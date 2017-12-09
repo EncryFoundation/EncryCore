@@ -1,27 +1,33 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Longs}
+import scorex.core.serialization.JsonSerializable
 import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.{Box, BoxUnlocker}
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.utils.ByteArray
 
-abstract class ErgoBaseTransaction[P <: Proposition, BX <: Box[P]] extends Transaction[P] {
+abstract class EncryBaseTransaction[P <: Proposition, BX <: Box[P]] extends Transaction[P] with JsonSerializable{
 
   // TODO: Implement custom `NoncedBox`
-  // `scorex.core.transaction.account.PublicKeyNoncedBox` is unsuitable
+  // `scorex.core.transaction.account.PublicKeyNoncedBox` is unsuitable for PKI
   // as a NoncedBox[P] because of hardcoded `PublicKey25519Proposition`.
 
   // TODO: Implement custom `Box` to store complex data.
-  // Default `scorex.core.transaction.box.Box` is unsuitable being designed to store only `Long` as a value.
+  // Default `scorex.core.transaction.box.Box` is suitable only for payments
+  // being designed to store only `Long` as a value.
 
-  import encry.modifiers.mempool.ErgoBaseTransaction._
+  import encry.modifiers.mempool.EncryBaseTransaction._
 
-  // Type of the transaction will be telling the abstract `dispatcher` how to treat txn.
+  // Type of the transaction will be telling the abstract `dispatcher` how to treat particular Txn.
   val typeId: TxTypeId
 
-  // `BoxUnlocker` holds ID and Key of the box to open.
+  // TODO: Do we need tx Version?
+
+  // `BoxUnlocker` holds ID and Key of the box to open (Sequence of `Tx Inputs` + Keys to unlock them).
+  // TODO: Implement `BoxUnlocker` and `Proof`.
   val unlockers: Traversable[BoxUnlocker[P]]
+  // Sequence of `Tx Outputs`.
   val newBoxes: Traversable[BX]
 
   val fee: Long
@@ -37,7 +43,11 @@ abstract class ErgoBaseTransaction[P <: Proposition, BX <: Box[P]] extends Trans
 
 }
 
-object ErgoBaseTransaction {
+object EncryBaseTransaction {
   // TODO: Make this type `supertagged`.
   type TxTypeId = Byte
+  type Nonce = Long
+  type Amount = Long
+
+  def nonceFromDigest(digest: Array[Byte]): Nonce = Longs.fromByteArray(digest.take(8))
 }

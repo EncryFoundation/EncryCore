@@ -1,4 +1,4 @@
-package encry.modifiers.mempool.box
+package encry.modifiers.mempool.box.body
 
 import scorex.core.serialization.JsonSerializable
 
