@@ -1,0 +1,5 @@
+package encry
+
+class EncryApp {
+
+}
