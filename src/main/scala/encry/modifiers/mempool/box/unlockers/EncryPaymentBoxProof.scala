@@ -8,6 +8,8 @@ import scala.util.Try
 
 class EncryPaymentBoxProof(message: Array[Byte]) extends Proof[PublicKey25519Proposition] {
 
+  override type M = EncryPaymentBoxProof
+
   // TODO: Always returns `true`!
   override def isValid(proposition: PublicKey25519Proposition, message: Array[Byte]): Boolean = true
 

@@ -1,19 +1,22 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Longs}
+import encry.modifiers.mempool.box.EncryBaseBox
+import encry.modifiers.mempool.box.body.BaseBoxBody
 import scorex.core.serialization.JsonSerializable
 import scorex.core.transaction.Transaction
-import scorex.core.transaction.box.{Box, BoxUnlocker}
+import scorex.core.transaction.box.BoxUnlocker
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.utils.ByteArray
 
-abstract class EncryBaseTransaction[P <: Proposition, BX <: Box[P]] extends Transaction[P] with JsonSerializable{
+abstract class EncryBaseTransaction[P <: Proposition, BB <: BaseBoxBody, BX <: EncryBaseBox[P, BB]]
+  extends Transaction[P] with JsonSerializable{
 
-  // TODO: Implement custom `NoncedBox`
+  // TODO: Implement custom `NoncedBox` --DONE
   // `scorex.core.transaction.account.PublicKeyNoncedBox` is unsuitable for PKI
   // as a NoncedBox[P] because of hardcoded `PublicKey25519Proposition`.
 
-  // TODO: Implement custom `Box` to store complex data.
+  // TODO: Implement custom `Box` to store complex data. --DONE
   // Default `scorex.core.transaction.box.Box` is suitable only for payments
   // being designed to store only `Long` as a value.
 
@@ -25,7 +28,7 @@ abstract class EncryBaseTransaction[P <: Proposition, BX <: Box[P]] extends Tran
   // TODO: Do we need tx Version?
 
   // `BoxUnlocker` holds ID and Key of the box to open (Sequence of `Tx Inputs` + Keys to unlock them).
-  // TODO: Implement `BoxUnlocker` and `Proof`.
+  // TODO: Implement `BoxUnlocker` and `Proof`. --DONE
   val unlockers: Traversable[BoxUnlocker[P]]
   // Sequence of `Tx Outputs`.
   val newBoxes: Traversable[BX]

@@ -13,6 +13,8 @@ case class EncryPaymentBox(override val proposition: PublicKey25519Proposition,
                            override val body: PaymentBoxBody)
   extends EncryPublicKeyNoncedBox[PublicKey25519Proposition, PaymentBoxBody] {
 
+  override type M = EncryPaymentBox
+
   override def json: Json = ???
 
   override def serializer: Serializer[EncryPaymentBox] = EncryPaymentBoxSerializer

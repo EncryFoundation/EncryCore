@@ -21,12 +21,14 @@ case class EncryPaymentTransaction(override val fee: Amount,
                                    override val timestamp: Long,
                                    useOutputs: IndexedSeq[ADKey],
                                    createOutputs: IndexedSeq[(PublicKey25519Proposition, Amount)])
-  extends EncryBaseTransaction[PublicKey25519Proposition, EncryPaymentBox] {
+  extends EncryBaseTransaction[PublicKey25519Proposition, PaymentBoxBody, EncryPaymentBox] {
+
+  override type M = EncryPaymentTransaction
 
   // Type of actual Tx type.
   override val typeId: TxTypeId = 1.toByte
 
-  override val unlockers: Traversable[BoxUnlocker[PublicKey25519Proposition]] = _
+  override val unlockers: Traversable[BoxUnlocker[PublicKey25519Proposition]] = ???
 
   override val newBoxes: Traversable[EncryPaymentBox] = createOutputs.zipWithIndex.map { case ((pkp, amount), idx) =>
     val nonce = nonceFromDigest(Algos.hash(hashNoNonces ++ Ints.toByteArray(idx)))
