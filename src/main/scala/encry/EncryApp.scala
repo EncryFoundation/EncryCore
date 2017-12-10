@@ -8,7 +8,7 @@ import scorex.core.{ModifierId, ModifierTypeId}
 
 import scorex.core.app.Application
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
-import scorex.crypto.encode.Base58
+import scorex.crypto.encode.Base16
 
 import encry.modifiers.history.EncryBlockHeader
 
@@ -21,9 +21,10 @@ import encry.modifiers.history.EncryBlockHeader
 
 object EncryApp extends App {
 //  new EncryApp(args).run()
-  val block = new EncryBlockHeader(99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 898989L, 0)
+  val block = new EncryBlockHeader(
+    99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 898989L, 0, targetedDiff = 5)
 
-  println(Base58.encode(block.powHash))
+  println("Block Hash > " + Base16.encode(block.powHash))
   println("Nonce > " + block.nonce)
 
   def forceStopApplication(code: Int = 1): Unit =

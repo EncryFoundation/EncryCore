@@ -11,7 +11,7 @@ import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.core.serialization.Serializer
 import scorex.crypto.hash.Digest32
 import scorex.core.block.Block._
-import scorex.crypto.encode.Base58
+import scorex.crypto.encode.Base16
 
 import scala.util.Try
 import scala.util.control.Breaks._
@@ -21,7 +21,8 @@ class EncryBlockHeader(override val version: Version,
                        override val txMerkleRoot: Digest32,
                        override val timestamp: Timestamp,
                        override val height: Int,
-                       var nonce: Long = 0L) extends EncryBaseBlockHeader {
+                       var nonce: Long = 0L,
+                       val targetedDiff: Int) extends EncryBaseBlockHeader {
 
   override type M = EncryBlockHeader
 
@@ -35,7 +36,7 @@ class EncryBlockHeader(override val version: Version,
     def loop(): Digest32 = {
       val hb = Bytes.concat(bytes, Longs.toByteArray(nonce))
       val solution = Algos.hash(hb)
-      if (Base58.encode(solution).slice(0, 2) == "11") {
+      if (Base16.encode(solution).slice(0, targetedDiff) == "0"*targetedDiff) {
         solution
       } else {
         nonce += 1
