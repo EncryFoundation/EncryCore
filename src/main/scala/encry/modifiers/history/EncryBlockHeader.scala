@@ -1,12 +1,9 @@
 package encry.modifiers.history
 
 import com.google.common.primitives._
-import encry.modifiers.EncryPersistentModifier
 import encry.settings.Constants
-import encry.mining.crypto.SimpleHash._
 import encry.settings.Algos
 import io.circe.Json
-import org.bouncycastle.crypto.digests.SHA256Digest
 import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.core.serialization.Serializer
 import scorex.crypto.hash.Digest32
@@ -14,7 +11,6 @@ import scorex.core.block.Block._
 import scorex.crypto.encode.Base16
 
 import scala.util.Try
-import scala.util.control.Breaks._
 
 class EncryBlockHeader(override val version: Version,
                        override val parentId: ModifierId,
@@ -39,6 +35,7 @@ class EncryBlockHeader(override val version: Version,
       if (Base16.encode(solution).slice(0, targetedDiff) == "0"*targetedDiff) {
         solution
       } else {
+        println("> " + Base16.encode(solution))
         nonce += 1
         loop()
       }

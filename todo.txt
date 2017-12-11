@@ -1,2 +1,4 @@
 TODO: Implement nonce generation in Transaction correctly
+TODO: State
+TODO: POW Algo (Equihash, maybe)
 

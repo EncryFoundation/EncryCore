@@ -22,10 +22,10 @@ import encry.modifiers.history.EncryBlockHeader
 object EncryApp extends App {
 //  new EncryApp(args).run()
   val block = new EncryBlockHeader(
-    99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 898989L, 0, targetedDiff = 5)
+    99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 898989L, 0, targetedDiff = 4)
 
   println("Block Hash > " + Base16.encode(block.powHash))
-  println("Nonce > " + block.nonce)
+  println("     Nonce > " + block.nonce)
 
   def forceStopApplication(code: Int = 1): Unit =
     new Thread(() => System.exit(code), "encry-shutdown-thread").start()
