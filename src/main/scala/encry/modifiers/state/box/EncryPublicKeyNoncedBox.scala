@@ -1,7 +1,7 @@
-package encry.modifiers.mempool.box
+package encry.modifiers.state.box
 
 import com.google.common.primitives.Longs
-import encry.modifiers.mempool.box.body.BaseBoxBody
+import encry.modifiers.state.box.body.BaseBoxBody
 import scorex.core.ModifierId
 import scorex.core.transaction.box.proposition.{Proposition, PublicKey25519Proposition}
 import scorex.crypto.authds.ADKey

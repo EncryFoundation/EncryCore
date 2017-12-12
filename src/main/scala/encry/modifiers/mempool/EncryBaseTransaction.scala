@@ -1,8 +1,8 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Longs}
-import encry.modifiers.mempool.box.EncryBaseBox
-import encry.modifiers.mempool.box.body.BaseBoxBody
+import encry.modifiers.state.box.EncryBaseBox
+import encry.modifiers.state.box.body.BaseBoxBody
 import scorex.core.serialization.JsonSerializable
 import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.BoxUnlocker
@@ -43,7 +43,6 @@ abstract class EncryBaseTransaction[P <: Proposition, BB <: BaseBoxBody, BX <: E
       scorex.core.utils.concatFixLengthBytes(unlockers.map(_.closedBoxId)),
       Longs.toByteArray(timestamp),
       Longs.toByteArray(fee))
-
 }
 
 object EncryBaseTransaction {

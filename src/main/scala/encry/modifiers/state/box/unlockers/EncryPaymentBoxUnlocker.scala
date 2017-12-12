@@ -1,4 +1,4 @@
-package encry.modifiers.mempool.box.unlockers
+package encry.modifiers.state.box.unlockers
 
 import scorex.core.transaction.box.BoxUnlocker
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition

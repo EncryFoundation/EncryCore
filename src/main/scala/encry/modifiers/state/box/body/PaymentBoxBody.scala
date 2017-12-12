@@ -1,4 +1,4 @@
-package encry.modifiers.mempool.box.body
+package encry.modifiers.state.box.body
 
 import io.circe.Json
 import io.circe.syntax._

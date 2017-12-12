@@ -1,8 +1,9 @@
 package encry.modifiers.mempool
 
 import encry.modifiers.mempool.EncryBaseTransaction._
-import encry.modifiers.mempool.box.body.PaymentBoxBody
-import encry.modifiers.mempool.box.{EncryPaymentBox, EncryPublicKeyNoncedBox}
+import encry.modifiers.state.box.body.PaymentBoxBody
+import encry.modifiers.state.box.{EncryPaymentBox, EncryPublicKeyNoncedBox}
+import encry.modifiers.state.box.unlockers.EncryPaymentBoxUnlocker
 import encry.settings.Algos
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import io.circe.Json
@@ -14,12 +15,14 @@ import scorex.core.transaction.box.BoxUnlocker
 import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
+import scorex.core.transaction.proof.Signature25519
 
 import scala.util.Try
 
 case class EncryPaymentTransaction(override val fee: Amount,
                                    override val timestamp: Long,
                                    useOutputs: IndexedSeq[ADKey],
+                                   signatures: IndexedSeq[Signature25519],
                                    createOutputs: IndexedSeq[(PublicKey25519Proposition, Amount)])
   extends EncryBaseTransaction[PublicKey25519Proposition, PaymentBoxBody, EncryPaymentBox] {
 
@@ -28,7 +31,9 @@ case class EncryPaymentTransaction(override val fee: Amount,
   // Type of actual Tx type.
   override val typeId: TxTypeId = 1.toByte
 
-  override val unlockers: Traversable[BoxUnlocker[PublicKey25519Proposition]] = ???
+  override val unlockers: Traversable[BoxUnlocker[PublicKey25519Proposition]] = useOutputs.zip(signatures).map{
+    case (boxId, sign) => EncryPaymentBoxUnlocker(boxId, sign)
+  }
 
   override val newBoxes: Traversable[EncryPaymentBox] = createOutputs.zipWithIndex.map { case ((pkp, amount), idx) =>
     val nonce = nonceFromDigest(Algos.hash(hashNoNonces ++ Ints.toByteArray(idx)))

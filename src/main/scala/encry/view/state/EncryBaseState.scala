@@ -2,8 +2,8 @@ package encry.view.state
 
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.mempool.box.EncryBaseBox
-import encry.modifiers.mempool.box.body.BaseBoxBody
+import encry.modifiers.state.box.EncryBaseBox
+import encry.modifiers.state.box.body.BaseBoxBody
 import scorex.core.VersionTag
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.{BoxStateChanges, Insertion, MinimalState, Removal}
@@ -21,17 +21,19 @@ trait EncryBaseState[P <: Proposition, BB <: BaseBoxBody, BX <: EncryBaseBox[P, 
 
   def rootHash(): ADDigest
 
-  def stateHeight(): Int
+  // TODO: Implement correctly.
+  def stateHeight(): Int = 0
 
   // TODO: Which instance of proposition should be passed here??
   def boxChanges(txs: Seq[TX], proposition: P): BoxStateChanges[P, BX] =
     BoxStateChanges[P, BX](txs.flatMap { tx =>
     tx.unlockers.filter { unl =>
-      unl.boxKey.isValid(proposition, tx.messageToSign /* Should this be a `MessageToSign`? */) }
+      unl.boxKey.isValid(proposition, tx.messageToSign) }
       .map( unl => Removal[P, BX](ADKey @@ unl.closedBoxId)) ++
       tx.newBoxes.map(bx => Insertion[P, BX](bx))
   })
 
+  // ID of last applied modifier.
   override def version: VersionTag
 
   override def applyModifier(mod: EncryPersistentModifier): Try[IState]
