@@ -3,5 +3,5 @@ TODO: Multiple TX types for `State`?
 TODO: POW Algo (Equihash, maybe)
 TODO: State authentication? (May already be implemented in Scorex); See: https://eprint.iacr.org/2016/994.pdf
 TODO: ADProofs implementation? ( - proof of transaction correctness relative to corresponding UTXO)
-
+TODO: How to implement `FullBlock` carrying different types of Txn?
 
