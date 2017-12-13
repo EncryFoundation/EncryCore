@@ -2,9 +2,10 @@ package encry.view.state
 
 import akka.actor.ActorRef
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.mempool.EncryPaymentTransaction
-import encry.modifiers.state.box.{EncryPaymentBox, EncryPaymentBoxSerializer}
-import encry.modifiers.state.box.body.PaymentBoxBody
+import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
+import encry.modifiers.state.box.{EncryBaseBox, EncryPaymentBox, EncryPaymentBoxSerializer}
+import encry.modifiers.state.box.body.{BaseBoxBody, PaymentBoxBody}
 import encry.settings.Algos
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.VersionTag
@@ -14,13 +15,14 @@ import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
+import scorex.core.transaction.box.proposition.Proposition
 
 import scala.util.Try
 
 class UtxoState(override val version: VersionTag,
                 val store: Store,
                 nodeViewHolderRef: Option[ActorRef])
-  extends EncryBaseState[PublicKey25519Proposition, PaymentBoxBody, EncryPaymentBox, EncryPaymentTransaction, UtxoState]
+  extends EncryBaseState[Proposition, BaseBoxBody, EncryBaseBox[_, _], EncryBaseTransaction[_, _, _], UtxoState]
     with TransactionValidation[PublicKey25519Proposition, EncryPaymentTransaction] with ScorexLogging {
 
   import UtxoState.metadata
@@ -40,7 +42,13 @@ class UtxoState(override val version: VersionTag,
   // TODO: Why 10?
   override def maxRollbackDepth: Int = 10
 
-  override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = ???
+  // Dispatches applying `Modifier` of particular type.
+  override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
+    case pb: EncryBlock =>
+      log.debug(s"Applying block with header ${pb.header.encodedId} to UtxoState with " +
+        s"root hash ${Algos.encode(rootHash)}")
+
+  }
 
   override def rollbackTo(version: VersionTag): Try[UtxoState] = ???
 

@@ -1,4 +1,4 @@
-package encry.modifiers.history
+package encry.modifiers.history.block.header
 
 import encry.modifiers.EncryPersistentModifier
 import scorex.core.ModifierId

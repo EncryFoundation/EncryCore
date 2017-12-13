@@ -1,14 +1,13 @@
-package encry.modifiers.history
+package encry.modifiers.history.block.header
 
 import com.google.common.primitives._
-import encry.settings.Constants
-import encry.settings.Algos
+import encry.settings.{Algos, Constants}
 import io.circe.Json
-import scorex.core.{ModifierId, ModifierTypeId}
-import scorex.core.serialization.Serializer
-import scorex.crypto.hash.Digest32
 import scorex.core.block.Block._
+import scorex.core.serialization.Serializer
+import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.crypto.encode.Base16
+import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 

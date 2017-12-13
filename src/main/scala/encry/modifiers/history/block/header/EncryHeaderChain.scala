@@ -1,5 +1,4 @@
-package encry.modifiers.history
-
+package encry.modifiers.history.block.header
 
 case class EncryHeaderChain(headers: Seq[EncryBlockHeader]) {
   headers.indices.foreach { i =>

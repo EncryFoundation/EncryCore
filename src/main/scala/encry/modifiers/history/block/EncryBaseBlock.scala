@@ -1,17 +1,18 @@
-package encry.modifiers.history
+package encry.modifiers.history.block
 
 import encry.modifiers.EncryPersistentModifier
+import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.payload.EncryBaseBlockPayload
 import scorex.core.TransactionsCarryingPersistentNodeViewModifier
-import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.Transaction
+import scorex.core.transaction.box.proposition.Proposition
 
-// TODO: How to implement `FullBlock` carrying different types of Txn?
 trait EncryBaseBlock[P <: Proposition, TX <: Transaction[P], BP <: EncryBaseBlockPayload[P, TX]]
   extends EncryPersistentModifier with TransactionsCarryingPersistentNodeViewModifier[P, TX] {
 
   val header: EncryBlockHeader
 
-  val blockPayload: BP
+  val payload: BP
 
   val toSeq: Seq[EncryPersistentModifier]
 
