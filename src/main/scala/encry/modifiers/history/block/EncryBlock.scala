@@ -7,21 +7,20 @@ import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
 import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
-import scorex.core.{ModifierId, ModifierTypeId}
+import scorex.core.{EphemerealNodeViewModifier, ModifierId, ModifierTypeId}
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.serialization.Serializer
 
 import scala.util.Try
 
 class EncryBlock(override val header: EncryBlockHeader,
-                 override val payload: EncryBlockPayload)
-  extends EncryBaseBlock[PublicKey25519Proposition, EncryBaseTransaction[_, _, _], EncryBlockPayload] {
+                 override val payload: EncryBlockPayload) extends EncryBaseBlock {
 
   override type M = EncryBlock
 
   override val toSeq: Seq[EncryPersistentModifier] = Seq(header, payload)
 
-  override def transactions: Seq[EncryBaseTransaction[_, _, _]] = payload.transactions
+  override def transactions: Seq[EphemerealNodeViewModifier] = payload.transactions
 
   override def parentId: ModifierId = header.parentId
 

@@ -3,18 +3,16 @@ package encry.modifiers.history.block
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBaseBlockPayload
-import scorex.core.TransactionsCarryingPersistentNodeViewModifier
-import scorex.core.transaction.Transaction
-import scorex.core.transaction.box.proposition.Proposition
+import scorex.core.EphemerealNodeViewModifier
 
-trait EncryBaseBlock[P <: Proposition, TX <: Transaction[P], BP <: EncryBaseBlockPayload[P, TX]]
-  extends EncryPersistentModifier with TransactionsCarryingPersistentNodeViewModifier[P, TX] {
+trait EncryBaseBlock extends EncryPersistentModifier {
 
   val header: EncryBlockHeader
 
-  val payload: BP
+  val payload: EncryBaseBlockPayload
 
   val toSeq: Seq[EncryPersistentModifier]
 
+  def transactions: Seq[EphemerealNodeViewModifier]
 }
 

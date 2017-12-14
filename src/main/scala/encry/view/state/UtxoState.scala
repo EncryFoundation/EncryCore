@@ -4,15 +4,15 @@ import akka.actor.ActorRef
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
-import encry.modifiers.state.box.{EncryBaseBox, EncryPaymentBox, EncryPaymentBoxSerializer}
+import encry.modifiers.state.box._
 import encry.modifiers.state.box.body.{BaseBoxBody, PaymentBoxBody}
 import encry.settings.Algos
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import scorex.core.VersionTag
+import scorex.core.{EphemerealNodeViewModifier, VersionTag}
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.transaction.state.TransactionValidation
 import scorex.core.utils.ScorexLogging
-import scorex.crypto.authds.ADDigest
+import scorex.crypto.authds.{ADDigest, ADKey}
 import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 import scorex.core.transaction.box.proposition.Proposition
@@ -41,6 +41,19 @@ class UtxoState(override val version: VersionTag,
 
   // TODO: Why 10?
   override def maxRollbackDepth: Int = 10
+
+  def boxChanges(txs: Seq[EphemerealNodeViewModifier]): EncryBoxStateChanges = {
+    EncryBoxStateChanges(txs.flatMap { tx =>
+      tx match {
+        case tx: EncryPaymentTransaction =>
+          tx.unlockers.filter {
+            unl => unl.boxKey.isValid(proposition, tx.messageToSign)
+          }.map( unl => Removal(ADKey @@ unl.closedBoxId)) ++
+            tx.newBoxes.map(bx => Insertion(bx))
+//      case tx: AnotherTypeTransaction => ...
+      }
+    })
+  }
 
   // Dispatches applying `Modifier` of particular type.
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {

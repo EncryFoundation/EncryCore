@@ -1,12 +1,12 @@
 package encry.view.state
 
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.state.box.EncryBaseBox
+import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
+import encry.modifiers.state.box.{EncryBaseBox, EncryBoxStateChanges, Insertion, Removal}
 import encry.modifiers.state.box.body.BaseBoxBody
-import scorex.core.VersionTag
-import scorex.core.transaction.box.proposition.Proposition
-import scorex.core.transaction.state.{BoxStateChanges, Insertion, MinimalState, Removal}
+import scorex.core.{EphemerealNodeViewModifier, VersionTag}
+import scorex.core.transaction.box.proposition.{Proposition, PublicKey25519Proposition}
+import scorex.core.transaction.state.MinimalState
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.authds.ADKey
@@ -25,13 +25,7 @@ trait EncryBaseState[P <: Proposition, BB <: BaseBoxBody, BX <: EncryBaseBox[P, 
   def stateHeight(): Int = 0
 
   // TODO: Which instance of proposition should be passed here??
-  def boxChanges(txs: Seq[TX], proposition: P): BoxStateChanges[P, BX] =
-    BoxStateChanges[P, BX](txs.flatMap { tx =>
-    tx.unlockers.filter { unl =>
-      unl.boxKey.isValid(proposition, tx.messageToSign) }
-      .map( unl => Removal[P, BX](ADKey @@ unl.closedBoxId)) ++
-      tx.newBoxes.map(bx => Insertion[P, BX](bx))
-  })
+  def boxChanges(txs: Seq[EphemerealNodeViewModifier]): EncryBoxStateChanges
 
   // ID of last applied modifier.
   override def version: VersionTag

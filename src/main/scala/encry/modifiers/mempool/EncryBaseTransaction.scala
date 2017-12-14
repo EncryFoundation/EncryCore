@@ -9,7 +9,7 @@ import scorex.core.transaction.box.BoxUnlocker
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.utils.ByteArray
 
-abstract class EncryBaseTransaction[P <: Proposition, BB <: BaseBoxBody, BX <: EncryBaseBox[P, BB]]
+trait EncryBaseTransaction[P <: Proposition, BB <: BaseBoxBody, BX <: EncryBaseBox[P, BB]]
   extends Transaction[P] with JsonSerializable{
 
   // TODO: Implement custom `NoncedBox` --DONE
