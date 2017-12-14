@@ -9,7 +9,7 @@ import scorex.core.transaction.box.BoxUnlocker
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.utils.ByteArray
 
-trait EncryBaseTransaction[P <: Proposition, BB <: BaseBoxBody, BX <: EncryBaseBox[P, BB]]
+trait EncryBaseTransaction[P <: Proposition, BXP <: Proposition, BB <: BaseBoxBody]
   extends Transaction[P] with JsonSerializable{
 
   // TODO: Implement custom `NoncedBox` --DONE
@@ -31,7 +31,7 @@ trait EncryBaseTransaction[P <: Proposition, BB <: BaseBoxBody, BX <: EncryBaseB
   // TODO: Implement `BoxUnlocker` and `Proof`. --DONE
   val unlockers: Traversable[BoxUnlocker[P]]
   // Sequence of `Tx Outputs`.
-  val newBoxes: Traversable[BX]
+  val newBoxes: Traversable[EncryBaseBox[BXP, BB]]
 
   val fee: Long
   val timestamp: Long
@@ -42,7 +42,8 @@ trait EncryBaseTransaction[P <: Proposition, BB <: BaseBoxBody, BX <: EncryBaseB
       if (newBoxes.nonEmpty) scorex.core.utils.concatBytes(newBoxes.map(_.bytes)) else Array[Byte](),
       scorex.core.utils.concatFixLengthBytes(unlockers.map(_.closedBoxId)),
       Longs.toByteArray(timestamp),
-      Longs.toByteArray(fee))
+      Longs.toByteArray(fee)
+    )
 }
 
 object EncryBaseTransaction {

@@ -45,7 +45,7 @@ class EncryMempool private[mempool](val unconfirmed: mutable.ListMap[TxKey, Encr
 
   override def putWithoutCheck(txs: Iterable[EncryPaymentTransaction]): EncryMempool = {
     txs.foreach(tx => {
-      println("Add:" + tx.signatures)
+      println("Add:" + tx.signature)
       unconfirmed.put(key(ModifierId @@ tx.hashNoNonces), tx)
     })
     //completeAssembly(txs)

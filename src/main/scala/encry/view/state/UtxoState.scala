@@ -3,27 +3,23 @@ package encry.view.state
 import akka.actor.ActorRef
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
+import encry.modifiers.mempool.EncryPaymentTransaction
 import encry.modifiers.state.box._
-import encry.modifiers.state.box.body.{BaseBoxBody, PaymentBoxBody}
+import encry.modifiers.state.TransactionValidator
 import encry.settings.Algos
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.{EphemerealNodeViewModifier, VersionTag}
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
-import scorex.core.transaction.state.TransactionValidation
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.{ADDigest, ADKey}
 import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
-import scorex.core.transaction.box.proposition.Proposition
 
 import scala.util.Try
 
 class UtxoState(override val version: VersionTag,
                 val store: Store,
                 nodeViewHolderRef: Option[ActorRef])
-  extends EncryBaseState[Proposition, BaseBoxBody, EncryBaseBox[_, _], EncryBaseTransaction[_, _, _], UtxoState]
-    with TransactionValidation[PublicKey25519Proposition, EncryPaymentTransaction] with ScorexLogging {
+  extends EncryBaseState[UtxoState] with TransactionValidator with ScorexLogging {
 
   import UtxoState.metadata
 
@@ -46,10 +42,22 @@ class UtxoState(override val version: VersionTag,
     EncryBoxStateChanges(txs.flatMap { tx =>
       tx match {
         case tx: EncryPaymentTransaction =>
-          tx.unlockers.filter {
-            unl => unl.boxKey.isValid(proposition, tx.messageToSign)
-          }.map( unl => Removal(ADKey @@ unl.closedBoxId)) ++
+//            val nb = store.get(new ByteArrayWrapper(key))
+//
+//            require(nb != null,"Empty data with this ADKey")
+//            nb match {
+//              case b : EncryPaymentBox =>{
+//                require(b.proposition.addrBytes == trx.senderProp.address,"Incorrect unlocker. Invalid Address")
+//              }
+//              case _ =>{
+//                require(false,"Incorrect box from storage")
+//              }
+//            }
+          tx.unlockers
+            .filter { unl => unl.boxKey.isValid(tx.proposition, tx.messageToSign)}
+            .map( unl => Removal(unl.closedBoxId)) ++
             tx.newBoxes.map(bx => Insertion(bx))
+
 //      case tx: AnotherTypeTransaction => ...
       }
     })
@@ -61,6 +69,7 @@ class UtxoState(override val version: VersionTag,
       log.debug(s"Applying block with header ${pb.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)}")
 
+      Try(this)
   }
 
   override def rollbackTo(version: VersionTag): Try[UtxoState] = ???
@@ -69,7 +78,7 @@ class UtxoState(override val version: VersionTag,
 
   override lazy val rootHash: ADDigest = ???
 
-  override def validate(tx: EncryPaymentTransaction): Try[Unit] = ???
+  override def validate(tx: EphemerealNodeViewModifier): Try[Unit] = ???
 
 }
 

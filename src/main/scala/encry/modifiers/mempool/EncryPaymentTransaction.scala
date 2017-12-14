@@ -2,7 +2,7 @@ package encry.modifiers.mempool
 
 import encry.modifiers.mempool.EncryBaseTransaction._
 import encry.modifiers.state.box.body.PaymentBoxBody
-import encry.modifiers.state.box.{EncryAddressNoncedBox, EncryPaymentBox}
+import encry.modifiers.state.box.{EncryNoncedBox, EncryPaymentBox}
 import encry.modifiers.state.box.unlockers.EncryPaymentBoxUnlocker
 import encry.settings.Algos
 import encry.crypto.Address
@@ -27,14 +27,14 @@ case class EncryPaymentTransaction(override val fee: Amount,
                                    signature: Signature25519,
                                    proposition: PublicKey25519Proposition,
                                    createOutputs: IndexedSeq[(Address, Amount)])
-  extends EncryBaseTransaction[PublicKey25519Proposition, PaymentBoxBody, EncryPaymentBox] {
+  extends EncryBaseTransaction[PublicKey25519Proposition, AddressProposition, PaymentBoxBody] {
 
   override type M = EncryPaymentTransaction
 
   // Type of actual Tx type.
   override val typeId: TxTypeId = 1.toByte
 
-  override val unlockers: Traversable[BoxUnlocker[PublicKey25519Proposition]] = useOutputs.map{
+  override val unlockers: Traversable[EncryPaymentBoxUnlocker] = useOutputs.map{
     boxId => EncryPaymentBoxUnlocker(boxId, signature)
   }
 
