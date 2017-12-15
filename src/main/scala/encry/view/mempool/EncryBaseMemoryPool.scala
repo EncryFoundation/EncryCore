@@ -1,5 +1,6 @@
-package encry.modifiers.mempool
+package encry.view.mempool
 
+import encry.modifiers.mempool.EncryBaseTransaction
 import scorex.core.{ModifierId, NodeViewComponent}
 
 import scala.util.Try
@@ -31,7 +32,7 @@ trait EncryBaseMemoryPool[M <: EncryBaseMemoryPool[M]] extends NodeViewComponent
 
   def take(limit: Int): Iterable[EncryBaseTransaction]
 
-  def filter(txs: Seq[EncryBaseTransaction]): M = filter(t => !txs.exists(_.id sameElements t.id))
+  def filter(txs: Seq[EncryBaseTransaction]): M
 
   def filter(condition: EncryBaseTransaction => Boolean): M
 

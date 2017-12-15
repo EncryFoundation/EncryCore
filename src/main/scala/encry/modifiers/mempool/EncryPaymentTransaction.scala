@@ -13,19 +13,19 @@ import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.transaction.box.Box.Amount
-import scorex.core.transaction.box.BoxUnlocker
 import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.{Base16, Base58}
 import scorex.crypto.hash.Digest32
 import scorex.core.transaction.proof.Signature25519
+import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.Try
 
-case class EncryPaymentTransaction(override val fee: Amount,
+case class EncryPaymentTransaction(sender: PublicKey25519Proposition,
+                                   override val fee: Amount,
                                    override val timestamp: Long,
+                                   var signature: Signature25519,
                                    useOutputs: IndexedSeq[ADKey],
-                                   signature: Signature25519,
-                                   proposition: PublicKey25519Proposition,
                                    createOutputs: IndexedSeq[(Address, Amount)])
   extends EncryTransaction[PublicKey25519Proposition, AddressProposition, PaymentBoxBody] {
 
@@ -39,7 +39,7 @@ case class EncryPaymentTransaction(override val fee: Amount,
   }
 
   override val newBoxes: Traversable[EncryPaymentBox] = createOutputs.zipWithIndex.map { case ((addr, amount), idx) =>
-    val nonce = nonceFromDigest(Algos.hash(hashNoNonces ++ Ints.toByteArray(idx)))
+    val nonce = nonceFromDigest(Algos.hash(txHash ++ Ints.toByteArray(idx)))
     EncryPaymentBox(AddressProposition(addr), nonce, PaymentBoxBody(amount))
   }
 
@@ -61,18 +61,24 @@ case class EncryPaymentTransaction(override val fee: Amount,
     }.asJson
   ).asJson
 
-  lazy val hashNoNonces: Digest32 = Algos.hash(
-    Bytes.concat(scorex.core.utils.concatFixLengthBytes(useOutputs),
+  // Which fields should be included into tx hash?
+  override lazy val txHash: Digest32 = Algos.hash(
+    Bytes.concat(
+      scorex.core.utils.concatFixLengthBytes(useOutputs),
       scorex.core.utils.concatFixLengthBytes(createOutputs.map { case (addr, amount) =>
         AddressProposition.addrBytes(addr) ++ Longs.toByteArray(amount)
-      })
+      }),
+      Longs.toByteArray(timestamp),
+      Longs.toByteArray(fee)
     )
   )
+
+  override lazy val messageToSign: Array[Byte] = txHash
 
   override lazy val semanticValidity: Try[Unit] = Try {
 
     // Signature validity checks.
-    require(signature.isValid(proposition, messageToSign), "Invalid signature!")
+    require(signature.isValid(sender, messageToSign), "Invalid signature!")
 
     // `Amount` & `Address` validity checks.
     require(createOutputs.forall { i =>
@@ -84,7 +90,42 @@ case class EncryPaymentTransaction(override val fee: Amount,
 
 object EncryPaymentTransactionSerializer extends Serializer[EncryPaymentTransaction] {
 
-  override def toBytes(obj: EncryPaymentTransaction): Array[Byte] = ???
+  override def toBytes(obj: EncryPaymentTransaction): Array[Byte] = {
+    Bytes.concat(
+      obj.sender.pubKeyBytes,
+      Longs.toByteArray(obj.fee),
+      Longs.toByteArray(obj.timestamp),
+      obj.signature.signature,
+      Ints.toByteArray(obj.useOutputs.length),
+      Ints.toByteArray(obj.createOutputs.length),
+      obj.useOutputs.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b)),
+      obj.createOutputs.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b._1.getBytes,Longs.toByteArray(b._2)))
+    )
+  }
 
-  override def parseBytes(bytes: Array[Byte]): Try[EncryPaymentTransaction] = ???
+  override def parseBytes(bytes: Array[Byte]): Try[EncryPaymentTransaction] = Try{
+
+    val sender = new PublicKey25519Proposition(PublicKey @@ bytes.slice(0,32))
+    val fee = Longs.fromByteArray(bytes.slice(32,40))
+    val timestamp = Longs.fromByteArray(bytes.slice(40,48))
+    val signature = Signature25519(Signature @@ bytes.slice(48,80))
+    val inputLength = Ints.fromByteArray(bytes.slice(80,84))
+    val outputLength = Ints.fromByteArray(bytes.slice(84,88))
+    val s = 88
+    val outElementLength = 32
+    val useOutputs = (0 until inputLength) map { i =>
+      ADKey @@ bytes.slice(s + i * outElementLength, s + (i + 1) * outElementLength)
+    }
+
+    val s2 = s + inputLength * outElementLength
+    val inElementLength = 40
+    val createOutputs = (0 until outputLength) map { i =>
+      // Longs.fromByteArray(bytes.slice(s2 + i * elementLength, s2 + (i + 1) * elementLength))
+      (Address @@ bytes.slice(s2 + i * inElementLength, s2 + (i + 1) * (inElementLength-8)).toString,
+        Longs.fromByteArray(bytes.slice(s2 + i * (inElementLength-8), s2 + (i + 1) * (inElementLength))))
+    }
+
+    EncryPaymentTransaction(sender,fee,timestamp,signature,useOutputs,createOutputs)
+
+  }
 }

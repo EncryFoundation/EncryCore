@@ -1,16 +1,15 @@
 package encry.view.mempool
 
-import encry.modifiers.mempool.EncryPaymentTransaction
+import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
 import encry.view.mempool.EncryMempool._
 import scorex.core.ModifierId
-import scorex.core.transaction.MemoryPool
 
 import scala.collection.mutable
 import scala.concurrent.{Future, Promise}
 import scala.util.{Success, Try}
 
-class EncryMempool private[mempool](val unconfirmed: mutable.ListMap[TxKey, EncryPaymentTransaction])
-  extends MemoryPool[EncryPaymentTransaction, EncryMempool] {
+class EncryMempool private[mempool](val unconfirmed: mutable.ListMap[TxKey, EncryBaseTransaction])
+  extends EncryBaseMemoryPool[EncryMempool] {
 
   override type NVCT = EncryMempool
 
@@ -25,17 +24,17 @@ class EncryMempool private[mempool](val unconfirmed: mutable.ListMap[TxKey, Encr
     new mutable.WrappedArray.ofByte(id)
   }
 
-  override def getById(id: ModifierId): Option[EncryPaymentTransaction] = unconfirmed.get(key(id))
+  override def getById(id: ModifierId): Option[EncryBaseTransaction] = unconfirmed.get(key(id))
 
   override def contains(id: ModifierId): Boolean = unconfirmed.contains(key(id))
 
-  override def getAll(ids: Seq[ModifierId]): Seq[EncryPaymentTransaction] = ids.flatMap(getById)
+  override def getAll(ids: Seq[ModifierId]): Seq[EncryBaseTransaction] = ids.flatMap(getById)
 
-  override def put(tx: EncryPaymentTransaction): Try[EncryMempool] = {
+  override def put(tx: EncryBaseTransaction): Try[EncryMempool] = {
     put(Seq(tx))
   }
 
-  override def put(txs: Iterable[EncryPaymentTransaction]): Try[EncryMempool] = Try {
+  override def put(txs: Iterable[EncryBaseTransaction]): Try[EncryMempool] = Try {
     txs.foreach(tx => {
       //require(!unconfirmed.contains(key(ModifierId @@ tx.hashNoNonces)))
     })
@@ -43,25 +42,28 @@ class EncryMempool private[mempool](val unconfirmed: mutable.ListMap[TxKey, Encr
     putWithoutCheck(txs)
   }
 
-  override def putWithoutCheck(txs: Iterable[EncryPaymentTransaction]): EncryMempool = {
+  override def putWithoutCheck(txs: Iterable[EncryBaseTransaction]): EncryMempool = {
     txs.foreach(tx => {
       println("Add:" + tx.signature)
-      unconfirmed.put(key(ModifierId @@ tx.hashNoNonces), tx)
+      unconfirmed.put(key(ModifierId @@ tx.txHash), tx)
     })
     //completeAssembly(txs)
     //todo cleanup?
     this
   }
 
-  override def remove(tx: EncryPaymentTransaction): EncryMempool = {
-    unconfirmed.remove(key(ModifierId @@ tx.hashNoNonces))
+  override def remove(tx: EncryBaseTransaction): EncryMempool = {
+    unconfirmed.remove(key(ModifierId @@ tx.txHash))
     this
   }
 
-  override def take(limit: Int): Iterable[EncryPaymentTransaction] =
+  override def take(limit: Int): Iterable[EncryBaseTransaction] =
     unconfirmed.values.toSeq.take(limit)
 
-  override def filter(condition: (EncryPaymentTransaction) => Boolean): EncryMempool = {
+  // TODO: Implement.
+  override def filter(txs: Seq[EncryBaseTransaction]): EncryMempool = this
+
+  override def filter(condition: (EncryBaseTransaction) => Boolean): EncryMempool = {
     unconfirmed.retain { (_, v) =>
       condition(v)
     }
@@ -70,8 +72,8 @@ class EncryMempool private[mempool](val unconfirmed: mutable.ListMap[TxKey, Encr
 
   override def size: Int = unconfirmed.size
 
-  private def completeAssembly(txs: Iterable[EncryPaymentTransaction]): Unit = synchronized {
-    val txsIds = txs.map(tx => key(ModifierId @@ tx.hashNoNonces))
+  private def completeAssembly(txs: Iterable[EncryBaseTransaction]): Unit = synchronized {
+    val txsIds = txs.map(tx => key(ModifierId @@ tx.txHash))
     val newMap = waitedForAssembly.flatMap(p => {
       val ids = p._1
       val newKey = ids -- txsIds
@@ -88,7 +90,7 @@ class EncryMempool private[mempool](val unconfirmed: mutable.ListMap[TxKey, Encr
   }
 
   def waitForAll(ids: MemPoolRequest): Future[MemPoolResponse] = synchronized {
-    val promise = Promise[Seq[EncryPaymentTransaction]]
+    val promise = Promise[Seq[EncryBaseTransaction]]
     waitedForAssembly = waitedForAssembly.updated(ids.map(id => key(id)).toSet, (promise, ids))
     promise.future
   }
@@ -100,7 +102,7 @@ object EncryMempool {
 
   type MemPoolRequest = Seq[ModifierId]
 
-  type MemPoolResponse = Seq[EncryPaymentTransaction]
+  type MemPoolResponse = Seq[EncryBaseTransaction]
 
   def empty: EncryMempool = new EncryMempool(mutable.ListMap.empty)
 }

@@ -1,26 +1,31 @@
 package encry.view.state
 
+import java.io.File
+
 import akka.actor.ActorRef
-import akka.actor.Status.Success
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
 import encry.modifiers.state.box._
 import encry.modifiers.state.TransactionValidator
+import encry.modifiers.state.box.body.BaseBoxBody
 import encry.modifiers.state.box.proposition.AddressProposition
 import encry.settings.Algos
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
+import scorex.core.transaction.box.Box
+import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.{EphemerealNodeViewModifier, VersionTag}
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.{ADDigest, ADKey}
 import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
+import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 class UtxoState(override val version: VersionTag,
                 val store: Store,
-                nodeViewHolderRef: Option[ActorRef])
+                /*nodeViewHolderRef: Option[ActorRef]*/)
   extends EncryBaseState[UtxoState] with TransactionValidator with ScorexLogging {
 
   import UtxoState.metadata
@@ -40,6 +45,16 @@ class UtxoState(override val version: VersionTag,
   // TODO: Why 10?
   override def maxRollbackDepth: Int = 10
 
+  // TODO: Fix return type
+  def getClosedBox(boxType: Any, boxId: Array[Byte]): Option[Box[_]] = {
+    boxType match {
+      case _: EncryPaymentBox => store.get(ByteArrayWrapper(boxId))
+        .map(_.data)
+        .map(EncryPaymentBoxSerializer.parseBytes)
+        .flatMap(_.toOption)
+    }
+  }
+
   def boxChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
     // Use neither `.filter` nor any validity checks here!
     // This method should be invoked when all txs are already validated.
@@ -57,7 +72,47 @@ class UtxoState(override val version: VersionTag,
 
   private[state] def checkTransactions(txs: Seq[EncryBaseTransaction]) = Try {
     // TODO: Достать выходы из бд и проверить соответствие адресов публ. ключам.
-    txs.forall(tx => tx.semanticValidity.isSuccess)
+//    txs.foreach(tx => tx.semanticValidity.get)
+
+    txs.forall {
+      case tx: EncryPaymentTransaction => {
+        println(s"TRX SemValid = ${tx.semanticValidity.isSuccess}")
+        // println(s"TRX input valid = ${!(tx.useOutputs.forall(key => store.get(new ByteArrayWrapper(key)).isEmpty))}")
+        tx.semanticValidity.isSuccess &&
+          tx.useOutputs.forall(key =>
+            store.get(new ByteArrayWrapper(key)) match {
+              case Some(data) => {
+                data match {
+                  case data: Store.V => {
+                    EncryPaymentBoxSerializer.parseBytes(data.data) match {
+                      case nb: Try[EncryPaymentBox] => {
+                        println(s"in nb = ${nb.get.proposition.address}")
+                        println(s"in tx = ${tx.sender.address}")
+                        println("trx accept" + (nb.get.proposition.address == tx.sender.address))
+                        nb.get.proposition.address == tx.sender.address
+                      }
+                      case _ => {
+                        println("1 fail")
+                        false
+                      }
+                    }
+                  }
+                  case _ => {
+                    println("2 fail")
+                    false
+                  }
+                }
+              }
+              case None => {
+                println("3 fail")
+                false
+              }
+            }
+            //
+          )
+      }
+    }
+
   }
 
   // Dispatches applying `Modifier` of particular type.
@@ -66,27 +121,43 @@ class UtxoState(override val version: VersionTag,
       log.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)}")
 
-      if (checkTransactions(block.payload.transactions).get) {
-        Try {
-          // TODO: Пробуем применить изменения к `store`.
-          new UtxoState(VersionTag @@ block.id, store, nodeViewHolderRef)
-        }
+      checkTransactions(block.payload.transactions) match {
+        case Success(_) =>
+          Try {
+            // TODO: Пробуем применить изменения к `store`.
+            println("Modifier applied")
+            new UtxoState(VersionTag @@ block.id, store /*, nodeViewHolderRef*/)
+          }
+        case Failure(e) =>
+          Failure(e)
       }
   }
 
-  override def rollbackTo(version: VersionTag): Try[UtxoState] = ???
-
-  override def rollbackVersions: Iterable[VersionTag] = ???
-
-  override lazy val rootHash: ADDigest = ???
-
-  override def validate(tx: EphemerealNodeViewModifier): Try[Unit] = ???
+  //TODO: implement
+  override def rollbackTo(version: VersionTag): Try[UtxoState] = Try{this}
+  //TODO: implement
+  override def rollbackVersions: Iterable[VersionTag] = List(VersionTag @@ "test".getBytes())
+  //TODO: implement
+  override lazy val rootHash: ADDigest = ADDigest @@ "test".getBytes()
+  //TODO: implement
+  override def validate(tx: EphemerealNodeViewModifier): Try[Unit] = Try{
+    tx match {
+      case tx: EncryPaymentTransaction =>
+        tx.semanticValidity.isSuccess && tx.useOutputs.forall(key => store.get(new ByteArrayWrapper(key)).isEmpty)
+    }
+  }
 
 }
 
 object UtxoState {
 
   private lazy val bestVersionKey = Algos.hash("best state version") // TODO: ???
+
+  def create(dir: File): UtxoState = {
+    val store = new LSMStore(dir, keepVersions = 20) // todo: magic number, move to settings
+    val dbVersion = store.get(ByteArrayWrapper(bestVersionKey)).map( _.data)
+    new UtxoState(VersionTag @@ dbVersion.getOrElse(EncryBaseState.genesisStateVersion), store)
+  }
 
   private def metadata(modId: VersionTag, stateRoot: ADDigest): Seq[(Array[Byte], Array[Byte])] = {
     val idStateDigestIdxElem: (Array[Byte], Array[Byte]) = modId -> stateRoot

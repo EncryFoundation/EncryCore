@@ -20,6 +20,8 @@ case class AddressProposition(address: Address) extends Proposition {
 
   override def serializer: Serializer[AddressProposition] = AddressPropositionSerializer
 
+  override lazy val bytes: Array[Byte] = AddressProposition.addrBytes(address)
+
 }
 
 object AddressProposition {

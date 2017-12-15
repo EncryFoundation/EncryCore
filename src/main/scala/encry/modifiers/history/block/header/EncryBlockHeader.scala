@@ -11,13 +11,13 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-class EncryBlockHeader(override val version: Version,
-                       override val parentId: ModifierId,
-                       override val txMerkleRoot: Digest32,
-                       override val timestamp: Timestamp,
-                       override val height: Int,
-                       var nonce: Long = 0L,
-                       val targetedDiff: Int) extends EncryBaseBlockHeader {
+case class EncryBlockHeader(override val version: Version,
+                            override val parentId: ModifierId,
+                            override val txMerkleRoot: Digest32,
+                            override val timestamp: Timestamp,
+                            override val height: Int,
+                            var nonce: Long = 0L,
+                            targetedDiff: Int) extends EncryBaseBlockHeader {
 
   override type M = EncryBlockHeader
 
