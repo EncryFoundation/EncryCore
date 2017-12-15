@@ -3,7 +3,7 @@ package encry.modifiers.history.block
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
+import encry.modifiers.mempool.{EncryTransaction, EncryPaymentTransaction}
 import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._

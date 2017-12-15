@@ -1,6 +1,6 @@
 package encry.modifiers.mempool
 
-import encry.modifiers.mempool.EncryBaseTransaction._
+import encry.modifiers.mempool.EncryTransaction._
 import encry.modifiers.state.box.body.PaymentBoxBody
 import encry.modifiers.state.box.{EncryNoncedBox, EncryPaymentBox}
 import encry.modifiers.state.box.unlockers.EncryPaymentBoxUnlocker
@@ -15,7 +15,7 @@ import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.transaction.box.Box.Amount
 import scorex.core.transaction.box.BoxUnlocker
 import scorex.crypto.authds.ADKey
-import scorex.crypto.encode.Base58
+import scorex.crypto.encode.{Base16, Base58}
 import scorex.crypto.hash.Digest32
 import scorex.core.transaction.proof.Signature25519
 
@@ -27,7 +27,7 @@ case class EncryPaymentTransaction(override val fee: Amount,
                                    signature: Signature25519,
                                    proposition: PublicKey25519Proposition,
                                    createOutputs: IndexedSeq[(Address, Amount)])
-  extends EncryBaseTransaction[PublicKey25519Proposition, AddressProposition, PaymentBoxBody] {
+  extends EncryTransaction[PublicKey25519Proposition, AddressProposition, PaymentBoxBody] {
 
   override type M = EncryPaymentTransaction
 
@@ -40,7 +40,7 @@ case class EncryPaymentTransaction(override val fee: Amount,
 
   override val newBoxes: Traversable[EncryPaymentBox] = createOutputs.zipWithIndex.map { case ((addr, amount), idx) =>
     val nonce = nonceFromDigest(Algos.hash(hashNoNonces ++ Ints.toByteArray(idx)))
-    EncryPaymentBox(new AddressProposition(addr), nonce, PaymentBoxBody(amount))
+    EncryPaymentBox(AddressProposition(addr), nonce, PaymentBoxBody(amount))
   }
 
   override def serializer: Serializer[EncryPaymentTransaction] = EncryPaymentTransactionSerializer
@@ -50,7 +50,7 @@ case class EncryPaymentTransaction(override val fee: Amount,
     "inputs" -> useOutputs.map { id =>
       Map(
         "id" -> Algos.encode(id).asJson,
-        "signature" -> "".asJson
+        "signature" -> Base58.encode(signature.bytes).asJson
       ).asJson
     }.asJson,
     "outputs" -> createOutputs.map { case (_, amount) =>
@@ -64,10 +64,21 @@ case class EncryPaymentTransaction(override val fee: Amount,
   lazy val hashNoNonces: Digest32 = Algos.hash(
     Bytes.concat(scorex.core.utils.concatFixLengthBytes(useOutputs),
       scorex.core.utils.concatFixLengthBytes(createOutputs.map { case (addr, amount) =>
-        addr ++ Longs.toByteArray(amount)
+        AddressProposition.addrBytes(addr) ++ Longs.toByteArray(amount)
       })
     )
   )
+
+  override lazy val semanticValidity: Try[Unit] = Try {
+
+    // Signature validity checks.
+    require(signature.isValid(proposition, messageToSign), "Invalid signature!")
+
+    // `Amount` & `Address` validity checks.
+    require(createOutputs.forall { i =>
+      i._2 >= 0 && AddressProposition.validAddress(i._1)
+    }, "Transaction invalid!")
+  }
 
 }
 

@@ -1,56 +1,22 @@
 package encry.modifiers.mempool
 
-import com.google.common.primitives.{Bytes, Longs}
-import encry.modifiers.state.box.EncryBaseBox
-import encry.modifiers.state.box.body.BaseBoxBody
-import scorex.core.serialization.JsonSerializable
-import scorex.core.transaction.Transaction
-import scorex.core.transaction.box.BoxUnlocker
 import scorex.core.transaction.box.proposition.Proposition
-import scorex.utils.ByteArray
+import scorex.core.{EphemerealNodeViewModifier, ModifierId, ModifierTypeId}
+import scorex.crypto.hash.Blake2b256
 
-trait EncryBaseTransaction[P <: Proposition, BXP <: Proposition, BB <: BaseBoxBody]
-  extends Transaction[P] with JsonSerializable{
+import scala.util.Try
 
-  // TODO: Implement custom `NoncedBox` --DONE
-  // `scorex.core.transaction.account.PublicKeyNoncedBox` is unsuitable for PKI
-  // as a NoncedBox[P] because of hardcoded `PublicKey25519Proposition`.
+trait EncryBaseTransaction extends EphemerealNodeViewModifier {
+  override val modifierTypeId: ModifierTypeId = EncryBaseTransaction.ModifierTypeId
 
-  // TODO: Implement custom `Box` to store complex data. --DONE
-  // Default `scorex.core.transaction.box.Box` is suitable only for payments
-  // being designed to store only `Long` as a value.
+  val messageToSign: Array[Byte]
 
-  import encry.modifiers.mempool.EncryBaseTransaction._
+  val semanticValidity: Try[Unit]
 
-  // Type of the transaction will be telling the abstract `dispatcher` how to treat particular Txn.
-  val typeId: TxTypeId
-
-  // TODO: Do we need tx Version?
-
-  // `BoxUnlocker` holds ID and Key of the box to open (Sequence of `Tx Inputs` + Keys to unlock them).
-  // TODO: Implement `BoxUnlocker` and `Proof`. --DONE
-  val unlockers: Traversable[BoxUnlocker[P]]
-  // Sequence of `Tx Outputs`.
-  val newBoxes: Traversable[EncryBaseBox[BXP, BB]]
-
-  val fee: Long
-  val timestamp: Long
-
-  override lazy val messageToSign: Array[Byte] =
-    Bytes.concat(
-      Array[Byte](typeId),
-      if (newBoxes.nonEmpty) scorex.core.utils.concatBytes(newBoxes.map(_.bytes)) else Array[Byte](),
-      scorex.core.utils.concatFixLengthBytes(unlockers.map(_.closedBoxId)),
-      Longs.toByteArray(timestamp),
-      Longs.toByteArray(fee)
-    )
+  override lazy val id: ModifierId = ModifierId @@ Blake2b256(messageToSign)
 }
 
-object EncryBaseTransaction {
-  // TODO: Make this type `supertagged`.
-  type TxTypeId = Byte
-  type Nonce = Long
-  type Amount = Long
 
-  def nonceFromDigest(digest: Array[Byte]): Nonce = Longs.fromByteArray(digest.take(8))
+object EncryBaseTransaction {
+  val ModifierTypeId: scorex.core.ModifierTypeId = scorex.core.ModifierTypeId @@ 2.toByte
 }

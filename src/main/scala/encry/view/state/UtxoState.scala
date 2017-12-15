@@ -1,11 +1,13 @@
 package encry.view.state
 
 import akka.actor.ActorRef
+import akka.actor.Status.Success
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.mempool.EncryPaymentTransaction
+import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
 import encry.modifiers.state.box._
 import encry.modifiers.state.TransactionValidator
+import encry.modifiers.state.box.proposition.AddressProposition
 import encry.settings.Algos
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.{EphemerealNodeViewModifier, VersionTag}
@@ -38,38 +40,38 @@ class UtxoState(override val version: VersionTag,
   // TODO: Why 10?
   override def maxRollbackDepth: Int = 10
 
-  def boxChanges(txs: Seq[EphemerealNodeViewModifier]): EncryBoxStateChanges = {
-    EncryBoxStateChanges(txs.flatMap { tx =>
-      tx match {
-        case tx: EncryPaymentTransaction =>
-//            val nb = store.get(new ByteArrayWrapper(key))
-//
-//            require(nb != null,"Empty data with this ADKey")
-//            nb match {
-//              case b : EncryPaymentBox =>{
-//                require(b.proposition.addrBytes == trx.senderProp.address,"Incorrect unlocker. Invalid Address")
-//              }
-//              case _ =>{
-//                require(false,"Incorrect box from storage")
-//              }
-//            }
-          tx.unlockers
-            .filter { unl => unl.boxKey.isValid(tx.proposition, tx.messageToSign)}
-            .map( unl => Removal(unl.closedBoxId)) ++
-            tx.newBoxes.map(bx => Insertion(bx))
+  def boxChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
+    // Use neither `.filter` nor any validity checks here!
+    // This method should be invoked when all txs are already validated.
+    EncryBoxStateChanges(
+      txs.flatMap { tx =>
+        tx match {
+          case tx: EncryPaymentTransaction =>
+            tx.unlockers.map( unl => Removal(unl.closedBoxId)) ++
+            tx.newBoxes.map( bx => Insertion(bx) )
 
-//      case tx: AnotherTypeTransaction => ...
+//        case tx: AnotherTypeTransaction => ...
       }
     })
   }
 
+  private[state] def checkTransactions(txs: Seq[EncryBaseTransaction]) = Try {
+    // TODO: Достать выходы из бд и проверить соответствие адресов публ. ключам.
+    txs.forall(tx => tx.semanticValidity.isSuccess)
+  }
+
   // Dispatches applying `Modifier` of particular type.
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
-    case pb: EncryBlock =>
-      log.debug(s"Applying block with header ${pb.header.encodedId} to UtxoState with " +
+    case block: EncryBlock =>
+      log.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)}")
 
-      Try(this)
+      if (checkTransactions(block.payload.transactions).get) {
+        Try {
+          // TODO: Пробуем применить изменения к `store`.
+          new UtxoState(VersionTag @@ block.id, store, nodeViewHolderRef)
+        }
+      }
   }
 
   override def rollbackTo(version: VersionTag): Try[UtxoState] = ???

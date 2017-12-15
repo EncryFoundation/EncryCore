@@ -1,5 +1,6 @@
 package encry.modifiers.history.block.payload
 
+import encry.modifiers.mempool.EncryBaseTransaction
 import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
@@ -11,7 +12,7 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-class EncryBlockPayload(override val headerId: ModifierId, txs: Seq[EphemerealNodeViewModifier])
+class EncryBlockPayload(override val headerId: ModifierId, txs: Seq[EncryBaseTransaction])
   extends EncryBaseBlockPayload {
 
   assert(txs.nonEmpty, "Block should contain at least 1 coinbase-like transaction")
@@ -20,7 +21,7 @@ class EncryBlockPayload(override val headerId: ModifierId, txs: Seq[EphemerealNo
 
   override type M = EncryBlockPayload
 
-  override val transactions: Seq[EphemerealNodeViewModifier] = txs
+  override val transactions: Seq[EncryBaseTransaction] = txs
 
   override def digest: Digest32 = EncryBlockPayload.rootHash(txs.map(_.id))
 

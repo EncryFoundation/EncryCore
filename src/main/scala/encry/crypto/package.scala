@@ -4,7 +4,7 @@ import supertagged.TaggedType
 
 package object crypto {
 
-  object Address extends TaggedType[Array[Byte]]
+  object Address extends TaggedType[String]
 
   type Address = Address.Type
 
