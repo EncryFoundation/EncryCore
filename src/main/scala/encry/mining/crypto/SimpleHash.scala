@@ -25,7 +25,7 @@ object SimpleHash {
     }
   }
 
-  def validateSolution(solution: Array[Byte], target: Int): Boolean = {
+  def validateSolution(solution: Array[Byte], target: Double): Boolean = {
     countLeadingZeroes(solution) >= target
   }
 }

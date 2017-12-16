@@ -46,7 +46,7 @@ class UtxoState(override val version: VersionTag,
   override def maxRollbackDepth: Int = 10
 
   // TODO: Fix return type
-  def getClosedBox(boxType: Any, boxId: Array[Byte]): Option[Box[_]] = {
+  def getClosedBox(boxType: Any, boxId: Array[Byte]): Option[Any] = {
     boxType match {
       case _: EncryPaymentBox => store.get(ByteArrayWrapper(boxId))
         .map(_.data)
@@ -63,56 +63,36 @@ class UtxoState(override val version: VersionTag,
         tx match {
           case tx: EncryPaymentTransaction =>
             tx.unlockers.map( unl => Removal(unl.closedBoxId)) ++
-            tx.newBoxes.map( bx => Insertion(bx) )
+              tx.newBoxes.map( bx => Insertion(bx) )
 
 //        case tx: AnotherTypeTransaction => ...
-      }
-    })
+        }
+      })
   }
 
-  private[state] def checkTransactions(txs: Seq[EncryBaseTransaction]) = Try {
-    // TODO: Достать выходы из бд и проверить соответствие адресов публ. ключам.
-//    txs.foreach(tx => tx.semanticValidity.get)
+  private[state] def checkTransactions(txs: Seq[EncryBaseTransaction]): Try[Unit] = Try {
 
-    txs.forall {
-      case tx: EncryPaymentTransaction => {
-        println(s"TRX SemValid = ${tx.semanticValidity.isSuccess}")
-        // println(s"TRX input valid = ${!(tx.useOutputs.forall(key => store.get(new ByteArrayWrapper(key)).isEmpty))}")
-        tx.semanticValidity.isSuccess &&
-          tx.useOutputs.forall(key =>
+    txs.foreach { tx =>
+      tx.semanticValidity.get
+      tx match {
+        case tx: EncryPaymentTransaction =>
+          tx.useOutputs.foreach { key =>
             store.get(new ByteArrayWrapper(key)) match {
-              case Some(data) => {
+              case Some(data) =>
                 data match {
-                  case data: Store.V => {
-                    EncryPaymentBoxSerializer.parseBytes(data.data) match {
-                      case nb: Try[EncryPaymentBox] => {
-                        println(s"in nb = ${nb.get.proposition.address}")
-                        println(s"in tx = ${tx.sender.address}")
-                        println("trx accept" + (nb.get.proposition.address == tx.sender.address))
-                        nb.get.proposition.address == tx.sender.address
-                      }
-                      case _ => {
-                        println("1 fail")
-                        false
-                      }
+                  case data: Store.V =>
+                    EncryPaymentBoxSerializer.parseBytes(data.data).get match {
+                      case nb: EncryPaymentBox =>
+                        if (nb.proposition.address == tx.senderProposition.address) Success(nb)
+                        else throw new Error("Illegal UTXO reference!")
+                      case _ => throw new Error(s"Cannot parse Box referenced in TX ${tx.txHash}")
                     }
-                  }
-                  case _ => {
-                    println("2 fail")
-                    false
-                  }
                 }
-              }
-              case None => {
-                println("3 fail")
-                false
-              }
+              case None => Failure
             }
-            //
-          )
+          }
       }
     }
-
   }
 
   // Dispatches applying `Modifier` of particular type.
@@ -129,16 +109,20 @@ class UtxoState(override val version: VersionTag,
             new UtxoState(VersionTag @@ block.id, store /*, nodeViewHolderRef*/)
           }
         case Failure(e) =>
+          println("Error occured during modifier application")
           Failure(e)
       }
   }
 
   //TODO: implement
   override def rollbackTo(version: VersionTag): Try[UtxoState] = Try{this}
+
   //TODO: implement
   override def rollbackVersions: Iterable[VersionTag] = List(VersionTag @@ "test".getBytes())
+
   //TODO: implement
   override lazy val rootHash: ADDigest = ADDigest @@ "test".getBytes()
+
   //TODO: implement
   override def validate(tx: EphemerealNodeViewModifier): Try[Unit] = Try{
     tx match {
@@ -146,6 +130,8 @@ class UtxoState(override val version: VersionTag,
         tx.semanticValidity.isSuccess && tx.useOutputs.forall(key => store.get(new ByteArrayWrapper(key)).isEmpty)
     }
   }
+
+  override def boxesOf(proposition: Proposition): Seq[Box[proposition.type]] = ???
 
 }
 

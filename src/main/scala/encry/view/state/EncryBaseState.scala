@@ -4,6 +4,8 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.EncryBoxStateChanges
 import encry.settings.Algos
+import scorex.core.transaction.box.Box
+import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.{EphemerealNodeViewModifier, VersionTag}
 import scorex.core.transaction.state.MinimalState
 import scorex.core.utils.ScorexLogging
@@ -22,8 +24,9 @@ trait EncryBaseState[IState <: MinimalState[EncryPersistentModifier, IState]]
   // TODO: Implement correctly.
   def stateHeight(): Int = 0
 
-  // TODO: Which instance of proposition should be passed here??
   def boxChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges
+
+  def boxesOf(proposition: Proposition): Seq[Box[proposition.type]]
 
   // ID of last applied modifier.
   override def version: VersionTag

@@ -11,4 +11,5 @@ trait EncryBaseBlockHeader extends EncryPersistentModifier {
   val txMerkleRoot: Digest32
   val timestamp: Timestamp
   val height: Int
+  val headerBytes: Array[Byte]
 }

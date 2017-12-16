@@ -2,7 +2,7 @@ package encry.modifiers.mempool
 
 import encry.modifiers.mempool.EncryTransaction._
 import encry.modifiers.state.box.body.PaymentBoxBody
-import encry.modifiers.state.box.{EncryNoncedBox, EncryPaymentBox}
+import encry.modifiers.state.box.EncryPaymentBox
 import encry.modifiers.state.box.unlockers.EncryPaymentBoxUnlocker
 import encry.settings.Algos
 import encry.crypto.Address
@@ -14,14 +14,14 @@ import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.ADKey
-import scorex.crypto.encode.{Base16, Base58}
+import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.Try
 
-case class EncryPaymentTransaction(sender: PublicKey25519Proposition,
+case class EncryPaymentTransaction(senderProposition: PublicKey25519Proposition,
                                    override val fee: Amount,
                                    override val timestamp: Long,
                                    var signature: Signature25519,
@@ -78,7 +78,7 @@ case class EncryPaymentTransaction(sender: PublicKey25519Proposition,
   override lazy val semanticValidity: Try[Unit] = Try {
 
     // Signature validity checks.
-    require(signature.isValid(sender, messageToSign), "Invalid signature!")
+    require(signature.isValid(senderProposition, messageToSign), "Invalid signature!")
 
     // `Amount` & `Address` validity checks.
     require(createOutputs.forall { i =>
@@ -92,14 +92,14 @@ object EncryPaymentTransactionSerializer extends Serializer[EncryPaymentTransact
 
   override def toBytes(obj: EncryPaymentTransaction): Array[Byte] = {
     Bytes.concat(
-      obj.sender.pubKeyBytes,
+      obj.senderProposition.pubKeyBytes,
       Longs.toByteArray(obj.fee),
       Longs.toByteArray(obj.timestamp),
       obj.signature.signature,
       Ints.toByteArray(obj.useOutputs.length),
       Ints.toByteArray(obj.createOutputs.length),
       obj.useOutputs.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b)),
-      obj.createOutputs.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b._1.getBytes,Longs.toByteArray(b._2)))
+      obj.createOutputs.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b._1.getBytes, Longs.toByteArray(b._2)))
     )
   }
 
@@ -114,10 +114,10 @@ object EncryPaymentTransactionSerializer extends Serializer[EncryPaymentTransact
     val s = 88
     val outElementLength = 32
     val useOutputs = (0 until inputLength) map { i =>
-      ADKey @@ bytes.slice(s + i * outElementLength, s + (i + 1) * outElementLength)
+      ADKey @@ bytes.slice(s + (i * outElementLength), s + (i + 1) * outElementLength)
     }
 
-    val s2 = s + inputLength * outElementLength
+    val s2 = s + (inputLength * outElementLength)
     val inElementLength = 40
     val createOutputs = (0 until outputLength) map { i =>
       // Longs.fromByteArray(bytes.slice(s2 + i * elementLength, s2 + (i + 1) * elementLength))
@@ -125,7 +125,7 @@ object EncryPaymentTransactionSerializer extends Serializer[EncryPaymentTransact
         Longs.fromByteArray(bytes.slice(s2 + i * (inElementLength-8), s2 + (i + 1) * (inElementLength))))
     }
 
-    EncryPaymentTransaction(sender,fee,timestamp,signature,useOutputs,createOutputs)
+    EncryPaymentTransaction(sender, fee, timestamp, signature, useOutputs, createOutputs)
 
   }
 }
