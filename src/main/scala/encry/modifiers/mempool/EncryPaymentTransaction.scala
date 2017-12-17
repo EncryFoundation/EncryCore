@@ -122,7 +122,7 @@ object EncryPaymentTransactionSerializer extends Serializer[EncryPaymentTransact
     val createOutputs = (0 until outputLength) map { i =>
       // Longs.fromByteArray(bytes.slice(s2 + i * elementLength, s2 + (i + 1) * elementLength))
       (Address @@ bytes.slice(s2 + i * inElementLength, s2 + (i + 1) * (inElementLength-8)).toString,
-        Longs.fromByteArray(bytes.slice(s2 + i * (inElementLength-8), s2 + (i + 1) * (inElementLength))))
+        Longs.fromByteArray(bytes.slice(s2 + i * (inElementLength-8), s2 + (i + 1) * inElementLength)))
     }
 
     EncryPaymentTransaction(sender, fee, timestamp, signature, useOutputs, createOutputs)

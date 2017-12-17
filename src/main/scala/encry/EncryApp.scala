@@ -47,6 +47,7 @@ object EncryApp extends App {
 
     println("Block Hash > " + Base16.encode(block.id))
     println("     Nonce > " + block.nonce)
+    println(s"ValidPOW = ${block.validPow}")
 //
 //  val dir = new File(System.getProperty("user.dir"))
 //

@@ -46,7 +46,7 @@ class UtxoState(override val version: VersionTag,
   override def maxRollbackDepth: Int = 10
 
   // TODO: Fix return type
-  def getClosedBox(boxType: Any, boxId: Array[Byte]): Option[Any] = {
+  def boxById(boxType: Any, boxId: Array[Byte]): Option[Any] = {
     boxType match {
       case _: EncryPaymentBox => store.get(ByteArrayWrapper(boxId))
         .map(_.data)
@@ -55,6 +55,7 @@ class UtxoState(override val version: VersionTag,
     }
   }
 
+  // Extracts `state changes` from the given sequence of transactions.
   def boxChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
     // Use neither `.filter` nor any validity checks here!
     // This method should be invoked when all txs are already validated.

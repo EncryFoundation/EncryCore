@@ -16,7 +16,7 @@ trait TransactionValidator extends StateFeature {
   def validate(tx: EphemerealNodeViewModifier): Try[Unit]
 }
 
-trait ModifierValidation[M <: PersistentNodeViewModifier] extends StateFeature {
+trait ModifierValidator[M <: PersistentNodeViewModifier] extends StateFeature {
   def validate(mod: M): Try[Unit]
 }
 

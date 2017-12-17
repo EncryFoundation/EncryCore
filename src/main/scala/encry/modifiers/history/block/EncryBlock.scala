@@ -22,6 +22,13 @@ class EncryBlock(override val header: EncryBlockHeader,
 
   override def transactions: Seq[EphemerealNodeViewModifier] = payload.transactions
 
+  override def semanticValidity: Try[Unit] = Try {
+    require(header.txMerkleRoot == payload.digest, "Invalid tx Merkle Root hash!")
+    require(header.validPow, "Invalid POW provided!")
+
+    // TODO: Further block validity checks.
+  }
+
   override def parentId: ModifierId = header.parentId
 
   override val modifierTypeId: ModifierTypeId = EncryBlock.modifierTypeId
