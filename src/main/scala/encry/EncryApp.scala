@@ -24,6 +24,8 @@ import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.authds.ADKey
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
+import scala.util.{Failure, Success, Try}
+
 
 //class EncryApp(args: Seq[String]) extends Application {
 //  override type P = PublicKey25519Proposition
@@ -48,6 +50,8 @@ object EncryApp extends App {
     println("Block Hash > " + Base16.encode(block.id))
     println("     Nonce > " + block.nonce)
     println(s"ValidPOW = ${block.validPow}")
+
+
 //
 //  val dir = new File(System.getProperty("user.dir"))
 //

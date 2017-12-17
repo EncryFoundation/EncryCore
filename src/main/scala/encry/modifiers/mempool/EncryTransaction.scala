@@ -4,13 +4,12 @@ import com.google.common.primitives.{Bytes, Longs}
 import encry.modifiers.state.box.EncryBaseBox
 import encry.modifiers.state.box.body.BaseBoxBody
 import scorex.core.serialization.JsonSerializable
-import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.BoxUnlocker
 import scorex.core.transaction.box.proposition.Proposition
-import scorex.utils.ByteArray
+import scorex.core.utils.ScorexLogging
 
 trait EncryTransaction[P <: Proposition, BXP <: Proposition, BB <: BaseBoxBody]
-  extends EncryBaseTransaction with JsonSerializable{
+  extends EncryBaseTransaction with JsonSerializable with ScorexLogging{
 
   // `scorex.core.transaction.account.PublicKeyNoncedBox` is unsuitable for PKI
   // as a NoncedBox[P] because of hardcoded `PublicKey25519Proposition`.

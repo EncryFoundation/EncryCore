@@ -12,6 +12,7 @@ trait EncryBaseTransaction extends EphemerealNodeViewModifier {
 
   val messageToSign: Array[Byte]
 
+  // Used as `ModifierId`.
   val txHash: Digest32
 
   var signature: Signature25519
@@ -23,7 +24,7 @@ trait EncryBaseTransaction extends EphemerealNodeViewModifier {
   // Type of the transaction will be telling the abstract `dispatcher` how to treat particular Txn.
   val typeId: TxTypeId
 
-  override lazy val id: ModifierId = ModifierId @@ Blake2b256(messageToSign)
+  override lazy val id: ModifierId = ModifierId @@ Blake2b256(txHash)
 }
 
 

@@ -19,7 +19,7 @@ import scorex.crypto.hash.Digest32
 import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.signatures.{PublicKey, Signature}
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 case class EncryPaymentTransaction(senderProposition: PublicKey25519Proposition,
                                    override val fee: Amount,
@@ -75,15 +75,20 @@ case class EncryPaymentTransaction(senderProposition: PublicKey25519Proposition,
 
   override lazy val messageToSign: Array[Byte] = txHash
 
-  override lazy val semanticValidity: Try[Unit] = Try {
-
+  override lazy val semanticValidity: Try[Unit] = {
     // Signature validity checks.
-    require(signature.isValid(senderProposition, messageToSign), "Invalid signature!")
-
+    if (!signature.isValid(senderProposition, messageToSign)) {
+      log.info(s"<TX: $txHash> Invalid signature provided.")
+      Failure(new Error("Invalid signature provided!"))
+    }
     // `Amount` & `Address` validity checks.
-    require(createOutputs.forall { i =>
+    if (!createOutputs.forall { i =>
       i._2 >= 0 && AddressProposition.validAddress(i._1)
-    }, "Transaction invalid!")
+    }) {
+      log.info(s"<TX: $txHash> Invalid content.")
+      Failure(new Error("Transaction invalid!"))
+    }
+    Success()
   }
 
 }

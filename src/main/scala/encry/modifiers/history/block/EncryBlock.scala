@@ -3,15 +3,14 @@ package encry.modifiers.history.block
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.mempool.{EncryTransaction, EncryPaymentTransaction}
+import encry.modifiers.mempool.EncryBaseTransaction
 import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
-import scorex.core.{EphemerealNodeViewModifier, ModifierId, ModifierTypeId}
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
+import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.core.serialization.Serializer
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 class EncryBlock(override val header: EncryBlockHeader,
                  override val payload: EncryBlockPayload) extends EncryBaseBlock {
@@ -20,13 +19,18 @@ class EncryBlock(override val header: EncryBlockHeader,
 
   override val toSeq: Seq[EncryPersistentModifier] = Seq(header, payload)
 
-  override def transactions: Seq[EphemerealNodeViewModifier] = payload.transactions
+  override def transactions: Seq[EncryBaseTransaction] = payload.transactions
 
-  override def semanticValidity: Try[Unit] = Try {
-    require(header.txMerkleRoot == payload.digest, "Invalid tx Merkle Root hash!")
-    require(header.validPow, "Invalid POW provided!")
-
-    // TODO: Further block validity checks.
+  override def semanticValidity: Try[Unit] = {
+    if (header.txMerkleRoot != payload.digest) {
+      log.info(s"<BLOCK ${header.id}> Invalid tx Merkle Root hash provided.")
+      Failure(new Error("Invalid tx Merkle Root hash provided!"))
+    }
+    if (!header.validPow) {
+      log.info(s"<BLOCK ${header.id}> Invalid POW provided.")
+      Failure(new Error("Invalid POW provided!"))
+    }
+    Success()
   }
 
   override def parentId: ModifierId = header.parentId
