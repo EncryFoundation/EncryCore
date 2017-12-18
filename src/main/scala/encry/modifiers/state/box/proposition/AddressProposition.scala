@@ -15,7 +15,6 @@ case class AddressProposition(address: Address) extends Proposition {
 
   override type M = AddressProposition
 
-  // TODO: Проверка соответствия адреса публичному ключу.
   def verify(proposition: PublicKey25519Proposition): Boolean = address == proposition.address
 
   override def serializer: Serializer[AddressProposition] = AddressPropositionSerializer

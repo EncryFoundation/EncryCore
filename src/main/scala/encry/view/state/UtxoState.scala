@@ -8,8 +8,6 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
 import encry.modifiers.state.box._
 import encry.modifiers.state.TransactionValidator
-import encry.modifiers.state.box.body.BaseBoxBody
-import encry.modifiers.state.box.proposition.AddressProposition
 import encry.settings.Algos
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.transaction.box.Box
@@ -18,7 +16,6 @@ import scorex.core.{EphemerealNodeViewModifier, VersionTag}
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.{ADDigest, ADKey}
 import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
 import scala.util.{Failure, Success, Try}
@@ -68,7 +65,8 @@ class UtxoState(override val version: VersionTag,
 
 //        case tx: AnotherTypeTransaction => ...
         }
-      })
+      }
+    )
   }
 
   private[state] def checkTransactions(txs: Seq[EncryBaseTransaction]): Try[Unit] = Try {

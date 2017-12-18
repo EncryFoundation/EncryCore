@@ -30,6 +30,10 @@ class EncryBlock(override val header: EncryBlockHeader,
       log.info(s"<BLOCK ${header.id}> Invalid POW provided.")
       Failure(new Error("Invalid POW provided!"))
     }
+    if (!header.validTimestamp) {
+      log.info(s"<BLOCK ${header.id}> Invalid timestamp provided.")
+      Failure(new Error("Invalid timestamp provided!"))
+    }
     Success()
   }
 

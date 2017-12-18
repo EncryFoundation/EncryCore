@@ -42,6 +42,10 @@ case class EncryBlockHeader(override val version: Version,
 
   val validPow: Boolean = validatePow(id, difficulty)
 
+  // Checks weather the block timestamp is less than
+  // two hours in the future (7200000ms) (allowing for time errors).
+  val validTimestamp: Boolean = (timestamp - System.currentTimeMillis()) < 7200000L
+
   override def serializer: Serializer[M] = EncryBlockHeaderSerializer
 
   override def json: Json = ???
