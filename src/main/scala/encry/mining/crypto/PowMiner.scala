@@ -7,6 +7,7 @@ import scorex.core.ModifierId
 import scorex.core.block.Block.{Timestamp, Version}
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.utils.ScorexLogging
+import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -68,6 +69,8 @@ object PowMiner extends App {
 
     val block = EncryBlockHeader(
       version, parentId, txMerkleRoot, timestamp, height, nonce, difficulty, generatorProposition)
+
+    println("Testing block hash: " + Base16.encode(block.id))
 
     val result = if (block.validPow) Some(block) else None
 
