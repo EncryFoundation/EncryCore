@@ -3,6 +3,7 @@ package encry.view.history.storage.processors
 import encry.settings.Constants._
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
+import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
 import scorex.core.consensus.History
@@ -10,11 +11,13 @@ import scorex.core.consensus.History
 import scala.annotation.tailrec
 import scala.util.Try
 
-trait BlockHeaderProcessor extends EncryBaseProcessor[EncryBlockHeader] {
+trait BlockHeaderProcessor {
 
   protected val BestHeaderKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(hashLength)(EncryBlockHeader.modifierTypeId))
 
   protected val BestFullBlockKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(hashLength)(-1))
+
+  protected val historyStorage: HistoryStorage
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 

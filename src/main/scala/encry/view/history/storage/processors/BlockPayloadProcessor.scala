@@ -6,7 +6,7 @@ import scorex.core.consensus.History
 
 import scala.util.Try
 
-trait BlockPayloadProcessor extends EncryBaseProcessor[EncryBlockPayload] {
+trait BlockPayloadProcessor {
 
   protected def process(payload: EncryBlockPayload): History.ProgressInfo[EncryPersistentModifier]
 
