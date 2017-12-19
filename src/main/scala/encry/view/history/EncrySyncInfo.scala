@@ -8,8 +8,8 @@ import scorex.core.serialization.Serializer
 
 import scala.util.Try
 
-class EncrySyncInfo(override val answer: Boolean,
-                    lastHeaderIds: Seq[ModifierId]) extends SyncInfo {
+case class EncrySyncInfo(override val answer: Boolean,
+                         lastHeaderIds: Seq[ModifierId]) extends SyncInfo {
 
   override type M = EncrySyncInfo
 
