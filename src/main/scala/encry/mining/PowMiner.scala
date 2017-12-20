@@ -1,6 +1,7 @@
 package encry.mining
 
 import akka.actor.{Actor, ActorRef}
+import encry.consensus.Difficulty
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.utils.Cancellable
 import scorex.core.ModifierId
@@ -58,7 +59,7 @@ object PowMiner extends App {
                    parentId: ModifierId,
                    txMerkleRoot: Digest32,
                    height: Int,
-                   difficulty: Int,
+                   difficulty: Difficulty,
                    generatorProposition: PublicKey25519Proposition): Option[EncryBlockHeader] = {
 
     val nonce = Random.nextLong()

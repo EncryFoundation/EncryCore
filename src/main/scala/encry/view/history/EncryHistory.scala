@@ -3,6 +3,7 @@ package encry.view.history
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.settings.Algos
 import encry.view.history.storage.HistoryStorage
 import encry.view.history.storage.processors.{BlockHeaderProcessor, BlockPayloadProcessor}
 import io.iohk.iodb.Store
@@ -82,10 +83,14 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
   def lastHeaders(count: Int): EncryHeaderChain = bestHeaderOpt
     .map(bestHeader => headerChainBack(count, bestHeader, b => false)).getOrElse(EncryHeaderChain.empty)
 
-  /**
-    * Gets ErgoPersistentModifier of type T by it's id if it is in history
-    */
-  // TODO:
+  // Gets EncryPersistentModifier by it's id if it is in history.
+  override def modifierById(id: ModifierId): Option[EncryPersistentModifier] = {
+    val modifier = historyStorage.modifierById(id)
+    assert(modifier.forall(_.id sameElements id), s"Modifier $modifier id is incorrect, ${Algos.encode(id)} expected")
+    modifier
+  }
+
+  // Gets EncryPersistentModifier of type T by it's id if it is in history.
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T] = modifierById(id) match {
     case Some(m: T@unchecked) if m.isInstanceOf[T] => Some(m)
     case _ => None

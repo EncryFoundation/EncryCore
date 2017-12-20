@@ -1,9 +1,11 @@
 package encry.settings
 
+import scala.concurrent.duration.FiniteDuration
+import java.util.concurrent.TimeUnit.SECONDS
+
 object ConsensusSettings {
   val initialDifficulty: BigInt = 15000
-  lazy val maxTarget = BigInt(1, Array.fill(32)(Byte.MinValue))
-  val difficultyRetargetingIntervalBlocks: Int = 2016
-  val blockEmissionIntervalMins: Int = 1
-  lazy val difficultyRetargetingIntervalMins: Int = difficultyRetargetingIntervalMins * blockEmissionIntervalMins
+  val maxTarget = BigInt(1, Array.fill(32)(Byte.MinValue))
+  val desiredBlockEmissionInterval: FiniteDuration = FiniteDuration(60, SECONDS)
+  val retargetingEpochsQty: Int = 10
 }

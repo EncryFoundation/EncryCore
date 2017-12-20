@@ -10,7 +10,9 @@ import scorex.core.app.Application
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.crypto.encode.{Base16, Base58}
 import java.io.File
+import java.util.concurrent.TimeUnit.SECONDS
 
+import encry.consensus.{Difficulty, PowLinearController}
 import encry.crypto.Address
 import encry.mining.PowMiner
 import encry.modifiers.history.block.EncryBlock
@@ -25,6 +27,7 @@ import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.authds.ADKey
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
+import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success, Try}
 
 
@@ -38,15 +41,14 @@ import scala.util.{Failure, Success, Try}
 object EncryApp extends App {
   //  new EncryApp(args).run()
   //-----
-
   val keyPair = Curve25519.createKeyPair(Base58.decode("Bars").get)
   val pubKey : PublicKey = keyPair._2
   val priKey : PrivateKey = keyPair._1
-  val recepientProp = PublicKey25519Proposition(pubKey)
+  val recipientProp = PublicKey25519Proposition(pubKey)
   val senderProp = PublicKey25519Proposition(pubKey)
 
   val block = new EncryBlockHeader(
-    99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 9999L, 0, 16, 6, senderProp)
+    99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 9999L, 0, 16, Difficulty @@ BigInt(20), senderProp)
 
   println("Block Hash > " + Base16.encode(block.id))
   println("     Nonce > " + block.nonce)
@@ -56,12 +58,19 @@ object EncryApp extends App {
   var foundBlock: Option[EncryBlockHeader] = None
   while (foundBlock.isEmpty) {
     foundBlock = PowMiner.powIteration(
-      99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 16, 20000, senderProp)
+      99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 16, Difficulty @@ BigInt(20000), senderProp)
   }
 
   println("Found valid blok hash: " + Base16.encode(foundBlock.get.id))
 
   println(s"ValidPOW = ${foundBlock.get.validPow}")
+
+  // Difficulty retargeting test
+  val t1 = PowLinearController.getTarget(Difficulty @@ BigInt(30000))
+
+  val d1 = PowLinearController.getNewDifficulty(t1, FiniteDuration(70, SECONDS))
+
+  println(s"Old target is 30000 and the new is $d1")
 
   val dir = new File(System.getProperty("user.dir"))
 
@@ -85,9 +94,9 @@ object EncryApp extends App {
 //  val senderProp = PublicKey25519Proposition(pubKey)
 
 
-  val nb1 = new EncryPaymentBox(new AddressProposition(Address @@ recepientProp.address),25L,PaymentBoxBody(12L))
-  println("Addr is: " + new AddressProposition(Address @@ recepientProp.address).address)
-  val nb2 = new EncryPaymentBox(new AddressProposition(Address @@ recepientProp.address),32L,PaymentBoxBody(24L))
+  val nb1 = new EncryPaymentBox(new AddressProposition(Address @@ recipientProp.address),25L,PaymentBoxBody(12L))
+  println("Addr is: " + new AddressProposition(Address @@ recipientProp.address).address)
+  val nb2 = new EncryPaymentBox(new AddressProposition(Address @@ recipientProp.address),32L,PaymentBoxBody(24L))
 
   val InputNullTX1 = IndexedSeq(ADKey @@ EncryPaymentBox.idFromBox(nb1.proposition, nb1.nonce))
 
@@ -98,10 +107,10 @@ object EncryApp extends App {
   val sigTX1 = Signature25519(Curve25519.sign(priKey,"firstTransaction".getBytes))
   val sigTX2 = Signature25519(Curve25519.sign(priKey,"secondTransaction".getBytes))
 
-  val OutputNullTX1 = IndexedSeq((Address @@ recepientProp.address,12L))
-  val OutputNullTX2 = IndexedSeq((Address @@ recepientProp.address,15L))
-  val BaseTX1 = EncryPaymentTransaction(senderProp,12L,123L,sigTX1,InputNullTX1,OutputNullTX1)
-  val BaseTX2 = EncryPaymentTransaction(senderProp,28L,124L,sigTX2,InputNullTX2,OutputNullTX2)
+  val OutputNullTX1 = IndexedSeq((Address @@ recipientProp.address,12L))
+  val OutputNullTX2 = IndexedSeq((Address @@ recipientProp.address,15L))
+  val BaseTX1 = EncryPaymentTransaction(senderProp, 12L, 123L, sigTX1, InputNullTX1, OutputNullTX1)
+  val BaseTX2 = EncryPaymentTransaction(senderProp, 28L, 124L, sigTX2, InputNullTX2, OutputNullTX2)
 
 
 
@@ -111,7 +120,7 @@ object EncryApp extends App {
   //Block init
 
   val testPayload = new EncryBlockPayload(ModifierId @@ "ModId".getBytes(),IndexedSeq(BaseTX1,BaseTX2))
-  val testHeader = EncryBlockHeader(99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 9999L, 0, 16, 2, senderProp)
+  val testHeader = EncryBlockHeader(99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 9999L, 0, 16, Difficulty @@ BigInt(20000), senderProp)
   val testBlock = new EncryBlock(testHeader,testPayload)
 
   //UTXO init

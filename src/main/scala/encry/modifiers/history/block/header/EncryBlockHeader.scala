@@ -1,6 +1,7 @@
 package encry.modifiers.history.block.header
 
 import com.google.common.primitives.{Ints, _}
+import encry.consensus.Difficulty
 import encry.settings.{Algos, Constants}
 import encry.consensus.validation.PowConsensusValidator._
 import io.circe.Json
@@ -19,7 +20,7 @@ case class EncryBlockHeader(override val version: Version,
                             override val timestamp: Timestamp,
                             override val height: Int,
                             var nonce: Long = 0L,
-                            difficulty: Int,
+                            difficulty: Difficulty,
                             generatorProposition: PublicKey25519Proposition) extends EncryBaseBlockHeader {
 
   override type M = EncryBlockHeader
@@ -36,7 +37,7 @@ case class EncryBlockHeader(override val version: Version,
       Longs.toByteArray(timestamp),
       Ints.toByteArray(height),
       Longs.toByteArray(nonce),
-      Ints.toByteArray(difficulty),
+      difficulty.toByteArray,
       generatorProposition.pubKeyBytes
     )
   }
@@ -71,7 +72,7 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
       obj.txMerkleRoot,
       Longs.toByteArray(obj.timestamp),
       Ints.toByteArray(obj.height),
-      Ints.toByteArray(obj.difficulty),
+      obj.difficulty.toByteArray,
       obj.generatorProposition.pubKeyBytes
     )
   }
