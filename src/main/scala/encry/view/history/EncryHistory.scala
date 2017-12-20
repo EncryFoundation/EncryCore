@@ -9,6 +9,7 @@ import io.iohk.iodb.Store
 import scorex.core.ModifierId
 import scorex.core.consensus.History
 import scorex.core.consensus.History.HistoryComparisonResult
+import scorex.core.utils.ScorexLogging
 import scorex.crypto.encode.Base58
 
 import scala.util.{Failure, Try}
@@ -19,20 +20,14 @@ import scala.util.{Failure, Try}
   * process different type of modifiers.
   *
   * HeadersProcessor: processor of block headers. It's the same for all node settings
-  * ADProofsProcessor: processor of ADProofs. ADProofs may
-  *   1. Be downloaded from other nodes (ADState == true)
-  *   2. Be calculated by using local state (ADState == false)
-  *   3. Be ignored by history in light mode (verifyTransactions == false)
-  * PoPoWProofsProcessor: processor of PoPoWProof. PoPoWProof may
-  *   1. Be downloaded once during bootstrap from other peers (poPoWBootstrap == true)
-  *   2. Be ignored by history (poPoWBootstrap == false)
   * BlockTransactionsProcessor: Processor of BlockTransactions. BlockTransactions may
   *   1. Be downloaded from other peers (verifyTransactions == true)
   *   2. Be ignored by history (verifyTransactions == false)
   */
 trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, EncryHistory]
   with BlockHeaderProcessor
-  with BlockPayloadProcessor {
+  with BlockPayloadProcessor
+  with ScorexLogging {
 
   protected val storage: Store
 
@@ -88,7 +83,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
     .map(bestHeader => headerChainBack(count, bestHeader, b => false)).getOrElse(EncryHeaderChain.empty)
 
   /**
-    * Get ErgoPersistentModifier of type T by it's id if it is in history
+    * Gets ErgoPersistentModifier of type T by it's id if it is in history
     */
   // TODO:
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T] = modifierById(id) match {

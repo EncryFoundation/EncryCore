@@ -12,7 +12,7 @@ import scorex.crypto.encode.{Base16, Base58}
 import java.io.File
 
 import encry.crypto.Address
-import encry.mining.crypto.PowMiner
+import encry.mining.PowMiner
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryPaymentTransaction

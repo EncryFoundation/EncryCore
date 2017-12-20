@@ -1,18 +1,15 @@
-package encry.mining.crypto
+package encry.mining
 
 import akka.actor.{Actor, ActorRef}
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.utils.Cancellable
 import scorex.core.ModifierId
-import scorex.core.block.Block.{Timestamp, Version}
+import scorex.core.block.Block.Version
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent._
-import scala.concurrent.duration._
 import scala.util.Random
 
 class PowMiner(viewHolderRef: ActorRef, settings: Any) extends Actor with ScorexLogging {

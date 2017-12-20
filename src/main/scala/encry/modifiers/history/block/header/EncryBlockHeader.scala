@@ -12,6 +12,7 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
+// TODO: Add generator signature to the header to verify miner`s identity?
 case class EncryBlockHeader(override val version: Version,
                             override val parentId: ModifierId,
                             override val txMerkleRoot: Digest32,
@@ -25,7 +26,7 @@ case class EncryBlockHeader(override val version: Version,
 
   override val modifierTypeId: ModifierTypeId = EncryBlockHeader.modifierTypeId
 
-  override lazy val id: ModifierId = ModifierId @@ Algos.hash(headerBytes)
+  override lazy val id: ModifierId = ModifierId @@ powHash
 
   override lazy val headerBytes: Array[Byte] = {
     Bytes.concat(
@@ -40,7 +41,10 @@ case class EncryBlockHeader(override val version: Version,
     )
   }
 
-  val validPow: Boolean = validatePow(id, difficulty)
+  // TODO: Move POW-related components to the special trait?
+  val powHash: Digest32 = Algos.hash(headerBytes)
+
+  val validPow: Boolean = validatePow(powHash, difficulty)
 
   // Checks whether the block timestamp is less than
   // two hours in the future (7200000ms) (allowing for time errors).
