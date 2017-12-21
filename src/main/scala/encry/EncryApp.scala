@@ -22,6 +22,7 @@ import encry.modifiers.state.box.{EncryPaymentBox, EncryPaymentBoxSerializer}
 import encry.modifiers.state.box.body.PaymentBoxBody
 import encry.modifiers.state.box.proposition.AddressProposition
 import encry.settings.Algos
+import encry.view.history.Height
 import encry.view.state.UtxoState
 import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.authds.ADKey
@@ -41,6 +42,9 @@ import scala.util.{Failure, Success, Try}
 object EncryApp extends App {
   //  new EncryApp(args).run()
   //-----
+
+  println(PowLinearController.epochsHeightsForRetargetingAt(Height @@ 9))
+
   val keyPair = Curve25519.createKeyPair(Base58.decode("Bars").get)
   val pubKey : PublicKey = keyPair._2
   val priKey : PrivateKey = keyPair._1
@@ -58,17 +62,18 @@ object EncryApp extends App {
   var foundBlock: Option[EncryBlockHeader] = None
   while (foundBlock.isEmpty) {
     foundBlock = PowMiner.powIteration(
-      99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 16, Difficulty @@ BigInt(20000), senderProp)
+      99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 16, Difficulty @@ BigInt(500), senderProp)
   }
 
   println("Found valid blok hash: " + Base16.encode(foundBlock.get.id))
 
   println(s"ValidPOW = ${foundBlock.get.validPow}")
 
+
   // Difficulty retargeting test
   val t1 = PowLinearController.getTarget(Difficulty @@ BigInt(30000))
 
-  val d1 = PowLinearController.getNewDifficulty(t1, FiniteDuration(70, SECONDS))
+  val d1 = PowLinearController.getNewDifficulty(Difficulty @@ BigInt(30000), FiniteDuration(70, SECONDS))
 
   println(s"Old target is 30000 and the new is $d1")
 

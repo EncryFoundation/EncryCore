@@ -12,6 +12,4 @@ object PowConsensusValidator {
     BigInt(1, headerHash) < target
   }
 
-  // TODO: Implement.
-  def validateDifficulty(actualDifficulty: Difficulty): Boolean = true
 }

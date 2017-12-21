@@ -1,8 +1,12 @@
 package encry.view.history.storage.processors
 
+import com.google.common.primitives.Ints
+import encry.consensus.{Difficulty, PowLinearController}
 import encry.settings.Constants._
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
+import encry.settings.Algos
+import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
@@ -27,6 +31,13 @@ trait BlockHeaderProcessor {
 
   protected def validate(header: EncryBlockHeader): Try[Unit]
 
+  protected def headerHeightKey(id: ModifierId): ByteArrayWrapper = ByteArrayWrapper(Algos.hash("height".getBytes ++ id))
+
+  def heightOf(id: ModifierId): Option[Int] =
+    historyStorage.db
+      .get(headerHeightKey(id))
+      .map(b => Ints.fromByteArray(b.data))
+
   /**
     * @param limit       - maximum length of resulting HeaderChain
     * @param startHeader - header to start
@@ -34,8 +45,8 @@ trait BlockHeaderProcessor {
     * @return at most limit header back in history starting from startHeader and when condition until is not satisfied
     *         Note now it includes one header satisfying until condition!
     */
-  // TODO:
-  protected def headerChainBack(limit: Int, startHeader: EncryBlockHeader, until: EncryBlockHeader => Boolean): EncryHeaderChain = {
+  protected def headerChainBack(limit: Int, startHeader: EncryBlockHeader,
+                                until: EncryBlockHeader => Boolean): EncryHeaderChain = {
     @tailrec
     def loop(header: EncryBlockHeader, acc: Seq[EncryBlockHeader]): Seq[EncryBlockHeader] = {
       if (acc.length == limit || until(header)) {
@@ -54,5 +65,13 @@ trait BlockHeaderProcessor {
 
     if (bestHeaderIdOpt.isEmpty || (limit == 0)) EncryHeaderChain(Seq())
     else EncryHeaderChain(loop(startHeader, Seq(startHeader)).reverse)
+  }
+
+  def requiredDifficultyAfter(parent: EncryBlockHeader): Difficulty = {
+    val parentHeight = heightOf(parent.id).get
+    val requiredHeadersHeights = PowLinearController.epochsHeightsForRetargetingAt(Height @@ (parentHeight + 1))
+    assert(requiredHeadersHeights.last == parentHeight, "Incorrect heights sequence!")
+    val chain = headerChainBack(requiredHeadersHeights.max - requiredHeadersHeights.min + 1, parent, (_: EncryBlockHeader) => false)
+    PowLinearController.getNewDifficulty(parent.difficulty, PowLinearController.getLastEpochsInterval(chain.headers))
   }
 }
