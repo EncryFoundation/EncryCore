@@ -1,7 +1,6 @@
 package encry.view.history.storage.processors
 
 import com.google.common.primitives.Ints
-import encry.consensus.validation.PowConsensusValidator
 import encry.consensus.{Difficulty, PowLinearController}
 import encry.settings.Constants._
 import encry.modifiers.EncryPersistentModifier
@@ -16,7 +15,7 @@ import scorex.core.consensus.History
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
-trait BlockHeaderProcessor {
+trait BlockHeadersProcessor {
 
   protected val consensusSettings: ConsensusSettings
 
@@ -32,6 +31,8 @@ trait BlockHeaderProcessor {
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
   protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage.db.get(BestHeaderKey).map(ModifierId @@ _.data)
+
+  def headersHeight: Int = bestHeaderIdOpt.flatMap(id => heightOf(id)).getOrElse(-1)
 
   protected def process(header: EncryBlockHeader): History.ProgressInfo[EncryPersistentModifier]
 
@@ -63,6 +64,24 @@ trait BlockHeaderProcessor {
     historyStorage.db
       .get(headerHeightKey(id))
       .map(b => Ints.fromByteArray(b.data))
+
+  def isInBestChain(id: ModifierId): Boolean = heightOf(id).flatMap(h => bestHeaderIdAtHeight(h))
+    .exists(_ sameElements id)
+
+  private def bestHeaderIdAtHeight(h: Int): Option[ModifierId] = headerIdsAtHeight(h).headOption
+
+  private def heightIdsKey(height: Int): ByteArrayWrapper = ByteArrayWrapper(Algos.hash(Ints.toByteArray(height)))
+
+  /**
+    * @param height - block height
+    * @return ids of headers on chosen height.
+    *         Seq.empty we don't have any headers on this height (e.g. it is too big or we bootstrap in PoPoW regime)
+    *         single id if no forks on this height
+    *         multiple ids if there are forks at chosen height.
+    *         First id is always from the best headers chain.
+    */
+  def headerIdsAtHeight(height: Int): Seq[ModifierId] =
+    ModifierId @@ historyStorage.db.get(heightIdsKey(height: Int)).map(_.data).getOrElse(Array()).grouped(32).toSeq
 
   /**
     * @param limit       - maximum length of resulting HeaderChain

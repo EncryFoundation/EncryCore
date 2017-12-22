@@ -9,9 +9,9 @@ import encry.EncryApp
 import scorex.core.utils.ScorexLogging
 
 case class EncryAppSettings(directory: String,
-                       consensusSettings: ConsensusSettings,
-                       testingSettings: TestingSettings,
-                       nodeSettings: NodeSettings)
+                            consensusSettings: ConsensusSettings,
+                            testingSettings: TestingSettings,
+                            nodeSettings: NodeSettings)
 
 object EncryAppSettings extends ScorexLogging {
 

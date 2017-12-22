@@ -56,13 +56,13 @@ object EncryApp extends App {
   println("     Nonce > " + block.nonce)
 
   // Miner
-//  var foundBlock: Option[EncryBlockHeader] = None
-//  while (foundBlock.isEmpty) {
-//    foundBlock = PowMiner.powIteration(
-//      99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 16, Difficulty @@ BigInt(500), senderProp)
-//  }
-//
-//  println("Found valid blok hash: " + Base16.encode(foundBlock.get.id))
+  var foundBlock: Option[EncryBlockHeader] = None
+  while (foundBlock.isEmpty) {
+    foundBlock = PowMiner.powIteration(
+      99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 16, Difficulty @@ BigInt(500), senderProp)
+  }
+
+  println("Found valid blok hash: " + Base16.encode(foundBlock.get.id))
 
 
 
@@ -116,7 +116,8 @@ object EncryApp extends App {
   //Block init
 
   val testPayload = new EncryBlockPayload(ModifierId @@ "ModId".getBytes(),IndexedSeq(BaseTX1,BaseTX2))
-  val testHeader = EncryBlockHeader(99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 9999L, 0, 16, Difficulty @@ BigInt(20000), senderProp)
+  val testHeader = EncryBlockHeader(99.toByte, ModifierId @@ Longs.toByteArray(999L),
+    Digest32 @@ Array[Byte](32), 9999L, 0, 16, Difficulty @@ BigInt(20000), senderProp)
   val testBlock = new EncryBlock(testHeader,testPayload)
 
   //UTXO init

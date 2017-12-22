@@ -13,8 +13,8 @@ class PowLinearController(consensusSettings: ConsensusSettings) {
 
   // Retargeting to adjust difficulty.
   def getNewTarget(oldTarget: BigInt, lastEpochsIntervalMs: FiniteDuration): BigInt =
-    oldTarget * lastEpochsIntervalMs.toMillis / consensusSettings.desiredEpochIntervalSec.toMillis *
-      consensusSettings.retargetingEpochsQty
+    oldTarget * lastEpochsIntervalMs.toMillis / (consensusSettings.desiredEpochIntervalSec.toMillis *
+      consensusSettings.retargetingEpochsQty)
 
   def getNewDifficulty(oldDifficulty: Difficulty, lastEpochsIntervalMs: FiniteDuration): Difficulty =
     Difficulty @@ (ConsensusSettings.maxTarget / getNewTarget(getTarget(oldDifficulty), lastEpochsIntervalMs))
