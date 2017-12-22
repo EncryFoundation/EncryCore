@@ -2,8 +2,10 @@ package encry.modifiers.history.block.header
 
 import com.google.common.primitives.{Ints, _}
 import encry.consensus.Difficulty
-import encry.settings.{Algos, Constants}
+import encry.settings.{Algos, ConsensusSettings, Constants}
 import encry.consensus.validation.PowConsensusValidator._
+import encry.modifiers.ModifierWithDigest
+import encry.modifiers.history.block.payload.EncryBlockPayload
 import io.circe.Json
 import scorex.core.block.Block._
 import scorex.core.serialization.Serializer
@@ -50,6 +52,11 @@ case class EncryBlockHeader(override val version: Version,
   // Checks whether the block timestamp is less than
   // two hours in the future (7200000ms) (allowing for time errors).
   val validTimestamp: Boolean = (timestamp - System.currentTimeMillis()) < 7200000L
+
+  lazy val isGenesis: Boolean = height == ConsensusSettings.genesisHeight
+
+  lazy val transactionsId: ModifierId =
+    ModifierWithDigest.computeId(EncryBlockPayload.modifierTypeId, id, txMerkleRoot)
 
   override def serializer: Serializer[M] = EncryBlockHeaderSerializer
 
