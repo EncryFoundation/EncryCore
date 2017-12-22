@@ -43,8 +43,6 @@ object EncryApp extends App {
   //  new EncryApp(args).run()
   //-----
 
-  println(PowLinearController.epochsHeightsForRetargetingAt(Height @@ 9))
-
   val keyPair = Curve25519.createKeyPair(Base58.decode("Bars").get)
   val pubKey : PublicKey = keyPair._2
   val priKey : PrivateKey = keyPair._1
@@ -56,26 +54,19 @@ object EncryApp extends App {
 
   println("Block Hash > " + Base16.encode(block.id))
   println("     Nonce > " + block.nonce)
-  println(s"ValidPOW = ${block.validPow}")
 
   // Miner
-  var foundBlock: Option[EncryBlockHeader] = None
-  while (foundBlock.isEmpty) {
-    foundBlock = PowMiner.powIteration(
-      99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 16, Difficulty @@ BigInt(500), senderProp)
-  }
+//  var foundBlock: Option[EncryBlockHeader] = None
+//  while (foundBlock.isEmpty) {
+//    foundBlock = PowMiner.powIteration(
+//      99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 16, Difficulty @@ BigInt(500), senderProp)
+//  }
+//
+//  println("Found valid blok hash: " + Base16.encode(foundBlock.get.id))
 
-  println("Found valid blok hash: " + Base16.encode(foundBlock.get.id))
-
-  println(s"ValidPOW = ${foundBlock.get.validPow}")
 
 
   // Difficulty retargeting test
-  val t1 = PowLinearController.getTarget(Difficulty @@ BigInt(30000))
-
-  val d1 = PowLinearController.getNewDifficulty(Difficulty @@ BigInt(30000), FiniteDuration(70, SECONDS))
-
-  println(s"Old target is 30000 and the new is $d1")
 
   val dir = new File(System.getProperty("user.dir"))
 

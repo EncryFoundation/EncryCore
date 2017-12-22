@@ -1,6 +1,7 @@
 package encry.view.history.storage.processors
 
 import com.google.common.primitives.Ints
+import encry.consensus.validation.PowConsensusValidator
 import encry.consensus.{Difficulty, PowLinearController}
 import encry.settings.Constants._
 import encry.modifiers.EncryPersistentModifier
@@ -16,6 +17,10 @@ import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
 trait BlockHeaderProcessor {
+
+  protected val consensusSettings: ConsensusSettings
+
+  protected lazy val powLinearController = new PowLinearController(consensusSettings)
 
   protected val BestHeaderKey: ByteArrayWrapper =
     ByteArrayWrapper(Array.fill(hashLength)(EncryBlockHeader.modifierTypeId))
@@ -90,10 +95,10 @@ trait BlockHeaderProcessor {
 
   def requiredDifficultyAfter(parent: EncryBlockHeader): Difficulty = {
     val parentHeight = heightOf(parent.id).get
-    val requiredHeadersHeights = PowLinearController.epochsHeightsForRetargetingAt(Height @@ (parentHeight + 1))
+    val requiredHeadersHeights = powLinearController.epochsHeightsForRetargetingAt(Height @@ (parentHeight + 1))
     assert(requiredHeadersHeights.last == parentHeight, "Incorrect heights sequence!")
     val chain = headerChainBack(requiredHeadersHeights.max - requiredHeadersHeights.min + 1,
       parent, (_: EncryBlockHeader) => false)
-    PowLinearController.getNewDifficulty(parent.difficulty, PowLinearController.getLastEpochsInterval(chain.headers))
+    powLinearController.getNewDifficulty(parent.difficulty, powLinearController.getLastEpochsInterval(chain.headers))
   }
 }

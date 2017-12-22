@@ -11,5 +11,4 @@ object PowConsensusValidator {
     println(s"Current target is: $target")
     BigInt(1, headerHash) < target
   }
-
 }

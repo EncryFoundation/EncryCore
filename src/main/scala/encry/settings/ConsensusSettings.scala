@@ -5,11 +5,11 @@ import java.util.concurrent.TimeUnit.SECONDS
 
 import encry.view.history.Height
 
-object ConsensusSettings {
+case class ConsensusSettings(initialDifficulty: BigInt,
+                             desiredEpochIntervalSec: FiniteDuration,
+                             retargetingEpochsQty: Int)
 
-  val initialDifficulty: BigInt = 15000
-  val maxTarget = BigInt(1, Array.fill(32)(Byte.MinValue))
-  val desiredEpochIntervalSec: FiniteDuration = FiniteDuration(60, SECONDS)
-  val retargetingEpochsQty: Int = 10
+object ConsensusSettings {
+  val maxTarget = BigInt(1, Array.fill(32)(Byte.MinValue))  // 2^256
   val genesisHeight: Height = Height @@ 1
 }

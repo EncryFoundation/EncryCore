@@ -3,7 +3,7 @@ package encry.view.history
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.settings.Algos
+import encry.settings.{Algos, ConsensusSettings}
 import encry.view.history.storage.HistoryStorage
 import encry.view.history.storage.processors.{BlockHeaderProcessor, BlockPayloadProcessor}
 import io.iohk.iodb.Store
@@ -29,6 +29,8 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
   with BlockHeaderProcessor
   with BlockPayloadProcessor
   with ScorexLogging {
+
+  protected val consensusSettings: ConsensusSettings
 
   protected val storage: Store
 
