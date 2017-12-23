@@ -1,7 +1,5 @@
 package encry.modifiers.state.box
 
-import scorex.core.transaction.box.Box
-import scorex.core.transaction.box.proposition.Proposition
 import scorex.crypto.authds._
 import scorex.crypto.encode.Base58
 

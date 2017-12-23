@@ -75,21 +75,25 @@ class UtxoState(override val version: VersionTag,
       tx.semanticValidity.get
       tx match {
         case tx: EncryPaymentTransaction =>
+          var inputsSum: Long = 0
           tx.useOutputs.foreach { key =>
             store.get(new ByteArrayWrapper(key)) match {
               case Some(data) =>
                 data match {
                   case data: Store.V =>
                     EncryPaymentBoxSerializer.parseBytes(data.data).get match {
-                      case nb: EncryPaymentBox =>
-                        if (nb.proposition.address == tx.senderProposition.address) Success(nb)
-                        else throw new Error("Illegal UTXO reference!")
-                      case _ => throw new Error(s"Cannot parse Box referenced in TX ${tx.txHash}")
+                      case box: EncryPaymentBox =>
+                        if (box.proposition.address == tx.senderProposition.address)
+                          inputsSum = inputsSum + box.body.amount
+                        else Failure(new Error(""))
+                      case _ => Failure(new Error(s"Cannot parse Box referenced in TX ${tx.txHash}"))
                     }
                 }
-              case None => Failure
+              case None => Failure(new Error(s"Cannot parse Box referenced in TX ${tx.txHash}"))
             }
           }
+          if (tx.createOutputs.map(i => i._2).sum != inputsSum) Failure(new Error("Inputs total amount overflow."))
+        case _ => Failure(new Error("Got Modifier of unknown type."))
       }
     }
   }
@@ -111,6 +115,7 @@ class UtxoState(override val version: VersionTag,
           println("Error occured during modifier application")
           Failure(e)
       }
+    case _ => Failure(new Error("Got Modifier of unknown type."))
   }
 
   //TODO: implement

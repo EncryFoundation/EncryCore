@@ -17,6 +17,7 @@ import scorex.core.consensus.History.ProgressInfo
 import scorex.core.utils.ScorexLogging
 
 import scala.annotation.tailrec
+import scala.util
 import scala.util.{Failure, Success, Try}
 
 trait BlockHeadersProcessor extends ScorexLogging {
@@ -38,6 +39,9 @@ trait BlockHeadersProcessor extends ScorexLogging {
 
   protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage.db.get(BestHeaderKey).map(ModifierId @@ _.data)
 
+  /**
+    * @return height of best header
+    */
   def headersHeight: Int = bestHeaderIdOpt.flatMap(id => heightOf(id)).getOrElse(-1)
 
   /**
@@ -78,6 +82,8 @@ trait BlockHeadersProcessor extends ScorexLogging {
       Failure(new Error("Header <id: ${header.id}> difficulty too low."))
     if (!header.validPow)
       Failure(new Error(s"Invalid POW in header <id: ${header.id}>"))
+    if (!heightOf(header.parentId).exists(h => headersHeight - h < consensusSettings.maxRollback))
+      Failure(new Error("Header is too old to be applied."))
     Success()
   }
 
@@ -132,13 +138,23 @@ trait BlockHeadersProcessor extends ScorexLogging {
     }
   }
 
-  protected def headerHeightKey(id: ModifierId): ByteArrayWrapper =
-    ByteArrayWrapper(Algos.hash("height".getBytes ++ id))
+//  protected def reportInvalid(header: EncryBlockHeader): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
+//
+//    val modifierId = header.id
+//    val payloadModifiers = Seq(header.transactionsId, header.ADProofsId).filter(id => historyStorage.contains(id))
+//      .map(id => ByteArrayWrapper(id))
+//
+//    val toRemove = Seq(headerScoreKey(modifierId), ByteArrayWrapper(modifierId)) ++ payloadModifiers
+//    val bestHeaderKeyUpdate = if (bestHeaderIdOpt.exists(_ sameElements modifierId)) {
+//      Seq(BestHeaderKey -> ByteArrayWrapper(header.parentId))
+//    } else Seq()
+//    val bestFullBlockKeyUpdate = if (bestFullBlockIdOpt.exists(_ sameElements modifierId)) {
+//      Seq(BestFullBlockKey -> ByteArrayWrapper(header.parentId))
+//    } else Seq()
+//    (toRemove, bestFullBlockKeyUpdate ++ bestHeaderKeyUpdate)
+//
+//  }
 
-  def heightOf(id: ModifierId): Option[Int] =
-    historyStorage.db
-      .get(headerHeightKey(id))
-      .map(b => Ints.fromByteArray(b.data))
 
   def isInBestChain(id: ModifierId): Boolean = heightOf(id).flatMap(h => bestHeaderIdAtHeight(h))
     .exists(_ sameElements id)
@@ -153,14 +169,18 @@ trait BlockHeadersProcessor extends ScorexLogging {
 
   protected def headerScoreKey(id: ModifierId): ByteArrayWrapper = ByteArrayWrapper(Algos.hash("score".getBytes ++ id))
 
-  /**
-    * @param id - header id
-    * @return score of header with such id if is in History
-    */
+  protected def headerHeightKey(id: ModifierId): ByteArrayWrapper = ByteArrayWrapper(Algos.hash("height".getBytes ++ id))
+
+  // TODO: How `block score` is calculated?
   protected def scoreOf(id: ModifierId): Option[BigInt] =
     historyStorage.db
       .get(headerScoreKey(id))
       .map(b => BigInt(b.data))
+
+  def heightOf(id: ModifierId): Option[Int] =
+    historyStorage.db
+      .get(headerHeightKey(id))
+      .map(b => Ints.fromByteArray(b.data))
 
   /**
     * @param height - block height
