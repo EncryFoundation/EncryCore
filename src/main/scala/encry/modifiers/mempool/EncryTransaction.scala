@@ -1,7 +1,7 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Longs}
-import encry.modifiers.state.box.EncryBaseBox
+import encry.modifiers.state.box.EncryBox
 import encry.modifiers.state.box.body.BaseBoxBody
 import scorex.core.serialization.JsonSerializable
 import scorex.core.transaction.box.BoxUnlocker
@@ -24,7 +24,7 @@ trait EncryTransaction[P <: Proposition, BXP <: Proposition, BB <: BaseBoxBody]
   // `BoxUnlocker` holds ID and Key of the box to open (Sequence of `Tx Inputs` + Keys to unlock them).
   val unlockers: Traversable[BoxUnlocker[P]]
   // Sequence of `Tx Outputs`.
-  val newBoxes: Traversable[EncryBaseBox[BXP, BB]]
+  val newBoxes: Traversable[EncryBox[BXP, BB]]
 
   val fee: Long
   val timestamp: Long

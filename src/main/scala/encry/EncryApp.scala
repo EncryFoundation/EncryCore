@@ -25,7 +25,7 @@ import encry.settings.Algos
 import encry.view.history.Height
 import encry.view.state.UtxoState
 import scorex.core.transaction.proof.Signature25519
-import scorex.crypto.authds.ADKey
+import scorex.crypto.authds.{ADDigest, ADKey}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
 import scala.concurrent.duration.FiniteDuration
@@ -50,7 +50,8 @@ object EncryApp extends App {
   val senderProp = PublicKey25519Proposition(pubKey)
 
   val block = new EncryBlockHeader(
-    99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 9999L, 0, 16, Difficulty @@ BigInt(20), senderProp)
+    99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), ADDigest @@ Array[Byte](32),
+    Digest32 @@ Array[Byte](32), 9999L, 0, 16, Difficulty @@ BigInt(20), senderProp)
 
   println("Block Hash > " + Base16.encode(block.id))
   println("     Nonce > " + block.nonce)
@@ -59,7 +60,8 @@ object EncryApp extends App {
   var foundBlock: Option[EncryBlockHeader] = None
   while (foundBlock.isEmpty) {
     foundBlock = PowMiner.powIteration(
-      99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), 16, Difficulty @@ BigInt(500), senderProp)
+      99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32), ADDigest @@ Array[Byte](32),
+      Digest32 @@ Array[Byte](32), 16, Difficulty @@ BigInt(500), senderProp)
   }
 
   println("Found valid blok hash: " + Base16.encode(foundBlock.get.id))
@@ -116,9 +118,9 @@ object EncryApp extends App {
   //Block init
 
   val testPayload = new EncryBlockPayload(ModifierId @@ "ModId".getBytes(),IndexedSeq(BaseTX1,BaseTX2))
-  val testHeader = EncryBlockHeader(99.toByte, ModifierId @@ Longs.toByteArray(999L),
-    Digest32 @@ Array[Byte](32), 9999L, 0, 16, Difficulty @@ BigInt(20000), senderProp)
-  val testBlock = new EncryBlock(testHeader,testPayload)
+  val testHeader = EncryBlockHeader(99.toByte, ModifierId @@ Longs.toByteArray(999L), Digest32 @@ Array[Byte](32),
+    ADDigest @@ Array[Byte](32), Digest32 @@ Array[Byte](32), 9999L, 0, 16, Difficulty @@ BigInt(20000), senderProp)
+  val testBlock = new EncryBlock(testHeader, testPayload, None)
 
   //UTXO init
 

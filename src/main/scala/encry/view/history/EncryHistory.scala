@@ -8,7 +8,7 @@ import encry.view.history.storage.HistoryStorage
 import encry.view.history.storage.processors.{BlockHeadersProcessor, BlockPayloadProcessor}
 import io.iohk.iodb.Store
 import scorex.core.ModifierId
-import scorex.core.consensus.History
+import scorex.core.consensus.{History, ModifierSemanticValidity}
 import scorex.core.consensus.History.{HistoryComparisonResult, ModifierIds}
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.encode.Base58
@@ -147,6 +147,18 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
     EncrySyncInfo(answer, Seq())
   } else {
     EncrySyncInfo(answer, lastHeaders(EncrySyncInfo.MaxBlockIds).headers.map(_.id))
+  }
+
+  override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity.Value = {
+    historyStorage.db.get(validityKey(modifierId)) match {
+      case Some(b) if b.data.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
+      case Some(b) if b.data.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
+      case None if contains(modifierId) => ModifierSemanticValidity.Unknown
+      case None => ModifierSemanticValidity.Absent
+      case m =>
+        log.error(s"Incorrect validity status: $m")
+        ModifierSemanticValidity.Absent
+    }
   }
 }
 

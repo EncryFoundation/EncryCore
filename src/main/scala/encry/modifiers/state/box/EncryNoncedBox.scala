@@ -3,7 +3,7 @@ package encry.modifiers.state.box
 import encry.modifiers.state.box.body.BaseBoxBody
 import scorex.core.transaction.box.proposition.Proposition
 
-trait EncryNoncedBox[P <: Proposition, BB <: BaseBoxBody] extends EncryBaseBox[P, BB] {
+trait EncryNoncedBox[P <: Proposition, BB <: BaseBoxBody] extends EncryBox[P, BB] {
 
   val nonce: Long
 

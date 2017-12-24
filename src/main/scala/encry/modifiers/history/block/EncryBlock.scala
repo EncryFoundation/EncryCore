@@ -1,6 +1,7 @@
 package encry.modifiers.history.block
 
 import encry.modifiers.EncryPersistentModifier
+import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
@@ -13,7 +14,8 @@ import scorex.core.serialization.Serializer
 import scala.util.{Failure, Success, Try}
 
 class EncryBlock(override val header: EncryBlockHeader,
-                 override val payload: EncryBlockPayload) extends EncryBaseBlock {
+                 override val payload: EncryBlockPayload,
+                 val adProofsOpt: Option[ADProofs]) extends EncryBaseBlock {
 
   override type M = EncryBlock
 

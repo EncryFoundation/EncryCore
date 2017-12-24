@@ -12,7 +12,7 @@ import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.{ModifierId, ModifierTypeId}
-import scorex.core.consensus.History
+import scorex.core.consensus.{History, ModifierSemanticValidity}
 import scorex.core.consensus.History.ProgressInfo
 import scorex.core.utils.ScorexLogging
 
@@ -38,6 +38,21 @@ trait BlockHeadersProcessor extends ScorexLogging {
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
   protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage.db.get(BestHeaderKey).map(ModifierId @@ _.data)
+
+  def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity.Value
+
+  private def heightIdsKey(height: Int): ByteArrayWrapper = ByteArrayWrapper(Algos.hash(Ints.toByteArray(height)))
+
+  protected def headerScoreKey(id: ModifierId): ByteArrayWrapper = ByteArrayWrapper(Algos.hash("score".getBytes ++ id))
+
+  protected def headerHeightKey(id: ModifierId): ByteArrayWrapper = ByteArrayWrapper(Algos.hash("height".getBytes ++ id))
+
+  protected def validityKey(id: Array[Byte]): ByteArrayWrapper = ByteArrayWrapper(Algos.hash("validity".getBytes ++ id))
+
+  /**
+    * Id of best header with transactions and proofs. None in regime that do not process transactions
+    */
+  def bestFullBlockIdOpt: Option[ModifierId] = None
 
   /**
     * @return height of best header
@@ -138,23 +153,22 @@ trait BlockHeadersProcessor extends ScorexLogging {
     }
   }
 
-//  protected def reportInvalid(header: EncryBlockHeader): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
-//
-//    val modifierId = header.id
-//    val payloadModifiers = Seq(header.transactionsId, header.ADProofsId).filter(id => historyStorage.contains(id))
-//      .map(id => ByteArrayWrapper(id))
-//
-//    val toRemove = Seq(headerScoreKey(modifierId), ByteArrayWrapper(modifierId)) ++ payloadModifiers
-//    val bestHeaderKeyUpdate = if (bestHeaderIdOpt.exists(_ sameElements modifierId)) {
-//      Seq(BestHeaderKey -> ByteArrayWrapper(header.parentId))
-//    } else Seq()
-//    val bestFullBlockKeyUpdate = if (bestFullBlockIdOpt.exists(_ sameElements modifierId)) {
-//      Seq(BestFullBlockKey -> ByteArrayWrapper(header.parentId))
-//    } else Seq()
-//    (toRemove, bestFullBlockKeyUpdate ++ bestHeaderKeyUpdate)
-//
-//  }
+  protected def reportInvalid(header: EncryBlockHeader): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
 
+    val modifierId = header.id
+    val payloadModifiers = Seq(header.transactionsId, header.adProofsId).filter(id => historyStorage.contains(id))
+      .map(id => ByteArrayWrapper(id))
+
+    val toRemove = Seq(headerScoreKey(modifierId), ByteArrayWrapper(modifierId)) ++ payloadModifiers
+    val bestHeaderKeyUpdate = if (bestHeaderIdOpt.exists(_ sameElements modifierId)) {
+      Seq(BestHeaderKey -> ByteArrayWrapper(header.parentId))
+    } else Seq()
+    val bestFullBlockKeyUpdate = if (bestFullBlockIdOpt.exists(_ sameElements modifierId)) {
+      Seq(BestFullBlockKey -> ByteArrayWrapper(header.parentId))
+    } else Seq()
+    (toRemove, bestFullBlockKeyUpdate ++ bestHeaderKeyUpdate)
+
+  }
 
   def isInBestChain(id: ModifierId): Boolean = heightOf(id).flatMap(h => bestHeaderIdAtHeight(h))
     .exists(_ sameElements id)
@@ -164,12 +178,6 @@ trait BlockHeadersProcessor extends ScorexLogging {
   private def bestHeaderIdAtHeight(h: Int): Option[ModifierId] = headerIdsAtHeight(h).headOption
 
   private def bestHeadersChainScore: BigInt = scoreOf(bestHeaderIdOpt.get).get
-
-  private def heightIdsKey(height: Int): ByteArrayWrapper = ByteArrayWrapper(Algos.hash(Ints.toByteArray(height)))
-
-  protected def headerScoreKey(id: ModifierId): ByteArrayWrapper = ByteArrayWrapper(Algos.hash("score".getBytes ++ id))
-
-  protected def headerHeightKey(id: ModifierId): ByteArrayWrapper = ByteArrayWrapper(Algos.hash("height".getBytes ++ id))
 
   // TODO: How `block score` is calculated?
   protected def scoreOf(id: ModifierId): Option[BigInt] =

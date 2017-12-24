@@ -5,12 +5,14 @@ import encry.consensus.Difficulty
 import encry.settings.{Algos, ConsensusSettings, Constants}
 import encry.consensus.validation.PowConsensusValidator._
 import encry.modifiers.ModifierWithDigest
+import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import io.circe.Json
 import scorex.core.block.Block._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.{ModifierId, ModifierTypeId}
+import scorex.crypto.authds.ADDigest
 import scorex.crypto.hash.Digest32
 
 import scala.util.Try
@@ -18,6 +20,8 @@ import scala.util.Try
 // TODO: Add generator signature to the header to verify miner`s identity?
 case class EncryBlockHeader(override val version: Version,
                             override val parentId: ModifierId,
+                            override val adProofsRoot: Digest32,
+                            override val stateRoot: ADDigest, // 32 bytes + 1 (tree height)
                             override val txMerkleRoot: Digest32,
                             override val timestamp: Timestamp,
                             override val height: Int,
@@ -35,6 +39,8 @@ case class EncryBlockHeader(override val version: Version,
     Bytes.concat(
       Array(version),
       parentId,
+      adProofsRoot,
+      stateRoot,
       txMerkleRoot,
       Longs.toByteArray(timestamp),
       Ints.toByteArray(height),
@@ -58,6 +64,8 @@ case class EncryBlockHeader(override val version: Version,
   lazy val transactionsId: ModifierId =
     ModifierWithDigest.computeId(EncryBlockPayload.modifierTypeId, id, txMerkleRoot)
 
+  lazy val adProofsId: ModifierId = ModifierWithDigest.computeId(ADProofs.modifierTypeId, id, adProofsRoot)
+
   override def serializer: Serializer[M] = EncryBlockHeaderSerializer
 
   override def json: Json = ???
@@ -76,6 +84,7 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
     Bytes.concat(
       Array(obj.version),
       obj.parentId,
+      obj.adProofsId,
       obj.txMerkleRoot,
       Longs.toByteArray(obj.timestamp),
       Ints.toByteArray(obj.height),

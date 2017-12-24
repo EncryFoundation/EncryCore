@@ -10,6 +10,7 @@ import scorex.core.ModifierId
 import scorex.core.block.Block.Version
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.utils.ScorexLogging
+import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
 
@@ -60,6 +61,8 @@ object PowMiner extends App {
   // Makes one attempt to find the right `nonce` for block.
   def powIteration(version: Version,
                    parentId: ModifierId,
+                   adProofRoot: Digest32,
+                   stateRoot: ADDigest,
                    txMerkleRoot: Digest32,
                    height: Int,
                    difficulty: Difficulty,
@@ -69,7 +72,7 @@ object PowMiner extends App {
     val timestamp = System.currentTimeMillis()
 
     val blockHeader = EncryBlockHeader(
-      version, parentId, txMerkleRoot, timestamp, height, nonce, difficulty, generatorProposition)
+      version, parentId, adProofRoot, stateRoot, txMerkleRoot, timestamp, height, nonce, difficulty, generatorProposition)
 
     println("Testing block hash: " + Base16.encode(blockHeader.id))
 

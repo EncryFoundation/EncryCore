@@ -1,9 +1,9 @@
 package encry.modifiers.history
 
 import com.google.common.primitives.Bytes
-import encry.modifiers.state.box.{EncryBoxStateChanges, EncryBoxStateChangeOperation, Insertion, Removal}
+import encry.modifiers.state.box._
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
-import encry.settings.Algos
+import encry.settings.{Algos, Constants}
 import io.circe.Json
 import io.circe.syntax._
 import scorex.core.{ModifierId, ModifierTypeId}
@@ -72,33 +72,35 @@ case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
   }
 }
 
-//object ADProofs {
-//  val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (104: Byte)
-//
-//  val KL = 32
-//
-//  def proofDigest(proofBytes: SerializedAdProof): Digest32 = Algos.hash(proofBytes)
-//
-//  /**
-//    * Convert operation over a box into an AVL+ tree modification
-//    * @param change - operation over a box
-//    * @return AVL+ tree modification
-//    */
-//  def changeToMod(change: EncryBoxStateChangeOperation): Modification =
-//    change match {
-//      case i: Insertion =>
-//        Insert(i.box.id, ADValue @@ i.box.bytes)
-//      case r: Removal[AnyoneCanSpendProposition.type, AnyoneCanSpendNoncedBox] =>
-//        Remove(r.boxId)
-//    }
-//}
-//
-//object ADProofSerializer extends Serializer[ADProofs] {
-//  override def toBytes(obj: ADProofs): Array[Byte] = Bytes.concat(obj.headerId, obj.proofBytes)
-//
-//  override def parseBytes(bytes: Array[Byte]): Try[ADProofs] = Try {
-//    ADProofs(
-//      ModifierId @@ bytes.take(Constants.ModifierIdSize),
-//      SerializedAdProof @@ bytes.slice(Constants.ModifierIdSize, bytes.length))
-//  }
-//}
+object ADProofs {
+  val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (104: Byte)
+
+  val KL = 32
+
+  def proofDigest(proofBytes: SerializedAdProof): Digest32 = Algos.hash(proofBytes)
+
+  /**
+    * Convert operation over a box into an AVL+ tree modification
+    * @param change - operation over a box
+    * @return AVL+ tree modification
+    */
+  def changeToMod(change: EncryBoxStateChangeOperation): Modification =
+    change match {
+      case Insertion(box) => box match {
+        case box: EncryPaymentBox => Insert(box.id, ADValue @@ box.bytes)
+        case _ => throw new Error("Got state modifier of unknown type.")
+      }
+      case r: Removal => Remove(r.boxId)
+    }
+}
+
+object ADProofSerializer extends Serializer[ADProofs] {
+
+  override def toBytes(obj: ADProofs): Array[Byte] = Bytes.concat(obj.headerId, obj.proofBytes)
+
+  override def parseBytes(bytes: Array[Byte]): Try[ADProofs] = Try {
+    ADProofs(
+      ModifierId @@ bytes.take(Constants.ModifierIdSize),
+      SerializedAdProof @@ bytes.slice(Constants.ModifierIdSize, bytes.length))
+  }
+}
