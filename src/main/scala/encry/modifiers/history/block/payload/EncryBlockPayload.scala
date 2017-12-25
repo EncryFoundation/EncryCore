@@ -30,7 +30,7 @@ class EncryBlockPayload(override val headerId: ModifierId, txs: Seq[EncryBaseTra
     "transactions" -> txs.map(_.json).asJson
   ).asJson
 
-  override def serializer: Serializer[EncryBlockPayload] = EncryPaymentBlockPayloadSerializer
+  override def serializer: Serializer[EncryBlockPayload] = EncryBlockPayloadSerializer
 
 }
 
@@ -41,7 +41,7 @@ object EncryBlockPayload {
   def rootHash(ids: Seq[ModifierId]): Digest32 = Algos.merkleTreeRoot(LeafData @@ ids)
 }
 
-object EncryPaymentBlockPayloadSerializer extends Serializer[EncryBlockPayload] {
+object EncryBlockPayloadSerializer extends Serializer[EncryBlockPayload] {
 
   override def toBytes(obj: EncryBlockPayload): Array[Byte] = ???
 
