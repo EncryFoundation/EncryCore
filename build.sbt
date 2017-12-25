@@ -4,7 +4,7 @@ version := "0.1"
 
 scalaVersion := "2.12.4"
 
-val scorexVersion = "2.0.0-RC3-256-g6bc4705-SNAPSHOT"
+val scorexVersion = "2.0.0-RC3-333-gf59db6f-SNAPSHOT"
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
   "SonaType" at "https://oss.sonatype.org/content/groups/public",

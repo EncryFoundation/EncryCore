@@ -50,7 +50,7 @@ case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
                      changes: EncryBoxStateChanges) =
       changes.operations.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, o) =>
         t.flatMap(_ => {
-          verifier.performOneOperation(ADProofs.changeToMod(o))
+          verifier.performOneOperation(ADProofs.toModification(o))
         })
       }
 
@@ -81,11 +81,11 @@ object ADProofs {
 
   /**
     * Convert operation over a box into an AVL+ tree modification
-    * @param change - operation over a box
+    * @param op - operation over a box
     * @return AVL+ tree modification
     */
-  def changeToMod(change: EncryBoxStateChangeOperation): Modification =
-    change match {
+  def toModification(op: EncryBoxStateChangeOperation): Modification =
+    op match {
       case Insertion(box) => box match {
         case box: EncryPaymentBox => Insert(box.id, ADValue @@ box.bytes)
         case _ => throw new Error("Got state modifier of unknown type.")

@@ -14,7 +14,7 @@ import scorex.crypto.encode.Base16
 
 import scala.util.Try
 
-trait EncryBaseState[IState <: MinimalState[EncryPersistentModifier, IState]]
+trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   extends MinimalState[EncryPersistentModifier, IState] with ScorexLogging {
 
   self: IState =>
@@ -41,7 +41,9 @@ trait EncryBaseState[IState <: MinimalState[EncryPersistentModifier, IState]]
 
 }
 
-object EncryBaseState extends ScorexLogging{
+object EncryState extends ScorexLogging{
+
+  // 33 bytes in Base58 encoding.
   val afterGenesisStateDigestHex: String = "f2343e160d4e42a83a87ea1a2f56b6fa2046ab8146c5e61727c297be578da0f510"
   val afterGenesisStateDigest: ADDigest = ADDigest @@ Base16.decode(afterGenesisStateDigestHex)
 

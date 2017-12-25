@@ -8,4 +8,5 @@ case class NodeSettings(ADState: Boolean,
                         minimalSuffix: Int,
                         mining: Boolean,
                         miningDelay: FiniteDuration,
-                        offlineGeneration: Boolean)
+                        offlineGeneration: Boolean,
+                        keepVersions: Int)

@@ -143,7 +143,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
   }
 
   // TODO:
-  override def syncInfo(answer: Boolean): EncrySyncInfo = if (isEmpty) {
+  def syncInfo(answer: Boolean): EncrySyncInfo = if (isEmpty) {
     EncrySyncInfo(answer, Seq())
   } else {
     EncrySyncInfo(answer, lastHeaders(EncrySyncInfo.MaxBlockIds).headers.map(_.id))

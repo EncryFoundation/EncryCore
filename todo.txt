@@ -1,6 +1,5 @@
 TODO: POW Algo (Equihash, maybe) -- Simple POW implemented
 TODO: State authentication? (May already be implemented in Scorex); See: https://eprint.iacr.org/2016/994.pdf
-TODO: ADProofs implementation? ( - proof of transaction correctness relative to corresponding UTXO)
-TODO: Difficulty adjustment retargeting within consensus. (See: Antonopolus's book)
-TODO: New Target = Old Target * (Actual Time of Last 2016 Blocks / 20160 minutes)
+TODO: Base `Box` trait without generics?
+
 
