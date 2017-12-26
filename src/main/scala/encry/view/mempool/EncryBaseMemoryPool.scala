@@ -1,18 +1,19 @@
 package encry.view.mempool
 
 import encry.modifiers.mempool.EncryBaseTransaction
+import scorex.core.transaction.MempoolReader
 import scorex.core.{ModifierId, NodeViewComponent}
 
 import scala.util.Try
 
-trait EncryBaseMemoryPool[M <: EncryBaseMemoryPool[M]] extends NodeViewComponent {
+trait EncryBaseMemoryPool[M <: EncryBaseMemoryPool[M]] extends EncryMempoolReader {
 
   def getById(id: ModifierId): Option[EncryBaseTransaction]
 
   def contains(id: ModifierId): Boolean
 
   //get ids from Seq, not presenting in mempool
-  def notIn(ids: Seq[ModifierId]): Seq[ModifierId] = ids.filter(id => !contains(id))
+  override def notIn(ids: Seq[ModifierId]): Seq[ModifierId] = ids.filter(id => !contains(id))
 
   def getAll(ids: Seq[ModifierId]): Seq[EncryBaseTransaction]
 
@@ -38,4 +39,8 @@ trait EncryBaseMemoryPool[M <: EncryBaseMemoryPool[M]] extends NodeViewComponent
 
   def size: Int
 
+  /**
+    * @return read-only copy of this history
+    */
+  def getReader: EncryMempoolReader = this
 }

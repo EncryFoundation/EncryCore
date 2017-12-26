@@ -15,7 +15,7 @@ import scorex.core.{ModifierTypeId, NodeViewHolder, NodeViewModifier}
 import scorex.core.transaction.box.proposition.Proposition
 
 abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings)
-  extends NodeViewHolder[Proposition, EncryBaseTransaction, EncryPersistentModifier] {
+  extends EncryBaseNodeViewHolder[EncryPersistentModifier] {
 
   // TODO: `settings.scorexSettings.network.networkChunkSize` should be used.
   override val networkChunkSize: Int = 400
