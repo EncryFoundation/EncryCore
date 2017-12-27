@@ -8,7 +8,7 @@ import scorex.core.transaction.box.Box
 import scorex.core.transaction.box.Box.Amount
 
 // TODO: Substitute `scorex.core.transaction.box.Box[P]` with custom base trait without generic params.
-trait EncryBox[P <: Proposition, BB <: BaseBoxBody] extends Box[P] with JsonSerializable {
+trait EncryBox[P <: Proposition, BB <: BaseBoxBody] extends EncryBaseBox with JsonSerializable {
   override val proposition: P
   override val id: ADKey
   val body: BB

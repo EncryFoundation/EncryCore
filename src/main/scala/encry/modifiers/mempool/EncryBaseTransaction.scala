@@ -1,13 +1,16 @@
 package encry.modifiers.mempool
 
 import encry.modifiers.mempool.EncryTransaction.TxTypeId
+import scorex.core.transaction.Transaction
+import scorex.core.transaction.box.proposition.{ProofOfKnowledgeProposition, Proposition}
 import scorex.core.transaction.proof.Signature25519
+import scorex.core.transaction.state.Secret
 import scorex.core.{EphemerealNodeViewModifier, ModifierId, ModifierTypeId}
 import scorex.crypto.hash.{Blake2b256, Digest32}
 
 import scala.util.Try
 
-trait EncryBaseTransaction extends EphemerealNodeViewModifier {
+trait EncryBaseTransaction extends Transaction[Proposition] {
   override val modifierTypeId: ModifierTypeId = EncryBaseTransaction.ModifierTypeId
 
   val messageToSign: Array[Byte]

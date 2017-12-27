@@ -19,7 +19,7 @@ class EncryBlock(override val header: EncryBlockHeader,
 
   override type M = EncryBlock
 
-  override val toSeq: Seq[EncryPersistentModifier] = Seq(header, payload)
+  override val toSeq: Seq[EncryPersistentModifier] = Seq(header, payload) ++ adProofsOpt.toSeq
 
   override def transactions: Seq[EncryBaseTransaction] = payload.transactions
 

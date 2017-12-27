@@ -3,6 +3,7 @@ package encry.view.wallet
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
 import scorex.core.VersionTag
+import scorex.core.transaction.box.Box
 import scorex.core.transaction.box.proposition.{Proposition, PublicKey25519Proposition}
 import scorex.core.transaction.state.PrivateKey25519
 import scorex.core.transaction.wallet.{Wallet, WalletBox, WalletTransaction}
@@ -23,9 +24,9 @@ class EncryWallet
 
   override def generateNewSecret(): EncryWallet = this
 
-  override def historyTransactions: Seq[WalletTransaction[PublicKey25519Proposition, EncryBaseTransaction]] = ???
+  override def historyTransactions: Seq[WalletTransaction[Proposition, EncryBaseTransaction]] = ???
 
-  override def boxes(): Seq[WalletBox[PublicKey25519Proposition, EncryBaseTransaction]] = ???
+  override def boxes(): Seq[WalletBox[Proposition, Box[Proposition]]] = ???
 
   override def publicKeys: Set[PI] = Set()
 
@@ -38,7 +39,7 @@ class EncryWallet
   override def scanOffchain(txs: Seq[EncryBaseTransaction]): EncryWallet = this
 
   //todo: implement
-  override def scanPersistent(modifier: EncryBaseTransaction): EncryWallet = this
+  override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = this
 
   //todo: implement
   override def rollback(to: VersionTag): Try[EncryWallet] = Success(this)

@@ -238,4 +238,21 @@ object UtxoState {
 
     Seq(idStateDigestIdxElem, stateDigestIdIdxElem, bestVersion)
   }
+
+  def fromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
+    val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32, valueLengthOpt = None)
+    bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
+
+    val store = new LSMStore(dir, keepVersions = Constants.keepVersions)
+
+    new UtxoState(EncryState.genesisStateVersion, store/*, nodeViewHolderRef*/) {
+      override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
+        PersistentBatchAVLProver.create(p,
+                                        storage,
+                                        metadata(EncryState.genesisStateVersion, p.digest),
+                                        paranoidChecks = true).get
+
+      assert(persistentProver.digest.sameElements(storage.version.get))
+    }
+  }
 }
