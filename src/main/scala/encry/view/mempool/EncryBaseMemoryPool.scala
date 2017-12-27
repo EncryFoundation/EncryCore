@@ -1,8 +1,7 @@
 package encry.view.mempool
 
 import encry.modifiers.mempool.EncryBaseTransaction
-import scorex.core.transaction.MempoolReader
-import scorex.core.{ModifierId, NodeViewComponent}
+import scorex.core.ModifierId
 
 import scala.util.Try
 
