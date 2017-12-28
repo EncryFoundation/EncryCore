@@ -2,6 +2,7 @@ package encry.view.wallet
 
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
+import encry.settings.EncryAppSettings
 import scorex.core.VersionTag
 import scorex.core.transaction.box.Box
 import scorex.core.transaction.box.proposition.{Proposition, PublicKey25519Proposition}
@@ -45,4 +46,8 @@ class EncryWallet
   override def rollback(to: VersionTag): Try[EncryWallet] = Success(this)
 
   override type NVCT = this.type
+}
+
+object EncryWallet {
+  def readOrGenerate(settings: EncryAppSettings): EncryWallet = new EncryWallet
 }

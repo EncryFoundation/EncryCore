@@ -1,4 +1,4 @@
-package encry.view.history.storage.processors
+package encry.view.history.storage.processors.payload
 
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.payload.EncryBlockPayload
@@ -6,7 +6,7 @@ import scorex.core.consensus.History
 
 import scala.util.Try
 
-trait BlockPayloadProcessor {
+trait  BaseBlockPayloadProcessor {
 
   protected def process(payload: EncryBlockPayload): History.ProgressInfo[EncryPersistentModifier]
 

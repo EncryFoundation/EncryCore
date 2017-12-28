@@ -61,7 +61,7 @@ case class EncryBlockHeader(override val version: Version,
 
   lazy val isGenesis: Boolean = height == ConsensusSettings.genesisHeight
 
-  lazy val transactionsId: ModifierId =
+  lazy val payloadId: ModifierId =
     ModifierWithDigest.computeId(EncryBlockPayload.modifierTypeId, id, txMerkleRoot)
 
   lazy val adProofsId: ModifierId = ModifierWithDigest.computeId(ADProofs.modifierTypeId, id, adProofsRoot)

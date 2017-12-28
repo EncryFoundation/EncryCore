@@ -1,5 +1,7 @@
 package encry.view
 
+import akka.actor.{ActorRef, ActorSystem, Props}
+import encry.EncryApp
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
@@ -8,11 +10,13 @@ import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransactionSer
 import encry.settings.EncryAppSettings
 import encry.view.history.{EncryHistory, EncrySyncInfo}
 import encry.view.mempool.EncryMempool
-import encry.view.state.EncryState
+import encry.view.state.{DigestState, EncryState, UtxoState}
 import encry.view.wallet.EncryWallet
 import scorex.core.serialization.Serializer
 import scorex.core.{ModifierTypeId, NodeViewHolder, NodeViewModifier}
 import scorex.core.transaction.box.proposition.Proposition
+
+import scala.util.{Failure, Success}
 
 abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings)
   extends NodeViewHolder[Proposition, EncryBaseTransaction, EncryPersistentModifier] {
@@ -57,10 +61,58 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     //todo: ensure that history is in certain mode
     val history = EncryHistory.readOrGenerate(settings)
 
-    val wallet = ErgoWallet.readOrGenerate(settings)
+    val wallet = EncryWallet.readOrGenerate(settings)
 
-    val memPool = ErgoMemPool.empty
+    val memPool = EncryMempool.empty
 
     (history, state, wallet, memPool)
+  }
+
+  /**
+    * Restore a local view during a node startup. If no any stored view found
+    * (e.g. if it is a first launch of a node) None is to be returned
+    */
+  override def restoreState: Option[NodeView] = {
+    EncryState.readOrGenerate(settings, Some(self)).map { stateIn =>
+      //todo: ensure that history is in certain mode
+      val history = EncryHistory.readOrGenerate(settings)
+      val wallet = EncryWallet.readOrGenerate(settings)
+      val memPool = EncryMempool.empty
+      val state = restoreConsistentState(stateIn.asInstanceOf[MS], history)
+      (history, state, wallet, memPool)
+    }
+  }
+
+  private def restoreConsistentState(state: StateType, history: EncryHistory) = {
+    // TODO: Do we need more than 1 block here?
+    history.bestFullBlockOpt.map { fb =>
+      if (!(state.version sameElements fb.id)) {
+        state.applyModifier(fb) match {
+          case Success(s) =>
+            log.info(s"State and History are inconsistent on startup. Applied missed modifier ${fb.encodedId}")
+            s
+          case Failure(e) =>
+            // TODO: Catch errors here.
+            log.error(s"Failed to apply missed modifier ${fb.encodedId}. Try to resync from genesis", e)
+            EncryApp.forceStopApplication(500)
+            state
+        }
+      } else {
+        state
+      }
+    }.getOrElse(state)
+  }
+}
+
+private[view] class DigestEncryNodeViewHolder(settings: EncryAppSettings)
+  extends EncryNodeViewHolder[DigestState](settings)
+
+private[view] class UtxoEncryNodeViewHolder(settings: EncryAppSettings)
+  extends EncryNodeViewHolder[UtxoState](settings)
+
+object ErgoNodeViewHolder {
+  def createActor(system: ActorSystem, settings: EncryAppSettings): ActorRef = {
+    if (settings.nodeSettings.ADState) system.actorOf(Props.create(classOf[DigestEncryNodeViewHolder], settings))
+    else system.actorOf(Props.create(classOf[UtxoEncryNodeViewHolder], settings))
   }
 }

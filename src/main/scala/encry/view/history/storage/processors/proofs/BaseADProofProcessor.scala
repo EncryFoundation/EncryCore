@@ -6,7 +6,7 @@ import scorex.core.consensus.History.ProgressInfo
 
 import scala.util.Try
 
-trait ADProofProcessor {
+trait BaseADProofProcessor {
 
   /**
     * Root hash only is kept in state

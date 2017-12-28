@@ -5,6 +5,7 @@ import encry.consensus.{Difficulty, PowLinearController}
 import encry.settings.Constants._
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.HistoryModifierSerializer
+import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.{Algos, ConsensusSettings, NodeSettings}
@@ -20,7 +21,7 @@ import scala.annotation.tailrec
 import scala.util
 import scala.util.{Failure, Success, Try}
 
-trait BlockHeadersProcessor extends ScorexLogging {
+trait BlockHeaderProcessor extends ScorexLogging {
 
   protected val nodeSettings: NodeSettings
 
@@ -48,6 +49,11 @@ trait BlockHeadersProcessor extends ScorexLogging {
   protected def headerHeightKey(id: ModifierId): ByteArrayWrapper = ByteArrayWrapper(Algos.hash("height".getBytes ++ id))
 
   protected def validityKey(id: Array[Byte]): ByteArrayWrapper = ByteArrayWrapper(Algos.hash("validity".getBytes ++ id))
+
+  // Defined if `scorex.core.consensus.HistoryReader`.
+  def contains(id: ModifierId): Boolean
+
+  def bestFullBlockOpt: Option[EncryBlock]
 
   /**
     * Id of best header with transactions and proofs. None in regime that do not process transactions
@@ -146,9 +152,9 @@ trait BlockHeadersProcessor extends ScorexLogging {
       case (true, true) =>
         // Ignoring `ADProofs` for now.
         // Original: Seq((EncryBlockPayload.modifierTypeId, h.transactionsId), (ADProofs.modifierTypeId, h.ADProofsId))
-        Seq((EncryBlockPayload.modifierTypeId, h.transactionsId))
+        Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
       case (true, false) =>
-        Seq((EncryBlockPayload.modifierTypeId, h.transactionsId))
+        Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
       case (false, _) => Seq()
     }
   }
@@ -156,7 +162,7 @@ trait BlockHeadersProcessor extends ScorexLogging {
   protected def reportInvalid(header: EncryBlockHeader): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
 
     val modifierId = header.id
-    val payloadModifiers = Seq(header.transactionsId, header.adProofsId).filter(id => historyStorage.contains(id))
+    val payloadModifiers = Seq(header.payloadId, header.adProofsId).filter(id => historyStorage.contains(id))
       .map(id => ByteArrayWrapper(id))
 
     val toRemove = Seq(headerScoreKey(modifierId), ByteArrayWrapper(modifierId)) ++ payloadModifiers

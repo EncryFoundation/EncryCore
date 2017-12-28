@@ -8,14 +8,12 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings._
-import encry.view.history.storage.HistoryStorage
-import encry.view.history.storage.processors.proofs.ADProofProcessor
-import encry.view.history.storage.processors.{BlockHeadersProcessor, BlockPayloadProcessor}
+import encry.view.history.storage.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
+import encry.view.history.storage.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.ModifierId
 import scorex.core.consensus.{History, ModifierSemanticValidity}
 import scorex.core.consensus.History.{HistoryComparisonResult, ModifierIds, ProgressInfo}
-import scorex.core.utils.ScorexLogging
 import scorex.crypto.encode.Base58
 
 import scala.util.{Failure, Try}
@@ -48,7 +46,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
                                       valid: Boolean,
                                       unusedParam: ModifierId): (EncryHistory, ProgressInfo[EncryPersistentModifier]) = {
     def validityRowsForHeader(h: EncryBlockHeader): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
-      Seq(h.id, h.transactionsId, h.adProofsId).map(id => validityKey(id) -> ByteArrayWrapper(Array(0.toByte)))
+      Seq(h.id, h.payloadId, h.adProofsId).map(id => validityKey(id) -> ByteArrayWrapper(Array(0.toByte)))
     }
 
     if (valid) {
@@ -155,26 +153,26 @@ object EncryHistory {
     iFile.mkdirs()
     val db = new LSMStore(iFile, keepVersions = Constants.keepVersions)
 
-    val nodeSettings = settings.nodeSettings
+    val _nodeSettings = settings.nodeSettings
 
     // TODO: Processors mix-ins for `EncryHistory` at instantiating.
-    val history: EncryHistory = (nodeSettings.ADState, nodeSettings.verifyTransactions) match {
+    val history: EncryHistory = (_nodeSettings.ADState, _nodeSettings.verifyTransactions) match {
       case (true, true) =>
-        new EncryHistory /* with `SomeProcessorMix-in` */ {
+        new EncryHistory with ADStateProofProcessor with BlockPayloadProcessor {
           override protected val consensusSettings: ConsensusSettings = settings.consensusSettings
-          override protected val nodeSettings: NodeSettings = nodeSettings
+          override protected val nodeSettings: NodeSettings = _nodeSettings
           override protected val storage: Store = db
         }
       case (false, true) =>
-        new EncryHistory {
+        new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
           override protected val consensusSettings: ConsensusSettings = settings.consensusSettings
-          override protected val nodeSettings: NodeSettings = nodeSettings
+          override protected val nodeSettings: NodeSettings = _nodeSettings
           override protected val storage: Store = db
         }
       case (true, false) =>
-        new EncryHistory {
+        new EncryHistory with ADStateProofProcessor with EmptyBlockPayloadProcessor {
           override protected val consensusSettings: ConsensusSettings = settings.consensusSettings
-          override protected val nodeSettings: NodeSettings = nodeSettings
+          override protected val nodeSettings: NodeSettings = _nodeSettings
           override protected val storage: Store = db
         }
       case m =>

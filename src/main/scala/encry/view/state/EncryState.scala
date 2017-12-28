@@ -5,10 +5,10 @@ import java.io.File
 import akka.actor.ActorRef
 import encry.crypto.Address
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.mempool.EncryBaseTransaction
+import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
 import encry.modifiers.state.box.body.PaymentBoxBody
 import encry.modifiers.state.box.proposition.AddressProposition
-import encry.modifiers.state.box.{EncryBaseBox, EncryBoxStateChanges, EncryPaymentBox}
+import encry.modifiers.state.box._
 import encry.settings.{Algos, EncryAppSettings, NodeSettings}
 import scorex.core.transaction.box.Box
 import scorex.core.transaction.box.proposition.Proposition
@@ -30,9 +30,24 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   // TODO: Implement correctly.
   def stateHeight(): Int = 0
 
-  def boxChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges
+  // Extracts `state changes` from the given sequence of transactions.
+  def boxChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
+    // Use neither `.filter` nor any validity checks here!
+    // This method should be invoked when all txs are already validated.
+    EncryBoxStateChanges(
+      txs.flatMap { tx =>
+        tx match {
+          case tx: EncryPaymentTransaction =>
+            tx.unlockers.map( unl => Removal(unl.closedBoxId)) ++
+              tx.newBoxes.map( bx => Insertion(bx) )
 
-  def boxesOf(proposition: Proposition): Seq[Box[proposition.type]]
+//        case tx: AnotherTypeTransaction => ...
+        }
+      }
+    )
+  }
+
+// TODO: Implement:  def boxesOf(proposition: Proposition): Seq[Box[proposition.type]]
 
   // ID of last applied modifier.
   override def version: VersionTag
@@ -79,5 +94,18 @@ object EncryState extends ScorexLogging{
 
   def generateGenesisDigestState(stateDir: File, settings: NodeSettings): DigestState = {
     DigestState.create(Some(genesisStateVersion), Some(afterGenesisStateDigest), stateDir, settings).get //todo: .get
+  }
+
+  def readOrGenerate(settings: EncryAppSettings, nodeViewHolderRef: Option[ActorRef]): Option[EncryState[_]] = {
+    val dir = stateDir(settings)
+    dir.mkdirs()
+
+    if (dir.listFiles().isEmpty) {
+      None
+    } else {
+      //todo: considering db state
+      if (settings.nodeSettings.ADState) DigestState.create(None, None, dir, settings.nodeSettings).toOption
+      else Some(UtxoState.create(dir/*, nodeViewHolderRef*/))
+    }
   }
 }

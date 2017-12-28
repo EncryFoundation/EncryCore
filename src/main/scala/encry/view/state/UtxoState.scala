@@ -42,29 +42,12 @@ class UtxoState(override val version: VersionTag,
 
   override def maxRollbackDepth: Int = 10
 
-  // TODO: Fix return type
-  def boxById(boxType: Any, boxId: ADKey): Option[Any] = {
+  // TODO: Fix return type!
+  def typedBoxById(boxType: Any, boxId: ADKey): Option[Any] = {
     boxType match {
       case _: EncryPaymentBox => persistentProver.unauthenticatedLookup(boxId)
         .map(EncryPaymentBoxSerializer.parseBytes).flatMap(_.toOption)
     }
-  }
-
-  // Extracts `state changes` from the given sequence of transactions.
-  def boxChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
-    // Use neither `.filter` nor any validity checks here!
-    // This method should be invoked when all txs are already validated.
-    EncryBoxStateChanges(
-      txs.flatMap { tx =>
-        tx match {
-          case tx: EncryPaymentTransaction =>
-            tx.unlockers.map( unl => Removal(unl.closedBoxId)) ++
-              tx.newBoxes.map( bx => Insertion(bx) )
-
-//        case tx: AnotherTypeTransaction => ...
-        }
-      }
-    )
   }
 
   private def onAdProofGenerated(proof: ADProofs): Unit = {
@@ -217,7 +200,7 @@ class UtxoState(override val version: VersionTag,
     Success()
   }
 
-  override def boxesOf(proposition: Proposition): Seq[Box[proposition.type]] = ???
+  def boxesOf(proposition: Proposition): Seq[Box[proposition.type]] = ???
 
 }
 

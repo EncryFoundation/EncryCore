@@ -2,5 +2,5 @@ TODO: POW Algo (Equihash, maybe) -- Simple POW implemented
 TODO: State authentication? (May already be implemented in Scorex); See: https://eprint.iacr.org/2016/994.pdf
 TODO: Base `Box` trait without generics?
 TODO: Implement custom base trait for wallet.
-
+TODO: Add @param: NodeViewHolderRef in *State.
 

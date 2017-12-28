@@ -5,7 +5,7 @@ import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
-import scorex.core.{EphemerealNodeViewModifier, ModifierId, ModifierTypeId}
+import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.crypto.authds.LeafData
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32

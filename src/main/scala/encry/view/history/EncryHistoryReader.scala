@@ -7,8 +7,9 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.{Algos, ConsensusSettings, NodeSettings}
 import encry.view.history.storage.HistoryStorage
-import encry.view.history.storage.processors.proofs.ADProofProcessor
-import encry.view.history.storage.processors.{BlockHeadersProcessor, BlockPayloadProcessor}
+import encry.view.history.storage.processors.proofs.BaseADProofProcessor
+import encry.view.history.storage.processors.BlockHeaderProcessor
+import encry.view.history.storage.processors.payload.BaseBlockPayloadProcessor
 import io.iohk.iodb.Store
 import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.core.consensus.History.{HistoryComparisonResult, ModifierIds}
@@ -19,9 +20,9 @@ import scala.util.{Failure, Try}
 
 trait EncryHistoryReader
   extends HistoryReader[EncryPersistentModifier, EncrySyncInfo]
-    with BlockHeadersProcessor
-    with BlockPayloadProcessor
-    with ADProofProcessor
+    with BlockHeaderProcessor
+    with BaseBlockPayloadProcessor
+    with BaseADProofProcessor
     with ScorexLogging {
 
   protected val consensusSettings: ConsensusSettings
@@ -30,6 +31,11 @@ trait EncryHistoryReader
   protected val storage: Store
 
   override protected lazy val historyStorage: HistoryStorage = new HistoryStorage(storage)
+
+  /**
+    * Is there's no history, even genesis block
+    */
+  def isEmpty: Boolean = bestHeaderIdOpt.isEmpty
 
   /**
     * Header of best Header chain. Empty if no genesis block is applied yet (from a chain or a PoPoW proof).
@@ -146,7 +152,7 @@ trait EncryHistoryReader
 
   def getFullBlock(header: EncryBlockHeader): Option[EncryBlock] = {
     val aDProofs = typedModifierById[ADProofs](header.adProofsId)
-    typedModifierById[EncryBlockPayload](header.transactionsId).map { txs =>
+    typedModifierById[EncryBlockPayload](header.payloadId).map { txs =>
       new EncryBlock(header, txs, aDProofs)
     }
   }
@@ -154,8 +160,8 @@ trait EncryHistoryReader
   def missedModifiersForFullChain(): Seq[(ModifierTypeId, ModifierId)] = {
     if (nodeSettings.verifyTransactions) {
       bestHeaderOpt.toSeq
-        .flatMap(h => headerChainBack(headersHeight + 1, h, p => contains(p.adProofsId) && contains(p.transactionsId)).headers)
-        .flatMap(h => Seq((EncryBlockPayload.modifierTypeId, h.transactionsId), (ADProofs.modifierTypeId, h.adProofsId)))
+        .flatMap(h => headerChainBack(headersHeight + 1, h, p => contains(p.adProofsId) && contains(p.payloadId)).headers)
+        .flatMap(h => Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId)))
         .filter(id => !contains(id._2))
     }
     else {
@@ -196,10 +202,10 @@ trait EncryHistoryReader
     (ourChain, commonBlockThenSuffixes)
   }
 
-  def syncInfo(answer: Boolean): EncrySyncInfo = if (isEmpty) {
-    EncrySyncInfo(answer, Seq())
+  override def syncInfo: EncrySyncInfo = if (isEmpty) {
+    EncrySyncInfo(Seq())
   } else {
-    EncrySyncInfo(answer, lastHeaders(EncrySyncInfo.MaxBlockIds).headers.map(_.id))
+    EncrySyncInfo(lastHeaders(EncrySyncInfo.MaxBlockIds).headers.map(_.id))
   }
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity.Value = {
