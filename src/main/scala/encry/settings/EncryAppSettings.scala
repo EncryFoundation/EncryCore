@@ -18,7 +18,7 @@ case class EncryAppSettings(directory: String,
 object EncryAppSettings extends ScorexLogging with SettingsReaders {
 
   val configPath: String = "encry"
-  val scorexConfigPath: String = "Scorex"
+  val scorexConfigPath: String = "scorex"
 
   def read(userConfigPath: Option[String]): EncryAppSettings = {
     fromConfig(readConfigFromPath(userConfigPath))

@@ -14,6 +14,7 @@ import scorex.core.network.message.MessageSpec
 import scorex.core.settings.ScorexSettings
 import scorex.core.transaction.box.proposition.Proposition
 
+import scala.concurrent.ExecutionContextExecutor
 import scala.io.Source
 
 
@@ -24,9 +25,11 @@ class EncryApp(args: Seq[String]) extends Application {
   override type PMOD = EncryPersistentModifier
   override type NVHT = EncryNodeViewHolder[_]
 
-  override implicit val settings: ScorexSettings = encrySettings.scorexSettings
+  implicit val ec: ExecutionContextExecutor = actorSystem.dispatcher
 
   lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(args.headOption)
+
+  override implicit lazy val settings: ScorexSettings = encrySettings.scorexSettings
 
   val nodeId: Array[Byte] = Algos.hash(encrySettings.scorexSettings.network.nodeName).take(5)
 
