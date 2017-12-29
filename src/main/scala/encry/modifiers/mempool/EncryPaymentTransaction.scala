@@ -131,6 +131,5 @@ object EncryPaymentTransactionSerializer extends Serializer[EncryPaymentTransact
     }
 
     EncryPaymentTransaction(sender, fee, timestamp, signature, useOutputs, createOutputs)
-
   }
 }

@@ -2,11 +2,10 @@ package encry.modifiers.mempool
 
 import encry.modifiers.mempool.EncryTransaction.TxTypeId
 import scorex.core.transaction.Transaction
-import scorex.core.transaction.box.proposition.{ProofOfKnowledgeProposition, Proposition}
+import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.proof.Signature25519
-import scorex.core.transaction.state.Secret
-import scorex.core.{EphemerealNodeViewModifier, ModifierId, ModifierTypeId}
-import scorex.crypto.hash.{Blake2b256, Digest32}
+import scorex.core.{ModifierId, ModifierTypeId}
+import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
@@ -27,7 +26,7 @@ trait EncryBaseTransaction extends Transaction[Proposition] {
   // Type of the transaction will be telling the abstract `dispatcher` how to treat particular Txn.
   val typeId: TxTypeId
 
-  override lazy val id: ModifierId = ModifierId @@ Blake2b256(txHash)
+  override lazy val id: ModifierId = ModifierId @@ txHash
 }
 
 

@@ -11,16 +11,6 @@ import scorex.core.utils.ScorexLogging
 trait EncryTransaction[P <: Proposition, BXP <: Proposition, BB <: BaseBoxBody]
   extends EncryBaseTransaction with JsonSerializable with ScorexLogging{
 
-  // `scorex.core.transaction.account.PublicKeyNoncedBox` is unsuitable for PKI
-  // as a NoncedBox[P] because of hardcoded `PublicKey25519Proposition`.
-
-  // Default `scorex.core.transaction.box.Box` is suitable only for payments
-  // being designed to store only `Long` as a value.
-
-  import encry.modifiers.mempool.EncryTransaction._
-
-  // Type of the transaction will be telling the abstract `dispatcher` how to treat particular Txn.
-
   // `BoxUnlocker` holds ID and Key of the box to open (Sequence of `Tx Inputs` + Keys to unlock them).
   val unlockers: Traversable[BoxUnlocker[P]]
   // Sequence of `Tx Outputs`.
@@ -32,7 +22,7 @@ trait EncryTransaction[P <: Proposition, BXP <: Proposition, BB <: BaseBoxBody]
 }
 
 object EncryTransaction {
-  // TODO: Make this type `supertagged`.
+
   type TxTypeId = Byte
   type Nonce = Long
   type Amount = Long
