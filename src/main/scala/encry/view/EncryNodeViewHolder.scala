@@ -110,7 +110,7 @@ private[view] class DigestEncryNodeViewHolder(settings: EncryAppSettings)
 private[view] class UtxoEncryNodeViewHolder(settings: EncryAppSettings)
   extends EncryNodeViewHolder[UtxoState](settings)
 
-object ErgoNodeViewHolder {
+object EncryNodeViewHolder {
   def createActor(system: ActorSystem, settings: EncryAppSettings): ActorRef = {
     if (settings.nodeSettings.ADState) system.actorOf(Props.create(classOf[DigestEncryNodeViewHolder], settings))
     else system.actorOf(Props.create(classOf[UtxoEncryNodeViewHolder], settings))

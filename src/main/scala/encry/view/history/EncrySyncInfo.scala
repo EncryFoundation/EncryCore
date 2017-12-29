@@ -4,6 +4,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import scorex.core.ModifierId
 import scorex.core.consensus.History.ModifierIds
 import scorex.core.consensus.SyncInfo
+import scorex.core.network.message.SyncInfoMessageSpec
 import scorex.core.serialization.Serializer
 
 import scala.util.Try
@@ -27,3 +28,5 @@ object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
 
   override def parseBytes(bytes: Array[Byte]): Try[EncrySyncInfo] = ???
 }
+
+object EncrySyncInfoMessageSpec extends SyncInfoMessageSpec[EncrySyncInfo](EncrySyncInfoSerializer.parseBytes)
