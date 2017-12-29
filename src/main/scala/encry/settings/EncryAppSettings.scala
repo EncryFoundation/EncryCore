@@ -6,14 +6,16 @@ import com.typesafe.config.{Config, ConfigFactory}
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.Ficus._
 import encry.EncryApp
+import scorex.core.settings.{ScorexSettings, SettingsReaders}
 import scorex.core.utils.ScorexLogging
 
 case class EncryAppSettings(directory: String,
                             consensusSettings: ConsensusSettings,
                             testingSettings: TestingSettings,
-                            nodeSettings: NodeSettings)
+                            nodeSettings: NodeSettings,
+                            scorexSettings: ScorexSettings)
 
-object EncryAppSettings extends ScorexLogging {
+object EncryAppSettings extends ScorexLogging with SettingsReaders {
 
   val configPath: String = "encry"
   val scorexConfigPath: String = "Scorex"
@@ -29,8 +31,9 @@ object EncryAppSettings extends ScorexLogging {
     val nodeSettings = config.as[NodeSettings](s"$configPath.node")
     val consensusSettings = config.as[ConsensusSettings](s"$configPath.chain")
     val testingSettings = config.as[TestingSettings](s"$configPath.testing")
+    val scorexSettings = config.as[ScorexSettings](scorexConfigPath)
 
-    EncryAppSettings(directory, consensusSettings, testingSettings, nodeSettings)
+    EncryAppSettings(directory, consensusSettings, testingSettings, nodeSettings, scorexSettings)
   }
 
   private def readConfigFromPath(userConfigPath: Option[String]): Config = {
@@ -43,17 +46,15 @@ object EncryAppSettings extends ScorexLogging {
     val config = maybeConfigFile match {
       // if no user config is supplied, the library will handle overrides/application/reference automatically
       case None =>
-        log.warn("APPSETTINGS:NO CONFIGURATION FILE WAS PROVIDED. STARTING WITH DEFAULT SETTINGS FOR TESTNET!")
-        //println("FALL HERE!!")
+        log.warn("NO CONFIGURATION FILE WAS PROVIDED. STARTING WITH DEFAULT SETTINGS FOR TESTNET!")
         ConfigFactory.load()
       // application config needs to be resolved wrt both system properties *and* user-supplied config.
       case Some(file) =>
         val cfg = ConfigFactory.parseFile(file)
-        if (!cfg.hasPath("App")) {
+        if (!cfg.hasPath("ergo")) {
           log.error("Malformed configuration file was provided! Aborting!")
           EncryApp.forceStopApplication()
         }
-
         ConfigFactory
           .defaultOverrides()
           .withFallback(cfg)
@@ -61,7 +62,7 @@ object EncryAppSettings extends ScorexLogging {
           .withFallback(ConfigFactory.defaultReference())
           .resolve()
     }
-    println("SEND CONFIG")
+
     config
   }
 }

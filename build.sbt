@@ -54,3 +54,29 @@ libraryDependencies ++= Seq(
   "org.scorexfoundation" %% "scrypto" % "2.0.3",
   "com.storm-enroute" %% "scalameter" % "0.8.+"
 ) ++ networkDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
+
+val opts = Seq(
+  "-server",
+  // JVM memory tuning for 2g ram
+  "-Xms128m",
+  "-Xmx2G",
+  "-XX:+ExitOnOutOfMemoryError",
+  // Java 9 support
+  "-XX:+IgnoreUnrecognizedVMOptions",
+  "--add-modules=java.xml.bind",
+
+  // from https://groups.google.com/d/msg/akka-user/9s4Yl7aEz3E/zfxmdc0cGQAJ
+  "-XX:+UseG1GC",
+  "-XX:+UseNUMA",
+  "-XX:+AlwaysPreTouch",
+
+  // probably can't use these with jstack and others tools
+  "-XX:+PerfDisableSharedMem",
+  "-XX:+ParallelRefProcEnabled",
+  "-XX:+UseStringDeduplication")
+
+// todo after adding sbt-native-packager
+//javaOptions in Universal ++= opts.map(opt => "-J" + opt)
+
+// -J prefix is required by the bash script
+javaOptions in run ++= opts

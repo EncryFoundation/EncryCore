@@ -11,7 +11,6 @@ import encry.modifiers.state.box._
 import encry.modifiers.state.TransactionValidator
 import encry.settings.{Algos, Constants}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import scorex.core.LocalInterface.LocallyGeneratedModifier
 import scorex.core.transaction.box.Box
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.{EphemerealNodeViewModifier, VersionTag}

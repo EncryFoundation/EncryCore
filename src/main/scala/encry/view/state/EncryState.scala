@@ -6,13 +6,11 @@ import akka.actor.ActorRef
 import encry.crypto.Address
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
+import encry.modifiers.state.box._
 import encry.modifiers.state.box.body.PaymentBoxBody
 import encry.modifiers.state.box.proposition.AddressProposition
-import encry.modifiers.state.box._
 import encry.settings.{Algos, EncryAppSettings, NodeSettings}
-import scorex.core.transaction.box.Box
-import scorex.core.transaction.box.proposition.Proposition
-import scorex.core.{EphemerealNodeViewModifier, VersionTag}
+import scorex.core.VersionTag
 import scorex.core.transaction.state.MinimalState
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADDigest
