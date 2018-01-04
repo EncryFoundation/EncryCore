@@ -17,7 +17,7 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-// TODO: Add generator signature to the header to verify miner`s identity?
+// TODO: Add generator proposition + signature to the header to verify miner`s identity?
 case class EncryBlockHeader(override val version: Version,
                             override val parentId: ModifierId,
                             override val adProofsRoot: Digest32,
@@ -26,8 +26,7 @@ case class EncryBlockHeader(override val version: Version,
                             override val timestamp: Timestamp,
                             override val height: Int,
                             var nonce: Long = 0L,
-                            difficulty: Difficulty,
-                            generatorProposition: PublicKey25519Proposition) extends EncryBaseBlockHeader {
+                            difficulty: Difficulty) extends EncryBaseBlockHeader {
 
   override type M = EncryBlockHeader
 
@@ -45,8 +44,7 @@ case class EncryBlockHeader(override val version: Version,
       Longs.toByteArray(timestamp),
       Ints.toByteArray(height),
       Longs.toByteArray(nonce),
-      difficulty.toByteArray,
-      generatorProposition.pubKeyBytes
+      difficulty.toByteArray
     )
   }
 
@@ -85,8 +83,7 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
       obj.txMerkleRoot,
       Longs.toByteArray(obj.timestamp),
       Ints.toByteArray(obj.height),
-      obj.difficulty.toByteArray,
-      obj.generatorProposition.pubKeyBytes
+      obj.difficulty.toByteArray
     )
   }
 

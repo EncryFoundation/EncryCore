@@ -214,15 +214,15 @@ class UtxoState(override val version: VersionTag,
   }._1
 
   def boxesOf(proposition: Proposition): Seq[Box[proposition.type]] = ???
-
 }
 
 object UtxoState {
 
-  private lazy val bestVersionKey = Algos.hash("best state version") // TODO: ???
+  // TODO: ???
+  private lazy val bestVersionKey = Algos.hash("best_state_version")
 
   def create(dir: File): UtxoState = {
-    val store = new LSMStore(dir, keepVersions = 20) // todo: magic number, move to settings
+    val store = new LSMStore(dir, keepVersions = Constants.keepVersions)
     val dbVersion = store.get(ByteArrayWrapper(bestVersionKey)).map( _.data)
     new UtxoState(VersionTag @@ dbVersion.getOrElse(EncryState.genesisStateVersion), store)
   }

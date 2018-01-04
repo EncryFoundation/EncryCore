@@ -2,12 +2,11 @@ package encry.modifiers.state.box.proposition
 
 import encry.crypto.Address
 import scorex.core.serialization.Serializer
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition.{ChecksumLength, calcCheckSum}
+import scorex.core.transaction.box.proposition.PublicKey25519Proposition.{ChecksumLength, calcCheckSum, _}
 import scorex.core.transaction.box.proposition.{Proposition, PublicKey25519Proposition}
 import scorex.crypto.encode.Base58
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition._
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 // Holds the wallet address, which responds to some `publicKey`.
 // Should be used with `scorex.core.transaction.box.proposition.PublicKey25519Proposition`.
@@ -20,12 +19,11 @@ case class AddressProposition(address: Address) extends Proposition {
   override def serializer: Serializer[AddressProposition] = AddressPropositionSerializer
 
   override lazy val bytes: Array[Byte] = AddressProposition.addrBytes(address)
-
 }
 
 object AddressProposition {
 
-  def addrBytes(address: Address): Array[Byte] = Base58.decode(address).get
+  def addrBytes(address: Address): Array[Byte] = address.getBytes
 
   def validAddress(address: String): Boolean = {
     val addrBytes: Array[Byte] = Base58.decode(address).get

@@ -1,53 +1,98 @@
 package encry.mining
 
 import akka.actor.{Actor, ActorRef}
-import encry.consensus.Difficulty
-import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.settings.ChainSettings
+import akka.pattern._
+import akka.util.Timeout
+import encry.consensus.{Difficulty, PowCandidateBlock, PowConsensus}
+import encry.modifiers.history.block.EncryBlock
+import encry.settings.EncryAppSettings
 import encry.utils.Cancellable
-import scorex.core.ModifierId
-import scorex.core.block.Block.Version
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
-import scorex.core.utils.ScorexLogging
-import scorex.crypto.authds.ADDigest
-import scorex.crypto.encode.Base16
-import scorex.crypto.hash.Digest32
+import encry.view.history.EncryHistory
+import encry.view.mempool.EncryMempool
+import encry.view.state.UtxoState
+import encry.view.wallet.EncryWallet
+import io.circe.Json
+import io.circe.syntax._
+import scorex.core.LocalInterface.LocallyGeneratedModifier
+import scorex.core.NodeViewHolder
+import scorex.core.NodeViewHolder.{GetDataFromCurrentView, SemanticallySuccessfulModifier, Subscribe}
+import scorex.core.utils.{NetworkTime, ScorexLogging}
 
-import scala.util.Random
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.util.Try
 
-class EncryMiner(viewHolderRef: ActorRef, chainSettings: ChainSettings, nodeId: Array[Byte])
+class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings, nodeId: Array[Byte])
   extends Actor with ScorexLogging {
 
   import EncryMiner._
 
+  private val consensus = new PowConsensus(settings.chainSettings)
+
   private var cancellableOpt: Option[Cancellable] = None
   private var isMining = false
+  private val startTime = NetworkTime.time()
   private var nonce = 0
-  private var candidateOpt: Option[EncryBlockHeader] = None
+  private var candidateOpt: Option[PowCandidateBlock] = None
+
+  override def preStart(): Unit = {
+    viewHolderRef ! Subscribe(Seq(NodeViewHolder.EventType.SuccessfulSemanticallyValidModifier))
+  }
 
   override def receive: Receive = {
 
-    // TODO: Tmp.
-    case StartMining => self ! MineBlock
+    case SemanticallySuccessfulModifier(mod) =>
+      if (isMining) {
+        mod match {
+          case block: EncryBlock =>
+            if (!candidateOpt.flatMap(_.parentOpt).exists(_.id sameElements block.header.id))
+              prepareCandidate(viewHolderRef, settings, nodeId)
 
-//    case StartMining =>
-//      if (settings.blockGenerationDelay >= 1.minute) {
-//        log.info("Mining is disabled for blockGenerationDelay >= 1 minute")
-//      } else {
-//        active = true
-//        self ! MineBlock
-//      }
-//
-//    case MineBlock =>
-//      if (active) {
-//        log.info("Mining of previous PoW block stopped")
-//        cancellableOpt.forall(_.cancel())
-//
-//        context.system.scheduler.scheduleOnce(50.millis) {
-//          if (cancellableOpt.forall(_.status.isCancelled)) viewHolderRef ! getRequiredData
-//          else self ! StartMining
-//        }
-//      }
+          case _ =>
+        }
+      } else if (settings.nodeSettings.mining) {
+        mod match {
+          case block: EncryBlock if block.header.timestamp >= startTime =>
+            self ! StartMining
+
+          case _ =>
+        }
+      }
+
+    case StartMining =>
+      if (!isMining && settings.nodeSettings.mining) {
+        log.info("Starting Mining")
+        isMining = true
+        prepareCandidate(viewHolderRef, settings, nodeId)
+        self ! MineBlock
+      }
+
+    case StopMining =>
+      isMining = false
+
+    case MineBlock =>
+      nonce = nonce + 1
+      candidateOpt match {
+        case Some(candidate) =>
+          consensus.verifyCandidate(candidate, nonce) match {
+            case Some(block) =>
+              log.info(s"New block found: $block")
+
+              viewHolderRef ! LocallyGeneratedModifier(block.header)
+              viewHolderRef ! LocallyGeneratedModifier(block.payload)
+              block.adProofsOpt.foreach { adp =>
+                viewHolderRef ! LocallyGeneratedModifier(adp)
+              }
+              context.system.scheduler.scheduleOnce(settings.nodeSettings.miningDelay)(self ! MineBlock)
+            case None =>
+              if (isMining) self ! MineBlock
+          }
+        case None =>
+          context.system.scheduler.scheduleOnce(1.second)(self ! MineBlock)
+      }
+
+    case MiningStatusRequest =>
+      sender ! MiningStatusResponse(isMining, candidateOpt)
   }
 }
 
@@ -59,27 +104,40 @@ object EncryMiner extends ScorexLogging {
 
   case object MineBlock
 
-  // Makes one attempt to find the right `nonce` for block.
-  def powIteration(version: Version,
-                   parentId: ModifierId,
-                   adProofRoot: Digest32,
-                   stateRoot: ADDigest,
-                   txMerkleRoot: Digest32,
-                   height: Int,
-                   difficulty: Difficulty,
-                   generatorProposition: PublicKey25519Proposition): Option[EncryBlockHeader] = {
+  case object MiningStatusRequest
 
-    val nonce = Random.nextLong()
-    val timestamp = System.currentTimeMillis()
+  case class MiningStatusResponse(isMining: Boolean, candidateBlock: Option[PowCandidateBlock]) {
+    lazy val json: Json = Map(
+      "isMining" -> isMining.asJson,
+      "candidateBlock" -> candidateBlock.map(_.json).getOrElse("None".asJson)
+    ).asJson
+  }
 
-    val blockHeader = EncryBlockHeader(
-      version, parentId, adProofRoot, stateRoot, txMerkleRoot, timestamp, height, nonce, difficulty, generatorProposition)
+  def prepareCandidate(viewHolderRef: ActorRef, settings: EncryAppSettings,
+                       nodeId: Array[Byte]): Future[Option[PowCandidateBlock]] = {
+    implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
+    (viewHolderRef ?
+      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[PowCandidateBlock]] { view =>
+        val bestHeaderOpt = view.history.bestFullBlockOpt.map(_.header)
 
-    println("Testing block hash: " + Base16.encode(blockHeader.id))
+        if (bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) Try {
+          // val coinbase = ...
 
-    // TODO: !!!
-    val result = if (/*blockHeader.validPow*/ 1 == 1) Some(blockHeader) else None
+          // TODO: Implement transaction limit definition.
+          val txs = view.state.filterValid(view.pool.take(10).toSeq)
+          val (adProof, adDigest) = view.state.proofsForTransactions(txs).get
+          val timestamp = NetworkTime.time()
+          val difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
+            .getOrElse(Difficulty @@ settings.chainSettings.initialDifficulty)
 
-    result
+          val candidate = new PowCandidateBlock(bestHeaderOpt, adProof, adDigest, txs, timestamp, difficulty)
+          log.debug(s"Send candidate block with ${candidate.transactions.length} transactions")
+
+          candidate
+        }.toOption
+        else {
+          None
+        }
+    }).mapTo[Option[PowCandidateBlock]]
   }
 }
