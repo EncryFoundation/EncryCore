@@ -10,7 +10,7 @@ import scorex.core.settings.{ScorexSettings, SettingsReaders}
 import scorex.core.utils.ScorexLogging
 
 case class EncryAppSettings(directory: String,
-                            consensusSettings: ConsensusSettings,
+                            chainSettings: ChainSettings,
                             testingSettings: TestingSettings,
                             nodeSettings: NodeSettings,
                             scorexSettings: ScorexSettings)
@@ -29,11 +29,11 @@ object EncryAppSettings extends ScorexLogging with SettingsReaders {
     val directory = config.as[String](s"$configPath.directory")
 
     val nodeSettings = config.as[NodeSettings](s"$configPath.node")
-    val consensusSettings = config.as[ConsensusSettings](s"$configPath.chain")
+    val chainSettings = config.as[ChainSettings](s"$configPath.chain")
     val testingSettings = config.as[TestingSettings](s"$configPath.testing")
     val scorexSettings = config.as[ScorexSettings](scorexConfigPath)
 
-    EncryAppSettings(directory, consensusSettings, testingSettings, nodeSettings, scorexSettings)
+    EncryAppSettings(directory, chainSettings, testingSettings, nodeSettings, scorexSettings)
   }
 
   private def readConfigFromPath(userConfigPath: Option[String]): Config = {

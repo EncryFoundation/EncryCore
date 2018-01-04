@@ -23,15 +23,11 @@ class EncryBlock(override val header: EncryBlockHeader,
 
   override def transactions: Seq[EncryBaseTransaction] = payload.transactions
 
-  // Note, that it does not include pow difficulty validity checks.
   override def semanticValidity: Try[Unit] = {
+    // TODO: Make transactions validity checks here?
     if (header.txMerkleRoot != payload.digest) {
       log.info(s"<BLOCK ${header.id}> Invalid tx Merkle Root hash provided.")
       Failure(new Error("Invalid tx Merkle Root hash provided!"))
-    }
-    if (!header.validPow) {
-      log.info(s"<BLOCK ${header.id}> Invalid POW provided.")
-      Failure(new Error("Invalid POW provided!"))
     }
     if (!header.validTimestamp) {
       log.info(s"<BLOCK ${header.id}> Invalid timestamp provided.")

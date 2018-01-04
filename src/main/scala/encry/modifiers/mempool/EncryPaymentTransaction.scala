@@ -83,7 +83,7 @@ case class EncryPaymentTransaction(senderProposition: PublicKey25519Proposition,
     }
     // `Amount` & `Address` validity checks.
     if (!createOutputs.forall { i =>
-      i._2 >= 0 && AddressProposition.validAddress(i._1)
+      i._2 > 0 && AddressProposition.validAddress(i._1)
     }) {
       log.info(s"<TX: $txHash> Invalid content.")
       Failure(new Error("Transaction invalid!"))

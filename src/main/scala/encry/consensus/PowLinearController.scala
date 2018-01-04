@@ -1,28 +1,28 @@
 package encry.consensus
 
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.settings.ConsensusSettings
+import encry.settings.ChainSettings
 import encry.view.history.Height
 import java.util.concurrent.TimeUnit.MILLISECONDS
 
 import scala.concurrent.duration.FiniteDuration
 
-class PowLinearController(consensusSettings: ConsensusSettings) {
+class PowLinearController(chainSettings: ChainSettings) {
 
   import PowLinearController._
 
   // Retargeting to adjust difficulty.
   def getNewTarget(oldTarget: BigInt, lastEpochsIntervalMs: FiniteDuration): BigInt =
-    oldTarget * lastEpochsIntervalMs.toMillis / (consensusSettings.desiredEpochIntervalSec.toMillis *
-      consensusSettings.retargetingEpochsQty)
+    oldTarget * lastEpochsIntervalMs.toMillis / (chainSettings.desiredBlockInterval.toMillis *
+      chainSettings.retargetingEpochsQty)
 
   def getNewDifficulty(oldDifficulty: Difficulty, lastEpochsIntervalMs: FiniteDuration): Difficulty =
-    Difficulty @@ (ConsensusSettings.maxTarget / getNewTarget(getTarget(oldDifficulty), lastEpochsIntervalMs))
+    Difficulty @@ (ChainSettings.maxTarget / getNewTarget(getTarget(oldDifficulty), lastEpochsIntervalMs))
 
   // Used to provide `getLastEpochsInterval()` with the sequence of headers of right heights.
   def epochsHeightsForRetargetingAt(height: Height): Seq[Height] = {
-    if ((height - 1) > consensusSettings.retargetingEpochsQty)
-      (0 until consensusSettings.retargetingEpochsQty)
+    if ((height - 1) > chainSettings.retargetingEpochsQty)
+      (0 until chainSettings.retargetingEpochsQty)
         .map(i => (height - 1) - i).reverse.map(i => Height @@ i)
     else
       (0 until height)
@@ -39,5 +39,5 @@ class PowLinearController(consensusSettings: ConsensusSettings) {
 object PowLinearController {
 
   def getTarget(difficulty: Difficulty): BigInt =
-    ConsensusSettings.maxTarget / difficulty
+    ChainSettings.maxTarget / difficulty
 }

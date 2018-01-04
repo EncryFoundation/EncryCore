@@ -2,9 +2,8 @@ package encry.mining
 
 import akka.actor.{Actor, ActorRef}
 import encry.consensus.Difficulty
-import encry.consensus.validation.PowConsensusValidator
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.settings.ConsensusSettings
+import encry.settings.ChainSettings
 import encry.utils.Cancellable
 import scorex.core.ModifierId
 import scorex.core.block.Block.Version
@@ -16,13 +15,15 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Random
 
-class PowMiner(viewHolderRef: ActorRef, consensusSettings: ConsensusSettings)
+class EncryMiner(viewHolderRef: ActorRef, chainSettings: ChainSettings, nodeId: Array[Byte])
   extends Actor with ScorexLogging {
 
-  import PowMiner._
+  import EncryMiner._
 
   private var cancellableOpt: Option[Cancellable] = None
-  private var active = false
+  private var isMining = false
+  private var nonce = 0
+  private var candidateOpt: Option[EncryBlockHeader] = None
 
   override def receive: Receive = {
 
@@ -50,7 +51,7 @@ class PowMiner(viewHolderRef: ActorRef, consensusSettings: ConsensusSettings)
   }
 }
 
-object PowMiner extends App {
+object EncryMiner extends ScorexLogging {
 
   case object StartMining
 
@@ -76,7 +77,8 @@ object PowMiner extends App {
 
     println("Testing block hash: " + Base16.encode(blockHeader.id))
 
-    val result = if (blockHeader.validPow) Some(blockHeader) else None
+    // TODO: !!!
+    val result = if (/*blockHeader.validPow*/ 1 == 1) Some(blockHeader) else None
 
     result
   }

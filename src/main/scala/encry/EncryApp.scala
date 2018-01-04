@@ -1,7 +1,7 @@
 package encry
 
 import akka.actor.{ActorRef, Props}
-import encry.mining.PowMiner
+import encry.mining.EncryMiner
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.network.EncryNodeViewSynchronizer
@@ -35,21 +35,22 @@ class EncryApp(args: Seq[String]) extends Application {
 
   override protected val additionalMessageSpecs: Seq[MessageSpec[_]] = Seq(EncrySyncInfoMessageSpec)
 
-  val minerRef: ActorRef = actorSystem.actorOf(Props(classOf[PowMiner], encrySettings, nodeViewHolderRef, nodeId))
-
   override val nodeViewHolderRef: ActorRef = EncryNodeViewHolder.createActor(actorSystem, encrySettings)
 
-  override val nodeViewSynchronizer: ActorRef = actorSystem.actorOf(
-    Props(new EncryNodeViewSynchronizer(
-      networkController, nodeViewHolderRef, localInterface, EncrySyncInfoMessageSpec, settings.network)))
+  val minerRef: ActorRef = actorSystem.actorOf(Props(classOf[EncryMiner], nodeViewHolderRef, encrySettings.chainSettings, nodeId))
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
 
+  // TODO: Implement.
   override val apiRoutes: Seq[ApiRoute] = Seq()
 
   override val localInterface: ActorRef = actorSystem.actorOf(
     Props(classOf[EncryLocalInterface], nodeViewHolderRef, minerRef, encrySettings)
   )
+
+  override val nodeViewSynchronizer: ActorRef = actorSystem.actorOf(
+    Props(new EncryNodeViewSynchronizer(
+      networkController, nodeViewHolderRef, localInterface, EncrySyncInfoMessageSpec, settings.network)))
 }
 
 object EncryApp extends App {

@@ -1,6 +1,6 @@
 package encry.modifiers.mempool
 
-import com.google.common.primitives.{Bytes, Longs}
+import com.google.common.primitives.Longs
 import encry.modifiers.state.box.EncryBox
 import encry.modifiers.state.box.body.BaseBoxBody
 import scorex.core.serialization.JsonSerializable
@@ -15,10 +15,6 @@ trait EncryTransaction[P <: Proposition, BXP <: Proposition, BB <: BaseBoxBody]
   val unlockers: Traversable[BoxUnlocker[P]]
   // Sequence of `Tx Outputs`.
   val newBoxes: Traversable[EncryBox[BXP, BB]]
-
-  val fee: Long
-  val timestamp: Long
-
 }
 
 object EncryTransaction {

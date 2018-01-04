@@ -1,19 +1,20 @@
 package encry.modifiers.state
 
+import encry.modifiers.mempool.EncryBaseTransaction
+import scorex.core.PersistentNodeViewModifier
 import scorex.core.transaction._
 import scorex.core.transaction.box.proposition.Proposition
-import scorex.core.{EphemerealNodeViewModifier, PersistentNodeViewModifier}
 
 import scala.util.Try
 
 trait StateFeature
 
 trait TransactionValidator extends StateFeature {
-  def isValid(tx: EphemerealNodeViewModifier): Boolean = validate(tx).isSuccess
+  def isValid(tx: EncryBaseTransaction): Boolean = validate(tx).isSuccess
 
-  def filterValid(txs: Seq[EphemerealNodeViewModifier]): Seq[EphemerealNodeViewModifier] = txs.filter(isValid)
+  def filterValid(txs: Seq[EncryBaseTransaction]): Seq[EncryBaseTransaction] = txs.filter(isValid)
 
-  def validate(tx: EphemerealNodeViewModifier): Try[Unit]
+  def validate(tx: EncryBaseTransaction): Try[Unit]
 }
 
 trait ModifierValidator[M <: PersistentNodeViewModifier] extends StateFeature {

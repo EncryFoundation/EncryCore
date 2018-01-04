@@ -1,33 +1,33 @@
 package encry.view.history.storage.processors
 
 import com.google.common.primitives.Ints
-import encry.consensus.{Difficulty, PowLinearController}
-import encry.settings.Constants._
+import encry.consensus.{Difficulty, PowConsensus}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.HistoryModifierSerializer
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.settings.{Algos, ConsensusSettings, NodeSettings}
+import encry.settings.Constants._
+import encry.settings.{Algos, ChainSettings, NodeSettings}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
-import scorex.core.{ModifierId, ModifierTypeId}
-import scorex.core.consensus.{History, ModifierSemanticValidity}
 import scorex.core.consensus.History.ProgressInfo
+import scorex.core.consensus.{History, ModifierSemanticValidity}
 import scorex.core.utils.ScorexLogging
+import scorex.core.{ModifierId, ModifierTypeId}
 
 import scala.annotation.tailrec
-import scala.util
 import scala.util.{Failure, Success, Try}
 
 trait BlockHeaderProcessor extends ScorexLogging {
 
   protected val nodeSettings: NodeSettings
 
-  protected val consensusSettings: ConsensusSettings
+  protected val chainSettings: ChainSettings
 
-  protected lazy val powLinearController = new PowLinearController(consensusSettings)
+  // TODO: Move consensus selection to the settings.
+  protected lazy val consensusAlgo = new PowConsensus(chainSettings)
 
   protected val BestHeaderKey: ByteArrayWrapper =
     ByteArrayWrapper(Array.fill(hashLength)(EncryBlockHeader.modifierTypeId))
@@ -88,7 +88,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
   protected def validate(header: EncryBlockHeader): Try[Unit] = {
     lazy val parentOpt = typedModifierById[EncryBlockHeader](header.parentId)
     if (header.parentId sameElements EncryBlockHeader.GenesisParentId)
-      if (header.height != ConsensusSettings.genesisHeight)
+      if (header.height != ChainSettings.genesisHeight)
         Failure(new Error("Invalid height for genesis block header."))
       Success()
     if (parentOpt.isEmpty)
@@ -101,9 +101,9 @@ trait BlockHeaderProcessor extends ScorexLogging {
       Failure(new Error("Header timestamp is less than parental`s"))
     if (requiredDifficultyAfter(parentOpt.get) > header.difficulty)
       Failure(new Error("Header <id: ${header.id}> difficulty too low."))
-    if (!header.validPow)
+    if (!consensusAlgo.validator.validatePow(header.hHash, header.difficulty))
       Failure(new Error(s"Invalid POW in header <id: ${header.id}>"))
-    if (!heightOf(header.parentId).exists(h => headersHeight - h < consensusSettings.maxRollback))
+    if (!heightOf(header.parentId).exists(h => headersHeight - h < chainSettings.maxRollback))
       Failure(new Error("Header is too old to be applied."))
     Success()
   }
@@ -114,8 +114,8 @@ trait BlockHeaderProcessor extends ScorexLogging {
       Seq(
         ByteArrayWrapper(header.id) -> ByteArrayWrapper(HistoryModifierSerializer.toBytes(header)),
         BestHeaderKey -> ByteArrayWrapper(header.id),
-        heightIdsKey(ConsensusSettings.genesisHeight) -> ByteArrayWrapper(header.id),
-        headerHeightKey(header.id) -> ByteArrayWrapper(Ints.toByteArray(ConsensusSettings.genesisHeight)),
+        heightIdsKey(ChainSettings.genesisHeight) -> ByteArrayWrapper(header.id),
+        headerHeightKey(header.id) -> ByteArrayWrapper(Ints.toByteArray(ChainSettings.genesisHeight)),
         headerScoreKey(header.id) -> ByteArrayWrapper(requiredDifficulty.toByteArray))
     } else {
       val blockScore = scoreOf(header.parentId).get + requiredDifficulty
@@ -238,10 +238,12 @@ trait BlockHeaderProcessor extends ScorexLogging {
 
   def requiredDifficultyAfter(parent: EncryBlockHeader): Difficulty = {
     val parentHeight = heightOf(parent.id).get
-    val requiredHeadersHeights = powLinearController.epochsHeightsForRetargetingAt(Height @@ (parentHeight + 1))
+    val requiredHeadersHeights =
+      consensusAlgo.difficultyController.epochsHeightsForRetargetingAt(Height @@ (parentHeight + 1))
     assert(requiredHeadersHeights.last == parentHeight, "Incorrect heights sequence!")
     val chain = headerChainBack(requiredHeadersHeights.max - requiredHeadersHeights.min + 1,
       parent, (_: EncryBlockHeader) => false)
-    powLinearController.getNewDifficulty(parent.difficulty, powLinearController.getLastEpochsInterval(chain.headers))
+    consensusAlgo.difficultyController.getNewDifficulty(parent.difficulty,
+      consensusAlgo.difficultyController.getLastEpochsInterval(chain.headers))
   }
 }

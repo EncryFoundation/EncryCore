@@ -5,18 +5,18 @@ import java.io.File
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
+import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings._
 import encry.view.history.storage.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
 import encry.view.history.storage.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.ModifierId
-import scorex.core.consensus.{History, ModifierSemanticValidity}
-import scorex.core.consensus.History.{HistoryComparisonResult, ModifierIds, ProgressInfo}
+import scorex.core.consensus.History
+import scorex.core.consensus.History.ProgressInfo
 import scorex.crypto.encode.Base58
 
-import scala.util.{Failure, Try}
+import scala.util.Try
 
 /**
   * History implementation. It is processing persistent modifiers generated locally or coming from network.
@@ -159,19 +159,19 @@ object EncryHistory {
     val history: EncryHistory = (_nodeSettings.ADState, _nodeSettings.verifyTransactions) match {
       case (true, true) =>
         new EncryHistory with ADStateProofProcessor with BlockPayloadProcessor {
-          override protected val consensusSettings: ConsensusSettings = settings.consensusSettings
+          override protected val chainSettings: ChainSettings = settings.chainSettings
           override protected val nodeSettings: NodeSettings = _nodeSettings
           override protected val storage: Store = db
         }
       case (false, true) =>
         new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
-          override protected val consensusSettings: ConsensusSettings = settings.consensusSettings
+          override protected val chainSettings: ChainSettings = settings.chainSettings
           override protected val nodeSettings: NodeSettings = _nodeSettings
           override protected val storage: Store = db
         }
       case (true, false) =>
         new EncryHistory with ADStateProofProcessor with EmptyBlockPayloadProcessor {
-          override protected val consensusSettings: ConsensusSettings = settings.consensusSettings
+          override protected val chainSettings: ChainSettings = settings.chainSettings
           override protected val nodeSettings: NodeSettings = _nodeSettings
           override protected val storage: Store = db
         }

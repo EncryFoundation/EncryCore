@@ -58,28 +58,7 @@ class UtxoState(override val version: VersionTag,
   private[state] def checkTransactions(txs: Seq[EncryBaseTransaction], expectedDigest: ADDigest): Try[Unit] = Try {
 
     // Carries out an exhaustive txs validation.
-    txs.foreach { tx =>
-      tx.semanticValidity.get
-      tx match {
-        case tx: EncryPaymentTransaction =>
-          var inputsSum: Long = 0
-          tx.useOutputs.foreach { key =>
-            persistentProver.unauthenticatedLookup(key) match {
-              case Some(data) =>
-                EncryPaymentBoxSerializer.parseBytes(data).get match {
-                  case box: EncryPaymentBox =>
-                    if (box.proposition.address == tx.senderProposition.address)
-                      inputsSum = inputsSum + box.body.amount
-                    else Failure(new Error(""))
-                  case _ => Failure(new Error(s"Cannot parse Box referenced in TX ${tx.txHash}"))
-                }
-              case None => Failure(new Error(s"Cannot parse Box referenced in TX ${tx.txHash}"))
-            }
-          }
-          if (tx.createOutputs.map(i => i._2).sum != inputsSum) Failure(new Error("Inputs total amount overflow."))
-        case _ => Failure(new Error("Got Modifier of unknown type."))
-      }
-    }
+    txs.foreach(tx => validate(tx))
 
     // Tries to apply operations to the state.
     boxChanges(txs).operations.map(ADProofs.toModification)
@@ -188,16 +167,51 @@ class UtxoState(override val version: VersionTag,
 
   override lazy val rootHash: ADDigest = persistentProver.digest
 
-  override def validate(tx: EphemerealNodeViewModifier): Try[Unit] = {
+  override def validate(tx: EncryBaseTransaction): Try[Unit] = {
+
+    // Carries out an exhaustive txs validation.
     tx match {
       case tx: EncryPaymentTransaction =>
-        tx.semanticValidity
-        if (!tx.useOutputs.forall(key => persistentProver.unauthenticatedLookup(key).isDefined))
-          Failure(new Error(s"Non-existent box referenced <tx: ${tx.txHash}>"))
-      case _ => Failure(new Error("Got unknown modifier."))
+        var inputsSum: Long = 0
+        tx.useOutputs.foreach { key =>
+          persistentProver.unauthenticatedLookup(key) match {
+            case Some(data) =>
+              EncryPaymentBoxSerializer.parseBytes(data).get match {
+                case box: EncryPaymentBox =>
+                  if (box.proposition.address == tx.senderProposition.address)
+                    inputsSum = inputsSum + box.body.amount
+                  else Failure(new Error(""))
+                case _ => Failure(new Error(s"Cannot find Box referenced in TX ${tx.txHash}"))
+              }
+            case None => Failure(new Error(s"Cannot find Box referenced in TX ${tx.txHash}"))
+          }
+        }
+        if (tx.createOutputs.map(i => i._2).sum != inputsSum) Failure(new Error("Inputs total amount overflow."))
+      case _ => Failure(new Error("Got Modifier of unknown type."))
     }
     Success()
   }
+
+  // Filters semantically valid and non conflicting transactions.
+  // Picks the transaction with highest fee if conflict detected.
+  // Note, this returns txs ordered by the amount of fee.
+  override def filterValid(txs: Seq[EncryBaseTransaction]): Seq[EncryBaseTransaction] = {
+    val semValidTxs = super.filterValid(txs)
+    semValidTxs
+      .sortBy(tx => tx.fee)
+      .reverse
+      .foldLeft((Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) { case ((nonConflictTxs, bxs), tx) =>
+      tx match {
+        case tx: EncryPaymentTransaction =>
+          val bxsRaw = tx.useOutputs.map(ByteArrayWrapper.apply)
+          if (bxsRaw.forall(k => !bxs.contains(k)) && bxsRaw.size == bxsRaw.toSet.size) {
+            (nonConflictTxs :+ tx) -> (bxs ++ bxsRaw)
+          } else {
+            (nonConflictTxs, bxs)
+          }
+      }
+    }
+  }._1
 
   def boxesOf(proposition: Proposition): Seq[Box[proposition.type]] = ???
 

@@ -27,6 +27,10 @@ trait EncryBaseTransaction extends Transaction[Proposition] {
   val typeId: TxTypeId
 
   override lazy val id: ModifierId = ModifierId @@ txHash
+
+  val fee: Long
+
+  val timestamp: Long
 }
 
 

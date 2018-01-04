@@ -2,7 +2,7 @@ package encry.modifiers.history.block.header
 
 import com.google.common.primitives.{Ints, _}
 import encry.consensus.Difficulty
-import encry.settings.{Algos, ConsensusSettings, Constants}
+import encry.settings.{Algos, ChainSettings, Constants}
 import encry.consensus.validation.PowConsensusValidator._
 import encry.modifiers.ModifierWithDigest
 import encry.modifiers.history.ADProofs
@@ -33,7 +33,7 @@ case class EncryBlockHeader(override val version: Version,
 
   override val modifierTypeId: ModifierTypeId = EncryBlockHeader.modifierTypeId
 
-  override lazy val id: ModifierId = ModifierId @@ powHash
+  override lazy val id: ModifierId = ModifierId @@ hHash
 
   override lazy val headerBytes: Array[Byte] = {
     Bytes.concat(
@@ -50,16 +50,13 @@ case class EncryBlockHeader(override val version: Version,
     )
   }
 
-  // TODO: Move POW-related components to the special trait?
-  val powHash: Digest32 = Algos.hash(headerBytes)
-
-  val validPow: Boolean = validatePow(powHash, difficulty)
+  val hHash: Digest32 = Algos.hash(headerBytes)
 
   // Checks whether the block timestamp is less than
   // two hours in the future (7200000ms) (allowing for time errors).
   val validTimestamp: Boolean = (timestamp - System.currentTimeMillis()) < 7200000L
 
-  lazy val isGenesis: Boolean = height == ConsensusSettings.genesisHeight
+  lazy val isGenesis: Boolean = height == ChainSettings.genesisHeight
 
   lazy val payloadId: ModifierId =
     ModifierWithDigest.computeId(EncryBlockPayload.modifierTypeId, id, txMerkleRoot)
