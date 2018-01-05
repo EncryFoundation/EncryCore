@@ -103,7 +103,7 @@ object EncryState extends ScorexLogging{
     } else {
       //todo: considering db state
       if (settings.nodeSettings.ADState) DigestState.create(None, None, dir, settings.nodeSettings).toOption
-      else Some(UtxoState.create(dir/*, nodeViewHolderRef*/))
+      else Some(UtxoState.create(dir, nodeViewHolderRef))
     }
   }
 }

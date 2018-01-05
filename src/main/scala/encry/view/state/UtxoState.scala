@@ -7,28 +7,29 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
-import encry.modifiers.state.box._
 import encry.modifiers.state.TransactionValidator
+import encry.modifiers.state.box._
 import encry.settings.{Algos, Constants}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
+import scorex.core.LocalInterface.LocallyGeneratedModifier
+import scorex.core.VersionTag
 import scorex.core.transaction.box.Box
 import scorex.core.transaction.box.proposition.Proposition
-import scorex.core.{EphemerealNodeViewModifier, VersionTag}
 import scorex.core.utils.ScorexLogging
-import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import scorex.crypto.authds.avltree.batch._
+import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
 import scala.util.{Failure, Success, Try}
 
 class UtxoState(override val version: VersionTag,
                 val store: Store,
-                /*nodeViewHolderRef: Option[ActorRef]*/)
+                nodeViewHolderRef: Option[ActorRef])
   extends EncryState[UtxoState] with TransactionValidator with ScorexLogging {
 
   import UtxoState.metadata
 
-  implicit val hf = new Blake2b256Unsafe
+  implicit val hf: Blake2b256Unsafe = new Blake2b256Unsafe
   private lazy val np = NodeParameters(keySize = 32, valueSize = EncryPaymentBoxSerializer.Length, labelSize = 32)
   protected lazy val storage = new VersionedIODBAVLStorage(store, np)
 
@@ -51,8 +52,8 @@ class UtxoState(override val version: VersionTag,
 
   private def onAdProofGenerated(proof: ADProofs): Unit = {
     // TODO: Notify `NodeView` of proof generation.
-    //    if(nodeViewHolderRef.isEmpty) log.warn("Got proof while nodeViewHolderRef is empty")
-    //    nodeViewHolderRef.foreach(h => h ! LocallyGeneratedModifier(proof))
+    if(nodeViewHolderRef.isEmpty) log.warn("Got proof while nodeViewHolderRef is empty")
+    nodeViewHolderRef.foreach(h => h ! LocallyGeneratedModifier(proof))
   }
 
   private[state] def checkTransactions(txs: Seq[EncryBaseTransaction], expectedDigest: ADDigest): Try[Unit] = Try {
@@ -100,7 +101,7 @@ class UtxoState(override val version: VersionTag,
             if (block.header.stateRoot sameElements persistentProver.digest)
               Failure(new Error("Unable to apply modification correctly."))
 
-            new UtxoState(VersionTag @@ block.id, store)
+            new UtxoState(VersionTag @@ block.id, store, nodeViewHolderRef)
           }
         case Failure(e) =>
           log.warn(s"Error while applying block with header ${block.header.encodedId} to UTXOState with root" +
@@ -150,7 +151,7 @@ class UtxoState(override val version: VersionTag,
     store.get(ByteArrayWrapper(version)) match {
       case Some(hash) =>
         val rollbackResult = prover.rollback(ADDigest @@ hash.data).map { _ =>
-          new UtxoState(version, store/*, nodeViewHolderRef*/) {
+          new UtxoState(version, store, nodeViewHolderRef) {
             override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] = prover
           }
         }
@@ -220,13 +221,12 @@ class UtxoState(override val version: VersionTag,
 
 object UtxoState {
 
-  // TODO: ???
   private lazy val bestVersionKey = Algos.hash("best_state_version")
 
-  def create(dir: File): UtxoState = {
+  def create(dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
     val store = new LSMStore(dir, keepVersions = Constants.keepVersions)
     val dbVersion = store.get(ByteArrayWrapper(bestVersionKey)).map( _.data)
-    new UtxoState(VersionTag @@ dbVersion.getOrElse(EncryState.genesisStateVersion), store)
+    new UtxoState(VersionTag @@ dbVersion.getOrElse(EncryState.genesisStateVersion), store, nodeViewHolderRef)
   }
 
   private def metadata(modId: VersionTag, stateRoot: ADDigest): Seq[(Array[Byte], Array[Byte])] = {
@@ -243,7 +243,7 @@ object UtxoState {
 
     val store = new LSMStore(dir, keepVersions = Constants.keepVersions)
 
-    new UtxoState(EncryState.genesisStateVersion, store/*, nodeViewHolderRef*/) {
+    new UtxoState(EncryState.genesisStateVersion, store, nodeViewHolderRef) {
       override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
         PersistentBatchAVLProver.create(p,
                                         storage,

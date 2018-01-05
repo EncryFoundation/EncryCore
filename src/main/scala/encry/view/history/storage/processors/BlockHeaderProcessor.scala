@@ -3,7 +3,7 @@ package encry.view.history.storage.processors
 import com.google.common.primitives.Ints
 import encry.consensus.{Difficulty, PowConsensus}
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.HistoryModifierSerializer
+import encry.modifiers.history.{ADProofs, HistoryModifierSerializer}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
@@ -111,9 +111,9 @@ trait BlockHeaderProcessor extends ScorexLogging {
       Failure(new Error("Header is too old to be applied."))
     } else {
       Success()
-    }.recoverWith { case thr =>
-      log.warn("Validation error: ", thr)
-      Failure(thr)
+    }.recoverWith { case err =>
+      log.warn("Validation error: ", err)
+      Failure(err)
     }
   }
 
@@ -155,13 +155,10 @@ trait BlockHeaderProcessor extends ScorexLogging {
     }
   }
 
-  // TODO: Use ADProofs?
   private def toDownload(h: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] = {
     (nodeSettings.verifyTransactions, nodeSettings.ADState) match {
       case (true, true) =>
-        // Ignoring `ADProofs` for now.
-        // Original: Seq((EncryBlockPayload.modifierTypeId, h.transactionsId), (ADProofs.modifierTypeId, h.ADProofsId))
-        Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
+        Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId))
       case (true, false) =>
         Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
       case (false, _) => Seq()
