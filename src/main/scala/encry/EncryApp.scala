@@ -1,6 +1,7 @@
 package encry
 
 import akka.actor.{ActorRef, Props}
+import encry.api.routes.{DebugApiRoute, HistoryApiRoute, MiningApiRoute, StateApiRoute}
 import encry.mining.EncryMiner
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
@@ -8,7 +9,7 @@ import encry.network.EncryNodeViewSynchronizer
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.EncryNodeViewHolder
 import encry.view.history.EncrySyncInfoMessageSpec
-import scorex.core.api.http.ApiRoute
+import scorex.core.api.http.{ApiRoute, PeersApiRoute, UtilsApiRoute}
 import scorex.core.app.Application
 import scorex.core.network.message.MessageSpec
 import scorex.core.settings.ScorexSettings
@@ -33,16 +34,23 @@ class EncryApp(args: Seq[String]) extends Application {
 
   val nodeId: Array[Byte] = Algos.hash(encrySettings.scorexSettings.network.nodeName).take(5)
 
-  override protected val additionalMessageSpecs: Seq[MessageSpec[_]] = Seq(EncrySyncInfoMessageSpec)
+  override protected lazy val additionalMessageSpecs: Seq[MessageSpec[_]] = Seq(EncrySyncInfoMessageSpec)
 
   override val nodeViewHolderRef: ActorRef = EncryNodeViewHolder.createActor(actorSystem, encrySettings)
 
-  val minerRef: ActorRef = actorSystem.actorOf(Props(classOf[EncryMiner], nodeViewHolderRef, encrySettings.chainSettings, nodeId))
+  val minerRef: ActorRef = actorSystem.actorOf(Props(classOf[EncryMiner], nodeViewHolderRef, encrySettings, nodeId))
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
 
   // TODO: Implement.
-  override val apiRoutes: Seq[ApiRoute] = Seq()
+  override val apiRoutes: Seq[ApiRoute] = Seq(
+    UtilsApiRoute(settings.restApi),
+    PeersApiRoute(peerManagerRef, networkController, settings.restApi),
+    HistoryApiRoute(nodeViewHolderRef, settings.restApi, encrySettings.nodeSettings.ADState),
+    StateApiRoute(nodeViewHolderRef, settings.restApi, encrySettings.nodeSettings.ADState),
+    MiningApiRoute(minerRef, settings.restApi),
+    DebugApiRoute(nodeViewHolderRef, settings.restApi, nodeId)
+  )
 
   override val localInterface: ActorRef = actorSystem.actorOf(
     Props(classOf[EncryLocalInterface], nodeViewHolderRef, minerRef, encrySettings)

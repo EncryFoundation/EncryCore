@@ -6,7 +6,6 @@ import akka.util.Timeout
 import encry.consensus.{Difficulty, PowCandidateBlock, PowConsensus}
 import encry.modifiers.history.block.EncryBlock
 import encry.settings.EncryAppSettings
-import encry.utils.Cancellable
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
@@ -18,6 +17,7 @@ import scorex.core.NodeViewHolder
 import scorex.core.NodeViewHolder.{GetDataFromCurrentView, SemanticallySuccessfulModifier, Subscribe}
 import scorex.core.utils.{NetworkTime, ScorexLogging}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Try
@@ -29,7 +29,7 @@ class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings, nodeId: Ar
 
   private val consensus = new PowConsensus(settings.chainSettings)
 
-  private var cancellableOpt: Option[Cancellable] = None
+//  private var cancellableOpt: Option[Cancellable] = None
   private var isMining = false
   private val startTime = NetworkTime.time()
   private var nonce = 0

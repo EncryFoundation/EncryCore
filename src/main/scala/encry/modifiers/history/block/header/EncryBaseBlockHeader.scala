@@ -11,7 +11,7 @@ trait EncryBaseBlockHeader extends EncryPersistentModifier {
   override def parentId: ModifierId
   val adProofsRoot: Digest32
   val stateRoot: ADDigest
-  val txMerkleRoot: Digest32
+  val txsRoot: Digest32
   val timestamp: Timestamp
   val height: Int
   val headerBytes: Array[Byte]

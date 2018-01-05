@@ -195,6 +195,8 @@ class UtxoState(override val version: VersionTag,
   // Filters semantically valid and non conflicting transactions.
   // Picks the transaction with highest fee if conflict detected.
   // Note, this returns txs ordered by the amount of fee.
+  // TODO: This method mainly invoked with ordered txs set from mempool,
+  // TODO: so do we need to sort txs here?
   override def filterValid(txs: Seq[EncryBaseTransaction]): Seq[EncryBaseTransaction] = {
     val semValidTxs = super.filterValid(txs)
     semValidTxs

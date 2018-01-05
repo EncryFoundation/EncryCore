@@ -25,7 +25,7 @@ class EncryBlock(override val header: EncryBlockHeader,
 
   override def semanticValidity: Try[Unit] = {
     // TODO: Make transactions validity checks here?
-    if (header.txMerkleRoot != payload.digest) {
+    if (header.txsRoot != payload.digest) {
       log.info(s"<BLOCK ${header.id}> Invalid tx Merkle Root hash provided.")
       Failure(new Error("Invalid tx Merkle Root hash provided!"))
     }
@@ -47,7 +47,7 @@ class EncryBlock(override val header: EncryBlockHeader,
   override lazy val json: Json = Map(
     "header" -> header.json,
     "payload" -> payload.json,
-//    "adPoofs" -> aDProofs.map(_.json).getOrElse(Map.empty[String, String].asJson)
+    "adPoofs" -> adProofsOpt.map(_.json).getOrElse(Map.empty[String, String].asJson)
   ).asJson
 }
 

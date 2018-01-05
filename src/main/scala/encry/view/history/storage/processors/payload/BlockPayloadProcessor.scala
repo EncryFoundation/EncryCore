@@ -44,8 +44,8 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
 
     historyStorage.modifierById(m.headerId) match {
       case Some(header: EncryBlockHeader) =>
-        if (!(header.txMerkleRoot sameElements m.digest))
-          Failure(new Error(s"Header transactions root ${Base58.encode(header.txMerkleRoot)} differs from block transactions $m digest"))
+        if (!(header.txsRoot sameElements m.digest))
+          Failure(new Error(s"Header transactions root ${Base58.encode(header.txsRoot)} differs from block transactions $m digest"))
 
         bestFullBlockIdOpt match {
           case None if nodeSettings.blocksToKeep < 0 =>

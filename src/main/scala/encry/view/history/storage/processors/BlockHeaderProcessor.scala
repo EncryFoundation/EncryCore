@@ -87,25 +87,34 @@ trait BlockHeaderProcessor extends ScorexLogging {
 
   protected def validate(header: EncryBlockHeader): Try[Unit] = {
     lazy val parentOpt = typedModifierById[EncryBlockHeader](header.parentId)
-    if (header.parentId sameElements EncryBlockHeader.GenesisParentId)
-      if (header.height != ChainSettings.genesisHeight)
+    if (header.parentId sameElements EncryBlockHeader.GenesisParentId) {
+      if (bestHeaderIdOpt.nonEmpty) {
+        Failure(new Error("Trying to append genesis block to non-empty history."))
+      } else if (header.height != ChainSettings.genesisHeight) {
         Failure(new Error("Invalid height for genesis block header."))
-      Success()
-    if (parentOpt.isEmpty)
+      } else {
+        Success()
+      }
+    } else if (parentOpt.isEmpty) {
       Failure(new Error(s"Parental header <id: ${header.parentId}> does not exist!"))
-    if (header.height != parentOpt.get.height + 1)
+    } else if (header.height != parentOpt.get.height + 1) {
       Failure(new Error(s"Invalid height in header <id: ${header.id}>"))
-    if (!header.validTimestamp)
+    } else if (!header.validTimestamp) {
       Failure(new Error(s"Invalid timestamp in header <id: ${header.id}>"))
-    if (header.timestamp < parentOpt.get.timestamp)
+    } else if (header.timestamp < parentOpt.get.timestamp) {
       Failure(new Error("Header timestamp is less than parental`s"))
-    if (requiredDifficultyAfter(parentOpt.get) > header.difficulty)
+    } else if (requiredDifficultyAfter(parentOpt.get) > header.difficulty) {
       Failure(new Error("Header <id: ${header.id}> difficulty too low."))
-    if (!consensusAlgo.validator.validatePow(header.hHash, header.difficulty))
+    } else if (!consensusAlgo.validator.validatePow(header.hHash, header.difficulty)) {
       Failure(new Error(s"Invalid POW in header <id: ${header.id}>"))
-    if (!heightOf(header.parentId).exists(h => headersHeight - h < chainSettings.maxRollback))
+    } else if (!heightOf(header.parentId).exists(h => headersHeight - h < chainSettings.maxRollback)) {
       Failure(new Error("Header is too old to be applied."))
-    Success()
+    } else {
+      Success()
+    }.recoverWith { case thr =>
+      log.warn("Validation error: ", thr)
+      Failure(thr)
+    }
   }
 
   private def toInsert(header: EncryBlockHeader): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
