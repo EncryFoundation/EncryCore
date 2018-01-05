@@ -55,7 +55,7 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
   }
 
   protected val onSemanticallySuccessfulModifier: Receive = {
-    case SemanticallySuccessfulModifier(mod: EncryBlock) =>
+    case SemanticallySuccessfulModifier(_: EncryBlock) =>
     //Do nothing, other nodes will request required modifiers via ProgressInfo.toDownload
     case SemanticallySuccessfulModifier(mod) =>
       broadcastModifierInv(mod)

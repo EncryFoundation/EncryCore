@@ -216,6 +216,7 @@ class UtxoState(override val version: VersionTag,
     }
   }._1
 
+  // TODO: Implement.
   def boxesOf(proposition: Proposition): Seq[Box[proposition.type]] = ???
 }
 

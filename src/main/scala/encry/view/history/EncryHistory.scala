@@ -108,7 +108,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
           val bestValidFullOpt: Option[EncryBlockHeader] = bestFullBlockOpt.flatMap(h => heightOf(h.header.id))
             .map(loopHeightDown)
 
-          if (bestHeaderOpt.contains(branchValidHeader) && bestFullBlockOpt.forall(b => bestValidFullOpt.contains(b))) {
+          if (bestHeaderOpt.contains(branchValidHeader) && bestFullBlockOpt.forall(b => bestValidFullOpt.contains(b.header))) {
             historyStorage.db.update(validityKey(modifier.id), Seq(), validityRow)
             this -> ProgressInfo[EncryPersistentModifier](None, Seq(), None, Seq())
           } else {

@@ -15,8 +15,8 @@ object Algos {
 
   //def blockIdDifficulty(id: Array[Byte]): BigInt = 1
 
-  val hash = Blake2b256
-  val encoder = Base58
+  val hash: Blake2b256.type = Blake2b256
+  val encoder: Base58.type = Base58
 
   val initialDifficulty = 1
 

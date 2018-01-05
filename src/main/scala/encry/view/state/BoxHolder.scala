@@ -7,7 +7,7 @@ import scala.collection.immutable.SortedMap
 
 class BoxHolder(val boxes: SortedMap[ByteArrayWrapper, EncryBaseBox]) {
 
-  def size = boxes.size
+  def size: Int = boxes.size
 
   def get(id: ByteArrayWrapper): Option[EncryBaseBox] = boxes.get(id)
 
@@ -17,8 +17,8 @@ class BoxHolder(val boxes: SortedMap[ByteArrayWrapper, EncryBaseBox]) {
   def addBoxes(bs: Seq[EncryBaseBox]): BoxHolder =
     new BoxHolder(boxes ++ bs.map(b => ByteArrayWrapper(b.id) -> b))
 
-  def take(howMany: Int): (Seq[EncryBaseBox], BoxHolder) =
-    (boxes.take(howMany).values.toSeq, new BoxHolder(boxes.drop(howMany)))
+  def take(qty: Int): (Seq[EncryBaseBox], BoxHolder) =
+    (boxes.take(qty).values.toSeq, new BoxHolder(boxes.drop(qty)))
 
   def sortedBoxes: Set[EncryBaseBox] = boxes.keySet.map(k => boxes(k))
 
