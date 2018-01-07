@@ -87,7 +87,7 @@ object ADProofs {
   def toModification(op: EncryBoxStateChangeOperation): Modification =
     op match {
       case Insertion(box) => box match {
-        case box: EncryPaymentBox => Insert(box.id, ADValue @@ box.bytes)
+        case box: PaymentBox => Insert(box.id, ADValue @@ box.bytes)
         case _ => throw new Error("Got state modifier of unknown type.")
       }
       case r: Removal => Remove(r.boxId)

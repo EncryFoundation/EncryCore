@@ -10,11 +10,11 @@ import scorex.crypto.hash.Digest32
 import scala.util.Try
 
 trait EncryBaseTransaction extends Transaction[Proposition] {
+
   override val modifierTypeId: ModifierTypeId = EncryBaseTransaction.ModifierTypeId
 
   val messageToSign: Array[Byte]
 
-  // Used as `ModifierId`.
   val txHash: Digest32
 
   var signature: Signature25519
@@ -23,17 +23,17 @@ trait EncryBaseTransaction extends Transaction[Proposition] {
 
   // TODO: Do we need tx Version?
 
-  // Type of the transaction will be telling the abstract `dispatcher` how to treat particular Txn.
+  // TODO: Do we need `typeId` here?
   val typeId: TxTypeId
 
-  override lazy val id: ModifierId = ModifierId @@ txHash
+  override lazy val id: ModifierId = ModifierId @@ (Array[Byte](typeId) ++ txHash)
 
   val fee: Long
 
   val timestamp: Long
 }
 
-
 object EncryBaseTransaction {
+
   val ModifierTypeId: scorex.core.ModifierTypeId = scorex.core.ModifierTypeId @@ 2.toByte
 }

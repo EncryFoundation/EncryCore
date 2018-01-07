@@ -7,7 +7,6 @@ import encry.crypto.Address
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
 import encry.modifiers.state.box._
-import encry.modifiers.state.box.body.PaymentBoxBody
 import encry.modifiers.state.box.proposition.AddressProposition
 import encry.settings.{Algos, EncryAppSettings, NodeSettings}
 import scorex.core.VersionTag
@@ -77,10 +76,10 @@ object EncryState extends ScorexLogging{
     lazy val initialBoxesNumber = 10000
 
     lazy val initialBoxes: Seq[EncryBaseBox] =
-      (1 to initialBoxesNumber).map(_ => EncryPaymentBox(
+      (1 to initialBoxesNumber).map(_ => PaymentBox(
         AddressProposition(Address @@ "f2343e160d4e42a83a87ea1a2f56b6fa2046ab8146c5e61727c297be578da0f510"),
         rndGen.nextLong(),
-        PaymentBoxBody(10000L)))
+        10000L))
 
     val bh = BoxHolder(initialBoxes)
 

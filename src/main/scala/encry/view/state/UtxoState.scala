@@ -30,13 +30,13 @@ class UtxoState(override val version: VersionTag,
   import UtxoState.metadata
 
   implicit val hf: Blake2b256Unsafe = new Blake2b256Unsafe
-  private lazy val np = NodeParameters(keySize = 32, valueSize = EncryPaymentBoxSerializer.Length, labelSize = 32)
+  private lazy val np = NodeParameters(keySize = 32, valueSize = PaymentBoxSerializer.Length, labelSize = 32)
   protected lazy val storage = new VersionedIODBAVLStorage(store, np)
 
   protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
     PersistentBatchAVLProver.create(
       new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32,
-        valueLengthOpt = Some(EncryPaymentBoxSerializer.Length)),
+        valueLengthOpt = Some(PaymentBoxSerializer.Length)),
       storage,
     ).get
 
@@ -45,13 +45,12 @@ class UtxoState(override val version: VersionTag,
   // TODO: Fix return type!
   def typedBoxById(boxType: Any, boxId: ADKey): Option[Any] = {
     boxType match {
-      case _: EncryPaymentBox => persistentProver.unauthenticatedLookup(boxId)
-        .map(EncryPaymentBoxSerializer.parseBytes).flatMap(_.toOption)
+      case _: PaymentBox => persistentProver.unauthenticatedLookup(boxId)
+        .map(PaymentBoxSerializer.parseBytes).flatMap(_.toOption)
     }
   }
 
   private def onAdProofGenerated(proof: ADProofs): Unit = {
-    // TODO: Notify `NodeView` of proof generation.
     if(nodeViewHolderRef.isEmpty) log.warn("Got proof while nodeViewHolderRef is empty")
     nodeViewHolderRef.foreach(h => h ! LocallyGeneratedModifier(proof))
   }
@@ -75,7 +74,7 @@ class UtxoState(override val version: VersionTag,
         s"${Algos.encode(persistentProver.digest)} given"))
   }
 
-  // Dispatches applying `Modifier` of particular type.
+  // State transition function `APPLY(S,TX) -> S'`.
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
     case block: EncryBlock =>
       log.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
@@ -177,10 +176,10 @@ class UtxoState(override val version: VersionTag,
         tx.useOutputs.foreach { key =>
           persistentProver.unauthenticatedLookup(key) match {
             case Some(data) =>
-              EncryPaymentBoxSerializer.parseBytes(data).get match {
-                case box: EncryPaymentBox =>
+              PaymentBoxSerializer.parseBytes(data).get match {
+                case box: PaymentBox =>
                   if (box.proposition.address == tx.senderProposition.address)
-                    inputsSum = inputsSum + box.body.amount
+                    inputsSum = inputsSum + box.amount
                   else Failure(new Error(""))
                 case _ => Failure(new Error(s"Cannot find Box referenced in TX ${tx.txHash}"))
               }

@@ -1,8 +1,7 @@
 package encry.modifiers.mempool
 
 import encry.modifiers.mempool.EncryTransaction._
-import encry.modifiers.state.box.body.PaymentBoxBody
-import encry.modifiers.state.box.EncryPaymentBox
+import encry.modifiers.state.box.PaymentBox
 import encry.modifiers.state.box.unlockers.EncryPaymentBoxUnlocker
 import encry.settings.Algos
 import encry.crypto.Address
@@ -27,21 +26,22 @@ case class EncryPaymentTransaction(senderProposition: PublicKey25519Proposition,
                                    var signature: Signature25519,
                                    useOutputs: IndexedSeq[ADKey],
                                    createOutputs: IndexedSeq[(Address, Amount)])
-  extends EncryTransaction[PublicKey25519Proposition, AddressProposition, PaymentBoxBody] {
+  extends EncryTransaction[PublicKey25519Proposition, AddressProposition] {
 
   override type M = EncryPaymentTransaction
 
   // Type of actual Tx type.
   override val typeId: TxTypeId = 1.toByte
 
-  override val unlockers: Traversable[EncryPaymentBoxUnlocker] = useOutputs.map{
-    boxId => EncryPaymentBoxUnlocker(boxId, signature)
-  }
+  // TODO: Use it in the state transition function or remove.
+  override val unlockers: Traversable[EncryPaymentBoxUnlocker] =
+    useOutputs.map(boxId => EncryPaymentBoxUnlocker(boxId, signature))
 
-  override val newBoxes: Traversable[EncryPaymentBox] = createOutputs.zipWithIndex.map { case ((addr, amount), idx) =>
-    val nonce = nonceFromDigest(Algos.hash(txHash ++ Ints.toByteArray(idx)))
-    EncryPaymentBox(AddressProposition(addr), nonce, PaymentBoxBody(amount))
-  }
+  override val newBoxes: Traversable[PaymentBox] =
+    createOutputs.zipWithIndex.map { case ((addr, amount), idx) =>
+      val nonce = nonceFromDigest(Algos.hash(txHash ++ Ints.toByteArray(idx)))
+      PaymentBox(AddressProposition(addr), nonce, amount)
+    }
 
   override def serializer: Serializer[EncryPaymentTransaction] = EncryPaymentTransactionSerializer
 
@@ -61,9 +61,10 @@ case class EncryPaymentTransaction(senderProposition: PublicKey25519Proposition,
     }.asJson
   ).asJson
 
-  // Which fields should be included into tx hash?
   override lazy val txHash: Digest32 = Algos.hash(
     Bytes.concat(
+      Array[Byte](typeId),
+      senderProposition.pubKeyBytes,
       scorex.core.utils.concatFixLengthBytes(useOutputs),
       scorex.core.utils.concatFixLengthBytes(createOutputs.map { case (addr, amount) =>
         AddressProposition.addrBytes(addr) ++ Longs.toByteArray(amount)
