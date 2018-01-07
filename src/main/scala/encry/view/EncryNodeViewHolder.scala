@@ -6,7 +6,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
-import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransactionSerializer}
+import encry.modifiers.mempool.{EncryBaseTransaction, CoinbaseTransactionSerializer}
 import encry.settings.EncryAppSettings
 import encry.view.history.{EncryHistory, EncrySyncInfo}
 import encry.view.mempool.EncryMempool
@@ -36,7 +36,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     EncryBlockHeader.modifierTypeId     -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId    -> EncryBlockPayloadSerializer,
     ADProofs.modifierTypeId             -> ADProofSerializer,
-    EncryBaseTransaction.ModifierTypeId -> EncryPaymentTransactionSerializer
+    EncryBaseTransaction.ModifierTypeId -> CoinbaseTransactionSerializer
   )
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {

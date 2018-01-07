@@ -21,7 +21,7 @@ case class OpenBox(override val nonce: Long,
 
   override val proposition: OpenProposition.type = OpenProposition
 
-  override val bxTypeId: BxTypeId = 0.toByte
+  override val typeId: BxTypeId = 0.toByte
 
   override lazy val bxHash: Digest32 = Algos.hash(
     Bytes.concat(

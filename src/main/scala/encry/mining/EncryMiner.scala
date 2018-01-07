@@ -121,7 +121,8 @@ object EncryMiner extends ScorexLogging {
         val bestHeaderOpt = view.history.bestFullBlockOpt.map(_.header)
 
         if (bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) Try {
-          // val coinbase = ...
+
+          // val coinbase = CoinbaseTransaction()
 
           // TODO: Implement transaction limit definition.
           val txs = view.state.filterValid(view.pool.take(10).toSeq)

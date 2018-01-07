@@ -12,11 +12,11 @@ trait EncryBox[P <: Proposition] extends EncryBaseBox with JsonSerializable {
 
   override val proposition: P
 
-  val bxTypeId: BxTypeId
+  val typeId: BxTypeId
 
   val bxHash: Digest32
 
-  override val id: ADKey = ADKey @@ (Array[Byte](bxTypeId) ++ bxHash)
+  override val id: ADKey = ADKey @@ (Array[Byte](typeId) ++ bxHash) // 33 bytes!
 
   // Remove redundant field from base class.
   override val value: Amount = 0L

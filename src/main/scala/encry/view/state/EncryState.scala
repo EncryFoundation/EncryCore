@@ -5,7 +5,7 @@ import java.io.File
 import akka.actor.ActorRef
 import encry.crypto.Address
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
+import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.AddressProposition
 import encry.settings.{Algos, EncryAppSettings, NodeSettings}
@@ -34,7 +34,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
     EncryBoxStateChanges(
       txs.flatMap { tx =>
         tx match {
-          case tx: EncryPaymentTransaction =>
+          case tx: PaymentTransaction =>
             tx.unlockers.map( unl => Removal(unl.closedBoxId)) ++
               tx.newBoxes.map( bx => Insertion(bx) )
 

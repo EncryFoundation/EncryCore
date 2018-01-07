@@ -21,7 +21,7 @@ case class PaymentBox(override val proposition: AddressProposition,
 
   override type M = PaymentBox
 
-  override val bxTypeId: BxTypeId = 1.toByte
+  override val typeId: BxTypeId = 1.toByte
 
   override lazy val bxHash: Digest32 = Algos.hash(
     Bytes.concat(

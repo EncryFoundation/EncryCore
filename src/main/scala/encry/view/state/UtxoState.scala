@@ -6,7 +6,7 @@ import akka.actor.ActorRef
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.mempool.{EncryBaseTransaction, EncryPaymentTransaction}
+import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.TransactionValidator
 import encry.modifiers.state.box._
 import encry.settings.{Algos, Constants}
@@ -167,26 +167,36 @@ class UtxoState(override val version: VersionTag,
 
   override lazy val rootHash: ADDigest = persistentProver.digest
 
+  // TODO: Test.
+  // Carries out an exhaustive txs validation.
   override def validate(tx: EncryBaseTransaction): Try[Unit] = {
 
-    // Carries out an exhaustive txs validation.
+    tx.semanticValidity
     tx match {
-      case tx: EncryPaymentTransaction =>
+      case tx: PaymentTransaction =>
         var inputsSum: Long = 0
         tx.useOutputs.foreach { key =>
           persistentProver.unauthenticatedLookup(key) match {
             case Some(data) =>
-              PaymentBoxSerializer.parseBytes(data).get match {
-                case box: PaymentBox =>
-                  if (box.proposition.address == tx.senderProposition.address)
-                    inputsSum = inputsSum + box.amount
-                  else Failure(new Error(""))
-                case _ => Failure(new Error(s"Cannot find Box referenced in TX ${tx.txHash}"))
+              key.head.toInt match {
+                case 0 =>
+                  OpenBoxSerializer.parseBytes(data) match {
+                    case Success(box) => inputsSum = inputsSum + box.amount
+                    case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))
+                  }
+                case 1 =>
+                  PaymentBoxSerializer.parseBytes(data) match {
+                    case Success(box) =>
+                      if (box.proposition.address == tx.senderProposition.address)
+                        inputsSum = inputsSum + box.amount
+                    case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))
+                  }
               }
             case None => Failure(new Error(s"Cannot find Box referenced in TX ${tx.txHash}"))
           }
         }
-        if (tx.createOutputs.map(i => i._2).sum != inputsSum) Failure(new Error("Inputs total amount overflow."))
+        if (tx.createOutputs.map(i => i._2).sum != inputsSum)
+          Failure(new Error("Inputs total amount mismatches Output sum."))
       case _ => Failure(new Error("Got Modifier of unknown type."))
     }
     Success()
@@ -204,7 +214,7 @@ class UtxoState(override val version: VersionTag,
       .reverse
       .foldLeft((Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) { case ((nonConflictTxs, bxs), tx) =>
       tx match {
-        case tx: EncryPaymentTransaction =>
+        case tx: PaymentTransaction =>
           val bxsRaw = tx.useOutputs.map(ByteArrayWrapper.apply)
           if (bxsRaw.forall(k => !bxs.contains(k)) && bxsRaw.size == bxsRaw.toSet.size) {
             (nonConflictTxs :+ tx) -> (bxs ++ bxsRaw)

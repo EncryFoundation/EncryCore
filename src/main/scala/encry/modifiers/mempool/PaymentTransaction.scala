@@ -1,49 +1,49 @@
 package encry.modifiers.mempool
 
-import encry.modifiers.mempool.EncryTransaction._
-import encry.modifiers.state.box.PaymentBox
-import encry.modifiers.state.box.unlockers.EncryPaymentBoxUnlocker
-import encry.settings.Algos
-import encry.crypto.Address
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import encry.crypto.Address
+import encry.modifiers.mempool.EncryTransaction._
 import encry.modifiers.state.box.proposition.AddressProposition
+import encry.modifiers.state.box.{EncryBaseBox, OpenBox, PaymentBox}
+import encry.settings.{Algos, Constants}
 import io.circe.Json
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.transaction.box.Box.Amount
+import scorex.core.transaction.box.proposition.PublicKey25519Proposition
+import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
-import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.{Failure, Success, Try}
 
-case class EncryPaymentTransaction(senderProposition: PublicKey25519Proposition,
-                                   override val fee: Amount,
-                                   override val timestamp: Long,
-                                   var signature: Signature25519,
-                                   useOutputs: IndexedSeq[ADKey],
-                                   createOutputs: IndexedSeq[(Address, Amount)])
-  extends EncryTransaction[PublicKey25519Proposition, AddressProposition] {
+case class PaymentTransaction(senderProposition: PublicKey25519Proposition,
+                              override val fee: Amount,
+                              override val timestamp: Long,
+                              var signature: Signature25519,
+                              useOutputs: IndexedSeq[ADKey],
+                              createOutputs: IndexedSeq[(Address, Amount)])
+  extends EncryTransaction[AddressProposition] {
 
-  override type M = EncryPaymentTransaction
+  override type M = PaymentTransaction
 
   // Type of actual Tx type.
   override val typeId: TxTypeId = 1.toByte
 
   // TODO: Use it in the state transition function or remove.
-  override val unlockers: Traversable[EncryPaymentBoxUnlocker] =
-    useOutputs.map(boxId => EncryPaymentBoxUnlocker(boxId, signature))
+  //  override val unlockers: Traversable[EncryPaymentBoxUnlocker] =
+  //    useOutputs.map(boxId => EncryPaymentBoxUnlocker(boxId, signature))
 
-  override val newBoxes: Traversable[PaymentBox] =
-    createOutputs.zipWithIndex.map { case ((addr, amount), idx) =>
-      val nonce = nonceFromDigest(Algos.hash(txHash ++ Ints.toByteArray(idx)))
-      PaymentBox(AddressProposition(addr), nonce, amount)
-    }
+  override val newBoxes: Traversable[EncryBaseBox] =
+    Seq(OpenBox(nonceFromDigest(Algos.hash(txHash)), fee)) ++
+      createOutputs.zipWithIndex.map { case ((addr, amount), idx) =>
+        val nonce = nonceFromDigest(Algos.hash(txHash ++ Ints.toByteArray(idx)))
+        PaymentBox(AddressProposition(addr), nonce, amount)
+      }
 
-  override def serializer: Serializer[EncryPaymentTransaction] = EncryPaymentTransactionSerializer
+  override def serializer: Serializer[PaymentTransaction] = CoinbaseTransactionSerializer
 
   override def json: Json = Map(
     "id" -> Base58.encode(id).asJson,
@@ -89,14 +89,18 @@ case class EncryPaymentTransaction(senderProposition: PublicKey25519Proposition,
       log.info(s"<TX: $txHash> Invalid content.")
       Failure(new Error("Transaction invalid!"))
     }
+    // `Fee` amount check.
+    if (fee < (Constants.feeMinAmount + Constants.txByteCost * serializer.toBytes(this).length))
+      Failure(new Error("Fee amount too small."))
+
     Success()
   }
 
 }
 
-object EncryPaymentTransactionSerializer extends Serializer[EncryPaymentTransaction] {
+object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
 
-  override def toBytes(obj: EncryPaymentTransaction): Array[Byte] = {
+  override def toBytes(obj: PaymentTransaction): Array[Byte] = {
     Bytes.concat(
       obj.senderProposition.pubKeyBytes,
       Longs.toByteArray(obj.fee),
@@ -109,7 +113,7 @@ object EncryPaymentTransactionSerializer extends Serializer[EncryPaymentTransact
     )
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[EncryPaymentTransaction] = Try{
+  override def parseBytes(bytes: Array[Byte]): Try[PaymentTransaction] = Try{
 
     val sender = new PublicKey25519Proposition(PublicKey @@ bytes.slice(0,32))
     val fee = Longs.fromByteArray(bytes.slice(32,40))
@@ -131,6 +135,6 @@ object EncryPaymentTransactionSerializer extends Serializer[EncryPaymentTransact
         Longs.fromByteArray(bytes.slice(s2 + i * (inElementLength-8), s2 + (i + 1) * inElementLength)))
     }
 
-    EncryPaymentTransaction(sender, fee, timestamp, signature, useOutputs, createOutputs)
+    PaymentTransaction(sender, fee, timestamp, signature, useOutputs, createOutputs)
   }
 }
