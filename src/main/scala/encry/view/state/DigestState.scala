@@ -42,7 +42,7 @@ class DigestState protected(override val version: VersionTag,
 
         txs.foldLeft(Success(): Try[Unit]) { case (status, tx) =>
           status.flatMap(_ => tx.semanticValidity)
-        }.flatMap(_ => block.adProofsOpt.map(_.verify(boxChanges(txs), rootHash, declaredHash))
+        }.flatMap(_ => block.adProofsOpt.map(_.verify(getStateChanges(txs), rootHash, declaredHash))
           .getOrElse(Failure(new Error("Proofs are empty"))))
       }.flatten match {
         case s: Success[_] =>

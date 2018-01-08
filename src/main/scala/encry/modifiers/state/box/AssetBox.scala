@@ -15,11 +15,11 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-case class PaymentBox(override val proposition: AddressProposition,
-                      override val nonce: Long,
-                      amount: Amount) extends EncryNoncedBox[AddressProposition] {
+case class AssetBox(override val proposition: AddressProposition,
+                    override val nonce: Long,
+                    amount: Amount) extends EncryNoncedBox[AddressProposition] {
 
-  override type M = PaymentBox
+  override type M = AssetBox
 
   override val typeId: BxTypeId = 1.toByte
 
@@ -31,7 +31,7 @@ case class PaymentBox(override val proposition: AddressProposition,
     )
   )
 
-  override def serializer: BoxCompanionSerializer[PaymentBox] = PaymentBoxSerializer
+  override def serializer: BoxCompanionSerializer[AssetBox] = AssetBoxSerializer
 
   override lazy val bytes: ADValue = ADValue @@ serializer.toBytes(this)
 
@@ -43,11 +43,11 @@ case class PaymentBox(override val proposition: AddressProposition,
   ).asJson
 }
 
-object PaymentBoxSerializer extends BoxCompanionSerializer[PaymentBox] {
+object AssetBoxSerializer extends BoxCompanionSerializer[AssetBox] {
 
   val Length: Int = 37
 
-  override def toBytes(obj: PaymentBox): Array[Byte] = {
+  override def toBytes(obj: AssetBox): Array[Byte] = {
     Bytes.concat(
       AddressProposition.addrBytes(obj.proposition.address),
       Longs.toByteArray(obj.nonce),
@@ -55,10 +55,10 @@ object PaymentBoxSerializer extends BoxCompanionSerializer[PaymentBox] {
     )
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[PaymentBox] = Try {
+  override def parseBytes(bytes: Array[Byte]): Try[AssetBox] = Try {
     val proposition = new AddressProposition(Address @@ Base58.encode(bytes.slice(0, Length)))
     val nonce = Longs.fromByteArray(bytes.slice(Length, Length + 8))
     val amount = Longs.fromByteArray(bytes.slice(Length + 8, Length + 16))
-    PaymentBox(proposition, nonce, amount)
+    AssetBox(proposition, nonce, amount)
   }
 }

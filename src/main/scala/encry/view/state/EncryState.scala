@@ -5,7 +5,7 @@ import java.io.File
 import akka.actor.ActorRef
 import encry.crypto.Address
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
+import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.AddressProposition
 import encry.settings.{Algos, EncryAppSettings, NodeSettings}
@@ -27,18 +27,20 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   // TODO: Implement correctly.
   def stateHeight(): Int = 0
 
+  // TODO: Do we need tx matching here?
   // Extracts `state changes` from the given sequence of transactions.
-  def boxChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
+  def getStateChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
     // Use neither `.filter` nor any validity checks here!
     // This method should be invoked when all txs are already validated.
     EncryBoxStateChanges(
       txs.flatMap { tx =>
         tx match {
           case tx: PaymentTransaction =>
-            tx.unlockers.map( unl => Removal(unl.closedBoxId)) ++
-              tx.newBoxes.map( bx => Insertion(bx) )
-
-//        case tx: AnotherTypeTransaction => ...
+            tx.unlockers.map(unl => Removal(unl.closedBoxId)) ++
+              tx.newBoxes.map(bx => Insertion(bx))
+          case tx: CoinbaseTransaction =>
+            tx.unlockers.map(unl => Removal(unl.closedBoxId)) ++
+              tx.newBoxes.map(bx => Insertion(bx))
         }
       }
     )
@@ -76,7 +78,7 @@ object EncryState extends ScorexLogging{
     lazy val initialBoxesNumber = 10000
 
     lazy val initialBoxes: Seq[EncryBaseBox] =
-      (1 to initialBoxesNumber).map(_ => PaymentBox(
+      (1 to initialBoxesNumber).map(_ => AssetBox(
         AddressProposition(Address @@ "f2343e160d4e42a83a87ea1a2f56b6fa2046ab8146c5e61727c297be578da0f510"),
         rndGen.nextLong(),
         10000L))

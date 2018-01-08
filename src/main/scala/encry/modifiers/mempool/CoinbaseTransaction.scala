@@ -4,7 +4,8 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.crypto.Address
 import encry.modifiers.mempool.EncryTransaction.{TxTypeId, _}
 import encry.modifiers.state.box.proposition.AddressProposition
-import encry.modifiers.state.box.{EncryBaseBox, PaymentBox}
+import encry.modifiers.state.box.unlockers.EncryAssetBoxUnlocker
+import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
@@ -22,8 +23,8 @@ import scala.util.{Failure, Success, Try}
 case class CoinbaseTransaction(winnerProposition: PublicKey25519Proposition,
                                override val timestamp: Long,
                                var signature: Signature25519,
-                               useOutputs: IndexedSeq[(ADKey, Amount)])
-  extends EncryTransaction[AddressProposition] {
+                               useBoxes: IndexedSeq[(ADKey, Amount)])
+  extends EncryTransaction[PublicKey25519Proposition] {
 
   override type M = CoinbaseTransaction
 
@@ -31,11 +32,14 @@ case class CoinbaseTransaction(winnerProposition: PublicKey25519Proposition,
 
   override val fee: Amount = 0L
 
+  override val unlockers: Traversable[EncryAssetBoxUnlocker] =
+    useBoxes.map { case (boxId, _) => EncryAssetBoxUnlocker(boxId, signature) }
+
   override val newBoxes: Traversable[EncryBaseBox] = Seq(
-    PaymentBox(
+    AssetBox(
       proposition = AddressProposition(Address @@ winnerProposition.address),
       nonce = nonceFromDigest(Algos.hash(txHash)),
-      amount = useOutputs.map(_._2).sum
+      amount = useBoxes.map(_._2).sum
     )
   )
 
@@ -49,7 +53,7 @@ case class CoinbaseTransaction(winnerProposition: PublicKey25519Proposition,
     Bytes.concat(
       Array[Byte](typeId),
       winnerProposition.pubKeyBytes,
-      scorex.core.utils.concatFixLengthBytes(useOutputs.map { case (key, amount) =>
+      scorex.core.utils.concatFixLengthBytes(useBoxes.map { case (key, amount) =>
         key ++ Longs.toByteArray(amount)
       }),
       Longs.toByteArray(timestamp),
@@ -75,8 +79,8 @@ object CoinbaseTransactionSerializer extends Serializer[CoinbaseTransaction] {
       obj.winnerProposition.pubKeyBytes,
       Longs.toByteArray(obj.timestamp),
       obj.signature.signature,
-      Ints.toByteArray(obj.useOutputs.length),
-      obj.useOutputs.foldLeft(Array[Byte]()) { case (arr, (key, amount)) =>
+      Ints.toByteArray(obj.useBoxes.length),
+      obj.useBoxes.foldLeft(Array[Byte]()) { case (arr, (key, amount)) =>
         arr ++ key ++ Longs.toByteArray(amount)
       }
     )

@@ -30,23 +30,24 @@ class UtxoState(override val version: VersionTag,
   import UtxoState.metadata
 
   implicit val hf: Blake2b256Unsafe = new Blake2b256Unsafe
-  private lazy val np = NodeParameters(keySize = 32, valueSize = PaymentBoxSerializer.Length, labelSize = 32)
+  // TODO: Note that Box has multiple subtypes of different lengths. Fix `valueSize`.
+  private lazy val np = NodeParameters(keySize = 33, valueSize = AssetBoxSerializer.Length, labelSize = 32)
   protected lazy val storage = new VersionedIODBAVLStorage(store, np)
 
   protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
     PersistentBatchAVLProver.create(
-      new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32,
-        valueLengthOpt = Some(PaymentBoxSerializer.Length)),
-      storage,
-    ).get
+      new BatchAVLProver[Digest32, Blake2b256Unsafe](
+        keyLength = 33, valueLengthOpt = Some(AssetBoxSerializer.Length)),
+      storage).get
 
   override def maxRollbackDepth: Int = 10
 
-  // TODO: Fix return type!
-  def typedBoxById(boxType: Any, boxId: ADKey): Option[Any] = {
-    boxType match {
-      case _: PaymentBox => persistentProver.unauthenticatedLookup(boxId)
-        .map(PaymentBoxSerializer.parseBytes).flatMap(_.toOption)
+  def typedBoxById(boxId: ADKey): Option[EncryBaseBox] = {
+    boxId.head.toInt match {
+      case 0 => persistentProver.unauthenticatedLookup(boxId)
+        .map(OpenBoxSerializer.parseBytes).flatMap(_.toOption)
+      case 1 => persistentProver.unauthenticatedLookup(boxId)
+        .map(AssetBoxSerializer.parseBytes).flatMap(_.toOption)
     }
   }
 
@@ -55,13 +56,14 @@ class UtxoState(override val version: VersionTag,
     nodeViewHolderRef.foreach(h => h ! LocallyGeneratedModifier(proof))
   }
 
-  private[state] def checkTransactions(txs: Seq[EncryBaseTransaction], expectedDigest: ADDigest): Try[Unit] = Try {
+  private[state] def checkTransactions(txs: Seq[EncryBaseTransaction],
+                                       expectedDigest: ADDigest): Try[Unit] = Try {
 
     // Carries out an exhaustive txs validation.
     txs.foreach(tx => validate(tx))
 
     // Tries to apply operations to the state.
-    boxChanges(txs).operations.map(ADProofs.toModification)
+    getStateChanges(txs).operations.map(ADProofs.toModification)
       .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
       t.flatMap(_ => {
         persistentProver.performOneOperation(m)
@@ -92,13 +94,13 @@ class UtxoState(override val version: VersionTag,
             log.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with " +
               s"root hash ${Algos.encode(rootHash)}")
             if (!store.get(ByteArrayWrapper(block.id)).exists(_.data sameElements block.header.stateRoot))
-              Failure(new Error("Unable to apply modification correctly."))
+              Failure(new Error("Unable to apply modification properly."))
             if (!store.rollbackVersions().exists(_.data sameElements block.header.stateRoot))
-              Failure(new Error("Unable to apply modification correctly."))
+              Failure(new Error("Unable to apply modification properly."))
             if (!block.header.adProofsRoot.sameElements(proofHash))
-              Failure(new Error("Unable to apply modification correctly."))
+              Failure(new Error("Unable to apply modification properly."))
             if (block.header.stateRoot sameElements persistentProver.digest)
-              Failure(new Error("Unable to apply modification correctly."))
+              Failure(new Error("Unable to apply modification properly."))
 
             new UtxoState(VersionTag @@ block.id, store, nodeViewHolderRef)
           }
@@ -122,7 +124,7 @@ class UtxoState(override val version: VersionTag,
         storage.version.get.sameElements(rootHash) &&
         store.lastVersionID.get.data.sameElements(rootHash))) Failure(new Error(""))
 
-      val mods = boxChanges(txs).operations.map(ADProofs.toModification)
+      val mods = getStateChanges(txs).operations.map(ADProofs.toModification)
       //todo .get
       mods.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
         t.flatMap(_ => {
@@ -143,7 +145,6 @@ class UtxoState(override val version: VersionTag,
     }
   }
 
-  //TODO: implement
   override def rollbackTo(version: VersionTag): Try[UtxoState] = {
     val prover = persistentProver
     log.info(s"Rollback UtxoState to version ${Algos.encoder.encode(version)}")
@@ -171,11 +172,11 @@ class UtxoState(override val version: VersionTag,
   // Carries out an exhaustive txs validation.
   override def validate(tx: EncryBaseTransaction): Try[Unit] = {
 
-    tx.semanticValidity
+    tx.semanticValidity.get
     tx match {
       case tx: PaymentTransaction =>
         var inputsSum: Long = 0
-        tx.useOutputs.foreach { key =>
+        tx.useBoxes.foreach { key =>
           persistentProver.unauthenticatedLookup(key) match {
             case Some(data) =>
               key.head.toInt match {
@@ -185,7 +186,7 @@ class UtxoState(override val version: VersionTag,
                     case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))
                   }
                 case 1 =>
-                  PaymentBoxSerializer.parseBytes(data) match {
+                  AssetBoxSerializer.parseBytes(data) match {
                     case Success(box) =>
                       if (box.proposition.address == tx.senderProposition.address)
                         inputsSum = inputsSum + box.amount
@@ -195,7 +196,7 @@ class UtxoState(override val version: VersionTag,
             case None => Failure(new Error(s"Cannot find Box referenced in TX ${tx.txHash}"))
           }
         }
-        if (tx.createOutputs.map(i => i._2).sum != inputsSum)
+        if (tx.createBoxes.map(i => i._2).sum != inputsSum)
           Failure(new Error("Inputs total amount mismatches Output sum."))
       case _ => Failure(new Error("Got Modifier of unknown type."))
     }
@@ -215,7 +216,7 @@ class UtxoState(override val version: VersionTag,
       .foldLeft((Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) { case ((nonConflictTxs, bxs), tx) =>
       tx match {
         case tx: PaymentTransaction =>
-          val bxsRaw = tx.useOutputs.map(ByteArrayWrapper.apply)
+          val bxsRaw = tx.useBoxes.map(ByteArrayWrapper.apply)
           if (bxsRaw.forall(k => !bxs.contains(k)) && bxsRaw.size == bxsRaw.toSet.size) {
             (nonConflictTxs :+ tx) -> (bxs ++ bxsRaw)
           } else {

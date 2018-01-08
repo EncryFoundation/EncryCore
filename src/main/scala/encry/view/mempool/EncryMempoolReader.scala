@@ -32,7 +32,7 @@ trait EncryMempoolReader extends MempoolReader[EncryBaseTransaction] {
   override def size: Int = unconfirmed.size
 
   protected def completeAssembly(txs: Iterable[EncryBaseTransaction]): Unit = synchronized {
-    val txsIds = txs.map(tx => key(ModifierId @@ tx.id))
+    val txsIds = txs.map(tx => key(tx.id))
     val newMap = waitedForAssembly.flatMap(p => {
       val ids = p._1
       val newKey = ids -- txsIds

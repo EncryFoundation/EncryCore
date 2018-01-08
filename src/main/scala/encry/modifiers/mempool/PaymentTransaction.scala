@@ -4,7 +4,8 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.crypto.Address
 import encry.modifiers.mempool.EncryTransaction._
 import encry.modifiers.state.box.proposition.AddressProposition
-import encry.modifiers.state.box.{EncryBaseBox, OpenBox, PaymentBox}
+import encry.modifiers.state.box.unlockers.EncryAssetBoxUnlocker
+import encry.modifiers.state.box.{EncryBaseBox, OpenBox, AssetBox}
 import encry.settings.{Algos, Constants}
 import io.circe.Json
 import io.circe.syntax._
@@ -23,37 +24,36 @@ case class PaymentTransaction(senderProposition: PublicKey25519Proposition,
                               override val fee: Amount,
                               override val timestamp: Long,
                               var signature: Signature25519,
-                              useOutputs: IndexedSeq[ADKey],
-                              createOutputs: IndexedSeq[(Address, Amount)])
-  extends EncryTransaction[AddressProposition] {
+                              useBoxes: IndexedSeq[ADKey],
+                              createBoxes: IndexedSeq[(Address, Amount)])
+  extends EncryTransaction[PublicKey25519Proposition] {
 
   override type M = PaymentTransaction
 
   // Type of actual Tx type.
   override val typeId: TxTypeId = 1.toByte
 
-  // TODO: Use it in the state transition function or remove.
-  //  override val unlockers: Traversable[EncryPaymentBoxUnlocker] =
-  //    useOutputs.map(boxId => EncryPaymentBoxUnlocker(boxId, signature))
+  override val unlockers: Traversable[EncryAssetBoxUnlocker] =
+    useBoxes.map(boxId => EncryAssetBoxUnlocker(boxId, signature))
 
   override val newBoxes: Traversable[EncryBaseBox] =
     Seq(OpenBox(nonceFromDigest(Algos.hash(txHash)), fee)) ++
-      createOutputs.zipWithIndex.map { case ((addr, amount), idx) =>
+      createBoxes.zipWithIndex.map { case ((addr, amount), idx) =>
         val nonce = nonceFromDigest(Algos.hash(txHash ++ Ints.toByteArray(idx)))
-        PaymentBox(AddressProposition(addr), nonce, amount)
+        AssetBox(AddressProposition(addr), nonce, amount)
       }
 
-  override def serializer: Serializer[PaymentTransaction] = CoinbaseTransactionSerializer
+  override def serializer: Serializer[PaymentTransaction] = PaymentTransactionSerializer
 
   override def json: Json = Map(
     "id" -> Base58.encode(id).asJson,
-    "inputs" -> useOutputs.map { id =>
+    "inputs" -> useBoxes.map { id =>
       Map(
         "id" -> Algos.encode(id).asJson,
         "signature" -> Base58.encode(signature.bytes).asJson
       ).asJson
     }.asJson,
-    "outputs" -> createOutputs.map { case (_, amount) =>
+    "outputs" -> createBoxes.map { case (_, amount) =>
       Map(
         "script" -> "".asJson,
         "amount" -> amount.asJson
@@ -65,8 +65,8 @@ case class PaymentTransaction(senderProposition: PublicKey25519Proposition,
     Bytes.concat(
       Array[Byte](typeId),
       senderProposition.pubKeyBytes,
-      scorex.core.utils.concatFixLengthBytes(useOutputs),
-      scorex.core.utils.concatFixLengthBytes(createOutputs.map { case (addr, amount) =>
+      scorex.core.utils.concatFixLengthBytes(useBoxes),
+      scorex.core.utils.concatFixLengthBytes(createBoxes.map { case (addr, amount) =>
         AddressProposition.addrBytes(addr) ++ Longs.toByteArray(amount)
       }),
       Longs.toByteArray(timestamp),
@@ -83,7 +83,7 @@ case class PaymentTransaction(senderProposition: PublicKey25519Proposition,
       Failure(new Error("Invalid signature provided!"))
     }
     // `Amount` & `Address` validity checks.
-    if (!createOutputs.forall { i =>
+    if (!createBoxes.forall { i =>
       i._2 > 0 && AddressProposition.validAddress(i._1)
     }) {
       log.info(s"<TX: $txHash> Invalid content.")
@@ -106,10 +106,10 @@ object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
       Longs.toByteArray(obj.fee),
       Longs.toByteArray(obj.timestamp),
       obj.signature.signature,
-      Ints.toByteArray(obj.useOutputs.length),
-      Ints.toByteArray(obj.createOutputs.length),
-      obj.useOutputs.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b)),
-      obj.createOutputs.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b._1.getBytes, Longs.toByteArray(b._2)))
+      Ints.toByteArray(obj.useBoxes.length),
+      Ints.toByteArray(obj.createBoxes.length),
+      obj.useBoxes.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b)),
+      obj.createBoxes.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b._1.getBytes, Longs.toByteArray(b._2)))
     )
   }
 

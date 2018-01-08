@@ -5,11 +5,10 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
-import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.core.serialization.Serializer
+import scorex.core.{ModifierId, ModifierTypeId}
 
 import scala.util.{Failure, Success, Try}
 
@@ -40,7 +39,7 @@ class EncryBlock(override val header: EncryBlockHeader,
 
   override val modifierTypeId: ModifierTypeId = EncryBlock.modifierTypeId
 
-  override lazy val id: ModifierId = ModifierId @@ Algos.hash(header.id ++ payload.id)
+  override lazy val id: ModifierId = header.id
 
   override def serializer: Serializer[EncryBlock] = EncryPaymentBlockSerializer
 
