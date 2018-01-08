@@ -1,10 +1,14 @@
 package encry.modifiers.state.box.unlockers
 
-import scorex.core.transaction.box.BoxUnlocker
+import encry.modifiers.state.box.proposition.AddressProposition
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.authds.ADKey
 
 case class EncryAssetBoxUnlocker(override val closedBoxId: ADKey,
                                  override val boxKey: Signature25519)
-  extends BoxUnlocker[PublicKey25519Proposition]
+  extends EncryBoxUnlocker[PublicKey25519Proposition] {
+
+  def isValid(addr: AddressProposition, proposition: PublicKey25519Proposition, msg: Array[Byte]): Boolean =
+    boxKey.isValid(proposition, msg) && proposition.address.eq(addr.address)
+}

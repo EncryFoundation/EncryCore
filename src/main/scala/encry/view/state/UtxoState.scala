@@ -6,6 +6,7 @@ import akka.actor.ActorRef
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.TransactionValidator
 import encry.modifiers.state.box._
@@ -89,18 +90,18 @@ class UtxoState(override val version: VersionTag,
             val proofBytes = persistentProver.generateProofAndUpdateStorage(md)
             val proofHash = ADProofs.proofDigest(proofBytes)
 
-            // TODO: Describe errors properly.
             if (block.adProofsOpt.isEmpty) onAdProofGenerated(ADProofs(block.header.id, proofBytes))
             log.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with " +
               s"root hash ${Algos.encode(rootHash)}")
+
             if (!store.get(ByteArrayWrapper(block.id)).exists(_.data sameElements block.header.stateRoot))
+              Failure(new Error("Storage kept roothash is not equal to the declared one."))
+            else if (!store.rollbackVersions().exists(_.data sameElements block.header.stateRoot))
               Failure(new Error("Unable to apply modification properly."))
-            if (!store.rollbackVersions().exists(_.data sameElements block.header.stateRoot))
-              Failure(new Error("Unable to apply modification properly."))
-            if (!block.header.adProofsRoot.sameElements(proofHash))
-              Failure(new Error("Unable to apply modification properly."))
-            if (block.header.stateRoot sameElements persistentProver.digest)
-              Failure(new Error("Unable to apply modification properly."))
+            else if (!(block.header.adProofsRoot sameElements proofHash))
+              Failure(new Error("Calculated proofHash is not equal to the declared one."))
+            else if (block.header.stateRoot sameElements persistentProver.digest)
+              Failure(new Error("Calculated stateRoot is not equal to the declared one."))
 
             new UtxoState(VersionTag @@ block.id, store, nodeViewHolderRef)
           }
@@ -109,14 +110,17 @@ class UtxoState(override val version: VersionTag,
             s" ${Algos.encode(rootHash)}: ", e)
           Failure(e)
       }
+
+    case header: EncryBlockHeader =>
+      Success(new UtxoState(VersionTag @@ header.id, this.store, nodeViewHolderRef))
+
     case _ => Failure(new Error("Got Modifier of unknown type."))
   }
 
   def proofsForTransactions(txs: Seq[EncryBaseTransaction]): Try[(SerializedAdProof, ADDigest)] = {
 
-    def rollback(): Try[Unit] = Try(
-      persistentProver.rollback(rootHash).ensuring(_.isSuccess && persistentProver.digest.sameElements(rootHash))
-    ).flatten
+    def rollback(): Try[Unit] = persistentProver.rollback(rootHash)
+      .ensuring(persistentProver.digest.sameElements(rootHash))
 
     Try {
       if (!(txs.isEmpty &&
@@ -169,6 +173,7 @@ class UtxoState(override val version: VersionTag,
   override lazy val rootHash: ADDigest = persistentProver.digest
 
   // TODO: Test.
+  // TODO: BUG: Too many redundant tx signature validity checks here.
   // Carries out an exhaustive txs validation.
   override def validate(tx: EncryBaseTransaction): Try[Unit] = {
 
@@ -176,10 +181,10 @@ class UtxoState(override val version: VersionTag,
     tx match {
       case tx: PaymentTransaction =>
         var inputsSum: Long = 0
-        tx.useBoxes.foreach { key =>
-          persistentProver.unauthenticatedLookup(key) match {
+        tx.unlockers.foreach { unl =>
+          persistentProver.unauthenticatedLookup(unl.closedBoxId) match {
             case Some(data) =>
-              key.head.toInt match {
+              unl.closedBoxId.head.toInt match {
                 case 0 =>
                   OpenBoxSerializer.parseBytes(data) match {
                     case Success(box) => inputsSum = inputsSum + box.amount
@@ -188,8 +193,9 @@ class UtxoState(override val version: VersionTag,
                 case 1 =>
                   AssetBoxSerializer.parseBytes(data) match {
                     case Success(box) =>
-                      if (box.proposition.address == tx.senderProposition.address)
-                        inputsSum = inputsSum + box.amount
+                      if (!unl.isValid(box.proposition, tx.senderProposition, tx.messageToSign))
+                        Failure(new Error(s"Invalid unlocker for box referenced in $tx"))
+                      inputsSum = inputsSum + box.amount
                     case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))
                   }
               }
@@ -256,12 +262,9 @@ object UtxoState {
 
     new UtxoState(EncryState.genesisStateVersion, store, nodeViewHolderRef) {
       override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
-        PersistentBatchAVLProver.create(p,
-                                        storage,
-                                        metadata(EncryState.genesisStateVersion, p.digest),
-                                        paranoidChecks = true).get
-
-      assert(persistentProver.digest.sameElements(storage.version.get))
+        PersistentBatchAVLProver.create(
+          p, storage, metadata(EncryState.genesisStateVersion, p.digest), paranoidChecks = true
+        ).get.ensuring(_.digest sameElements storage.version.get)
     }
   }
 }

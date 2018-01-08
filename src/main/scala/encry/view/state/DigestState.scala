@@ -64,13 +64,13 @@ class DigestState protected(override val version: VersionTag,
 
   //todo: utxo snapshot could go here
   override def applyModifier(mod: EncryPersistentModifier): Try[DigestState] = mod match {
-    case fb: EncryBlock if settings.verifyTransactions =>
-      log.info(s"Got new full block with id ${fb.encodedId} with root ${Algos.encoder.encode(fb.header.stateRoot)}")
-      this.validate(fb).flatMap(_ => update(VersionTag @@ fb.header.id, fb.header.stateRoot))
+    case block: EncryBlock if settings.verifyTransactions =>
+      log.info(s"Got new full block with id ${block.encodedId} with root ${Algos.encoder.encode(block.header.stateRoot)}")
+      this.validate(block).flatMap(_ => update(VersionTag @@ block.header.id, block.header.stateRoot))
 
-    case h: EncryBlockHeader if !settings.verifyTransactions =>
-      log.info(s"Got new Header ${h.encodedId} with root ${Algos.encoder.encode(h.stateRoot)}")
-      update(VersionTag @@ h.id, h.stateRoot)
+    case header: EncryBlockHeader if !settings.verifyTransactions =>
+      log.info(s"Got new Header ${header.encodedId} with root ${Algos.encoder.encode(header.stateRoot)}")
+      update(VersionTag @@ header.id, header.stateRoot)
 
     case a: Any =>
       log.info(s"Unhandled modifier: $a")
