@@ -1,7 +1,9 @@
 package encry.modifiers.mempool
 
 import encry.modifiers.mempool.EncryTransaction.TxTypeId
+import encry.modifiers.state.box.EncryBaseBox
 import scorex.core.transaction.Transaction
+import scorex.core.transaction.box.BoxUnlocker
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.proof.Signature25519
 import scorex.core.{ModifierId, ModifierTypeId}
@@ -33,6 +35,11 @@ trait EncryBaseTransaction extends Transaction[Proposition] {
   val timestamp: Long
 
   val length: Int
+
+  // `BoxUnlocker` holds ID and Key of the box to open (Sequence of `Tx Inputs` + Keys to unlock them).
+  val unlockers: Traversable[BoxUnlocker[_]]
+  // Sequence of `Tx Outputs`.
+  val newBoxes: Traversable[EncryBaseBox]
 }
 
 object EncryBaseTransaction {

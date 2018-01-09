@@ -193,7 +193,7 @@ class UtxoState(override val version: VersionTag,
                 case 1 =>
                   AssetBoxSerializer.parseBytes(data) match {
                     case Success(box) =>
-                      if (!unl.isValid(box.proposition, tx.senderProposition, tx.messageToSign))
+                      if (!unl.isValid(box.proposition, tx.proposition, tx.messageToSign))
                         Failure(new Error(s"Invalid unlocker for box referenced in $tx"))
                       inputsSum = inputsSum + box.amount
                     case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))

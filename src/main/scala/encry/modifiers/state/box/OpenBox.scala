@@ -21,7 +21,7 @@ case class OpenBox(override val nonce: Long,
 
   override val proposition: OpenProposition.type = OpenProposition
 
-  override val typeId: BxTypeId = 0.toByte
+  override val typeId: BxTypeId = OpenBox.typeId
 
   override lazy val bxHash: Digest32 = Algos.hash(
     Bytes.concat(
@@ -40,6 +40,11 @@ case class OpenBox(override val nonce: Long,
     "nonce" -> nonce.asJson,
     "value" -> value.asJson
   ).asJson
+}
+
+object OpenBox {
+
+   val typeId: BxTypeId = 0.toByte
 }
 
 object OpenBoxSerializer extends SizedCompanionSerializer[OpenBox] {

@@ -20,7 +20,7 @@ import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.{Failure, Success, Try}
 
-case class PaymentTransaction(senderProposition: PublicKey25519Proposition,
+case class PaymentTransaction(proposition: PublicKey25519Proposition,
                               override val fee: Amount,
                               override val timestamp: Long,
                               var signature: Signature25519,
@@ -33,7 +33,7 @@ case class PaymentTransaction(senderProposition: PublicKey25519Proposition,
   override val length: Int = 80 + (33 * useBoxes.size) + (28 * createBoxes.size)
 
   // Type of actual Tx type.
-  override val typeId: TxTypeId = 1.toByte
+  override val typeId: TxTypeId = PaymentTransaction.typeId
 
   override val unlockers: Traversable[EncryAssetBoxUnlocker] =
     useBoxes.map(boxId => EncryAssetBoxUnlocker(boxId, signature))
@@ -63,24 +63,13 @@ case class PaymentTransaction(senderProposition: PublicKey25519Proposition,
     }.asJson
   ).asJson
 
-  override lazy val txHash: Digest32 = Algos.hash(
-    Bytes.concat(
-      Array[Byte](typeId),
-      senderProposition.pubKeyBytes,
-      scorex.core.utils.concatFixLengthBytes(useBoxes),
-      scorex.core.utils.concatFixLengthBytes(createBoxes.map { case (addr, amount) =>
-        AddressProposition.addrBytes(addr) ++ Longs.toByteArray(amount)
-      }),
-      Longs.toByteArray(timestamp),
-      Longs.toByteArray(fee)
-    )
-  )
+  override lazy val txHash: Digest32 = PaymentTransaction.getHash(proposition, fee, timestamp, useBoxes, createBoxes)
 
   override lazy val messageToSign: Array[Byte] = txHash
 
   override lazy val semanticValidity: Try[Unit] = {
     // Signature validity checks.
-    if (!signature.isValid(senderProposition, messageToSign)) {
+    if (!signature.isValid(proposition, messageToSign)) {
       log.info(s"<TX: $txHash> Invalid signature provided.")
       Failure(new Error("Invalid signature provided!"))
     }
@@ -100,11 +89,40 @@ case class PaymentTransaction(senderProposition: PublicKey25519Proposition,
 
 }
 
+object PaymentTransaction {
+
+  val typeId: TxTypeId = 1.toByte
+
+  def getHash(proposition: PublicKey25519Proposition,
+              fee: Amount,
+              timestamp: Long,
+              useBoxes: IndexedSeq[ADKey],
+              createBoxes: IndexedSeq[(Address, Amount)]): Digest32 = Algos.hash(
+    Bytes.concat(
+      Array[Byte](typeId),
+      proposition.pubKeyBytes,
+      scorex.core.utils.concatFixLengthBytes(useBoxes),
+      scorex.core.utils.concatFixLengthBytes(createBoxes.map { case (addr, amount) =>
+        AddressProposition.addrBytes(addr) ++ Longs.toByteArray(amount)
+      }),
+      Longs.toByteArray(timestamp),
+      Longs.toByteArray(fee)
+    )
+  )
+
+  def getMessageToSign(proposition: PublicKey25519Proposition,
+                       fee: Amount,
+                       timestamp: Long,
+                       useBoxes: IndexedSeq[ADKey],
+                       createBoxes: IndexedSeq[(Address, Amount)]): Array[Byte] =
+    getHash(proposition, fee, timestamp, useBoxes, createBoxes)
+}
+
 object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
 
   override def toBytes(obj: PaymentTransaction): Array[Byte] = {
     Bytes.concat(
-      obj.senderProposition.pubKeyBytes,
+      obj.proposition.pubKeyBytes,
       Longs.toByteArray(obj.fee),
       Longs.toByteArray(obj.timestamp),
       obj.signature.signature,
