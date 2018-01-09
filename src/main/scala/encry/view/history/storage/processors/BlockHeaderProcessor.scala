@@ -245,11 +245,11 @@ trait BlockHeaderProcessor extends ScorexLogging {
   def requiredDifficultyAfter(parent: EncryBlockHeader): Difficulty = {
     val parentHeight = heightOf(parent.id).get
     val requiredHeadersHeights =
-      consensusAlgo.difficultyController.epochsHeightsForRetargetingAt(Height @@ (parentHeight + 1))
+      consensusAlgo.difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
     assert(requiredHeadersHeights.last == parentHeight, "Incorrect heights sequence!")
     val chain = headerChainBack(requiredHeadersHeights.max - requiredHeadersHeights.min + 1,
       parent, (_: EncryBlockHeader) => false)
     consensusAlgo.difficultyController.getNewDifficulty(parent.difficulty,
-      consensusAlgo.difficultyController.getLastEpochsInterval(chain.headers))
+      consensusAlgo.difficultyController.getTimedelta(chain.headers))
   }
 }

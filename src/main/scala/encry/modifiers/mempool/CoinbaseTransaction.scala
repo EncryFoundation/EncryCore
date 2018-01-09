@@ -28,6 +28,8 @@ case class CoinbaseTransaction(winnerProposition: PublicKey25519Proposition,
 
   override type M = CoinbaseTransaction
 
+  override val length: Int = 72 + (41 * useBoxes.size)
+
   override val typeId: TxTypeId = 0.toByte
 
   override val fee: Amount = 0L

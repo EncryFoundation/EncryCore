@@ -32,13 +32,13 @@ class UtxoState(override val version: VersionTag,
 
   implicit val hf: Blake2b256Unsafe = new Blake2b256Unsafe
   // TODO: Note that Box has multiple subtypes of different lengths. Fix `valueSize`.
-  private lazy val np = NodeParameters(keySize = 33, valueSize = AssetBoxSerializer.Length, labelSize = 32)
+  private lazy val np = NodeParameters(keySize = 33, valueSize = AssetBoxSerializer.Size, labelSize = 32)
   protected lazy val storage = new VersionedIODBAVLStorage(store, np)
 
   protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
     PersistentBatchAVLProver.create(
       new BatchAVLProver[Digest32, Blake2b256Unsafe](
-        keyLength = 33, valueLengthOpt = Some(AssetBoxSerializer.Length)),
+        keyLength = 33, valueLengthOpt = Some(AssetBoxSerializer.Size)),
       storage).get
 
   override def maxRollbackDepth: Int = 10
@@ -173,8 +173,8 @@ class UtxoState(override val version: VersionTag,
   override lazy val rootHash: ADDigest = persistentProver.digest
 
   // TODO: Test.
-  // TODO: BUG: Too many redundant tx signature validity checks here.
-  // Carries out an exhaustive txs validation.
+  // TODO: OPTIMISATION: Too many redundant signature validity checks here.
+  // Carries out an exhaustive tx validation.
   override def validate(tx: EncryBaseTransaction): Try[Unit] = {
 
     tx.semanticValidity.get

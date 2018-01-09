@@ -5,7 +5,7 @@ import encry.crypto.Address
 import encry.modifiers.mempool.EncryTransaction.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.AddressProposition
-import encry.modifiers.state.box.serializers.BoxCompanionSerializer
+import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
@@ -31,7 +31,7 @@ case class AssetBox(override val proposition: AddressProposition,
     )
   )
 
-  override def serializer: BoxCompanionSerializer[AssetBox] = AssetBoxSerializer
+  override def serializer: SizedCompanionSerializer[AssetBox] = AssetBoxSerializer
 
   override lazy val bytes: ADValue = ADValue @@ serializer.toBytes(this)
 
@@ -43,9 +43,9 @@ case class AssetBox(override val proposition: AddressProposition,
   ).asJson
 }
 
-object AssetBoxSerializer extends BoxCompanionSerializer[AssetBox] {
+object AssetBoxSerializer extends SizedCompanionSerializer[AssetBox] {
 
-  val Length: Int = 37
+  val Size: Int = 37
 
   override def toBytes(obj: AssetBox): Array[Byte] = {
     Bytes.concat(
@@ -56,9 +56,9 @@ object AssetBoxSerializer extends BoxCompanionSerializer[AssetBox] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[AssetBox] = Try {
-    val proposition = new AddressProposition(Address @@ Base58.encode(bytes.slice(0, Length)))
-    val nonce = Longs.fromByteArray(bytes.slice(Length, Length + 8))
-    val amount = Longs.fromByteArray(bytes.slice(Length + 8, Length + 16))
+    val proposition = new AddressProposition(Address @@ Base58.encode(bytes.slice(0, Size)))
+    val nonce = Longs.fromByteArray(bytes.slice(Size, Size + 8))
+    val amount = Longs.fromByteArray(bytes.slice(Size + 8, Size + 16))
     AssetBox(proposition, nonce, amount)
   }
 }

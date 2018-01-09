@@ -19,8 +19,8 @@ class PowLinearController(chainSettings: ChainSettings) {
   def getNewDifficulty(oldDifficulty: Difficulty, lastEpochsIntervalMs: FiniteDuration): Difficulty =
     Difficulty @@ (ChainSettings.maxTarget / getNewTarget(getTarget(oldDifficulty), lastEpochsIntervalMs))
 
-  // Used to provide `getLastEpochsInterval()` with the sequence of headers of right heights.
-  def epochsHeightsForRetargetingAt(height: Height): Seq[Height] = {
+  // Used to provide `getTimedelta()` with the sequence of headers of right heights.
+  def getHeightsForRetargetingAt(height: Height): Seq[Height] = {
     if ((height - 1) > chainSettings.retargetingEpochsQty)
       (0 until chainSettings.retargetingEpochsQty)
         .map(i => (height - 1) - i).reverse.map(i => Height @@ i)
@@ -29,7 +29,7 @@ class PowLinearController(chainSettings: ChainSettings) {
         .map(i => (height - 1) - i).filter(i => i > 1).reverse.map(i => Height @@ i)
   }
 
-  def getLastEpochsInterval(headers: Seq[EncryBlockHeader]): FiniteDuration = {
+  def getTimedelta(headers: Seq[EncryBlockHeader]): FiniteDuration = {
     val start = headers.head.timestamp
     val end = headers.last.timestamp
     FiniteDuration(end - start, MILLISECONDS)

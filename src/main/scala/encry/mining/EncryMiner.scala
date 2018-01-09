@@ -5,6 +5,7 @@ import akka.pattern._
 import akka.util.Timeout
 import encry.consensus.{Difficulty, PowCandidateBlock, PowConsensus}
 import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.mempool.EncryBaseTransaction
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
@@ -124,8 +125,11 @@ object EncryMiner extends ScorexLogging {
 
           // val coinbase = CoinbaseTransaction()
 
-          // TODO: Implement transaction limit definition.
-          val txs = view.state.filterValid(view.pool.take(10).toSeq)
+          val txs = view.state.filterValid(view.pool.takeAllUnordered.toSeq)
+            .foldLeft(Seq[EncryBaseTransaction]()) { case (txsBuff, tx) =>
+                if (txsBuff.map(_.length).sum <= settings.chainSettings.blockMaxSize) txsBuff :+ tx
+                txsBuff
+            }
           val (adProof, adDigest) = view.state.proofsForTransactions(txs).get
           val timestamp = NetworkTime.time()
           val difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))

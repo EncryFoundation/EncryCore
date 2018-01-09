@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import encry.modifiers.mempool.EncryTransaction.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.{OpenProposition, OpenPropositionSerializer}
-import encry.modifiers.state.box.serializers.BoxCompanionSerializer
+import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
@@ -30,7 +30,7 @@ case class OpenBox(override val nonce: Long,
     )
   )
 
-  override def serializer: BoxCompanionSerializer[M] = OpenBoxSerializer
+  override def serializer: SizedCompanionSerializer[M] = OpenBoxSerializer
 
   override lazy val bytes: ADValue = ADValue @@ serializer.toBytes(this)
 
@@ -42,9 +42,9 @@ case class OpenBox(override val nonce: Long,
   ).asJson
 }
 
-object OpenBoxSerializer extends BoxCompanionSerializer[OpenBox] {
+object OpenBoxSerializer extends SizedCompanionSerializer[OpenBox] {
 
-  val Length: Int = 17
+  val Size: Int = 17
 
   override def toBytes(obj: OpenBox): Array[Byte] = {
     Bytes.concat(
@@ -56,8 +56,8 @@ object OpenBoxSerializer extends BoxCompanionSerializer[OpenBox] {
 
   override def parseBytes(bytes: Array[Byte]): Try[OpenBox] = Try {
     val _ = OpenPropositionSerializer.parseBytes(bytes.slice(0, 1))
-    val nonce = Longs.fromByteArray(bytes.slice(Length, Length + 8))
-    val amount = Longs.fromByteArray(bytes.slice(Length + 8, Length + 16))
+    val nonce = Longs.fromByteArray(bytes.slice(Size, Size + 8))
+    val amount = Longs.fromByteArray(bytes.slice(Size + 8, Size + 16))
     OpenBox(nonce, amount)
   }
 }

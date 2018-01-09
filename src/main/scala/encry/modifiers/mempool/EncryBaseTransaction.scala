@@ -31,6 +31,8 @@ trait EncryBaseTransaction extends Transaction[Proposition] {
   val fee: Long
 
   val timestamp: Long
+
+  val length: Int
 }
 
 object EncryBaseTransaction {

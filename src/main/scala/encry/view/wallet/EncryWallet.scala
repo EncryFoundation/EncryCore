@@ -53,7 +53,8 @@ case class EncryWallet(seed: ByteStr,
 
   override def scanOffchain(tx: EncryBaseTransaction): EncryWallet = tx match {
     case sp: PaymentTransaction =>
-      if ((sp.senderProposition.bytes sameElements secret.publicKeyBytes) || sp.createBoxes.foldRight(false) { (a: (Address, Amount), b: Boolean) => a._1 sameElements secret.publicKeyBytes }) {
+      if ((sp.senderProposition.bytes sameElements secret.publicKeyBytes) || sp.createBoxes.foldRight(false) {
+        (a: (Address, Amount), _: Boolean) => a._1 sameElements secret.publicKeyBytes }) {
         EncryWallet(seed, chainTransactions, offchainTransactions + (sp.id -> sp), currentBalance)
       } else this
   }
@@ -87,7 +88,6 @@ case class EncryWallet(seed: ByteStr,
       }
     }
   }
-
 
   //todo: implement
   override def rollback(to: VersionTag): Try[EncryWallet] = Success(this)

@@ -8,7 +8,7 @@ import encry.view.history.Height
 case class ChainSettings(initialDifficulty: BigInt,
                          desiredBlockInterval: FiniteDuration,
                          retargetingEpochsQty: Int,
-                         blockSize: Int) {
+                         blockMaxSize: Int) {
 
   lazy val maxRollback: Long = 600.days.toMillis / desiredBlockInterval.toMillis
 }

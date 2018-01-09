@@ -30,6 +30,8 @@ case class PaymentTransaction(senderProposition: PublicKey25519Proposition,
 
   override type M = PaymentTransaction
 
+  override val length: Int = 80 + (33 * useBoxes.size) + (28 * createBoxes.size)
+
   // Type of actual Tx type.
   override val typeId: TxTypeId = 1.toByte
 
@@ -43,7 +45,7 @@ case class PaymentTransaction(senderProposition: PublicKey25519Proposition,
         AssetBox(AddressProposition(addr), nonce, amount)
       }
 
-  override def serializer: Serializer[PaymentTransaction] = PaymentTransactionSerializer
+  override def serializer: Serializer[M] = PaymentTransactionSerializer
 
   override def json: Json = Map(
     "id" -> Base58.encode(id).asJson,
