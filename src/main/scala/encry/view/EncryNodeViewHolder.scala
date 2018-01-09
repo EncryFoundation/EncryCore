@@ -63,7 +63,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
 
     val wallet = EncryWallet.readOrGenerate(settings)
 
-    val memPool = EncryMempool.empty
+    val memPool = EncryMempool.empty(settings)
 
     (history, state, wallet, memPool)
   }
@@ -77,7 +77,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
       //todo: ensure that history is in certain mode
       val history = EncryHistory.readOrGenerate(settings)
       val wallet = EncryWallet.readOrGenerate(settings)
-      val memPool = EncryMempool.empty
+      val memPool = EncryMempool.empty(settings)
       val state = restoreConsistentState(stateIn.asInstanceOf[MS], history)
       (history, state, wallet, memPool)
     }

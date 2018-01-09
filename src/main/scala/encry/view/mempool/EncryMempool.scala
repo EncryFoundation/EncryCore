@@ -1,15 +1,18 @@
 package encry.view.mempool
 
 import encry.modifiers.mempool.EncryBaseTransaction
+import encry.settings.EncryAppSettings
 import encry.view.mempool.EncryMempool._
 import scorex.core.ModifierId
 import scorex.core.transaction.MemoryPool
 import scorex.core.utils.ScorexLogging
 
+import scala.concurrent.duration._
 import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}
 
-class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTransaction])
+class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTransaction],
+                                    settings: EncryAppSettings)
   extends MemoryPool[EncryBaseTransaction, EncryMempool] with EncryMempoolReader with ScorexLogging {
 
   // TODO: Cleanup():
@@ -30,7 +33,6 @@ class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTra
   override def putWithoutCheck(txs: Iterable[EncryBaseTransaction]): EncryMempool = {
     txs.foreach(tx => unconfirmed.put(key(tx.id), tx))
     completeAssembly(txs)
-    // TODO: Cleanup?
     this
   }
 
@@ -50,6 +52,9 @@ class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTra
     }
     this
   }
+
+  def removeExpired(currentTime: Long): Unit =
+    filter(tx => (currentTime - tx.timestamp).millis > settings.nodeSettings.utxMaxAge)
 }
 
 object EncryMempool {
@@ -60,5 +65,5 @@ object EncryMempool {
 
   type MemPoolResponse = Seq[EncryBaseTransaction]
 
-  def empty: EncryMempool = new EncryMempool(TrieMap.empty)
+  def empty(settings: EncryAppSettings): EncryMempool = new EncryMempool(TrieMap.empty, settings)
 }

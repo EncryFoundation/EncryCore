@@ -1,4 +1,4 @@
-package encry.mining
+package encry.local.mining
 
 import akka.actor.{Actor, ActorRef}
 import akka.pattern._

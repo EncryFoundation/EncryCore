@@ -9,4 +9,5 @@ case class NodeSettings(ADState: Boolean,
                         mining: Boolean,
                         miningDelay: FiniteDuration,
                         offlineGeneration: Boolean,
-                        keepVersions: Int)
+                        keepVersions: Int,
+                        utxMaxAge: FiniteDuration)

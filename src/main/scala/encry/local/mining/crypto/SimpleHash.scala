@@ -1,8 +1,7 @@
-package encry.mining.crypto
+package encry.local.mining.crypto
 
-import org.bouncycastle.crypto.Digest
 import encry.utils.LittleEndianBytes._
-import scorex.crypto.hash.{CryptographicHash32, Digest32}
+import org.bouncycastle.crypto.Digest
 
 object SimpleHash {
 
