@@ -7,7 +7,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
+import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.TransactionValidator
 import encry.modifiers.state.box._
 import encry.settings.{Algos, Constants}
@@ -57,7 +57,8 @@ class UtxoState(override val version: VersionTag,
     nodeViewHolderRef.foreach(h => h ! LocallyGeneratedModifier(proof))
   }
 
-  private[state] def checkTransactions(txs: Seq[EncryBaseTransaction],
+  // TODO: Make sure all errors are being caught properly.
+  private[state] def applyTransactions(txs: Seq[EncryBaseTransaction],
                                        expectedDigest: ADDigest): Try[Unit] = Try {
 
     def rollback(): Try[Unit] = persistentProver.rollback(rootHash)
@@ -67,16 +68,18 @@ class UtxoState(override val version: VersionTag,
 
     txs.foreach { tx =>
       // Carries out an exhaustive txs validation and then tries to apply it.
-      if (validate(tx).isSuccess)
+      if (validate(tx).isSuccess) {
         getStateChanges(tx).operations.map(ADProofs.toModification)
           .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
           t.flatMap(_ => {
             appliedModCounter = appliedModCounter + 1
             persistentProver.performOneOperation(m)
           })
-        }.get
-      else if (appliedModCounter > 0)
-        rollback()
+        }
+      } else {
+        if (appliedModCounter > 0) rollback()
+        Failure(new Error(s"Error while applying modifier $tx."))
+      }
     }
 
     // Checks whether the outcoming result is the same as expected.
@@ -91,7 +94,7 @@ class UtxoState(override val version: VersionTag,
       log.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)}")
 
-      checkTransactions(block.payload.transactions, block.header.stateRoot) match {
+      applyTransactions(block.payload.transactions, block.header.stateRoot) match {
         case Success(_) =>
           Try {
             val md = metadata(VersionTag @@ block.id, block.header.stateRoot)
@@ -131,10 +134,12 @@ class UtxoState(override val version: VersionTag,
       .ensuring(persistentProver.digest.sameElements(rootHash))
 
     Try {
-      if (!(txs.isEmpty &&
-        persistentProver.digest.sameElements(rootHash) &&
+      assert(txs.nonEmpty, "Empty transaction sequence passed.")
+
+      if (!(persistentProver.digest.sameElements(rootHash) &&
         storage.version.get.sameElements(rootHash) &&
-        store.lastVersionID.get.data.sameElements(rootHash))) Failure(new Error(""))
+        store.lastVersionID.get.data.sameElements(rootHash)))
+        Failure(new Error("Bad state version."))
 
       val mods = getAllStateChanges(txs).operations.map(ADProofs.toModification)
       //todo .get
@@ -206,12 +211,35 @@ class UtxoState(override val version: VersionTag,
                       inputsSum = inputsSum + box.amount
                     case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))
                   }
+                case _ => Failure(new Error("Got Modifier of unknown type."))
               }
             case None => Failure(new Error(s"Cannot find Box referenced in TX ${tx.txHash}"))
           }
         }
         if (tx.createBoxes.map(i => i._2).sum != inputsSum)
           Failure(new Error("Inputs total amount mismatches Output sum."))
+
+      case tx: CoinbaseTransaction =>
+        tx.useBoxes.foreach { bxId =>
+          persistentProver.unauthenticatedLookup(bxId) match {
+            case Some(data) =>
+              bxId.head.toInt match {
+                case 0 =>
+                  OpenBoxSerializer.parseBytes(data) match {
+                    case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))
+                  }
+                case 3 =>
+                  CoinbaseBoxSerializer.parseBytes(data) match {
+                    case Success(box) =>
+                      if (box.proposition.height <= 1234) // TODO: Change right operand to currentHeight.
+                        Failure(new Error(s"Box referenced in tx: $tx is disallowed to be spent at current height."))
+                    case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))
+                  }
+                case _ => Failure(new Error("Got Modifier of unknown type."))
+              }
+            case None => Failure(new Error(s"Cannot find Box referenced in TX ${tx.txHash}"))
+          }
+        }
       case _ => Failure(new Error("Got Modifier of unknown type."))
     }
     Success()
@@ -219,11 +247,10 @@ class UtxoState(override val version: VersionTag,
 
   // Filters semantically valid and non conflicting transactions.
   // Picks the transaction with highest fee if conflict detected.
-  // Note, this returns txs ordered by the amount of fee.
-  // TODO: This method mainly invoked with ordered txs set from mempool,
-  // TODO: so do we need to sort txs here?
+  // Note, this returns txs ordered chronologically.
+  // TODO: OPTIMISATION: Too many sorting here.
   override def filterValid(txs: Seq[EncryBaseTransaction]): Seq[EncryBaseTransaction] = {
-    val semValidTxs = super.filterValid(txs)
+    val semValidTxs = super.filterValid(txs.sortBy(_.timestamp))
     semValidTxs
       .sortBy(tx => tx.fee)
       .reverse
@@ -238,7 +265,7 @@ class UtxoState(override val version: VersionTag,
           }
       }
     }
-  }._1
+  }._1.sortBy(_.timestamp)
 
   // TODO: Implement.
   def boxesOf(proposition: Proposition): Seq[Box[proposition.type]] = ???

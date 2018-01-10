@@ -41,8 +41,7 @@ class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTra
     this
   }
 
-  override def take(limit: Int): Iterable[EncryBaseTransaction] =
-    unconfirmed.values.toSeq.sortBy(tx => tx.fee).reverse.take(limit)
+  override def take(limit: Int): Iterable[EncryBaseTransaction] = unconfirmed.values.toSeq.take(limit)
 
   def takeAllUnordered: Iterable[EncryBaseTransaction] = unconfirmed.values.toSeq
 

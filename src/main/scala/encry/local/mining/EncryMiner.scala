@@ -126,27 +126,31 @@ object EncryMiner extends ScorexLogging {
 
           val timestamp = NetworkTime.time()
 
-          val txs = view.state.filterValid(view.pool.takeAllUnordered.toSeq)
+          var txs = view.state.filterValid(view.pool.takeAllUnordered.toSeq)
             .foldLeft(Seq[EncryBaseTransaction]()) { case (txsBuff, tx) =>
+              // TODO: Correct right operand on CoinbaseTx.length here.
               if ((txsBuff.map(_.length).sum + tx.length) <= settings.chainSettings.blockMaxSize) txsBuff :+ tx
               txsBuff
             }
 
+          // TODO: Which PubK should we pick here?
           val minerProposition = view.vault.publicKeys.head
-          val privateKey: PrivateKey25519 = view.vault.secretByPublicImage(view.vault.publicKeys.head).get
-          val openBxs = txs.map(tx => tx.newBoxes.head).map(bx => (bx.id, bx.value)).toIndexedSeq
+          val privateKey: PrivateKey25519 = view.vault.secretByPublicImage(minerProposition).get
+          val openBxs = txs.map(tx => tx.newBoxes.head).toIndexedSeq
+          val amount = openBxs.map(_.value).sum
           val signature = PrivateKey25519Companion.sign(privateKey,
-            CoinbaseTransaction.getHash(minerProposition, openBxs, timestamp))
+            CoinbaseTransaction.getHash(minerProposition, openBxs.map(_.id), timestamp, amount))
 
-          // TODO: Coinbase is not prepended to txs yet.
-          val coinbase = CoinbaseTransaction(minerProposition, timestamp, signature, openBxs)
+          val coinbase = CoinbaseTransaction(minerProposition, timestamp, signature, openBxs.map(_.id), amount)
+
+          txs = txs.sortBy(_.timestamp) :+ coinbase
 
           val (adProof, adDigest) = view.state.proofsForTransactions(txs).get
           val difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
             .getOrElse(Difficulty @@ settings.chainSettings.initialDifficulty)
 
           val candidate = new PowCandidateBlock(bestHeaderOpt, adProof, adDigest, txs, timestamp, difficulty)
-          log.debug(s"Send candidate block with ${candidate.transactions.length} transactions")
+          log.debug(s"Sending candidate block with ${candidate.transactions.length} transactions")
 
           candidate
         }.toOption

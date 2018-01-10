@@ -9,6 +9,8 @@ import scorex.core.utils.ScorexLogging
 trait EncryTransaction[P <: Proposition]
   extends EncryBaseTransaction with JsonSerializable with ScorexLogging{
 
+  val proposition: P
+
   val unlockers: Traversable[BoxUnlocker[P]]
 }
 

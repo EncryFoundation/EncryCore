@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.crypto.Address
 import encry.modifiers.mempool.EncryTransaction.{TxTypeId, _}
 import encry.modifiers.state.box.proposition.AddressProposition
-import encry.modifiers.state.box.unlockers.EncryAssetBoxUnlocker
+import encry.modifiers.state.box.unlockers.AssetBoxUnlocker
 import encry.modifiers.state.box.{AssetBox, EncryNoncedBox}
 import encry.settings.Algos
 import io.circe.Json
@@ -20,10 +20,11 @@ import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.{Failure, Success, Try}
 
-case class CoinbaseTransaction(proposition: PublicKey25519Proposition,
+case class CoinbaseTransaction(override val proposition: PublicKey25519Proposition,
                                override val timestamp: Long,
                                var signature: Signature25519,
-                               useBoxes: IndexedSeq[(ADKey, Amount)])
+                               useBoxes: IndexedSeq[ADKey],
+                               amount: Amount)
   extends EncryTransaction[PublicKey25519Proposition] {
 
   override type M = CoinbaseTransaction
@@ -34,14 +35,15 @@ case class CoinbaseTransaction(proposition: PublicKey25519Proposition,
 
   override val fee: Amount = 0L
 
-  override val unlockers: Traversable[EncryAssetBoxUnlocker] =
-    useBoxes.map { case (boxId, _) => EncryAssetBoxUnlocker(boxId, signature) }
+  // TODO: This transaction type does not use `unlockers`.
+  override val unlockers: Traversable[AssetBoxUnlocker] =
+    useBoxes.map(boxId => AssetBoxUnlocker(boxId, signature))
 
   override val newBoxes: Traversable[EncryNoncedBox[AddressProposition]] = Seq(
     AssetBox(
       proposition = AddressProposition(Address @@ proposition.address),
       nonce = nonceFromDigest(Algos.hash(txHash)),
-      amount = useBoxes.map(_._2).sum
+      amount = amount
     )
   )
 
@@ -51,7 +53,7 @@ case class CoinbaseTransaction(proposition: PublicKey25519Proposition,
 
   override def serializer: Serializer[M] = CoinbaseTransactionSerializer
 
-  override lazy val txHash: Digest32 = CoinbaseTransaction.getHash(proposition, useBoxes, timestamp)
+  override lazy val txHash: Digest32 = CoinbaseTransaction.getHash(proposition, useBoxes, timestamp, amount)
 
   override lazy val messageToSign: Array[Byte] = txHash
 
@@ -70,21 +72,24 @@ object CoinbaseTransaction {
   val typeId: TxTypeId = 0.toByte
 
   def getHash(proposition: PublicKey25519Proposition,
-              useBoxes: IndexedSeq[(ADKey, Amount)],
-              timestamp: Long): Digest32 = Algos.hash(
+              useBoxes: IndexedSeq[ADKey],
+              timestamp: Long,
+              amount: Amount): Digest32 = Algos.hash(
     Bytes.concat(
       Array[Byte](typeId),
       proposition.pubKeyBytes,
-      useBoxes.foldLeft(Array[Byte]()) { case (arr, (key, amount)) =>
-        arr ++ key ++ Longs.toByteArray(amount)
-      },
       Longs.toByteArray(timestamp),
+      useBoxes.foldLeft(Array[Byte]()) { case (arr, key) =>
+        arr ++ key
+      },
+      Longs.toByteArray(amount),
     )
   )
 
   def getMessageToSign(proposition: PublicKey25519Proposition,
-                       useBoxes: IndexedSeq[(ADKey, Amount)],
-                       timestamp: Long): Array[Byte] = getHash(proposition, useBoxes, timestamp)
+                       useBoxes: IndexedSeq[ADKey],
+                       timestamp: Long,
+                       amount: Amount): Array[Byte] = getHash(proposition, useBoxes, timestamp, amount)
 }
 
 object CoinbaseTransactionSerializer extends Serializer[CoinbaseTransaction] {
@@ -94,9 +99,10 @@ object CoinbaseTransactionSerializer extends Serializer[CoinbaseTransaction] {
       obj.proposition.pubKeyBytes,
       Longs.toByteArray(obj.timestamp),
       obj.signature.signature,
+      Longs.toByteArray(obj.amount),
       Ints.toByteArray(obj.useBoxes.length),
-      obj.useBoxes.foldLeft(Array[Byte]()) { case (arr, (key, amount)) =>
-        arr ++ key ++ Longs.toByteArray(amount)
+      obj.useBoxes.foldLeft(Array[Byte]()) { case (arr, key) =>
+        arr ++ key
       }
     )
   }
@@ -107,14 +113,14 @@ object CoinbaseTransactionSerializer extends Serializer[CoinbaseTransaction] {
     val sender = new PublicKey25519Proposition(PublicKey @@ bytes.slice(0,32))
     val timestamp = Longs.fromByteArray(bytes.slice(32,40))
     val signature = Signature25519(Signature @@ bytes.slice(40, 72))
-    val inputLength = Ints.fromByteArray(bytes.slice(72, 76))
-    val s = 76
+    val amount = Longs.fromByteArray(bytes.slice(72, 80))
+    val inputLength = Ints.fromByteArray(bytes.slice(80, 84))
+    val s = 84
     val outElementLength = 41
-    val useOutputs = (0 until inputLength) map { i =>
-      ADKey @@ bytes.slice(s + (i * outElementLength), s + (i + 1) * outElementLength - 8) ->
-      Longs.fromByteArray(bytes.slice(s + (i * outElementLength) + 32, s + (i + 1) * outElementLength))
+    val useBoxes = (0 until inputLength) map { i =>
+      ADKey @@ bytes.slice(s + (i * outElementLength), s + (i + 1) * outElementLength)
     }
 
-    CoinbaseTransaction(sender, timestamp, signature, useOutputs)
+    CoinbaseTransaction(sender, timestamp, signature, useBoxes, amount)
   }
 }

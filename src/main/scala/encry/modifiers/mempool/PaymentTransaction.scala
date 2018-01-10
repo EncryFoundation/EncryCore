@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.crypto.Address
 import encry.modifiers.mempool.EncryTransaction._
 import encry.modifiers.state.box.proposition.AddressProposition
-import encry.modifiers.state.box.unlockers.EncryAssetBoxUnlocker
+import encry.modifiers.state.box.unlockers.AssetBoxUnlocker
 import encry.modifiers.state.box.{EncryBaseBox, OpenBox, AssetBox}
 import encry.settings.{Algos, Constants}
 import io.circe.Json
@@ -20,7 +20,7 @@ import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.{Failure, Success, Try}
 
-case class PaymentTransaction(proposition: PublicKey25519Proposition,
+case class PaymentTransaction(override val proposition: PublicKey25519Proposition,
                               override val fee: Amount,
                               override val timestamp: Long,
                               var signature: Signature25519,
@@ -35,8 +35,8 @@ case class PaymentTransaction(proposition: PublicKey25519Proposition,
   // Type of actual Tx type.
   override val typeId: TxTypeId = PaymentTransaction.typeId
 
-  override val unlockers: Traversable[EncryAssetBoxUnlocker] =
-    useBoxes.map(boxId => EncryAssetBoxUnlocker(boxId, signature))
+  override val unlockers: Traversable[AssetBoxUnlocker] =
+    useBoxes.map(boxId => AssetBoxUnlocker(boxId, signature))
 
   override val newBoxes: Traversable[EncryBaseBox] =
     Seq(OpenBox(nonceFromDigest(Algos.hash(txHash)), fee)) ++
