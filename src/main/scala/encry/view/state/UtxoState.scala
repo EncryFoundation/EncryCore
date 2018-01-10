@@ -60,16 +60,24 @@ class UtxoState(override val version: VersionTag,
   private[state] def checkTransactions(txs: Seq[EncryBaseTransaction],
                                        expectedDigest: ADDigest): Try[Unit] = Try {
 
-    // Carries out an exhaustive txs validation.
-    txs.foreach(tx => validate(tx))
+    def rollback(): Try[Unit] = persistentProver.rollback(rootHash)
+      .ensuring(persistentProver.digest.sameElements(rootHash))
 
-    // Tries to apply operations to the state.
-    getStateChanges(txs).operations.map(ADProofs.toModification)
-      .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
-      t.flatMap(_ => {
-        persistentProver.performOneOperation(m)
-      })
-    }.get
+    var appliedModCounter: Int = 0
+
+    txs.foreach { tx =>
+      // Carries out an exhaustive txs validation and then tries to apply it.
+      if (validate(tx).isSuccess)
+        getStateChanges(tx).operations.map(ADProofs.toModification)
+          .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
+          t.flatMap(_ => {
+            appliedModCounter = appliedModCounter + 1
+            persistentProver.performOneOperation(m)
+          })
+        }.get
+      else if (appliedModCounter > 0)
+        rollback()
+    }
 
     // Checks whether the outcoming result is the same as expected.
     if (!expectedDigest.sameElements(persistentProver.digest))
@@ -128,7 +136,7 @@ class UtxoState(override val version: VersionTag,
         storage.version.get.sameElements(rootHash) &&
         store.lastVersionID.get.data.sameElements(rootHash))) Failure(new Error(""))
 
-      val mods = getStateChanges(txs).operations.map(ADProofs.toModification)
+      val mods = getAllStateChanges(txs).operations.map(ADProofs.toModification)
       //todo .get
       mods.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
         t.flatMap(_ => {

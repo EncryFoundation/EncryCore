@@ -29,7 +29,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 
   // TODO: Do we need tx matching here?
   // Extracts `state changes` from the given sequence of transactions.
-  def getStateChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
+  def getAllStateChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
     // Use neither `.filter` nor any validity checks here!
     // This method should be invoked when all txs are already validated.
     EncryBoxStateChanges(
@@ -45,6 +45,8 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
       }
     )
   }
+
+  def getStateChanges(tx: EncryBaseTransaction): EncryBoxStateChanges = getAllStateChanges(Seq(tx))
 
 // TODO: Implement:  def boxesOf(proposition: Proposition): Seq[Box[proposition.type]]
 

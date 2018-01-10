@@ -2,6 +2,7 @@ package encry
 
 import akka.actor.{ActorRef, Props}
 import encry.api.routes.{DebugApiRoute, HistoryApiRoute, MiningApiRoute, StateApiRoute}
+import encry.local.EncryLocalInterface
 import encry.local.mining.EncryMiner
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction

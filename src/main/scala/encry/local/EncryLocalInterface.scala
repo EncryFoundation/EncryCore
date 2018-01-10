@@ -1,4 +1,4 @@
-package encry
+package encry.local
 
 import akka.actor.ActorRef
 import encry.modifiers.EncryPersistentModifier
