@@ -14,6 +14,7 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
+// Now used currently.
 case class CoinbaseBox(override val proposition: HeightProposition,
                        override val nonce: Long,
                        amount: Amount) extends EncryNoncedBox[HeightProposition] {

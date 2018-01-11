@@ -11,6 +11,7 @@ import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, Payme
 import encry.modifiers.state.TransactionValidator
 import encry.modifiers.state.box._
 import encry.settings.{Algos, Constants}
+import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.LocalInterface.LocallyGeneratedModifier
 import scorex.core.VersionTag
@@ -226,10 +227,6 @@ class UtxoState(override val version: VersionTag,
               bxId.head.toInt match {
                 case 0 =>
                   OpenBoxSerializer.parseBytes(data) match {
-                    case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))
-                  }
-                case 3 =>
-                  CoinbaseBoxSerializer.parseBytes(data) match {
                     case Success(box) =>
                       if (box.proposition.height <= 1234) // TODO: Change right operand to currentHeight.
                         Failure(new Error(s"Box referenced in tx: $tx is disallowed to be spent at current height."))
@@ -266,6 +263,8 @@ class UtxoState(override val version: VersionTag,
       }
     }
   }._1.sortBy(_.timestamp)
+
+  def getOpenBoxesAtHeight(height: Height): IndexedSeq[CoinbaseBox] = ???
 
   // TODO: Implement.
   def boxesOf(proposition: Proposition): Seq[Box[proposition.type]] = ???

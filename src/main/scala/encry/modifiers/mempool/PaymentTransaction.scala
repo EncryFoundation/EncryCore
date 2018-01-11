@@ -3,10 +3,11 @@ package encry.modifiers.mempool
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.crypto.Address
 import encry.modifiers.mempool.EncryTransaction._
-import encry.modifiers.state.box.proposition.AddressProposition
+import encry.modifiers.state.box.proposition.{AddressProposition, HeightProposition}
 import encry.modifiers.state.box.unlockers.AssetBoxUnlocker
-import encry.modifiers.state.box.{EncryBaseBox, OpenBox, AssetBox}
-import encry.settings.{Algos, Constants}
+import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox}
+import encry.settings.Algos
+import encry.view.history.Height
 import io.circe.Json
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
@@ -39,7 +40,7 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
     useBoxes.map(boxId => AssetBoxUnlocker(boxId, signature))
 
   override val newBoxes: Traversable[EncryBaseBox] =
-    Seq(OpenBox(nonceFromDigest(Algos.hash(txHash)), fee)) ++
+    Seq(OpenBox(HeightProposition(Height @@ 0), nonceFromDigest(Algos.hash(txHash)), fee)) ++
       createBoxes.zipWithIndex.map { case ((addr, amount), idx) =>
         val nonce = nonceFromDigest(Algos.hash(txHash ++ Ints.toByteArray(idx)))
         AssetBox(AddressProposition(addr), nonce, amount)
@@ -81,12 +82,11 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
       Failure(new Error("Transaction invalid!"))
     }
     // `Fee` amount check.
-    if (fee < (Constants.feeMinAmount + Constants.txByteCost * serializer.toBytes(this).length))
+    if (fee < minimalFee)
       Failure(new Error("Fee amount too small."))
 
     Success()
   }
-
 }
 
 object PaymentTransaction {

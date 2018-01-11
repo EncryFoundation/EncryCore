@@ -19,7 +19,8 @@ import scala.util.{Success, Try}
 case class EncryWallet(seed: ByteStr,
                        chainTransactions: Map[ModifierId, EncryBaseTransaction] = Map(),
                        offchainTransactions: Map[ModifierId, EncryBaseTransaction] = Map(),
-                       currentBalance: Long = 0)
+                       currentBalance: Long = 0
+                       /*walletStore : LSMStore = new LSMStore(new File("wallet.store"))*/)
   extends Wallet[Proposition, EncryBaseTransaction, EncryPersistentModifier, EncryWallet]
     with ScorexLogging {
 
@@ -68,7 +69,9 @@ case class EncryWallet(seed: ByteStr,
         tx match {
           //TODO: not efficient
           case sp: PaymentTransaction =>
-            if ((sp.proposition.bytes sameElements secret.publicKeyBytes) || sp.createBoxes.foldRight(false) { (a: (Address, Amount), b: Boolean) => a._1.getBytes() sameElements secret.publicKeyBytes }){
+            if ((sp.proposition.bytes sameElements secret.publicKeyBytes) || sp.createBoxes.foldRight(false) {
+              (a: (Address, Amount), b: Boolean) => a._1.getBytes() sameElements secret.publicKeyBytes
+            }){
               val ct = w.chainTransactions + (sp.id -> sp)
               val oct = w.offchainTransactions - sp.id
               var curWalBal = w.currentBalance
@@ -95,6 +98,6 @@ case class EncryWallet(seed: ByteStr,
 
 object EncryWallet {
   def readOrGenerate(settings: EncryAppSettings): EncryWallet = {
-    EncryWallet(ByteStr("test_seed".getBytes()), Map(), Map())
+    EncryWallet(ByteStr(settings.walletSettings.seed.getBytes()),Map(),Map(),0)
   }
 }

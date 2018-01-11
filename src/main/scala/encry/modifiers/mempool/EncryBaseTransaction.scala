@@ -2,6 +2,7 @@ package encry.modifiers.mempool
 
 import encry.modifiers.mempool.EncryTransaction.TxTypeId
 import encry.modifiers.state.box.EncryBaseBox
+import encry.settings.Constants
 import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.BoxUnlocker
 import scorex.core.transaction.box.proposition.Proposition
@@ -40,6 +41,9 @@ trait EncryBaseTransaction extends Transaction[Proposition] {
   val unlockers: Traversable[BoxUnlocker[_]]
   // Sequence of `Tx Outputs`.
   val newBoxes: Traversable[EncryBaseBox]
+
+  val minimalFee: Float = Constants.feeMinAmount + Constants.txByteCost * length
+
 }
 
 object EncryBaseTransaction {

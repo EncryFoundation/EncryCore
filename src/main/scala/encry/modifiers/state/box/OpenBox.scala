@@ -3,7 +3,7 @@ package encry.modifiers.state.box
 import com.google.common.primitives.{Bytes, Longs}
 import encry.modifiers.mempool.EncryTransaction.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import encry.modifiers.state.box.proposition.{OpenProposition, OpenPropositionSerializer}
+import encry.modifiers.state.box.proposition.{HeightProposition, HeightPropositionSerializer}
 import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.settings.Algos
 import io.circe.Json
@@ -14,12 +14,11 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-case class OpenBox(override val nonce: Long,
-                   amount: Amount) extends EncryNoncedBox[OpenProposition.type] {
+case class OpenBox(override val proposition: HeightProposition,
+                   override val nonce: Long,
+                   amount: Amount) extends EncryNoncedBox[HeightProposition] {
 
   override type M = OpenBox
-
-  override val proposition: OpenProposition.type = OpenProposition
 
   override val typeId: BxTypeId = OpenBox.typeId
 
@@ -36,7 +35,7 @@ case class OpenBox(override val nonce: Long,
 
   override def json: Json = Map(
     "id" -> Base58.encode(id).asJson,
-    "proposition" -> "Open".asJson,
+    "proposition" -> s"Open after ${proposition.height}".asJson,
     "nonce" -> nonce.asJson,
     "value" -> value.asJson
   ).asJson
@@ -49,7 +48,7 @@ object OpenBox {
 
 object OpenBoxSerializer extends SizedCompanionSerializer[OpenBox] {
 
-  val Size: Int = 17
+  val Size: Int = 20
 
   override def toBytes(obj: OpenBox): Array[Byte] = {
     Bytes.concat(
@@ -60,9 +59,9 @@ object OpenBoxSerializer extends SizedCompanionSerializer[OpenBox] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[OpenBox] = Try {
-    val _ = OpenPropositionSerializer.parseBytes(bytes.slice(0, 1))
+    val proposition = HeightPropositionSerializer.parseBytes(bytes.slice(0, 4)).get
     val nonce = Longs.fromByteArray(bytes.slice(Size, Size + 8))
     val amount = Longs.fromByteArray(bytes.slice(Size + 8, Size + 16))
-    OpenBox(nonce, amount)
+    OpenBox(proposition, nonce, amount)
   }
 }
