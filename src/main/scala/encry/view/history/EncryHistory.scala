@@ -68,7 +68,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
           } else {
             //in fork processing
             val modHeight = heightOf(fb.header.id).get
-            val chainBack = headerChainBack(headersHeight - modHeight, bestHeader, h => h.parentId sameElements fb.header.id)
+            val chainBack = headerChainBack(bestHeaderHeight - modHeight, bestHeader, h => h.parentId sameElements fb.header.id)
             //block in the best chain that link to this header
             val toApply = chainBack.headOption.flatMap(opt => getFullBlock(opt))
             assert(toApply.get.header.parentId sameElements fb.header.id, "Should never be here, State is inconsistent")
@@ -104,7 +104,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
             }
           }
 
-          val branchValidHeader: EncryBlockHeader = loopHeightDown(headersHeight)
+          val branchValidHeader: EncryBlockHeader = loopHeightDown(bestHeaderHeight)
           val bestValidFullOpt: Option[EncryBlockHeader] = bestFullBlockOpt.flatMap(h => heightOf(h.header.id))
             .map(loopHeightDown)
 

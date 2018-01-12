@@ -58,12 +58,12 @@ trait BlockHeaderProcessor extends ScorexLogging {
   /**
     * Id of best header with transactions and proofs. None in regime that do not process transactions
     */
-  def bestFullBlockIdOpt: Option[ModifierId] = None
+  def bestFullBlockIdOpt: Option[ModifierId]
 
   /**
     * @return height of best header
     */
-  def headersHeight: Int = bestHeaderIdOpt.flatMap(id => heightOf(id)).getOrElse(-1)
+  def bestHeaderHeight: Int = bestHeaderIdOpt.flatMap(id => heightOf(id)).getOrElse(-1)
 
   /**
     * @return ProgressInfo - info required for State to be consistent with History
@@ -107,7 +107,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
       Failure(new Error("Header <id: ${header.id}> difficulty too low."))
     } else if (!consensusAlgo.validator.validatePow(header.hHash, header.difficulty)) {
       Failure(new Error(s"Invalid POW in header <id: ${header.id}>"))
-    } else if (!heightOf(header.parentId).exists(h => headersHeight - h < chainSettings.maxRollback)) {
+    } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainSettings.maxRollback)) {
       Failure(new Error("Header is too old to be applied."))
     } else {
       Success()

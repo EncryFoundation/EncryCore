@@ -27,7 +27,7 @@ case class EncryWallet(seed: ByteStr,
   override type S = PrivateKey25519
   override type PI = PublicKey25519Proposition
 
-  //TODO: for wallet app should generate keys from file?
+  // TODO: Should keys for wallet app be generated from file?
   private val secret: S = {
     val pair = Curve25519.createKeyPair(seed.arr)
     PrivateKey25519(pair._1, pair._2)
@@ -70,7 +70,7 @@ case class EncryWallet(seed: ByteStr,
           //TODO: not efficient
           case sp: PaymentTransaction =>
             if ((sp.proposition.bytes sameElements secret.publicKeyBytes) || sp.createBoxes.foldRight(false) {
-              (a: (Address, Amount), b: Boolean) => a._1.getBytes() sameElements secret.publicKeyBytes
+              (a: (Address, Amount), _: Boolean) => a._1.getBytes() sameElements secret.publicKeyBytes
             }){
               val ct = w.chainTransactions + (sp.id -> sp)
               val oct = w.offchainTransactions - sp.id
@@ -98,6 +98,6 @@ case class EncryWallet(seed: ByteStr,
 
 object EncryWallet {
   def readOrGenerate(settings: EncryAppSettings): EncryWallet = {
-    EncryWallet(ByteStr(settings.walletSettings.seed.getBytes()),Map(),Map(),0)
+    EncryWallet(ByteStr(settings.walletSettings.seed.getBytes()), Map(), Map())
   }
 }

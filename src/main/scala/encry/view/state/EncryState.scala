@@ -4,6 +4,7 @@ import java.io.File
 
 import akka.actor.ActorRef
 import encry.crypto.Address
+import encry.local.TransactionFactory
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box._
@@ -73,7 +74,7 @@ object EncryState extends ScorexLogging{
 
   def stateDir(settings: EncryAppSettings) = new File(s"${settings.directory}/state")
 
-  def generateGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
+  def genGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
     log.info("Generating genesis UTXO state")
     lazy val genesisSeed = Long.MaxValue
     lazy val rndGen = new scala.util.Random(genesisSeed)
@@ -91,6 +92,16 @@ object EncryState extends ScorexLogging{
       log.info("Genesis UTXO state generated")
       us.rootHash.sameElements(afterGenesisStateDigest) && us.version.sameElements(genesisStateVersion)
     }) -> bh
+  }
+
+  def genTestingUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
+    log.info("Generating testing UTXO state")
+
+    lazy val initialBoxes: Seq[EncryBaseBox] = TransactionFactory.genAssetBoxes
+    log.info(s"${initialBoxes.size} initial boxes generated.")
+    val bh = BoxHolder(initialBoxes)
+
+    UtxoState.fromBoxHolder(bh, stateDir, nodeViewHolderRef) -> bh
   }
 
   def generateGenesisDigestState(stateDir: File, settings: NodeSettings): DigestState = {

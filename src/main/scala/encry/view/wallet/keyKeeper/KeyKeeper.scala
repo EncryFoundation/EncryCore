@@ -2,9 +2,8 @@ package encry.view.wallet.keyKeeper
 
 import java.io.File
 
-import io.iohk.iodb.LSMStore
-import scorex.core.utils.ScorexLogging
 import scorex.core.transaction.state.PrivateKey25519
+import scorex.core.utils.ScorexLogging
 import scorex.crypto.signatures.Curve25519
 
 import scala.util.Try
@@ -48,7 +47,6 @@ case class KeyKeeper(dir : Option[String],
       }
         //TODO : implement
       case Some(file) => {
-        val store = new LSMStore(file)
         Set(generatePKfromStr(password))
       }
     }

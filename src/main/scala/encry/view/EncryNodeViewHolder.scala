@@ -53,10 +53,11 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     dir.mkdir()
     assert(dir.listFiles().isEmpty, s"Genesis directory $dir should always be empty")
 
-    val state = (
+    val state = {
       if (settings.nodeSettings.ADState) EncryState.generateGenesisDigestState(dir, settings.nodeSettings)
-      else EncryState.generateGenesisUtxoState(dir, Some(self))._1
-      ).asInstanceOf[MS]
+      else if (settings.testingSettings.transactionGeneration) EncryState.genTestingUtxoState(dir, Some(self))._1
+      else EncryState.genGenesisUtxoState(dir, Some(self))._1
+    }.asInstanceOf[MS]
 
     //todo: ensure that history is in certain mode
     val history = EncryHistory.readOrGenerate(settings)

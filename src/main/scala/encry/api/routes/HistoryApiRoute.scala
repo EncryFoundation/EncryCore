@@ -40,7 +40,7 @@ case class HistoryApiRoute(nodeViewActorRef: ActorRef, settings: RESTApiSettings
 
   private def getHeight: Future[ScorexApiResponse] = getHistory.map { h =>
     SuccessApiResponse(Map(
-      "headers-height" -> h.headersHeight
+      "headers-height" -> h.bestHeaderHeight
     ).asJson)
   }
 

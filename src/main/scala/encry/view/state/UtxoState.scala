@@ -201,7 +201,7 @@ class UtxoState(override val version: VersionTag,
               unl.closedBoxId.head.toInt match {
                 case 0 =>
                   OpenBoxSerializer.parseBytes(data) match {
-                    case Success(box) => inputsSum = inputsSum + box.amount
+                    case Success(box) => inputsSum += box.amount
                     case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))
                   }
                 case 1 =>
@@ -209,7 +209,7 @@ class UtxoState(override val version: VersionTag,
                     case Success(box) =>
                       if (!unl.isValid(box.proposition, tx.proposition, tx.messageToSign))
                         Failure(new Error(s"Invalid unlocker for box referenced in $tx"))
-                      inputsSum = inputsSum + box.amount
+                      inputsSum += box.amount
                     case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))
                   }
                 case _ => Failure(new Error("Got Modifier of unknown type."))
@@ -220,6 +220,7 @@ class UtxoState(override val version: VersionTag,
         if (tx.createBoxes.map(i => i._2).sum != inputsSum)
           Failure(new Error("Inputs total amount mismatches Output sum."))
 
+      // This branch does not use `unlockers`
       case tx: CoinbaseTransaction =>
         tx.useBoxes.foreach { bxId =>
           persistentProver.unauthenticatedLookup(bxId) match {
@@ -228,7 +229,8 @@ class UtxoState(override val version: VersionTag,
                 case 0 =>
                   OpenBoxSerializer.parseBytes(data) match {
                     case Success(box) =>
-                      if (box.proposition.height <= 1234) // TODO: Change right operand to currentHeight.
+                      // TODO: How to get `bestHeaderHeight` to compare with `box.proposition.height`?
+                      if (box.proposition.height > 0)
                         Failure(new Error(s"Box referenced in tx: $tx is disallowed to be spent at current height."))
                     case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))
                   }
@@ -268,6 +270,9 @@ class UtxoState(override val version: VersionTag,
 
   // TODO: Implement.
   def boxesOf(proposition: Proposition): Seq[Box[proposition.type]] = ???
+
+  def randomBox(): Option[EncryBaseBox] =
+    persistentProver.avlProver.randomWalk().map(_._1).flatMap(typedBoxById)
 }
 
 object UtxoState {
@@ -289,10 +294,12 @@ object UtxoState {
   }
 
   def fromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32, valueLengthOpt = None)
+    val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 33, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
     val store = new LSMStore(dir, keepVersions = Constants.keepVersions)
+
+    println(s"Generation UTXO State from BH with ${bh.boxes.size} boxes")
 
     new UtxoState(EncryState.genesisStateVersion, store, nodeViewHolderRef) {
       override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =

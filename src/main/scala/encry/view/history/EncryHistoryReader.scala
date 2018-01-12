@@ -88,17 +88,17 @@ trait EncryHistoryReader
     if (isEmpty) {
       info.startingPoints
     } else if (info.lastHeaderIds.isEmpty) {
-      val heightFrom = Math.min(headersHeight, size - 1)
+      val heightFrom = Math.min(bestHeaderHeight, size - 1)
       val startId = headerIdsAtHeight(heightFrom).head
       val startHeader = typedModifierById[EncryBlockHeader](startId).get
       val headers = headerChainBack(size, startHeader, _ => false)
-      assert(headers.headers.exists(_.height == 0), "Should always contain genesis header")
+        .ensuring(_.headers.exists(_.height == 0), "Should always contain genesis header")
       headers.headers.flatMap(h => Seq((EncryBlockHeader.modifierTypeId, h.id)))
     } else {
       val ids = info.lastHeaderIds
       val lastHeaderInOurBestChain: ModifierId = ids.view.reverse.find(m => isInBestChain(m)).get
       val theirHeight = heightOf(lastHeaderInOurBestChain).get
-      val heightFrom = Math.min(headersHeight, theirHeight + size)
+      val heightFrom = Math.min(bestHeaderHeight, theirHeight + size)
       val startId = headerIdsAtHeight(heightFrom).head
       val startHeader = typedModifierById[EncryBlockHeader](startId).get
       val headerIds = headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
@@ -138,11 +138,9 @@ trait EncryHistoryReader
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(EncryHeaderChain.empty)
 
   // Gets EncryPersistentModifier by it's id if it is in history.
-  override def modifierById(id: ModifierId): Option[EncryPersistentModifier] = {
-    val modifier = historyStorage.modifierById(id)
-    assert(modifier.forall(_.id sameElements id), s"Modifier $modifier id is incorrect, ${Algos.encode(id)} expected")
-    modifier
-  }
+  override def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
+    historyStorage.modifierById(id)
+      .ensuring(_.forall(_.id sameElements id), s"Modifier ${Algos.encode(id)} id is incorrect")
 
   // Gets EncryPersistentModifier of type T by it's id if it is in history.
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T] = modifierById(id) match {
@@ -160,7 +158,7 @@ trait EncryHistoryReader
   def missedModifiersForFullChain(): Seq[(ModifierTypeId, ModifierId)] = {
     if (nodeSettings.verifyTransactions) {
       bestHeaderOpt.toSeq
-        .flatMap(h => headerChainBack(headersHeight + 1, h, p => contains(p.adProofsId) && contains(p.payloadId)).headers)
+        .flatMap(h => headerChainBack(bestHeaderHeight + 1, h, p => contains(p.adProofsId) && contains(p.payloadId)).headers)
         .flatMap(h => Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId)))
         .filter(id => !contains(id._2))
     }

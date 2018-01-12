@@ -31,7 +31,7 @@ object EncryAppSettings extends ScorexLogging with SettingsReaders {
     val nodeSettings = config.as[NodeSettings](s"$configPath.node")
     val chainSettings = config.as[ChainSettings](s"$configPath.chain")
     val testingSettings = config.as[TestingSettings](s"$configPath.testing")
-    val walletSettings = config.as[WalletSettings]((s"$configPath.wallet"))
+    val walletSettings = config.as[WalletSettings](s"$configPath.wallet")
     val scorexSettings = config.as[ScorexSettings](scorexConfigPath)
 
     EncryAppSettings(directory, chainSettings, testingSettings, nodeSettings,walletSettings, scorexSettings)
