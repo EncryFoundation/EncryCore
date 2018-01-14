@@ -2,27 +2,19 @@ package encry.view.state
 
 import java.io.File
 
-import encry.local.TransactionFactory
-import encry.modifiers.state.box.OpenBox
-import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.Constants
-import encry.view.history.Height
 import io.iohk.iodb.LSMStore
-import scorex.crypto.authds.ADValue
 import scorex.crypto.authds.avltree.batch._
+import scorex.crypto.authds.{ADKey, ADValue}
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
 class UtxoStateTest extends org.scalatest.FunSuite {
 
   test("BatchAVLProver should have the same digest after rollback as before.") {
 
-    val boxesType1 = TransactionFactory.genAssetBoxes
-    val boxesType2 = IndexedSeq(
-      OpenBox(HeightProposition(Height @@ 111L), 99L, 1000L),
-      OpenBox(HeightProposition(Height @@ 101L), 199L, 1000L)
-    )
-
-    val boxHolder = BoxHolder(boxesType1 ++ boxesType2)
+    val valuesToInsert = (1 until 100).map { i =>
+      Array.fill(32)(i.toByte) -> Array.fill(64)(i.toByte)
+    }
 
     val dir: File = new File("/Encry/test-data")
     assert(dir.exists() && dir.isDirectory, "dir is invalid.")
@@ -43,7 +35,7 @@ class UtxoStateTest extends org.scalatest.FunSuite {
 
     val initialDigest = persistentProver.digest
 
-    boxHolder.sortedBoxes.foreach(b => prover.performOneOperation(Insert(b.id, ADValue @@ b.bytes))
+    valuesToInsert.foreach(v => prover.performOneOperation(Insert(ADKey @@ v._1, ADValue @@ v._2))
       .ensuring(_.isSuccess))
 
     persistentProver.rollback(initialDigest)

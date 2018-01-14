@@ -43,7 +43,7 @@ case class OpenBox(override val proposition: HeightProposition,
 
 object OpenBox {
 
-   val typeId: BxTypeId = 0.toByte
+   val typeId: BxTypeId = 2.toByte
 }
 
 object OpenBoxSerializer extends SizedCompanionSerializer[OpenBox] {

@@ -22,7 +22,7 @@ case class AssetBox(override val proposition: AddressProposition,
 
   override type M = AssetBox
 
-  override val typeId: BxTypeId = 1.toByte
+  override val typeId: BxTypeId = AssetBox.typeId
 
   override val id: ADKey = ADKey @@ bxHash.updated(0, typeId) // 32 bytes!
 
@@ -42,6 +42,11 @@ case class AssetBox(override val proposition: AddressProposition,
     "nonce" -> nonce.asJson,
     "value" -> value.asJson
   ).asJson
+}
+
+object AssetBox {
+
+  val typeId: BxTypeId = 1.toByte
 }
 
 object AssetBoxSerializer extends SizedCompanionSerializer[AssetBox] {

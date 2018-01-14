@@ -45,10 +45,10 @@ class UtxoState(override val version: VersionTag,
   override def maxRollbackDepth: Int = 10
 
   def typedBoxById(boxId: ADKey): Option[EncryBaseBox] = {
-    boxId.head.toInt match {
-      case 0 => persistentProver.unauthenticatedLookup(boxId)
+    boxId.head match {
+      case OpenBox.typeId => persistentProver.unauthenticatedLookup(boxId)
         .map(OpenBoxSerializer.parseBytes).flatMap(_.toOption)
-      case 1 => persistentProver.unauthenticatedLookup(boxId)
+      case AssetBox.typeId => persistentProver.unauthenticatedLookup(boxId)
         .map(AssetBoxSerializer.parseBytes).flatMap(_.toOption)
     }
   }
@@ -184,7 +184,7 @@ class UtxoState(override val version: VersionTag,
     persistentProver.storage.rollbackVersions.map(v =>
       VersionTag @@ store.get(ByteArrayWrapper(Algos.hash(v))).get.data)
 
-  val rootHash: ADDigest = persistentProver.digest
+  override lazy val rootHash: ADDigest = persistentProver.digest
 
   // TODO: Test.
   // TODO: OPTIMISATION: Too many redundant signature validity checks here.
@@ -198,13 +198,13 @@ class UtxoState(override val version: VersionTag,
         tx.unlockers.foreach { unl =>
           persistentProver.unauthenticatedLookup(unl.closedBoxId) match {
             case Some(data) =>
-              unl.closedBoxId.head.toInt match {
-                case 0 =>
+              unl.closedBoxId.head match {
+                case OpenBox.typeId =>
                   OpenBoxSerializer.parseBytes(data) match {
                     case Success(box) => inputsSum += box.amount
                     case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))
                   }
-                case 1 =>
+                case AssetBox.typeId =>
                   AssetBoxSerializer.parseBytes(data) match {
                     case Success(box) =>
                       if (!unl.isValid(box.proposition, tx.proposition, tx.messageToSign))
@@ -225,8 +225,8 @@ class UtxoState(override val version: VersionTag,
         tx.useBoxes.foreach { bxId =>
           persistentProver.unauthenticatedLookup(bxId) match {
             case Some(data) =>
-              bxId.head.toInt match {
-                case 0 =>
+              bxId.head match {
+                case OpenBox.typeId =>
                   OpenBoxSerializer.parseBytes(data) match {
                     case Success(box) =>
                       // TODO: How to get `bestHeaderHeight` to compare with `box.proposition.height`?
