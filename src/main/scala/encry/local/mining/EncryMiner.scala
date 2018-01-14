@@ -65,12 +65,15 @@ class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings, nodeId: Ar
       if (!isMining && settings.nodeSettings.mining) {
         log.info("Starting Mining")
         isMining = true
-        prepareCandidate(viewHolderRef, settings, nodeId)
         self ! MineBlock
       }
 
     case StopMining =>
       isMining = false
+
+    case PrepareCandidate =>
+      val cOpt = prepareCandidate(viewHolderRef, settings, nodeId)
+      cOpt onComplete(opt => candidateOpt = opt.get)
 
     case MineBlock =>
       nonce = nonce + 1
@@ -91,7 +94,7 @@ class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings, nodeId: Ar
           }
         case None =>
           log.info("Candidate is empty. Trying again in 1 sec.")
-          prepareCandidate(viewHolderRef, settings, nodeId)
+          self ! PrepareCandidate
           context.system.scheduler.scheduleOnce(1.second)(self ! MineBlock)
       }
 
@@ -107,6 +110,8 @@ object EncryMiner extends ScorexLogging {
   case object StopMining
 
   case object MineBlock
+
+  case object PrepareCandidate
 
   case object MiningStatusRequest
 
