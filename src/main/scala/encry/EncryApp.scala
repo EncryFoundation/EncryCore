@@ -2,8 +2,10 @@ package encry
 
 import akka.actor.{ActorRef, Props}
 import encry.api.routes.{DebugApiRoute, HistoryApiRoute, MiningApiRoute, StateApiRoute}
-import encry.local.EncryLocalInterface
+import encry.local.TransactionGenerator.StartGeneration
 import encry.local.mining.EncryMiner
+import encry.local.mining.EncryMiner.StartMining
+import encry.local.{EncryLocalInterface, TransactionGenerator}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.network.EncryNodeViewSynchronizer
@@ -60,6 +62,15 @@ class EncryApp(args: Seq[String]) extends Application {
   override val nodeViewSynchronizer: ActorRef = actorSystem.actorOf(
     Props(new EncryNodeViewSynchronizer(
       networkController, nodeViewHolderRef, localInterface, EncrySyncInfoMessageSpec, settings.network)))
+
+  if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) {
+    minerRef ! StartMining
+  }
+
+  if (encrySettings.testingSettings.transactionGeneration) {
+    val txGen = actorSystem.actorOf(Props(classOf[TransactionGenerator], nodeViewHolderRef, encrySettings.testingSettings))
+    txGen ! StartGeneration
+  }
 }
 
 object EncryApp extends App {

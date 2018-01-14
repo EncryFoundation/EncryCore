@@ -4,8 +4,7 @@ import supertagged.TaggedType
 
 package object history {
 
-  object Height extends TaggedType[Int]
+  object Height extends TaggedType[Long]
 
   type Height = Height.Type
-
 }

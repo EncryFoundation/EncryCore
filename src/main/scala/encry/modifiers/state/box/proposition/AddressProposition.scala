@@ -18,15 +18,16 @@ case class AddressProposition(address: Address) extends Proposition {
 
   override def serializer: Serializer[AddressProposition] = AddressPropositionSerializer
 
-  override lazy val bytes: Array[Byte] = AddressProposition.addrBytes(address)
+  override lazy val bytes: Array[Byte] = AddressProposition.getAddrBytes(address)
 }
 
 object AddressProposition {
 
-  def addrBytes(address: Address): Array[Byte] = address.getBytes
+  def getAddrBytes(address: Address): Array[Byte] = Base58.decode(address).get
 
-  def validAddress(address: String): Boolean = {
-    val addrBytes: Array[Byte] = Base58.decode(address).get
+  // TODO: Use this in transaction.semanticValidity.
+  def validAddress(address: Address): Boolean = {
+    val addrBytes: Array[Byte] = getAddrBytes(address)
       if (addrBytes.length != AddressLength) false
       else {
         val checkSum = addrBytes.takeRight(ChecksumLength)

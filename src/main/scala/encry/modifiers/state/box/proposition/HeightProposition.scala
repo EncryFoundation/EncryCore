@@ -1,6 +1,7 @@
 package encry.modifiers.state.box.proposition
 
-import com.google.common.primitives.Ints
+import com.google.common.primitives.Longs
+import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.view.history.Height
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.Proposition
@@ -14,11 +15,13 @@ case class HeightProposition(height: Height) extends Proposition {
   override def serializer: Serializer[M] = HeightPropositionSerializer
 }
 
-object HeightPropositionSerializer extends Serializer[HeightProposition] {
+object HeightPropositionSerializer extends SizedCompanionSerializer[HeightProposition] {
 
-  override def toBytes(obj: HeightProposition): Array[Byte] = Ints.toByteArray(obj.height)
+  val Size = 8
+
+  override def toBytes(obj: HeightProposition): Array[Byte] = Longs.toByteArray(obj.height)
 
   override def parseBytes(bytes: Array[Byte]): Try[HeightProposition] = Try {
-    HeightProposition(Height @@ Ints.fromByteArray(bytes))
+    HeightProposition(Height @@ Longs.fromByteArray(bytes))
   }
 }

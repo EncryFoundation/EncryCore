@@ -41,14 +41,12 @@ case class KeyKeeper(dir : Option[String],
     } yield file
 
     storeFile match {
-      case None => {
+      case None =>
         log.debug("KeyKepper store doesn't exists. Starting with empty KeyKepper. Generate key from user-app password")
         Set(generatePKfromStr(password))
-      }
-        //TODO : implement
-      case Some(file) => {
+      //TODO : implement
+      case Some(_) =>
         Set(generatePKfromStr(password))
-      }
     }
   }
 

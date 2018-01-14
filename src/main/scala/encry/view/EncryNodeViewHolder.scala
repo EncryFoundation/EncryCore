@@ -55,7 +55,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
 
     val state = {
       if (settings.nodeSettings.ADState) EncryState.generateGenesisDigestState(dir, settings.nodeSettings)
-      else if (settings.testingSettings.transactionGeneration) EncryState.genTestingUtxoState(dir, Some(self))._1
+//      else if (settings.testingSettings.transactionGeneration) EncryState.genTestingUtxoState(dir, Some(self))._1
       else EncryState.genGenesisUtxoState(dir, Some(self))._1
     }.asInstanceOf[MS]
 

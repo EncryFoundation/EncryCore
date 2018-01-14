@@ -75,7 +75,8 @@ case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
 object ADProofs {
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (104: Byte)
 
-  val KL = 32
+  // TODO: WARN
+  val KL = 33
 
   def proofDigest(proofBytes: SerializedAdProof): Digest32 = Algos.hash(proofBytes)
 
@@ -87,7 +88,8 @@ object ADProofs {
   def toModification(op: EncryBoxStateChangeOperation): Modification =
     op match {
       case Insertion(box) => box match {
-        case box: AssetBox => Insert(box.id, ADValue @@ box.bytes)
+        case bx: AssetBox => Insert(bx.id, ADValue @@ bx.bytes)
+        case bx: OpenBox => Insert(bx.id, ADValue @@ bx.bytes)
         case _ => throw new Error("Got state modifier of unknown type.")
       }
       case r: Removal => Remove(r.boxId)

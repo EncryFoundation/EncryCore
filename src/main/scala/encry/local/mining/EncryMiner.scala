@@ -22,7 +22,7 @@ import scorex.core.utils.{NetworkTime, ScorexLogging}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings, nodeId: Array[Byte])
   extends Actor with ScorexLogging {
@@ -90,6 +90,8 @@ class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings, nodeId: Ar
               if (isMining) self ! MineBlock
           }
         case None =>
+          log.info("Candidate is empty. Trying again in 1 sec.")
+          prepareCandidate(viewHolderRef, settings, nodeId)
           context.system.scheduler.scheduleOnce(1.second)(self ! MineBlock)
       }
 
@@ -122,7 +124,7 @@ object EncryMiner extends ScorexLogging {
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[PowCandidateBlock]] { view =>
         val bestHeaderOpt = view.history.bestFullBlockOpt.map(_.header)
 
-        if (bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) Try {
+        if ((bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) && !view.pool.isEmpty) Try {
 
           val timestamp = NetworkTime.time()
 
@@ -130,7 +132,7 @@ object EncryMiner extends ScorexLogging {
             .foldLeft(Seq[EncryBaseTransaction]()) { case (txsBuff, tx) =>
               // TODO: Correct right operand on CoinbaseTx.length here.
               if ((txsBuff.map(_.length).sum + tx.length) <= settings.chainSettings.blockMaxSize) txsBuff :+ tx
-              txsBuff
+              else txsBuff
             }
 
           // TODO: Which PubK should we pick here?
@@ -153,6 +155,9 @@ object EncryMiner extends ScorexLogging {
           log.debug(s"Sending candidate block with ${candidate.transactions.length} transactions")
 
           candidate
+        }.recoverWith { case thr =>
+          log.warn("Error when trying to generate candidate: ", thr)
+          Failure(thr)
         }.toOption
         else
           None

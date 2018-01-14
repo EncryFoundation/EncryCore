@@ -32,14 +32,14 @@ class UtxoState(override val version: VersionTag,
   import UtxoState.metadata
 
   implicit val hf: Blake2b256Unsafe = new Blake2b256Unsafe
-  // TODO: Note that Box has multiple subtypes of different lengths. Fix `valueSize`.
-  private lazy val np = NodeParameters(keySize = 33, valueSize = AssetBoxSerializer.Size, labelSize = 32)
+  // TODO: Note that Box has multiple subtypes of different lengths. Fix `valueSize`.!!!! Error from here.
+  private lazy val np = NodeParameters(keySize = 32, valueSize = AssetBoxSerializer.Size, labelSize = 32)
   protected lazy val storage = new VersionedIODBAVLStorage(store, np)
 
   protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
     PersistentBatchAVLProver.create(
       new BatchAVLProver[Digest32, Blake2b256Unsafe](
-        keyLength = 33, valueLengthOpt = Some(AssetBoxSerializer.Size)),
+        keyLength = 32, valueLengthOpt = None),
       storage).get
 
   override def maxRollbackDepth: Int = 10
@@ -131,8 +131,9 @@ class UtxoState(override val version: VersionTag,
 
   def proofsForTransactions(txs: Seq[EncryBaseTransaction]): Try[(SerializedAdProof, ADDigest)] = {
 
-    def rollback(): Try[Unit] = persistentProver.rollback(rootHash)
-      .ensuring(persistentProver.digest.sameElements(rootHash))
+    def rollback(): Try[Unit] = Try(
+      persistentProver.rollback(rootHash).ensuring(_.isSuccess && persistentProver.digest.sameElements(rootHash))
+    ).flatten
 
     Try {
       assert(txs.nonEmpty, "Empty transaction sequence passed.")
@@ -153,7 +154,6 @@ class UtxoState(override val version: VersionTag,
       }.get
 
       val proof = persistentProver.generateProofAndUpdateStorage()
-
       val digest = persistentProver.digest
 
       proof -> digest
@@ -184,7 +184,7 @@ class UtxoState(override val version: VersionTag,
     persistentProver.storage.rollbackVersions.map(v =>
       VersionTag @@ store.get(ByteArrayWrapper(Algos.hash(v))).get.data)
 
-  override lazy val rootHash: ADDigest = persistentProver.digest
+  val rootHash: ADDigest = persistentProver.digest
 
   // TODO: Test.
   // TODO: OPTIMISATION: Too many redundant signature validity checks here.
@@ -248,10 +248,9 @@ class UtxoState(override val version: VersionTag,
   // Picks the transaction with highest fee if conflict detected.
   // Note, this returns txs ordered chronologically.
   // TODO: OPTIMISATION: Too many sorting here.
-  override def filterValid(txs: Seq[EncryBaseTransaction]): Seq[EncryBaseTransaction] = {
-    val semValidTxs = super.filterValid(txs.sortBy(_.timestamp))
-    semValidTxs
-      .sortBy(tx => tx.fee)
+  override def filterValid(txs: Seq[EncryBaseTransaction]): Seq[EncryBaseTransaction] =
+    super.filterValid(txs.sortBy(_.timestamp))
+      .sortBy(_.fee)
       .reverse
       .foldLeft((Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) { case ((nonConflictTxs, bxs), tx) =>
       tx match {
@@ -263,8 +262,7 @@ class UtxoState(override val version: VersionTag,
             (nonConflictTxs, bxs)
           }
       }
-    }
-  }._1.sortBy(_.timestamp)
+    }._1.sortBy(_.timestamp)
 
   def getOpenBoxesAtHeight(height: Height): IndexedSeq[CoinbaseBox] = ???
 
@@ -275,7 +273,7 @@ class UtxoState(override val version: VersionTag,
     persistentProver.avlProver.randomWalk().map(_._1).flatMap(typedBoxById)
 }
 
-object UtxoState {
+object UtxoState extends ScorexLogging {
 
   private lazy val bestVersionKey = Algos.hash("best_state_version")
 
@@ -294,12 +292,12 @@ object UtxoState {
   }
 
   def fromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 33, valueLengthOpt = None)
+    val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
-    val store = new LSMStore(dir, keepVersions = Constants.keepVersions)
+    val store = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
 
-    println(s"Generation UTXO State from BH with ${bh.boxes.size} boxes")
+    log.info(s"Generating UTXO State from BH with ${bh.boxes.size} boxes")
 
     new UtxoState(EncryState.genesisStateVersion, store, nodeViewHolderRef) {
       override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =

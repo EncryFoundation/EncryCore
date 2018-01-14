@@ -75,10 +75,10 @@ case class EncryWallet(seed: ByteStr,
               val ct = w.chainTransactions + (sp.id -> sp)
               val oct = w.offchainTransactions - sp.id
               var curWalBal = w.currentBalance
-              var wB = for(a <- sp.createBoxes){
-                if(sp.proposition.bytes sameElements secret.publicKeyBytes){
-                  curWalBal-=a._2
-                }else if(a._1.getBytes() sameElements secret.publicKeyBytes){
+              for (a <- sp.createBoxes) {
+                if (sp.proposition.bytes sameElements secret.publicKeyBytes) {
+                  curWalBal -= a._2
+                } else if (a._1.getBytes sameElements secret.publicKeyBytes) {
                   curWalBal += a._2
                 }
               }

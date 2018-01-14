@@ -14,7 +14,7 @@ import scorex.core.VersionTag
 import scorex.core.transaction.state.MinimalState
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADDigest
-import scorex.crypto.encode.Base16
+import scorex.crypto.encode.{Base16, Base58}
 
 import scala.util.Try
 
@@ -67,47 +67,32 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 object EncryState extends ScorexLogging{
 
   // 33 bytes in Base58 encoding.
-  val afterGenesisStateDigestHex: String = "f2343e160d4e42a83a87ea1a2f56b6fa2046ab8146c5e61727c297be578da0f510"
-  val afterGenesisStateDigest: ADDigest = ADDigest @@ Base16.decode(afterGenesisStateDigestHex)
+  val afterGenesisStateDigestHex: String = "Tgx54rhrGNhTnrHBiRYwyugnCo7A61ZR4xSq2xcqAv9kG"
+  val afterGenesisStateDigest: ADDigest = ADDigest @@ Algos.decode(afterGenesisStateDigestHex).get
 
   lazy val genesisStateVersion: VersionTag = VersionTag @@ Algos.hash(afterGenesisStateDigest.tail)
 
   def stateDir(settings: EncryAppSettings) = new File(s"${settings.directory}/state")
 
   def genGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
-    log.info("Generating genesis UTXO state")
+    log.info("Generating genesis UTXO state.")
     lazy val genesisSeed = Long.MaxValue
-    lazy val rndGen = new scala.util.Random(genesisSeed)
-    lazy val initialBoxesNumber = 10000
 
-    lazy val initialBoxes: Seq[EncryBaseBox] =
-      (1 to initialBoxesNumber).map(_ => AssetBox(
-        AddressProposition(Address @@ "f2343e160d4e42a83a87ea1a2f56b6fa2046ab8146c5e61727c297be578da0f510"),
-        rndGen.nextLong(),
-        10000L))
+    lazy val initialBoxes: Seq[EncryBaseBox] = TransactionFactory.genAssetBoxes
 
     val bh = BoxHolder(initialBoxes)
 
     UtxoState.fromBoxHolder(bh, stateDir, nodeViewHolderRef).ensuring(us => {
-      log.info("Genesis UTXO state generated")
+      log.info(s"Generated UTXO state with ${bh.boxes.size} boxes inside.")
       us.rootHash.sameElements(afterGenesisStateDigest) && us.version.sameElements(genesisStateVersion)
     }) -> bh
-  }
-
-  def genTestingUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
-    log.info("Generating testing UTXO state")
-
-    lazy val initialBoxes: Seq[EncryBaseBox] = TransactionFactory.genAssetBoxes
-    log.info(s"${initialBoxes.size} initial boxes generated.")
-    val bh = BoxHolder(initialBoxes)
-
-    UtxoState.fromBoxHolder(bh, stateDir, nodeViewHolderRef) -> bh
   }
 
   def generateGenesisDigestState(stateDir: File, settings: NodeSettings): DigestState = {
     DigestState.create(Some(genesisStateVersion), Some(afterGenesisStateDigest), stateDir, settings).get //todo: .get
   }
 
+  // TODO:
   def readOrGenerate(settings: EncryAppSettings, nodeViewHolderRef: Option[ActorRef]): Option[EncryState[_]] = {
     val dir = stateDir(settings)
     dir.mkdirs()

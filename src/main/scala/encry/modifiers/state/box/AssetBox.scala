@@ -9,7 +9,8 @@ import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
-import scorex.crypto.authds.ADValue
+import scorex.core.transaction.box.proposition.PublicKey25519Proposition.AddressLength
+import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
@@ -23,6 +24,8 @@ case class AssetBox(override val proposition: AddressProposition,
 
   override val typeId: BxTypeId = 1.toByte
 
+  override val id: ADKey = ADKey @@ bxHash.updated(0, typeId) // 32 bytes!
+
   override lazy val bxHash: Digest32 = Algos.hash(
     Bytes.concat(
       proposition.bytes,
@@ -32,8 +35,6 @@ case class AssetBox(override val proposition: AddressProposition,
   )
 
   override def serializer: SizedCompanionSerializer[AssetBox] = AssetBoxSerializer
-
-  override lazy val bytes: ADValue = ADValue @@ serializer.toBytes(this)
 
   override def json: Json = Map(
     "id" -> Base58.encode(id).asJson,
@@ -45,20 +46,20 @@ case class AssetBox(override val proposition: AddressProposition,
 
 object AssetBoxSerializer extends SizedCompanionSerializer[AssetBox] {
 
-  val Size: Int = 37
+  val Size: Int = AddressLength + 16
 
   override def toBytes(obj: AssetBox): Array[Byte] = {
     Bytes.concat(
-      AddressProposition.addrBytes(obj.proposition.address),
+      AddressProposition.getAddrBytes(obj.proposition.address),
       Longs.toByteArray(obj.nonce),
       Longs.toByteArray(obj.amount)
     )
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[AssetBox] = Try {
-    val proposition = new AddressProposition(Address @@ Base58.encode(bytes.slice(0, Size)))
-    val nonce = Longs.fromByteArray(bytes.slice(Size, Size + 8))
-    val amount = Longs.fromByteArray(bytes.slice(Size + 8, Size + 16))
+    val proposition = new AddressProposition(Address @@ Base58.encode(bytes.slice(0, AddressLength)))
+    val nonce = Longs.fromByteArray(bytes.slice(AddressLength, AddressLength + 8))
+    val amount = Longs.fromByteArray(bytes.slice(AddressLength + 8, AddressLength + 16))
     AssetBox(proposition, nonce, amount)
   }
 }

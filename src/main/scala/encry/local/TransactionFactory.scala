@@ -19,12 +19,13 @@ object TransactionFactory {
 
   object TestProps {
     lazy val nonce = 0
-    lazy val boxValue = 1000
-    lazy val txAmount = 900
+    lazy val boxValue: Amount = 1000
+    lazy val txAmount: Amount = 900
+    lazy val txFee: Amount = 100
     lazy val testDir = "test/"
-    lazy val keysFilePath = s"${testDir}keys.seq"
+    lazy val keysFilePath = s"${testDir}seeds"
     lazy val splitSymbol = ";"
-    lazy val recipientAddr: Address = Address @@ "f2343e160d4e42a83a87ea1a2f56b6fa2046ab8146c5e61727c297be578da0f510"
+    lazy val recipientAddr: Address = Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp"
   }
 
   // TODO: Should be evaluated once during the test.
@@ -59,8 +60,10 @@ object TransactionFactory {
     }
 
   def genAssetBoxes: IndexedSeq[AssetBox] =
-    getOrGenerateKeys(TestProps.keysFilePath).foldLeft(IndexedSeq[AssetBox]()) { case (bxs, pp) =>
-      bxs :+ AssetBox(AddressProposition(Address @@ pp.publicImage.address), TestProps.nonce, TestProps.boxValue)
+    getOrGenerateKeys(TestProps.keysFilePath).foldLeft(IndexedSeq[AssetBox]()) { case (bxs, pk) =>
+      bxs :+ AssetBox(
+        AddressProposition(Address @@ PublicKey25519Proposition(pk.publicKeyBytes).address),
+        TestProps.nonce, TestProps.boxValue)
     }
 
   def genAssetBox(address: Address): AssetBox =
@@ -71,11 +74,11 @@ object TransactionFactory {
       s :+ box.id
     }
 
-  // TODO: This method is redundant.
-  def getRandomTxOutputs(amount: Amount): IndexedSeq[(Address, Amount)] = {
-    val div = Random.shuffle(Seq(2, 10, 5, 1)).head
-    (0 until (amount / div).toInt).foldLeft(IndexedSeq[(Address, Amount)]()) { case (outs, am) =>
-      outs :+ (TestProps.recipientAddr, am.toLong)
-    }
-  }
+//  // TODO: This method is redundant.
+//  def getRandomTxOutputs(amount: Amount): IndexedSeq[(Address, Amount)] = {
+//    val div = Random.shuffle(Seq(2, 10, 5, 1)).head
+//    (0 until amount.toInt).foldLeft(IndexedSeq[(Address, Amount)]()) { case (outs, am) =>
+//      outs :+ (TestProps.recipientAddr, am.toLong)
+//    }
+//  }
 }

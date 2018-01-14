@@ -8,7 +8,7 @@ import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
-import scorex.crypto.authds.ADValue
+import scorex.crypto.authds.{ADKey, ADValue}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
@@ -22,6 +22,8 @@ case class CoinbaseBox(override val proposition: HeightProposition,
   override type M = CoinbaseBox
 
   override val typeId: BxTypeId = CoinbaseBox.typeId
+
+  override val id: ADKey = ADKey @@ bxHash.updated(0, typeId) // 33 bytes!
 
   override lazy val bxHash: Digest32 = Algos.hash(
     Bytes.concat(

@@ -8,7 +8,7 @@ import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
-import scorex.crypto.authds.ADValue
+import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
@@ -22,6 +22,8 @@ case class OpenBox(override val proposition: HeightProposition,
 
   override val typeId: BxTypeId = OpenBox.typeId
 
+  override val id: ADKey = ADKey @@ bxHash.updated(0, typeId)
+
   override lazy val bxHash: Digest32 = Algos.hash(
     Bytes.concat(
       Longs.toByteArray(nonce),
@@ -30,8 +32,6 @@ case class OpenBox(override val proposition: HeightProposition,
   )
 
   override def serializer: SizedCompanionSerializer[M] = OpenBoxSerializer
-
-  override lazy val bytes: ADValue = ADValue @@ serializer.toBytes(this)
 
   override def json: Json = Map(
     "id" -> Base58.encode(id).asJson,
@@ -48,7 +48,7 @@ object OpenBox {
 
 object OpenBoxSerializer extends SizedCompanionSerializer[OpenBox] {
 
-  val Size: Int = 20
+  val Size: Int = 24
 
   override def toBytes(obj: OpenBox): Array[Byte] = {
     Bytes.concat(
@@ -59,9 +59,9 @@ object OpenBoxSerializer extends SizedCompanionSerializer[OpenBox] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[OpenBox] = Try {
-    val proposition = HeightPropositionSerializer.parseBytes(bytes.slice(0, 4)).get
-    val nonce = Longs.fromByteArray(bytes.slice(Size, Size + 8))
-    val amount = Longs.fromByteArray(bytes.slice(Size + 8, Size + 16))
+    val proposition = HeightPropositionSerializer.parseBytes(bytes.slice(0, HeightPropositionSerializer.Size)).get
+    val nonce = Longs.fromByteArray(bytes.slice(HeightPropositionSerializer.Size, 8 + 8))
+    val amount = Longs.fromByteArray(bytes.slice(HeightPropositionSerializer.Size + 8, 8 + 16))
     OpenBox(proposition, nonce, amount)
   }
 }

@@ -53,4 +53,6 @@ trait EncryMempoolReader extends MempoolReader[EncryBaseTransaction] {
     waitedForAssembly = waitedForAssembly.updated(ids.map(id => key(id)).toSet, (promise, ids))
     promise.future
   }
+
+  def isEmpty: Boolean = size == 0
 }
