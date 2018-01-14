@@ -40,7 +40,7 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
     useBoxes.map(boxId => AssetBoxUnlocker(boxId, signature))
 
   override val newBoxes: Traversable[EncryBaseBox] =
-    Seq(OpenBox(HeightProposition(Height @@ 0L), nonceFromDigest(Algos.hash(txHash)), fee)) ++
+    Seq(OpenBox(HeightProposition(Height @@ 0), nonceFromDigest(Algos.hash(txHash)), fee)) ++
       createBoxes.zipWithIndex.map { case ((addr, amount), idx) =>
         val nonce = nonceFromDigest(Algos.hash(txHash ++ Ints.toByteArray(idx)))
         AssetBox(AddressProposition(addr), nonce, amount)
