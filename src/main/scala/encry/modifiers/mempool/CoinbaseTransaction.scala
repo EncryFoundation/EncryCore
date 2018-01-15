@@ -112,10 +112,10 @@ object CoinbaseTransactionSerializer extends Serializer[CoinbaseTransaction] {
 
     val sender = new PublicKey25519Proposition(PublicKey @@ bytes.slice(0,32))
     val timestamp = Longs.fromByteArray(bytes.slice(32,40))
-    val signature = Signature25519(Signature @@ bytes.slice(40, 72))
-    val amount = Longs.fromByteArray(bytes.slice(72, 80))
-    val inputLength = Ints.fromByteArray(bytes.slice(80, 84))
-    val s = 84
+    val signature = Signature25519(Signature @@ bytes.slice(40, 104))
+    val amount = Longs.fromByteArray(bytes.slice(104, 112))
+    val inputLength = Ints.fromByteArray(bytes.slice(112, 116))
+    val s = 116
     val outElementLength = 41
     val useBoxes = (0 until inputLength) map { i =>
       ADKey @@ bytes.slice(s + (i * outElementLength), s + (i + 1) * outElementLength)

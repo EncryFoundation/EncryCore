@@ -31,7 +31,7 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
 
   override type M = PaymentTransaction
 
-  override val length: Int = 80 + (33 * useBoxes.size) + (28 * createBoxes.size)
+  override val length: Int = 120 + (32 * useBoxes.size) + (45 * createBoxes.size)
 
   // Type of actual Tx type.
   override val typeId: TxTypeId = PaymentTransaction.typeId
@@ -78,8 +78,7 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
     // TODO: Txs generated during tests does not pass this tests.
     // `Amount` & `Address` validity checks.
     if (!createBoxes.forall { i =>
-      // i._2 > 0 && AddressProposition.validAddress(i._1)
-      i._2 > 0
+      i._2 > 0 && AddressProposition.validAddress(i._1)
     }) {
       log.info(s"<TX: $txHash> Invalid content.")
       Failure(new Error("Transaction invalid!"))
@@ -132,30 +131,30 @@ object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
       Ints.toByteArray(obj.useBoxes.length),
       Ints.toByteArray(obj.createBoxes.length),
       obj.useBoxes.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b)),
-      obj.createBoxes.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b._1.getBytes, Longs.toByteArray(b._2)))
+      obj.createBoxes.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, AddressProposition.getAddrBytes(b._1), Longs.toByteArray(b._2)))
     )
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[PaymentTransaction] = Try {
 
-    val sender = new PublicKey25519Proposition(PublicKey @@ bytes.slice(0,32))
-    val fee = Longs.fromByteArray(bytes.slice(32,40))
-    val timestamp = Longs.fromByteArray(bytes.slice(40,48))
-    val signature = Signature25519(Signature @@ bytes.slice(48,80))
-    val inputLength = Ints.fromByteArray(bytes.slice(80,84))
-    val outputLength = Ints.fromByteArray(bytes.slice(84,88))
-    val s = 88
+    val sender = new PublicKey25519Proposition(PublicKey @@ bytes.slice(0, 32))
+    val fee = Longs.fromByteArray(bytes.slice(32, 40))
+    val timestamp = Longs.fromByteArray(bytes.slice(40, 48))
+    val signature = Signature25519(Signature @@ bytes.slice(48, 112))
+    val inputLength = Ints.fromByteArray(bytes.slice(112, 116))
+    val outputLength = Ints.fromByteArray(bytes.slice(116, 120))
+    val s = 120
     val outElementLength = 32
     val useOutputs = (0 until inputLength) map { i =>
       ADKey @@ bytes.slice(s + (i * outElementLength), s + (i + 1) * outElementLength)
     }
 
     val s2 = s + (inputLength * outElementLength)
-    val inElementLength = 40
+    val inElementLength = 45
     val createOutputs = (0 until outputLength) map { i =>
       // Longs.fromByteArray(bytes.slice(s2 + i * elementLength, s2 + (i + 1) * elementLength))
-      (Address @@ bytes.slice(s2 + i * inElementLength, s2 + (i + 1) * (inElementLength-8)).toString,
-        Longs.fromByteArray(bytes.slice(s2 + i * (inElementLength-8), s2 + (i + 1) * inElementLength)))
+      (Address @@ Base58.encode(bytes.slice(s2 + i * inElementLength, s2 + (i + 1) * (inElementLength - 8))),
+        Longs.fromByteArray(bytes.slice(s2 + (i + 1) * (inElementLength - 8), s2 + (i + 1) * inElementLength)))
     }
 
     PaymentTransaction(sender, fee, timestamp, signature, useOutputs, createOutputs)

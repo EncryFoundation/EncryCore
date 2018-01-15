@@ -4,7 +4,7 @@ import java.io.File
 
 import akka.actor.ActorRef
 import encry.crypto.Address
-import encry.local.TransactionFactory
+import encry.local.TestFactory
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box._
@@ -67,7 +67,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 object EncryState extends ScorexLogging{
 
   // 33 bytes in Base58 encoding.
-  val afterGenesisStateDigestHex: String = "Tgx54rhrGNhTnrHBiRYwyugnCo7A61ZR4xSq2xcqAv9kG"
+  val afterGenesisStateDigestHex: String = "2HTKzf5wZBCxMw2suCjx7qSwZFMwdzkhcC7h8fVsRTdwtb"
   val afterGenesisStateDigest: ADDigest = ADDigest @@ Algos.decode(afterGenesisStateDigestHex).get
 
   lazy val genesisStateVersion: VersionTag = VersionTag @@ Algos.hash(afterGenesisStateDigest.tail)
@@ -78,11 +78,13 @@ object EncryState extends ScorexLogging{
     log.info("Generating genesis UTXO state.")
     lazy val genesisSeed = Long.MaxValue
 
-    lazy val initialBoxes: Seq[EncryBaseBox] = TransactionFactory.genAssetBoxes
+    lazy val initialBoxes: Seq[EncryBaseBox] = TestFactory.genAssetBoxes
 
     val bh = BoxHolder(initialBoxes)
 
     UtxoState.fromBoxHolder(bh, stateDir, nodeViewHolderRef).ensuring(us => {
+      log.debug(s"Expected afterGenesisDigest: $afterGenesisStateDigestHex")
+      log.debug(s"Actual afterGenesisDigest:   ${Base58.encode(us.rootHash)}")
       log.info(s"Generated UTXO state with ${bh.boxes.size} boxes inside.")
       us.rootHash.sameElements(afterGenesisStateDigest) && us.version.sameElements(genesisStateVersion)
     }) -> bh

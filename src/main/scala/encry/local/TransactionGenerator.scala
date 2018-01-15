@@ -13,11 +13,12 @@ import scorex.core.LocalInterface.LocallyGeneratedTransaction
 import scorex.core.NodeViewHolder.GetDataFromCurrentView
 import scorex.core.transaction.box.Box.Amount
 import scorex.core.transaction.box.proposition.Proposition
-import scorex.core.transaction.state.PrivateKey25519Companion
+import scorex.core.transaction.state.{PrivateKey25519, PrivateKey25519Companion}
 import scorex.core.utils.{NetworkTime, ScorexLogging}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.util.Random
 
 // TODO: Undone
 class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings) extends Actor with ScorexLogging {
@@ -25,21 +26,34 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings) exte
 
   var isStarted = false
 
-  private lazy val factory = TransactionFactory
+  private lazy val factory = TestFactory
   private lazy val keys = factory.getOrGenerateKeys(factory.TestProps.keysFilePath)
+
+  private var currentSlice = (0, 7)
+  private var txsGenerated = 0
 
   override def receive: Receive = {
     case StartGeneration =>
       if (!isStarted) {
         log.info("Starting transaction generation.")
-        context.system.scheduler.schedule(1500.millis, 1500.millis)(self ! FetchBoxes)
+        context.system.scheduler.scheduleOnce(1500.millis)(self ! FetchBoxes)
       }
 
     case FetchBoxes =>
       viewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool,
         Seq[EncryBaseTransaction]] { v =>
         if (v.pool.size < settings.keepPoolSize) {
-          keys.map { key =>
+          var keysSlice = Seq[PrivateKey25519]()
+          if (currentSlice._2 <= TestFactory.TestProps.keysQty) {
+            keysSlice = keys.slice(currentSlice._1, currentSlice._2)
+            txsGenerated += currentSlice._2 - currentSlice._1
+          } else {
+            keysSlice = keys.slice(currentSlice._1, TestFactory.TestProps.keysQty)
+            txsGenerated += TestFactory.TestProps.keysQty - currentSlice._1
+          }
+          val randShift = Random.nextInt(10)
+          currentSlice = (currentSlice._1 + randShift, currentSlice._2 + randShift)
+          keysSlice.map { key =>
             val proposition = key.publicImage
             val fee = factory.TestProps.txFee
             val timestamp = NetworkTime.time()
@@ -55,6 +69,9 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings) exte
           Seq()
         }
       }
+      if (txsGenerated < TestFactory.TestProps.keysQty)
+        log.info(s"$txsGenerated transactions generated, repeating in 5sec ...")
+        context.system.scheduler.scheduleOnce(5.seconds)(self ! FetchBoxes)
 
     case txs: Seq[EncryBaseTransaction] =>
       txs.foreach { tx =>

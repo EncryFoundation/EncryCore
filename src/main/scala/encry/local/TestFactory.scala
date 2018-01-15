@@ -15,16 +15,16 @@ import scala.io.Source
 import scala.util.Random
 
 // Toolbox for tests only!
-object TransactionFactory {
+object TestFactory {
 
   object TestProps {
+    lazy val keysQty = 100
     lazy val nonce = 0
     lazy val boxValue: Amount = 1000
     lazy val txAmount: Amount = 900
     lazy val txFee: Amount = 100
     lazy val testDir = "test/"
     lazy val keysFilePath = s"${testDir}seeds"
-    lazy val splitSymbol = ";"
     lazy val recipientAddr: Address = Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp"
   }
 
@@ -48,7 +48,7 @@ object TransactionFactory {
     val file = new File(filePath)
     if (file.exists) getKeysFromFile
     else {
-      genKeysFile(20, TestProps.keysFilePath)
+      genKeysFile(TestProps.keysQty, TestProps.keysFilePath)
       getKeysFromFile
     }
   }

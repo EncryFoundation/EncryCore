@@ -1,9 +1,10 @@
 package encry.modifiers.history.block
 
+import com.google.common.primitives.{Bytes, Ints}
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.{ADProofSerializer, ADProofs}
+import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
+import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.mempool.EncryBaseTransaction
 import io.circe.Json
 import io.circe.syntax._
@@ -41,7 +42,7 @@ class EncryBlock(override val header: EncryBlockHeader,
 
   override lazy val id: ModifierId = header.id
 
-  override def serializer: Serializer[EncryBlock] = EncryPaymentBlockSerializer
+  override def serializer: Serializer[EncryBlock] = EncryBlockSerializer
 
   override lazy val json: Json = Map(
     "header" -> header.json,
@@ -54,9 +55,32 @@ object EncryBlock {
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (-127: Byte)
 }
 
-object EncryPaymentBlockSerializer extends Serializer[EncryBlock] {
+object EncryBlockSerializer extends Serializer[EncryBlock] {
 
-  override def toBytes(obj: EncryBlock): Array[Byte] = ???
+  override def toBytes(obj: EncryBlock): Array[Byte] = {
+    val headerBytes = obj.header.serializer.toBytes(obj.header)
+    val payloadBytes = obj.payload.serializer.toBytes(obj.payload)
+    val aDProofsBytes = obj.adProofsOpt.get.serializer.toBytes(obj.adProofsOpt.get)
+    Bytes.concat(
+      Ints.toByteArray(headerBytes.length),
+      headerBytes,
+      Ints.toByteArray(payloadBytes.length),
+      payloadBytes,
+      Ints.toByteArray(aDProofsBytes.length),
+      aDProofsBytes
+    )
+  }
 
-  override def parseBytes(bytes: Array[Byte]): Try[EncryBlock] = ???
+  override def parseBytes(bytes: Array[Byte]): Try[EncryBlock] = Try{
+    var s = 4
+    val headerSize = Ints.fromByteArray(bytes.slice(0,s))
+    val header = EncryBlockHeaderSerializer.parseBytes(bytes.slice(s,s+headerSize))
+    s+=headerSize
+    val payloadSize = Ints.fromByteArray(bytes.slice(s,s+4))
+    val payload = EncryBlockPayloadSerializer.parseBytes(bytes.slice(s+4,s+payloadSize))
+    s+=payloadSize
+    val aDProofsSize = Ints.fromByteArray(bytes.slice(s,s+4))
+    val aDProofs = ADProofSerializer.parseBytes(bytes.slice(s+4,s+aDProofsSize))
+    new EncryBlock(header.get,payload.get,Option(aDProofs.get))
+  }
 }

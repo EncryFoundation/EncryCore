@@ -2,7 +2,7 @@ package encry.view.wallet
 
 import encry.crypto.Address
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.EncryAppSettings
@@ -62,10 +62,9 @@ case class EncryWallet(seed: ByteStr,
     txs.foldLeft(this) { case (wallet, tx) => wallet.scanOffchain(tx) }
   }
 
-  override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet =
-  {
+  override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = {
     modifier match {
-      case a : EncryBlockPayload => a.transactions.foldLeft(this) { case (w, tx) =>
+      case a: EncryBlock => a.transactions.foldLeft(this) { case (w, tx) =>
         tx match {
           //TODO: not efficient
           case sp: PaymentTransaction =>

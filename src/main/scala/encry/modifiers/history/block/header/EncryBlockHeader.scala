@@ -81,22 +81,17 @@ object EncryBlockHeader {
 
 object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
 
-  def toBytesWithoutPOW(obj: EncryBlockHeader): Array[Byte] = {
+  override def toBytes(obj: EncryBlockHeader): Array[Byte] = {
     Bytes.concat(
       Array(obj.version),
       obj.parentId,
-      obj.adProofsId,
+      obj.adProofsRoot,
+      obj.stateRoot,
       obj.txsRoot,
       Longs.toByteArray(obj.timestamp),
       Ints.toByteArray(obj.height),
+      Longs.toByteArray(obj.nonce),
       obj.difficulty.toByteArray
-    )
-  }
-
-  override def toBytes(obj: EncryBlockHeader): Array[Byte] = {
-    Bytes.concat(
-      toBytesWithoutPOW(obj),
-      Longs.toByteArray(obj.nonce)
     )
   }
 
@@ -105,11 +100,12 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
     val parentId = ModifierId @@ bytes.slice(1, 33)
     val adProofsRoot = Digest32 @@ bytes.slice(33, 65)
     val stateRoot =  ADDigest @@ bytes.slice(65, 98)  // 32 bytes + 1 (tree height)
-    val txMerkleRoot = Digest32 @@ bytes.slice(98, 130)
+    val txsRoot = Digest32 @@ bytes.slice(98, 130)
     val timestamp = Longs.fromByteArray(bytes.slice(130, 138))
     val height = Ints.fromByteArray(bytes.slice(138, 142))
     val nonce = Longs.fromByteArray(bytes.slice(142, 150))
     val difficulty = Difficulty @@ BigInt.apply(bytes.slice(150, bytes.length-1))
-    EncryBlockHeader(version, parentId, adProofsRoot, stateRoot, txMerkleRoot, timestamp, height, nonce, difficulty)
+
+    EncryBlockHeader(version, parentId, adProofsRoot, stateRoot, txsRoot, timestamp, height, nonce, difficulty)
   }
 }
