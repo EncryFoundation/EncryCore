@@ -38,6 +38,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
       modifier match {
         case header: EncryBlockHeader => (this, process(header))
         case payload: EncryBlockPayload => (this, process(payload))
+        case adProofs: ADProofs => (this, process(adProofs))
       }
     }
   }

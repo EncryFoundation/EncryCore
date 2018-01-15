@@ -48,7 +48,7 @@ trait EncryBaseTransaction extends Transaction[Proposition] {
 
   val minimalFee: Float = Constants.feeMinAmount + Constants.txByteCost * length
 
-  override def toString: String = s"<TX: type=$modifierTypeId id=${Base58.encode(txHash)}>"
+  override def toString: String = s"<TX: type=$typeId id=${Base58.encode(txHash)}>"
 }
 
 object EncryBaseTransaction {

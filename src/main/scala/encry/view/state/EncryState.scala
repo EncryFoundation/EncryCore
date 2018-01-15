@@ -4,7 +4,7 @@ import java.io.File
 
 import akka.actor.ActorRef
 import encry.crypto.Address
-import encry.local.TestFactory
+import encry.local.TestHelper
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box._
@@ -67,7 +67,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 object EncryState extends ScorexLogging{
 
   // 33 bytes in Base58 encoding.
-  val afterGenesisStateDigestHex: String = "2HTKzf5wZBCxMw2suCjx7qSwZFMwdzkhcC7h8fVsRTdwtb"
+  val afterGenesisStateDigestHex: String = "pVzwqsYKoyfEjWYsUa55cqbWp3hqyideAdrSuFPjWxtHM"
   val afterGenesisStateDigest: ADDigest = ADDigest @@ Algos.decode(afterGenesisStateDigestHex).get
 
   lazy val genesisStateVersion: VersionTag = VersionTag @@ Algos.hash(afterGenesisStateDigest.tail)
@@ -78,7 +78,7 @@ object EncryState extends ScorexLogging{
     log.info("Generating genesis UTXO state.")
     lazy val genesisSeed = Long.MaxValue
 
-    lazy val initialBoxes: Seq[EncryBaseBox] = TestFactory.genAssetBoxes
+    lazy val initialBoxes: Seq[EncryBaseBox] = TestHelper.genAssetBoxes
 
     val bh = BoxHolder(initialBoxes)
 

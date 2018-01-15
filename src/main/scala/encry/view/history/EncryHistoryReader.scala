@@ -127,6 +127,7 @@ trait EncryHistoryReader
     modifier match {
       case header: EncryBlockHeader => validate(header)
       case payload: EncryBlockPayload => validate(payload)
+      case adProofs: ADProofs => validate(adProofs)
       case mod: Any => Failure(new Error(s"Modifier $mod is of incorrect type."))
     }
   }

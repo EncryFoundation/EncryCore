@@ -104,7 +104,7 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
     val timestamp = Longs.fromByteArray(bytes.slice(130, 138))
     val height = Ints.fromByteArray(bytes.slice(138, 142))
     val nonce = Longs.fromByteArray(bytes.slice(142, 150))
-    val difficulty = Difficulty @@ BigInt.apply(bytes.slice(150, bytes.length-1))
+    val difficulty = Difficulty @@ BigInt.apply(bytes.slice(150, bytes.length))
 
     EncryBlockHeader(version, parentId, adProofsRoot, stateRoot, txsRoot, timestamp, height, nonce, difficulty)
   }

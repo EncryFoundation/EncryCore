@@ -1,7 +1,7 @@
 package encry.modifiers.history.block.payload
 
 import encry.crypto.Address
-import encry.local.TestFactory
+import encry.local.TestHelper
 import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
 import org.scalatest.FunSuite
 import scorex.core.ModifierId
@@ -13,15 +13,15 @@ class EncryBlockPayloadSerializerTest extends FunSuite {
 
   test("testParseBytes & testToBytes") {
 
-    val factory = TestFactory
-    val keys = factory.getOrGenerateKeys(factory.TestProps.keysFilePath).slice(0, 10)
+    val factory = TestHelper
+    val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath).slice(0, 10)
 
     val txs = keys.map { key =>
       val proposition = key.publicImage
-      val fee = factory.TestProps.txFee
+      val fee = factory.Props.txFee
       val timestamp = NetworkTime.time()
       val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
-      val outputs = IndexedSeq((Address @@ factory.TestProps.recipientAddr, factory.TestProps.boxValue))
+      val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
       val sig = PrivateKey25519Companion.sign(
         key,
         PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)

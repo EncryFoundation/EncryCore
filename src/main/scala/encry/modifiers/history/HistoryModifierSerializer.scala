@@ -12,9 +12,8 @@ object HistoryModifierSerializer extends Serializer[EncryPersistentModifier] {
   override def toBytes(obj: EncryPersistentModifier): Array[Byte] = obj match {
     case m: EncryBlockHeader =>
       EncryBlockHeader.modifierTypeId +: EncryBlockHeaderSerializer.toBytes(m)
-    //TODO: ADProofs
-    //    case m: ADProofs =>
-    //      ADProofs.modifierTypeId +: ADProofSerializer.toBytes(m)
+    case m: ADProofs =>
+      ADProofs.modifierTypeId +: ADProofSerializer.toBytes(m)
     case m: EncryBlockPayload =>
       EncryBlockPayload.modifierTypeId +: EncryBlockPayloadSerializer.toBytes(m)
     case m =>
@@ -23,12 +22,11 @@ object HistoryModifierSerializer extends Serializer[EncryPersistentModifier] {
 
   override def parseBytes(bytes: Array[Byte]): Try[EncryPersistentModifier] = Try {
     bytes.head match {
-      case EncryBlockHeader.`modifierTypeId` =>
+      case EncryBlockHeader.modifierTypeId =>
         EncryBlockHeaderSerializer.parseBytes(bytes.tail).get
-      //TODO: ADproofs
-      //      case ADProofs.`modifierTypeId` =>
-      //        ADProofSerializer.parseBytes(bytes.tail).get
-      case EncryBlockPayload.`modifierTypeId` =>
+      case ADProofs.modifierTypeId =>
+        ADProofSerializer.parseBytes(bytes.tail).get
+      case EncryBlockPayload.modifierTypeId =>
         EncryBlockPayloadSerializer.parseBytes(bytes.tail).get
       case m =>
         throw new Error(s"Deserialization for unknown type byte: $m")

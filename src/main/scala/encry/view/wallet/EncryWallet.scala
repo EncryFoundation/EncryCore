@@ -3,7 +3,8 @@ package encry.view.wallet
 import encry.crypto.Address
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
+import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.EncryAppSettings
 import scorex.core.transaction.box.Box.Amount
@@ -84,8 +85,10 @@ case class EncryWallet(seed: ByteStr,
               val cb = curWalBal
               EncryWallet(seed, ct, oct, cb)
             } else w
+          case ct: CoinbaseTransaction => w
         }
       }
+      case bh: EncryBlockHeader => this
     }
   }
 

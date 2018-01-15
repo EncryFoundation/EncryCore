@@ -14,21 +14,19 @@ import scorex.crypto.signatures.Curve25519
 import scala.io.Source
 import scala.util.Random
 
-// Toolbox for tests only!
-object TestFactory {
+object TestHelper {
 
-  object TestProps {
+  object Props {
     lazy val keysQty = 100
     lazy val nonce = 0
     lazy val boxValue: Amount = 1000
     lazy val txAmount: Amount = 900
     lazy val txFee: Amount = 100
-    lazy val testDir = "test/"
+    lazy val testDir = "test-data/"
     lazy val keysFilePath = s"${testDir}seeds"
     lazy val recipientAddr: Address = Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp"
   }
 
-  // TODO: Should be evaluated once during the test.
   def genKeysFile(qty: Int, filePath: String): Unit = {
     val fileWriter = new FileWriter(new File(filePath))
     (0 until qty).foreach { _ =>
@@ -48,37 +46,23 @@ object TestFactory {
     val file = new File(filePath)
     if (file.exists) getKeysFromFile
     else {
-      genKeysFile(TestProps.keysQty, TestProps.keysFilePath)
+      genKeysFile(Props.keysQty, Props.keysFilePath)
       getKeysFromFile
     }
   }
 
-  // TODO: This method is redundant.
-  def genProps(privKeys: Seq[PrivateKey25519]): Seq[PublicKey25519Proposition] =
-    privKeys.foldLeft(Seq[PublicKey25519Proposition]()) { case (s, pk) =>
-      s :+ PublicKey25519Proposition(pk.publicKeyBytes)
-    }
-
   def genAssetBoxes: IndexedSeq[AssetBox] =
-    getOrGenerateKeys(TestProps.keysFilePath).foldLeft(IndexedSeq[AssetBox]()) { case (bxs, pk) =>
+    getOrGenerateKeys(Props.keysFilePath).foldLeft(IndexedSeq[AssetBox]()) { case (bxs, pk) =>
       bxs :+ AssetBox(
         AddressProposition(Address @@ PublicKey25519Proposition(pk.publicKeyBytes).address),
-        TestProps.nonce, TestProps.boxValue)
+        Props.nonce, Props.boxValue)
     }
 
   def genAssetBox(address: Address): AssetBox =
-    AssetBox(AddressProposition(address), TestProps.nonce, TestProps.boxValue)
+    AssetBox(AddressProposition(address), Props.nonce, Props.boxValue)
 
   def genTxOutputs(boxes: Traversable[EncryBaseBox]): IndexedSeq[ADKey] =
     boxes.foldLeft(IndexedSeq[ADKey]()) { case(s, box) =>
       s :+ box.id
     }
-
-//  // TODO: This method is redundant.
-//  def getRandomTxOutputs(amount: Amount): IndexedSeq[(Address, Amount)] = {
-//    val div = Random.shuffle(Seq(2, 10, 5, 1)).head
-//    (0 until amount.toInt).foldLeft(IndexedSeq[(Address, Amount)]()) { case (outs, am) =>
-//      outs :+ (TestProps.recipientAddr, am.toLong)
-//    }
-//  }
 }

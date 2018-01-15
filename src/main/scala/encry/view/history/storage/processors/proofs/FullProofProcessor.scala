@@ -46,7 +46,7 @@ trait FullProofProcessor extends BaseADProofProcessor with BlockProcessor {
             s"Trying to apply proofs ${m.encodedId} for header ${header.encodedId}, which parent proofs are empty")
         }
       case _ =>
-        throw new Error(s"Header for modifier $m is no defined")
+        throw new Error(s"Header for modifier $m is undefined")
     }
   }
 }

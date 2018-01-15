@@ -26,8 +26,8 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings) exte
 
   var isStarted = false
 
-  private lazy val factory = TestFactory
-  private lazy val keys = factory.getOrGenerateKeys(factory.TestProps.keysFilePath)
+  private lazy val factory = TestHelper
+  private lazy val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath)
 
   private var currentSlice = (0, 7)
   private var txsGenerated = 0
@@ -44,21 +44,21 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings) exte
         Seq[EncryBaseTransaction]] { v =>
         if (v.pool.size < settings.keepPoolSize) {
           var keysSlice = Seq[PrivateKey25519]()
-          if (currentSlice._2 <= TestFactory.TestProps.keysQty) {
+          if (currentSlice._2 <= TestHelper.Props.keysQty) {
             keysSlice = keys.slice(currentSlice._1, currentSlice._2)
             txsGenerated += currentSlice._2 - currentSlice._1
           } else {
-            keysSlice = keys.slice(currentSlice._1, TestFactory.TestProps.keysQty)
-            txsGenerated += TestFactory.TestProps.keysQty - currentSlice._1
+            keysSlice = keys.slice(currentSlice._1, TestHelper.Props.keysQty)
+            txsGenerated += TestHelper.Props.keysQty - currentSlice._1
           }
           val randShift = Random.nextInt(10)
           currentSlice = (currentSlice._1 + randShift, currentSlice._2 + randShift)
           keysSlice.map { key =>
             val proposition = key.publicImage
-            val fee = factory.TestProps.txFee
+            val fee = factory.Props.txFee
             val timestamp = NetworkTime.time()
             val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
-            val outputs = IndexedSeq((Address @@ factory.TestProps.recipientAddr, factory.TestProps.boxValue))
+            val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
             val sig = PrivateKey25519Companion.sign(
               key,
               PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
@@ -69,7 +69,7 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings) exte
           Seq()
         }
       }
-      if (txsGenerated < TestFactory.TestProps.keysQty)
+      if (txsGenerated < TestHelper.Props.keysQty)
         log.info(s"$txsGenerated transactions generated, repeating in 5sec ...")
         context.system.scheduler.scheduleOnce(5.seconds)(self ! FetchBoxes)
 
