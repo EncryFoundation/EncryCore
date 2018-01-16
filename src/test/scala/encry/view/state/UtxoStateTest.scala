@@ -18,7 +18,7 @@ class UtxoStateTest extends org.scalatest.FunSuite {
 
   test("FilterValid(txs) should return only valid txs (against current state).") {
 
-    val dir: File = new File("/Users/ilaoskin/IdeaProjects/Encry/test-data/state1")
+    val dir: File = new File("/IdeaProjects/Encry/test-data/state1")
     assert(dir.exists() && dir.isDirectory, "dir is invalid.")
 
     def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
@@ -40,7 +40,7 @@ class UtxoStateTest extends org.scalatest.FunSuite {
     val state = utxoFromBoxHolder(bh, dir, None)
 
     val factory = TestHelper
-    val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath).slice(0, 10)
+    val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath)
 
     val validTxs = keys.map { key =>
       val proposition = key.publicImage
@@ -89,7 +89,7 @@ class UtxoStateTest extends org.scalatest.FunSuite {
 
   test("BatchAVLProver should have the same digest after rollback as before.") {
 
-    val dir: File = new File("/Users/ilaoskin/IdeaProjects/Encry/test-data/state2")
+    val dir: File = new File("/IdeaProjects/Encry/test-data/state2")
     assert(dir.exists() && dir.isDirectory, "dir is invalid.")
 
     val store = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
