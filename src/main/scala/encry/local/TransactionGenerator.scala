@@ -52,7 +52,6 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings) exte
             keysSlice = keys.slice(currentSlice._1, TestHelper.Props.keysQty)
             txsGenerated += TestHelper.Props.keysQty - currentSlice._1
           }
-          println(currentSlice._1, currentSlice._2)
           val randShift = Random.nextInt(10) + 2
           currentSlice = (currentSlice._2, currentSlice._2 + randShift)
           keysSlice.map { key =>

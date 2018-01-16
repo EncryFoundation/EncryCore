@@ -177,8 +177,7 @@ object EncryHistory {
           override protected val storage: Store = db
         }
       case m =>
-        throw new Error(s"Unsupported settings combination ADState==${m._1}, verifyTransactions==${m._2}, " +
-          s"poPoWBootstrap==${m._1}")
+        throw new Error(s"Unsupported settings combination ADState==${m._1}, verifyTransactions==${m._2}, ")
     }
     history
   }

@@ -57,6 +57,7 @@ case class EncryWallet(seed: ByteStr,
         (a: (Address, Amount), _: Boolean) => a._1 sameElements secret.publicKeyBytes }) {
         EncryWallet(seed, chainTransactions, offchainTransactions + (sp.id -> sp), currentBalance)
       } else this
+    case ct: CoinbaseTransaction => this
   }
 
   override def scanOffchain(txs: Seq[EncryBaseTransaction]): EncryWallet = {

@@ -72,15 +72,15 @@ object EncryBlockSerializer extends Serializer[EncryBlock] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[EncryBlock] = Try{
-    var s = 4
-    val headerSize = Ints.fromByteArray(bytes.slice(0,s))
-    val header = EncryBlockHeaderSerializer.parseBytes(bytes.slice(s,s+headerSize))
-    s+=headerSize
-    val payloadSize = Ints.fromByteArray(bytes.slice(s,s+4))
-    val payload = EncryBlockPayloadSerializer.parseBytes(bytes.slice(s+4,s+payloadSize))
-    s+=payloadSize
-    val aDProofsSize = Ints.fromByteArray(bytes.slice(s,s+4))
-    val aDProofs = ADProofSerializer.parseBytes(bytes.slice(s+4,s+aDProofsSize))
-    new EncryBlock(header.get,payload.get,Option(aDProofs.get))
+    var pointer = 4
+    val headerSize = Ints.fromByteArray(bytes.slice(0, pointer))
+    val header = EncryBlockHeaderSerializer.parseBytes(bytes.slice(pointer,pointer+headerSize))
+    pointer += headerSize
+    val payloadSize = Ints.fromByteArray(bytes.slice(pointer, pointer + 4))
+    val payload = EncryBlockPayloadSerializer.parseBytes(bytes.slice(pointer + 4, pointer + 4 + payloadSize))
+    pointer += payloadSize + 4
+    val aDProofsSize = Ints.fromByteArray(bytes.slice(pointer, pointer + 4))
+    val aDProofs = ADProofSerializer.parseBytes(bytes.slice(pointer + 4, pointer + 4 + aDProofsSize))
+    new EncryBlock(header.get, payload.get, Option(aDProofs.get))
   }
 }

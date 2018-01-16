@@ -23,7 +23,7 @@ import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Random, Success, Try}
 
 class UtxoState(override val version: VersionTag,
                 val store: Store,
@@ -108,13 +108,13 @@ class UtxoState(override val version: VersionTag,
               s"root hash ${Algos.encode(rootHash)}")
 
             if (!store.get(ByteArrayWrapper(block.id)).exists(_.data sameElements block.header.stateRoot))
-              Failure(new Error("Storage kept roothash is not equal to the declared one."))
+              throw new Error("Storage kept roothash is not equal to the declared one.")
             else if (!store.rollbackVersions().exists(_.data sameElements block.header.stateRoot))
-              Failure(new Error("Unable to apply modification properly."))
+              throw new Error("Unable to apply modification properly.")
             else if (!(block.header.adProofsRoot sameElements proofHash))
-              Failure(new Error("Calculated proofHash is not equal to the declared one."))
-            else if (block.header.stateRoot sameElements persistentProver.digest)
-              Failure(new Error("Calculated stateRoot is not equal to the declared one."))
+              throw new Error("Calculated proofHash is not equal to the declared one.")
+            else if (!(block.header.stateRoot sameElements persistentProver.digest))
+              throw new Error("Calculated stateRoot is not equal to the declared one.")
 
             new UtxoState(VersionTag @@ block.id, store, nodeViewHolderRef)
           }
