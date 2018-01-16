@@ -73,10 +73,11 @@ case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
 }
 
 object ADProofs {
+
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (104: Byte)
 
   // TODO: WARN
-  val KL = 33
+  val KL = 32
 
   def proofDigest(proofBytes: SerializedAdProof): Digest32 = Algos.hash(proofBytes)
 

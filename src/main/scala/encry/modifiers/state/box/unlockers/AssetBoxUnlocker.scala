@@ -10,5 +10,5 @@ case class AssetBoxUnlocker(override val closedBoxId: ADKey,
   extends EncryBoxUnlocker[PublicKey25519Proposition] {
 
   def isValid(bxProp: AddressProposition, txProp: PublicKey25519Proposition, msg: Array[Byte]): Boolean =
-    boxKey.isValid(txProp, msg) && txProp.address.eq(bxProp.address)
+    boxKey.isValid(txProp, msg) && txProp.address == bxProp.address
 }

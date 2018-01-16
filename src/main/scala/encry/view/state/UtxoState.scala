@@ -20,6 +20,7 @@ import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
+import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
 import scala.util.{Failure, Success, Try}
@@ -189,7 +190,7 @@ class UtxoState(override val version: VersionTag,
   // TODO: Test.
   // TODO: OPTIMISATION: Too many redundant signature validity checks here.
   // Carries out an exhaustive tx validation.
-  override def validate(tx: EncryBaseTransaction): Try[Unit] = {
+  override def validate(tx: EncryBaseTransaction): Try[Unit] = Try {
 
     tx.semanticValidity.get
     tx match {
@@ -202,23 +203,27 @@ class UtxoState(override val version: VersionTag,
                 case OpenBox.typeId =>
                   OpenBoxSerializer.parseBytes(data) match {
                     case Success(box) => inputsSum += box.amount
-                    case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))
+                    case Failure(_) => throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
                   }
                 case AssetBox.typeId =>
                   AssetBoxSerializer.parseBytes(data) match {
                     case Success(box) =>
                       if (!unl.isValid(box.proposition, tx.proposition, tx.messageToSign))
-                        Failure(new Error(s"Invalid unlocker for box referenced in $tx"))
+                        throw new Error(s"Invalid unlocker for box referenced in $tx")
                       inputsSum += box.amount
-                    case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))
+                    case Failure(_) =>
+                      throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
                   }
-                case _ => Failure(new Error("Got Modifier of unknown type."))
+                case _ => throw new Exception("Got Modifier of unknown type.")
               }
-            case None => Failure(new Error(s"Cannot find Box referenced in TX ${tx.txHash}"))
+            case None =>
+              throw new Error(s"Cannot find Box referenced in TX ${tx.txHash}")
           }
         }
-        if (tx.createBoxes.map(i => i._2).sum != inputsSum)
-          Failure(new Error("Inputs total amount mismatches Output sum."))
+        if (tx.createBoxes.map(i => i._2).sum != inputsSum) {
+          println(s"Inputs total is: $inputsSum and outpts is: ${tx.createBoxes.map(i => i._2).sum}")
+          throw new Error("Inputs total amount mismatches Output sum.")
+        }
 
       // This branch does not use `unlockers`
       case tx: CoinbaseTransaction =>
@@ -231,17 +236,16 @@ class UtxoState(override val version: VersionTag,
                     case Success(box) =>
                       // TODO: How to get `bestHeaderHeight` to compare with `box.proposition.height`?
                       if (box.proposition.height > 0)
-                        Failure(new Error(s"Box referenced in tx: $tx is disallowed to be spent at current height."))
-                    case Failure(_) => Failure(new Error(s"Unable to parse Box referenced in TX ${tx.txHash}"))
+                        throw new Error(s"Box referenced in tx: $tx is disallowed to be spent at current height.")
+                    case Failure(_) => throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
                   }
-                case _ => Failure(new Error("Got Modifier of unknown type."))
+                case _ => throw new Error("Got Modifier of unknown type.")
               }
-            case None => Failure(new Error(s"Cannot find Box referenced in TX ${tx.txHash}"))
+            case None => throw new Exception(s"Cannot find Box referenced in TX ${tx.txHash}")
           }
         }
-      case _ => Failure(new Error("Got Modifier of unknown type."))
+      case _ => throw new Error("Got Modifier of unknown type.")
     }
-    Success()
   }
 
   // Filters semantically valid and non conflicting transactions.

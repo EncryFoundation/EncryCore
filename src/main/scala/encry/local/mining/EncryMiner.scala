@@ -6,6 +6,7 @@ import akka.util.Timeout
 import encry.consensus.{Difficulty, PowCandidateBlock, PowConsensus}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction}
+import encry.modifiers.state.box.OpenBox
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
@@ -18,6 +19,7 @@ import scorex.core.NodeViewHolder
 import scorex.core.NodeViewHolder.{GetDataFromCurrentView, SemanticallySuccessfulModifier, Subscribe}
 import scorex.core.transaction.state.{PrivateKey25519, PrivateKey25519Companion}
 import scorex.core.utils.{NetworkTime, ScorexLogging}
+import scorex.crypto.encode.Base58
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -88,6 +90,7 @@ class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings, nodeId: Ar
               block.adProofsOpt.foreach { adp =>
                 viewHolderRef ! LocallyGeneratedModifier(adp)
               }
+              candidateOpt = None
               context.system.scheduler.scheduleOnce(settings.nodeSettings.miningDelay)(self ! MineBlock)
             case None =>
               if (isMining) self ! MineBlock
@@ -129,6 +132,14 @@ object EncryMiner extends ScorexLogging {
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[PowCandidateBlock]] { view =>
         val bestHeaderOpt = view.history.bestFullBlockOpt.map(_.header)
 
+        if (bestHeaderOpt.isDefined) {
+          log.debug("BestHeader id:        " + Base58.encode(bestHeaderOpt.get.hHash))
+          log.debug("BestHeader timestamp: " + bestHeaderOpt.get.timestamp)
+          log.debug("BestHeader height:    " + bestHeaderOpt.get.height)
+        } else {
+          log.debug("BestHeader is undefined")
+        }
+
         if ((bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) && !view.pool.isEmpty) Try {
 
           val timestamp = NetworkTime.time()
@@ -143,7 +154,7 @@ object EncryMiner extends ScorexLogging {
           // TODO: Which PubK should we pick here?
           val minerProposition = view.vault.publicKeys.head
           val privateKey: PrivateKey25519 = view.vault.secretByPublicImage(minerProposition).get
-          val openBxs = txs.map(tx => tx.newBoxes.head).toIndexedSeq
+          val openBxs = txs.flatMap(tx => tx.newBoxes.filter(_.isInstanceOf[OpenBox])).toIndexedSeq
           val amount = openBxs.map(_.value).sum
           val signature = PrivateKey25519Companion.sign(privateKey,
             CoinbaseTransaction.getHash(minerProposition, openBxs.map(_.id), timestamp, amount))

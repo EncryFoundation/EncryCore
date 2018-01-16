@@ -15,6 +15,7 @@ import scorex.core.transaction.box.Box.Amount
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.{PrivateKey25519, PrivateKey25519Companion}
 import scorex.core.utils.{NetworkTime, ScorexLogging}
+import scorex.crypto.encode.Base58
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -51,8 +52,9 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings) exte
             keysSlice = keys.slice(currentSlice._1, TestHelper.Props.keysQty)
             txsGenerated += TestHelper.Props.keysQty - currentSlice._1
           }
-          val randShift = Random.nextInt(10)
-          currentSlice = (currentSlice._1 + randShift, currentSlice._2 + randShift)
+          println(currentSlice._1, currentSlice._2)
+          val randShift = Random.nextInt(10) + 2
+          currentSlice = (currentSlice._2, currentSlice._2 + randShift)
           keysSlice.map { key =>
             val proposition = key.publicImage
             val fee = factory.Props.txFee

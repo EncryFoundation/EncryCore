@@ -2,21 +2,94 @@ package encry.view.state
 
 import java.io.File
 
+import akka.actor.ActorRef
+import encry.crypto.Address
+import encry.local.TestHelper
+import encry.modifiers.mempool.PaymentTransaction
 import encry.settings.Constants
 import io.iohk.iodb.LSMStore
+import scorex.core.transaction.state.PrivateKey25519Companion
+import scorex.core.utils.NetworkTime
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADKey, ADValue}
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
 class UtxoStateTest extends org.scalatest.FunSuite {
 
-  test("BatchAVLProver should have the same digest after rollback as before.") {
+  test("FilterValid(txs) should return only valid txs (against current state).") {
 
-    val valuesToInsert = (1 until 100).map { i =>
-      Array.fill(32)(i.toByte) -> Array.fill(64)(i.toByte)
+    val dir: File = new File("/Users/ilaoskin/IdeaProjects/Encry/test-data/state1")
+    assert(dir.exists() && dir.isDirectory, "dir is invalid.")
+
+    def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
+      val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32, valueLengthOpt = None)
+      bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
+
+      val store = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
+
+      new UtxoState(EncryState.genesisStateVersion, store, nodeViewHolderRef) {
+        override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
+          PersistentBatchAVLProver.create(
+            p, storage, paranoidChecks = true
+          ).get
+      }
     }
 
-    val dir: File = new File("/Encry/test-data")
+    val bh = BoxHolder(TestHelper.genAssetBoxes)
+
+    val state = utxoFromBoxHolder(bh, dir, None)
+
+    val factory = TestHelper
+    val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath).slice(0, 10)
+
+    val validTxs = keys.map { key =>
+      val proposition = key.publicImage
+      val fee = factory.Props.txFee
+      val timestamp = NetworkTime.time()
+      val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
+      val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
+      val sig = PrivateKey25519Companion.sign(
+        key,
+        PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
+      )
+      PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
+    }
+
+    val invalidTxs = keys.map { key =>
+      val proposition = key.publicImage
+      val fee = factory.Props.txFee
+      val timestamp = NetworkTime.time()
+      val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp")).map(_.id)
+      val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, 30000L))
+      val sig = PrivateKey25519Companion.sign(
+        key,
+        PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
+      )
+      PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
+    }
+
+    val filteredValidTxs = state.filterValid(validTxs)
+
+    assert(filteredValidTxs.size == validTxs.size, s"filterValid(validTxs) " +
+      s"return ${filteredValidTxs.size}, but ${validTxs.size} was expected.")
+
+    val filteredInvalidTxs = state.filterValid(invalidTxs)
+
+    assert(filteredInvalidTxs.isEmpty, s"filterValid(invalidTxs) " +
+      s"return ${filteredInvalidTxs.size}, but 0 was expected.")
+
+    val filteredValidAndInvalidTxs = state.filterValid(validTxs ++ invalidTxs)
+
+    assert(filteredValidAndInvalidTxs.size == validTxs.size, s"filterValid(validTxs + invalidTxs) " +
+      s"return ${filteredValidAndInvalidTxs.size}, but ${validTxs.size} was expected.")
+
+//    persistentProver.rollback(rollbackPoint)
+//      .ensuring(_.isSuccess && persistentProver.digest.sameElements(rollbackPoint))
+  }
+
+  test("BatchAVLProver should have the same digest after rollback as before.") {
+
+    val dir: File = new File("/Users/ilaoskin/IdeaProjects/Encry/test-data/state2")
     assert(dir.exists() && dir.isDirectory, "dir is invalid.")
 
     val store = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
@@ -32,6 +105,10 @@ class UtxoStateTest extends org.scalatest.FunSuite {
 
     val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
       PersistentBatchAVLProver.create(prover, storage).get
+
+    val valuesToInsert = (1 until 100).map { i =>
+      Array.fill(32)(i.toByte) -> Array.fill(64)(i.toByte)
+    }
 
     val initialDigest = persistentProver.digest
 

@@ -16,7 +16,7 @@ class PowConsensus(chainSettings: ChainSettings) {
   def verifyCandidate(candidate: PowCandidateBlock, nonce: Long): Option[EncryBlock] = {
 
     // TODO: Move to settings.
-    val version = 0.toByte
+    val version = 1.toByte
     val parentId: ModifierId = ModifierId @@ candidate.parentOpt.map(_.id).getOrElse(EncryBlockHeader.GenesisParentId)
     val adProofsRoot = ADProofs.proofDigest(candidate.adProofBytes)
     val txRoot = EncryBlockPayload.rootHash(candidate.transactions.map(_.id))

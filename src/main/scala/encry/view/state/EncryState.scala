@@ -3,18 +3,16 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
-import encry.crypto.Address
 import encry.local.TestHelper
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box._
-import encry.modifiers.state.box.proposition.AddressProposition
 import encry.settings.{Algos, EncryAppSettings, NodeSettings}
 import scorex.core.VersionTag
 import scorex.core.transaction.state.MinimalState
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADDigest
-import scorex.crypto.encode.{Base16, Base58}
+import scorex.crypto.encode.Base58
 
 import scala.util.Try
 

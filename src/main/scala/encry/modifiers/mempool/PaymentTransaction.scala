@@ -19,7 +19,7 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{PublicKey, Signature}
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Success, Try}
 
 case class PaymentTransaction(override val proposition: PublicKey25519Proposition,
                               override val fee: Amount,
@@ -72,7 +72,7 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
     // Signature validity checks.
     if (!signature.isValid(proposition, messageToSign)) {
       log.info(s"<TX: $txHash> Invalid signature provided.")
-      Failure(new Error("Invalid signature provided!"))
+      throw new Error("Invalid signature provided!")
     }
 
     // TODO: Txs generated during tests does not pass this tests.
@@ -81,11 +81,11 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
       i._2 > 0 && AddressProposition.validAddress(i._1)
     }) {
       log.info(s"<TX: $txHash> Invalid content.")
-      Failure(new Error("Transaction invalid!"))
+      throw new Error("Transaction invalid!")
     }
     // `Fee` amount check.
     if (fee < minimalFee)
-      Failure(new Error("Fee amount too small."))
+      throw new Error("Fee amount too small.")
 
     Success()
   }
