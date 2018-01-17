@@ -2,6 +2,7 @@ package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs}
 import encry.crypto.Address
+import encry.modifiers.mempool.EncryTransaction
 import encry.modifiers.mempool.EncryTransaction.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.AddressProposition
@@ -14,7 +15,7 @@ import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 case class AssetBox(override val proposition: AddressProposition,
                     override val nonce: Long,
@@ -33,6 +34,10 @@ case class AssetBox(override val proposition: AddressProposition,
       Longs.toByteArray(amount)
     )
   )
+
+  override def unlockTry(modifier: EncryTransaction, script: Option[String] = None): Try[Unit] =
+    if (modifier.senderProposition.address != proposition.address) Failure(new Error("Unlock failed"))
+    else Success()
 
   override def serializer: SizedCompanionSerializer[AssetBox] = AssetBoxSerializer
 

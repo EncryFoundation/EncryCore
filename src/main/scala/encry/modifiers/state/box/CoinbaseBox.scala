@@ -1,6 +1,7 @@
 package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs}
+import encry.modifiers.mempool.EncryTransaction
 import encry.modifiers.mempool.EncryTransaction.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.{HeightProposition, HeightPropositionSerializer}
@@ -12,7 +13,7 @@ import scorex.crypto.authds.{ADKey, ADValue}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
-import scala.util.Try
+import scala.util.{Success, Try}
 
 // Now used currently.
 case class CoinbaseBox(override val proposition: HeightProposition,
@@ -31,6 +32,8 @@ case class CoinbaseBox(override val proposition: HeightProposition,
       Longs.toByteArray(amount)
     )
   )
+
+  override def unlockTry(modifier: EncryTransaction, script: Option[String]): Try[Unit] = Success()
 
   override def serializer: SizedCompanionSerializer[M] = CoinbaseBoxSerializer
 

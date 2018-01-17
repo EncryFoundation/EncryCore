@@ -4,8 +4,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.crypto.Address
 import encry.modifiers.mempool.EncryTransaction.{TxTypeId, _}
 import encry.modifiers.state.box.proposition.AddressProposition
-import encry.modifiers.state.box.unlockers.AssetBoxUnlocker
-import encry.modifiers.state.box.{AssetBox, EncryNoncedBox}
+import encry.modifiers.state.box.{AssetBox, EncryNoncedBox, OpenBox}
 import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
@@ -20,12 +19,12 @@ import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.{Failure, Success, Try}
 
-case class CoinbaseTransaction(override val proposition: PublicKey25519Proposition,
+case class CoinbaseTransaction(override val senderProposition: PublicKey25519Proposition,
                                override val timestamp: Long,
-                               var signature: Signature25519,
-                               useBoxes: IndexedSeq[ADKey],
+                               override var signature: Signature25519,
+                               override val useBoxes: IndexedSeq[ADKey],
                                amount: Amount)
-  extends EncryTransaction[PublicKey25519Proposition] {
+  extends EncryTransaction {
 
   override type M = CoinbaseTransaction
 
@@ -35,13 +34,11 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
 
   override val fee: Amount = 0L
 
-  // TODO: This transaction type does not use `unlockers`.
-  override val unlockers: Traversable[AssetBoxUnlocker] =
-    useBoxes.map(boxId => AssetBoxUnlocker(boxId, signature))
+  override val feeBox: Option[OpenBox] = None
 
   override val newBoxes: Traversable[EncryNoncedBox[AddressProposition]] = Seq(
     AssetBox(
-      proposition = AddressProposition(Address @@ proposition.address),
+      proposition = AddressProposition(Address @@ senderProposition.address),
       nonce = nonceFromDigest(Algos.hash(txHash)),
       amount = amount
     )
@@ -53,13 +50,11 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
 
   override def serializer: Serializer[M] = CoinbaseTransactionSerializer
 
-  override lazy val txHash: Digest32 = CoinbaseTransaction.getHash(proposition, useBoxes, timestamp, amount)
-
-  override lazy val messageToSign: Array[Byte] = txHash
+  override lazy val txHash: Digest32 = CoinbaseTransaction.getHash(senderProposition, useBoxes, timestamp, amount)
 
   override lazy val semanticValidity: Try[Unit] = {
     // Signature validity checks.
-    if (!signature.isValid(proposition, messageToSign)) {
+    if (!signature.isValid(senderProposition, messageToSign)) {
       log.info(s"<TX: $txHash> Invalid signature provided.")
       Failure(new Error("Invalid signature provided!"))
     }
@@ -96,7 +91,7 @@ object CoinbaseTransactionSerializer extends Serializer[CoinbaseTransaction] {
 
   override def toBytes(obj: CoinbaseTransaction): Array[Byte] = {
     Bytes.concat(
-      obj.proposition.pubKeyBytes,
+      obj.senderProposition.pubKeyBytes,
       Longs.toByteArray(obj.timestamp),
       obj.signature.signature,
       Longs.toByteArray(obj.amount),

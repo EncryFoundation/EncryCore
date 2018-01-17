@@ -35,10 +35,10 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
       txs.flatMap { tx =>
         tx match {
           case tx: PaymentTransaction =>
-            tx.unlockers.map(unl => Removal(unl.closedBoxId)) ++
+            tx.useBoxes.map(bxId => Removal(bxId)) ++
               tx.newBoxes.map(bx => Insertion(bx))
           case tx: CoinbaseTransaction =>
-            tx.unlockers.map(unl => Removal(unl.closedBoxId)) ++
+            tx.useBoxes.map(bxId => Removal(bxId)) ++
               tx.newBoxes.map(bx => Insertion(bx))
         }
       }

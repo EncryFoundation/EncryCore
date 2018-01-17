@@ -74,20 +74,20 @@ class UtxoState(override val version: VersionTag,
         getStateChanges(tx).operations.map(ADProofs.toModification)
           .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
           t.flatMap(_ => {
-            appliedModCounter = appliedModCounter + 1
+            appliedModCounter += 1
             persistentProver.performOneOperation(m)
           })
         }
       } else {
         if (appliedModCounter > 0) rollback()
-        Failure(new Error(s"Error while applying modifier $tx."))
+        throw new Error(s"Error while applying modifier $tx.")
       }
     }
 
     // Checks whether the outcoming result is the same as expected.
     if (!expectedDigest.sameElements(persistentProver.digest))
-      Failure(new Error(s"Digest after txs application is wrong. ${Algos.encode(expectedDigest)} expected, " +
-        s"${Algos.encode(persistentProver.digest)} given"))
+      throw new Error(s"Digest after txs application is wrong. ${Algos.encode(expectedDigest)} expected, " +
+        s"${Algos.encode(persistentProver.digest)} given")
   }
 
   // State transition function `APPLY(S,TX) -> S'`.
@@ -96,32 +96,29 @@ class UtxoState(override val version: VersionTag,
       log.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)}")
 
-      applyTransactions(block.payload.transactions, block.header.stateRoot) match {
-        case Success(_) =>
-          Try {
-            val md = metadata(VersionTag @@ block.id, block.header.stateRoot)
-            val proofBytes = persistentProver.generateProofAndUpdateStorage(md)
-            val proofHash = ADProofs.proofDigest(proofBytes)
+      applyTransactions(block.payload.transactions, block.header.stateRoot).map { _: Unit =>
+        val md = metadata(VersionTag @@ block.id, block.header.stateRoot)
+        val proofBytes = persistentProver.generateProofAndUpdateStorage(md)
+        val proofHash = ADProofs.proofDigest(proofBytes)
 
-            if (block.adProofsOpt.isEmpty) onAdProofGenerated(ADProofs(block.header.id, proofBytes))
-            log.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with " +
-              s"root hash ${Algos.encode(rootHash)}")
+        if (block.adProofsOpt.isEmpty) onAdProofGenerated(ADProofs(block.header.id, proofBytes))
+        log.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with " +
+          s"root hash ${Algos.encode(rootHash)}")
 
-            if (!store.get(ByteArrayWrapper(block.id)).exists(_.data sameElements block.header.stateRoot))
-              throw new Error("Storage kept roothash is not equal to the declared one.")
-            else if (!store.rollbackVersions().exists(_.data sameElements block.header.stateRoot))
-              throw new Error("Unable to apply modification properly.")
-            else if (!(block.header.adProofsRoot sameElements proofHash))
-              throw new Error("Calculated proofHash is not equal to the declared one.")
-            else if (!(block.header.stateRoot sameElements persistentProver.digest))
-              throw new Error("Calculated stateRoot is not equal to the declared one.")
+        if (!store.get(ByteArrayWrapper(block.id)).exists(_.data sameElements block.header.stateRoot))
+          throw new Error("Storage kept roothash is not equal to the declared one.")
+        else if (!store.rollbackVersions().exists(_.data sameElements block.header.stateRoot))
+          throw new Error("Unable to apply modification properly.")
+        else if (!(block.header.adProofsRoot sameElements proofHash))
+          throw new Error("Calculated proofHash is not equal to the declared one.")
+        else if (!(block.header.stateRoot sameElements persistentProver.digest))
+          throw new Error("Calculated stateRoot is not equal to the declared one.")
 
-            new UtxoState(VersionTag @@ block.id, store, nodeViewHolderRef)
-          }
-        case Failure(e) =>
-          log.warn(s"Error while applying block with header ${block.header.encodedId} to UTXOState with root" +
-            s" ${Algos.encode(rootHash)}: ", e)
-          Failure(e)
+        new UtxoState(VersionTag @@ block.id, store, nodeViewHolderRef)
+      }.recoverWith[UtxoState] { case e =>
+        log.warn(s"Error while applying block with header ${block.header.encodedId} to UTXOState with root" +
+          s" ${Algos.encode(rootHash)}: ", e)
+        Failure(e)
       }
 
     case header: EncryBlockHeader =>
@@ -196,19 +193,21 @@ class UtxoState(override val version: VersionTag,
     tx match {
       case tx: PaymentTransaction =>
         var inputsSum: Long = 0
-        tx.unlockers.foreach { unl =>
-          persistentProver.unauthenticatedLookup(unl.closedBoxId) match {
+        tx.useBoxes.foreach { bxId =>
+          persistentProver.unauthenticatedLookup(bxId) match {
             case Some(data) =>
-              unl.closedBoxId.head match {
+              bxId.head match {
                 case OpenBox.typeId =>
                   OpenBoxSerializer.parseBytes(data) match {
-                    case Success(box) => inputsSum += box.amount
-                    case Failure(_) => throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
+                    case Success(box) =>
+                      inputsSum += box.amount
+                    case Failure(_) =>
+                      throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
                   }
                 case AssetBox.typeId =>
                   AssetBoxSerializer.parseBytes(data) match {
                     case Success(box) =>
-                      if (!unl.isValid(box.proposition, tx.proposition, tx.messageToSign))
+                      if (box.unlockTry(tx).isFailure)
                         throw new Error(s"Invalid unlocker for box referenced in $tx")
                       inputsSum += box.amount
                     case Failure(_) =>
@@ -220,10 +219,8 @@ class UtxoState(override val version: VersionTag,
               throw new Error(s"Cannot find Box referenced in TX ${tx.txHash}")
           }
         }
-        if (tx.createBoxes.map(i => i._2).sum != inputsSum) {
-          println(s"Inputs total is: $inputsSum and outpts is: ${tx.createBoxes.map(i => i._2).sum}")
+        if (tx.createBoxes.map(i => i._2).sum != inputsSum)
           throw new Error("Inputs total amount mismatches Output sum.")
-        }
 
       // This branch does not use `unlockers`
       case tx: CoinbaseTransaction =>
@@ -237,11 +234,14 @@ class UtxoState(override val version: VersionTag,
                       // TODO: How to get `bestHeaderHeight` to compare with `box.proposition.height`?
                       if (box.proposition.height > 0)
                         throw new Error(s"Box referenced in tx: $tx is disallowed to be spent at current height.")
-                    case Failure(_) => throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
+                    case Failure(_) =>
+                      throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
                   }
-                case _ => throw new Error("Got Modifier of unknown type.")
+                case _ =>
+                  throw new Error("Got Modifier of unknown type.")
               }
-            case None => throw new Exception(s"Cannot find Box referenced in TX ${tx.txHash}")
+            case None =>
+              throw new Exception(s"Cannot find Box referenced in TX ${tx.txHash}")
           }
         }
       case _ => throw new Error("Got Modifier of unknown type.")

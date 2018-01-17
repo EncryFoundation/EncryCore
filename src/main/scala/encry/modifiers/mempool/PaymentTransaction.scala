@@ -4,7 +4,6 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.crypto.Address
 import encry.modifiers.mempool.EncryTransaction._
 import encry.modifiers.state.box.proposition.{AddressProposition, HeightProposition}
-import encry.modifiers.state.box.unlockers.AssetBoxUnlocker
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox}
 import encry.settings.Algos
 import encry.view.history.Height
@@ -21,13 +20,13 @@ import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.{Success, Try}
 
-case class PaymentTransaction(override val proposition: PublicKey25519Proposition,
+case class PaymentTransaction(override val senderProposition: PublicKey25519Proposition,
                               override val fee: Amount,
                               override val timestamp: Long,
-                              var signature: Signature25519,
-                              useBoxes: IndexedSeq[ADKey],
+                              override var signature: Signature25519,
+                              override val useBoxes: IndexedSeq[ADKey],
                               createBoxes: IndexedSeq[(Address, Amount)])
-  extends EncryTransaction[PublicKey25519Proposition] {
+  extends EncryTransaction {
 
   override type M = PaymentTransaction
 
@@ -36,11 +35,11 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
   // Type of actual Tx type.
   override val typeId: TxTypeId = PaymentTransaction.typeId
 
-  override val unlockers: Traversable[AssetBoxUnlocker] =
-    useBoxes.map(boxId => AssetBoxUnlocker(boxId, signature))
+  override val feeBox: Option[OpenBox] =
+    Some(OpenBox(HeightProposition(Height @@ 0), nonceFromDigest(Algos.hash(txHash)), fee))
 
   override val newBoxes: Traversable[EncryBaseBox] =
-    Seq(OpenBox(HeightProposition(Height @@ 0), nonceFromDigest(Algos.hash(txHash)), fee)) ++
+    Seq(feeBox.get) ++
       createBoxes.zipWithIndex.map { case ((addr, amount), idx) =>
         val nonce = nonceFromDigest(Algos.hash(txHash ++ Ints.toByteArray(idx)))
         AssetBox(AddressProposition(addr), nonce, amount)
@@ -64,13 +63,11 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
     }.asJson
   ).asJson
 
-  override lazy val txHash: Digest32 = PaymentTransaction.getHash(proposition, fee, timestamp, useBoxes, createBoxes)
-
-  override lazy val messageToSign: Array[Byte] = txHash
+  override lazy val txHash: Digest32 = PaymentTransaction.getHash(senderProposition, fee, timestamp, useBoxes, createBoxes)
 
   override lazy val semanticValidity: Try[Unit] = {
     // Signature validity checks.
-    if (!signature.isValid(proposition, messageToSign)) {
+    if (!signature.isValid(senderProposition, messageToSign)) {
       log.info(s"<TX: $txHash> Invalid signature provided.")
       throw new Error("Invalid signature provided!")
     }
@@ -124,7 +121,7 @@ object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
 
   override def toBytes(obj: PaymentTransaction): Array[Byte] = {
     Bytes.concat(
-      obj.proposition.pubKeyBytes,
+      obj.senderProposition.pubKeyBytes,
       Longs.toByteArray(obj.fee),
       Longs.toByteArray(obj.timestamp),
       obj.signature.signature,
