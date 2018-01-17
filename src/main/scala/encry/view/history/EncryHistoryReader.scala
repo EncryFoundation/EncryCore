@@ -110,7 +110,7 @@ trait EncryHistoryReader
   /**
     * @return all possible forks, that contains specified header
     */
-  private[history] def continuationHeaderChains(header: EncryBlockHeader): Seq[EncryHeaderChain] = {
+  protected[history] def continuationHeaderChains(header: EncryBlockHeader): Seq[EncryHeaderChain] = {
     def loop(acc: Seq[EncryBlockHeader]): Seq[EncryHeaderChain] = {
       val bestHeader = acc.last
       val currentHeight = heightOf(bestHeader.id).get

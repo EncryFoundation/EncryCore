@@ -11,18 +11,17 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import scorex.core.LocalInterface.LocallyGeneratedTransaction
 import scorex.core.NodeViewHolder.GetDataFromCurrentView
-import scorex.core.transaction.box.Box.Amount
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.{PrivateKey25519, PrivateKey25519Companion}
 import scorex.core.utils.{NetworkTime, ScorexLogging}
-import scorex.crypto.encode.Base58
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Random
 
-// TODO: Undone
-class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings) extends Actor with ScorexLogging {
+class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings)
+  extends Actor with ScorexLogging {
+
   var txGenerator: Cancellable = _
 
   var isStarted = false
@@ -61,9 +60,7 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings) exte
             val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
             val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
             val sig = PrivateKey25519Companion.sign(
-              key,
-              PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
-            )
+              key, PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs))
             PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
           }
         } else {
@@ -91,5 +88,4 @@ object TransactionGenerator {
   case object FetchBoxes
 
   case object StopGeneration
-
 }
