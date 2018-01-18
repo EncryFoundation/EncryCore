@@ -19,7 +19,7 @@ import scorex.core.NodeViewHolder
 import scorex.core.NodeViewHolder.{GetDataFromCurrentView, SemanticallySuccessfulModifier, Subscribe}
 import scorex.core.transaction.state.{PrivateKey25519, PrivateKey25519Companion}
 import scorex.core.utils.{NetworkTime, ScorexLogging}
-import scorex.crypto.encode.Base58
+import scorex.crypto.encode.{Base16, Base58}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -97,8 +97,8 @@ class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings, nodeId: Ar
           }
         case None =>
           log.info("Candidate is empty. Trying again in 1 sec.")
-          self ! PrepareCandidate
-          context.system.scheduler.scheduleOnce(1.second)(self ! MineBlock)
+          context.system.scheduler.scheduleOnce(1.second)(self ! PrepareCandidate)
+          context.system.scheduler.scheduleOnce(2.second)(self ! MineBlock)
       }
 
     case MiningStatusRequest =>
@@ -133,7 +133,7 @@ object EncryMiner extends ScorexLogging {
         val bestHeaderOpt = view.history.bestFullBlockOpt.map(_.header)
 
         if (bestHeaderOpt.isDefined) {
-          log.debug("BestHeader id:        " + Base58.encode(bestHeaderOpt.get.hHash))
+          log.debug("BestHeader id:        " + Base16.encode(bestHeaderOpt.get.hHash))
           log.debug("BestHeader timestamp: " + bestHeaderOpt.get.timestamp)
           log.debug("BestHeader height:    " + bestHeaderOpt.get.height)
         } else {

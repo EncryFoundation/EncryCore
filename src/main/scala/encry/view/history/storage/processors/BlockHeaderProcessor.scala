@@ -197,10 +197,10 @@ trait BlockHeaderProcessor extends ScorexLogging {
       .get(headerScoreKey(id))
       .map(b => BigInt(b.data))
 
-  def heightOf(id: ModifierId): Option[Int] =
+  def heightOf(id: ModifierId): Option[Height] =
     historyStorage.db
       .get(headerHeightKey(id))
-      .map(b => Ints.fromByteArray(b.data))
+      .map(b => Height @@ Ints.fromByteArray(b.data))
 
   /**
     * @param height - block height
@@ -247,13 +247,16 @@ trait BlockHeaderProcessor extends ScorexLogging {
     if (parentHeight <= 2) {
       Difficulty @@ chainSettings.initialDifficulty
     } else {
-      val requiredHeadersHeights =
+      val requiredHeights =
         consensusAlgo.difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
           .ensuring(_.last == parentHeight, "Incorrect heights sequence!")
-      val chain = headerChainBack(requiredHeadersHeights.max - requiredHeadersHeights.min + 1,
+      val chain = headerChainBack(requiredHeights.max - requiredHeights.min + 1,
         parent, (_: EncryBlockHeader) => false)
-      consensusAlgo.difficultyController.getNewDifficulty(parent.difficulty,
-        consensusAlgo.difficultyController.getTimedelta(chain.headers))
+      val requiredHeaders = (requiredHeights.min to requiredHeights.max)
+        .zip(chain.headers).filter(p => requiredHeights.contains(p._1))
+      assert(requiredHeights.length == requiredHeaders.length,
+        s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}")
+      consensusAlgo.difficultyController.getDifficulty(requiredHeaders)
     }
   }
 }

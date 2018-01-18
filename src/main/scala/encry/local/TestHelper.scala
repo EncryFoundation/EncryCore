@@ -17,7 +17,7 @@ import scala.util.Random
 object TestHelper {
 
   object Props {
-    lazy val keysQty = 100
+    lazy val keysQty = 1000
     lazy val nonce = 0
     lazy val boxValue: Amount = 1000
     lazy val txAmount: Amount = 900
