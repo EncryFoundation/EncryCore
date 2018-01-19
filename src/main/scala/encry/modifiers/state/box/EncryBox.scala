@@ -27,4 +27,6 @@ trait EncryBox[P <: Proposition] extends EncryBaseBox with JsonSerializable {
 object EncryBox {
 
   type BxTypeId = Byte
+
+  val BoxIdSize = 32
 }

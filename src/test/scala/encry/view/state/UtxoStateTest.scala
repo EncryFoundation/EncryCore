@@ -7,27 +7,31 @@ import encry.crypto.Address
 import encry.local.TestHelper
 import encry.modifiers.mempool.PaymentTransaction
 import encry.settings.Constants
-import io.iohk.iodb.LSMStore
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import scorex.core.ModifierId
+import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.transaction.state.PrivateKey25519Companion
 import scorex.core.utils.NetworkTime
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADKey, ADValue}
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
+import scorex.utils.Random
 
 class UtxoStateTest extends org.scalatest.FunSuite {
 
   test("FilterValid(txs) should return only valid txs (against current state).") {
 
-    val dir: File = new File("/IdeaProjects/Encry/test-data/state1")
+    val dir: File = new File("/Users/ilaoskin/IdeaProjects/Encry/test-data/state1")
     assert(dir.exists() && dir.isDirectory, "dir is invalid.")
 
     def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
       val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32, valueLengthOpt = None)
       bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
-      val store = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
+      val stateStore = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
+      val indexStore = new LSMStore(dir, keySize = PublicKey25519Proposition.AddressLength, keepVersions = Constants.keepVersions)
 
-      new UtxoState(EncryState.genesisStateVersion, store, nodeViewHolderRef) {
+      new UtxoState(EncryState.genesisStateVersion, stateStore, indexStore, nodeViewHolderRef) {
         override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
           PersistentBatchAVLProver.create(
             p, storage, paranoidChecks = true
@@ -89,7 +93,7 @@ class UtxoStateTest extends org.scalatest.FunSuite {
 
   test("BatchAVLProver should have the same digest after rollback as before.") {
 
-    val dir: File = new File("/IdeaProjects/Encry/test-data/state2")
+    val dir: File = new File("/Users/ilaoskin/IdeaProjects/Encry/test-data/state2")
     assert(dir.exists() && dir.isDirectory, "dir is invalid.")
 
     val store = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
@@ -120,6 +124,32 @@ class UtxoStateTest extends org.scalatest.FunSuite {
     val afterRollbackDigest = persistentProver.digest
 
     assert(afterRollbackDigest sameElements initialDigest, "Invalid digest after rollback.")
+
+    store.close()
   }
 
+  test("Store.update & Store.get") {
+
+    val dir: File = new File("/Users/ilaoskin/IdeaProjects/Encry/test-data/state3")
+    assert(dir.exists() && dir.isDirectory, "dir is invalid.")
+
+    val storage = new LSMStore(dir, keepVersions = Constants.keepVersions)
+
+    val storageVersion: ModifierId = ModifierId @@ Random.randomBytes()
+
+    val valuesToInsert = (1 until 100).map { i =>
+      ByteArrayWrapper(Array.fill(32)(i.toByte)) -> ByteArrayWrapper(Array.fill(64)(i.toByte))
+    }
+
+    storage.update(ByteArrayWrapper(storageVersion), Seq(), valuesToInsert)
+
+    assert((1 until 100).forall(i => storage.get(ByteArrayWrapper(Array.fill(32)(i.toByte))).isDefined),
+      "Inserted key is undefined.")
+
+    assert((1 until 100).forall(i => storage.get(
+      ByteArrayWrapper(Array.fill(32)(i.toByte))).get.data sameElements Array.fill(64)(i.toByte)),
+      "Inserted value is undefined.")
+
+    storage.close()
+  }
 }

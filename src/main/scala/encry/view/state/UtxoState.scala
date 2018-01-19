@@ -3,6 +3,7 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
+import encry.crypto.Address
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -11,48 +12,28 @@ import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, Payme
 import encry.modifiers.state.TransactionValidator
 import encry.modifiers.state.box._
 import encry.settings.{Algos, Constants}
-import encry.view.history.Height
+import encry.view.state.index.StateIndexReader
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.LocalInterface.LocallyGeneratedModifier
 import scorex.core.VersionTag
-import scorex.core.transaction.box.Box
-import scorex.core.transaction.box.proposition.Proposition
+import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
-import scala.util.{Failure, Random, Success, Try}
+import scala.collection.mutable
+import scala.util.{Failure, Success, Try}
 
 class UtxoState(override val version: VersionTag,
-                val store: Store,
+                override val stateStore: Store,
+                override val indexStore: Store,
                 nodeViewHolderRef: Option[ActorRef])
-  extends EncryState[UtxoState] with TransactionValidator with ScorexLogging {
+  extends EncryState[UtxoState] with UtxoStateReader with StateIndexReader with TransactionValidator {
 
   import UtxoState.metadata
 
-  implicit val hf: Blake2b256Unsafe = new Blake2b256Unsafe
-  // TODO: Note that Box has multiple subtypes of different lengths. Fix `valueSize`.!!!! Error from here.
-  private lazy val np = NodeParameters(keySize = 32, valueSize = AssetBoxSerializer.Size, labelSize = 32)
-  protected lazy val storage = new VersionedIODBAVLStorage(store, np)
-
-  protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
-    PersistentBatchAVLProver.create(
-      new BatchAVLProver[Digest32, Blake2b256Unsafe](
-        keyLength = 32, valueLengthOpt = None),
-      storage).get
-
   override def maxRollbackDepth: Int = 10
-
-  def typedBoxById(boxId: ADKey): Option[EncryBaseBox] = {
-    boxId.head match {
-      case OpenBox.typeId => persistentProver.unauthenticatedLookup(boxId)
-        .map(OpenBoxSerializer.parseBytes).flatMap(_.toOption)
-      case AssetBox.typeId => persistentProver.unauthenticatedLookup(boxId)
-        .map(AssetBoxSerializer.parseBytes).flatMap(_.toOption)
-    }
-  }
 
   private def onAdProofGenerated(proof: ADProofs): Unit = {
     if(nodeViewHolderRef.isEmpty) log.warn("Got proof while nodeViewHolderRef is empty")
@@ -68,19 +49,51 @@ class UtxoState(override val version: VersionTag,
 
     var appliedModCounter: Int = 0
 
-    txs.foreach { tx =>
-      // Carries out an exhaustive txs validation and then tries to apply it.
-      if (validate(tx).isSuccess) {
-        getStateChanges(tx).operations.map(ADProofs.toModification)
-          .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
-          t.flatMap(_ => {
-            appliedModCounter += 1
-            persistentProver.performOneOperation(m)
-          })
+    // TODO: Make sure all errors inside are being caught properly.
+    val txsApplyTry: Try[Unit] = Try {
+      txs.foreach { tx =>
+        // Carries out an exhaustive txs validation and then tries to apply it.
+        if (validate(tx).isSuccess) {
+          getStateChanges(tx).operations.map(ADProofs.toModification)
+            .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
+            t.flatMap { _ =>
+              appliedModCounter += 1
+              persistentProver.performOneOperation(m)
+            }
+          }
+        } else {
+          if (appliedModCounter > 0) rollback()
+          throw new Error(s"Error while applying modifier $tx.")
         }
-      } else {
-        if (appliedModCounter > 0) rollback()
-        throw new Error(s"Error while applying modifier $tx.")
+      }
+    }
+
+    // TODO: Test.
+    if (txsApplyTry.isSuccess) {
+      val accountOpsMap = mutable.HashMap.empty[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]
+      txs.foreach { tx =>
+        tx.useBoxes.foreach { id =>
+          accountOpsMap.get(Address @@ tx.senderProposition.address) match {
+            case Some(t) =>
+              if (t._2.exists(_.sameElements(id))) t._2.remove(id)
+              t._1.add(id)
+            case None =>
+              accountOpsMap.update(
+                Address @@ tx.senderProposition.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
+            }
+          }
+        tx.newBoxes.foreach {
+          case bx: AssetBox =>
+            accountOpsMap.get(bx.proposition.address) match {
+              case Some(t) => t._2.add(bx.id)
+              case None => accountOpsMap.update(
+                bx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
+            }
+          case bx: OpenBox => None  // TODO:
+        }
+      }
+      accountOpsMap.foreach { case (addr, (toRem, toIns)) =>
+        updateIndexFor(addr, toRem.toSeq, toIns.toSeq)
       }
     }
 
@@ -105,16 +118,16 @@ class UtxoState(override val version: VersionTag,
         log.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with " +
           s"root hash ${Algos.encode(rootHash)}")
 
-        if (!store.get(ByteArrayWrapper(block.id)).exists(_.data sameElements block.header.stateRoot))
+        if (!stateStore.get(ByteArrayWrapper(block.id)).exists(_.data sameElements block.header.stateRoot))
           throw new Error("Storage kept roothash is not equal to the declared one.")
-        else if (!store.rollbackVersions().exists(_.data sameElements block.header.stateRoot))
+        else if (!stateStore.rollbackVersions().exists(_.data sameElements block.header.stateRoot))
           throw new Error("Unable to apply modification properly.")
         else if (!(block.header.adProofsRoot sameElements proofHash))
           throw new Error("Calculated proofHash is not equal to the declared one.")
         else if (!(block.header.stateRoot sameElements persistentProver.digest))
           throw new Error("Calculated stateRoot is not equal to the declared one.")
 
-        new UtxoState(VersionTag @@ block.id, store, nodeViewHolderRef)
+        new UtxoState(VersionTag @@ block.id, stateStore, indexStore, nodeViewHolderRef)
       }.recoverWith[UtxoState] { case e =>
         log.warn(s"Error while applying block with header ${block.header.encodedId} to UTXOState with root" +
           s" ${Algos.encode(rootHash)}: ", e)
@@ -122,7 +135,7 @@ class UtxoState(override val version: VersionTag,
       }
 
     case header: EncryBlockHeader =>
-      Success(new UtxoState(VersionTag @@ header.id, this.store, nodeViewHolderRef))
+      Success(new UtxoState(VersionTag @@ header.id, stateStore, indexStore, nodeViewHolderRef))
 
     case _ => Failure(new Error("Got Modifier of unknown type."))
   }
@@ -138,7 +151,7 @@ class UtxoState(override val version: VersionTag,
 
       if (!(persistentProver.digest.sameElements(rootHash) &&
         storage.version.get.sameElements(rootHash) &&
-        store.lastVersionID.get.data.sameElements(rootHash)))
+        stateStore.lastVersionID.get.data.sameElements(rootHash)))
         Failure(new Error("Bad state version."))
 
       val mods = getAllStateChanges(txs).operations.map(ADProofs.toModification)
@@ -164,14 +177,14 @@ class UtxoState(override val version: VersionTag,
   override def rollbackTo(version: VersionTag): Try[UtxoState] = {
     val prover = persistentProver
     log.info(s"Rollback UtxoState to version ${Algos.encoder.encode(version)}")
-    store.get(ByteArrayWrapper(version)) match {
+    stateStore.get(ByteArrayWrapper(version)) match {
       case Some(hash) =>
         val rollbackResult = prover.rollback(ADDigest @@ hash.data).map { _ =>
-          new UtxoState(version, store, nodeViewHolderRef) {
+          new UtxoState(version, stateStore, indexStore, nodeViewHolderRef) {
             override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] = prover
           }
         }
-        store.clean(Constants.keepVersions)
+        stateStore.clean(Constants.keepVersions)
         rollbackResult
       case None =>
         Failure(new Error(s"Unable to get root hash at version ${Algos.encoder.encode(version)}"))
@@ -180,7 +193,7 @@ class UtxoState(override val version: VersionTag,
 
   override def rollbackVersions: Iterable[VersionTag] =
     persistentProver.storage.rollbackVersions.map(v =>
-      VersionTag @@ store.get(ByteArrayWrapper(Algos.hash(v))).get.data)
+      VersionTag @@ stateStore.get(ByteArrayWrapper(Algos.hash(v))).get.data)
 
   override lazy val rootHash: ADDigest = persistentProver.digest
 
@@ -267,14 +280,6 @@ class UtxoState(override val version: VersionTag,
           }
       }
     }._1.sortBy(_.timestamp)
-
-  def getOpenBoxesAtHeight(height: Height): IndexedSeq[CoinbaseBox] = ???
-
-  // TODO: Implement.
-  def boxesOf(proposition: Proposition): Seq[Box[proposition.type]] = ???
-
-  def randomBox(): Option[EncryBaseBox] =
-    persistentProver.avlProver.randomWalk().map(_._1).flatMap(typedBoxById)
 }
 
 object UtxoState extends ScorexLogging {
@@ -282,9 +287,11 @@ object UtxoState extends ScorexLogging {
   private lazy val bestVersionKey = Algos.hash("best_state_version")
 
   def create(dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val store = new LSMStore(dir, keepVersions = Constants.keepVersions)
-    val dbVersion = store.get(ByteArrayWrapper(bestVersionKey)).map( _.data)
-    new UtxoState(VersionTag @@ dbVersion.getOrElse(EncryState.genesisStateVersion), store, nodeViewHolderRef)
+    val stateStore = new LSMStore(dir, keepVersions = Constants.keepVersions)
+    val indexStore = new LSMStore(dir,
+      keySize = PublicKey25519Proposition.AddressLength, keepVersions = Constants.keepVersions)
+    val dbVersion = stateStore.get(ByteArrayWrapper(bestVersionKey)).map( _.data)
+    new UtxoState(VersionTag @@ dbVersion.getOrElse(EncryState.genesisStateVersion), stateStore, indexStore, nodeViewHolderRef)
   }
 
   private def metadata(modId: VersionTag, stateRoot: ADDigest): Seq[(Array[Byte], Array[Byte])] = {
@@ -299,11 +306,13 @@ object UtxoState extends ScorexLogging {
     val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
-    val store = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
+    val stateStore = new LSMStore(dir, keepVersions = Constants.keepVersions)
+    val indexStore = new LSMStore(dir,
+      keySize = PublicKey25519Proposition.AddressLength, keepVersions = Constants.keepVersions)
 
     log.info(s"Generating UTXO State from BH with ${bh.boxes.size} boxes")
 
-    new UtxoState(EncryState.genesisStateVersion, store, nodeViewHolderRef) {
+    new UtxoState(EncryState.genesisStateVersion, stateStore, indexStore, nodeViewHolderRef) {
       override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
         PersistentBatchAVLProver.create(
           p, storage, metadata(EncryState.genesisStateVersion, p.digest), paranoidChecks = true
