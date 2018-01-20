@@ -72,15 +72,17 @@ object EncryState extends ScorexLogging{
 
   def stateDir(settings: EncryAppSettings) = new File(s"${settings.directory}/state")
 
-  def genGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
+  def indexDir(settings: EncryAppSettings) = new File(s"${settings.directory}/index")
+
+  def genGenesisUtxoState(stateDir: File, indexDir: File,
+                          nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
     log.info("Generating genesis UTXO state.")
-    lazy val genesisSeed = Long.MaxValue
 
     lazy val initialBoxes: Seq[EncryBaseBox] = TestHelper.genAssetBoxes
 
     val bh = BoxHolder(initialBoxes)
 
-    UtxoState.fromBoxHolder(bh, stateDir, nodeViewHolderRef).ensuring(us => {
+    UtxoState.fromBoxHolder(bh, stateDir, indexDir, nodeViewHolderRef).ensuring(us => {
       log.debug(s"Expected afterGenesisDigest: $afterGenesisStateDigestHex")
       log.debug(s"Actual afterGenesisDigest:   ${Base58.encode(us.rootHash)}")
       log.info(s"Generated UTXO state with ${bh.boxes.size} boxes inside.")
@@ -94,15 +96,18 @@ object EncryState extends ScorexLogging{
 
   // TODO:
   def readOrGenerate(settings: EncryAppSettings, nodeViewHolderRef: Option[ActorRef]): Option[EncryState[_]] = {
-    val dir = stateDir(settings)
-    dir.mkdirs()
+    val stDir = stateDir(settings)
+    stDir.mkdirs()
 
-    if (dir.listFiles().isEmpty) {
+    val idxDir = indexDir(settings)
+    idxDir.mkdirs()
+
+    if (stDir.listFiles().isEmpty) {
       None
     } else {
       //todo: considering db state
-      if (settings.nodeSettings.ADState) DigestState.create(None, None, dir, settings.nodeSettings).toOption
-      else Some(UtxoState.create(dir, nodeViewHolderRef))
+      if (settings.nodeSettings.ADState) DigestState.create(None, None, stDir, settings.nodeSettings).toOption
+      else Some(UtxoState.create(stDir, idxDir, nodeViewHolderRef))
     }
   }
 }

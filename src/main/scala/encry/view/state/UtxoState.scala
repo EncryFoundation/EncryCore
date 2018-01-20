@@ -15,7 +15,7 @@ import encry.settings.{Algos, Constants}
 import encry.view.state.index.StateIndexReader
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.LocalInterface.LocallyGeneratedModifier
-import scorex.core.VersionTag
+import scorex.core.{ModifierId, VersionTag}
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.avltree.batch._
@@ -42,7 +42,7 @@ class UtxoState(override val version: VersionTag,
 
   // TODO: Make sure all errors are being caught properly.
   private[state] def applyTransactions(txs: Seq[EncryBaseTransaction],
-                                       expectedDigest: ADDigest): Try[Unit] = Try {
+                                       expectedDigest: ADDigest, modId: ModifierId): Try[Unit] = Try {
 
     def rollback(): Try[Unit] = persistentProver.rollback(rootHash)
       .ensuring(persistentProver.digest.sameElements(rootHash))
@@ -76,7 +76,7 @@ class UtxoState(override val version: VersionTag,
           accountOpsMap.get(Address @@ tx.senderProposition.address) match {
             case Some(t) =>
               if (t._2.exists(_.sameElements(id))) t._2.remove(id)
-              t._1.add(id)
+              else t._1.add(id)
             case None =>
               accountOpsMap.update(
                 Address @@ tx.senderProposition.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
@@ -89,12 +89,17 @@ class UtxoState(override val version: VersionTag,
               case None => accountOpsMap.update(
                 bx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
             }
-          case bx: OpenBox => None  // TODO:
+          case bx: OpenBox =>
+            if (tx.isInstanceOf[CoinbaseTransaction]) {
+              accountOpsMap.get(Address @@ tx.senderProposition.address) match {
+                case Some(t) => t._2.add(bx.id)
+                case None => accountOpsMap.update(
+                  Address @@ tx.senderProposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
+              }
+            }
         }
       }
-      accountOpsMap.foreach { case (addr, (toRem, toIns)) =>
-        updateIndexFor(addr, toRem.toSeq, toIns.toSeq)
-      }
+      updateIndexBulk(modId, accountOpsMap)
     }
 
     // Checks whether the outcoming result is the same as expected.
@@ -109,7 +114,7 @@ class UtxoState(override val version: VersionTag,
       log.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)}")
 
-      applyTransactions(block.payload.transactions, block.header.stateRoot).map { _: Unit =>
+      applyTransactions(block.payload.transactions, block.header.stateRoot, block.id).map { _: Unit =>
         val md = metadata(VersionTag @@ block.id, block.header.stateRoot)
         val proofBytes = persistentProver.generateProofAndUpdateStorage(md)
         val proofHash = ADProofs.proofDigest(proofBytes)
@@ -286,9 +291,9 @@ object UtxoState extends ScorexLogging {
 
   private lazy val bestVersionKey = Algos.hash("best_state_version")
 
-  def create(dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val stateStore = new LSMStore(dir, keepVersions = Constants.keepVersions)
-    val indexStore = new LSMStore(dir,
+  def create(stateDir: File, indexDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
+    val stateStore = new LSMStore(stateDir, keepVersions = Constants.keepVersions)
+    val indexStore = new LSMStore(indexDir,
       keySize = PublicKey25519Proposition.AddressLength, keepVersions = Constants.keepVersions)
     val dbVersion = stateStore.get(ByteArrayWrapper(bestVersionKey)).map( _.data)
     new UtxoState(VersionTag @@ dbVersion.getOrElse(EncryState.genesisStateVersion), stateStore, indexStore, nodeViewHolderRef)
@@ -302,12 +307,13 @@ object UtxoState extends ScorexLogging {
     Seq(idStateDigestIdxElem, stateDigestIdIdxElem, bestVersion)
   }
 
-  def fromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
+  def fromBoxHolder(bh: BoxHolder, stateDir: File,
+                    indexDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
     val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
-    val stateStore = new LSMStore(dir, keepVersions = Constants.keepVersions)
-    val indexStore = new LSMStore(dir,
+    val stateStore = new LSMStore(stateDir, keepVersions = Constants.keepVersions)
+    val indexStore = new LSMStore(indexDir,
       keySize = PublicKey25519Proposition.AddressLength, keepVersions = Constants.keepVersions)
 
     log.info(s"Generating UTXO State from BH with ${bh.boxes.size} boxes")

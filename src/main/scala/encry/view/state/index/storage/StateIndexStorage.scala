@@ -13,7 +13,7 @@ class StateIndexStorage(val db: Store) extends ScorexLogging with AutoCloseable 
   def boxesByAddress(addr: Address): Option[Seq[ADKey]] =
     db.get(ByteArrayWrapper(AddressProposition.getAddrBytes(addr))).flatMap { bytes =>
       Some(bytes.data.sliding(EncryBox.BoxIdSize).map(ADKey @@ _).toSeq)
-        .ensuring(_.forall(_.size == EncryBox.BoxIdSize))
+        .ensuring(_.forall(_.forall(i => i.length == EncryBox.BoxIdSize)))
     }
 
   def contains(id: ModifierId): Boolean = db.get(ByteArrayWrapper(id)).isDefined

@@ -6,10 +6,11 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
-import encry.modifiers.mempool.{EncryBaseTransaction, CoinbaseTransactionSerializer}
+import encry.modifiers.mempool.{CoinbaseTransactionSerializer, EncryBaseTransaction}
 import encry.settings.EncryAppSettings
 import encry.view.history.{EncryHistory, EncrySyncInfo}
 import encry.view.mempool.EncryMempool
+import encry.view.state.EncryState.indexDir
 import encry.view.state.{DigestState, EncryState, UtxoState}
 import encry.view.wallet.EncryWallet
 import scorex.core.serialization.Serializer
@@ -49,14 +50,18 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     * Hard-coded initial view all the honest nodes in a network are making progress from.
     */
   override protected def genesisState: (EncryHistory, MS, EncryWallet, EncryMempool) = {
-    val dir = EncryState.stateDir(settings)
-    dir.mkdir()
-    assert(dir.listFiles().isEmpty, s"Genesis directory $dir should always be empty")
+    val stateDir = EncryState.stateDir(settings)
+    stateDir.mkdir()
+
+    val idxDir = EncryState.indexDir(settings)
+    idxDir.mkdirs()
+
+    assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
 
     val state = {
-      if (settings.nodeSettings.ADState) EncryState.generateGenesisDigestState(dir, settings.nodeSettings)
+      if (settings.nodeSettings.ADState) EncryState.generateGenesisDigestState(stateDir, settings.nodeSettings)
 //      else if (settings.testingSettings.transactionGeneration) EncryState.genTestingUtxoState(dir, Some(self))._1
-      else EncryState.genGenesisUtxoState(dir, Some(self))._1
+      else EncryState.genGenesisUtxoState(stateDir, idxDir, Some(self))._1
     }.asInstanceOf[MS]
 
     //todo: ensure that history is in certain mode
