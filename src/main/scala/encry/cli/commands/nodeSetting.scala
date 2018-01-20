@@ -1,4 +1,4 @@
-package encry.cli.commandObjects
+package encry.cli.commands
 
 import scala.util.Try
 

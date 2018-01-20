@@ -99,7 +99,7 @@ class UtxoState(override val version: VersionTag,
             }
         }
       }
-      updateIndexBulk(modId, accountOpsMap)
+      bulkUpdateIndex(modId, accountOpsMap)
     }
 
     // Checks whether the outcoming result is the same as expected.

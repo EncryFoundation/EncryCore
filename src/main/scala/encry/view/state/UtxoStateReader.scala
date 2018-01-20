@@ -1,16 +1,17 @@
 package encry.view.state
 
+import encry.crypto.Address
 import encry.modifiers.state.box._
 import encry.view.history.Height
+import encry.view.state.index.{Portfolio, StateIndexReader}
 import io.iohk.iodb.Store
-import scorex.core.transaction.box.Box
-import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
 import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
+import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
-trait UtxoStateReader extends ScorexLogging {
+trait UtxoStateReader extends StateIndexReader with ScorexLogging {
 
   implicit val hf: Blake2b256Unsafe = new Blake2b256Unsafe
 
@@ -26,19 +27,44 @@ trait UtxoStateReader extends ScorexLogging {
         keyLength = EncryBox.BoxIdSize, valueLengthOpt = None),
       storage).get
 
-  def typedBoxById(boxId: ADKey): Option[EncryBaseBox] = {
+  def boxById(boxId: ADKey): Option[EncryBaseBox] =
     boxId.head match {
       case OpenBox.typeId => persistentProver.unauthenticatedLookup(boxId)
         .map(OpenBoxSerializer.parseBytes).flatMap(_.toOption)
       case AssetBox.typeId => persistentProver.unauthenticatedLookup(boxId)
         .map(AssetBoxSerializer.parseBytes).flatMap(_.toOption)
     }
-  }
+
+  def typedBoxById[BXT <: EncryBaseBox](boxId: ADKey): Option[EncryBaseBox] =
+    boxById(boxId) match {
+      case Some(bx) => if (bx.isInstanceOf[BXT]) Some(bx) else None
+      case _ => None
+    }
 
   def getOpenBoxesAtHeight(height: Height): IndexedSeq[CoinbaseBox] = ???
 
-  def boxesOf(proposition: Proposition): Seq[Box[proposition.type]] = ???
-
   def randomBox(): Option[EncryBaseBox] =
-    persistentProver.avlProver.randomWalk().map(_._1).flatMap(typedBoxById)
+    persistentProver.avlProver.randomWalk().map(_._1).flatMap(boxById)
+
+  // TODO: Take into account the case when State does not contain any boxes of address.
+  def boxesByAddress(address: Address): Option[Seq[EncryBaseBox]] =
+    boxesIdsByAddress(address) match {
+      case Some(bxIds) =>
+        Some(bxIds.foldLeft(Seq[EncryBaseBox]()) { case (buff, id) =>
+          boxById(id) match {
+            case Some(bx) => buff :+ bx
+            case None =>
+              log.warn(s"Box: ${Base58.encode(id)} exists in index, but was not found in state.")
+              buff
+          }
+      })
+      case _ => None
+    }
+
+  def portfolioByAddress(address: Address): Option[Portfolio] =
+    boxesByAddress(address) match {
+      case Some(bxs) =>
+        Some(Portfolio(address, Balance @@ bxs.filter(_.isInstanceOf[AssetBox]).map(_.value).sum, Some(bxs)))
+      case _ => None
+    }
 }

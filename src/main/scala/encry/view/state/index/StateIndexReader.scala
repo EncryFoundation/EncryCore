@@ -1,6 +1,5 @@
 package encry.view.state.index
 
-import com.google.common.primitives.Bytes
 import encry.crypto.Address
 import encry.modifiers.state.box.proposition.AddressProposition
 import encry.settings.Algos
@@ -9,7 +8,6 @@ import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.core.ModifierId
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
-import scorex.crypto.encode.Base58
 import scorex.utils.Random
 
 import scala.collection.mutable
@@ -48,19 +46,20 @@ trait StateIndexReader extends ScorexLogging {
     }
   }
 
-  def updateIndexBulk(version: ModifierId,
+  def bulkUpdateIndex(version: ModifierId,
                       opsMap: mutable.HashMap[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]): Unit = {
     val opsFinal = opsMap
-      .foldLeft(Seq[(Address, Seq[ADKey])](), Seq[(Address, Seq[ADKey])]()) { case ((bNew, bExs), (addr, (toRem, toIns))) =>
-      val bxsOpt = indexStorage.boxesByAddress(addr)
-      bxsOpt match {
-        case Some(bxs) =>
-          bNew -> (bExs :+ (addr, bxs.filterNot(toRem.contains) ++ toIns.toSeq))
-        case None =>
-          (bNew :+ (addr, toIns.toSeq)) -> bExs
+      .foldLeft(Seq[(Address, Seq[ADKey])](), Seq[(Address, Seq[ADKey])]()) {
+        case ((bNew, bExs), (addr, (toRem, toIns))) =>
+          val bxsOpt = indexStorage.boxesByAddress(addr)
+          bxsOpt match {
+            case Some(bxs) =>
+              bNew -> (bExs :+ (addr, bxs.filterNot(toRem.contains) ++ toIns.toSeq))
+            case None =>
+              (bNew :+ (addr, toIns.toSeq)) -> bExs
+          }
       }
-    }
-    // First remove existing records assoc with particular address.
+    // First remove existing records assoc with addresses to be updated.
     indexStorage.update(
       ModifierId @@ Algos.hash(version),
       opsFinal._2.map(i => ByteArrayWrapper(AddressProposition.getAddrBytes(i._1))),

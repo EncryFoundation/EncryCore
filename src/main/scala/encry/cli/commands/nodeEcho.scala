@@ -1,5 +1,4 @@
-package encry.cli.commandObjects
-import akka.actor.ActorRef
+package encry.cli.commands
 
 import scala.util.Try
 
