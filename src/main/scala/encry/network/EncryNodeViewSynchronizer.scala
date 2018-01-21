@@ -14,6 +14,7 @@ import scorex.core.network.message.Message
 import scorex.core.network.{NodeViewSynchronizer, SendToRandom}
 import scorex.core.settings.NetworkSettings
 import scorex.core.transaction.box.proposition.Proposition
+import scorex.core.utils.NetworkTimeProvider
 import scorex.core.{ModifierId, ModifierTypeId, NodeViewHolder}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -23,15 +24,17 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
                                 viewHolderRef: ActorRef,
                                 localInterfaceRef: ActorRef,
                                 syncInfoSpec: EncrySyncInfoMessageSpec.type,
-                                networkSettings: NetworkSettings)
+                                networkSettings: NetworkSettings,
+                                timeProvider: NetworkTimeProvider)
   extends NodeViewSynchronizer[Proposition, EncryBaseTransaction,
     EncrySyncInfo, EncrySyncInfoMessageSpec.type, EncryPersistentModifier, EncryHistory,
     EncryMempool](networkControllerRef, viewHolderRef, localInterfaceRef,
-    syncInfoSpec, networkSettings) {
+    syncInfoSpec, networkSettings, timeProvider) {
 
   import EncryNodeViewSynchronizer._
 
-  override protected val deliveryTracker = new EncryDeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self)
+  override protected val deliveryTracker =
+    new EncryDeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self, timeProvider)
 
   private val toDownloadCheckInterval = 3.seconds
 
@@ -56,7 +59,7 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
 
   protected val onSemanticallySuccessfulModifier: Receive = {
     case SemanticallySuccessfulModifier(_: EncryBlock) =>
-    //Do nothing, other nodes will request required modifiers via ProgressInfo.toDownload
+    // Do nothing, other nodes will request required modifiers via ProgressInfo.toDownload
     case SemanticallySuccessfulModifier(mod) =>
       broadcastModifierInv(mod)
   }
@@ -75,7 +78,6 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
       deliveryTracker.downloadRetry().foreach(i => requestDownload(i._2.tp, i._1))
 
   }
-
 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
     val msg = Message(requestModifierSpec, Right(modifierTypeId -> Seq(modifierId)), None)

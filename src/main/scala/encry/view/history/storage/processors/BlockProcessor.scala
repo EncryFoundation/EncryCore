@@ -54,9 +54,9 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
       .map(c => header +: c)
       .maxBy(c => scoreOf(c.last.id))
 
-    val newBestAfterThis = bestFullChain.last
+    val bestChainNew = bestFullChain.last
 
-    (bestFullBlockOpt, bestFullBlockIdOpt.flatMap(scoreOf), scoreOf(newBestAfterThis.id)) match {
+    (bestFullBlockOpt, bestFullBlockIdOpt.flatMap(scoreOf), scoreOf(bestChainNew.id)) match {
       case (None, _, _) if nodeSettings.blocksToKeep < 0 && header.isGenesis =>
         log.info(s"Initialize full block chain with genesis header ${header.encodedId} with transactions and proofs")
         updateStorage(newModRow, storageVersion, fullBlock, fullBlock.header.id)
@@ -64,24 +64,24 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
         log.info(s"Initialize full block chain with new best header ${header.encodedId} with transactions and proofs")
         updateStorage(newModRow, storageVersion, fullBlock, fullBlock.header.id)
       case (Some(prevBest), _, Some(score)) if header.parentId sameElements prevBest.header.id =>
-        log.info(s"New best full block with header ${newBestAfterThis.encodedId}. " +
-          s"Height = ${newBestAfterThis.height}, score = $score")
+        log.info(s"New best full block with header ${bestChainNew.encodedId}. " +
+          s"Height = ${bestChainNew.height}, score = $score")
         if (nodeSettings.blocksToKeep >= 0) pruneOnNewBestBlock(header)
-        updateStorage(newModRow, storageVersion, fullBlock, newBestAfterThis.id)
+        updateStorage(newModRow, storageVersion, fullBlock, bestChainNew.id)
 
       case (Some(prevBest), Some(prevBestScore), Some(score)) if score > prevBestScore =>
         //TODO currentScore == prevBestScore
-        log.info(s"Process fork for new best full block with header ${newBestAfterThis.encodedId}. " +
-          s"Height = ${newBestAfterThis.height}, score = $score")
-        updateStorage(newModRow, storageVersion, fullBlock, newBestAfterThis.id)
+        log.info(s"Process fork for new best full block with header ${bestChainNew.encodedId}. " +
+          s"Height = ${bestChainNew.height}, score = $score")
+        updateStorage(newModRow, storageVersion, fullBlock, bestChainNew.id)
         val (prevChain, newChain) = commonBlockThenSuffixes(prevBest.header, header)
 
         //todo: is flatMap in next two lines safe?
         val toRemove: Seq[EncryBlock] = prevChain.tail.headers.flatMap(getFullBlock)
           .ensuring(_.nonEmpty, s"Should always have blocks to remove. Current = $header, prevBest = $prevBest")
         if (nodeSettings.blocksToKeep >= 0) {
-          val bestHeight: Int = newBestAfterThis.height
-          val diff = newBestAfterThis.height - prevBest.header.height
+          val bestHeight: Int = bestChainNew.height
+          val diff = bestChainNew.height - prevBest.header.height
           val lastKept = bestHeight - nodeSettings.blocksToKeep
           pruneBlockDataAt(((lastKept - diff) until lastKept).filter(_ >= 0))
         }

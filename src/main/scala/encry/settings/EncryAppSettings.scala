@@ -13,7 +13,7 @@ case class EncryAppSettings(directory: String,
                             chainSettings: ChainSettings,
                             testingSettings: TestingSettings,
                             nodeSettings: NodeSettings,
-                            walletSettings : WalletSettings,
+                            walletSettings: WalletSettings,
                             scorexSettings: ScorexSettings)
 
 object EncryAppSettings extends ScorexLogging with SettingsReaders {

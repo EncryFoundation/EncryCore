@@ -3,11 +3,11 @@ import sbt._
 
 name := "Encry"
 
-version := "0.1"
+version := "0.1.9"
 
 scalaVersion := "2.12.4"
 
-val scorexVersion = "2.0.0-RC3-358-ga397c61-SNAPSHOT"
+val scorexVersion = "cf146d15-SNAPSHOT"
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
   "SonaType" at "https://oss.sonatype.org/content/groups/public",
@@ -41,6 +41,7 @@ val testingDependencies = Seq(
   "org.scalactic" %% "scalactic" % "3.0.3" % "test",
   "org.scalatest" %% "scalatest" % "3.0.3" % "test",
   "org.scalacheck" %% "scalacheck" % "1.13.+" % "test",
+  "org.scorexfoundation" %% "scorex-testkit" % scorexVersion % "test",
   "net.databinder.dispatch" %% "dispatch-core" % "+" % "test"
 )
 

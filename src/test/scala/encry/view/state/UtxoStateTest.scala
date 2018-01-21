@@ -49,7 +49,7 @@ class UtxoStateTest extends org.scalatest.FunSuite {
     val validTxs = keys.map { key =>
       val proposition = key.publicImage
       val fee = factory.Props.txFee
-      val timestamp = NetworkTime.time()
+      val timestamp = 1234567L
       val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
       val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
       val sig = PrivateKey25519Companion.sign(
@@ -62,7 +62,7 @@ class UtxoStateTest extends org.scalatest.FunSuite {
     val invalidTxs = keys.map { key =>
       val proposition = key.publicImage
       val fee = factory.Props.txFee
-      val timestamp = NetworkTime.time()
+      val timestamp = 123456789L
       val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp")).map(_.id)
       val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, 30000L))
       val sig = PrivateKey25519Companion.sign(

@@ -8,15 +8,13 @@ import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.core.ModifierId
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
-import scorex.utils.Random
+import scorex.crypto.encode.Base58
 
 import scala.collection.mutable
 
 trait StateIndexReader extends ScorexLogging {
 
   val indexStore: Store
-
-  protected val indexVersion: ModifierId = ModifierId @@ Random.randomBytes()
 
   protected lazy val indexStorage = new StateIndexStorage(indexStore)
 
@@ -59,6 +57,7 @@ trait StateIndexReader extends ScorexLogging {
               (bNew :+ (addr, toIns.toSeq)) -> bExs
           }
       }
+    log.info(s"Updating index for mod: ${Base58.encode(version)}")
     // First remove existing records assoc with addresses to be updated.
     indexStorage.update(
       ModifierId @@ Algos.hash(version),

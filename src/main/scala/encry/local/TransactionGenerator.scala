@@ -13,13 +13,13 @@ import scorex.core.LocalInterface.LocallyGeneratedTransaction
 import scorex.core.NodeViewHolder.GetDataFromCurrentView
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.{PrivateKey25519, PrivateKey25519Companion}
-import scorex.core.utils.{NetworkTime, ScorexLogging}
+import scorex.core.utils.{NetworkTime, NetworkTimeProvider, ScorexLogging}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Random
 
-class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings)
+class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings, timeProvider: NetworkTimeProvider)
   extends Actor with ScorexLogging {
 
   var txGenerator: Cancellable = _
@@ -56,7 +56,7 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings)
           keysSlice.map { key =>
             val proposition = key.publicImage
             val fee = factory.Props.txFee
-            val timestamp = NetworkTime.time()
+            val timestamp = timeProvider.time()
             val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
             val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
             val sig = PrivateKey25519Companion.sign(

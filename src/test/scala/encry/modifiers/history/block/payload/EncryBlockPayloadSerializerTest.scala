@@ -19,7 +19,7 @@ class EncryBlockPayloadSerializerTest extends FunSuite {
     val txs = keys.map { key =>
       val proposition = key.publicImage
       val fee = factory.Props.txFee
-      val timestamp = NetworkTime.time()
+      val timestamp = 12335467L
       val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
       val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
       val sig = PrivateKey25519Companion.sign(
@@ -28,8 +28,6 @@ class EncryBlockPayloadSerializerTest extends FunSuite {
       )
       PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
     }
-
-    val txsSer: Array[Byte] = txs.flatMap(tx => tx.serializer.toBytes(tx)).toArray
 
     val blockPayload = new EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), txs)
 
@@ -43,6 +41,4 @@ class EncryBlockPayloadSerializerTest extends FunSuite {
 
     assert(txs.size == blockPayloadDeserialized.get.transactions.size, "Transactions quantity mismatch.")
   }
-
-
 }

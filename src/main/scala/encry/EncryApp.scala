@@ -43,13 +43,13 @@ class EncryApp(args: Seq[String]) extends Application {
 
   override val nodeViewHolderRef: ActorRef = EncryNodeViewHolder.createActor(actorSystem, encrySettings)
 
-  val minerRef: ActorRef = actorSystem.actorOf(Props(classOf[EncryMiner], nodeViewHolderRef, encrySettings, nodeId))
+  val minerRef: ActorRef =
+    actorSystem.actorOf(Props(classOf[EncryMiner], nodeViewHolderRef, encrySettings, nodeId, timeProvider))
 
   val cliListenerRef : ActorRef = actorSystem.actorOf(Props(classOf[CliListener], nodeViewHolderRef))
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
 
-  // TODO: Implement.
   override val apiRoutes: Seq[ApiRoute] = Seq(
     UtilsApiRoute(settings.restApi),
     PeersApiRoute(peerManagerRef, networkController, settings.restApi),
@@ -65,14 +65,15 @@ class EncryApp(args: Seq[String]) extends Application {
 
   override val nodeViewSynchronizer: ActorRef = actorSystem.actorOf(
     Props(new EncryNodeViewSynchronizer(
-      networkController, nodeViewHolderRef, localInterface, EncrySyncInfoMessageSpec, settings.network)))
+      networkController, nodeViewHolderRef, localInterface, EncrySyncInfoMessageSpec, settings.network, timeProvider)))
 
   if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) {
     minerRef ! StartMining
   }
 
   if (encrySettings.testingSettings.transactionGeneration) {
-    val txGen = actorSystem.actorOf(Props(classOf[TransactionGenerator], nodeViewHolderRef, encrySettings.testingSettings))
+    val txGen = actorSystem.actorOf(
+      Props(classOf[TransactionGenerator], nodeViewHolderRef, encrySettings.testingSettings, timeProvider))
     txGen ! StartGeneration
   }
 

@@ -18,16 +18,16 @@ import scorex.core.LocalInterface.LocallyGeneratedModifier
 import scorex.core.NodeViewHolder
 import scorex.core.NodeViewHolder.{GetDataFromCurrentView, SemanticallySuccessfulModifier, Subscribe}
 import scorex.core.transaction.state.{PrivateKey25519, PrivateKey25519Companion}
-import scorex.core.utils.{NetworkTime, ScorexLogging}
-import scorex.crypto.encode.{Base16, Base58}
+import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
+import scorex.crypto.encode.Base16
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Try}
 
-class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings, nodeId: Array[Byte])
-  extends Actor with ScorexLogging {
+class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings,
+                 nodeId: Array[Byte], timeProvider: NetworkTimeProvider) extends Actor with ScorexLogging {
 
   import EncryMiner._
 
@@ -35,7 +35,7 @@ class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings, nodeId: Ar
 
 //  private var cancellableOpt: Option[Cancellable] = None
   private var isMining = false
-  private val startTime = NetworkTime.time()
+  private val startTime = timeProvider.time()
   private var nonce = 0
   private var candidateOpt: Option[PowCandidateBlock] = None
 
@@ -50,7 +50,7 @@ class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings, nodeId: Ar
         mod match {
           case block: EncryBlock =>
             if (!candidateOpt.flatMap(_.parentOpt).exists(_.id sameElements block.header.id))
-              prepareCandidate(viewHolderRef, settings, nodeId)
+              prepareCandidate(viewHolderRef, settings, nodeId, timeProvider)
 
           case _ =>
         }
@@ -74,7 +74,7 @@ class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings, nodeId: Ar
       isMining = false
 
     case PrepareCandidate =>
-      val cOpt = prepareCandidate(viewHolderRef, settings, nodeId)
+      val cOpt = prepareCandidate(viewHolderRef, settings, nodeId, timeProvider)
       cOpt onComplete(opt => candidateOpt = opt.get)
 
     case MineBlock =>
@@ -126,7 +126,7 @@ object EncryMiner extends ScorexLogging {
   }
 
   def prepareCandidate(viewHolderRef: ActorRef, settings: EncryAppSettings,
-                       nodeId: Array[Byte]): Future[Option[PowCandidateBlock]] = {
+                       nodeId: Array[Byte], timeProvider: NetworkTimeProvider): Future[Option[PowCandidateBlock]] = {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
     (viewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[PowCandidateBlock]] { view =>
@@ -142,7 +142,7 @@ object EncryMiner extends ScorexLogging {
 
         if ((bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) && !view.pool.isEmpty) Try {
 
-          val timestamp = NetworkTime.time()
+          val timestamp = timeProvider.time()
 
           var txs = view.state.filterValid(view.pool.takeAllUnordered.toSeq)
             .foldLeft(Seq[EncryBaseTransaction]()) { case (txsBuff, tx) =>

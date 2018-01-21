@@ -46,18 +46,18 @@ trait UtxoStateReader extends StateIndexReader with ScorexLogging {
   def randomBox(): Option[EncryBaseBox] =
     persistentProver.avlProver.randomWalk().map(_._1).flatMap(boxById)
 
-  // TODO: Take into account the case when State does not contain any boxes of address.
   def boxesByAddress(address: Address): Option[Seq[EncryBaseBox]] =
     boxesIdsByAddress(address) match {
       case Some(bxIds) =>
-        Some(bxIds.foldLeft(Seq[EncryBaseBox]()) { case (buff, id) =>
+        val bxs = bxIds.foldLeft(Seq[EncryBaseBox]()) { case (buff, id) =>
           boxById(id) match {
             case Some(bx) => buff :+ bx
             case None =>
               log.warn(s"Box: ${Base58.encode(id)} exists in index, but was not found in state.")
               buff
           }
-      })
+        }
+        if (bxs.nonEmpty) Some(bxs) else None
       case _ => None
     }
 

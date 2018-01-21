@@ -18,7 +18,7 @@ class PaymentTransactionSerializerTest extends FunSuite {
     val tx = {
       val proposition = key.publicImage
       val fee = factory.Props.txFee
-      val timestamp = NetworkTime.time()
+      val timestamp = 1234567L
       val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
       val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
       val sig = PrivateKey25519Companion.sign(

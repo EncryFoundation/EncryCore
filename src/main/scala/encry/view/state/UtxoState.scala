@@ -20,6 +20,7 @@ import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
+import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
 import scala.collection.mutable
@@ -110,6 +111,7 @@ class UtxoState(override val version: VersionTag,
 
   // State transition function `APPLY(S,TX) -> S'`.
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
+
     case block: EncryBlock =>
       log.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)}")
