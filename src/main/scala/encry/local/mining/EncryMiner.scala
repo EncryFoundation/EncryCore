@@ -33,7 +33,6 @@ class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings,
 
   private val consensus = new PowConsensus(settings.chainSettings)
 
-//  private var cancellableOpt: Option[Cancellable] = None
   private var isMining = false
   private val startTime = timeProvider.time()
   private var nonce = 0

@@ -19,7 +19,8 @@ import scorex.core.transaction.box.proposition.Proposition
 
 import scala.util.{Failure, Success}
 
-abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings)
+abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings,
+                                                                       indexUpdaterRef: Option[ActorRef])
   extends NodeViewHolder[Proposition, EncryBaseTransaction, EncryPersistentModifier] {
 
   // TODO: `settings.scorexSettings.network.networkChunkSize` should be used here.
@@ -61,7 +62,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     val state = {
       if (settings.nodeSettings.ADState) EncryState.generateGenesisDigestState(stateDir, settings.nodeSettings)
 //      else if (settings.testingSettings.transactionGeneration) EncryState.genTestingUtxoState(dir, Some(self))._1
-      else EncryState.genGenesisUtxoState(stateDir, idxDir, Some(self))._1
+      else EncryState.genGenesisUtxoState(stateDir, idxDir, Some(self), indexUpdaterRef)._1
     }.asInstanceOf[MS]
 
     //todo: ensure that history is in certain mode
@@ -79,7 +80,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     * (e.g. if it is a first launch of a node) None is to be returned
     */
   override def restoreState: Option[NodeView] = {
-    EncryState.readOrGenerate(settings, Some(self)).map { stateIn =>
+    EncryState.readOrGenerate(settings, Some(self), indexUpdaterRef).map { stateIn =>
       //todo: ensure that history is in certain mode
       val history = EncryHistory.readOrGenerate(settings)
       val wallet = EncryWallet.readOrGenerate(settings)
@@ -111,14 +112,14 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
 }
 
 private[view] class DigestEncryNodeViewHolder(settings: EncryAppSettings)
-  extends EncryNodeViewHolder[DigestState](settings)
+  extends EncryNodeViewHolder[DigestState](settings, None)
 
-private[view] class UtxoEncryNodeViewHolder(settings: EncryAppSettings)
-  extends EncryNodeViewHolder[UtxoState](settings)
+private[view] class UtxoEncryNodeViewHolder(settings: EncryAppSettings, indexUpdaterRef: Option[ActorRef])
+  extends EncryNodeViewHolder[UtxoState](settings, indexUpdaterRef: Option[ActorRef])
 
 object EncryNodeViewHolder {
-  def createActor(system: ActorSystem, settings: EncryAppSettings): ActorRef = {
+  def createActor(system: ActorSystem, settings: EncryAppSettings, indexUpdaterRef: Option[ActorRef]): ActorRef = {
     if (settings.nodeSettings.ADState) system.actorOf(Props.create(classOf[DigestEncryNodeViewHolder], settings))
-    else system.actorOf(Props.create(classOf[UtxoEncryNodeViewHolder], settings))
+    else system.actorOf(Props.create(classOf[UtxoEncryNodeViewHolder], settings, indexUpdaterRef))
   }
 }

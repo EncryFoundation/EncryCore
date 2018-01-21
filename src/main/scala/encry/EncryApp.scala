@@ -14,6 +14,7 @@ import encry.network.EncryNodeViewSynchronizer
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.EncryNodeViewHolder
 import encry.view.history.EncrySyncInfoMessageSpec
+import encry.view.state.index.StateIndexUpdater
 import scorex.core.api.http.{ApiRoute, PeersApiRoute, UtilsApiRoute}
 import scorex.core.app.Application
 import scorex.core.network.message.MessageSpec
@@ -41,12 +42,15 @@ class EncryApp(args: Seq[String]) extends Application {
 
   override protected lazy val additionalMessageSpecs: Seq[MessageSpec[_]] = Seq(EncrySyncInfoMessageSpec)
 
-  override val nodeViewHolderRef: ActorRef = EncryNodeViewHolder.createActor(actorSystem, encrySettings)
+  val indexUpdaterRef: ActorRef = actorSystem.actorOf(Props(classOf[StateIndexUpdater], encrySettings))
+
+  override val nodeViewHolderRef: ActorRef =
+    EncryNodeViewHolder.createActor(actorSystem, encrySettings, Some(indexUpdaterRef))
 
   val minerRef: ActorRef =
     actorSystem.actorOf(Props(classOf[EncryMiner], nodeViewHolderRef, encrySettings, nodeId, timeProvider))
 
-  val cliListenerRef : ActorRef = actorSystem.actorOf(Props(classOf[CliListener], nodeViewHolderRef))
+  val cliListenerRef: ActorRef = actorSystem.actorOf(Props(classOf[CliListener], nodeViewHolderRef))
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
 

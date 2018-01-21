@@ -29,7 +29,8 @@ import scala.util.{Failure, Success, Try}
 class UtxoState(override val version: VersionTag,
                 override val stateStore: Store,
                 override val indexStore: Store,
-                nodeViewHolderRef: Option[ActorRef])
+                nodeViewHolderRef: Option[ActorRef],
+                override val indexUpdaterRef: Option[ActorRef])
   extends EncryState[UtxoState] with UtxoStateReader with StateIndexReader with TransactionValidator {
 
   import UtxoState.metadata
@@ -50,57 +51,20 @@ class UtxoState(override val version: VersionTag,
 
     var appliedModCounter: Int = 0
 
-    // TODO: Make sure all errors inside are being caught properly.
-    val txsApplyTry: Try[Unit] = Try {
-      txs.foreach { tx =>
-        // Carries out an exhaustive txs validation and then tries to apply it.
-        if (validate(tx).isSuccess) {
-          getStateChanges(tx).operations.map(ADProofs.toModification)
-            .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
-            t.flatMap { _ =>
-              appliedModCounter += 1
-              persistentProver.performOneOperation(m)
-            }
+    txs.foreach { tx =>
+      // Carries out an exhaustive txs validation and then tries to apply it.
+      if (validate(tx).isSuccess) {
+        getStateChanges(tx).operations.map(ADProofs.toModification)
+          .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
+          t.flatMap { _ =>
+            appliedModCounter += 1
+            persistentProver.performOneOperation(m)
           }
-        } else {
-          if (appliedModCounter > 0) rollback()
-          throw new Error(s"Error while applying modifier $tx.")
         }
+      } else {
+        if (appliedModCounter > 0) rollback()
+        throw new Error(s"Error while applying modifier $tx.")
       }
-    }
-
-    // TODO: Test.
-    if (txsApplyTry.isSuccess) {
-      val accountOpsMap = mutable.HashMap.empty[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]
-      txs.foreach { tx =>
-        tx.useBoxes.foreach { id =>
-          accountOpsMap.get(Address @@ tx.senderProposition.address) match {
-            case Some(t) =>
-              if (t._2.exists(_.sameElements(id))) t._2.remove(id)
-              else t._1.add(id)
-            case None =>
-              accountOpsMap.update(
-                Address @@ tx.senderProposition.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
-            }
-          }
-        tx.newBoxes.foreach {
-          case bx: AssetBox =>
-            accountOpsMap.get(bx.proposition.address) match {
-              case Some(t) => t._2.add(bx.id)
-              case None => accountOpsMap.update(
-                bx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
-            }
-          case bx: OpenBox =>
-            if (tx.isInstanceOf[CoinbaseTransaction]) {
-              accountOpsMap.get(Address @@ tx.senderProposition.address) match {
-                case Some(t) => t._2.add(bx.id)
-                case None => accountOpsMap.update(
-                  Address @@ tx.senderProposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
-              }
-            }
-        }
-      }
-      bulkUpdateIndex(modId, accountOpsMap)
     }
 
     // Checks whether the outcoming result is the same as expected.
@@ -134,7 +98,10 @@ class UtxoState(override val version: VersionTag,
         else if (!(block.header.stateRoot sameElements persistentProver.digest))
           throw new Error("Calculated stateRoot is not equal to the declared one.")
 
-        new UtxoState(VersionTag @@ block.id, stateStore, indexStore, nodeViewHolderRef)
+        // Update state index.
+        if (indexUpdaterRef.isDefined) indexUpdaterRef.get ! block
+
+        new UtxoState(VersionTag @@ block.id, stateStore, indexStore, nodeViewHolderRef, indexUpdaterRef)
       }.recoverWith[UtxoState] { case e =>
         log.warn(s"Error while applying block with header ${block.header.encodedId} to UTXOState with root" +
           s" ${Algos.encode(rootHash)}: ", e)
@@ -142,7 +109,7 @@ class UtxoState(override val version: VersionTag,
       }
 
     case header: EncryBlockHeader =>
-      Success(new UtxoState(VersionTag @@ header.id, stateStore, indexStore, nodeViewHolderRef))
+      Success(new UtxoState(VersionTag @@ header.id, stateStore, indexStore, nodeViewHolderRef, indexUpdaterRef))
 
     case _ => Failure(new Error("Got Modifier of unknown type."))
   }
@@ -187,7 +154,7 @@ class UtxoState(override val version: VersionTag,
     stateStore.get(ByteArrayWrapper(version)) match {
       case Some(hash) =>
         val rollbackResult = prover.rollback(ADDigest @@ hash.data).map { _ =>
-          new UtxoState(version, stateStore, indexStore, nodeViewHolderRef) {
+          new UtxoState(version, stateStore, indexStore, nodeViewHolderRef, indexUpdaterRef) {
             override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] = prover
           }
         }
@@ -293,12 +260,14 @@ object UtxoState extends ScorexLogging {
 
   private lazy val bestVersionKey = Algos.hash("best_state_version")
 
-  def create(stateDir: File, indexDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
+  def create(stateDir: File, indexDir: File,
+             nodeViewHolderRef: Option[ActorRef], indexUpdaterRef: Option[ActorRef]): UtxoState = {
     val stateStore = new LSMStore(stateDir, keepVersions = Constants.keepVersions)
     val indexStore = new LSMStore(indexDir,
       keySize = PublicKey25519Proposition.AddressLength, keepVersions = Constants.keepVersions)
     val dbVersion = stateStore.get(ByteArrayWrapper(bestVersionKey)).map( _.data)
-    new UtxoState(VersionTag @@ dbVersion.getOrElse(EncryState.genesisStateVersion), stateStore, indexStore, nodeViewHolderRef)
+    new UtxoState(VersionTag @@ dbVersion.getOrElse(EncryState.genesisStateVersion),
+      stateStore, indexStore, nodeViewHolderRef, indexUpdaterRef)
   }
 
   private def metadata(modId: VersionTag, stateRoot: ADDigest): Seq[(Array[Byte], Array[Byte])] = {
@@ -310,7 +279,7 @@ object UtxoState extends ScorexLogging {
   }
 
   def fromBoxHolder(bh: BoxHolder, stateDir: File,
-                    indexDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
+                    indexDir: File, nodeViewHolderRef: Option[ActorRef], indexUpdaterRef: Option[ActorRef]): UtxoState = {
     val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
@@ -320,7 +289,7 @@ object UtxoState extends ScorexLogging {
 
     log.info(s"Generating UTXO State from BH with ${bh.boxes.size} boxes")
 
-    new UtxoState(EncryState.genesisStateVersion, stateStore, indexStore, nodeViewHolderRef) {
+    new UtxoState(EncryState.genesisStateVersion, stateStore, indexStore, nodeViewHolderRef, indexUpdaterRef) {
       override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
         PersistentBatchAVLProver.create(
           p, storage, metadata(EncryState.genesisStateVersion, p.digest), paranoidChecks = true
