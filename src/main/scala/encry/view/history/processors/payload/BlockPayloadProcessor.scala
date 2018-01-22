@@ -1,4 +1,4 @@
-package encry.view.history.storage.processors.payload
+package encry.view.history.processors.payload
 
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
@@ -6,7 +6,7 @@ import encry.modifiers.history.{ADProofs, HistoryModifierSerializer}
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.view.history.storage.HistoryStorage
-import encry.view.history.storage.processors.BlockProcessor
+import encry.view.history.processors.BlockProcessor
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.consensus.History.ProgressInfo
 import scorex.crypto.encode.Base58

@@ -1,4 +1,4 @@
-package encry.view.history.storage.processors.proofs
+package encry.view.history.processors.proofs
 
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs

@@ -1,4 +1,4 @@
-package encry.view.history.storage.processors
+package encry.view.history.processors
 
 import com.google.common.primitives.Ints
 import encry.consensus.{Difficulty, PowConsensus}
@@ -191,7 +191,6 @@ trait BlockHeaderProcessor extends ScorexLogging {
 
   private def bestHeadersChainScore: BigInt = scoreOf(bestHeaderIdOpt.get).get
 
-  // TODO: How `block score` is calculated?
   protected def scoreOf(id: ModifierId): Option[BigInt] =
     historyStorage.db
       .get(headerScoreKey(id))

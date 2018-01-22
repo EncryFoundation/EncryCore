@@ -8,8 +8,8 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings._
-import encry.view.history.storage.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
-import encry.view.history.storage.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
+import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
+import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.ModifierId
 import scorex.core.consensus.History

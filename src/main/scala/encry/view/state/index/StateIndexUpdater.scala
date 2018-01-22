@@ -57,11 +57,8 @@ class StateIndexUpdater(settings: EncryAppSettings) extends Actor with ScorexLog
             }
         }
       }
-    bulkUpdateIndex(block.header.id, accountOpsMap)
-
+      bulkUpdateIndex(block.header.id, accountOpsMap)
   }
-
-  def boxesIdsByAddress(addr: Address): Option[Seq[ADKey]] = indexStorage.boxesByAddress(addr)
 
   // Updates or creates index for key `address`.
   def updateIndexFor(address: Address, toRemove: Seq[ADKey], toInsert: Seq[ADKey]): Unit = {
@@ -118,5 +115,3 @@ class StateIndexUpdater(settings: EncryAppSettings) extends Actor with ScorexLog
     )
   }
 }
-
-object StateIndexUpdater

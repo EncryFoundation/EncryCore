@@ -1,4 +1,4 @@
-package encry.view.history.storage.processors.payload
+package encry.view.history.processors.payload
 
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.payload.EncryBlockPayload

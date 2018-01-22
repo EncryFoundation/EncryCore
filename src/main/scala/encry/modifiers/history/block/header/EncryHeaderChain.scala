@@ -23,6 +23,8 @@ case class EncryHeaderChain(headers: Seq[EncryBlockHeader]) {
     EncryHeaderChain(commonBlockThenSuffixes)
   }
 
+  def apply(idx: Int): EncryBlockHeader = headers(idx)
+
   lazy val size: Int = length
 
   lazy val length: Int = headers.size

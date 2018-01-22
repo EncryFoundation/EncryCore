@@ -1,4 +1,4 @@
-package encry.view.history.storage.processors
+package encry.view.history.processors
 
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history._
@@ -71,21 +71,25 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
 
       case (Some(prevBest), Some(prevBestScore), Some(score)) if score > prevBestScore =>
         //TODO currentScore == prevBestScore
-        log.info(s"Process fork for new best full block with header ${bestChainNew.encodedId}. " +
-          s"Height = ${bestChainNew.height}, score = $score")
-        updateStorage(newModRow, storageVersion, fullBlock, bestChainNew.id)
         val (prevChain, newChain) = commonBlockThenSuffixes(prevBest.header, header)
-
-        //todo: is flatMap in next two lines safe?
         val toRemove: Seq[EncryBlock] = prevChain.tail.headers.flatMap(getFullBlock)
-          .ensuring(_.nonEmpty, s"Should always have blocks to remove. Current = $header, prevBest = $prevBest")
-        if (nodeSettings.blocksToKeep >= 0) {
-          val bestHeight: Int = bestChainNew.height
-          val diff = bestChainNew.height - prevBest.header.height
-          val lastKept = bestHeight - nodeSettings.blocksToKeep
-          pruneBlockDataAt(((lastKept - diff) until lastKept).filter(_ >= 0))
+        if(toRemove.nonEmpty) {
+          log.info(s"Process fork for new best full block with header ${bestChainNew.encodedId}. " +
+            s"Height = ${bestChainNew.height}, score = $score")
+          updateStorage(newModRow, storageVersion, fullBlock, bestChainNew.id)
+
+          if (nodeSettings.blocksToKeep >= 0) {
+            val bestHeight: Int = bestChainNew.height
+            val diff = bestChainNew.height - prevBest.header.height
+            val lastKept = bestHeight - nodeSettings.blocksToKeep
+            pruneBlockDataAt(((lastKept - diff) until lastKept).filter(_ >= 0))
+          }
+          ProgressInfo(Some(getFullBlock(prevChain.head).get.id), toRemove, Some(getFullBlock(newChain(1)).get), Seq())
+        } else {
+          log.info(s"Got transactions and proofs for header ${header.encodedId} with no connection to genesis")
+          historyStorage.insert(storageVersion, Seq(newModRow))
+          ProgressInfo(None, Seq(), None, Seq())
         }
-        ProgressInfo(Some(getFullBlock(prevChain.head).get.id), toRemove, Some(getFullBlock(newChain.head).get), Seq())
       case _ =>
         log.info(s"Got transactions and proofs for non-best header ${header.encodedId}")
         historyStorage.insert(storageVersion, Seq(newModRow))

@@ -26,7 +26,6 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   // TODO: Implement correctly.
   def stateHeight(): Int = 0
 
-  // TODO: Do we need tx matching here?
   // Extracts `state changes` from the given sequence of transactions.
   def getAllStateChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
     // Use neither `.filter` nor any validity checks here!
@@ -34,10 +33,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
     EncryBoxStateChanges(
       txs.flatMap { tx =>
         tx match {
-          case tx: PaymentTransaction =>
-            tx.useBoxes.map(bxId => Removal(bxId)) ++
-              tx.newBoxes.map(bx => Insertion(bx))
-          case tx: CoinbaseTransaction =>
+          case tx@(_: PaymentTransaction | _: CoinbaseTransaction) =>
             tx.useBoxes.map(bxId => Removal(bxId)) ++
               tx.newBoxes.map(bx => Insertion(bx))
         }
@@ -46,8 +42,6 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   }
 
   def getStateChanges(tx: EncryBaseTransaction): EncryBoxStateChanges = getAllStateChanges(Seq(tx))
-
-// TODO: Implement:  def boxesOf(proposition: Proposition): Seq[Box[proposition.type]]
 
   // ID of last applied modifier.
   override def version: VersionTag
@@ -59,7 +53,6 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   def rollbackVersions: Iterable[VersionTag]
 
   override type NVCT = this.type
-
 }
 
 object EncryState extends ScorexLogging{

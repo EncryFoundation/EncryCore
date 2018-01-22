@@ -3,7 +3,6 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
-import encry.crypto.Address
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -15,15 +14,13 @@ import encry.settings.{Algos, Constants}
 import encry.view.state.index.StateIndexReader
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.LocalInterface.LocallyGeneratedModifier
-import scorex.core.{ModifierId, VersionTag}
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.utils.ScorexLogging
+import scorex.core.{ModifierId, VersionTag}
 import scorex.crypto.authds.avltree.batch._
-import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
-import scorex.crypto.encode.Base58
+import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
-import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
 class UtxoState(override val version: VersionTag,

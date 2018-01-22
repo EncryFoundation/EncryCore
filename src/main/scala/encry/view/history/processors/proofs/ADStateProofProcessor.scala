@@ -1,4 +1,4 @@
-package encry.view.history.storage.processors.proofs
+package encry.view.history.processors.proofs
 
 /**
   * ADProof processor for regime that validate transactions via ADProofs.
