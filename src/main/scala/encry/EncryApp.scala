@@ -1,6 +1,7 @@
 package encry
 
 import akka.actor.{ActorRef, Props}
+import encry.api.http.routes.{HistoryApiRoute, InfoRoute, TransactionsApiRoute}
 import encry.cli.CliListener
 import encry.cli.CliListener.StartListen
 import encry.local.TransactionGenerator.StartGeneration
@@ -11,9 +12,9 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.network.EncryNodeViewSynchronizer
 import encry.settings.{Algos, EncryAppSettings}
-import encry.view.EncryNodeViewHolder
+import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import encry.view.history.EncrySyncInfoMessageSpec
-import scorex.core.api.http.ApiRoute
+import scorex.core.api.http.{ApiRoute, PeersApiRoute, UtilsApiRoute}
 import scorex.core.app.Application
 import scorex.core.network.message.MessageSpec
 import scorex.core.settings.ScorexSettings
@@ -40,8 +41,9 @@ class EncryApp(args: Seq[String]) extends Application {
 
   override protected lazy val additionalMessageSpecs: Seq[MessageSpec[_]] = Seq(EncrySyncInfoMessageSpec)
 
-  override val nodeViewHolderRef: ActorRef =
-    EncryNodeViewHolder.createActor(actorSystem, encrySettings)
+  override val nodeViewHolderRef: ActorRef = EncryNodeViewHolder.createActor(actorSystem, encrySettings)
+
+  val readersHolderRef: ActorRef = actorSystem.actorOf(Props(classOf[EncryViewReadersHolder], nodeViewHolderRef))
 
   val minerRef: ActorRef =
     actorSystem.actorOf(Props(classOf[EncryMiner], nodeViewHolderRef, encrySettings, nodeId, timeProvider))
@@ -50,7 +52,13 @@ class EncryApp(args: Seq[String]) extends Application {
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
 
-  override val apiRoutes: Seq[ApiRoute] = Seq()
+  override val apiRoutes: Seq[ApiRoute] = Seq(
+    UtilsApiRoute(settings.restApi),
+    PeersApiRoute(peerManagerRef, networkController, settings.restApi),
+    InfoRoute(readersHolderRef, minerRef, peerManagerRef, encrySettings.nodeSettings.ADState, settings.restApi, nodeId),
+    HistoryApiRoute(readersHolderRef, minerRef, encrySettings, nodeId, encrySettings.nodeSettings.ADState),
+    TransactionsApiRoute(readersHolderRef, nodeViewHolderRef, settings.restApi, encrySettings.nodeSettings.ADState)
+  )
 
   override val localInterface: ActorRef = actorSystem.actorOf(
     Props(classOf[EncryLocalInterface], nodeViewHolderRef, minerRef, encrySettings)

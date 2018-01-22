@@ -52,6 +52,12 @@ trait EncryHistoryReader
     bestFullBlockIdOpt.flatMap(id => typedModifierById[EncryBlockHeader](id)).flatMap(getFullBlock)
 
   /**
+    * @return ids of count headers starting from offset
+    */
+  def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
+    .flatMap(h => headerIdsAtHeight(h).headOption)
+
+  /**
     * Id of best block to mine
     */
   override def openSurfaceIds(): Seq[ModifierId] = bestFullBlockIdOpt.orElse(bestHeaderIdOpt).toSeq
