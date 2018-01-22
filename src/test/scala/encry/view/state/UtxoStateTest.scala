@@ -31,7 +31,7 @@ class UtxoStateTest extends org.scalatest.FunSuite {
       val stateStore = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
       val indexStore = new LSMStore(dir, keySize = PublicKey25519Proposition.AddressLength, keepVersions = Constants.keepVersions)
 
-      new UtxoState(EncryState.genesisStateVersion, stateStore, indexStore, None, None) {
+      new UtxoState(EncryState.genesisStateVersion, stateStore, indexStore, None) {
         override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
           PersistentBatchAVLProver.create(
             p, storage, paranoidChecks = true

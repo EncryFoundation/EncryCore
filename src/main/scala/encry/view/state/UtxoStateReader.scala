@@ -17,7 +17,8 @@ trait UtxoStateReader extends StateIndexReader with ScorexLogging {
 
   val stateStore: Store
 
-  private lazy val np = NodeParameters(keySize = EncryBox.BoxIdSize, valueSize = AssetBoxSerializer.Size, labelSize = 32)
+  private lazy val np =
+    NodeParameters(keySize = EncryBox.BoxIdSize, valueSize = AssetBoxSerializer.Size, labelSize = 32)
 
   protected lazy val storage = new VersionedIODBAVLStorage(stateStore, np)
 

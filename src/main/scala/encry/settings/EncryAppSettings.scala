@@ -47,7 +47,7 @@ object EncryAppSettings extends ScorexLogging with SettingsReaders {
     val config = maybeConfigFile match {
       // if no user config is supplied, the library will handle overrides/application/reference automatically
       case None =>
-        log.warn("NO CONFIGURATION FILE WAS PROVIDED. STARTING WITH DEFAULT SETTINGS FOR TESTNET!")
+        log.warn("No configuration file was provided. Starting with default settings!")
         ConfigFactory.load()
       // application config needs to be resolved wrt both system properties *and* user-supplied config.
       case Some(file) =>

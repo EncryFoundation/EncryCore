@@ -49,28 +49,7 @@ components:
           description: The script which should be successfully executed for the waste of this output
           type: string
 
-    AnyoneCanSpendTransaction:
-      type: object
-      description: Transaction without any lockers and unlockers
-      required:
-        - id
-        - inputs
-        - outputs
-      properties:
-        id:
-          $ref: '#/components/schemas/TransactionId'
-        inputs:
-          description: Many transaction inputs
-          type: array
-          items:
-            $ref: '#/components/schemas/AnyoneCanSpendTransactionInput'
-        outputs:
-          description: Many transaction outputs
-          type: array
-          items:
-            $ref: '#/components/schemas/AnyoneCanSpendTransactionOutput'
-
-    FullBlock:
+    Block:
       description: Block with header and transactions
       type: object
       required:

@@ -19,8 +19,8 @@ case class CliListener(viewHolderRef: ActorRef) extends Actor{
       while (true) {
         val input = readLine()
         commands.get(parseCommand(input).head) match {
-          case Some(value) => parseCommand(input).slice(1, parseCommand(input).length).foreach(
-            command => value.get(command.split("=").head) match {
+          case Some(value) => parseCommand(input).slice(1, parseCommand(input).length)
+            .foreach(command => value.get(command.split("=").head) match {
               case Some(cmd) =>
                 cmd.execute(command).get
               case None =>

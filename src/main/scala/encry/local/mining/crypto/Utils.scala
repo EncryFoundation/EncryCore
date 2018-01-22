@@ -3,7 +3,7 @@ package encry.local.mining.crypto
 import encry.utils.LittleEndianBytes._
 import org.bouncycastle.crypto.Digest
 
-object SimpleHash {
+object Utils {
 
   def nonceToLeBytes(nonce: BigInt): Array[Byte] = {
     (for (i <- 0 to 7) yield leIntToByteArray((nonce >> 32 * i).intValue())).reduce(_ ++ _)

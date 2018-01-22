@@ -3,24 +3,22 @@ package encry.view
 import akka.actor.{ActorRef, ActorSystem, Props}
 import encry.EncryApp
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
+import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{CoinbaseTransactionSerializer, EncryBaseTransaction}
 import encry.settings.EncryAppSettings
 import encry.view.history.{EncryHistory, EncrySyncInfo}
 import encry.view.mempool.EncryMempool
-import encry.view.state.EncryState.indexDir
 import encry.view.state.{DigestState, EncryState, UtxoState}
 import encry.view.wallet.EncryWallet
 import scorex.core.serialization.Serializer
-import scorex.core.{ModifierTypeId, NodeViewHolder, NodeViewModifier}
 import scorex.core.transaction.box.proposition.Proposition
+import scorex.core.{ModifierTypeId, NodeViewHolder, NodeViewModifier}
 
 import scala.util.{Failure, Success}
 
-abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings,
-                                                                       indexUpdaterRef: Option[ActorRef])
+abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings)
   extends NodeViewHolder[Proposition, EncryBaseTransaction, EncryPersistentModifier] {
 
   // TODO: `settings.scorexSettings.network.networkChunkSize` should be used here.
@@ -62,7 +60,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     val state = {
       if (settings.nodeSettings.ADState) EncryState.generateGenesisDigestState(stateDir, settings.nodeSettings)
 //      else if (settings.testingSettings.transactionGeneration) EncryState.genTestingUtxoState(dir, Some(self))._1
-      else EncryState.genGenesisUtxoState(stateDir, idxDir, Some(self), indexUpdaterRef)._1
+      else EncryState.genGenesisUtxoState(stateDir, idxDir, Some(self))._1
     }.asInstanceOf[MS]
 
     //todo: ensure that history is in certain mode
@@ -80,7 +78,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     * (e.g. if it is a first launch of a node) None is to be returned
     */
   override def restoreState: Option[NodeView] = {
-    EncryState.readOrGenerate(settings, Some(self), indexUpdaterRef).map { stateIn =>
+    EncryState.readOrGenerate(settings, Some(self)).map { stateIn =>
       //todo: ensure that history is in certain mode
       val history = EncryHistory.readOrGenerate(settings)
       val wallet = EncryWallet.readOrGenerate(settings)
@@ -112,14 +110,14 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
 }
 
 private[view] class DigestEncryNodeViewHolder(settings: EncryAppSettings)
-  extends EncryNodeViewHolder[DigestState](settings, None)
+  extends EncryNodeViewHolder[DigestState](settings)
 
-private[view] class UtxoEncryNodeViewHolder(settings: EncryAppSettings, indexUpdaterRef: Option[ActorRef])
-  extends EncryNodeViewHolder[UtxoState](settings, indexUpdaterRef: Option[ActorRef])
+private[view] class UtxoEncryNodeViewHolder(settings: EncryAppSettings)
+  extends EncryNodeViewHolder[UtxoState](settings)
 
 object EncryNodeViewHolder {
-  def createActor(system: ActorSystem, settings: EncryAppSettings, indexUpdaterRef: Option[ActorRef]): ActorRef = {
+  def createActor(system: ActorSystem, settings: EncryAppSettings): ActorRef = {
     if (settings.nodeSettings.ADState) system.actorOf(Props.create(classOf[DigestEncryNodeViewHolder], settings))
-    else system.actorOf(Props.create(classOf[UtxoEncryNodeViewHolder], settings, indexUpdaterRef))
+    else system.actorOf(Props.create(classOf[UtxoEncryNodeViewHolder], settings))
   }
 }
