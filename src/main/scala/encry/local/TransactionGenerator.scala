@@ -1,7 +1,7 @@
 package encry.local
 
 import akka.actor.{Actor, ActorRef, Cancellable}
-import encry.crypto.Address
+import encry.account.Address
 import encry.local.TransactionGenerator.{FetchBoxes, StartGeneration, StopGeneration}
 import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
 import encry.settings.TestingSettings

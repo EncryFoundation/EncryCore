@@ -23,9 +23,6 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 
   def rootHash(): ADDigest
 
-  // TODO: Implement correctly.
-  def stateHeight(): Int = 0
-
   // Extracts `state changes` from the given sequence of transactions.
   def getAllStateChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
     // Use neither `.filter` nor any validity checks here!

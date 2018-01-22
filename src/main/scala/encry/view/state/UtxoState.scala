@@ -11,8 +11,12 @@ import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, Payme
 import encry.modifiers.state.TransactionValidator
 import encry.modifiers.state.box._
 import encry.settings.{Algos, Constants}
+import encry.view.history.{EncryHistory, Height}
+import encry.view.mempool.EncryMempool
 import encry.view.state.index.StateIndexReader
+import encry.view.wallet.EncryWallet
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
+import scorex.core.NodeViewHolder.{CurrentView, GetDataFromCurrentView}
 import scorex.core.LocalInterface.LocallyGeneratedModifier
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.utils.ScorexLogging

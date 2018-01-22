@@ -2,7 +2,7 @@ openapi: "3.0.0"
 
 info:
   version: "0.1"
-  title: Ergo Node API
+  title: Encry Node API
   description: API docs for Encry Node. Models are shared between all Encry products
 #  contact:
 #    name: Encry Platform Team
@@ -41,7 +41,7 @@ components:
         - script
       properties:
         value:
-          description: Amount of Ergo token
+          description: Amount of Encry token
           type: number
           minimum: 0
           example: 14.7

@@ -1,6 +1,6 @@
 package encry.view.state.index.storage
 
-import encry.crypto.Address
+import encry.account.Address
 import encry.modifiers.state.box.EncryBox
 import encry.modifiers.state.box.proposition.AddressProposition
 import io.iohk.iodb.{ByteArrayWrapper, Store}

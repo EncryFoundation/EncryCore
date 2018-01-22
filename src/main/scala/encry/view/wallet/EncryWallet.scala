@@ -1,6 +1,6 @@
 package encry.view.wallet
 
-import encry.crypto.Address
+import encry.account.Address
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader

@@ -1,7 +1,7 @@
 package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs}
-import encry.crypto.Address
+import encry.account.Address
 import encry.modifiers.mempool.EncryTransaction
 import encry.modifiers.mempool.EncryTransaction.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId

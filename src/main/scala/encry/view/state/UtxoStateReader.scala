@@ -1,6 +1,6 @@
 package encry.view.state
 
-import encry.crypto.Address
+import encry.account.Address
 import encry.modifiers.state.box._
 import encry.view.history.Height
 import encry.view.state.index.{Portfolio, StateIndexReader}
@@ -24,8 +24,7 @@ trait UtxoStateReader extends StateIndexReader with ScorexLogging {
   protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
     PersistentBatchAVLProver.create(
       new BatchAVLProver[Digest32, Blake2b256Unsafe](
-        keyLength = EncryBox.BoxIdSize, valueLengthOpt = None),
-      storage).get
+        keyLength = EncryBox.BoxIdSize, valueLengthOpt = None), storage).get
 
   def boxById(boxId: ADKey): Option[EncryBaseBox] =
     boxId.head match {
@@ -41,9 +40,13 @@ trait UtxoStateReader extends StateIndexReader with ScorexLogging {
       case _ => None
     }
 
-  def getOpenBoxesAtHeight(height: Height): IndexedSeq[CoinbaseBox] = ???
+  def getOpenBoxesAtHeight(height: Height): Seq[OpenBox] =
+    boxesByAddress(StateIndexReader.openBoxAddress)
+      .map(bxs => bxs.filter(bx => bx.isInstanceOf[OpenBox] &&
+        bx.proposition.asInstanceOf[OpenBox].proposition.height <= height)
+        .map(_.asInstanceOf[OpenBox])).getOrElse(Seq())
 
-  def randomBox(): Option[EncryBaseBox] =
+  def getRandomBox: Option[EncryBaseBox] =
     persistentProver.avlProver.randomWalk().map(_._1).flatMap(boxById)
 
   def boxesByAddress(address: Address): Option[Seq[EncryBaseBox]] =

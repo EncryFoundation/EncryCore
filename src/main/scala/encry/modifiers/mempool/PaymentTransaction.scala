@@ -1,7 +1,7 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import encry.crypto.Address
+import encry.account.Address
 import encry.modifiers.mempool.EncryTransaction._
 import encry.modifiers.state.box.proposition.{AddressProposition, HeightProposition}
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox}
@@ -48,6 +48,7 @@ case class PaymentTransaction(override val senderProposition: PublicKey25519Prop
   override def serializer: Serializer[M] = PaymentTransactionSerializer
 
   override def json: Json = Map(
+    "type" -> "Payment".asJson,
     "id" -> Base58.encode(id).asJson,
     "inputs" -> useBoxes.map { id =>
       Map(
@@ -63,7 +64,8 @@ case class PaymentTransaction(override val senderProposition: PublicKey25519Prop
     }.asJson
   ).asJson
 
-  override lazy val txHash: Digest32 = PaymentTransaction.getHash(senderProposition, fee, timestamp, useBoxes, createBoxes)
+  override lazy val txHash: Digest32 =
+    PaymentTransaction.getHash(senderProposition, fee, timestamp, useBoxes, createBoxes)
 
   override lazy val semanticValidity: Try[Unit] = {
     // Signature validity checks.
@@ -128,7 +130,8 @@ object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
       Ints.toByteArray(obj.useBoxes.length),
       Ints.toByteArray(obj.createBoxes.length),
       obj.useBoxes.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b)),
-      obj.createBoxes.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, AddressProposition.getAddrBytes(b._1), Longs.toByteArray(b._2)))
+      obj.createBoxes.foldLeft(Array[Byte]())((a, b) =>
+        Bytes.concat(a, AddressProposition.getAddrBytes(b._1), Longs.toByteArray(b._2)))
     )
   }
 
@@ -142,14 +145,13 @@ object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
     val outputLength = Ints.fromByteArray(bytes.slice(116, 120))
     val s = 120
     val outElementLength = 32
-    val useOutputs = (0 until inputLength) map { i =>
+    val useOutputs = (0 until inputLength).map { i =>
       ADKey @@ bytes.slice(s + (i * outElementLength), s + (i + 1) * outElementLength)
     }
 
     val s2 = s + (inputLength * outElementLength)
     val inElementLength = 45
-    val createOutputs = (0 until outputLength) map { i =>
-      // Longs.fromByteArray(bytes.slice(s2 + i * elementLength, s2 + (i + 1) * elementLength))
+    val createOutputs = (0 until outputLength).map { i =>
       (Address @@ Base58.encode(bytes.slice(s2 + i * inElementLength, s2 + (i + 1) * (inElementLength - 8))),
         Longs.fromByteArray(bytes.slice(s2 + (i + 1) * (inElementLength - 8), s2 + (i + 1) * inElementLength)))
     }

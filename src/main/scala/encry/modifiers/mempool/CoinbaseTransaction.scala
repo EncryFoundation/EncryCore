@@ -1,7 +1,7 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import encry.crypto.Address
+import encry.account.Address
 import encry.modifiers.mempool.EncryTransaction.{TxTypeId, _}
 import encry.modifiers.state.box.proposition.AddressProposition
 import encry.modifiers.state.box.{AssetBox, EncryNoncedBox, OpenBox}
@@ -45,7 +45,20 @@ case class CoinbaseTransaction(override val senderProposition: PublicKey25519Pro
   )
 
   override def json: Json = Map(
+    "type" -> "Coinbase".asJson,
     "id" -> Base58.encode(id).asJson,
+    "inputs" -> useBoxes.map { id =>
+      Map(
+        "id" -> Algos.encode(id).asJson,
+        "signature" -> Base58.encode(signature.bytes).asJson
+      ).asJson
+    }.asJson,
+    "outputs" -> newBoxes.map { case bx: AssetBox =>
+      Map(
+        "script" -> "".asJson,
+        "amount" -> bx.amount.asJson
+      ).asJson
+    }.asJson
   ).asJson
 
   override def serializer: Serializer[M] = CoinbaseTransactionSerializer
@@ -102,8 +115,7 @@ object CoinbaseTransactionSerializer extends Serializer[CoinbaseTransaction] {
     )
   }
 
-  // TODO: Test.
-  override def parseBytes(bytes: Array[Byte]): Try[CoinbaseTransaction] = Try{
+  override def parseBytes(bytes: Array[Byte]): Try[CoinbaseTransaction] = Try {
 
     val sender = new PublicKey25519Proposition(PublicKey @@ bytes.slice(0, 32))
     val timestamp = Longs.fromByteArray(bytes.slice(32, 40))

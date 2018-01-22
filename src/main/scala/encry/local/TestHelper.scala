@@ -2,7 +2,7 @@ package encry.local
 
 import java.io.{File, FileWriter}
 
-import encry.crypto.Address
+import encry.account.Address
 import encry.modifiers.mempool.EncryTransaction.Amount
 import encry.modifiers.state.box.proposition.AddressProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}

@@ -7,7 +7,7 @@ import encry.settings.EncryAppSettings
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.{LocalInterface, ModifierId}
 
-class EncryLocalInterface (override val viewHolderRef: ActorRef, miner: ActorRef, ergoSettings: EncryAppSettings)
+class EncryLocalInterface (override val viewHolderRef: ActorRef, miner: ActorRef, settings: EncryAppSettings)
   extends LocalInterface[Proposition, EncryBaseTransaction, EncryPersistentModifier] {
 
   override protected def onStartingPersistentModifierApplication(pmod: EncryPersistentModifier): Unit = {}

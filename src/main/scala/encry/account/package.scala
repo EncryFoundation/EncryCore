@@ -2,7 +2,7 @@ package encry
 
 import supertagged.TaggedType
 
-package object crypto {
+package object account {
 
   object Address extends TaggedType[String]
 

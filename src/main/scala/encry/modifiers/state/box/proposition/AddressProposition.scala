@@ -1,6 +1,6 @@
 package encry.modifiers.state.box.proposition
 
-import encry.crypto.Address
+import encry.account.Address
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition.{ChecksumLength, calcCheckSum, _}
 import scorex.core.transaction.box.proposition.{Proposition, PublicKey25519Proposition}

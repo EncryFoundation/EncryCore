@@ -1,7 +1,7 @@
 package encry.modifiers.history.block
 
 import encry.consensus.Difficulty
-import encry.crypto.Address
+import encry.account.Address
 import encry.local.TestHelper
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader

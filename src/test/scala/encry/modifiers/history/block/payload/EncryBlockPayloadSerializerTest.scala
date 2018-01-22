@@ -1,6 +1,6 @@
 package encry.modifiers.history.block.payload
 
-import encry.crypto.Address
+import encry.account.Address
 import encry.local.TestHelper
 import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
 import org.scalatest.FunSuite

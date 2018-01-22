@@ -118,7 +118,7 @@ object DigestState {
 
         new DigestState(version, ADDigest @@ rootHash, store, settings)
 
-      case _ => ???
+      case _ => throw new Error("Unsupported argument combination.")
     }
   }
 }

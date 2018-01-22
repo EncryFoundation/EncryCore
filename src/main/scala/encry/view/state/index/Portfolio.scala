@@ -1,6 +1,6 @@
 package encry.view.state.index
 
-import encry.crypto.Address
+import encry.account.Address
 import encry.modifiers.state.box.EncryBaseBox
 import encry.view.state.Balance
 

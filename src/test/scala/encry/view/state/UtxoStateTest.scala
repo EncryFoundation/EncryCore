@@ -3,7 +3,7 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
-import encry.crypto.Address
+import encry.account.Address
 import encry.local.TestHelper
 import encry.modifiers.mempool.PaymentTransaction
 import encry.settings.Constants

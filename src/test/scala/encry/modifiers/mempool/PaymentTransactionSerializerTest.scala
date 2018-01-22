@@ -1,6 +1,6 @@
 package encry.modifiers.mempool
 
-import encry.crypto.Address
+import encry.account.Address
 import encry.local.TestHelper
 import org.scalatest.FunSuite
 import scorex.core.transaction.state.PrivateKey25519Companion

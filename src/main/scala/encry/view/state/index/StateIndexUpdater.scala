@@ -1,7 +1,7 @@
 package encry.view.state.index
 
 import akka.actor.Actor
-import encry.crypto.Address
+import encry.account.Address
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.CoinbaseTransaction
 import encry.modifiers.state.box.proposition.AddressProposition
@@ -28,36 +28,34 @@ class StateIndexUpdater(settings: EncryAppSettings) extends Actor with ScorexLog
   override def receive: Receive = {
 
     case block: EncryBlock =>
-      val accountOpsMap = mutable.HashMap.empty[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]
+      val stateOpsMap = mutable.HashMap.empty[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]
       block.payload.transactions.foreach { tx =>
         tx.useBoxes.foreach { id =>
-          accountOpsMap.get(Address @@ tx.senderProposition.address) match {
+          stateOpsMap.get(Address @@ tx.senderProposition.address) match {
             case Some(t) =>
               if (t._2.exists(_.sameElements(id))) t._2.remove(id)
               else t._1.add(id)
             case None =>
-              accountOpsMap.update(
+              stateOpsMap.update(
                 Address @@ tx.senderProposition.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
           }
         }
         tx.newBoxes.foreach {
           case bx: AssetBox =>
-            accountOpsMap.get(bx.proposition.address) match {
+            stateOpsMap.get(bx.proposition.address) match {
               case Some(t) => t._2.add(bx.id)
-              case None => accountOpsMap.update(
+              case None => stateOpsMap.update(
                 bx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
             }
           case bx: OpenBox =>
-            if (tx.isInstanceOf[CoinbaseTransaction]) {
-              accountOpsMap.get(Address @@ tx.senderProposition.address) match {
-                case Some(t) => t._2.add(bx.id)
-                case None => accountOpsMap.update(
-                  Address @@ tx.senderProposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
-              }
+            stateOpsMap.get(StateIndexReader.openBoxAddress) match {
+              case Some(t) => t._2.add(bx.id)
+              case None => stateOpsMap.update(
+                Address @@ tx.senderProposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
             }
         }
       }
-      bulkUpdateIndex(block.header.id, accountOpsMap)
+      bulkUpdateIndex(block.header.id, stateOpsMap)
   }
 
   // Updates or creates index for key `address`.
@@ -97,7 +95,7 @@ class StateIndexUpdater(settings: EncryAppSettings) extends Actor with ScorexLog
               (bNew :+ (addr, toIns.toSeq)) -> bExs
           }
       }
-    log.info(s"Updating index for mod: ${Base58.encode(version)}")
+    log.info(s"Updating index for mod: ${Base58.encode(version)} ..")
     // First remove existing records assoc with addresses to be updated.
     indexStorage.update(
       ModifierId @@ Algos.hash(version),

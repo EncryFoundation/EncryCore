@@ -52,7 +52,7 @@ object EncryAppSettings extends ScorexLogging with SettingsReaders {
       // application config needs to be resolved wrt both system properties *and* user-supplied config.
       case Some(file) =>
         val cfg = ConfigFactory.parseFile(file)
-        if (!cfg.hasPath("ergo")) {
+        if (!cfg.hasPath("encry")) {
           log.error("Malformed configuration file was provided! Aborting!")
           EncryApp.forceStopApplication()
         }
