@@ -7,9 +7,13 @@ import io.circe.Json
 import io.circe.syntax._
 import scorex.core.block.Block.Timestamp
 import scorex.core.serialization.JsonSerializable
+import scorex.core.transaction.box.proposition.PublicKey25519Proposition
+import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 
-class PowCandidateBlock(val parentOpt: Option[EncryBlockHeader],
+class PowCandidateBlock(val proposition: PublicKey25519Proposition,
+                        val signature: Signature25519,
+                        val parentOpt: Option[EncryBlockHeader],
                         val adProofBytes: SerializedAdProof,
                         val stateRoot: ADDigest,
                         val transactions: Seq[EncryBaseTransaction],

@@ -3,14 +3,14 @@ openapi: "3.0.0"
 info:
   version: "0.1"
   title: Encry Node API
-  description: API docs for Encry Node. Models are shared between all Encry products
-#  contact:
-#    name: Encry Platform Team
-#    email:
-#    url:
-#  license:
-#    name:
-#    url:
+  description: API docs for Encry Node.
+  contact:
+    name: Encry Core Team
+    email:
+    url:
+  license:
+    name: CC0 1.0 Universal
+    url:
 
 components:
   schemas:
@@ -49,7 +49,28 @@ components:
           description: The script which should be successfully executed for the waste of this output
           type: string
 
-    Block:
+    AnyoneCanSpendTransaction:
+      type: object
+      description: Transaction without any lockers and unlockers
+      required:
+        - id
+        - inputs
+        - outputs
+      properties:
+        id:
+          $ref: '#/components/schemas/TransactionId'
+        inputs:
+          description: Many transaction inputs
+          type: array
+          items:
+            $ref: '#/components/schemas/AnyoneCanSpendTransactionInput'
+        outputs:
+          description: Many transaction outputs
+          type: array
+          items:
+            $ref: '#/components/schemas/AnyoneCanSpendTransactionOutput'
+
+    FullBlock:
       description: Block with header and transactions
       type: object
       required:
@@ -720,13 +741,14 @@ paths:
         - peers
       responses:
         200:
-          description: Array of peer objects
+          description: Array of the addresses
           content:
             application/json:
               schema:
                 type: array
                 items:
-                    $ref: '#/components/schemas/Peer'
+                  type: string
+                  descriptiom: Blacklisted node address
 
   /utils/seed:
     get:

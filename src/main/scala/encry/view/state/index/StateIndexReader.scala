@@ -31,13 +31,13 @@ trait StateIndexReader extends ScorexLogging {
         val stateOpsMap = mutable.HashMap.empty[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]
         block.payload.transactions.foreach { tx =>
           tx.useBoxes.foreach { id =>
-            stateOpsMap.get(Address @@ tx.senderProposition.address) match {
+            stateOpsMap.get(Address @@ tx.proposition.address) match {
               case Some(t) =>
                 if (t._2.exists(_.sameElements(id))) t._2.remove(id)
                 else t._1.add(id)
               case None =>
                 stateOpsMap.update(
-                  Address @@ tx.senderProposition.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
+                  Address @@ tx.proposition.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
             }
           }
           tx.newBoxes.foreach {
@@ -51,7 +51,7 @@ trait StateIndexReader extends ScorexLogging {
               stateOpsMap.get(StateIndexReader.openBoxAddress) match {
                 case Some(t) => t._2.add(bx.id)
                 case None => stateOpsMap.update(
-                  Address @@ tx.senderProposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
+                  Address @@ tx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
               }
           }
         }

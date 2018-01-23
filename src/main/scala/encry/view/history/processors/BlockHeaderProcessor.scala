@@ -109,6 +109,8 @@ trait BlockHeaderProcessor extends ScorexLogging {
       Failure(new Error(s"Invalid POW in header <id: ${header.id}>"))
     } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainSettings.maxRollback)) {
       Failure(new Error("Header is too old to be applied."))
+    } else if (!header.validSignature) {
+      Failure(new Error("Block signature is invalid."))
     } else {
       Success()
     }.recoverWith { case err =>

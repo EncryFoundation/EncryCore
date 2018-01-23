@@ -20,10 +20,10 @@ import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.{Success, Try}
 
-case class PaymentTransaction(override val senderProposition: PublicKey25519Proposition,
+case class PaymentTransaction(override val proposition: PublicKey25519Proposition,
                               override val fee: Amount,
                               override val timestamp: Long,
-                              override var signature: Signature25519,
+                              override val signature: Signature25519,
                               override val useBoxes: IndexedSeq[ADKey],
                               createBoxes: IndexedSeq[(Address, Amount)])
   extends EncryTransaction {
@@ -65,16 +65,14 @@ case class PaymentTransaction(override val senderProposition: PublicKey25519Prop
   ).asJson
 
   override lazy val txHash: Digest32 =
-    PaymentTransaction.getHash(senderProposition, fee, timestamp, useBoxes, createBoxes)
+    PaymentTransaction.getHash(proposition, fee, timestamp, useBoxes, createBoxes)
 
   override lazy val semanticValidity: Try[Unit] = {
     // Signature validity checks.
-    if (!signature.isValid(senderProposition, messageToSign)) {
+    if (!validSignature) {
       log.info(s"<TX: $txHash> Invalid signature provided.")
       throw new Error("Invalid signature provided!")
     }
-
-    // TODO: Txs generated during tests does not pass this tests.
     // `Amount` & `Address` validity checks.
     if (!createBoxes.forall { i =>
       i._2 > 0 && AddressProposition.validAddress(i._1)
@@ -123,7 +121,7 @@ object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
 
   override def toBytes(obj: PaymentTransaction): Array[Byte] = {
     Bytes.concat(
-      obj.senderProposition.pubKeyBytes,
+      obj.proposition.pubKeyBytes,
       Longs.toByteArray(obj.fee),
       Longs.toByteArray(obj.timestamp),
       obj.signature.signature,

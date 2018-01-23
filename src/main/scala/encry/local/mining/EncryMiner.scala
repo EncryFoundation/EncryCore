@@ -5,6 +5,7 @@ import akka.pattern._
 import akka.util.Timeout
 import encry.consensus.{Difficulty, PowCandidateBlock, PowConsensus}
 import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction}
 import encry.modifiers.state.box.OpenBox
 import encry.settings.EncryAppSettings
@@ -141,12 +142,13 @@ object EncryMiner extends ScorexLogging {
 
         if ((bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) && !view.pool.isEmpty) Try {
 
-          val timestamp = timeProvider.time()
+          // TODO: Should this be lazy?
+          lazy val timestamp = timeProvider.time()
 
           var txs = view.state.filterValid(view.pool.takeAllUnordered.toSeq)
             .foldLeft(Seq[EncryBaseTransaction]()) { case (txsBuff, tx) =>
-              // TODO: Correct right operand on CoinbaseTx.length here.
-              if ((txsBuff.map(_.length).sum + tx.length) <= settings.chainSettings.blockMaxSize) txsBuff :+ tx
+              // 124 is approximate CoinbaseTx.length in bytes.
+              if ((txsBuff.map(_.length).sum + tx.length) <= settings.chainSettings.blockMaxSize - 124) txsBuff :+ tx
               else txsBuff
             }
 
@@ -155,10 +157,10 @@ object EncryMiner extends ScorexLogging {
           val privateKey: PrivateKey25519 = view.vault.secretByPublicImage(minerProposition).get
           val openBxs = txs.flatMap(tx => tx.newBoxes.filter(_.isInstanceOf[OpenBox])).toIndexedSeq
           val amount = openBxs.map(_.value).sum
-          val signature = PrivateKey25519Companion.sign(privateKey,
+          val cTxSignature = PrivateKey25519Companion.sign(privateKey,
             CoinbaseTransaction.getHash(minerProposition, openBxs.map(_.id), timestamp, amount))
 
-          val coinbase = CoinbaseTransaction(minerProposition, timestamp, signature, openBxs.map(_.id), amount)
+          val coinbase = CoinbaseTransaction(minerProposition, timestamp, cTxSignature, openBxs.map(_.id), amount)
 
           txs = txs.sortBy(_.timestamp) :+ coinbase
 
@@ -166,7 +168,12 @@ object EncryMiner extends ScorexLogging {
           val difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
             .getOrElse(Difficulty @@ settings.chainSettings.initialDifficulty)
 
-          val candidate = new PowCandidateBlock(bestHeaderOpt, adProof, adDigest, txs, timestamp, difficulty)
+          val derivedFields = PowConsensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
+          val blockSignature = PrivateKey25519Companion.sign(privateKey,
+            EncryBlockHeader.getMessageToSign(derivedFields._1, minerProposition, derivedFields._2,
+              derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, difficulty))
+
+          val candidate = new PowCandidateBlock(minerProposition, blockSignature, bestHeaderOpt, adProof, adDigest, txs, timestamp, difficulty)
           log.debug(s"Sending candidate block with ${candidate.transactions.length} transactions")
 
           candidate

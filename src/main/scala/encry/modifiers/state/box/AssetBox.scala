@@ -36,7 +36,7 @@ case class AssetBox(override val proposition: AddressProposition,
   )
 
   override def unlockTry(modifier: EncryTransaction, script: Option[String] = None): Try[Unit] =
-    if (modifier.senderProposition.address != proposition.address) Failure(new Error("Unlock failed"))
+    if (modifier.proposition.address != proposition.address) Failure(new Error("Unlock failed"))
     else Success()
 
   override def serializer: SizedCompanionSerializer[AssetBox] = AssetBoxSerializer

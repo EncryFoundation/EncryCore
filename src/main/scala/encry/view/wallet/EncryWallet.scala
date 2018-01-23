@@ -53,7 +53,7 @@ case class EncryWallet(seed: ByteStr,
 
   override def scanOffchain(tx: EncryBaseTransaction): EncryWallet = tx match {
     case sp: PaymentTransaction =>
-      if ((sp.senderProposition.bytes sameElements secret.publicKeyBytes) || sp.createBoxes.foldRight(false) {
+      if ((sp.proposition.bytes sameElements secret.publicKeyBytes) || sp.createBoxes.foldRight(false) {
         (a: (Address, Amount), _: Boolean) => a._1 sameElements secret.publicKeyBytes }) {
         EncryWallet(seed, chainTransactions, offchainTransactions + (sp.id -> sp), currentBalance)
       } else this
@@ -70,14 +70,14 @@ case class EncryWallet(seed: ByteStr,
         tx match {
           //TODO: not efficient
           case sp: PaymentTransaction =>
-            if ((sp.senderProposition.bytes sameElements secret.publicKeyBytes) || sp.createBoxes.foldRight(false) {
+            if ((sp.proposition.bytes sameElements secret.publicKeyBytes) || sp.createBoxes.foldRight(false) {
               (a: (Address, Amount), _: Boolean) => a._1.getBytes() sameElements secret.publicKeyBytes
             }){
               val ct = w.chainTransactions + (sp.id -> sp)
               val oct = w.offchainTransactions - sp.id
               var curWalBal = w.currentBalance
               for (a <- sp.createBoxes) {
-                if (sp.senderProposition.bytes sameElements secret.publicKeyBytes) {
+                if (sp.proposition.bytes sameElements secret.publicKeyBytes) {
                   curWalBal -= a._2
                 } else if (a._1.getBytes sameElements secret.publicKeyBytes) {
                   curWalBal += a._2

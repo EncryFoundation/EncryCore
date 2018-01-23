@@ -1,11 +1,11 @@
 package encry.modifiers.mempool
 
+import encry.modifiers.Signable25519
 import encry.modifiers.mempool.EncryTransaction.TxTypeId
 import encry.modifiers.state.box.{EncryBaseBox, OpenBox}
 import encry.settings.Constants
 import scorex.core.transaction.Transaction
-import scorex.core.transaction.box.proposition.{Proposition, PublicKey25519Proposition}
-import scorex.core.transaction.proof.Signature25519
+import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
@@ -13,17 +13,13 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-trait EncryBaseTransaction extends Transaction[Proposition] {
+trait EncryBaseTransaction extends Transaction[Proposition] with Signable25519 {
 
   override val modifierTypeId: ModifierTypeId = EncryBaseTransaction.ModifierTypeId
 
-  val senderProposition: PublicKey25519Proposition
-
   val txHash: Digest32
 
-  val messageToSign: Array[Byte] = txHash
-
-  var signature: Signature25519
+  val dataToSign: Array[Byte] = txHash
 
   val semanticValidity: Try[Unit]
 
@@ -34,8 +30,7 @@ trait EncryBaseTransaction extends Transaction[Proposition] {
 
   // TODO: ModifierId.length can not be 33 bytes as the value of 32 bytes hardcoded in scorex.
   // override lazy val id: ModifierId = ModifierId @@ (Array[Byte](typeId) ++ txHash)
-
-  override lazy val id: ModifierId = ModifierId @@ txHash
+  override lazy val id: ModifierId = ModifierId @@ txHash.updated(0, typeId)
 
   val fee: Long
 
@@ -53,6 +48,9 @@ trait EncryBaseTransaction extends Transaction[Proposition] {
   val minimalFee: Float = Constants.feeMinAmount + Constants.txByteCost * length
 
   override def toString: String = s"<TX: type=$typeId id=${Base58.encode(txHash)}>"
+
+  // Shadowed.
+  override val messageToSign: Array[TxTypeId] = Array.fill(32)(1.toByte)
 }
 
 object EncryBaseTransaction {
