@@ -12,13 +12,7 @@ class CoinbaseTransactionSerializerTest extends FunSuite {
 
   test("test ParseBytes & toBytes") {
 
-    val coinbase = CoinbaseTransaction(
-      PublicKey25519Proposition(PublicKey @@ Random.randomBytes()),
-      178999L,
-      Signature25519(Signature @@ Random.randomBytes(64)),
-      IndexedSeq(ADKey @@ Random.randomBytes(), ADKey @@ Random.randomBytes()),
-      999L
-    )
+    val coinbase = InstanceFactory.coinbaseTransaction
 
     val coinbaseSerialized = CoinbaseTransactionSerializer.toBytes(coinbase)
 

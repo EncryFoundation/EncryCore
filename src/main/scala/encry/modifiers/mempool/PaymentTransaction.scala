@@ -70,19 +70,17 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
   override lazy val semanticValidity: Try[Unit] = {
     // Signature validity checks.
     if (!validSignature) {
-      log.info(s"<TX: $txHash> Invalid signature provided.")
-      throw new Error("Invalid signature provided!")
+      throw new Error("Invalid signature")
     }
     // `Amount` & `Address` validity checks.
     if (!createBoxes.forall { i =>
       i._2 > 0 && AddressProposition.validAddress(i._1)
     }) {
-      log.info(s"<TX: $txHash> Invalid content.")
-      throw new Error("Transaction invalid!")
+      throw new Error("Bad outputs")
     }
     // `Fee` amount check.
     if (fee < minimalFee)
-      throw new Error("Fee amount too small.")
+      throw new Error("Fee amount too small")
 
     Success()
   }

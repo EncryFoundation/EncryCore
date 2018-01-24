@@ -7,12 +7,12 @@ import scorex.core.ModifierId
 import scorex.core.api.http.ApiRoute
 import scorex.crypto.encode.Base58
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.Success
 
 trait EncryBaseApiRoute extends ApiRoute {
 
-  implicit val ec = context.dispatcher
+  implicit val ec: ExecutionContextExecutor = context.dispatcher
 
   protected def toJsonResponse(js: Json): Route = {
     val resp = complete(HttpEntity(ContentTypes.`application/json`, js.spaces2))

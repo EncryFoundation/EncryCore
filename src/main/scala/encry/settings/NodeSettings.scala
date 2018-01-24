@@ -10,4 +10,5 @@ case class NodeSettings(ADState: Boolean,
                         miningDelay: FiniteDuration,
                         offlineGeneration: Boolean,
                         keepVersions: Int,
-                        utxMaxAge: FiniteDuration)
+                        utxMaxAge: FiniteDuration,
+                        mempoolCleanupInterval: FiniteDuration)

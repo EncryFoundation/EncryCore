@@ -1,20 +1,16 @@
 package encry.api.http.routes
 
 import akka.actor.{ActorRef, ActorRefFactory}
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.modifiers.mempool.PaymentTransaction
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import encry.view.history.EncryHistoryReader
 import encry.view.mempool.EncryMempoolReader
 import io.circe.Json
 import io.circe.syntax._
-import scorex.core.LocalInterface.LocallyGeneratedTransaction
 import scorex.core.ModifierId
 import scorex.core.settings.RESTApiSettings
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.crypto.encode.Base16
 
 import scala.concurrent.Future
@@ -36,7 +32,7 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
 
   private def getMemPool: Future[EncryMempoolReader] = (readersHolder ? GetReaders).mapTo[Readers].map(_.m.get)
 
-  // TODO: Implement.
+  // TODO: How to get transaction from history? Implement.
   private def getTransactionById(id: ModifierId): Future[Option[Json]] = getHistory.map {
     _.modifierById(id)
   }.map(_.map { modifier => ??? })

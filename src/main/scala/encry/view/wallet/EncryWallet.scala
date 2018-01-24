@@ -7,6 +7,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.EncryAppSettings
+import encry.view.wallet.keys.KeyManager
 import scorex.core.transaction.box.Box.Amount
 import scorex.core.transaction.box.proposition.{Proposition, PublicKey25519Proposition}
 import scorex.core.transaction.state.PrivateKey25519
@@ -20,42 +21,42 @@ import scala.util.{Success, Try}
 case class EncryWallet(seed: ByteStr,
                        chainTransactions: Map[ModifierId, EncryBaseTransaction] = Map(),
                        offchainTransactions: Map[ModifierId, EncryBaseTransaction] = Map(),
-                       currentBalance: Long = 0
-                       /*walletStore : LSMStore = new LSMStore(new File("wallet.store"))*/)
+                       currentBalance: Long = 0,
+                       keyStorage: KeyManager)
   extends Wallet[Proposition, EncryBaseTransaction, EncryPersistentModifier, EncryWallet]
     with ScorexLogging {
 
   override type S = PrivateKey25519
   override type PI = PublicKey25519Proposition
 
-  // TODO: Should keys for wallet app be generated from file?
   private val secret: S = {
     val pair = Curve25519.createKeyPair(seed.arr)
     PrivateKey25519(pair._1, pair._2)
   }
 
   override def secretByPublicImage(publicImage: PublicKey25519Proposition): Option[S] =
-    if (publicImage.address == secret.publicImage.address) Some(secret) else None
+    keyStorage.keys.find(k => k.publicImage.address == publicImage.address)
 
-  //TODO: for Wallet app needs more than one secret
+  override def historyTransactions: Seq[WalletTransaction[Proposition, EncryBaseTransaction]] = ???
 
-  override def generateNewSecret(): EncryWallet = throw new Error("Only one secret is supported")
+  override def boxes(): Seq[WalletBox[Proposition, EncryBaseBox]] = ???
+//    chainTransactions.filter(a => !(publicKeys contains a._2.senderProposition)).foldLeft(Seq[(Proposition, EncryBaseBox)]()){
+//      case (seq,txCase) => seq :+ txCase._2.newBoxes.filter(_.isInstanceOf[AssetBox]).foldLeft(Seq[(Proposition, EncryBaseBox)]()){
+//        case(seq,box) => seq :+ (box.proposition,box)
+//      }
+//    }
 
-  //TODO: need baseEncryPropos
+  override def secrets: Set[PrivateKey25519] = keyStorage.keys.toSet
 
-  override def historyTransactions: Seq[WalletTransaction[Proposition, EncryBaseTransaction]] = Seq()
-
-  override def boxes():  Seq[WalletBox[Proposition, EncryBaseBox]] = Seq()
-
-  override def publicKeys: Set[PI] = Set(secret.publicImage)
-
-  override def secrets: Set[S] = Set(secret)
+  override def publicKeys: Set[PublicKey25519Proposition] = secrets.foldLeft(Seq[PublicKey25519Proposition]()){
+    case(set,key) => set :+ PublicKey25519Proposition(key.publicKeyBytes)
+  }.toSet
 
   override def scanOffchain(tx: EncryBaseTransaction): EncryWallet = tx match {
     case sp: PaymentTransaction =>
       if ((sp.proposition.bytes sameElements secret.publicKeyBytes) || sp.createBoxes.foldRight(false) {
         (a: (Address, Amount), _: Boolean) => a._1 sameElements secret.publicKeyBytes }) {
-        EncryWallet(seed, chainTransactions, offchainTransactions + (sp.id -> sp), currentBalance)
+        EncryWallet(seed, chainTransactions, offchainTransactions + (sp.id -> sp), currentBalance, keyStorage = this.keyStorage)
       } else this
     case ct: CoinbaseTransaction => this
   }
@@ -84,7 +85,7 @@ case class EncryWallet(seed: ByteStr,
                 }
               }
               val cb = curWalBal
-              EncryWallet(seed, ct, oct, cb)
+              EncryWallet(seed, ct, oct, cb,keyStorage = w.keyStorage)
             } else w
           case ct: CoinbaseTransaction => w
         }
@@ -97,10 +98,19 @@ case class EncryWallet(seed: ByteStr,
   override def rollback(to: VersionTag): Try[EncryWallet] = Success(this)
 
   override type NVCT = this.type
+
+  // Shadowed.
+  override def generateNewSecret(): EncryWallet = this
 }
 
 object EncryWallet {
+
   def readOrGenerate(settings: EncryAppSettings): EncryWallet = {
-    EncryWallet(ByteStr(settings.walletSettings.seed.getBytes()), Map(), Map())
+    EncryWallet(
+      ByteStr(settings.walletSettings.seed.getBytes()),
+      Map(),
+      Map(),
+      keyStorage = KeyManager.readOrGenerate(settings)
+    )
   }
 }

@@ -56,7 +56,8 @@ libraryDependencies ++= Seq(
   "org.scorexfoundation" %% "iodb" % "0.3.2",
   "org.scorexfoundation" %% "avl-iodb" % "0.2.11",
   "org.scorexfoundation" %% "scrypto" % "2.0.3",
-  "com.storm-enroute" %% "scalameter" % "0.8.+"
+  "com.storm-enroute" %% "scalameter" % "0.8.+",
+  "io.monix" %% "monix" % "2.3.3"
 ) ++ networkDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
 
 val opts = Seq(

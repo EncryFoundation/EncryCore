@@ -14,11 +14,13 @@ import encry.view.state.{DigestState, EncryState, UtxoState}
 import encry.view.wallet.EncryWallet
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.Proposition
+import scorex.core.utils.NetworkTimeProvider
 import scorex.core.{ModifierTypeId, NodeViewHolder, NodeViewModifier}
 
 import scala.util.{Failure, Success}
 
-abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings)
+abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings,
+                                                                       timeProvider: NetworkTimeProvider)
   extends NodeViewHolder[Proposition, EncryBaseTransaction, EncryPersistentModifier] {
 
   // TODO: `settings.scorexSettings.network.networkChunkSize` should be used here.
@@ -68,7 +70,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
 
     val wallet = EncryWallet.readOrGenerate(settings)
 
-    val memPool = EncryMempool.empty(settings)
+    val memPool = EncryMempool.empty(settings, timeProvider)
 
     (history, state, wallet, memPool)
   }
@@ -82,7 +84,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
       //todo: ensure that history is in certain mode
       val history = EncryHistory.readOrGenerate(settings)
       val wallet = EncryWallet.readOrGenerate(settings)
-      val memPool = EncryMempool.empty(settings)
+      val memPool = EncryMempool.empty(settings, timeProvider)
       val state = restoreConsistentState(stateIn.asInstanceOf[MS], history)
       (history, state, wallet, memPool)
     }
@@ -109,15 +111,15 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
   }
 }
 
-private[view] class DigestEncryNodeViewHolder(settings: EncryAppSettings)
-  extends EncryNodeViewHolder[DigestState](settings)
+private[view] class DigestEncryNodeViewHolder(settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
+  extends EncryNodeViewHolder[DigestState](settings, timeProvider)
 
-private[view] class UtxoEncryNodeViewHolder(settings: EncryAppSettings)
-  extends EncryNodeViewHolder[UtxoState](settings)
+private[view] class UtxoEncryNodeViewHolder(settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
+  extends EncryNodeViewHolder[UtxoState](settings, timeProvider)
 
 object EncryNodeViewHolder {
-  def createActor(system: ActorSystem, settings: EncryAppSettings): ActorRef = {
-    if (settings.nodeSettings.ADState) system.actorOf(Props.create(classOf[DigestEncryNodeViewHolder], settings))
-    else system.actorOf(Props.create(classOf[UtxoEncryNodeViewHolder], settings))
+  def createActor(system: ActorSystem, settings: EncryAppSettings, timeProvider: NetworkTimeProvider): ActorRef = {
+    if (settings.nodeSettings.ADState) system.actorOf(Props.create(classOf[DigestEncryNodeViewHolder], settings, timeProvider))
+    else system.actorOf(Props.create(classOf[UtxoEncryNodeViewHolder], settings, timeProvider))
   }
 }

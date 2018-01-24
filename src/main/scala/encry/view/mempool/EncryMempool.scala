@@ -3,21 +3,28 @@ package encry.view.mempool
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.settings.EncryAppSettings
 import encry.view.mempool.EncryMempool._
+import monix.eval.Task
+import monix.execution.Scheduler
 import scorex.core.ModifierId
 import scorex.core.transaction.MemoryPool
-import scorex.core.utils.ScorexLogging
+import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 
-import scala.concurrent.duration._
 import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}
 
 class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTransaction],
-                                    settings: EncryAppSettings)
-  extends MemoryPool[EncryBaseTransaction, EncryMempool] with EncryMempoolReader with ScorexLogging {
+                                    settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
+  extends MemoryPool[EncryBaseTransaction, EncryMempool] with EncryMempoolReader with AutoCloseable with ScorexLogging {
 
-  // TODO: Cleanup():
-  // TODO: <-- RemoveExpired()
-  // TODO: <-- RemoveCheapest()
+  private implicit val cleanupScheduler: Scheduler = Scheduler.singleThread("mempool-cleanup-thread")
+
+  private val removeExpired = Task {
+    filter(tx => (timeProvider.time() - tx.timestamp) > settings.nodeSettings.utxMaxAge.toMillis)
+  }.delayExecution(settings.nodeSettings.mempoolCleanupInterval)
+
+  private val cleanup = removeExpired.runAsync
+
+  override def close(): Unit = cleanup.cancel()
 
   override type NVCT = EncryMempool
 
@@ -51,9 +58,6 @@ class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTra
     }
     this
   }
-
-  def removeExpired(currentTime: Long): Unit =
-    filter(tx => (currentTime - tx.timestamp).millis > settings.nodeSettings.utxMaxAge)
 }
 
 object EncryMempool {
@@ -64,5 +68,6 @@ object EncryMempool {
 
   type MemPoolResponse = Seq[EncryBaseTransaction]
 
-  def empty(settings: EncryAppSettings): EncryMempool = new EncryMempool(TrieMap.empty, settings)
+  def empty(settings: EncryAppSettings, timeProvider: NetworkTimeProvider): EncryMempool =
+    new EncryMempool(TrieMap.empty, settings, timeProvider)
 }

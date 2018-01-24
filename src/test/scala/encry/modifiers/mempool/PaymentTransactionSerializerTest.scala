@@ -12,27 +12,14 @@ class PaymentTransactionSerializerTest extends FunSuite {
 
   test("toBytes & parseBytes") {
 
-    val factory = TestHelper
-    val key = factory.getOrGenerateKeys(factory.Props.keysFilePath).head
-
-    val tx = {
-      val proposition = key.publicImage
-      val fee = factory.Props.txFee
-      val timestamp = 1234567L
-      val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
-      val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
-      val sig = PrivateKey25519Companion.sign(
-        key,
-        PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
-      )
-      PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
-    }
+    val tx = InstanceFactory.paymentTransactionValid
 
     val txSerialized = PaymentTransactionSerializer.toBytes(tx)
 
     val txDeserialized = PaymentTransactionSerializer.parseBytes(txSerialized)
 
     assert(txDeserialized.isSuccess, "Deserialization failed.")
+
     assert(tx.txHash sameElements txDeserialized.get.txHash, "Id mismatch.")
   }
 

@@ -21,6 +21,7 @@ import scorex.core.NodeViewHolder.{GetDataFromCurrentView, SemanticallySuccessfu
 import scorex.core.transaction.state.{PrivateKey25519, PrivateKey25519Companion}
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 import scorex.crypto.encode.Base16
+import scorex.utils.Random
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -140,7 +141,9 @@ object EncryMiner extends ScorexLogging {
           log.debug("BestHeader is undefined")
         }
 
-        if ((bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) && !view.pool.isEmpty) Try {
+        if ((bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) &&
+          !view.pool.isEmpty &&
+          !view.vault.keyStorage.isEmpty) Try {
 
           // TODO: Should this be lazy?
           lazy val timestamp = timeProvider.time()
@@ -181,8 +184,10 @@ object EncryMiner extends ScorexLogging {
           log.warn("Error when trying to generate candidate: ", thr)
           Failure(thr)
         }.toOption
-        else
+        else {
+          if (view.vault.keyStorage.isEmpty) view.vault.keyStorage.initStorage(Random.randomBytes())
           None
+        }
     }).mapTo[Option[PowCandidateBlock]]
   }
 }

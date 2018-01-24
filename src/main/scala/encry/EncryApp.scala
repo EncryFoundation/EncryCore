@@ -3,7 +3,7 @@ package encry
 import akka.actor.{ActorRef, Props}
 import encry.api.http.routes.{HistoryApiRoute, InfoRoute, TransactionsApiRoute}
 import encry.cli.CliListener
-import encry.cli.CliListener.StartListen
+import encry.cli.CliListener.StartListening
 import encry.local.TransactionGenerator.StartGeneration
 import encry.local.mining.EncryMiner
 import encry.local.mining.EncryMiner.StartMining
@@ -41,14 +41,14 @@ class EncryApp(args: Seq[String]) extends Application {
 
   override protected lazy val additionalMessageSpecs: Seq[MessageSpec[_]] = Seq(EncrySyncInfoMessageSpec)
 
-  override val nodeViewHolderRef: ActorRef = EncryNodeViewHolder.createActor(actorSystem, encrySettings)
+  override val nodeViewHolderRef: ActorRef = EncryNodeViewHolder.createActor(actorSystem, encrySettings, timeProvider)
 
   val readersHolderRef: ActorRef = actorSystem.actorOf(Props(classOf[EncryViewReadersHolder], nodeViewHolderRef))
 
   val minerRef: ActorRef =
     actorSystem.actorOf(Props(classOf[EncryMiner], nodeViewHolderRef, encrySettings, nodeId, timeProvider))
 
-  val cliListenerRef: ActorRef = actorSystem.actorOf(Props(classOf[CliListener], nodeViewHolderRef))
+  val cliListenerRef: ActorRef = actorSystem.actorOf(Props(classOf[CliListener], nodeViewHolderRef, encrySettings))
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
 
@@ -78,7 +78,7 @@ class EncryApp(args: Seq[String]) extends Application {
     txGen ! StartGeneration
   }
 
-  cliListenerRef ! StartListen
+  cliListenerRef ! StartListening
 }
 
 object EncryApp extends App {
