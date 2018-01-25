@@ -1,6 +1,6 @@
 package encry.modifiers.state.box.proposition
 
-import com.google.common.primitives.{Ints, Longs}
+import com.google.common.primitives.Ints
 import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.view.history.Height
 import scorex.core.serialization.Serializer
@@ -19,7 +19,7 @@ object HeightPropositionSerializer extends SizedCompanionSerializer[HeightPropos
 
   val Size = 4
 
-  override def toBytes(obj: HeightProposition): Array[Byte] = Longs.toByteArray(obj.height)
+  override def toBytes(obj: HeightProposition): Array[Byte] = Ints.toByteArray(obj.height)
 
   override def parseBytes(bytes: Array[Byte]): Try[HeightProposition] = Try {
     HeightProposition(Height @@ Ints.fromByteArray(bytes))
