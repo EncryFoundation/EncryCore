@@ -10,6 +10,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.TransactionValidator
 import encry.modifiers.state.box._
+import encry.modifiers.state.box.proposition.AddressProposition
 import encry.settings.{Algos, Constants}
 import encry.view.history.Height
 import encry.view.state.index.StateIndexReader

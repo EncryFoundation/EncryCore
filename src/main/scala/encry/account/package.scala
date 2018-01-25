@@ -8,4 +8,7 @@ package object account {
 
   type Address = Address.Type
 
+  object Balance extends TaggedType[Long]
+
+  type Balance = Balance.Type
 }

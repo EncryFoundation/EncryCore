@@ -23,7 +23,7 @@ trait StateIndexReader extends ScorexLogging {
 
   protected lazy val indexStorage = new StateIndexStorage(indexStore)
 
-  def boxesIdsByAddress(addr: Address): Option[Seq[ADKey]] = indexStorage.boxesByAddress(addr)
+  def boxIdsByAddress(addr: Address): Option[Seq[ADKey]] = indexStorage.boxesByAddress(addr)
 
   def updateIndexOn(mod: EncryPersistentModifier): Future[Unit] = Future {
     mod match {
@@ -31,13 +31,22 @@ trait StateIndexReader extends ScorexLogging {
         val stateOpsMap = mutable.HashMap.empty[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]
         block.payload.transactions.foreach { tx =>
           tx.useBoxes.foreach { id =>
-            stateOpsMap.get(Address @@ tx.proposition.address) match {
-              case Some(t) =>
-                if (t._2.exists(_.sameElements(id))) t._2.remove(id)
-                else t._1.add(id)
-              case None =>
-                stateOpsMap.update(
-                  Address @@ tx.proposition.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
+            id.head match {
+              case AssetBox.typeId =>
+                stateOpsMap.get(Address @@ tx.proposition.address) match {
+                  case Some(t) =>
+                    if (t._2.exists(_.sameElements(id))) t._2.remove(id)
+                    else t._1.add(id)
+                  case None =>
+                    stateOpsMap.update(
+                      Address @@ tx.proposition.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
+                }
+              case OpenBox.typeId =>
+                stateOpsMap.get(StateIndexReader.openBoxesKey) match {
+                  case Some(t) =>
+                    if (t._2.exists(_.sameElements(id))) t._2.remove(id)
+                  case None => // ?
+                }
             }
           }
           tx.newBoxes.foreach {
@@ -48,7 +57,7 @@ trait StateIndexReader extends ScorexLogging {
                   bx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
               }
             case bx: OpenBox =>
-              stateOpsMap.get(StateIndexReader.openBoxAddress) match {
+              stateOpsMap.get(StateIndexReader.openBoxesKey) match {
                 case Some(t) => t._2.add(bx.id)
                 case None => stateOpsMap.update(
                   Address @@ tx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
@@ -98,7 +107,9 @@ trait StateIndexReader extends ScorexLogging {
               (bNew :+ (addr, toIns.toSeq)) -> bExs
           }
       }
+
     log.info(s"Updating index for mod: ${Base58.encode(version)} ..")
+
     // First remove existing records assoc with addresses to be updated.
     indexStorage.update(
       ModifierId @@ Algos.hash(version),
@@ -107,8 +118,7 @@ trait StateIndexReader extends ScorexLogging {
     )
     // Than insert new versions of records + new records.
     indexStorage.update(
-      version,
-      Seq(),
+      version, Seq(),
       (opsFinal._1 ++ opsFinal._2).map { case (addr, ids) =>
         ByteArrayWrapper(AddressProposition.getAddrBytes(addr)) ->
           ByteArrayWrapper(ids.foldLeft(Array[Byte]()) { case (buff, id) => buff ++ id })
@@ -119,5 +129,5 @@ trait StateIndexReader extends ScorexLogging {
 
 object StateIndexReader {
 
-  val openBoxAddress: Address = Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp"
+  val openBoxesKey: Address = Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp"
 }

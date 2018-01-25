@@ -1,6 +1,6 @@
 package encry.view.state
 
-import encry.account.Address
+import encry.account.{Address, Balance}
 import encry.modifiers.state.box._
 import encry.view.history.Height
 import encry.view.state.index.{Portfolio, StateIndexReader}
@@ -43,7 +43,7 @@ trait UtxoStateReader extends StateIndexReader with ScorexLogging {
     }
 
   def getOpenBoxesAtHeight(height: Height): Seq[OpenBox] =
-    boxesByAddress(StateIndexReader.openBoxAddress)
+    boxesByAddress(StateIndexReader.openBoxesKey)
       .map(bxs => bxs.filter(bx => bx.isInstanceOf[OpenBox] &&
         bx.asInstanceOf[OpenBox].proposition.height <= height)
         .map(_.asInstanceOf[OpenBox])).getOrElse(Seq())
@@ -52,7 +52,7 @@ trait UtxoStateReader extends StateIndexReader with ScorexLogging {
     persistentProver.avlProver.randomWalk().map(_._1).flatMap(boxById)
 
   def boxesByAddress(address: Address): Option[Seq[EncryBaseBox]] =
-    boxesIdsByAddress(address) match {
+    boxIdsByAddress(address) match {
       case Some(bxIds) =>
         val bxs = bxIds.foldLeft(Seq[EncryBaseBox]()) { case (buff, id) =>
           boxById(id) match {
