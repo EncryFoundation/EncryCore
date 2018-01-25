@@ -33,6 +33,7 @@ trait UtxoStateReader extends StateIndexReader with ScorexLogging {
         .map(OpenBoxSerializer.parseBytes).flatMap(_.toOption)
       case AssetBox.typeId => persistentProver.unauthenticatedLookup(boxId)
         .map(AssetBoxSerializer.parseBytes).flatMap(_.toOption)
+      case _ => None
     }
 
   def typedBoxById[BXT <: EncryBaseBox](boxId: ADKey): Option[EncryBaseBox] =
@@ -44,7 +45,7 @@ trait UtxoStateReader extends StateIndexReader with ScorexLogging {
   def getOpenBoxesAtHeight(height: Height): Seq[OpenBox] =
     boxesByAddress(StateIndexReader.openBoxAddress)
       .map(bxs => bxs.filter(bx => bx.isInstanceOf[OpenBox] &&
-        bx.proposition.asInstanceOf[OpenBox].proposition.height <= height)
+        bx.asInstanceOf[OpenBox].proposition.height <= height)
         .map(_.asInstanceOf[OpenBox])).getOrElse(Seq())
 
   def getRandomBox: Option[EncryBaseBox] =

@@ -3,9 +3,10 @@ package encry.modifiers.mempool
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.Address
 import encry.modifiers.mempool.EncryTransaction.{TxTypeId, _}
-import encry.modifiers.state.box.proposition.AddressProposition
-import encry.modifiers.state.box.{AssetBox, EncryNoncedBox, OpenBox}
+import encry.modifiers.state.box.proposition.{AddressProposition, HeightProposition}
+import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox}
 import encry.settings.Algos
+import encry.view.history.Height
 import io.circe.Json
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
@@ -35,13 +36,13 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
 
   override val feeBox: Option[OpenBox] = None
 
-  override val newBoxes: Traversable[EncryNoncedBox[AddressProposition]] = Seq(
+  override val newBoxes: Traversable[EncryBaseBox] = Seq(
     AssetBox(
       proposition = AddressProposition(Address @@ proposition.address),
       nonce = nonceFromDigest(Algos.hash(txHash)),
       amount = amount
     )
-  )
+  ) ++ Seq(OpenBox(HeightProposition(Height @@ 1), timestamp, 9999L))
 
   override def json: Json = Map(
     "type" -> "Coinbase".asJson,
