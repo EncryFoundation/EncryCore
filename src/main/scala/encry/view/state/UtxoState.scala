@@ -10,7 +10,9 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.TransactionValidator
 import encry.modifiers.state.box._
+import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.{Algos, Constants}
+import encry.view.history.Height
 import encry.view.state.index.StateIndexReader
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.LocalInterface.LocallyGeneratedModifier
@@ -287,5 +289,11 @@ object UtxoState extends ScorexLogging {
           p, storage, metadata(EncryState.genesisStateVersion, p.digest), paranoidChecks = true
         ).get.ensuring(_.digest sameElements storage.version.get)
     }
+  }
+
+  def newOpenBoxAt(height: Height): OpenBox = {
+    val perBlockEmissionAmount = 2000L
+    OpenBox(HeightProposition(Height @@ (height + Constants.emissionHeightLock)),
+      9999 * height, perBlockEmissionAmount)
   }
 }

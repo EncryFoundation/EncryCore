@@ -3,10 +3,11 @@ package encry.modifiers.mempool
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.Address
 import encry.modifiers.mempool.EncryTransaction.{TxTypeId, _}
-import encry.modifiers.state.box.proposition.{AddressProposition, HeightProposition}
+import encry.modifiers.state.box.proposition.AddressProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox}
 import encry.settings.Algos
 import encry.view.history.Height
+import encry.view.state.UtxoState
 import io.circe.Json
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
@@ -24,7 +25,8 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
                                override val timestamp: Long,
                                override val signature: Signature25519,
                                override val useBoxes: IndexedSeq[ADKey],
-                               amount: Amount) extends EncryTransaction {
+                               amount: Amount,
+                               height: Height) extends EncryTransaction {
 
   override type M = CoinbaseTransaction
 
@@ -42,7 +44,7 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
       nonce = nonceFromDigest(Algos.hash(txHash)),
       amount = amount
     )
-  ) ++ Seq(OpenBox(HeightProposition(Height @@ 0), timestamp, 9999L))
+  ) :+ UtxoState.newOpenBoxAt(height)
 
   override def json: Json = Map(
     "type" -> "Coinbase".asJson,
@@ -63,7 +65,7 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
 
   override def serializer: Serializer[M] = CoinbaseTransactionSerializer
 
-  override lazy val txHash: Digest32 = CoinbaseTransaction.getHash(proposition, useBoxes, timestamp, amount)
+  override lazy val txHash: Digest32 = CoinbaseTransaction.getHash(proposition, useBoxes, timestamp, amount, height)
 
   override lazy val semanticValidity: Try[Unit] = {
     // Signature validity checks.
@@ -82,7 +84,8 @@ object CoinbaseTransaction {
   def getHash(proposition: PublicKey25519Proposition,
               useBoxes: IndexedSeq[ADKey],
               timestamp: Long,
-              amount: Amount): Digest32 = Algos.hash(
+              amount: Amount,
+              height: Height): Digest32 = Algos.hash(
     Bytes.concat(
       Array[Byte](typeId),
       proposition.pubKeyBytes,
@@ -91,13 +94,15 @@ object CoinbaseTransaction {
         arr ++ key
       },
       Longs.toByteArray(amount),
+      Ints.toByteArray(height)
     )
   )
 
   def getMessageToSign(proposition: PublicKey25519Proposition,
                        useBoxes: IndexedSeq[ADKey],
                        timestamp: Long,
-                       amount: Amount): Array[Byte] = getHash(proposition, useBoxes, timestamp, amount)
+                       amount: Amount,
+                       height: Height): Array[Byte] = getHash(proposition, useBoxes, timestamp, amount, height)
 }
 
 object CoinbaseTransactionSerializer extends Serializer[CoinbaseTransaction] {
@@ -108,6 +113,7 @@ object CoinbaseTransactionSerializer extends Serializer[CoinbaseTransaction] {
       Longs.toByteArray(obj.timestamp),
       obj.signature.signature,
       Longs.toByteArray(obj.amount),
+      Ints.toByteArray(obj.height),
       Ints.toByteArray(obj.useBoxes.length),
       obj.useBoxes.foldLeft(Array[Byte]()) { case (arr, key) =>
         arr ++ key
@@ -121,13 +127,14 @@ object CoinbaseTransactionSerializer extends Serializer[CoinbaseTransaction] {
     val timestamp = Longs.fromByteArray(bytes.slice(32, 40))
     val signature = Signature25519(Signature @@ bytes.slice(40, 104))
     val amount = Longs.fromByteArray(bytes.slice(104, 112))
-    val inputLength = Ints.fromByteArray(bytes.slice(112, 116))
-    val s = 116
+    val height = Height @@ Ints.fromByteArray(bytes.slice(112, 116))
+    val inputLength = Ints.fromByteArray(bytes.slice(116, 120))
+    val s = 120
     val outElementLength = 32
     val useBoxes = (0 until inputLength) map { i =>
       ADKey @@ bytes.slice(s + (i * outElementLength), s + (i + 1) * outElementLength)
     }
 
-    CoinbaseTransaction(sender, timestamp, signature, useBoxes, amount)
+    CoinbaseTransaction(sender, timestamp, signature, useBoxes, amount, height)
   }
 }

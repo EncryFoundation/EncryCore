@@ -7,7 +7,9 @@ import encry.local.TestHelper
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box._
-import encry.settings.{Algos, EncryAppSettings, NodeSettings}
+import encry.modifiers.state.box.proposition.HeightProposition
+import encry.settings.{Algos, Constants, EncryAppSettings, NodeSettings}
+import encry.view.history.Height
 import scorex.core.VersionTag
 import scorex.core.transaction.state.MinimalState
 import scorex.core.utils.ScorexLogging
@@ -63,6 +65,10 @@ object EncryState extends ScorexLogging{
   def stateDir(settings: EncryAppSettings) = new File(s"${settings.directory}/state")
 
   def indexDir(settings: EncryAppSettings) = new File(s"${settings.directory}/index")
+
+  // TODO: Magic numbers. Move to settings.
+  def initialOpenBoxes: IndexedSeq[OpenBox] = (0 until 100).map(i =>
+    OpenBox(HeightProposition(Height @@ -1), 9999 * i, 20L))
 
   def genGenesisUtxoState(stateDir: File, indexDir: File,
                           nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {

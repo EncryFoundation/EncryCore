@@ -9,7 +9,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction}
 import encry.modifiers.state.box.OpenBox
 import encry.settings.EncryAppSettings
-import encry.view.history.EncryHistory
+import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
@@ -145,8 +145,8 @@ object EncryMiner extends ScorexLogging {
           !view.pool.isEmpty &&
           !view.vault.keyStorage.isEmpty) Try {
 
-          // TODO: Should this be lazy?
           lazy val timestamp = timeProvider.time()
+          val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(-1) + 1)
 
           var txs = view.state.filterValid(view.pool.takeAllUnordered.toSeq)
             .foldLeft(Seq[EncryBaseTransaction]()) { case (txsBuff, tx) =>
@@ -158,12 +158,14 @@ object EncryMiner extends ScorexLogging {
           // TODO: Which PubK should we pick here?
           val minerProposition = view.vault.publicKeys.head
           val privateKey: PrivateKey25519 = view.vault.secretByPublicImage(minerProposition).get
-          val openBxs = txs.flatMap(tx => tx.newBoxes.filter(_.isInstanceOf[OpenBox])).toIndexedSeq
+          val openBxs = txs.flatMap(tx => tx.newBoxes.filter(_.isInstanceOf[OpenBox])).toIndexedSeq ++
+            view.state.getOpenBoxesAtHeight(height)
           val amount = openBxs.map(_.value).sum
           val cTxSignature = PrivateKey25519Companion.sign(privateKey,
-            CoinbaseTransaction.getHash(minerProposition, openBxs.map(_.id), timestamp, amount))
+            CoinbaseTransaction.getHash(minerProposition, openBxs.map(_.id), timestamp, amount, height))
 
-          val coinbase = CoinbaseTransaction(minerProposition, timestamp, cTxSignature, openBxs.map(_.id), amount)
+          val coinbase =
+            CoinbaseTransaction(minerProposition, timestamp, cTxSignature, openBxs.map(_.id), amount, height)
 
           txs = txs.sortBy(_.timestamp) :+ coinbase
 
@@ -176,8 +178,11 @@ object EncryMiner extends ScorexLogging {
             EncryBlockHeader.getMessageToSign(derivedFields._1, minerProposition, derivedFields._2,
               derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, difficulty))
 
-          val candidate = new PowCandidateBlock(minerProposition, blockSignature, bestHeaderOpt, adProof, adDigest, txs, timestamp, difficulty)
-          log.debug(s"Sending candidate block with ${candidate.transactions.length} transactions")
+          val candidate = new PowCandidateBlock(minerProposition,
+            blockSignature, bestHeaderOpt, adProof, adDigest, txs, timestamp, difficulty)
+
+          log.debug(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
+            s"and 1 coinbase for height=${height}")
 
           candidate
         }.recoverWith { case thr =>

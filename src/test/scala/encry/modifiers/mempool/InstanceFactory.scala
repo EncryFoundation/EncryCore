@@ -2,6 +2,7 @@ package encry.modifiers.mempool
 
 import encry.account.Address
 import encry.local.TestHelper
+import encry.view.history.Height
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.transaction.proof.Signature25519
 import scorex.core.transaction.state.PrivateKey25519Companion
@@ -42,6 +43,7 @@ object InstanceFactory {
     178999L,
     Signature25519(Signature @@ Random.randomBytes(64)),
     IndexedSeq(ADKey @@ Random.randomBytes(), ADKey @@ Random.randomBytes()),
-    999L
+    999L,
+    Height @@ 0
   )
 }

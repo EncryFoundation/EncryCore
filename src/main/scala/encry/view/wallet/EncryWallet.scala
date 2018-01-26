@@ -40,11 +40,16 @@ case class EncryWallet(seed: ByteStr,
   override def historyTransactions: Seq[WalletTransaction[Proposition, EncryBaseTransaction]] = ???
 
   override def boxes(): Seq[WalletBox[Proposition, EncryBaseBox]] = ???
-//    chainTransactions.filter(a => !(publicKeys contains a._2.senderProposition)).foldLeft(Seq[(Proposition, EncryBaseBox)]()){
-//      case (seq,txCase) => seq :+ txCase._2.newBoxes.filter(_.isInstanceOf[AssetBox]).foldLeft(Seq[(Proposition, EncryBaseBox)]()){
-//        case(seq,box) => seq :+ (box.proposition,box)
-//      }
-//    }
+//    chainTransactions
+//          .filter(a => !(publicKeys contains a._2.proposition))
+//          .foldLeft(Seq[(EncryBaseBox, EncryBaseTransaction)]()) {
+//          case (seq, txCase) =>
+//            seq ++ txCase._2.newBoxes
+//              .filter(_.isInstanceOf[AssetBox])
+//              .foldLeft(Seq[(EncryBaseBox, EncryBaseTransaction)]()) { case (buff, box) =>
+//                buff ++ Seq((box, txCase._2))
+//          }
+//        }.map(i => WalletBox[PI, EncryBaseBox](i._1, i._2.id, i._2.timestamp)(AssetBoxSerializer))
 
   override def secrets: Set[PrivateKey25519] = keyStorage.keys.toSet
 
