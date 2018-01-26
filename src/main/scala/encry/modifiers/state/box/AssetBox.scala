@@ -35,7 +35,8 @@ case class AssetBox(override val proposition: AddressProposition,
     )
   )
 
-  override def unlockTry(modifier: EncryTransaction, script: Option[String] = None): Try[Unit] =
+  override def unlockTry(modifier: EncryTransaction, script: Option[String] = None,
+                         ctxOpt: Option[Context] = None): Try[Unit] =
     if (modifier.proposition.address != proposition.address) Failure(new Error("Unlock failed"))
     else Success()
 

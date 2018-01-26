@@ -183,8 +183,7 @@ class UtxoState(override val version: VersionTag,
                 case OpenBox.typeId =>
                   OpenBoxSerializer.parseBytes(data) match {
                     case Success(box) =>
-                      if (box.proposition.height > stateHeight)
-                        throw new Error(s"Box referenced in tx: $tx is disallowed to be spent at current height.")
+                      box.unlockTry(tx, ctxOpt = Some(Context(stateHeight)))
                       inputsSumCounter += box.amount
                     case Failure(_) =>
                       throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
@@ -192,8 +191,7 @@ class UtxoState(override val version: VersionTag,
                 case AssetBox.typeId =>
                   AssetBoxSerializer.parseBytes(data) match {
                     case Success(box) =>
-                      if (box.unlockTry(tx).isFailure)
-                        throw new Error(s"Invalid unlocker for box referenced in $tx")
+                      box.unlockTry(tx)
                       inputsSumCounter += box.amount
                     case Failure(_) =>
                       throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
@@ -215,8 +213,7 @@ class UtxoState(override val version: VersionTag,
                 case OpenBox.typeId =>
                   OpenBoxSerializer.parseBytes(data) match {
                     case Success(box) =>
-                      if (box.proposition.height > stateHeight)
-                        throw new Error(s"Box referenced in tx: $tx is disallowed to be spent at current height.")
+                      box.unlockTry(tx, ctxOpt = Some(Context(stateHeight)))
                     case Failure(_) =>
                       throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
                   }

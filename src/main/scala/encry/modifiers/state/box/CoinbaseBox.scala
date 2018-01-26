@@ -33,7 +33,7 @@ case class CoinbaseBox(override val proposition: HeightProposition,
     )
   )
 
-  override def unlockTry(modifier: EncryTransaction, script: Option[String]): Try[Unit] = Success()
+  override def unlockTry(modifier: EncryTransaction, script: Option[String], ctxOpt: Option[Context]): Try[Unit] = Success()
 
   override def serializer: SizedCompanionSerializer[M] = CoinbaseBoxSerializer
 

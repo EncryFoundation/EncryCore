@@ -21,7 +21,7 @@ class UtxoStateTest extends org.scalatest.FunSuite {
 
   test("FilterValid(txs) should return only valid txs (against current state).") {
 
-    val dir: File = new File("/Users/ilaoskin/IdeaProjects/Encry/test-data/state1")
+    val dir: File = new File(s"${System.getProperty("user.dir")}/test-data/state1")
     assert(dir.exists() && dir.isDirectory, "dir is invalid.")
 
     def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
@@ -93,7 +93,7 @@ class UtxoStateTest extends org.scalatest.FunSuite {
 
   test("BatchAVLProver should have the same digest after rollback as before.") {
 
-    val dir: File = new File("/Users/ilaoskin/IdeaProjects/Encry/test-data/state2")
+    val dir: File = new File(s"${System.getProperty("user.dir")}/test-data/state2")
     assert(dir.exists() && dir.isDirectory, "dir is invalid.")
 
     val store = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
@@ -126,30 +126,5 @@ class UtxoStateTest extends org.scalatest.FunSuite {
     assert(afterRollbackDigest sameElements initialDigest, "Invalid digest after rollback.")
 
     store.close()
-  }
-
-  test("Store.update & Store.get") {
-
-    val dir: File = new File("/Users/ilaoskin/IdeaProjects/Encry/test-data/state3")
-    assert(dir.exists() && dir.isDirectory, "dir is invalid.")
-
-    val storage = new LSMStore(dir, keepVersions = Constants.keepVersions)
-
-    val storageVersion: ModifierId = ModifierId @@ Random.randomBytes()
-
-    val valuesToInsert = (1 until 100).map { i =>
-      ByteArrayWrapper(Array.fill(32)(i.toByte)) -> ByteArrayWrapper(Array.fill(64)(i.toByte))
-    }
-
-    storage.update(ByteArrayWrapper(storageVersion), Seq(), valuesToInsert)
-
-    assert((1 until 100).forall(i => storage.get(ByteArrayWrapper(Array.fill(32)(i.toByte))).isDefined),
-      "Inserted key is undefined.")
-
-    assert((1 until 100).forall(i => storage.get(
-      ByteArrayWrapper(Array.fill(32)(i.toByte))).get.data sameElements Array.fill(64)(i.toByte)),
-      "Inserted value is undefined.")
-
-    storage.close()
   }
 }

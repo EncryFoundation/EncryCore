@@ -48,7 +48,7 @@ trait UtxoStateReader extends StateIndexReader with ScorexLogging {
     }
 
   def getOpenBoxesAtHeight(height: Height): Seq[OpenBox] =
-    boxesByAddress(StateIndexReader.openBoxesKey)
+    boxesByAddress(StateIndexReader.openBoxesAddress)
       .map(bxs => bxs.filter(bx => bx.isInstanceOf[OpenBox] &&
         bx.asInstanceOf[OpenBox].proposition.height <= height)
         .map(_.asInstanceOf[OpenBox])).getOrElse(Seq())

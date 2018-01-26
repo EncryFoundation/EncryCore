@@ -13,7 +13,7 @@ import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 case class OpenBox(override val proposition: HeightProposition,
                    override val nonce: Long,
@@ -32,7 +32,10 @@ case class OpenBox(override val proposition: HeightProposition,
     )
   )
 
-  override def unlockTry(modifier: EncryTransaction, script: Option[String] = None): Try[Unit] = Success()
+  override def unlockTry(modifier: EncryTransaction,
+                         script: Option[String] = None, ctxOpt: Option[Context]): Try[Unit] =
+    if (ctxOpt.isDefined && proposition.height <= ctxOpt.get.height) Success()
+    else Failure(new Error("Unlock failed"))
 
   override def serializer: SizedCompanionSerializer[M] = OpenBoxSerializer
 

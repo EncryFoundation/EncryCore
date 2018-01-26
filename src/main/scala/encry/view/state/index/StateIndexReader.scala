@@ -44,7 +44,7 @@ trait StateIndexReader extends ScorexLogging {
                       Address @@ tx.proposition.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
                 }
               case OpenBox.typeId =>
-                stateOpsMap.get(StateIndexReader.openBoxesKey) match {
+                stateOpsMap.get(StateIndexReader.openBoxesAddress) match {
                   case Some(t) =>
                     if (t._2.exists(_.sameElements(id))) t._2.remove(id)
                   case None => // ?
@@ -59,7 +59,7 @@ trait StateIndexReader extends ScorexLogging {
                   bx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
               }
             case bx: OpenBox =>
-              stateOpsMap.get(StateIndexReader.openBoxesKey) match {
+              stateOpsMap.get(StateIndexReader.openBoxesAddress) match {
                 case Some(t) => t._2.add(bx.id)
                 case None => stateOpsMap.update(
                   Address @@ tx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
@@ -98,7 +98,7 @@ trait StateIndexReader extends ScorexLogging {
 
   def bulkUpdateIndex(version: ModifierId,
                       opsMap: mutable.HashMap[Address, (mutable.Set[ADKey], mutable.Set[ADKey])],
-                      heightOpt: Option[Height]): Unit = {
+                      modHeightOpt: Option[Height]): Unit = {
     val opsFinal = opsMap
       .foldLeft(Seq[(Address, Seq[ADKey])](), Seq[(Address, Seq[ADKey])]()) {
         case ((bNew, bExs), (addr, (toRem, toIns))) =>
@@ -114,7 +114,7 @@ trait StateIndexReader extends ScorexLogging {
     log.info(s"Updating index for mod: ${Base58.encode(version)}")
 
     val keysToRemove = {
-      if (heightOpt.isDefined)
+      if (modHeightOpt.isDefined)
         opsFinal._2.map(i => ByteArrayWrapper(AddressProposition.getAddrBytes(i._1))) :+
           StateIndexReader.stateHeightKey
       else
@@ -126,8 +126,8 @@ trait StateIndexReader extends ScorexLogging {
         ByteArrayWrapper(AddressProposition.getAddrBytes(addr)) ->
           ByteArrayWrapper(ids.foldLeft(Array[Byte]()) { case (buff, id) => buff ++ id })
       }
-      if (heightOpt.isDefined)
-        bxsOps :+ (StateIndexReader.stateHeightKey, ByteArrayWrapper(Ints.toByteArray(heightOpt.get)))
+      if (modHeightOpt.isDefined)
+        bxsOps :+ (StateIndexReader.stateHeightKey, ByteArrayWrapper(Ints.toByteArray(modHeightOpt.get)))
       else
         bxsOps
     }
@@ -142,7 +142,7 @@ trait StateIndexReader extends ScorexLogging {
 
 object StateIndexReader {
 
-  val openBoxesKey: Address = Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp"
+  val openBoxesAddress: Address = Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp"
 
   val stateHeightKey: ByteArrayWrapper = ByteArrayWrapper(Algos.hash("state_height".getBytes))
 }
