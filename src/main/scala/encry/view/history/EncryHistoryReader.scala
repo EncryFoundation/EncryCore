@@ -175,6 +175,17 @@ trait EncryHistoryReader
     }
   }
 
+  def fullBlocksAfter(fromBlockOpt: Option[EncryBlock]): Try[Seq[EncryBlock]] = Try {
+    bestFullBlockOpt match {
+      case Some(bestFull) if !fromBlockOpt.contains(bestFull) =>
+        val until = (h: EncryBlockHeader) => fromBlockOpt.exists(fb => h.parentId sameElements fb.header.id)
+        headerChainBack(bestFull.header.height + 1, bestFull.header, until).headers
+          .map(h => getFullBlock(h).get)
+      case _ =>
+        Seq()
+    }
+  }
+
   protected[history] def commonBlockThenSuffixes(header1: EncryBlockHeader,
                                                  header2: EncryBlockHeader): (EncryHeaderChain, EncryHeaderChain) = {
     assert(contains(header1))

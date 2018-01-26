@@ -1,5 +1,6 @@
 package encry.view.state
 
+import com.google.common.primitives.Ints
 import encry.account.{Address, Balance}
 import encry.modifiers.state.box._
 import encry.view.history.Height
@@ -7,7 +8,8 @@ import encry.view.state.index.{Portfolio, StateIndexReader}
 import io.iohk.iodb.Store
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
-import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
+import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters,
+  PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
@@ -16,6 +18,9 @@ trait UtxoStateReader extends StateIndexReader with ScorexLogging {
   implicit val hf: Blake2b256Unsafe = new Blake2b256Unsafe
 
   val stateStore: Store
+
+  def stateHeight: Height = indexStorage.db.get(StateIndexReader.stateHeightKey)
+    .map(d => Height @@ Ints.fromByteArray(d.data)).getOrElse(Height @@ 0)
 
   private lazy val np =
     NodeParameters(keySize = EncryBox.BoxIdSize, valueSize = AssetBoxSerializer.Size, labelSize = 32)

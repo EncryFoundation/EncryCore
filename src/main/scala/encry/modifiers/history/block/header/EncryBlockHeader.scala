@@ -27,7 +27,7 @@ case class EncryBlockHeader(override val version: Version,
                             override val stateRoot: ADDigest, // 32 bytes + 1 (tree height)
                             override val txsRoot: Digest32,
                             override val timestamp: Timestamp,
-                            override val height: Int,
+                            override val height: Int, // TODO: @@ Height
                             var nonce: Long = 0L,
                             difficulty: Difficulty) extends EncryBaseBlockHeader {
 

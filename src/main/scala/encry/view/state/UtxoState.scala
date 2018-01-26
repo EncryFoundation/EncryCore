@@ -10,9 +10,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.TransactionValidator
 import encry.modifiers.state.box._
-import encry.modifiers.state.box.proposition.AddressProposition
 import encry.settings.{Algos, Constants}
-import encry.view.history.Height
 import encry.view.state.index.StateIndexReader
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.LocalInterface.LocallyGeneratedModifier
@@ -76,7 +74,7 @@ class UtxoState(override val version: VersionTag,
 
     case block: EncryBlock =>
       log.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
-        s"root hash ${Algos.encode(rootHash)}")
+        s"root hash ${Algos.encode(rootHash)} at height $stateHeight")
 
       applyTransactions(block.payload.transactions, block.header.stateRoot, block.id).map { _: Unit =>
         val md = metadata(VersionTag @@ block.id, block.header.stateRoot)
@@ -185,6 +183,8 @@ class UtxoState(override val version: VersionTag,
                 case OpenBox.typeId =>
                   OpenBoxSerializer.parseBytes(data) match {
                     case Success(box) =>
+                      if (box.proposition.height > stateHeight)
+                        throw new Error(s"Box referenced in tx: $tx is disallowed to be spent at current height.")
                       inputsSumCounter += box.amount
                     case Failure(_) =>
                       throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
@@ -215,8 +215,7 @@ class UtxoState(override val version: VersionTag,
                 case OpenBox.typeId =>
                   OpenBoxSerializer.parseBytes(data) match {
                     case Success(box) =>
-                      // TODO: How to get `bestHeaderHeight` to compare with `box.proposition.height`?
-                      if (box.proposition.height > 0)
+                      if (box.proposition.height > stateHeight)
                         throw new Error(s"Box referenced in tx: $tx is disallowed to be spent at current height.")
                     case Failure(_) =>
                       throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")

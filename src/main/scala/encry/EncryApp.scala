@@ -85,6 +85,8 @@ object EncryApp extends App {
 
   new EncryApp(args).run()
 
-  def forceStopApplication(code: Int = 1): Unit =
-    new Thread(() => System.exit(code), "encry-shutdown-thread").start()
+  def forceStopApplication(code: Int = 1) = {
+    new Thread(() => System.exit(code), "ergo-platform-shutdown-thread").start()
+    throw new Error("Exit")
+  }
 }

@@ -1,11 +1,13 @@
 package encry.view.state.index
 
+import com.google.common.primitives.Ints
 import encry.account.Address
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.state.box.{AssetBox, OpenBox}
 import encry.modifiers.state.box.proposition.AddressProposition
 import encry.settings.Algos
+import encry.view.history.Height
 import encry.view.state.index.storage.StateIndexStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.core.ModifierId
@@ -64,7 +66,7 @@ trait StateIndexReader extends ScorexLogging {
               }
           }
         }
-        bulkUpdateIndex(block.header.id, stateOpsMap)
+        bulkUpdateIndex(block.header.id, stateOpsMap, Some(Height @@ mod.asInstanceOf[EncryBlock].header.height))
 
       case _ => // Do nothing.
     }
@@ -95,7 +97,8 @@ trait StateIndexReader extends ScorexLogging {
   }
 
   def bulkUpdateIndex(version: ModifierId,
-                      opsMap: mutable.HashMap[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]): Unit = {
+                      opsMap: mutable.HashMap[Address, (mutable.Set[ADKey], mutable.Set[ADKey])],
+                      heightOpt: Option[Height]): Unit = {
     val opsFinal = opsMap
       .foldLeft(Seq[(Address, Seq[ADKey])](), Seq[(Address, Seq[ADKey])]()) {
         case ((bNew, bExs), (addr, (toRem, toIns))) =>
@@ -108,26 +111,38 @@ trait StateIndexReader extends ScorexLogging {
           }
       }
 
-    log.info(s"Updating index for mod: ${Base58.encode(version)} ..")
+    log.info(s"Updating index for mod: ${Base58.encode(version)}")
 
-    // First remove existing records assoc with addresses to be updated.
-    indexStorage.update(
-      ModifierId @@ Algos.hash(version),
-      opsFinal._2.map(i => ByteArrayWrapper(AddressProposition.getAddrBytes(i._1))),
-      Seq()
-    )
-    // Than insert new versions of records + new records.
-    indexStorage.update(
-      version, Seq(),
-      (opsFinal._1 ++ opsFinal._2).map { case (addr, ids) =>
+    val keysToRemove = {
+      if (heightOpt.isDefined)
+        opsFinal._2.map(i => ByteArrayWrapper(AddressProposition.getAddrBytes(i._1))) :+
+          StateIndexReader.stateHeightKey
+      else
+        opsFinal._2.map(i => ByteArrayWrapper(AddressProposition.getAddrBytes(i._1)))
+    }
+
+    val recordsToInsert = {
+      val bxsOps = (opsFinal._1 ++ opsFinal._2).map { case (addr, ids) =>
         ByteArrayWrapper(AddressProposition.getAddrBytes(addr)) ->
           ByteArrayWrapper(ids.foldLeft(Array[Byte]()) { case (buff, id) => buff ++ id })
       }
-    )
+      if (heightOpt.isDefined)
+        bxsOps :+ (StateIndexReader.stateHeightKey, ByteArrayWrapper(Ints.toByteArray(heightOpt.get)))
+      else
+        bxsOps
+    }
+
+    // First remove existing records assoc with addresses to be updated.
+    indexStorage.update(ModifierId @@ Algos.hash(version), keysToRemove, Seq())
+
+    // Than insert new versions of records + new records.
+    indexStorage.update(version, Seq(), recordsToInsert)
   }
 }
 
 object StateIndexReader {
 
   val openBoxesKey: Address = Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp"
+
+  val stateHeightKey: ByteArrayWrapper = ByteArrayWrapper(Algos.hash("state_height".getBytes))
 }
