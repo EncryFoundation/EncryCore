@@ -74,8 +74,7 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
     if (!validSignature) {
       log.info(s"<TX: $txHash> Invalid signature provided.")
       Failure(new Error("Invalid signature provided!"))
-    }
-    Success()
+    } else Success()
   }
 }
 

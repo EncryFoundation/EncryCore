@@ -47,7 +47,7 @@ trait StateIndexReader extends ScorexLogging {
                 stateOpsMap.get(StateIndexReader.openBoxesAddress) match {
                   case Some(t) =>
                     if (t._2.exists(_.sameElements(id))) t._2.remove(id)
-                  case None => // ?
+                  case None => // Do nothing.
                 }
             }
           }
@@ -62,7 +62,7 @@ trait StateIndexReader extends ScorexLogging {
               stateOpsMap.get(StateIndexReader.openBoxesAddress) match {
                 case Some(t) => t._2.add(bx.id)
                 case None => stateOpsMap.update(
-                  Address @@ tx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
+                  StateIndexReader.openBoxesAddress, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
               }
           }
         }

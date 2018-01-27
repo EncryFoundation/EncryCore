@@ -289,14 +289,6 @@ object UtxoState extends ScorexLogging {
         PersistentBatchAVLProver.create(
           p, storage, metadata(EncryState.genesisStateVersion, p.digest), paranoidChecks = true
         ).get.ensuring(_.digest sameElements storage.version.get)
-
-//      indexStorage.insert(
-//        ModifierId @@ EncryState.genesisStateVersion,
-//        Seq(
-//          ByteArrayWrapper(AddressProposition.getAddrBytes(StateIndexReader.openBoxesAddress)) ->
-//            ByteArrayWrapper(bh.sortedBoxes.foldLeft(Array[Byte]()) { case (buff, bx) => buff ++ bx.id })
-//        )
-//      )
     }
   }
 
