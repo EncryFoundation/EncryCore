@@ -259,7 +259,7 @@ object UtxoState extends ScorexLogging {
   def create(stateDir: File, indexDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
     val stateStore = new LSMStore(stateDir, keepVersions = Constants.keepVersions)
     val indexStore = new LSMStore(indexDir,
-      keySize = PublicKey25519Proposition.AddressLength, keepVersions = Constants.keepVersions)
+      keySize = 32, keepVersions = Constants.keepVersions)
     val dbVersion = stateStore.get(ByteArrayWrapper(bestVersionKey)).map( _.data)
     new UtxoState(VersionTag @@ dbVersion.getOrElse(EncryState.genesisStateVersion),
       stateStore, indexStore, nodeViewHolderRef)
@@ -280,7 +280,7 @@ object UtxoState extends ScorexLogging {
 
     val stateStore = new LSMStore(stateDir, keepVersions = Constants.keepVersions)
     val indexStore = new LSMStore(indexDir,
-      keySize = PublicKey25519Proposition.AddressLength, keepVersions = Constants.keepVersions)
+      keySize = 32, keepVersions = Constants.keepVersions)
 
     log.info(s"Generating UTXO State from BH with ${bh.boxes.size} boxes")
 

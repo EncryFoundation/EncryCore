@@ -21,6 +21,8 @@ import scala.concurrent.Future
 
 trait StateIndexReader extends ScorexLogging {
 
+  import StateIndexReader._
+
   val indexStore: Store
 
   protected lazy val indexStorage = new StateIndexStorage(indexStore)
@@ -28,6 +30,7 @@ trait StateIndexReader extends ScorexLogging {
   def boxIdsByAddress(addr: Address): Option[Seq[ADKey]] = indexStorage.boxesByAddress(addr)
 
   def updateIndexOn(mod: EncryPersistentModifier): Future[Unit] = Future {
+
     mod match {
       case block: EncryBlock =>
         val stateOpsMap = mutable.HashMap.empty[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]
@@ -74,23 +77,23 @@ trait StateIndexReader extends ScorexLogging {
 
   // Updates or creates index for key `address`.
   def updateIndexFor(address: Address, toRemove: Seq[ADKey], toInsert: Seq[ADKey]): Future[Unit] = Future {
-    val addrBytes = AddressProposition.getAddrBytes(address)
+    val addrKey = keyByAddress(address)
     val bxsOpt = indexStorage.boxesByAddress(address)
     bxsOpt match {
       case Some(bxs) =>
         indexStorage.update(
-          ModifierId @@ Algos.hash(addrBytes ++ toRemove.head ++ toInsert.head),
-          Seq(ByteArrayWrapper(addrBytes)),
-          Seq(ByteArrayWrapper(addrBytes) -> ByteArrayWrapper(
+          ModifierId @@ Algos.hash(addrKey ++ toRemove.head ++ toInsert.head),
+          Seq(ByteArrayWrapper(addrKey)),
+          Seq(ByteArrayWrapper(addrKey) -> ByteArrayWrapper(
             (bxs.filterNot(toRemove.contains) ++ toInsert)
               .foldLeft(Array[Byte]()) { case (buff, id) => buff ++ id }
           ))
         )
       case None =>
         indexStorage.update(
-          ModifierId @@ Algos.hash(addrBytes ++ toRemove.head ++ toInsert.head),
+          ModifierId @@ Algos.hash(addrKey ++ toRemove.head ++ toInsert.head),
           Seq(),
-          Seq(ByteArrayWrapper(addrBytes) ->
+          Seq(ByteArrayWrapper(addrKey) ->
             ByteArrayWrapper(toInsert.foldLeft(Array[Byte]()) { case (buff, id) => buff ++ id }))
         )
     }
@@ -115,15 +118,14 @@ trait StateIndexReader extends ScorexLogging {
 
     val keysToRemove = {
       if (modHeightOpt.isDefined)
-        opsFinal._2.map(i => ByteArrayWrapper(AddressProposition.getAddrBytes(i._1))) :+
-          StateIndexReader.stateHeightKey
+        opsFinal._2.map(i => ByteArrayWrapper(keyByAddress(i._1))) :+ StateIndexReader.stateHeightKey
       else
-        opsFinal._2.map(i => ByteArrayWrapper(AddressProposition.getAddrBytes(i._1)))
+        opsFinal._2.map(i => ByteArrayWrapper(keyByAddress(i._1)))
     }
 
     val recordsToInsert = {
       val bxsOps = (opsFinal._1 ++ opsFinal._2).map { case (addr, ids) =>
-        ByteArrayWrapper(AddressProposition.getAddrBytes(addr)) ->
+        ByteArrayWrapper(keyByAddress(addr)) ->
           ByteArrayWrapper(ids.foldLeft(Array[Byte]()) { case (buff, id) => buff ++ id })
       }
       if (modHeightOpt.isDefined)
@@ -145,4 +147,6 @@ object StateIndexReader {
   val openBoxesAddress: Address = Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp"
 
   val stateHeightKey: ByteArrayWrapper = ByteArrayWrapper(Algos.hash("state_height".getBytes))
+
+  def keyByAddress(address: Address) = Algos.hash(AddressProposition.getAddrBytes(address))
 }

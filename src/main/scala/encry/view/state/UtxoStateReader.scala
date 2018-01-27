@@ -64,8 +64,7 @@ trait UtxoStateReader extends StateIndexReader with ScorexLogging {
       case Some(bxIds) =>
         val bxs = bxIds.foldLeft(Seq[EncryBaseBox]()) { case (buff, id) =>
           boxById(id) match {
-            case Some(bx) =>
-              buff :+ bx
+            case Some(bx) => buff :+ bx
             case None =>
               log.warn(s"Box: ${Base58.encode(id)} exists in index, but was not found in state.")
               buff
