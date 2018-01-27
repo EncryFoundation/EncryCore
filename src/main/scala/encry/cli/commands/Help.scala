@@ -8,7 +8,7 @@ import scorex.core.NodeViewHolder
 
 import scala.util.Try
 
-object Height extends Command {
+object Help extends Command {
 
   override def execute(view: NodeViewHolder.CurrentView[EncryHistory,
     UtxoState, EncryWallet, EncryMempool], args: Array[String]): Try[Unit] = Try{

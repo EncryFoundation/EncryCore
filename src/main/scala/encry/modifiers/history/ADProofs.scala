@@ -93,7 +93,7 @@ object ADProofs {
         case bx: OpenBox => Insert(bx.id, ADValue @@ bx.bytes)
         case _ => throw new Error("Got state modifier of unknown type.")
       }
-      case r: Removal => Remove(r.boxId)
+      case Removal(id) => Remove(id)
     }
 }
 

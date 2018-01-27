@@ -61,7 +61,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
 
     val state = {
       if (settings.nodeSettings.ADState) EncryState.generateGenesisDigestState(stateDir, settings.nodeSettings)
-      else EncryState.genGenesisUtxoState(stateDir, idxDir, Some(self))._1
+      else EncryState.generateGenesisUtxoState(stateDir, idxDir, Some(self))._1
     }.asInstanceOf[MS]
 
     //todo: ensure that history is in certain mode

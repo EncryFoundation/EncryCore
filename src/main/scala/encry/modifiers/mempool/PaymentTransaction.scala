@@ -18,7 +18,7 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{PublicKey, Signature}
 
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 case class PaymentTransaction(override val proposition: PublicKey25519Proposition,
                               override val fee: Amount,
@@ -70,19 +70,15 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
   override lazy val semanticValidity: Try[Unit] = {
     // Signature validity checks.
     if (!validSignature) {
-      throw new Error("Invalid signature")
-    }
-    // `Amount` & `Address` validity checks.
-    if (!createBoxes.forall { i =>
+      Failure(new Error("Invalid signature"))
+    } else if (!createBoxes.forall { i =>
       i._2 > 0 && AddressProposition.validAddress(i._1)
     }) {
-      throw new Error("Bad outputs")
-    }
-    // `Fee` amount check.
-    if (fee < minimalFee)
-      throw new Error("Fee amount too small")
-
-    Success()
+      Failure(new Error("Bad outputs"))
+    } else if (fee < minimalFee) {
+      Failure(new Error("Fee amount too small"))
+    } else
+      Success()
   }
 }
 

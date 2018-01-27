@@ -23,18 +23,18 @@ class EncryBlock(override val header: EncryBlockHeader,
 
   override def transactions: Seq[EncryBaseTransaction] = payload.transactions
 
-  override def semanticValidity: Try[Unit] = {
-    // TODO: Make transactions validity checks here?
+  override def semanticValidity: Try[Unit] =
     if (header.txsRoot != payload.digest) {
-      log.info(s"<BLOCK ${header.id}> Invalid tx Merkle Root hash provided.")
-      Failure(new Error("Invalid tx Merkle Root hash provided!"))
+      log.info(s"<BLOCK ${header.encodedId}> Invalid tx Merkle Root hash.")
+      Failure(new Error("Invalid tx Merkle Root hash"))
+    } else if (!header.validTimestamp) {
+      log.info(s"<BLOCK ${header.encodedId}> Invalid timestamp.")
+      Failure(new Error("Invalid timestamp"))
+    } else if (!header.validSignature) {
+      log.info(s"<BLOCK ${header.encodedId}> Invalid timestamp signature.")
+      Failure(new Error("Invalid signature"))
     }
-    if (!header.validTimestamp) {
-      log.info(s"<BLOCK ${header.id}> Invalid timestamp provided.")
-      Failure(new Error("Invalid timestamp provided!"))
-    }
-    Success()
-  }
+    else Success()
 
   override def parentId: ModifierId = header.parentId
 

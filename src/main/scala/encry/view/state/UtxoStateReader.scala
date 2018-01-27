@@ -53,6 +53,9 @@ trait UtxoStateReader extends StateIndexReader with ScorexLogging {
         bx.asInstanceOf[OpenBox].proposition.height <= height)
         .map(_.asInstanceOf[OpenBox])).getOrElse(Seq())
 
+  def getOpenBoxIdsAtHeight(height: Height): Seq[ADKey] =
+    boxIdsByAddress(StateIndexReader.openBoxesAddress).getOrElse(Seq())
+
   def getRandomBox: Option[EncryBaseBox] =
     persistentProver.avlProver.randomWalk().map(_._1).flatMap(boxById)
 
@@ -61,7 +64,8 @@ trait UtxoStateReader extends StateIndexReader with ScorexLogging {
       case Some(bxIds) =>
         val bxs = bxIds.foldLeft(Seq[EncryBaseBox]()) { case (buff, id) =>
           boxById(id) match {
-            case Some(bx) => buff :+ bx
+            case Some(bx) =>
+              buff :+ bx
             case None =>
               log.warn(s"Box: ${Base58.encode(id)} exists in index, but was not found in state.")
               buff

@@ -26,6 +26,6 @@ class BoxHolder(val boxes: SortedMap[ByteArrayWrapper, EncryBaseBox]) {
 }
 
 object BoxHolder {
-  def apply(initialBoxes: Seq[EncryBaseBox]): BoxHolder =
-    new BoxHolder(SortedMap(initialBoxes.map(b => ByteArrayWrapper(b.id) -> b): _*))
+  def apply(bxs: Seq[EncryBaseBox]): BoxHolder =
+    new BoxHolder(SortedMap(bxs.map(b => ByteArrayWrapper(b.id) -> b): _*))
 }

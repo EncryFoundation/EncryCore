@@ -65,6 +65,8 @@ class UtxoState(override val version: VersionTag,
       }
     }
 
+    log.debug(s"$appliedModCounter modifications applied")
+
     // Checks whether the outcoming result is the same as expected.
     if (!expectedDigest.sameElements(persistentProver.digest))
       throw new Error(s"Digest after txs application is wrong. ${Algos.encode(expectedDigest)} expected, " +
@@ -123,8 +125,7 @@ class UtxoState(override val version: VersionTag,
 
       if (!(persistentProver.digest.sameElements(rootHash) &&
         storage.version.get.sameElements(rootHash) &&
-        stateStore.lastVersionID.get.data.sameElements(rootHash)))
-        Failure(new Error("Bad state version."))
+        stateStore.lastVersionID.get.data.sameElements(rootHash))) Failure(new Error("Bad state version."))
 
       val mods = getAllStateChanges(txs).operations.map(ADProofs.toModification)
       //todo .get
@@ -141,7 +142,7 @@ class UtxoState(override val version: VersionTag,
 
       proof -> digest
     } match {
-      case Success(res) => rollback().map(_ => res)
+      case Success(result) => rollback().map(_ => result)
       case Failure(e) => rollback().flatMap(_ => Failure(e))
     }
   }
@@ -174,7 +175,7 @@ class UtxoState(override val version: VersionTag,
   // Carries out an exhaustive tx validation.
   override def validate(tx: EncryBaseTransaction): Try[Unit] = Try {
 
-    tx.semanticValidity.get
+    tx.semanticValidity.failed
     tx match {
       case tx: PaymentTransaction =>
         var inputsSumCounter: Long = 0
@@ -274,7 +275,7 @@ object UtxoState extends ScorexLogging {
 
   def fromBoxHolder(bh: BoxHolder, stateDir: File,
                     indexDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32, valueLengthOpt = None)
+    val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = EncryBox.BoxIdSize, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
     val stateStore = new LSMStore(stateDir, keepVersions = Constants.keepVersions)
@@ -288,6 +289,14 @@ object UtxoState extends ScorexLogging {
         PersistentBatchAVLProver.create(
           p, storage, metadata(EncryState.genesisStateVersion, p.digest), paranoidChecks = true
         ).get.ensuring(_.digest sameElements storage.version.get)
+
+//      indexStorage.insert(
+//        ModifierId @@ EncryState.genesisStateVersion,
+//        Seq(
+//          ByteArrayWrapper(AddressProposition.getAddrBytes(StateIndexReader.openBoxesAddress)) ->
+//            ByteArrayWrapper(bh.sortedBoxes.foldLeft(Array[Byte]()) { case (buff, bx) => buff ++ bx.id })
+//        )
+//      )
     }
   }
 

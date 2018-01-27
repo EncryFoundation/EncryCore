@@ -34,10 +34,12 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
 
   override val typeId: TxTypeId = CoinbaseTransaction.typeId
 
+  // Zero for coinbase.
   override val fee: Amount = 0L
 
   override val feeBox: Option[OpenBox] = None
 
+  // FIXME: AssetBox is created even if amount=0.
   override val newBoxes: Traversable[EncryBaseBox] = Seq(
     AssetBox(
       proposition = AddressProposition(Address @@ proposition.address),
