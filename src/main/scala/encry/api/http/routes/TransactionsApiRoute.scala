@@ -20,9 +20,11 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
                                (implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
+  //implicit val paymentTransactionUnmarshaller = Unmarshaller.apply[HttpRequest, PaymentTransaction]()
+
   override val route: Route = pathPrefix("transactions") {
     getUnconfirmedTransactionsR ~
-//      sendTransactionR ~
+      //sendTransactionR ~
       getTransactionByIdR
   }
 
@@ -41,11 +43,9 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
     _.take(limit).toSeq
   }.map(_.map(_.json).asJson)
 
-  // TODO: This causes node crash. FIX.
-//  //todo There in no codec for "AnyoneCanSpendTransaction" need to make one.
 //  def sendTransactionR: Route = (post & entity(as[PaymentTransaction])) { tx =>
 //    // todo validation?
-//    nodeViewActorRef ! LocallyGeneratedTransaction[PublicKey25519Proposition, PaymentTransaction](tx)
+//    nodeViewActorRef ! LocallyGeneratedTransaction[Proposition, PaymentTransaction](tx)
 //    complete(StatusCodes.OK)
 //  }
 

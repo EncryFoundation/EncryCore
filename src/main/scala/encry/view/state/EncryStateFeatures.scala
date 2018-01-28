@@ -1,4 +1,4 @@
-package encry.modifiers.state
+package encry.view.state
 
 import encry.modifiers.mempool.EncryBaseTransaction
 import scorex.core.PersistentNodeViewModifier

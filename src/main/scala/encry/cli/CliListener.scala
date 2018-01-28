@@ -14,7 +14,7 @@ import scorex.core.NodeViewHolder.GetDataFromCurrentView
 import scorex.core.utils.ScorexLogging
 
 import scala.collection.mutable
-import scala.io.StdIn._
+import scala.io.StdIn
 
 case class CliListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings) extends Actor with ScorexLogging {
 
@@ -34,26 +34,24 @@ case class CliListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings) 
   override def receive: Receive = {
 
     case StartListening =>
-      while (true) {
-        val input = readLine()
+      Iterator.continually(StdIn.readLine()).takeWhile(!_.equals("quit")).foreach { input =>
         commands.get(parseCommand(input).head) match {
-          case Some(value) => parseCommand(input).slice(1, parseCommand(input).length).foreach(
-            command =>
+          case Some(value) =>
+            parseCommand(input).slice(1, parseCommand(input).length).foreach { command =>
               value.get(command.split("=").head) match {
-              case Some(cmd) =>
-                implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
-                nodeViewHolderRef ?
-                  GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Unit] { view =>
-                    cmd.execute(view, command.split("="))
-                  }
-              case None =>
-                println("Unsupported command. Type 'app -help' to get commands list")
-                log.debug("Unsupported command")
-            }
-          )
+                case Some(cmd) =>
+                  implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
+                  nodeViewHolderRef ?
+                    GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Unit] { view =>
+                      cmd.execute(view, command.split("="))
+                    }
+                case None =>
+                  println("Unsupported command. Type 'app -help' to get commands list")
+                  log.debug("Unsupported command")
+              }
+          }
           case None =>
             println("Unsupported command. Type 'app -help' to get commands list")
-            log.debug("Unsupported command")
         }
       }
   }

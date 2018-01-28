@@ -46,7 +46,7 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
       nonce = nonceFromDigest(Algos.hash(txHash)),
       amount = amount
     )
-  ) :+ UtxoState.newOpenBoxAt(height)
+  ) :+ UtxoState.newOpenBoxAt(height, seed = timestamp * length)
 
   override def json: Json = Map(
     "type" -> "Coinbase".asJson,
