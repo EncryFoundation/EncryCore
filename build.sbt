@@ -7,12 +7,12 @@ version := "0.1.9"
 
 scalaVersion := "2.12.4"
 
-val scorexVersion = "e56b893b-SNAPSHOT"
-
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
   "SonaType" at "https://oss.sonatype.org/content/groups/public",
   "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/",
   "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/")
+
+val scorexVersion = "e56b893b-SNAPSHOT"
 
 val circeVersion = "0.8.0"
 
@@ -57,6 +57,7 @@ libraryDependencies ++= Seq(
   "org.scorexfoundation" %% "avl-iodb" % "0.2.11",
   "org.scorexfoundation" %% "scrypto" % "2.0.3",
   "com.storm-enroute" %% "scalameter" % "0.8.+",
+  "io.spray" %%  "spray-json" % "1.3.3",
   "io.monix" %% "monix" % "2.3.3"
 ) ++ networkDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
 

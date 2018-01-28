@@ -48,17 +48,19 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
   override def serializer: Serializer[M] = PaymentTransactionSerializer
 
   override def json: Json = Map(
-    "type" -> "Payment".asJson,
-    "id" -> Base58.encode(id).asJson,
+    "id" -> Algos.encode(id).asJson,
+    "proposition" -> Algos.encode(proposition.pubKeyBytes).asJson,
+    "fee" -> fee.asJson,
+    "timestamp" -> timestamp.asJson,
+    "signature" -> Algos.encode(signature.signature).asJson,
     "inputs" -> useBoxes.map { id =>
       Map(
         "id" -> Algos.encode(id).asJson,
-        "signature" -> Base58.encode(signature.bytes).asJson
       ).asJson
     }.asJson,
-    "outputs" -> createBoxes.map { case (_, amount) =>
+    "outputs" -> createBoxes.map { case (addr, amount) =>
       Map(
-        "script" -> "".asJson,
+        "address" -> addr.toString.asJson,
         "amount" -> amount.asJson
       ).asJson
     }.asJson
