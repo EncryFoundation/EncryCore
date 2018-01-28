@@ -159,7 +159,7 @@ object EncryMiner extends ScorexLogging {
           val minerProposition = view.vault.publicKeys.head
           val privateKey: PrivateKey25519 = view.vault.secretByPublicImage(minerProposition).get
           val openBxs = txs.flatMap(tx => tx.newBoxes.filter(_.isInstanceOf[OpenBox])).toIndexedSeq ++
-            view.state.getOpenBoxesAtHeight(height)
+            view.state.getAvailableOpenBoxesAt(height)
           val amount = openBxs.map(_.value).sum
           val cTxSignature = PrivateKey25519Companion.sign(privateKey,
             CoinbaseTransaction.getHash(minerProposition, openBxs.map(_.id), timestamp, amount, height))

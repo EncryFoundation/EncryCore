@@ -33,8 +33,8 @@ class EncryBlock(override val header: EncryBlockHeader,
     } else if (!header.validSignature) {
       log.info(s"<BLOCK ${header.encodedId}> Invalid timestamp signature.")
       Failure(new Error("Invalid signature"))
-    }
-    else Success()
+    } else
+      Success()
 
   override def parentId: ModifierId = header.parentId
 

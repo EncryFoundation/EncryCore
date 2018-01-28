@@ -47,10 +47,12 @@ trait StateIndexReader extends ScorexLogging {
                       Address @@ tx.proposition.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
                 }
               case OpenBox.typeId =>
-                stateOpsMap.get(StateIndexReader.openBoxesAddress) match {
+                stateOpsMap.get(openBoxesAddress) match {
                   case Some(t) =>
                     if (t._2.exists(_.sameElements(id))) t._2.remove(id)
-                  case None => // Do nothing.
+                    else t._1.add(id)
+                  case None =>
+                    stateOpsMap.update(openBoxesAddress, mutable.Set(id) -> mutable.Set.empty[ADKey])
                 }
             }
           }
@@ -108,7 +110,9 @@ trait StateIndexReader extends ScorexLogging {
           val bxsOpt = indexStorage.boxesByAddress(addr)
           bxsOpt match {
             case Some(bxs) =>
-              bNew -> (bExs :+ (addr, bxs.filterNot(toRem.contains) ++ toIns.toSeq))
+              val bxsToReInsert = bxs.foldLeft(Seq[ADKey]()) {
+                case (buff, id) => if (toRem.forall(!_.sameElements(id))) buff :+ id else buff }
+              bNew -> (bExs :+ (addr, bxsToReInsert ++ toIns.toSeq))
             case None =>
               (bNew :+ (addr, toIns.toSeq)) -> bExs
           }
