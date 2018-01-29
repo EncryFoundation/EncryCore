@@ -3,12 +3,11 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
-import encry.local.TestHelper
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.{AddressProposition, HeightProposition}
-import encry.settings.{Algos, Constants, EncryAppSettings, NodeSettings}
+import encry.settings.{Algos, EncryAppSettings, NodeSettings}
 import encry.view.history.Height
 import encry.view.state.index.StateIndexReader
 import scorex.core.VersionTag

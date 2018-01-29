@@ -33,7 +33,7 @@ class EncryViewReadersHolder(viewHolderRef: ActorRef) extends Actor with ScorexL
     case ChangedState(reader: StateReader@unchecked) if reader.isInstanceOf[StateReader] =>
       stateReaderOpt = Some(reader)
 
-    case ChangedMempool(reader: EncryMempoolReader@unchecked) if reader.isInstanceOf[EncryHistoryReader] =>
+    case ChangedMempool(reader: EncryMempoolReader@unchecked) if reader.isInstanceOf[EncryMempoolReader] =>
       mempoolReaderOpt = Some(reader)
 
     case GetReaders =>
