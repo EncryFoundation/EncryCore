@@ -22,14 +22,16 @@ class UtxoStateTest extends org.scalatest.FunSuite {
   test("FilterValid(txs) should return only valid txs (against current state).") {
 
     val dir: File = new File(s"${System.getProperty("user.dir")}/test-data/state1")
-    assert(dir.exists() && dir.isDirectory, "dir is invalid.")
+    dir.mkdir()
+
+    assert(dir.exists() && dir.isDirectory && dir.listFiles.isEmpty, "dir is invalid.")
 
     def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
       val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32, valueLengthOpt = None)
       bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
       val stateStore = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
-      val indexStore = new LSMStore(dir, keySize = PublicKey25519Proposition.AddressLength, keepVersions = Constants.keepVersions)
+      val indexStore = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
 
       new UtxoState(EncryState.genesisStateVersion, stateStore, indexStore, None) {
         override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
@@ -63,7 +65,8 @@ class UtxoStateTest extends org.scalatest.FunSuite {
       val proposition = key.publicImage
       val fee = factory.Props.txFee
       val timestamp = 123456789L
-      val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp")).map(_.id)
+      val useBoxes =
+        IndexedSeq(factory.genAssetBox(Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp")).map(_.id)
       val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, 30000L))
       val sig = PrivateKey25519Companion.sign(
         key,
@@ -86,15 +89,14 @@ class UtxoStateTest extends org.scalatest.FunSuite {
 
     assert(filteredValidAndInvalidTxs.size == validTxs.size, s"filterValid(validTxs + invalidTxs) " +
       s"return ${filteredValidAndInvalidTxs.size}, but ${validTxs.size} was expected.")
-
-//    persistentProver.rollback(rollbackPoint)
-//      .ensuring(_.isSuccess && persistentProver.digest.sameElements(rollbackPoint))
   }
 
   test("BatchAVLProver should have the same digest after rollback as before.") {
 
     val dir: File = new File(s"${System.getProperty("user.dir")}/test-data/state2")
-    assert(dir.exists() && dir.isDirectory, "dir is invalid.")
+    dir.mkdir()
+
+    assert(dir.exists() && dir.isDirectory && dir.listFiles.isEmpty, "dir is invalid.")
 
     val store = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
 

@@ -25,8 +25,6 @@ class TransactionsApiRouteSpec extends PropSpec with Matchers {
 
     val txSerialized = txWrapped.asJson.noSpaces
 
-    println(txSerialized)
-
     val txDeserialized = decode[PaymentTransactionModel](txSerialized)
 
     txDeserialized.isRight shouldBe true
