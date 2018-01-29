@@ -124,10 +124,10 @@ case class KeyManager(store: LSMStore,
 
 object KeyManager extends ScorexLogging {
 
-  def keysDir(settings: EncryAppSettings) = new File(s"${settings.directory}/keys")
+  def getKeysDir(settings: EncryAppSettings) = new File(s"${settings.directory}/keys")
 
   def readOrGenerate(settings: EncryAppSettings, password: Option[String] = None): KeyManager = {
-    val dir = keysDir(settings)
+    val dir = getKeysDir(settings)
     dir.mkdirs()
 
     KeyManager(new LSMStore(dir, 32), settings.keyManagerSettings, password)

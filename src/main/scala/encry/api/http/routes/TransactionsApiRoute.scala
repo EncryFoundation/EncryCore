@@ -19,6 +19,7 @@ import scorex.core.settings.RESTApiSettings
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.crypto.encode.Base16
 import spray.json.DefaultJsonProtocol._
+import spray.json.RootJsonFormat
 
 import scala.concurrent.Future
 
@@ -27,7 +28,7 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
                                (implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
-  implicit val paymentTxCodec = jsonFormat6(PaymentTransactionModel)
+  implicit val paymentTxCodec: RootJsonFormat[PaymentTransactionModel] = jsonFormat6(PaymentTransactionModel)
 
   override val route: Route = pathPrefix("transactions") {
     getUnconfirmedTransactionsR ~ sendTransactionR ~ getTransactionByIdR

@@ -1,3 +1,3 @@
 package encry.settings
 
-case class WalletSettings (seed : String)
+case class WalletSettings (seed: String)

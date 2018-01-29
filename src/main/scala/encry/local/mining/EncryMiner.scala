@@ -182,7 +182,7 @@ object EncryMiner extends ScorexLogging {
             blockSignature, bestHeaderOpt, adProof, adDigest, txs, timestamp, difficulty)
 
           log.debug(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
-            s"and 1 coinbase for height=${height}")
+            s"and 1 coinbase for height=$height")
 
           candidate
         }.recoverWith { case thr =>

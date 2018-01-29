@@ -108,7 +108,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
           s.applyModifier(m) match {
             case Success(newState) =>
               newState
-            case Failure(e) =>
+            case Failure(_) =>
               throw new Error(s"Failed to apply missed modifier ${m.encodedId}")
           }
         }
