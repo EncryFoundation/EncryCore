@@ -24,7 +24,6 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
 
   override val route: Route = pathPrefix("blocks") {
     getBlocksR ~
-    postBlocksR ~
     getLastHeadersR ~
     getBlockIdsAtHeightR ~
     getBlockHeaderByHeaderIdR ~
@@ -56,9 +55,6 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
   def getBlocksR: Route = (pathEndOrSingleSlash & get & paging) { (offset, limit) =>
     getHeaderIds(limit, offset).okJson()
   }
-
-  // TODO: Implement.
-  def postBlocksR: Route = post { ??? }
 
   def getLastHeadersR: Route = (pathPrefix("lastHeaders" / IntNumber) & get) { count => getLastHeaders(count).okJson() }
 

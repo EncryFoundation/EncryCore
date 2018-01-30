@@ -98,12 +98,13 @@ case class KeyManager(store: LSMStore,
 
   def generateSync(): Try[Array[Byte]] = ???
 
-  def addKey(): Unit = {
+  def createNewKey(): Unit = {
     val keysQty =
       store.get(new ByteArrayWrapper(Algos.hash("count"))).map(d => Ints.fromByteArray(d.data)).getOrElse(0)
     store.update(System.currentTimeMillis(), Seq(new ByteArrayWrapper(Algos.hash("count"))), Seq())
     store.update(System.currentTimeMillis(), Seq(), Seq(
-      (new ByteArrayWrapper(Algos.hash("count")), new ByteArrayWrapper(Ints.toByteArray(keysQty)))
+      (new ByteArrayWrapper(Algos.hash("count")), new ByteArrayWrapper(Ints.toByteArray(keysQty))),
+      (new ByteArrayWrapper(Algos.hash("key" + keysQty)), new ByteArrayWrapper(keys(keysQty-1).publicImage.pubKeyBytes))
     ))
   }
 

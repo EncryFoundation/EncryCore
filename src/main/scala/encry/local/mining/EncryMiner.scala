@@ -143,7 +143,7 @@ object EncryMiner extends ScorexLogging {
 
         if ((bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) &&
           !view.pool.isEmpty &&
-          !view.vault.keyStorage.isEmpty) Try {
+          view.vault.keyManager.keys.nonEmpty) Try {
 
           lazy val timestamp = timeProvider.time()
           val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(-1) + 1)
@@ -190,7 +190,7 @@ object EncryMiner extends ScorexLogging {
           Failure(thr)
         }.toOption
         else {
-          if (view.vault.keyStorage.isEmpty) view.vault.keyStorage.initStorage(Random.randomBytes())
+          if (view.vault.keyManager.isEmpty) view.vault.keyManager.initStorage(Random.randomBytes())
           None
         }
     }).mapTo[Option[PowCandidateBlock]]

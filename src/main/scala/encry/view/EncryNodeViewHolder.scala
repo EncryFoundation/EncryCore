@@ -51,10 +51,10 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     * Hard-coded initial view all the honest nodes in a network are making progress from.
     */
   override protected def genesisState: (EncryHistory, MS, EncryWallet, EncryMempool) = {
-    val stateDir = EncryState.stateDir(settings)
+    val stateDir = EncryState.getStateDir(settings)
     stateDir.mkdir()
 
-    val idxDir = EncryState.indexDir(settings)
+    val idxDir = EncryState.getIndexDir(settings)
     idxDir.mkdirs()
 
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")

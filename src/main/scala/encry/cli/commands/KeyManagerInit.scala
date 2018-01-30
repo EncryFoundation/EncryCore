@@ -13,6 +13,6 @@ object KeyManagerInit extends Command {
 
   override def execute(view: NodeViewHolder.CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool],
                        args: Array[String]): Try[Unit] = Try{
-    view.vault.keyStorage.initStorage(Base58.decode(args(1)).get)
+    view.vault.keyManager.initStorage(Base58.decode(args(1)).get)
   }
 }

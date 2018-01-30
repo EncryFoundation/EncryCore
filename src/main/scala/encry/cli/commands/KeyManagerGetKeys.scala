@@ -13,7 +13,7 @@ object KeyManagerGetKeys extends Command {
 
   override def execute(view: NodeViewHolder.CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool],
                        args: Array[String]): Try[Unit] = Try {
-    view.vault.keyStorage.keys.foreach(
+    view.vault.keyManager.keys.foreach(
       a => println(Base58.encode(a.publicKeyBytes))
     )
   }

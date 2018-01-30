@@ -63,9 +63,9 @@ object EncryState extends ScorexLogging{
 
   lazy val genesisStateVersion: VersionTag = VersionTag @@ Algos.hash(afterGenesisStateDigest.tail)
 
-  def stateDir(settings: EncryAppSettings) = new File(s"${settings.directory}/state")
+  def getStateDir(settings: EncryAppSettings) = new File(s"${settings.directory}/state")
 
-  def indexDir(settings: EncryAppSettings) = new File(s"${settings.directory}/index")
+  def getIndexDir(settings: EncryAppSettings) = new File(s"${settings.directory}/index")
 
   // TODO: Magic numbers. Move to settings.
   def initialOpenBoxes: IndexedSeq[OpenBox] = (0 until 100).map(i =>
@@ -101,10 +101,10 @@ object EncryState extends ScorexLogging{
   // TODO:
   def readOrGenerate(settings: EncryAppSettings,
                      nodeViewHolderRef: Option[ActorRef]): Option[EncryState[_]] = {
-    val stDir = stateDir(settings)
+    val stDir = getStateDir(settings)
     stDir.mkdirs()
 
-    val idxDir = indexDir(settings)
+    val idxDir = getIndexDir(settings)
     idxDir.mkdirs()
 
     if (stDir.listFiles().isEmpty) {

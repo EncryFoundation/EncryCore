@@ -16,4 +16,15 @@ object Constants {
   val txByteCost: Float = 0.00046f
 
   val emissionHeightLock = 1
+
+  object Store {
+
+    val stateKeepVersions: Int = 200
+
+    val indexKeepVersions: Int = 200
+
+    val stateStoreKeyLength: Int = 32
+
+    val indexStoreKeyLength: Int = 32
+  }
 }

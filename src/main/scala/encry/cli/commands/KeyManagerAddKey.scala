@@ -13,6 +13,6 @@ object KeyManagerAddKey extends Command {
 
   override def execute(view: NodeViewHolder.CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool],
                        args: Array[String]): Try[Unit] = Try {
-    view.vault.keyStorage.addKey()
+    view.vault.keyManager.createNewKey()
   }
 }

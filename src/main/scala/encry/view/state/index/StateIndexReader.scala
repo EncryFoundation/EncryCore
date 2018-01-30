@@ -27,10 +27,11 @@ trait StateIndexReader extends ScorexLogging {
 
   protected lazy val indexStorage = new StateIndexStorage(indexStore)
 
-  def boxIdsByAddress(addr: Address): Option[Seq[ADKey]] = indexStorage.boxesByAddress(addr)
+  def boxIdsByAddress(addr: Address): Option[Seq[ADKey]] = indexStorage.boxIdsByAddress(addr)
 
   def updateIndexOn(mod: EncryPersistentModifier): Future[Unit] = Future {
 
+    // FIXME: Usage of `exists()`.
     mod match {
       case block: EncryBlock =>
         val stateOpsMap = mutable.HashMap.empty[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]
@@ -80,7 +81,7 @@ trait StateIndexReader extends ScorexLogging {
   // Updates or creates index for key `address`.
   def updateIndexFor(address: Address, toRemove: Seq[ADKey], toInsert: Seq[ADKey]): Future[Unit] = Future {
     val addrKey = keyByAddress(address)
-    val bxsOpt = indexStorage.boxesByAddress(address)
+    val bxsOpt = indexStorage.boxIdsByAddress(address)
     bxsOpt match {
       case Some(bxs) =>
         indexStorage.update(
@@ -107,7 +108,7 @@ trait StateIndexReader extends ScorexLogging {
     val opsFinal = opsMap
       .foldLeft(Seq[(Address, Seq[ADKey])](), Seq[(Address, Seq[ADKey])]()) {
         case ((bNew, bExs), (addr, (toRem, toIns))) =>
-          val bxsOpt = indexStorage.boxesByAddress(addr)
+          val bxsOpt = indexStorage.boxIdsByAddress(addr)
           bxsOpt match {
             case Some(bxs) =>
               val bxsToReInsert = bxs.foldLeft(Seq[ADKey]()) {
