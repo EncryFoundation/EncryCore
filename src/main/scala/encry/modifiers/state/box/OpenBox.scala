@@ -17,7 +17,8 @@ import scala.util.{Failure, Success, Try}
 
 case class OpenBox(override val proposition: HeightProposition,
                    override val nonce: Long,
-                   amount: Amount) extends EncryNoncedBox[HeightProposition] {
+                   override val amount: Amount)
+  extends EncryNoncedBox[HeightProposition] with AmountCarryingBox {
 
   override type M = OpenBox
 

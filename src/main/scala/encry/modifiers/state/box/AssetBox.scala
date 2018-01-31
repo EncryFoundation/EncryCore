@@ -19,7 +19,8 @@ import scala.util.{Failure, Success, Try}
 
 case class AssetBox(override val proposition: AddressProposition,
                     override val nonce: Long,
-                    amount: Amount) extends EncryNoncedBox[AddressProposition] {
+                    override val amount: Amount)
+  extends EncryNoncedBox[AddressProposition] with AmountCarryingBox {
 
   override type M = AssetBox
 

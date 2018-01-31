@@ -3,6 +3,7 @@ package encry.local.mining
 import akka.actor.{Actor, ActorRef}
 import akka.pattern._
 import akka.util.Timeout
+import encry.account.Address
 import encry.consensus.{Difficulty, PowCandidateBlock, PowConsensus}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
@@ -158,11 +159,20 @@ object EncryMiner extends ScorexLogging {
           // TODO: Which PubK should we pick here?
           val minerProposition = view.vault.publicKeys.head
           val privateKey: PrivateKey25519 = view.vault.secretByPublicImage(minerProposition).get
-          val openBxs = txs.flatMap(tx => tx.newBoxes.filter(_.isInstanceOf[OpenBox])).toIndexedSeq ++
-            view.state.getAvailableOpenBoxesAt(height)
-          val amount = openBxs.map(_.value).sum
+
+          val openBxs: IndexedSeq[OpenBox] = txs.foldLeft(IndexedSeq[OpenBox]())((buff, tx) =>
+            buff ++ tx.newBoxes.foldLeft(IndexedSeq[OpenBox]()) { case (buff2, bx) =>
+              bx match {
+                case obx: OpenBox => buff2 :+ obx
+                case _ => buff2
+              }
+            }) ++ view.state.getAvailableOpenBoxesAt(height)
+
+          val amount = openBxs.map(_.amount).sum
           val cTxSignature = PrivateKey25519Companion.sign(privateKey,
             CoinbaseTransaction.getHash(minerProposition, openBxs.map(_.id), timestamp, amount, height))
+
+          println(s"Current miner balance: ${view.state.portfolioByAddress(Address @@ minerProposition.address).map(_.balance).getOrElse("Not found")}")
 
           val coinbase =
             CoinbaseTransaction(minerProposition, timestamp, cTxSignature, openBxs.map(_.id), amount, height)

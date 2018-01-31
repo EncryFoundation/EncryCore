@@ -8,8 +8,7 @@ import encry.view.state.index.{Portfolio, StateIndexReader}
 import io.iohk.iodb.Store
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
-import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters,
-  PersistentBatchAVLProver, VersionedIODBAVLStorage}
+import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
@@ -77,7 +76,8 @@ trait UtxoStateReader extends StateIndexReader with ScorexLogging {
   def portfolioByAddress(address: Address): Option[Portfolio] =
     boxesByAddress(address) match {
       case Some(bxs) =>
-        Some(Portfolio(address, Balance @@ bxs.filter(_.isInstanceOf[AssetBox]).map(_.value).sum, Some(bxs)))
+        Some(Portfolio(address,
+          Balance @@ bxs.filter(_.isInstanceOf[AssetBox]).map(_.asInstanceOf[AssetBox].amount).sum, Some(bxs)))
       case _ => None
     }
 }
