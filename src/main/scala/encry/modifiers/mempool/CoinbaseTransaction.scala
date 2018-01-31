@@ -40,13 +40,14 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
   override val feeBox: Option[OpenBox] = None
 
   // FIXME: AssetBox is created even if amount=0.
-  override val newBoxes: Traversable[EncryBaseBox] = Seq(
-    AssetBox(
+  override val newBoxes: Traversable[EncryBaseBox] = {
+    val assetBox = AssetBox(
       proposition = AddressProposition(Address @@ proposition.address),
       nonce = nonceFromDigest(Algos.hash(txHash)),
-      amount = amount
-    )
-  ) :+ UtxoState.newOpenBoxAt(height, seed = timestamp * length)
+      amount = amount)
+    val openBox = UtxoState.newOpenBoxAt(height, seed = timestamp * length)
+    if (amount == 0) Seq(openBox) else Seq(assetBox, openBox)
+  }
 
   override def json: Json = Map(
     "type" -> "Coinbase".asJson,
