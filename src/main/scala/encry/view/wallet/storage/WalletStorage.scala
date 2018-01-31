@@ -1,7 +1,7 @@
 package encry.view.wallet.storage
 
 import com.google.common.primitives.Longs
-import encry.modifiers.mempool.{PaymentTransaction, PaymentTransactionSerializer}
+import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction, PaymentTransactionSerializer}
 import encry.modifiers.state.box.{AssetBox, AssetBoxSerializer}
 import encry.settings.Algos
 import encry.view.EncryBaseStorage
@@ -99,23 +99,23 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition
     } else throw new Error("Box with this id is already contains in db")
   }
 
-  def putTransaction(tx: PaymentTransaction): Unit = {
+  def putTransaction(tx: EncryBaseTransaction): Unit = {
     if(getTransactionById(tx.txHash).isFailure){
       val txsRawBytes = db.get(transactionIdsKey).map(_.data).getOrElse(Array[Byte]())
-      if(publicKeys contains tx.proposition){
+      if (publicKeys.contains(tx.proposition) && !tx.isInstanceOf[CoinbaseTransaction]) {
         updateTrxList(txsRawBytes ++ tx.txHash)
         db.update(
           new ByteArrayWrapper(tx.txHash),
           Seq(),
-          Seq((new ByteArrayWrapper(tx.txHash), new ByteArrayWrapper(PaymentTransactionSerializer.toBytes(tx))))
+          Seq((new ByteArrayWrapper(tx.txHash), new ByteArrayWrapper(tx.bytes)))
         )
         deleteBoxesById(tx.useBoxes)
-      }else{
+      } else {
         updateTrxList(txsRawBytes ++ tx.txHash)
         db.update(
           new ByteArrayWrapper(tx.txHash),
           Seq(),
-          Seq((new ByteArrayWrapper(tx.txHash), new ByteArrayWrapper(PaymentTransactionSerializer.toBytes(tx))))
+          Seq((new ByteArrayWrapper(tx.txHash), new ByteArrayWrapper(tx.bytes)))
         )
         putBoxes(tx.newBoxes.filter(box => box.isInstanceOf[AssetBox] &&
           publicKeys.map(a => a.address).contains(box.asInstanceOf[AssetBox].proposition.address))

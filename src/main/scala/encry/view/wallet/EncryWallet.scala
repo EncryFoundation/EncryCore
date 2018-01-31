@@ -42,11 +42,10 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
     modifier match {
       case a: EncryBlock => a.transactions.foldLeft(this) { case (wallet, tx) =>
         tx match {
-          case ptx: PaymentTransaction =>
-            walletStorage.putTransaction(ptx)
+          case tx@(_: PaymentTransaction | _: CoinbaseTransaction) =>
+            walletStorage.putTransaction(tx)
             this
-          case _: CoinbaseTransaction =>
-            wallet
+          case _ => this // Do nothing.
         }
       }
       case _: EncryBlockHeader => this

@@ -1,26 +1,65 @@
 package encry.view.wallet.storage
 
+import java.io.File
+
 import encry.account.Address
 import encry.local.TestHelper
 import encry.modifiers.mempool.PaymentTransaction
-import encry.settings.EncryAppSettings
+import encry.settings.{Algos, EncryAppSettings}
 import encry.view.wallet.EncryWallet
+import encry.view.wallet.keys.KeyManager
+import io.iohk.iodb.LSMStore
 import org.scalatest.FunSuite
 import scorex.core.transaction.state.PrivateKey25519Companion
+import scorex.crypto.encode.Base58
+import scorex.utils.Random
 
-class WalletStorageManagerTest extends FunSuite {
+class WalletStorageTest extends FunSuite {
 
-  test("Wallet Data Manager Test"){
+  test("WalletStorage"){
 
     lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(Option(""))
 
-    val wallet: EncryWallet = EncryWallet.readOrGenerate(encrySettings)
+    val walletDir: File = new File(s"${System.getProperty("user.dir")}/test-data/wallet")
+    walletDir.mkdir()
 
-    wallet.keyManager.initStorage("testSeed".getBytes())
+    val walletStorage = new LSMStore(walletDir, keySize = 32, keepVersions = 0)
+
+    val keysDir: File = new File(s"${System.getProperty("user.dir")}/test-data/keys")
+
+    keysDir.mkdir()
+
+    val keyStorage = new LSMStore(keysDir, keySize = 32, keepVersions = 0)
+
+    def readOrGenerate(keysStore: LSMStore,
+                       settings: EncryAppSettings,
+                       password: Option[Array[Byte]] = Option(Array[Byte]()),
+                       seed: Array[Byte] = Random.randomBytes()): KeyManager = {
+
+      val keyManager = KeyManager(keysStore, settings.keyManagerSettings, password)
+
+      if (keyManager.keys.isEmpty) {
+        println("init")
+        keyManager.initStorage(seed)
+        if (settings.keyManagerSettings.lock && !keyManager.isLocked) {
+          keyManager.lock()
+        }
+      }
+
+      keyManager
+    }
+
+    val keyManager = readOrGenerate(keyStorage, encrySettings, Option(Algos.hash("Password")))
+
+    val wallet: EncryWallet = new EncryWallet(walletStorage, keyManager)
+
+    //wallet.keyManager.initStorage("testSeed".getBytes())
 
     val factory = TestHelper
     val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath)
 
+
+    keyManager.keys.foreach(a => println(Base58.encode(a.bytes)))
 
     val validTxs = keys.map { key =>
       val proposition = key.publicImage
@@ -49,8 +88,6 @@ class WalletStorageManagerTest extends FunSuite {
     }
 
     val tx = validTxs :+ spentTx
-
-    //   println(Base58.encode(wdm.listOfTransactions))
 
     val trxCount = 50
 

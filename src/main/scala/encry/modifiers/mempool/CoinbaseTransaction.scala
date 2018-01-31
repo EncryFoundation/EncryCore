@@ -65,7 +65,7 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
     }.asJson
   ).asJson
 
-  override def serializer: Serializer[M] = CoinbaseTransactionSerializer
+  override lazy val serializer: Serializer[M] = CoinbaseTransactionSerializer
 
   override lazy val txHash: Digest32 = CoinbaseTransaction.getHash(proposition, useBoxes, timestamp, amount, height)
 

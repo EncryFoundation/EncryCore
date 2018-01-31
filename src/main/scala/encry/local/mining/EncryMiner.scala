@@ -190,7 +190,7 @@ object EncryMiner extends ScorexLogging {
           Failure(thr)
         }.toOption
         else {
-          if (view.vault.keyManager.isEmpty) view.vault.keyManager.initStorage(Random.randomBytes())
+          if (view.vault.keyManager.keys.isEmpty) view.vault.keyManager.initStorage(Random.randomBytes())
           None
         }
     }).mapTo[Option[PowCandidateBlock]]

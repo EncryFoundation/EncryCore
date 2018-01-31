@@ -97,7 +97,7 @@ class UtxoState(override val version: VersionTag,
           throw new Error("Calculated stateRoot is not equal to the declared one.")
 
         // Update state index.
-        updateIndexOn(block)
+        updateIndex(block)
 
         new UtxoState(VersionTag @@ block.id, stateStore, indexStore, nodeViewHolderRef)
       }.recoverWith[UtxoState] { case e =>

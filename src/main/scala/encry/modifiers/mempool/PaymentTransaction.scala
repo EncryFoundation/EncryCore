@@ -45,7 +45,7 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
         AssetBox(AddressProposition(addr), nonce, amount)
       }
 
-  override def serializer: Serializer[M] = PaymentTransactionSerializer
+  override lazy val serializer: Serializer[M] = PaymentTransactionSerializer
 
   override def json: Json = Map(
     "id" -> Algos.encode(id).asJson,

@@ -30,8 +30,8 @@ class UtxoStateTest extends org.scalatest.FunSuite {
       val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32, valueLengthOpt = None)
       bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
-      val stateStore = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
-      val indexStore = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
+      val stateStore = new LSMStore(dir, keySize = 32, keepVersions = 0)
+      val indexStore = new LSMStore(dir, keySize = 32, keepVersions = 0)
 
       new UtxoState(EncryState.genesisStateVersion, stateStore, indexStore, None) {
         override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
