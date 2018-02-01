@@ -12,10 +12,5 @@ class KeyManagerTest extends FunSuite {
     lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(Option(""))
 
     val keyManager = KeyManager.readOrGenerate(encrySettings, Option(Algos.hash("Password")))
-
-    println(Ints.fromByteArray(keyManager.getKey(KeyManager.countKey)))
-
-    keyManager.keys.foreach(a => println(Base58.encode(a.bytes)))
-
   }
 }

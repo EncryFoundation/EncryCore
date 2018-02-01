@@ -11,7 +11,6 @@ import encry.view.wallet.keys.KeyManager
 import io.iohk.iodb.LSMStore
 import org.scalatest.FunSuite
 import scorex.core.transaction.state.PrivateKey25519Companion
-import scorex.crypto.encode.Base58
 import scorex.utils.Random
 
 class WalletStorageTest extends FunSuite {
@@ -39,7 +38,6 @@ class WalletStorageTest extends FunSuite {
       val keyManager = KeyManager(keysStore, settings.keyManagerSettings, password)
 
       if (keyManager.keys.isEmpty) {
-        println("init")
         keyManager.initStorage(seed)
         if (settings.keyManagerSettings.lock && !keyManager.isLocked) {
           keyManager.lock()
@@ -57,9 +55,6 @@ class WalletStorageTest extends FunSuite {
 
     val factory = TestHelper
     val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath)
-
-
-    keyManager.keys.foreach(a => println(Base58.encode(a.bytes)))
 
     val validTxs = keys.map { key =>
       val proposition = key.publicImage

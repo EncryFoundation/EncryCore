@@ -3,7 +3,6 @@ package encry.local.mining
 import akka.actor.{Actor, ActorRef}
 import akka.pattern._
 import akka.util.Timeout
-import encry.account.Address
 import encry.consensus.{Difficulty, PowCandidateBlock, PowConsensus}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
@@ -171,8 +170,6 @@ object EncryMiner extends ScorexLogging {
           val amount = openBxs.map(_.amount).sum
           val cTxSignature = PrivateKey25519Companion.sign(privateKey,
             CoinbaseTransaction.getHash(minerProposition, openBxs.map(_.id), timestamp, amount, height))
-
-          println(s"Current miner balance: ${view.state.portfolioByAddress(Address @@ minerProposition.address).map(_.balance).getOrElse("Not found")}")
 
           val coinbase =
             CoinbaseTransaction(minerProposition, timestamp, cTxSignature, openBxs.map(_.id), amount, height)
