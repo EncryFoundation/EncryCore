@@ -31,10 +31,15 @@ class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTra
   override def put(tx: EncryBaseTransaction): Try[EncryMempool] = put(Seq(tx))
 
   override def put(txs: Iterable[EncryBaseTransaction]): Try[EncryMempool] = {
-    if (!txs.forall(tx => !unconfirmed.contains(key(tx.id)) && tx.semanticValidity.isSuccess))
-      Failure(new Error("Failed to put transaction into pool"))
-    else
-      Success(putWithoutCheck(txs))
+    val validTxs = txs.filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
+    if (validTxs.nonEmpty) {
+      if ((size + validTxs.size) <= settings.nodeSettings.mempoolMaxCapacity) {
+        Success(putWithoutCheck(validTxs))
+      } else {
+        val overflow = (size + validTxs.size) - settings.nodeSettings.mempoolMaxCapacity
+        Success(putWithoutCheck(validTxs.take(validTxs.size - overflow)))
+      }
+    } else Failure(new Error("Failed to put transaction into pool"))
   }
 
   override def putWithoutCheck(txs: Iterable[EncryBaseTransaction]): EncryMempool = {

@@ -3,6 +3,7 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
+import encry.local.TestHelper
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box._
@@ -57,7 +58,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 object EncryState extends ScorexLogging{
 
   // 33 bytes in Base58 encoding.
-  val afterGenesisStateDigestHex: String = "29KLRhyQqxtFT5y6MQGwLJ3iqbdCziSBudBvH5aCJxQcYk"
+  val afterGenesisStateDigestHex: String = "BrXzqSBcUxvnM3YyhcNYXWnQBYoYRQGeWKVp8GpJChxGT"
 
   val afterGenesisStateDigest: ADDigest = ADDigest @@ Algos.decode(afterGenesisStateDigestHex).get
 
@@ -82,7 +83,7 @@ object EncryState extends ScorexLogging{
                                nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
     log.info("Generating genesis UTXO state.")
 
-    lazy val initialBoxes: Seq[EncryBaseBox] = genesisEmptyBoxes
+    lazy val initialBoxes: Seq[EncryBaseBox] = TestHelper.genAssetBoxes
 
     val bh = BoxHolder(initialBoxes)
 

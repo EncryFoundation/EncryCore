@@ -43,11 +43,11 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition
   def updateADKeysList(newList: Array[Byte]): Unit = {
     //delete previous value
     db.update(
-      new ByteArrayWrapper(Algos.hash(newList)), Seq(boxIdsKey), Seq()
+      new ByteArrayWrapper(Algos.hash(newList ++ Longs.toByteArray(System.currentTimeMillis()))), Seq(boxIdsKey), Seq()
     )
     //put new value
     db.update(
-      new ByteArrayWrapper(Algos.hash(Algos.hash(newList))),
+      new ByteArrayWrapper(Algos.hash(Algos.hash(newList ++ Longs.toByteArray(System.currentTimeMillis())))),
       Seq(),
       Seq((boxIdsKey, new ByteArrayWrapper(newList)))
     )
@@ -60,11 +60,11 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition
   def updateTrxList(newList: Array[Byte]): Unit ={
     //delete previous value
     db.update(
-      new ByteArrayWrapper(Algos.hash(newList)), Seq(transactionIdsKey), Seq()
+      new ByteArrayWrapper(Algos.hash(newList ++ Longs.toByteArray(System.currentTimeMillis()))), Seq(transactionIdsKey), Seq()
     )
     //put new value
     db.update(
-      new ByteArrayWrapper(Algos.hash(Algos.hash(newList))),
+      new ByteArrayWrapper(Algos.hash(Algos.hash(newList ++ Longs.toByteArray(System.currentTimeMillis())))),
       Seq(),
       Seq((transactionIdsKey, new ByteArrayWrapper(newList)))
     )

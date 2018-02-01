@@ -144,7 +144,7 @@ trait EncryHistoryReader
   def lastHeaders(count: Int): EncryHeaderChain = bestHeaderOpt
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(EncryHeaderChain.empty)
 
-  // TODO: This causes node crashing on error.
+  // FIXME: This causes node crashing on error.
   // Gets EncryPersistentModifier by it's id if it is in history.
   override def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
     historyStorage.modifierById(id)
