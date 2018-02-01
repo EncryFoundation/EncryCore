@@ -62,8 +62,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
               nonMarkedIds.map(id => validityKey(id) -> ByteArrayWrapper(Array(1.toByte))))
           }
 
-          val bestFull = bestFullBlockOpt.get
-          if (fb == bestFull) {
+          if (bestFullBlockOpt.contains(fb)) {
             //applied best header to history
             this -> ProgressInfo[EncryPersistentModifier](None, Seq(), None, Seq())
           } else {

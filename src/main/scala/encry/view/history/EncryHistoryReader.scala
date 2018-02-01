@@ -5,16 +5,16 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.settings.{Algos, ChainSettings, NodeSettings}
-import encry.view.history.storage.HistoryStorage
-import encry.view.history.processors.proofs.BaseADProofProcessor
+import encry.settings.{ChainSettings, NodeSettings}
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
+import encry.view.history.processors.proofs.BaseADProofProcessor
+import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.Store
-import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.core.consensus.History.{HistoryComparisonResult, ModifierIds}
 import scorex.core.consensus.{History, HistoryReader, ModifierSemanticValidity}
 import scorex.core.utils.ScorexLogging
+import scorex.core.{ModifierId, ModifierTypeId}
 
 import scala.util.{Failure, Try}
 
@@ -144,11 +144,12 @@ trait EncryHistoryReader
   def lastHeaders(count: Int): EncryHeaderChain = bestHeaderOpt
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(EncryHeaderChain.empty)
 
-  // FIXME: This causes node crashing on error.
   // Gets EncryPersistentModifier by it's id if it is in history.
   override def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
-    historyStorage.modifierById(id)
-      .ensuring(_.forall(_.id sameElements id), s"Modifier ${Algos.encode(id)} id is incorrect")
+    historyStorage.modifierById(id) match {
+      case Some(mod) => if (mod.id sameElements id) Some(mod) else None
+      case _ => None
+    }
 
   // Gets EncryPersistentModifier of type T by it's id if it is in history.
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T] = modifierById(id) match {

@@ -28,7 +28,8 @@ case class CliListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings) 
     "-addKey" -> KeyManagerAddKey,
     "-init" -> KeyManagerInit,
     "-getKeys" -> KeyManagerGetKeys,
-    "-balance" -> GetBalance
+    "-balance" -> GetBalance,
+    "-sendTx" -> Transfer
     ))
 
   override def receive: Receive = {
@@ -40,11 +41,7 @@ case class CliListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings) 
             parseCommand(input).slice(1, parseCommand(input).length).foreach { command =>
               value.get(command.split("=").head) match {
                 case Some(cmd) =>
-                  implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
-                  nodeViewHolderRef ?
-                    GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Unit] { view =>
-                      cmd.execute(view, command.split("="))
-                    }
+                  val answer = cmd.execute(nodeViewHolderRef, command.split("="), settings).get
                 case None =>
                   println("Unsupported command. Type 'app -help' to get commands list")
                   log.debug("Unsupported command")

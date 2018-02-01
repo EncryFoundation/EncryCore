@@ -21,7 +21,7 @@ class EncryBlockPayloadSerializerTest extends FunSuite {
       val fee = factory.Props.txFee
       val timestamp = 12335467L
       val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
-      val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
+      val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue), (Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
       val sig = PrivateKey25519Companion.sign(
         key,
         PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)

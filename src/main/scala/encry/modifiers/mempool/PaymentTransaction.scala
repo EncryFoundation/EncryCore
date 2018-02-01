@@ -96,10 +96,9 @@ object PaymentTransaction {
     Bytes.concat(
       Array[Byte](typeId),
       proposition.pubKeyBytes,
-      scorex.core.utils.concatFixLengthBytes(useBoxes),
-      scorex.core.utils.concatFixLengthBytes(createBoxes.map { case (addr, amount) =>
-        AddressProposition.getAddrBytes(addr) ++ Longs.toByteArray(amount)
-      }),
+      useBoxes.foldLeft(Array[Byte]())(_ ++ _),
+      createBoxes.foldLeft(Array[Byte]())((buff, t) =>
+        buff ++ AddressProposition.getAddrBytes(t._1) ++ Longs.toByteArray(t._2)),
       Longs.toByteArray(timestamp),
       Longs.toByteArray(fee)
     )
@@ -142,14 +141,12 @@ object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
     val useOutputs = (0 until inputLength).map { i =>
       ADKey @@ bytes.slice(s + (i * outElementLength), s + (i + 1) * outElementLength)
     }
-
     val s2 = s + (inputLength * outElementLength)
     val inElementLength = 45
     val createOutputs = (0 until outputLength).map { i =>
-      (Address @@ Base58.encode(bytes.slice(s2 + i * inElementLength, s2 + (i + 1) * (inElementLength - 8))),
-        Longs.fromByteArray(bytes.slice(s2 + (i + 1) * (inElementLength - 8), s2 + (i + 1) * inElementLength)))
+      (Address @@ Base58.encode(bytes.slice(s2 + i * inElementLength, s2 + (i * inElementLength) + 37)),
+        Longs.fromByteArray(bytes.slice(s2 + (i * inElementLength) + 37, s2 + (i + 1) * inElementLength)))
     }
-
     PaymentTransaction(sender, fee, timestamp, signature, useOutputs, createOutputs)
   }
 }

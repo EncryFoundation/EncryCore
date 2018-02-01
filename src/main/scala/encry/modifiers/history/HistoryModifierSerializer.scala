@@ -22,11 +22,11 @@ object HistoryModifierSerializer extends Serializer[EncryPersistentModifier] {
 
   override def parseBytes(bytes: Array[Byte]): Try[EncryPersistentModifier] = Try {
     bytes.head match {
-      case EncryBlockHeader.modifierTypeId =>
+      case EncryBlockHeader.`modifierTypeId` =>
         EncryBlockHeaderSerializer.parseBytes(bytes.tail).get
-      case ADProofs.modifierTypeId =>
+      case ADProofs.`modifierTypeId` =>
         ADProofSerializer.parseBytes(bytes.tail).get
-      case EncryBlockPayload.modifierTypeId =>
+      case EncryBlockPayload.`modifierTypeId` =>
         EncryBlockPayloadSerializer.parseBytes(bytes.tail).get
       case m =>
         throw new Error(s"Deserialization for unknown type byte: $m")

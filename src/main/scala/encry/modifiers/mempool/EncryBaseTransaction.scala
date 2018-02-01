@@ -47,7 +47,7 @@ trait EncryBaseTransaction extends Transaction[Proposition] with Signable25519 {
 
   val minimalFee: Float = Constants.feeMinAmount + Constants.txByteCost * length
 
-  override def toString: String = s"<TX: type=$typeId id=${Base58.encode(txHash)}>"
+  override def toString: String = s"<TX: type=$typeId id=${Base58.encode(id)}>"
 
   // Shadowed.
   override val messageToSign: Array[TxTypeId] = Array.fill(32)(1.toByte)

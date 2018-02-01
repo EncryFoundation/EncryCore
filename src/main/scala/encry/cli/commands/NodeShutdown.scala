@@ -1,4 +1,7 @@
 package encry.cli.commands
+import akka.actor.ActorRef
+import akka.util.Timeout
+import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
@@ -9,7 +12,6 @@ import scala.util.Try
 
 object NodeShutdown extends Command {
 
-  override def execute(view: NodeViewHolder.CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool],
-                       args: Array[String]): Try[Unit] = Try(System.exit(0))
+  override def execute(nodeViewHolderRef: ActorRef, args: Array[String], settings: EncryAppSettings): Try[Unit] = Try(System.exit(0))
 
 }

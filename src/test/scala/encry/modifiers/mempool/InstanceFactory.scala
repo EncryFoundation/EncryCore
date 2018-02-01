@@ -20,7 +20,7 @@ object InstanceFactory {
     val fee = genHelper.Props.txFee
     val timestamp = 1234567L
     val useBoxes = IndexedSeq(genHelper.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
-    val outputs = IndexedSeq((Address @@ genHelper.Props.recipientAddr, genHelper.Props.boxValue))
+    val outputs = IndexedSeq((Address @@ genHelper.Props.recipientAddr, genHelper.Props.boxValue), (Address @@ genHelper.Props.recipientAddr, genHelper.Props.boxValue))
     val sig = PrivateKey25519Companion.sign(
       key,
       PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)

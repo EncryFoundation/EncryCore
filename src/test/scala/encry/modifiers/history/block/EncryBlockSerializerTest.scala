@@ -55,12 +55,14 @@ class EncryBlockSerializerTest extends FunSuite {
 
     val adProofs = ADProofs(ModifierId @@ Random.randomBytes(), SerializedAdProof @@ Random.randomBytes())
 
-    val eB = new EncryBlock(blockHeader,blockPayload,Option(adProofs))
+    val block = new EncryBlock(blockHeader,blockPayload,Option(adProofs))
 
-    val blockSer = EncryBlockSerializer.toBytes(eB)
+    val blockSererialized = EncryBlockSerializer.toBytes(block)
 
-    val blockDeSer = EncryBlockSerializer.parseBytes(blockSer).get
+    val blockDeserealized = EncryBlockSerializer.parseBytes(blockSererialized).get
 
-    assert(eB.adProofsOpt.get.bytes sameElements blockDeSer.adProofsOpt.get.bytes,"ADProofs bytes mismatch.")
+    assert(block.adProofsOpt.get.bytes sameElements blockDeserealized.adProofsOpt.get.bytes,"ADProofs bytes mismatch.")
+
+    assert(block.id sameElements blockDeserealized.id, "Block Id mismatch.")
   }
 }

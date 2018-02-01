@@ -38,16 +38,18 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
   protected def processFullBlock(fullBlock: EncryBlock,
                                  txsAreNew: Boolean): ProgressInfo[EncryPersistentModifier] = {
     val header: EncryBlockHeader = fullBlock.header
-    val txs: EncryBlockPayload = fullBlock.payload
+    val payload: EncryBlockPayload = fullBlock.payload
      val adProofsOpt: Option[ADProofs] = fullBlock.adProofsOpt
       .ensuring(_.isDefined || txsAreNew, "Only transactions can be new when proofs are empty")
 
     val newModRow = if (txsAreNew) {
-      (ByteArrayWrapper(txs.id), ByteArrayWrapper(HistoryModifierSerializer.toBytes(txs)))
+      val pBefore = payload
+      val pAfter = HistoryModifierSerializer.parseBytes(HistoryModifierSerializer.toBytes(payload)).get
+      (ByteArrayWrapper(payload.id), ByteArrayWrapper(HistoryModifierSerializer.toBytes(payload)))
     } else {
       (ByteArrayWrapper(adProofsOpt.get.id), ByteArrayWrapper(HistoryModifierSerializer.toBytes(adProofsOpt.get)))
     }
-    val storageVersion = if (txsAreNew) txs.id else adProofsOpt.get.id
+    val storageVersion = if (txsAreNew) payload.id else adProofsOpt.get.id
 
     val continuations = continuationHeaderChains(header).map(_.headers.tail)
     val bestFullChain = continuations.map(hc => hc.map(getFullBlock).takeWhile(_.isDefined).flatten.map(_.header))

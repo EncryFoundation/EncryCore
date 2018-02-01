@@ -44,19 +44,12 @@ object EncryBlockPayload {
 
 object EncryBlockPayloadSerializer extends Serializer[EncryBlockPayload] {
 
-  //TODO: Array[Byte](tx.typeId)?
   override def toBytes(obj: EncryBlockPayload): Array[Byte] =
     Bytes.concat(
       obj.headerId,
       Ints.toByteArray(obj.transactions.size),
       obj.transactions.foldLeft(Seq[Array[Byte]]()){ case (arr, tx) =>
-        val txBytes = tx match {
-          case tx: PaymentTransaction =>
-            PaymentTransactionSerializer.toBytes(tx.asInstanceOf[PaymentTransaction])
-          case tx: CoinbaseTransaction =>
-            CoinbaseTransactionSerializer.toBytes(tx.asInstanceOf[CoinbaseTransaction])
-        }
-        arr :+ (Ints.toByteArray(txBytes.length) ++ Array[Byte](tx.typeId) ++ txBytes)
+        arr :+ (Ints.toByteArray(tx.bytes.length) ++ Array[Byte](tx.typeId) ++ tx.bytes)
       }.flatten.toArray
     )
 

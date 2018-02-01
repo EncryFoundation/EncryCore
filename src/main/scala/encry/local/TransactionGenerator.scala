@@ -69,7 +69,7 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings, time
       }
       if (txsGenerated < TestHelper.Props.keysQty)
         log.info(s"$txsGenerated transactions generated, repeating in 5sec ...")
-        context.system.scheduler.scheduleOnce(5.seconds)(self ! FetchBoxes)
+        context.system.scheduler.scheduleOnce(10.seconds)(self ! FetchBoxes)
 
     case txs: Seq[EncryBaseTransaction] =>
       txs.foreach { tx =>
