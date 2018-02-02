@@ -10,7 +10,7 @@ import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.{AddressProposition, HeightProposition}
 import encry.settings.{Algos, EncryAppSettings, NodeSettings}
 import encry.view.history.Height
-import encry.view.state.index.StateIndexReader
+import encry.view.state.index.StateIndexManager
 import scorex.core.VersionTag
 import scorex.core.transaction.state.MinimalState
 import scorex.core.utils.ScorexLogging
@@ -76,7 +76,7 @@ object EncryState extends ScorexLogging{
     lazy val genesisSeed = Long.MaxValue
     lazy val rndGen = new scala.util.Random(genesisSeed)
     (0 until 20).map(_ =>
-      AssetBox(AddressProposition(StateIndexReader.openBoxesAddress), rndGen.nextLong(), 0L))
+      AssetBox(AddressProposition(StateIndexManager.openBoxesAddress), rndGen.nextLong(), 0L))
   }
 
   def generateGenesisUtxoState(stateDir: File, indexDir: File,

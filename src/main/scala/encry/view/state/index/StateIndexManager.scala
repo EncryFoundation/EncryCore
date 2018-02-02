@@ -20,9 +20,9 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-trait StateIndexReader extends ScorexLogging {
+trait StateIndexManager extends ScorexLogging {
 
-  import StateIndexReader._
+  import StateIndexManager._
 
   val indexStore: Store
 
@@ -35,82 +35,58 @@ trait StateIndexReader extends ScorexLogging {
       case block: EncryBlock =>
         bulkUpdateIndex(
           block.header.id,
-          toIndexModsMap(block.payload.transactions),
-          Some(Height @@ mod.asInstanceOf[EncryBlock].header.height)
+          toIndexModificationsMap(block.payload.transactions),
+          Some(Height @@ block.header.height)
         )
       case payload: EncryBlockPayload =>
         bulkUpdateIndex(
           payload.headerId,
-          toIndexModsMap(payload.transactions),
+          toIndexModificationsMap(payload.transactions),
           None
         )
       case _ => // Do nothing.
     }
   }
 
-  private def toIndexModsMap(txs: Seq[EncryBaseTransaction]) = {
-    val stateOpsMap = mutable.HashMap.empty[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]
+  private def toIndexModificationsMap(txs: Seq[EncryBaseTransaction]) = {
+    val idxModificationsMap = mutable.HashMap.empty[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]
     txs.foreach { tx =>
       tx.useBoxes.foreach { id =>
         id.head match {
           case AssetBox.typeId =>
-            stateOpsMap.get(Address @@ tx.proposition.address) match {
+            idxModificationsMap.get(Address @@ tx.proposition.address) match {
               case Some(t) =>
                 if (t._2.exists(_.sameElements(id))) t._2.remove(id)
                 else t._1.add(id)
               case None =>
-                stateOpsMap.update(
+                idxModificationsMap.update(
                   Address @@ tx.proposition.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
             }
           case OpenBox.typeId =>
-            stateOpsMap.get(openBoxesAddress) match {
+            idxModificationsMap.get(openBoxesAddress) match {
               case Some(t) =>
                 if (t._2.exists(_.sameElements(id))) t._2.remove(id)
                 else t._1.add(id)
               case None =>
-                stateOpsMap.update(openBoxesAddress, mutable.Set(id) -> mutable.Set.empty[ADKey])
+                idxModificationsMap.update(openBoxesAddress, mutable.Set(id) -> mutable.Set.empty[ADKey])
             }
         }
       }
       tx.newBoxes.foreach {
         case bx: AssetBox =>
-          stateOpsMap.get(bx.proposition.address) match {
+          idxModificationsMap.get(bx.proposition.address) match {
             case Some(t) => t._2.add(bx.id)
-            case None => stateOpsMap.update(
+            case None => idxModificationsMap.update(
               bx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
           }
         case bx: OpenBox =>
-          stateOpsMap.get(openBoxesAddress) match {
+          idxModificationsMap.get(openBoxesAddress) match {
             case Some(t) => t._2.add(bx.id)
-            case None => stateOpsMap.update(openBoxesAddress, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
+            case None => idxModificationsMap.update(openBoxesAddress, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
           }
       }
     }
-    stateOpsMap
-  }
-
-  // Updates or creates index for key `address`.
-  def updateAddressIndex(address: Address, toRemove: Seq[ADKey], toInsert: Seq[ADKey]): Unit = {
-    val addrKey = keyByAddress(address)
-    val bxsOpt = indexStorage.boxIdsByAddress(address)
-    bxsOpt match {
-      case Some(bxs) =>
-        indexStorage.update(
-          deriveVersionId(addrKey ++ toRemove.head ++ toInsert.head),
-          Seq(ByteArrayWrapper(addrKey)),
-          Seq(ByteArrayWrapper(addrKey) -> ByteArrayWrapper(
-            (bxs.filterNot(toRemove.contains) ++ toInsert)
-              .foldLeft(Array[Byte]()) { case (buff, id) => buff ++ id }
-          ))
-        )
-      case None =>
-        indexStorage.update(
-          deriveVersionId(addrKey ++ toRemove.head ++ toInsert.head),
-          Seq(),
-          Seq(ByteArrayWrapper(addrKey) ->
-            ByteArrayWrapper(toInsert.foldLeft(Array[Byte]()) { case (buff, id) => buff ++ id }))
-        )
-    }
+    idxModificationsMap
   }
 
   def bulkUpdateIndex(version: ModifierId,
@@ -139,28 +115,21 @@ trait StateIndexReader extends ScorexLogging {
 
     val toInsert = {
       val bxsOps = (opsFinal._1 ++ opsFinal._2).map { case (addr, ids) =>
-        ByteArrayWrapper(keyByAddress(addr)) ->
-          ByteArrayWrapper(ids.foldLeft(Array[Byte]()) { case (buff, id) => buff ++ id })
+        ByteArrayWrapper(keyByAddress(addr)) -> ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
       }
       if (modHeightOpt.isDefined) bxsOps :+ (stateHeightKey, ByteArrayWrapper(Ints.toByteArray(modHeightOpt.get)))
       else bxsOps
     }
 
-    // First remove existing records assoc with addresses to be updated.
-    indexStorage.update(deriveVersionId(version), toRemove, Seq())
-
-    // Than insert new versions of records + new records.
-    indexStorage.update(version, Seq(), toInsert)
+    indexStorage.updateWithReplacement(version, toRemove, toInsert)
   }
 }
 
-object StateIndexReader {
+object StateIndexManager {
 
   val openBoxesAddress: Address = Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp"
 
   val stateHeightKey: ByteArrayWrapper = ByteArrayWrapper(Algos.hash("state_height".getBytes))
 
   def keyByAddress(address: Address) = Algos.hash(AddressProposition.getAddrBytes(address))
-
-  def deriveVersionId(bytes: Array[Byte]): ModifierId = ModifierId @@ Algos.hash(bytes)
 }

@@ -12,7 +12,7 @@ import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.{Algos, Constants}
 import encry.view.history.Height
-import encry.view.state.index.StateIndexReader
+import encry.view.state.index.StateIndexManager
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.LocalInterface.LocallyGeneratedModifier
 import scorex.core.utils.ScorexLogging
@@ -27,7 +27,7 @@ class UtxoState(override val version: VersionTag,
                 override val stateStore: Store,
                 override val indexStore: Store,
                 nodeViewHolderRef: Option[ActorRef])
-  extends EncryState[UtxoState] with UtxoStateReader with StateIndexReader with TransactionValidator {
+  extends EncryState[UtxoState] with UtxoStateReader with StateIndexManager with TransactionValidator {
 
   import UtxoState.metadata
 

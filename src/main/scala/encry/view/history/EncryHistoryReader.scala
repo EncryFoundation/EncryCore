@@ -16,6 +16,7 @@ import scorex.core.consensus.{History, HistoryReader, ModifierSemanticValidity}
 import scorex.core.utils.ScorexLogging
 import scorex.core.{ModifierId, ModifierTypeId}
 
+import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
 trait EncryHistoryReader
@@ -117,16 +118,20 @@ trait EncryHistoryReader
     * @return all possible forks, that contains specified header
     */
   protected[history] def continuationHeaderChains(header: EncryBlockHeader): Seq[EncryHeaderChain] = {
-    def loop(acc: Seq[EncryBlockHeader]): Seq[EncryHeaderChain] = {
-      val bestHeader = acc.last
-      val currentHeight = heightOf(bestHeader.id).get
+    @tailrec
+    def loop(acc: Seq[Seq[EncryBlockHeader]]): Seq[EncryHeaderChain] = {
+      val currentHeight = heightOf(acc.head.head.id).get
       val nextLevelHeaders = headerIdsAtHeight(currentHeight + 1).map(id => typedModifierById[EncryBlockHeader](id).get)
-        .filter(_.parentId sameElements bestHeader.id)
-      if (nextLevelHeaders.isEmpty) Seq(EncryHeaderChain(acc))
-      else nextLevelHeaders.map(h => acc :+ h).flatMap(chain => loop(chain))
+      if (nextLevelHeaders.isEmpty) acc.map(chain => EncryHeaderChain(chain.reverse))
+      else {
+        val updatedChains = nextLevelHeaders
+          .flatMap(h => acc.find(chain => h.parentId sameElements chain.head.id).map(c => h +: c))
+        val nonUpdatedChains = acc.filter(chain => !nextLevelHeaders.exists(_.parentId sameElements chain.head.id))
+        loop(updatedChains ++ nonUpdatedChains)
+      }
     }
 
-    loop(Seq(header))
+    loop(Seq(Seq(header)))
   }
 
   protected def testApplicable(modifier: EncryPersistentModifier): Try[Unit] = {

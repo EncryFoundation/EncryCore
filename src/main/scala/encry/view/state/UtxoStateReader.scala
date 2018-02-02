@@ -4,7 +4,7 @@ import com.google.common.primitives.Ints
 import encry.account.{Address, Balance}
 import encry.modifiers.state.box._
 import encry.view.history.Height
-import encry.view.state.index.{Portfolio, StateIndexReader}
+import encry.view.state.index.{Portfolio, StateIndexManager}
 import io.iohk.iodb.Store
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
@@ -12,13 +12,13 @@ import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, Persi
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
-trait UtxoStateReader extends StateIndexReader with ScorexLogging {
+trait UtxoStateReader extends StateIndexManager with ScorexLogging {
 
   implicit val hf: Blake2b256Unsafe = new Blake2b256Unsafe
 
   val stateStore: Store
 
-  def stateHeight: Height = indexStorage.db.get(StateIndexReader.stateHeightKey)
+  def stateHeight: Height = indexStorage.db.get(StateIndexManager.stateHeightKey)
     .map(d => Height @@ Ints.fromByteArray(d.data)).getOrElse(Height @@ 0)
 
   private lazy val np =
@@ -40,20 +40,20 @@ trait UtxoStateReader extends StateIndexReader with ScorexLogging {
       case _ => None
     }
 
-  def typedBoxById[BXT <: EncryBaseBox](boxId: ADKey): Option[EncryBaseBox] =
+  def typedBoxById[B <: EncryBaseBox](boxId: ADKey): Option[EncryBaseBox] =
     boxById(boxId) match {
-      case Some(bx) => if (bx.isInstanceOf[BXT]) Some(bx) else None
+      case Some(bx: B@unchecked) if bx.isInstanceOf[B] => Some(bx)
       case _ => None
     }
 
   def getAvailableOpenBoxesAt(height: Height): Seq[OpenBox] =
-    boxesByAddress(StateIndexReader.openBoxesAddress)
+    boxesByAddress(StateIndexManager.openBoxesAddress)
       .map(bxs => bxs.filter(bx => bx.isInstanceOf[OpenBox] &&
         bx.asInstanceOf[OpenBox].proposition.height <= height)
         .map(_.asInstanceOf[OpenBox])).getOrElse(Seq())
 
   def getOpenBoxIdsAtHeight(height: Height): Seq[ADKey] =
-    boxIdsByAddress(StateIndexReader.openBoxesAddress).getOrElse(Seq())
+    boxIdsByAddress(StateIndexManager.openBoxesAddress).getOrElse(Seq())
 
   def getRandomBox: Option[EncryBaseBox] =
     persistentProver.avlProver.randomWalk().map(_._1).flatMap(boxById)
