@@ -2,5 +2,5 @@ package encry.api.models
 
 trait BaseModel[T] {
 
-  def toBaseObj: T
+  def toBaseObj: Option[T]
 }

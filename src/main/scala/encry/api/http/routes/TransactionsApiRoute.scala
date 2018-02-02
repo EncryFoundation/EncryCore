@@ -49,8 +49,10 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
   }.map(_.map(_.json).asJson)
 
   def sendTransactionR: Route = (path("transfer") & post & entity(as[PaymentTransactionModel])) { model =>
-    nodeViewActorRef ! LocallyGeneratedTransaction[Proposition, PaymentTransaction](model.toBaseObj)
-    complete(StatusCodes.OK)
+    model.toBaseObj.map { ptx =>
+      nodeViewActorRef ! LocallyGeneratedTransaction[Proposition, PaymentTransaction](ptx)
+      complete(StatusCodes.OK)
+    }.getOrElse(complete(StatusCodes.BadRequest))
   }
 
   def getTransactionByIdR: Route = (path(Segment) & get) { id =>

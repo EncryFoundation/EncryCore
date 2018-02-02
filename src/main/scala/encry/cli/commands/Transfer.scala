@@ -24,7 +24,7 @@ object Transfer extends Command {
   /**
     * Command "wallet -sendTx=toAddress;Amount"
     * Example "wallet -sendTx=3Y49ihvfesPcSfCxRLW4q4jjwzJhkFS8tFdN6KWMgcHSUvcngy;10"
- *
+    *
     * @param nodeViewHolderRef
     * @param args
     * @return
@@ -33,7 +33,7 @@ object Transfer extends Command {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
     nodeViewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Unit] { view =>
-        val recepient = args(1).split(";").head
+        val recipient = args(1).split(";").head
         val amount = args(1).split(";").last.toLong
         val proposition = view.vault.keyManager.keys.head.publicImage
         val fee = 100L
@@ -43,7 +43,7 @@ object Transfer extends Command {
         }
         val useBoxes = boxes.map(_.id).toIndexedSeq
         val outputs = IndexedSeq(
-          (Address @@ recepient, amount),
+          (Address @@ recipient, amount),
           (Address @@ proposition.address, boxes.map(_.amount).sum - amount))
         val sig = Signature25519(Curve25519.sign(
           view.vault.keyManager.keys.head.privKeyBytes,
@@ -55,5 +55,4 @@ object Transfer extends Command {
         nodeViewHolderRef ! LocallyGeneratedTransaction[Proposition, EncryBaseTransaction](tx)
       }
   }
-
 }

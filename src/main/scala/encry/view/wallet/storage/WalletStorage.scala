@@ -110,6 +110,9 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition
           Seq((new ByteArrayWrapper(tx.txHash), new ByteArrayWrapper(tx.bytes)))
         )
         deleteBoxesById(tx.useBoxes)
+        putBoxes(tx.newBoxes.filter(box => box.isInstanceOf[AssetBox] &&
+          publicKeys.map(a => a.address).contains(box.asInstanceOf[AssetBox].proposition.address))
+          .map(_.asInstanceOf[AssetBox]).toSeq)
       } else {
         updateTrxList(txsRawBytes ++ tx.txHash)
         db.update(
@@ -123,7 +126,7 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition
       }
       refreshBalance()
     } else {
-      throw new Error("Tx with this txHash is already contains in db")
+      throw new Error("Transaction is already in storage.")
     }
   }
 

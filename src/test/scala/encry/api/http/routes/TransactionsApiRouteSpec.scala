@@ -31,7 +31,7 @@ class TransactionsApiRouteSpec extends PropSpec with Matchers {
 
     txWrapped.proposition shouldEqual txDeserialized.right.get.proposition
 
-    val baseTxDeserialized = txDeserialized.right.get.toBaseObj
+    val baseTxDeserialized = txDeserialized.right.get.toBaseObj.get
 
     tx.id shouldEqual baseTxDeserialized.id
   }

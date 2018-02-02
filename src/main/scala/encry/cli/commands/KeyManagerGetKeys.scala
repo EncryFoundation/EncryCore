@@ -1,14 +1,13 @@
 package encry.cli.commands
 
 import akka.actor.ActorRef
-import encry.view.history.EncryHistory
-import encry.view.mempool.EncryMempool
-import encry.view.state.UtxoState
 import akka.pattern._
 import akka.util.Timeout
 import encry.settings.EncryAppSettings
+import encry.view.history.EncryHistory
+import encry.view.mempool.EncryMempool
+import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
-import scorex.core.NodeViewHolder
 import scorex.core.NodeViewHolder.GetDataFromCurrentView
 import scorex.crypto.encode.Base58
 

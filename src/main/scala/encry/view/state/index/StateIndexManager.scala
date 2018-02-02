@@ -127,6 +127,7 @@ trait StateIndexManager extends ScorexLogging {
 
 object StateIndexManager {
 
+  // OpenBoxes are stored in index under this addr for consensus.
   val openBoxesAddress: Address = Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp"
 
   val stateHeightKey: ByteArrayWrapper = ByteArrayWrapper(Algos.hash("state_height".getBytes))

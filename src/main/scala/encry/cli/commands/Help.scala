@@ -13,20 +13,21 @@ import scala.util.Try
 
 object Help extends Command {
 
-  override def execute(nodeViewHolderRef: ActorRef, args: Array[String], settings: EncryAppSettings): Try[Unit] = Try{
+  override def execute(nodeViewHolderRef: ActorRef, args: Array[String], settings: EncryAppSettings): Try[Unit] = Try {
 
     println(
       """
         |Usage: [GROUP_NAME] [COMMAND]=[ARGUMENT]
         |
-        |Group name   Command   Argument   Meaning
+        |Group name    Command     Argument   Meaning
         |----------------------------------------------------------------
-        |node         -stop     None       Stop node
-        |wallet       -getKeys  None       Show wallet keys
-        |-//-         -init     Seed       Init storage with seed
-        |-//-         -addKey   None       Add key to storage
-        |-//-         -balance  None       Show balance of current wallet
-        |app          -help     None       Show all supported commands
+        |node          -stop       None       Stop node
+        |wallet        -getKeys    None       Show wallet keys
+        |wallet        -init       Seed       Init storage with seed
+        |wallet        -addKey     None       Add key to storage
+        |wallet        -balance    None       Show balance of current wallet
+        |wallet        -transfer   addr;am    Transfer `am`ount to `addr`ess
+        |app           -help       None       Show all supported commands
       """
         .stripMargin)
   }

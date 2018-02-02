@@ -152,7 +152,7 @@ trait EncryHistoryReader
   // Gets EncryPersistentModifier by it's id if it is in history.
   override def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
     historyStorage.modifierById(id) match {
-      case Some(mod) => if (mod.id sameElements id) Some(mod) else None
+      case Some(mod) if mod.id sameElements id => Some(mod)
       case _ => None
     }
 

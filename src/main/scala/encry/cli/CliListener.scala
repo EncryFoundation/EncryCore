@@ -1,16 +1,9 @@
 package encry.cli
 
 import akka.actor.{Actor, ActorRef}
-import akka.pattern._
-import akka.util.Timeout
 import encry.cli.CliListener.StartListening
 import encry.cli.commands._
 import encry.settings.EncryAppSettings
-import encry.view.history.EncryHistory
-import encry.view.mempool.EncryMempool
-import encry.view.state.UtxoState
-import encry.view.wallet.EncryWallet
-import scorex.core.NodeViewHolder.GetDataFromCurrentView
 import scorex.core.utils.ScorexLogging
 
 import scala.collection.mutable
@@ -18,15 +11,21 @@ import scala.io.StdIn
 
 case class CliListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings) extends Actor with ScorexLogging {
 
+  val prompt = "$> "
+
   val commands: mutable.HashMap[String,mutable.HashMap[String, Command]] = mutable.HashMap.empty
 
   commands.update("node", mutable.HashMap(
     "-stop" -> NodeShutdown
     ))
 
+  commands.update("app", mutable.HashMap(
+    "-help" -> Help
+  ))
+
   commands.update("wallet", mutable.HashMap(
     "-addKey" -> KeyManagerAddKey,
-    "-init" -> KeyManagerInit,
+    "-init" -> InitKeyStorage,
     "-getKeys" -> KeyManagerGetKeys,
     "-balance" -> GetBalance,
     "-sendTx" -> Transfer
@@ -35,13 +34,13 @@ case class CliListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings) 
   override def receive: Receive = {
 
     case StartListening =>
-      Iterator.continually(StdIn.readLine()).takeWhile(!_.equals("quit")).foreach { input =>
+      Iterator.continually(StdIn.readLine(prompt)).takeWhile(!_.equals("quit")).foreach { input =>
         commands.get(parseCommand(input).head) match {
           case Some(value) =>
             parseCommand(input).slice(1, parseCommand(input).length).foreach { command =>
               value.get(command.split("=").head) match {
                 case Some(cmd) =>
-                  val answer = cmd.execute(nodeViewHolderRef, command.split("="), settings).get
+                  cmd.execute(nodeViewHolderRef, command.split("="), settings).get
                 case None =>
                   println("Unsupported command. Type 'app -help' to get commands list")
                   log.debug("Unsupported command")

@@ -13,9 +13,9 @@ import scorex.crypto.encode.Base58
 
 import scala.util.Try
 
-object KeyManagerInit extends Command {
+object InitKeyStorage extends Command {
 
-  override def execute(nodeViewHolderRef: ActorRef, args: Array[String], settings: EncryAppSettings): Try[Unit] = Try{
+  override def execute(nodeViewHolderRef: ActorRef, args: Array[String], settings: EncryAppSettings): Try[Unit] = Try {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
     nodeViewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Unit] { view =>
