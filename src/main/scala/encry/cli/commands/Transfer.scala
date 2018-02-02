@@ -4,6 +4,7 @@ import akka.actor.ActorRef
 import akka.pattern._
 import akka.util.Timeout
 import encry.account.Address
+import encry.cli.Response
 import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box.AssetBox
 import encry.settings.EncryAppSettings
@@ -29,7 +30,9 @@ object Transfer extends Command {
     * @param args
     * @return
     */
-  override def execute(nodeViewHolderRef: ActorRef, args: Array[String], settings: EncryAppSettings): Try[Unit] = Try {
+  // TODO: Input validation.
+  override def execute(nodeViewHolderRef: ActorRef,
+                       args: Array[String], settings: EncryAppSettings): Option[Response] = Try {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
     nodeViewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Unit] { view =>
@@ -37,7 +40,7 @@ object Transfer extends Command {
         val amount = args(1).split(";").last.toLong
         val proposition = view.vault.keyManager.keys.head.publicImage
         val fee = 100L
-        val timestamp = 1234567L
+        val timestamp = System.currentTimeMillis()  // TODO: Use NTP.
         val boxes = view.vault.walletStorage.getAllBoxes.foldLeft(Seq[AssetBox]()) {
           case (seq, box) => if (seq.map(_.amount).sum < amount) seq :+ box else seq
         }
@@ -54,5 +57,5 @@ object Transfer extends Command {
 
         nodeViewHolderRef ! LocallyGeneratedTransaction[Proposition, EncryBaseTransaction](tx)
       }
-  }
+  }.toOption.map(_ => Some(Response("OK"))).getOrElse(Some(Response("Operation failed")))
 }

@@ -1,3 +1,3 @@
 package encry.cli
 
-case class Response(v: Option[String])
+case class Response(inner: String)

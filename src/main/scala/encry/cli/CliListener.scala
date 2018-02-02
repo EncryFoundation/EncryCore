@@ -40,10 +40,9 @@ case class CliListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings) 
             parseCommand(input).slice(1, parseCommand(input).length).foreach { command =>
               value.get(command.split("=").head) match {
                 case Some(cmd) =>
-                  cmd.execute(nodeViewHolderRef, command.split("="), settings).get
+                  println(cmd.execute(nodeViewHolderRef, command.split("="), settings).map(_.inner).getOrElse(""))
                 case None =>
                   println("Unsupported command. Type 'app -help' to get commands list")
-                  log.debug("Unsupported command")
               }
           }
           case None =>

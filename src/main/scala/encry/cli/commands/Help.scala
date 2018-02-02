@@ -1,21 +1,14 @@
 package encry.cli.commands
 
 import akka.actor.ActorRef
-import akka.util.Timeout
+import encry.cli.Response
 import encry.settings.EncryAppSettings
-import encry.view.history.EncryHistory
-import encry.view.mempool.EncryMempool
-import encry.view.state.UtxoState
-import encry.view.wallet.EncryWallet
-import scorex.core.NodeViewHolder
-
-import scala.util.Try
 
 object Help extends Command {
 
-  override def execute(nodeViewHolderRef: ActorRef, args: Array[String], settings: EncryAppSettings): Try[Unit] = Try {
-
-    println(
+  override def execute(nodeViewHolderRef: ActorRef,
+                       args: Array[String], settings: EncryAppSettings): Option[Response] =
+    Some(Response(
       """
         |Usage: [GROUP_NAME] [COMMAND]=[ARGUMENT]
         |
@@ -29,6 +22,5 @@ object Help extends Command {
         |wallet        -transfer   addr;am    Transfer `am`ount to `addr`ess
         |app           -help       None       Show all supported commands
       """
-        .stripMargin)
-  }
+        .stripMargin))
 }
