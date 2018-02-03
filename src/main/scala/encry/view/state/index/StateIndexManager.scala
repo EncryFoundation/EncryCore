@@ -109,13 +109,13 @@ trait StateIndexManager extends ScorexLogging {
     log.info(s"Updating StateIndex for mod: ${Algos.encode(version)}")
 
     val toRemove = {
-      if (modHeightOpt.isDefined) opsFinal._2.map(i => ByteArrayWrapper(keyByAddress(i._1))) :+ stateHeightKey
-      else opsFinal._2.map(i => ByteArrayWrapper(keyByAddress(i._1)))
+      if (modHeightOpt.isDefined) opsFinal._2.map(i => keyByAddress(i._1)) :+ stateHeightKey
+      else opsFinal._2.map(i => keyByAddress(i._1))
     }
 
     val toInsert = {
       val bxsOps = (opsFinal._1 ++ opsFinal._2).map { case (addr, ids) =>
-        ByteArrayWrapper(keyByAddress(addr)) -> ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
+        keyByAddress(addr) -> ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
       }
       if (modHeightOpt.isDefined) bxsOps :+ (stateHeightKey, ByteArrayWrapper(Ints.toByteArray(modHeightOpt.get)))
       else bxsOps
@@ -132,5 +132,6 @@ object StateIndexManager {
 
   val stateHeightKey: ByteArrayWrapper = ByteArrayWrapper(Algos.hash("state_height".getBytes))
 
-  def keyByAddress(address: Address) = Algos.hash(AddressProposition.getAddrBytes(address))
+  def keyByAddress(address: Address): ByteArrayWrapper =
+    ByteArrayWrapper(Algos.hash(AddressProposition.getAddrBytes(address)))
 }

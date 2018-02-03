@@ -14,7 +14,7 @@ import scorex.core.NodeViewHolder.GetDataFromCurrentView
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-object PrintPrivateKeys extends Command {
+object PrintPrivKeys extends Command {
 
   override def execute(nodeViewHolderRef: ActorRef,
                        args: Array[String], settings: EncryAppSettings): Option[Response] = {

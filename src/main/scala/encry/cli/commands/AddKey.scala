@@ -14,7 +14,7 @@ import scorex.core.NodeViewHolder.GetDataFromCurrentView
 
 import scala.util.Try
 
-object KeyManagerAddKey extends Command {
+object AddKey extends Command {
 
   override def execute(nodeViewHolderRef: ActorRef,
                        args: Array[String], settings: EncryAppSettings): Option[Response] = Try {

@@ -6,193 +6,105 @@ import encry.modifiers.state.box.{AssetBox, AssetBoxSerializer}
 import encry.settings.Algos
 import encry.view.EncryBaseStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
+import scorex.core.ModifierId
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.crypto.authds.ADKey
-import scorex.crypto.hash.Digest32
 
-import scala.util.Try
+import scala.util.{Random, Try}
 
-class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition]) extends EncryBaseStorage {
+class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition])
+  extends EncryBaseStorage {
 
   import WalletStorage._
 
-  /**
-    * Get keys of unspent boxes
-    * @return seq of ADKeys
-    */
-  def getBoxIds: Seq[ADKey] ={
-    val boxIdsRaw = db.get(boxIdsKey).map(v =>v.data).getOrElse(Array[Byte]())
-    (0 until (boxIdsRaw.length/32)).foldLeft(Seq[ADKey]())( (seq,i) =>
-      seq :+ ADKey @@ boxIdsRaw.slice(32*i,32*i+32)
-    )
+  def nonVersionedUpdateWithReplacement(idsToRemove: Seq[ByteArrayWrapper],
+                                        toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit = {
+    db.update(Random.nextLong(), idsToRemove, Seq())
+    db.update(Random.nextLong(), Seq(), toInsert)
   }
 
-  /**
-    * Get keys of all transactions
-    * @return seq of Digest32
-    */
-  def getTransactionIds: Seq[Digest32] =
-    db.get(boxIdsKey).map { v =>
-      v.data.sliding(1, 32).foldLeft(Seq[Digest32]())((seq, key) => seq :+ Digest32 @@ key)
-    }.getOrElse(Seq())
-
-  /**
-    * Update value of key "listOfBoxesKeys"
-    * @param newList - new value
-    */
-  def updateADKeysList(newList: Array[Byte]): Unit = {
-    //delete previous value
-    db.update(
-      new ByteArrayWrapper(Algos.hash(newList ++ Longs.toByteArray(System.currentTimeMillis()))), Seq(boxIdsKey), Seq()
-    )
-    //put new value
-    db.update(
-      new ByteArrayWrapper(Algos.hash(Algos.hash(newList ++ Longs.toByteArray(System.currentTimeMillis())))),
-      Seq(),
-      Seq((boxIdsKey, new ByteArrayWrapper(newList)))
-    )
+  def nonVersionedUpdate(idsToRemove: Seq[ByteArrayWrapper],
+                         toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit = {
+    db.update(Random.nextLong(), idsToRemove, toInsert)
   }
 
-  /**
-    * Update value of key "listOfTransactions"
-    * @param newList - new value
-    */
-  def updateTrxList(newList: Array[Byte]): Unit ={
-    //delete previous value
-    db.update(
-      new ByteArrayWrapper(Algos.hash(newList ++ Longs.toByteArray(System.currentTimeMillis()))), Seq(transactionIdsKey), Seq()
-    )
-    //put new value
-    db.update(
-      new ByteArrayWrapper(Algos.hash(Algos.hash(newList ++ Longs.toByteArray(System.currentTimeMillis())))),
-      Seq(),
-      Seq((transactionIdsKey, new ByteArrayWrapper(newList)))
-    )
+  def nonVersionedInsert(toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit = {
+    db.update(Random.nextLong(), Seq(), toInsert)
   }
 
-  def updateBalance(newBalance: Long): Unit = {
-    //delete previous value
-    db.update(
-      new ByteArrayWrapper(Algos.hash(Longs.toByteArray(newBalance + System.currentTimeMillis()))),
-      Seq(balanceKey),
-      Seq()
-    )
-    //put new value
-    db.update(
-      new ByteArrayWrapper(Algos.hash(Algos.hash(Longs.toByteArray(newBalance + System.currentTimeMillis())))),
-      Seq(),
-      Seq((balanceKey, new ByteArrayWrapper(Longs.toByteArray(newBalance))))
-    )
-  }
+  def packBoxIds(ids: Seq[ADKey]): ByteArrayWrapper =
+    new ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
 
-  /**
-    * Put box to store
-    * @param box
-    */
-  def putBox(box: AssetBox): Unit = {
-    if(getBoxById(box.id).isFailure) {
-      db.update(
-        new ByteArrayWrapper(Algos.hash(box.id ++ Longs.toByteArray(System.currentTimeMillis()))),
-        Seq(),
-        Seq((new ByteArrayWrapper(Algos.hash(box.id)), new ByteArrayWrapper(AssetBoxSerializer.toBytes(box))))
-      )
-    } else throw new Error("Box with this id is already contains in db")
-  }
+  def getBoxIds: Seq[ADKey] =
+    getAndUnpackComplexValue(boxIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
+
+  def getTransactionIds: Seq[ModifierId] =
+    getAndUnpackComplexValue(transactionIdsKey, 32).map(ModifierId @@ _).getOrElse(Seq())
+
+  def updateBalance(newBalance: Long): Unit =
+    nonVersionedUpdateWithReplacement(Seq(balanceKey),
+      Seq(balanceKey -> ByteArrayWrapper(Longs.toByteArray(newBalance))))
 
   def putTransaction(tx: EncryBaseTransaction): Unit = {
-    if(getTransactionById(tx.txHash).isFailure){
-      val txsRawBytes = db.get(transactionIdsKey).map(_.data).getOrElse(Array[Byte]())
-      if (publicKeys.contains(tx.proposition) && !tx.isInstanceOf[CoinbaseTransaction]) {
-        updateTrxList(txsRawBytes ++ tx.txHash)
-        db.update(
-          new ByteArrayWrapper(tx.txHash),
-          Seq(),
-          Seq((new ByteArrayWrapper(tx.txHash), new ByteArrayWrapper(tx.bytes)))
-        )
-        deleteBoxesById(tx.useBoxes)
-        putBoxes(tx.newBoxes.filter(box => box.isInstanceOf[AssetBox] &&
-          publicKeys.map(a => a.address).contains(box.asInstanceOf[AssetBox].proposition.address))
-          .map(_.asInstanceOf[AssetBox]).toSeq)
-      } else {
-        updateTrxList(txsRawBytes ++ tx.txHash)
-        db.update(
-          new ByteArrayWrapper(tx.txHash),
-          Seq(),
-          Seq((new ByteArrayWrapper(tx.txHash), new ByteArrayWrapper(tx.bytes)))
-        )
-        putBoxes(tx.newBoxes.filter(box => box.isInstanceOf[AssetBox] &&
-          publicKeys.map(a => a.address).contains(box.asInstanceOf[AssetBox].proposition.address))
-          .map(_.asInstanceOf[AssetBox]).toSeq)
-      }
+    if(getTransactionById(tx.id).isEmpty){
+      val txIdsRaw = getRawValue(transactionIdsKey).getOrElse(Array[Byte]())
+      nonVersionedUpdateWithReplacement(Seq(transactionIdsKey),
+        Seq(transactionIdsKey -> ByteArrayWrapper(txIdsRaw ++ tx.id)))
+      nonVersionedInsert(Seq(txKeyById(tx.id) -> ByteArrayWrapper(tx.bytes)))
+      if (!tx.isInstanceOf[CoinbaseTransaction]) deleteBoxesById(tx.useBoxes)
+      putBoxes(tx.newBoxes.filter(box => box.isInstanceOf[AssetBox] &&
+        publicKeys.map(a => a.address).contains(box.asInstanceOf[AssetBox].proposition.address))
+        .map(_.asInstanceOf[AssetBox]).toSeq)
       refreshBalance()
+    }
+  }
+
+  def putBox(box: AssetBox): Unit = {
+    if(getBoxById(box.id).isEmpty) {
+      nonVersionedInsert(Seq(boxKeyById(box.id) -> ByteArrayWrapper(AssetBoxSerializer.toBytes(box))))
+    }
+  }
+
+  def putBoxes(boxes: Seq[AssetBox]): Unit = {
+    val boxIdsOpt = db.get(boxIdsKey)
+    if (boxIdsOpt.isEmpty) {
+      nonVersionedInsert(Seq(boxIdsKey -> packBoxIds(boxes.map(_.id))))
     } else {
-      throw new Error("Transaction is already in storage.")
+      val oldValue = boxIdsOpt.map(_.data).getOrElse(Array.empty[Byte])
+      val newValue = oldValue ++ boxes.foldLeft(Array[Byte]())(_ ++ _.id)
+      nonVersionedUpdateWithReplacement(Seq(boxIdsKey), Seq(boxIdsKey -> ByteArrayWrapper(newValue)))
     }
+    boxes.foreach(putBox)
   }
 
-  /**
-    * Put seq of boxes to store
-    * @param boxList
-    */
-  def putBoxes(boxList: Seq[AssetBox]): Unit = {
-    if(getBoxIds.isEmpty) {
-      updateADKeysList(boxList.foldLeft(Array[Byte]())(_ ++ _.id))
-    }
-    else
-      updateADKeysList(
-        db.get(boxIdsKey).map(_.data)
-          .getOrElse(Array[Byte]()) ++ boxList.foldLeft(Array[Byte]())(_ ++ _.id))
-    boxList.foreach(putBox)
-  }
-
-  /**
-    * Delete box from store by Id
-    * @param id
-    */
   def deleteBoxById(id: ADKey): Unit = {
-    updateADKeysList(
-      db.get(boxIdsKey).map(_.data)
-        .getOrElse(Array[Byte]()).sliding(32).foldLeft(Array[Byte]()) { case (buff, key) =>
-      if (!(key sameElements id)) buff ++ key else buff
-    })
-    db.update(System.currentTimeMillis(), Seq(ByteArrayWrapper(id)), Seq())
+    nonVersionedUpdateWithReplacement(Seq(boxIdsKey),
+      Seq(boxIdsKey -> packBoxIds(getBoxIds.filterNot(_ sameElements id))))
   }
 
   def deleteBoxesById(ids: Seq[ADKey]): Unit = {
-    val newList = getBoxIds.foldLeft(Array[Byte]()) {
-      case (buff, id) => if (ids.forall(!_.sameElements(id))) buff ++ id else buff }
-
-    updateADKeysList(newList)
+    nonVersionedUpdateWithReplacement(Seq(boxIdsKey),
+      Seq(boxIdsKey -> packBoxIds(getBoxIds.foldLeft(Seq[ADKey]())((acc, id) =>
+        if (!ids.exists(_ sameElements id)) acc :+ id else acc))))
   }
 
-  /**
-    * Return instance of box
-    * @param id - box id
-    * @return
-    */
-  def getBoxById(id: ADKey): Try[AssetBox] = Try {
-    AssetBoxSerializer.parseBytes(db.get(new ByteArrayWrapper(Algos.hash(id))).get.data).get
-  }
+  def getBoxById(id: ADKey): Option[AssetBox] = Try {
+      AssetBoxSerializer.parseBytes(db.get(boxKeyById(id)).get.data).get
+    }.toOption
 
   def getAllBoxes: Seq[AssetBox] =
     getBoxIds.foldLeft(Seq[AssetBox]()) { case (buff, id) =>
       val bx = getBoxById(id)
-      if (bx.isSuccess) buff :+ bx.get else buff
+      if (bx.isDefined) buff :+ bx.get else buff
     }
 
-  /**
-    * Return instance of transaction
-    * @param txHash - hash of transaction
-    * @return
-    */
-  def getTransactionById(txHash: Digest32): Try[PaymentTransaction] = Try {
-    PaymentTransactionSerializer.parseBytes(db.get(new ByteArrayWrapper(txHash)).get.data).get
-  }
+  def getTransactionById(id: ModifierId): Option[PaymentTransaction] = Try {
+    PaymentTransactionSerializer.parseBytes(db.get(ByteArrayWrapper(id)).get.data).get
+  }.toOption
 
   def refreshBalance(): Unit ={
     updateBalance(getAllBoxes.foldLeft(0L)(_ + _.amount))
   }
-
 }
 
 object WalletStorage {
@@ -202,4 +114,8 @@ object WalletStorage {
   val transactionIdsKey = ByteArrayWrapper(Algos.hash("listOfTransactions"))
 
   val balanceKey = ByteArrayWrapper(Algos.hash("balance"))
+
+  def boxKeyById(id: ADKey): ByteArrayWrapper = ByteArrayWrapper(id)
+
+  def txKeyById(id: ModifierId): ByteArrayWrapper = ByteArrayWrapper(id)
 }

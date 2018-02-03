@@ -1,7 +1,7 @@
 package encry.cli
 
 import akka.actor.{Actor, ActorRef}
-import encry.cli.CliListener.StartListening
+import encry.cli.ConsolePromptListener.StartListening
 import encry.cli.commands._
 import encry.settings.EncryAppSettings
 import scorex.core.utils.ScorexLogging
@@ -9,7 +9,7 @@ import scorex.core.utils.ScorexLogging
 import scala.collection.mutable
 import scala.io.StdIn
 
-case class CliListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings) extends Actor with ScorexLogging {
+case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings) extends Actor with ScorexLogging {
 
   val prompt = "$> "
 
@@ -17,19 +17,20 @@ case class CliListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings) 
 
   commands.update("node", mutable.HashMap(
     "-stop" -> NodeShutdown
-    ))
+  ))
 
   commands.update("app", mutable.HashMap(
     "-help" -> Help
   ))
 
   commands.update("wallet", mutable.HashMap(
-    "-addKey" -> KeyManagerAddKey,
+    "-addKey" -> AddKey,
     "-init" -> InitKeyStorage,
-    "-getKeys" -> KeyManagerGetKeys,
+    "-printPubKeys" -> PrintPubKeys,
+    "-printPrivKeys" -> PrintPrivKeys,
     "-balance" -> GetBalance,
-    "-sendTx" -> Transfer
-    ))
+    "-transfer" -> Transfer
+  ))
 
   override def receive: Receive = {
 
@@ -58,7 +59,7 @@ case class CliListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings) 
 
 }
 
-object CliListener {
+object ConsolePromptListener {
 
   case object StartListening
 }

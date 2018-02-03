@@ -12,15 +12,16 @@ object Help extends Command {
       """
         |Usage: [GROUP_NAME] [COMMAND]=[ARGUMENT]
         |
-        |Group name    Command     Argument   Meaning
+        |Group name    Command         Argument   Meaning
         |----------------------------------------------------------------
-        |node          -stop       None       Stop node
-        |wallet        -getKeys    None       Show wallet keys
-        |wallet        -init       Seed       Init storage with seed
-        |wallet        -addKey     None       Add key to storage
-        |wallet        -balance    None       Show balance of current wallet
-        |wallet        -transfer   addr;am    Transfer `am`ount to `addr`ess
-        |app           -help       None       Show all supported commands
+        |node          -stop           None       Stop node
+        |wallet        -printPubKeys   None       Prints available public keys
+        |wallet        -printPrivKeys  None       Prints available public keys
+        |wallet        -init           Seed       Init storage with seed
+        |wallet        -addKey         None       Add key to storage
+        |wallet        -balance        None       Show balance of current wallet
+        |wallet        -transfer       addr;am    Transfer `am`ount to `addr`ess
+        |app           -help           None       Show all supported commands
       """
         .stripMargin))
 }

@@ -13,14 +13,14 @@ trait WalletReader {
 
   val walletStorage: WalletStorage
 
-  def getBoxById(id: ADKey): Option[AssetBox] = walletStorage.getBoxById(id).toOption
+  def getBoxById(id: ADKey): Option[AssetBox] = walletStorage.getBoxById(id)
 
   def getAvailableBoxes: Seq[AssetBox] = walletStorage.getAllBoxes
 
   def getAllTransactions: Seq[PaymentTransaction] =
     walletStorage.getTransactionIds.foldLeft(Seq[PaymentTransaction]()) { case (buff, id) =>
-      val bx = walletStorage.getTransactionById(id)
-      if (bx.isSuccess) buff :+ bx.get else buff
+      val bxOpt = walletStorage.getTransactionById(id)
+      if (bxOpt.isDefined) buff :+ bxOpt.get else buff
     }
 
   def balance: Long = walletStore.get(WalletStorage.balanceKey).map(v => Longs.fromByteArray(v.data)).getOrElse(0L)

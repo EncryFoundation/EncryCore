@@ -1,3 +1,3 @@
 #!/bin/bash
 sbt run
-echo Starting EncryCore client..sbt
+echo Starting EncryCore client..
