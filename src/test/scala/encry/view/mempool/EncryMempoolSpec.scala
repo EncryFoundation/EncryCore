@@ -7,7 +7,7 @@ import scorex.core.utils.NetworkTimeProvider
 
 class EncryMempoolSpec extends PropSpec with Matchers with EncryGenerator {
 
-  lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(Option(""))
+  lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(Some("encry"))
 
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(encrySettings.scorexSettings.ntp)
 
