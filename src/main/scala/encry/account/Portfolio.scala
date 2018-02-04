@@ -1,6 +1,5 @@
-package encry.view.state.index
+package encry.account
 
-import encry.account.{Address, Balance}
 import encry.modifiers.state.box.EncryBaseBox
 
 case class Portfolio(address: Address, balance: Balance, boxes: Option[Seq[EncryBaseBox]] = None) {

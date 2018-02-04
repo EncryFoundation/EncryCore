@@ -7,7 +7,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
+import encry.modifiers.mempool.{AddPubKeyInfoTransaction, CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.{Algos, Constants}
@@ -170,6 +170,7 @@ class UtxoState(override val version: VersionTag,
 
   // TODO: Test.
   // TODO: OPTIMISATION: Too many redundant signature validity checks here.
+  // TODO: Refactoring. Too many lines of code in one method.
   // Carries out an exhaustive tx validation.
   override def validate(tx: EncryBaseTransaction): Try[Unit] = Try {
 
@@ -225,6 +226,32 @@ class UtxoState(override val version: VersionTag,
               throw new Exception(s"Cannot find Box referenced in TX ${tx.txHash}")
           }
         }
+
+      case tx: AddPubKeyInfoTransaction =>
+        tx.useBoxes.foreach { bxId =>
+          persistentProver.unauthenticatedLookup(bxId) match {
+            case Some(data) =>
+              bxId.head match {
+                case AssetBox.typeId =>
+                  AssetBoxSerializer.parseBytes(data) match {
+                    case Success(box) => box.unlockTry(tx)
+                    case Failure(_) =>
+                      throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
+                  }
+                case PubKeyInfoBox.typeId =>
+                  PubKeyInfoBoxSerializer.parseBytes(data) match {
+                    case Success(box) => box.unlockTry(tx)
+                    case Failure(_) =>
+                      throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
+                  }
+                case _ =>
+                  throw new Error("Got Modifier of unknown type.")
+              }
+            case None =>
+              throw new Exception(s"Cannot find Box referenced in TX ${tx.txHash}")
+          }
+        }
+
       case _ => throw new Error("Got Modifier of unknown type.")
     }
   }

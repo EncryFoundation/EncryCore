@@ -1,10 +1,10 @@
 package encry.view.state
 
 import com.google.common.primitives.Ints
-import encry.account.{Address, Balance}
+import encry.account.{Address, Balance, Portfolio}
 import encry.modifiers.state.box._
 import encry.view.history.Height
-import encry.view.state.index.{Portfolio, StateIndexManager}
+import encry.view.state.index.StateIndexManager
 import io.iohk.iodb.Store
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADKey

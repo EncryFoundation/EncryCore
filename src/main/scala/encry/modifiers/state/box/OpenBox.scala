@@ -9,7 +9,6 @@ import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
-import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
@@ -23,8 +22,6 @@ case class OpenBox(override val proposition: HeightProposition,
   override type M = OpenBox
 
   override val typeId: BxTypeId = OpenBox.typeId
-
-  override val id: ADKey = ADKey @@ bxHash.updated(0, typeId)
 
   override lazy val bxHash: Digest32 = Algos.hash(
     Bytes.concat(

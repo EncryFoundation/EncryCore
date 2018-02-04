@@ -172,7 +172,7 @@ trait EncryHistoryReader
   def missedModifiersForFullChain(): Seq[(ModifierTypeId, ModifierId)] = {
     if (nodeSettings.verifyTransactions) {
       bestHeaderOpt.toSeq
-        .flatMap(h => headerChainBack(bestHeaderHeight + 1, h, p => contains(p.adProofsId) && contains(p.payloadId)).headers)
+        .flatMap(h => headerChainBack(bestHeaderHeight + 1, h, _ => false).headers)
         .flatMap(h => Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId)))
         .filter(id => !contains(id._2))
     }

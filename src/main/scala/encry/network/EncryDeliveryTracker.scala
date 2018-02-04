@@ -17,38 +17,45 @@ class EncryDeliveryTracker(context: ActorContext,
   extends DeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, nvsRef) {
 
   val toDownload: mutable.Map[ModifierIdAsKey, ToDownloadStatus] = mutable.Map[ModifierIdAsKey, ToDownloadStatus]()
-  //TODO move to config?
-  private val toDownloadRetryInterval = 30.seconds
-  private val toDownloadLifetime = 1.hour
 
-  def downloadRequested(modifierTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
-    val time = timeProvider.time()
-    val prevValue = toDownload.get(key(modifierId))
-    val newValue = prevValue.map(p => p.copy(lastTry = time)).getOrElse(ToDownloadStatus(modifierTypeId, time, time))
-    toDownload.put(key(modifierId), newValue)
+  //TODO move to config?
+  private val ToDownloadRetryInterval = 30.seconds
+  private val ToDownloadLifetime = 24.hours
+  private val MaxModifiersToDownload = 100
+  private var lastTime = timeProvider.time()
+
+  override def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = {
+    if (isExpecting(mtid, mid, cp) || toDownload.contains(key(mid))) {
+      toDownload.remove(key(mid))
+      expecting.find(e => (mtid == e._1) && (mid sameElements e._2) && cp == e._3)
+        .foreach(e => expecting -= e)
+      delivered(key(mid)) = cp
+    } else {
+      deliveredSpam(key(mid)) = cp
+    }
   }
 
-  override def receive(mtId: ModifierTypeId, mId: ModifierId, cp: ConnectedPeer): Unit = {
-    if (isExpecting(mtId, mId, cp) || toDownload.contains(key(mId))) {
-      toDownload.remove(key(mId))
-      val eo = expecting.find(e => (mtId == e._1) && (mId sameElements e._2) && cp == e._3)
-      for (e <- eo) expecting -= e
-      delivered(key(mId)) = cp
-    } else {
-      deliveredSpam(key(mId)) = cp
-    }
+  def downloadRequested(modifierTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
+    lastTime = Math.max(timeProvider.time(), lastTime + 1)
+    val newValue = toDownload.get(key(modifierId))
+      .map(_.copy(lastTry = lastTime))
+      .getOrElse(ToDownloadStatus(modifierTypeId, lastTime, lastTime))
+    toDownload.put(key(modifierId), newValue)
   }
 
   def removeOutdatedToDownload(historyReaderOpt: Option[EncryHistoryReader]): Unit = {
     val currentTime = timeProvider.time()
-    toDownload.filter(td => (td._2.firstViewed < currentTime - toDownloadLifetime.toMillis)
+    toDownload.filter(td => (td._2.firstViewed < currentTime - ToDownloadLifetime.toMillis)
       || historyReaderOpt.exists(hr => hr.contains(ModifierId @@ td._1.array)))
       .foreach(i => toDownload.remove(i._1))
   }
 
-  def downloadRetry(): Seq[(ModifierId, ToDownloadStatus)] = {
+  def downloadRetry(historyReaderOpt: Option[EncryHistoryReader]): Seq[(ModifierId, ToDownloadStatus)] = {
+    removeOutdatedToDownload(historyReaderOpt)
     val currentTime = timeProvider.time()
-    toDownload.filter(_._2.lastTry < currentTime - toDownloadRetryInterval.toMillis)
-      .map(i => (ModifierId @@ i._1.array, i._2)).toSeq
+    toDownload.filter(_._2.lastTry < currentTime - ToDownloadRetryInterval.toMillis).toSeq
+      .sortBy(_._2.lastTry)
+      .take(MaxModifiersToDownload)
+      .map(i => (ModifierId @@ i._1.array, i._2))
   }
 }

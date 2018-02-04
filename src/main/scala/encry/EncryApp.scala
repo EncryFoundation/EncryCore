@@ -81,12 +81,12 @@ class EncryApp(args: Seq[String]) extends Application {
   cliListenerRef ! StartListening
 }
 
-object EncryApp extends App {
+object EncryApp {
 
-  new EncryApp(args).run()
+  def main(args: Array[String]): Unit = new EncryApp(args).run()
 
   def forceStopApplication(code: Int = 1) = {
-    new Thread(() => System.exit(code), "ergo-platform-shutdown-thread").start()
+    new Thread(() => System.exit(code), "encry-shutdown-thread").start()
     throw new Error("Exit")
   }
 }

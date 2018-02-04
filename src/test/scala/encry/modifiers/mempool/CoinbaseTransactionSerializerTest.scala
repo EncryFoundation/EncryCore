@@ -1,5 +1,6 @@
 package encry.modifiers.mempool
 
+import encry.modifiers.InstanceFactory
 import org.scalatest.FunSuite
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.transaction.proof.Signature25519

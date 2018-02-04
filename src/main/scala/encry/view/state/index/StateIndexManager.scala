@@ -6,7 +6,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.state.box.{AssetBox, OpenBox}
+import encry.modifiers.state.box.{AssetBox, OpenBox, PubKeyInfoBox}
 import encry.modifiers.state.box.proposition.AddressProposition
 import encry.settings.Algos
 import encry.view.history.Height
@@ -48,6 +48,7 @@ trait StateIndexManager extends ScorexLogging {
     }
   }
 
+  // TODO: Refactoring. Too many lines of code in one method.
   private def toIndexModificationsMap(txs: Seq[EncryBaseTransaction]) = {
     val idxModificationsMap = mutable.HashMap.empty[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]
     txs.foreach { tx =>
@@ -74,6 +75,12 @@ trait StateIndexManager extends ScorexLogging {
       }
       tx.newBoxes.foreach {
         case bx: AssetBox =>
+          idxModificationsMap.get(bx.proposition.address) match {
+            case Some(t) => t._2.add(bx.id)
+            case None => idxModificationsMap.update(
+              bx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
+          }
+        case bx: PubKeyInfoBox =>
           idxModificationsMap.get(bx.proposition.address) match {
             case Some(t) => t._2.add(bx.id)
             case None => idxModificationsMap.update(

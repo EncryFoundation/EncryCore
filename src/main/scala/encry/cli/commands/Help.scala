@@ -10,18 +10,18 @@ object Help extends Command {
                        args: Array[String], settings: EncryAppSettings): Option[Response] =
     Some(Response(
       """
-        |Usage: [GROUP_NAME] [COMMAND]=[ARGUMENT]
+        |Usage: [GROUP_NAME] [COMMAND]=[ARGUMENT_1];[ARGUMENT_2]
         |
-        |Group name    Command         Argument   Meaning
-        |----------------------------------------------------------------
-        |node          -stop           None       Stop node
-        |wallet        -printPubKeys   None       Prints available public keys
-        |wallet        -printPrivKeys  None       Prints available public keys
-        |wallet        -init           Seed       Init storage with seed
-        |wallet        -addKey         None       Add key to storage
-        |wallet        -balance        None       Show balance of current wallet
-        |wallet        -transfer       addr;am    Transfer `am`ount to `addr`ess
-        |app           -help           None       Show all supported commands
+        |Group name    Command          Argument       Meaning
+        |--------------------------------------------------------------------------
+        |node          -shutdown        None           Shutdown the node
+        |wallet        -printPubKeys    None           Prints available public keys
+        |wallet        -printPrivKeys   None           Prints available public keys
+        |wallet        -init            Seed           Init storage with seed
+        |wallet        -addKey          None           Add key to storage
+        |wallet        -balance         None           Show balance of current wallet
+        |wallet        -transfer        addr;amount    Transfer `amount` to `addr`ess
+        |app           -help            None           Show all supported commands
       """
         .stripMargin))
 }

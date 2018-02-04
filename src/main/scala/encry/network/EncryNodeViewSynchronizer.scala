@@ -39,8 +39,8 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
   private val toDownloadCheckInterval = 3.seconds
 
   override def preStart(): Unit = {
-    viewHolderRef ! Subscribe(Seq(NodeViewHolder.EventType.DownloadNeeded))
     super.preStart()
+    viewHolderRef ! Subscribe(Seq(NodeViewHolder.EventType.DownloadNeeded))
     context.system.scheduler.schedule(toDownloadCheckInterval, toDownloadCheckInterval)(self ! CheckModifiersToDownload)
     initializeToDownload()
   }
@@ -54,12 +54,12 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
   protected def onMissedModifiers(): Receive = {
     case MissedModifiers(ids) =>
       log.info(s"Initialize toDownload with ${ids.length} ids: ${scorex.core.idsToString(ids)}")
-      ids.foreach(id => requestDownload(id._1, id._2))
+      ids.foreach { id => requestDownload(id._1, id._2) }
   }
 
   protected val onSemanticallySuccessfulModifier: Receive = {
     case SemanticallySuccessfulModifier(_: EncryBlock) =>
-    // Do nothing, other nodes will request required modifiers via ProgressInfo.toDownload
+    //Do nothing, other nodes will request required modifiers via ProgressInfo.toDownload
     case SemanticallySuccessfulModifier(mod) =>
       broadcastModifierInv(mod)
   }
@@ -74,9 +74,10 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
 
   protected val onCheckModifiersToDownload: Receive = {
     case CheckModifiersToDownload =>
-      deliveryTracker.removeOutdatedToDownload(historyReaderOpt)
-      deliveryTracker.downloadRetry().foreach(i => requestDownload(i._2.tp, i._1))
-
+      val modifiersToDownloadNow = deliveryTracker.downloadRetry(historyReaderOpt)
+      if (modifiersToDownloadNow.nonEmpty) log.debug(s"Going to request ${modifiersToDownloadNow.size} of " +
+        s"${deliveryTracker.toDownload.size} missed modifiers")
+      modifiersToDownloadNow.foreach(i => requestDownload(i._2.tp, i._1))
   }
 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {

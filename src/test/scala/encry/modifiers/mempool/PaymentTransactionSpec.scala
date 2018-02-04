@@ -1,5 +1,6 @@
 package encry.modifiers.mempool
 
+import encry.modifiers.InstanceFactory
 import org.scalatest.{Matchers, PropSpec}
 
 class PaymentTransactionSpec extends PropSpec with Matchers {
