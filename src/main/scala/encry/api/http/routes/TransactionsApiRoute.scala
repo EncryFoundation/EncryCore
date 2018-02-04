@@ -5,8 +5,8 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.api.models.PaymentTransactionModel
-import encry.modifiers.mempool.PaymentTransaction
+import encry.api.models.{AddPubKeyInfoTransactionModel, PaymentTransactionModel}
+import encry.modifiers.mempool.{AddPubKeyInfoTransaction, PaymentTransaction}
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import encry.view.history.EncryHistoryReader
 import encry.view.mempool.EncryMempoolReader
@@ -24,33 +24,42 @@ import spray.json.RootJsonFormat
 import scala.concurrent.Future
 
 case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: ActorRef,
-                                restApiSettings: RESTApiSettings, digest: Boolean)
-                               (implicit val context: ActorRefFactory)
+                                restApiSettings: RESTApiSettings, digest: Boolean)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
   implicit val paymentTxCodec: RootJsonFormat[PaymentTransactionModel] = jsonFormat6(PaymentTransactionModel)
 
+  implicit val addPubKeyInfoTxCodec: RootJsonFormat[AddPubKeyInfoTransactionModel] =
+    jsonFormat8(AddPubKeyInfoTransactionModel)
+
   override val route: Route = pathPrefix("transactions") {
-    getUnconfirmedTransactionsR ~ sendTransactionR ~ getTransactionByIdR
+    getUnconfirmedTransactionsR ~ transferTransactionR ~ addPubKeyInfoTransactionR ~ getTransactionByIdR
   }
 
   override val settings: RESTApiSettings = restApiSettings
 
   private def getHistory: Future[EncryHistoryReader] = (readersHolder ? GetReaders).mapTo[Readers].map(_.h.get)
 
-  private def getMemPool: Future[EncryMempoolReader] = (readersHolder ? GetReaders).mapTo[Readers].map(_.m.get)
+  private def getMempool: Future[EncryMempoolReader] = (readersHolder ? GetReaders).mapTo[Readers].map(_.m.get)
 
   private def getTransactionById(id: ModifierId): Future[Option[Json]] = getHistory.map {
     _.modifierById(id)
   }.map(_.map { modifier => ??? })
 
-  private def getUnconfirmedTransactions(limit: Int): Future[Json] = getMemPool.map {
+  private def getUnconfirmedTransactions(limit: Int): Future[Json] = getMempool.map {
     _.take(limit).toSeq
   }.map(_.map(_.json).asJson)
 
-  def sendTransactionR: Route = (path("transfer") & post & entity(as[PaymentTransactionModel])) { model =>
+  def transferTransactionR: Route = (path("transfer") & post & entity(as[PaymentTransactionModel])) { model =>
     model.toBaseObj.map { ptx =>
       nodeViewActorRef ! LocallyGeneratedTransaction[Proposition, PaymentTransaction](ptx)
+      complete(StatusCodes.OK)
+    }.getOrElse(complete(StatusCodes.BadRequest))
+  }
+
+  def addPubKeyInfoTransactionR: Route = (path("add-key-info") & post & entity(as[AddPubKeyInfoTransactionModel])) { model =>
+    model.toBaseObj.map { tx =>
+      nodeViewActorRef ! LocallyGeneratedTransaction[Proposition, AddPubKeyInfoTransaction](tx)
       complete(StatusCodes.OK)
     }.getOrElse(complete(StatusCodes.BadRequest))
   }

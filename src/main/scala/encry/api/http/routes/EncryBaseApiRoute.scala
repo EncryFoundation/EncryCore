@@ -2,6 +2,7 @@ package encry.api.http.routes
 
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.{Directive, Directive1, Route}
+import encry.account.Address
 import io.circe.Json
 import scorex.core.ModifierId
 import scorex.core.api.http.ApiRoute
@@ -33,6 +34,13 @@ trait EncryBaseApiRoute extends ApiRoute {
   val headerId: Directive1[ModifierId] = pathPrefix(Segment).flatMap { h =>
     Base58.decode(h) match {
       case Success(header) => provide(ModifierId @@ header)
+      case _ => reject
+    }
+  }
+
+  val accountAddress: Directive1[Address] = pathPrefix(Segment).flatMap { addr =>
+    Base58.decode(addr) match {
+      case Success(_) => provide(Address @@ addr)
       case _ => reject
     }
   }

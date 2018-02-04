@@ -18,7 +18,6 @@ case class PaymentTransactionModel(proposition: String,
                                    createBoxes: IndexedSeq[(String, Long)])
   extends BaseModel[PaymentTransaction] {
 
-  // FIXME: .get
   override def toBaseObj: Option[PaymentTransaction] =
     Try {
       PaymentTransaction(

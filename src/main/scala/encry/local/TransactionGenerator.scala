@@ -71,7 +71,7 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings, time
         log.info(s"$txsGenerated transactions generated, repeating in 5sec ...")
         context.system.scheduler.scheduleOnce(10.seconds)(self ! FetchBoxes)
 
-    case txs: Seq[EncryBaseTransaction] =>
+    case txs: Seq[EncryBaseTransaction]@unchecked =>
       txs.foreach { tx =>
         viewHolder ! LocallyGeneratedTransaction[Proposition, EncryBaseTransaction](tx)
       }

@@ -3,6 +3,7 @@ package encry.modifiers.state.box
 import encry.modifiers.mempool.EncryTransaction
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.settings.Algos
+import scorex.core.serialization.JsonSerializable
 import scorex.core.transaction.box.Box
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.crypto.authds.ADKey
@@ -11,7 +12,7 @@ import scorex.crypto.hash.Digest32
 import scala.util.Try
 
 // TODO: Should substitute `scorex.core.transaction.box.Box[P]` in the future.
-trait EncryBaseBox extends Box[Proposition] {
+trait EncryBaseBox extends Box[Proposition] with JsonSerializable {
 
   val typeId: BxTypeId
 

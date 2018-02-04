@@ -1,10 +1,9 @@
 package encry.modifiers.state.box
 
-import scorex.core.serialization.JsonSerializable
 import scorex.core.transaction.box.Box.Amount
 import scorex.core.transaction.box.proposition.Proposition
 
-trait EncryBox[P <: Proposition] extends EncryBaseBox with JsonSerializable {
+trait EncryBox[P <: Proposition] extends EncryBaseBox {
 
   override val proposition: P
 

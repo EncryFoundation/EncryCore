@@ -4,9 +4,9 @@ import akka.actor.{Actor, ActorRef}
 import encry.view.EncryViewReadersHolder.{GetDataFromHistory, GetReaders, Readers}
 import encry.view.history.EncryHistoryReader
 import encry.view.mempool.EncryMempoolReader
+import encry.view.state.UtxoStateReader
 import scorex.core.NodeViewHolder
 import scorex.core.NodeViewHolder._
-import scorex.core.transaction.state.StateReader
 import scorex.core.utils.ScorexLogging
 
 class EncryViewReadersHolder(viewHolderRef: ActorRef) extends Actor with ScorexLogging {
@@ -23,14 +23,14 @@ class EncryViewReadersHolder(viewHolderRef: ActorRef) extends Actor with ScorexL
   }
 
   var historyReaderOpt: Option[EncryHistoryReader] = None
-  var stateReaderOpt: Option[StateReader] = None
+  var stateReaderOpt: Option[UtxoStateReader] = None
   var mempoolReaderOpt: Option[EncryMempoolReader] = None
 
   override def receive: Receive = {
     case ChangedHistory(reader: EncryHistoryReader@unchecked) if reader.isInstanceOf[EncryHistoryReader] =>
       historyReaderOpt = Some(reader)
 
-    case ChangedState(reader: StateReader@unchecked) if reader.isInstanceOf[StateReader] =>
+    case ChangedState(reader: UtxoStateReader@unchecked) if reader.isInstanceOf[UtxoStateReader] =>
       stateReaderOpt = Some(reader)
 
     case ChangedMempool(reader: EncryMempoolReader@unchecked) if reader.isInstanceOf[EncryMempoolReader] =>
@@ -57,5 +57,5 @@ object EncryViewReadersHolder {
 
   case object GetReaders
 
-  case class Readers(h: Option[EncryHistoryReader], s: Option[StateReader], m: Option[EncryMempoolReader])
+  case class Readers(h: Option[EncryHistoryReader], s: Option[UtxoStateReader], m: Option[EncryMempoolReader])
 }

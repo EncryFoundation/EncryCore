@@ -6,13 +6,14 @@ import encry.modifiers.state.box._
 import encry.view.history.Height
 import encry.view.state.index.StateIndexManager
 import io.iohk.iodb.Store
+import scorex.core.transaction.state.StateReader
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
 import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
-trait UtxoStateReader extends StateIndexManager with ScorexLogging {
+trait UtxoStateReader extends StateIndexManager with StateReader with ScorexLogging {
 
   implicit val hf: Blake2b256Unsafe = new Blake2b256Unsafe
 
