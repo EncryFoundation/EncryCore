@@ -54,15 +54,19 @@ object InstanceFactory {
   val addPubKeyInfoTransaction: AddPubKeyInfoTransaction = {
     val proposition = key.publicImage
     val fee = genHelper.Props.txFee
-    val useBoxes = IndexedSeq(genHelper.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
+    val change = 20L
+    val useBoxes = IndexedSeq(genHelper.genAssetBox(Address @@ key.publicImage.address),
+      genHelper.genAssetBox(Address @@ key.publicImage.address), genHelper.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
     val pubKeyBytes = PublicKey @@ Random.randomBytes()
     val pubKeyProofBytes = Signature @@ Random.randomBytes(64)
     val pubKeyInfo = "format:curve25519"
     val sig = PrivateKey25519Companion.sign(
       key,
-      AddPubKeyInfoTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, pubKeyBytes, pubKeyProofBytes, pubKeyInfo)
+      AddPubKeyInfoTransaction.getMessageToSign(
+        proposition, fee, timestamp, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfo)
     )
-    AddPubKeyInfoTransaction(proposition, fee, timestamp, sig, useBoxes, pubKeyBytes, pubKeyProofBytes, pubKeyInfo)
+    AddPubKeyInfoTransaction(
+      proposition, fee, timestamp, sig, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfo)
   }
 
   val pubKeyInfoBox: PubKeyInfoBox =

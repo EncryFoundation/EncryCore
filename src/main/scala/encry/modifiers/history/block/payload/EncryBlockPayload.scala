@@ -65,6 +65,8 @@ object EncryBlockPayloadSerializer extends Serializer[EncryBlockPayload] {
           Some(PaymentTransactionSerializer.parseBytes(bytes.slice(slicePointer + 5, slicePointer + 5 + txSize)).get)
         case CoinbaseTransaction.typeId =>
           Some(CoinbaseTransactionSerializer.parseBytes(bytes.slice(slicePointer + 5, slicePointer + 5 + txSize)).get)
+        case AddPubKeyInfoTransaction.typeId =>
+          Some(AddPubKeyInfoTransactionSerializer.parseBytes(bytes.slice(slicePointer + 5, slicePointer + 5 + txSize)).get)
         case _ =>
           Failure(new Error("Got unhandled modifier."))
           None

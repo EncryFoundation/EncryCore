@@ -39,7 +39,6 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
 
   override val feeBox: Option[OpenBox] = None
 
-  // FIXME: AssetBox is created even if amount=0.
   override val newBoxes: Traversable[EncryBaseBox] = {
     val assetBox = AssetBox(
       proposition = AddressProposition(Address @@ proposition.address),

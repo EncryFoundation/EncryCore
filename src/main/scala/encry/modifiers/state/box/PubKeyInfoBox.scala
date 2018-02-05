@@ -57,7 +57,7 @@ object PubKeyInfoBox {
 
 object PubKeyInfoBoxSerializer extends SizedCompanionSerializer[PubKeyInfoBox] {
 
-  val Size: Int = AddressLength + 16
+  val Size: Int = AddressLength + 40
 
   override def toBytes(obj: PubKeyInfoBox): Array[Byte] = {
     Bytes.concat(

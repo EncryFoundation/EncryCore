@@ -15,6 +15,6 @@ class AddPubKeyInfoTransactionSerializerTest extends FunSuite {
 
     assert(txDeserialized.isSuccess, "Deserialization failed.")
 
-    assert(tx.txHash sameElements txDeserialized.get.txHash, "Id mismatch.")
+    assert(tx.id sameElements txDeserialized.get.id, "Id mismatch.")
   }
 }

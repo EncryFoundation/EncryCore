@@ -266,7 +266,7 @@ class UtxoState(override val version: VersionTag,
       .reverse
       .foldLeft((Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) { case ((nonConflictTxs, bxs), tx) =>
       tx match {
-        case tx: PaymentTransaction =>
+        case tx: EncryBaseTransaction =>
           val bxsRaw = tx.useBoxes.map(ByteArrayWrapper.apply)
           if (bxsRaw.forall(k => !bxs.contains(k)) && bxsRaw.size == bxsRaw.toSet.size) {
             (nonConflictTxs :+ tx) -> (bxs ++ bxsRaw)
@@ -317,7 +317,7 @@ object UtxoState extends ScorexLogging {
 
   def newOpenBoxAt(height: Height, seed: Long): OpenBox = {
     val perBlockEmissionAmount = 2000L
-    OpenBox(HeightProposition(Height @@ (height + Constants.emissionHeightLock)),
+    OpenBox(HeightProposition(Height @@ (height + Constants.coinbaseHeightLock)),
       seed * height, perBlockEmissionAmount)
   }
 }

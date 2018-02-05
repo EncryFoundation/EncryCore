@@ -15,7 +15,7 @@ object Constants {
   val feeMinAmount: Int = 2
   val txByteCost: Float = 0.00046f
 
-  val emissionHeightLock = 1
+  val coinbaseHeightLock = 1
 
   object Store {
 

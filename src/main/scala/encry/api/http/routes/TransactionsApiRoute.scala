@@ -30,7 +30,7 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
   implicit val paymentTxCodec: RootJsonFormat[PaymentTransactionModel] = jsonFormat6(PaymentTransactionModel)
 
   implicit val addPubKeyInfoTxCodec: RootJsonFormat[AddPubKeyInfoTransactionModel] =
-    jsonFormat8(AddPubKeyInfoTransactionModel)
+    jsonFormat9(AddPubKeyInfoTransactionModel)
 
   override val route: Route = pathPrefix("transactions") {
     getUnconfirmedTransactionsR ~ transferTransactionR ~ addPubKeyInfoTransactionR ~ getTransactionByIdR

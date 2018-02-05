@@ -3,6 +3,7 @@ package encry.modifiers.history.block
 import encry.account.Address
 import encry.consensus.Difficulty
 import encry.local.TestHelper
+import encry.modifiers.InstanceFactory
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
@@ -49,7 +50,7 @@ class EncryBlockSerializerTest extends FunSuite {
         PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
       )
       PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
-    }
+    } :+ InstanceFactory.addPubKeyInfoTransaction :+ InstanceFactory.coinbaseTransaction
 
     val blockPayload = new EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), txs)
 
