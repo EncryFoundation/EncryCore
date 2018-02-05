@@ -47,15 +47,14 @@ case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Prop
       pubKeyInfo
     )
 
-  private val changeBox =
-    if (change > 0) Some(AssetBox(
+  private val changeBox = if (change > 0) Some(AssetBox(
         AddressProposition(Address @@ proposition.address),
         nonceFromDigest(Algos.hash(txHash :+ OpenBox.typeId)),
         change)
       ) else None
 
   override val newBoxes: Traversable[EncryBaseBox] =
-    changeBox.map(bx => Seq(feeBox.get, pubKeyInfoBox) :+ bx).getOrElse(Seq(feeBox.get, pubKeyInfoBox))
+    changeBox.map(bx => Seq(feeBox.get, pubKeyInfoBox, bx)).getOrElse(Seq(feeBox.get, pubKeyInfoBox))
 
   override lazy val serializer: Serializer[M] = AddPubKeyInfoTransactionSerializer
 
@@ -75,8 +74,8 @@ case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Prop
     "publicKeyInfo" -> pubKeyInfo.asJson
   ).asJson
 
-  override lazy val txHash: Digest32 =
-    AddPubKeyInfoTransaction.getHash(proposition, fee, timestamp, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfo)
+  override lazy val txHash: Digest32 = AddPubKeyInfoTransaction
+    .getHash(proposition, fee, timestamp, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfo)
 
   override lazy val semanticValidity: Try[Unit] = {
     // Signature validity checks.

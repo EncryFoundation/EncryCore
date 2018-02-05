@@ -3,6 +3,7 @@ package encry.view.state
 import com.google.common.primitives.Ints
 import encry.account.{Address, Balance, Portfolio}
 import encry.modifiers.state.box._
+import encry.settings.Algos
 import encry.view.history.Height
 import encry.view.state.index.StateIndexManager
 import io.iohk.iodb.Store
@@ -10,7 +11,6 @@ import scorex.core.transaction.state.StateReader
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
 import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
 trait UtxoStateReader extends StateIndexManager with StateReader with ScorexLogging {
@@ -22,9 +22,9 @@ trait UtxoStateReader extends StateIndexManager with StateReader with ScorexLogg
   def stateHeight: Height = indexStorage.db.get(StateIndexManager.stateHeightKey)
     .map(d => Height @@ Ints.fromByteArray(d.data)).getOrElse(Height @@ 0)
 
-  // FIXME: Fixed valueSize causes errors during application of boxes of different types.
+  // FIXME: Fixed valueSize causes errors during application of boxes of different types to state.
   private lazy val np =
-    NodeParameters(keySize = EncryBox.BoxIdSize, valueSize = AssetBoxSerializer.Size, labelSize = 32)
+    NodeParameters(keySize = EncryBox.BoxIdSize, valueSize = OpenBoxSerializer.Size, labelSize = 32)
 
   protected lazy val storage = new VersionedIODBAVLStorage(stateStore, np)
 
@@ -65,9 +65,12 @@ trait UtxoStateReader extends StateIndexManager with StateReader with ScorexLogg
       case Some(bxIds) =>
         val bxs = bxIds.foldLeft(Seq[EncryBaseBox]()) { case (buff, id) =>
           boxById(id) match {
-            case Some(bx) => buff :+ bx
+            case Some(bx) =>
+              if (bx.isInstanceOf[PubKeyInfoBox]) println(s"$bx fetched by boxesByAddress()")
+              buff :+ bx
             case None =>
-              log.warn(s"Box: ${Base58.encode(id)} exists in index, but was not found in state.")
+              println(s"Box: ${Algos.encode(id)} exists in index, but was not found in state.")
+              log.warn(s"Box: ${Algos.encode(id)} exists in index, but was not found in state.")
               buff
           }
         }

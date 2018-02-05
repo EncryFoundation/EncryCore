@@ -40,7 +40,7 @@ class UtxoState(override val version: VersionTag,
 
   // TODO: Make sure all errors are being caught properly.
   private[state] def applyTransactions(txs: Seq[EncryBaseTransaction],
-                                       expectedDigest: ADDigest, modId: ModifierId): Try[Unit] = Try {
+                                       expectedDigest: ADDigest): Try[Unit] = Try {
 
     def rollback(): Try[Unit] = persistentProver.rollback(rootHash)
       .ensuring(persistentProver.digest.sameElements(rootHash))
@@ -54,7 +54,9 @@ class UtxoState(override val version: VersionTag,
           .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
           t.flatMap { _ =>
             appliedModCounter += 1
-            persistentProver.performOneOperation(m)
+            val popTry = persistentProver.performOneOperation(m)
+            if (tx.isInstanceOf[AddPubKeyInfoTransaction]) println(s"$m : " + Algos.encode(m.key) + s" Is successful: ${popTry.isSuccess}")
+            popTry
           }
         }
       } else {
@@ -78,7 +80,7 @@ class UtxoState(override val version: VersionTag,
       log.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $stateHeight")
 
-      applyTransactions(block.payload.transactions, block.header.stateRoot, block.id).map { _: Unit =>
+      applyTransactions(block.payload.transactions, block.header.stateRoot).map { _: Unit =>
         val md = metadata(VersionTag @@ block.id, block.header.stateRoot)
         val proofBytes = persistentProver.generateProofAndUpdateStorage(md)
         val proofHash = ADProofs.proofDigest(proofBytes)
@@ -234,13 +236,8 @@ class UtxoState(override val version: VersionTag,
               bxId.head match {
                 case AssetBox.typeId =>
                   AssetBoxSerializer.parseBytes(data) match {
-                    case Success(box) => box.unlockTry(tx)
-                    case Failure(_) =>
-                      throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
-                  }
-                case PubKeyInfoBox.typeId =>
-                  PubKeyInfoBoxSerializer.parseBytes(data) match {
-                    case Success(box) => box.unlockTry(tx)
+                    case Success(box) =>
+                      box.unlockTry(tx)
                     case Failure(_) =>
                       throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
                   }
