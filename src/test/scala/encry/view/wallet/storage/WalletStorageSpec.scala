@@ -2,7 +2,7 @@ package encry.view.wallet.storage
 
 import java.io.File
 
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import io.iohk.iodb.{ByteArrayWrapper, LogStore}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 
@@ -16,7 +16,7 @@ class WalletStorageSpec extends PropSpec with Matchers {
 
   assert(dir.exists() && dir.isDirectory && dir.listFiles.isEmpty, "dir is invalid.")
 
-  val store = new LSMStore(dir)
+  val store = new LogStore(dir)
   val walletStorage = new WalletStorage(store, Set.empty[PublicKey25519Proposition])
 
   property("Complex value unpacking from storage") {

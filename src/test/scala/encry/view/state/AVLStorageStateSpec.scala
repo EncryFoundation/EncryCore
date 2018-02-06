@@ -4,7 +4,7 @@ import java.io.File
 
 import encry.modifiers.state.box.EncryBox
 import encry.settings.Algos
-import io.iohk.iodb.{LSMStore, Store}
+import io.iohk.iodb.{LogStore, Store}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
@@ -22,10 +22,10 @@ class AVLStorageStateSpec extends PropSpec with Matchers {
 
   assert(dir.exists() && dir.isDirectory && dir.listFiles.isEmpty, "dir is invalid.")
 
-  val stateStore: Store = new LSMStore(dir, keepVersions = 10)
+  val stateStore: Store = new LogStore(dir, keepVersions = 10)
 
   private lazy val np =
-    NodeParameters(keySize = EncryBox.BoxIdSize, valueSize = 32, labelSize = 32)
+    NodeParameters(keySize = EncryBox.BoxIdSize, valueSize = 64, labelSize = 32)
 
   protected lazy val storage = new VersionedIODBAVLStorage(stateStore, np)
 
@@ -63,45 +63,48 @@ class AVLStorageStateSpec extends PropSpec with Matchers {
   }
 
   def applyModifications(mods: Seq[Modification]): Unit =
-    mods.foreach(m => persistentProver.performOneOperation(m).ensuring(_.isSuccess, "Mod application failed."))
+    mods.foreach(m => {
+      persistentProver.performOneOperation(m).ensuring(_.isSuccess, "Mod application failed.")
+    })
 
-  private val initialMods32 = (0 until 20)
+  private val initialMods32 = (0 until 100)
     .map(i => Insert(ADKey @@ Random.randomBytes(), ADValue @@ Array.fill(32)(i.toByte)))
 
-  private val initialMods64 = (0 until 20)
+  private val initialMods64 = (0 until 100)
     .map(i => Insert(ADKey @@ Random.randomBytes(), ADValue @@ Array.fill(64)(i.toByte)))
 
-  private val initialMods128 = (0 until 20)
+  private val initialMods128 = (0 until 100)
     .map(i => Insert(ADKey @@ Random.randomBytes(), ADValue @@ Array.fill(128)(i.toByte)))
 
-  private val mods32 = (0 until 20)
+  private val mods32 = (0 until 50)
     .map(i => Insert(ADKey @@ Random.randomBytes(), ADValue @@ Array.fill(32)(i.toByte)))
 
-  private val mods64 = (0 until 20)
+  private val mods64 = (0 until 150)
     .map(i => Insert(ADKey @@ Random.randomBytes(), ADValue @@ Array.fill(64)(i.toByte)))
 
-  private val mods128 = (0 until 20)
+  private val mods128 = (0 until 50)
     .map(i => Insert(ADKey @@ Random.randomBytes(), ADValue @@ Array.fill(128)(i.toByte)))
 
   property("Digest (proof) == Digest (actual) after mods application. Genesis 32 -> Further 64") {
 
     // Setting up initial state.
-    applyModifications(initialMods32)
+    applyModifications(initialMods64)
 
     persistentProver.generateProofAndUpdateStorage()
 
-    lazy val rollbackPoint1 = persistentProver.digest
+    lazy val afterGenesisDigest = persistentProver.digest
 
-    val proof = genProof(mods32, rollbackPoint1)
+    val proof = genProof(mods128, afterGenesisDigest)
 
     // Applying mods with greater values.
-    applyModifications(mods32)
+    applyModifications(mods128)
+
+    persistentProver.generateProofAndUpdateStorage()
 
     proof.isSuccess shouldBe true
 
-    println(s"Expected digest: ${Algos.encode(proof.get._2)}")
-    println(s"Actual digest:   ${Algos.encode(persistentProver.digest)}")
-
     proof.get._2.sameElements(persistentProver.digest) shouldBe true
+
+    mods128.forall(m => persistentProver.unauthenticatedLookup(m.key).isDefined) shouldBe true
   }
 }

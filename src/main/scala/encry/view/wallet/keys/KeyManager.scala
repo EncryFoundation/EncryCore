@@ -7,7 +7,7 @@ import javax.crypto.spec.{IvParameterSpec, PBEKeySpec, SecretKeySpec}
 
 import com.google.common.primitives.{Ints, Longs}
 import encry.settings.{Algos, EncryAppSettings, KeyManagerSettings}
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import io.iohk.iodb.{ByteArrayWrapper, LogStore}
 import scorex.core.transaction.state.PrivateKey25519
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.hash.{Blake2b512, Digest32}
@@ -25,7 +25,7 @@ import scala.util.Try
   * @param passwdBytes - password to unlock storage
   */
 
-case class KeyManager(store: LSMStore,
+case class KeyManager(store: LogStore,
                       storageSettings: KeyManagerSettings,
                       passwdBytes: Option[Array[Byte]]) extends ScorexLogging {
   /**
@@ -251,7 +251,7 @@ object KeyManager extends ScorexLogging {
     val dir = getKeysDir(settings)
     dir.mkdirs()
 
-    val keysStore = new LSMStore(dir, keepVersions = 0)
+    val keysStore = new LogStore(dir, keepVersions = 0)
 
     val keyManager = KeyManager(keysStore, settings.keyManagerSettings, password)
 

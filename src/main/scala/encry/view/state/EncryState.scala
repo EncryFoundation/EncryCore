@@ -58,7 +58,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 object EncryState extends ScorexLogging{
 
   // 33 bytes in Base58 encoding.
-  val afterGenesisStateDigestHex: String = "HNdTATcN9LfGyhJuRHNPa7ig425AyFTBS2cQrk7vKwsnW"
+  val afterGenesisStateDigestHex: String = "29KLRhyQqxtFT5y6MQGwLJ3iqbdCziSBudBvH5aCJxQcYk"
 
   val afterGenesisStateDigest: ADDigest = ADDigest @@ Algos.decode(afterGenesisStateDigestHex).get
 
@@ -83,7 +83,7 @@ object EncryState extends ScorexLogging{
                                nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
     log.info("Generating genesis UTXO state.")
 
-    lazy val initialBoxes: Seq[EncryBaseBox] = initialOpenBoxes
+    lazy val initialBoxes: Seq[EncryBaseBox] = genesisEmptyBoxes
 
     val bh = BoxHolder(initialBoxes)
 

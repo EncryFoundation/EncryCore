@@ -24,14 +24,14 @@ trait UtxoStateReader extends StateIndexManager with StateReader with ScorexLogg
 
   // FIXME: Fixed valueSize causes errors during application of boxes of different types to state.
   private lazy val np =
-    NodeParameters(keySize = EncryBox.BoxIdSize, valueSize = OpenBoxSerializer.Size, labelSize = 32)
+    NodeParameters(keySize = EncryBox.BoxIdSize, valueSize = AssetBoxSerializer.Size, labelSize = 32)
 
   protected lazy val storage = new VersionedIODBAVLStorage(stateStore, np)
 
-  protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
-    PersistentBatchAVLProver.create(
-      new BatchAVLProver[Digest32, Blake2b256Unsafe](
-        keyLength = EncryBox.BoxIdSize, valueLengthOpt = None), storage).get
+  protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] = {
+    val bp = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32, valueLengthOpt = None)
+    PersistentBatchAVLProver.create(bp, storage).get
+  }
 
   def boxById(boxId: ADKey): Option[EncryBaseBox] =
     boxId.head match {

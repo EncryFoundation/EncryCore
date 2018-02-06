@@ -9,7 +9,7 @@ import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction, Payme
 import encry.settings.EncryAppSettings
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
-import io.iohk.iodb.{LSMStore, Store}
+import io.iohk.iodb.{LogStore, Store}
 import scorex.core.VersionTag
 import scorex.core.transaction.box.proposition.{Proposition, PublicKey25519Proposition}
 import scorex.core.transaction.state.PrivateKey25519
@@ -68,7 +68,7 @@ object EncryWallet {
     val walletDir = getWalletDir(settings)
     walletDir.mkdirs()
 
-    val walletStore = new LSMStore(walletDir, keepVersions = 100)  // TODO: Move to constants.
+    val walletStore = new LogStore(walletDir, keepVersions = 100)  // TODO: Move to constants.
 
     new EncryWallet(walletStore, keyManager = KeyManager.readOrGenerate(settings))
   }

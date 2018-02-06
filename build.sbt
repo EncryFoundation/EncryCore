@@ -53,7 +53,7 @@ libraryDependencies ++= Seq(
   "org.whispersystems" % "curve25519-java" % "+",
   "org.rudogma" %% "supertagged" % "1.+",
   "org.scorexfoundation" %% "scorex-core" % scorexVersion,
-  "org.scorexfoundation" %% "iodb" % "0.3.2",
+  "org.scorexfoundation" %% "iodb" % "0.4.0",
   "org.scorexfoundation" %% "avl-iodb" % "0.2.11",
   "org.scorexfoundation" %% "scrypto" % "2.0.3",
   "com.storm-enroute" %% "scalameter" % "0.8.+",

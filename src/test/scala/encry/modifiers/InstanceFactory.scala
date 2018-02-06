@@ -74,6 +74,6 @@ object InstanceFactory {
       AddressProposition(Address @@ key.publicImage.address),
       999L,
       PublicKey @@ Random.randomBytes(),
-      "format:curve25519"
+      ""
     )
 }
