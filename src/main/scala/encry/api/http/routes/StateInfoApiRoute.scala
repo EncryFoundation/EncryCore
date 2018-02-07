@@ -28,7 +28,7 @@ case class StateInfoApiRoute(readersHolder: ActorRef, nodeViewActorRef: ActorRef
 
   private def getKeyInfoByAddress(address: Address): Future[Option[Json]] = getState.map {
     _.boxesByAddress(address)
-  }.map(_.map(_.map(_.json).asJson))
+  }.map(_.map(_.filter(_.isInstanceOf[PubKeyInfoBox]).map(_.json).asJson))
 
   def getKeyInfoByAddressR: Route = (accountAddress & pathPrefix("keys") & get) { addr =>
     getKeyInfoByAddress(addr).okJson()

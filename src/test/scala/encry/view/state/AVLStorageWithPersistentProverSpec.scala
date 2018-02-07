@@ -26,7 +26,7 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
   // Otherwise `persistentProver.digest` is unpredictable
   // (despite the fact, that `BatchAVLProver.valueLengthOpt = None`)
   private lazy val np =
-    NodeParameters(keySize = 32, valueSize = 64, labelSize = 32)
+    NodeParameters(keySize = 32, labelSize = 32)
 
   protected lazy val storage = new VersionedIODBAVLStorage(stateStore, np)
 
@@ -92,7 +92,7 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
   property("Digest (proof) == Digest (actual) after mods application. mods64 at genesis, then mods128") {
 
     // Setting up initial state.
-    applyModifications(initialMods64)
+    applyModifications(initialMods32)
 
     persistentProver.generateProofAndUpdateStorage()
 

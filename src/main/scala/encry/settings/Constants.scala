@@ -17,6 +17,8 @@ object Constants {
 
   val coinbaseHeightLock = 1
 
+  val genesisBoxesQty = 100
+
   object Store {
 
     val stateKeepVersions: Int = 200

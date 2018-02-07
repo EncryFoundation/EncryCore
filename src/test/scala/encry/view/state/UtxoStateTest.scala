@@ -105,7 +105,7 @@ class UtxoStateTest extends org.scalatest.FunSuite {
     val prover: BatchAVLProver[Digest32, Blake2b256Unsafe] =
       new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32, valueLengthOpt = None)
 
-    val np = NodeParameters(keySize = 32, valueSize = 0, labelSize = 32)
+    val np = NodeParameters(keySize = 32, labelSize = 32)
 
     val storage: VersionedAVLStorage[Digest32] = new VersionedIODBAVLStorage(store, np)
 

@@ -73,7 +73,6 @@ object InstanceFactory {
     PubKeyInfoBox(
       AddressProposition(Address @@ key.publicImage.address),
       999L,
-      PublicKey @@ Random.randomBytes(),
-      ""
+      PublicKey @@ Random.randomBytes()
     )
 }

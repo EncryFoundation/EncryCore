@@ -8,7 +8,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.{AddPubKeyInfoTransaction, CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.{AddressProposition, HeightProposition}
-import encry.settings.{Algos, EncryAppSettings, NodeSettings}
+import encry.settings.{Algos, Constants, EncryAppSettings, NodeSettings}
 import encry.view.history.Height
 import encry.view.state.index.StateIndexManager
 import scorex.core.VersionTag
@@ -58,7 +58,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 object EncryState extends ScorexLogging{
 
   // 33 bytes in Base58 encoding.
-  val afterGenesisStateDigestHex: String = "29KLRhyQqxtFT5y6MQGwLJ3iqbdCziSBudBvH5aCJxQcYk"
+  val afterGenesisStateDigestHex: String = "Uqp57y4Cn4Qn83poBi3LrpSYJoXAgjwn9iHUiHUpaLHae"
 
   val afterGenesisStateDigest: ADDigest = ADDigest @@ Algos.decode(afterGenesisStateDigestHex).get
 
@@ -68,22 +68,18 @@ object EncryState extends ScorexLogging{
 
   def getIndexDir(settings: EncryAppSettings) = new File(s"${settings.directory}/index")
 
-  // TODO: Magic numbers. Move to settings.
-  def initialOpenBoxes: IndexedSeq[OpenBox] = (0 until 100).map(i =>
-    OpenBox(HeightProposition(Height @@ -1), 9999 * i, 20L))
-
-  def genesisEmptyBoxes: IndexedSeq[AssetBox] = {
+  def genesisBoxes: IndexedSeq[OpenBox] = {
     lazy val genesisSeed = Long.MaxValue
     lazy val rndGen = new scala.util.Random(genesisSeed)
-    (0 until 20).map(_ =>
-      AssetBox(AddressProposition(StateIndexManager.openBoxesAddress), rndGen.nextLong(), 0L))
+    (0 until Constants.genesisBoxesQty).map(_ =>
+      OpenBox(HeightProposition(Height @@ -1), rndGen.nextLong(), 20L))
   }
 
   def generateGenesisUtxoState(stateDir: File, indexDir: File,
                                nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
     log.info("Generating genesis UTXO state.")
 
-    lazy val initialBoxes: Seq[EncryBaseBox] = genesisEmptyBoxes
+    lazy val initialBoxes: Seq[EncryBaseBox] = genesisBoxes
 
     val bh = BoxHolder(initialBoxes)
 

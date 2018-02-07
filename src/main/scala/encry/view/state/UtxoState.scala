@@ -54,9 +54,7 @@ class UtxoState(override val version: VersionTag,
           .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
           t.flatMap { _ =>
             appliedModCounter += 1
-            val popTry = persistentProver.performOneOperation(m)
-            if (tx.isInstanceOf[AddPubKeyInfoTransaction]) println(s"$m : " + Algos.encode(m.key) + s" Is successful: ${popTry.isSuccess}")
-            popTry
+            persistentProver.performOneOperation(m)
           }
         }
       } else {

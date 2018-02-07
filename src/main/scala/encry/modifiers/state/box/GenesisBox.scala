@@ -62,7 +62,6 @@ object GenesisBoxSerializer extends SizedCompanionSerializer[GenesisBox] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[GenesisBox] = Try {
-    println(bytes.length)
     val proposition = HeightPropositionSerializer.parseBytes(bytes.slice(0, HeightPropositionSerializer.Size)).get
     val nonce = Longs.fromByteArray(bytes.slice(HeightPropositionSerializer.Size, HeightPropositionSerializer.Size + 8))
     val gb = bytes.slice(HeightPropositionSerializer.Size + 8, bytes.length)

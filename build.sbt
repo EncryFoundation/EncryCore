@@ -54,7 +54,7 @@ libraryDependencies ++= Seq(
   "org.rudogma" %% "supertagged" % "1.+",
   "org.scorexfoundation" %% "scorex-core" % scorexVersion,
   "org.scorexfoundation" %% "iodb" % "0.3.2",
-  "org.scorexfoundation" %% "avl-iodb" % "0.2.11",
+//  "org.scorexfoundation" %% "avl-iodb" % "0.2.11",
   "org.scorexfoundation" %% "scrypto" % "2.0.3",
   "com.storm-enroute" %% "scalameter" % "0.8.+",
   "io.spray" %%  "spray-json" % "1.3.3",

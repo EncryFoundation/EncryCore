@@ -24,7 +24,7 @@ trait UtxoStateReader extends StateIndexManager with StateReader with ScorexLogg
 
   // FIXME: Fixed valueSize causes errors during application of boxes of different types to state.
   private lazy val np =
-    NodeParameters(keySize = EncryBox.BoxIdSize, valueSize = AssetBoxSerializer.Size, labelSize = 32)
+    NodeParameters(keySize = EncryBox.BoxIdSize, labelSize = 32)
 
   protected lazy val storage = new VersionedIODBAVLStorage(stateStore, np)
 
@@ -39,6 +39,8 @@ trait UtxoStateReader extends StateIndexManager with StateReader with ScorexLogg
         .map(OpenBoxSerializer.parseBytes).flatMap(_.toOption)
       case AssetBox.typeId => persistentProver.unauthenticatedLookup(boxId)
         .map(AssetBoxSerializer.parseBytes).flatMap(_.toOption)
+      case PubKeyInfoBox.typeId => persistentProver.unauthenticatedLookup(boxId)
+        .map(PubKeyInfoBoxSerializer.parseBytes).flatMap(_.toOption)
       case _ => None
     }
 
@@ -66,10 +68,8 @@ trait UtxoStateReader extends StateIndexManager with StateReader with ScorexLogg
         val bxs = bxIds.foldLeft(Seq[EncryBaseBox]()) { case (buff, id) =>
           boxById(id) match {
             case Some(bx) =>
-              if (bx.isInstanceOf[PubKeyInfoBox]) println(s"$bx fetched by boxesByAddress()")
               buff :+ bx
             case None =>
-              println(s"Box: ${Algos.encode(id)} exists in index, but was not found in state.")
               log.warn(s"Box: ${Algos.encode(id)} exists in index, but was not found in state.")
               buff
           }

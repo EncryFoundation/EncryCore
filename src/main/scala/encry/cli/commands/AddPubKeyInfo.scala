@@ -41,7 +41,7 @@ object AddPubKeyInfo extends Command {
         Try {
           val pubKeyBytes = PublicKey @@ Random.randomBytes()
           val pubKeyProofBytes = Signature @@ Random.randomBytes(64)
-          val pubKeyInfo = "hui"
+          val pubKeyInfo = ""
           val fee = 20L
           val proposition = view.vault.keyManager.keys.head.publicImage
           val timestamp = System.currentTimeMillis() // TODO: Use NTP.

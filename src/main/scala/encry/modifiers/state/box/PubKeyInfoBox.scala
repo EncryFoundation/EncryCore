@@ -17,8 +17,7 @@ import scala.util.{Failure, Success, Try}
 
 case class PubKeyInfoBox(override val proposition: AddressProposition,
                          override val nonce: Long,
-                         pubKeyBytes: PublicKey,
-                         pubKeyInfo: String)
+                         pubKeyBytes: PublicKey)
   extends EncryNoncedBox[AddressProposition] {
 
   override type M = PubKeyInfoBox
@@ -29,8 +28,7 @@ case class PubKeyInfoBox(override val proposition: AddressProposition,
     Bytes.concat(
       proposition.bytes,
       Longs.toByteArray(nonce),
-      pubKeyBytes,
-      pubKeyInfo.getBytes
+      pubKeyBytes
     )
   )
 
@@ -45,14 +43,13 @@ case class PubKeyInfoBox(override val proposition: AddressProposition,
     "id" -> Algos.encode(id).asJson,
     "proposition" -> proposition.address.toString.asJson,
     "nonce" -> nonce.asJson,
-    "publicKey" -> Algos.encode(pubKeyBytes).asJson,
-    "publicKeyInfo" -> pubKeyInfo.asJson
+    "publicKey" -> Algos.encode(pubKeyBytes).asJson
   ).asJson
 }
 
 object PubKeyInfoBox {
 
-  val typeId: BxTypeId = 3.toByte
+  val typeId: BxTypeId = 4.toByte
 }
 
 object PubKeyInfoBoxSerializer extends SizedCompanionSerializer[PubKeyInfoBox] {
@@ -63,8 +60,7 @@ object PubKeyInfoBoxSerializer extends SizedCompanionSerializer[PubKeyInfoBox] {
     Bytes.concat(
       AddressProposition.getAddrBytes(obj.proposition.address),
       Longs.toByteArray(obj.nonce),
-      obj.pubKeyBytes,
-      obj.pubKeyInfo.getBytes
+      obj.pubKeyBytes
     )
   }
 
@@ -73,7 +69,6 @@ object PubKeyInfoBoxSerializer extends SizedCompanionSerializer[PubKeyInfoBox] {
     val nonce = Longs.fromByteArray(bytes.slice(AddressLength, AddressLength + 8))
     val pubKeyDataStart = AddressLength + 8
     val pubKeyBytes = PublicKey @@ bytes.slice(pubKeyDataStart, pubKeyDataStart + 32)
-    val pubKeyInfo = new String(bytes.slice(pubKeyDataStart + 32, bytes.length), "UTF-8")
-    PubKeyInfoBox(proposition, nonce, pubKeyBytes, pubKeyInfo)
+    PubKeyInfoBox(proposition, nonce, pubKeyBytes)
   }
 }

@@ -83,7 +83,6 @@ trait StateIndexManager extends ScorexLogging {
         case bx: PubKeyInfoBox =>
           idxModificationsMap.get(bx.proposition.address) match {
             case Some(t) =>
-              println(s"Adding PKIBox to the index 1 > (addr: ${bx.proposition.address}, bxId: ${Algos.encode(bx.id)})")
               t._2.add(bx.id)
             case None =>
               idxModificationsMap.update(

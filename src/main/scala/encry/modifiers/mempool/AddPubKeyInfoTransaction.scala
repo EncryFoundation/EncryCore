@@ -43,8 +43,7 @@ case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Prop
     PubKeyInfoBox(
       AddressProposition(Address @@ proposition.address),
       nonceFromDigest(Algos.hash(txHash :+ PubKeyInfoBox.typeId)),
-      pubKeyBytes,
-      pubKeyInfo
+      pubKeyBytes
     )
 
   private val changeBox = if (change > 0) Some(AssetBox(
