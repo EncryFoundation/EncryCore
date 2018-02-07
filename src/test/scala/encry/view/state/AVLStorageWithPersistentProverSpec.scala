@@ -2,9 +2,7 @@ package encry.view.state
 
 import java.io.File
 
-import encry.modifiers.state.box.EncryBox
-import encry.settings.Algos
-import io.iohk.iodb.{LogStore, Store}
+import io.iohk.iodb.{LSMStore, Store}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
@@ -13,7 +11,7 @@ import scorex.utils.Random
 
 import scala.util.{Failure, Success, Try}
 
-class AVLStorageStateSpec extends PropSpec with Matchers {
+class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
 
   implicit val hf: Blake2b256Unsafe = new Blake2b256Unsafe
 
@@ -22,17 +20,22 @@ class AVLStorageStateSpec extends PropSpec with Matchers {
 
   assert(dir.exists() && dir.isDirectory && dir.listFiles.isEmpty, "dir is invalid.")
 
-  val stateStore: Store = new LogStore(dir, keepVersions = 10)
+  val stateStore: Store = new LSMStore(dir, keepVersions = 10)
 
+  // `valueSize` should equals value length of initial modifications.
+  // Otherwise `persistentProver.digest` is unpredictable
+  // (despite the fact, that `BatchAVLProver.valueLengthOpt = None`)
   private lazy val np =
-    NodeParameters(keySize = EncryBox.BoxIdSize, valueSize = 64, labelSize = 32)
+    NodeParameters(keySize = 32, valueSize = 64, labelSize = 32)
 
   protected lazy val storage = new VersionedIODBAVLStorage(stateStore, np)
 
+  // Here `BatchAVLProver.valueLengthOpt` is optional, but
+  // `VersionedIODBAVLStorage.NodeParameters.valueSize` is required
   protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
     PersistentBatchAVLProver.create(
       new BatchAVLProver[Digest32, Blake2b256Unsafe](
-        keyLength = EncryBox.BoxIdSize, valueLengthOpt = None), storage).get
+        keyLength = 32, valueLengthOpt = None), storage).get
 
   def genProof(mods: Seq[Modification], rollBackTo: ADDigest): Try[(SerializedAdProof, ADDigest)] = {
 
@@ -85,7 +88,8 @@ class AVLStorageStateSpec extends PropSpec with Matchers {
   private val mods128 = (0 until 50)
     .map(i => Insert(ADKey @@ Random.randomBytes(), ADValue @@ Array.fill(128)(i.toByte)))
 
-  property("Digest (proof) == Digest (actual) after mods application. Genesis 32 -> Further 64") {
+  // The result of this test is unstable, even if modifiers values is always of the same size.
+  property("Digest (proof) == Digest (actual) after mods application. mods64 at genesis, then mods128") {
 
     // Setting up initial state.
     applyModifications(initialMods64)

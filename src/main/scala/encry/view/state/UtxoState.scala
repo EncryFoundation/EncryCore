@@ -13,7 +13,7 @@ import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.{Algos, Constants}
 import encry.view.history.Height
 import encry.view.state.index.StateIndexManager
-import io.iohk.iodb.{ByteArrayWrapper, LogStore, Store}
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.LocalInterface.LocallyGeneratedModifier
 import scorex.core.utils.ScorexLogging
 import scorex.core.{ModifierId, VersionTag}
@@ -279,8 +279,8 @@ object UtxoState extends ScorexLogging {
   private lazy val bestVersionKey = Algos.hash("best_state_version")
 
   def create(stateDir: File, indexDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val stateStore = new LogStore(stateDir, keepVersions = Constants.Store.stateKeepVersions)
-    val indexStore = new LogStore(indexDir, keepVersions = Constants.Store.indexKeepVersions)
+    val stateStore = new LSMStore(stateDir, keepVersions = Constants.Store.stateKeepVersions)
+    val indexStore = new LSMStore(indexDir, keepVersions = Constants.Store.indexKeepVersions)
     val dbVersion = stateStore.get(ByteArrayWrapper(bestVersionKey)).map( _.data)
     new UtxoState(VersionTag @@ dbVersion.getOrElse(EncryState.genesisStateVersion),
       stateStore, indexStore, nodeViewHolderRef)
@@ -299,8 +299,8 @@ object UtxoState extends ScorexLogging {
     val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = EncryBox.BoxIdSize, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
-    val stateStore = new LogStore(stateDir, keepVersions = Constants.Store.stateKeepVersions)
-    val indexStore = new LogStore(indexDir, keepVersions = Constants.Store.indexKeepVersions)
+    val stateStore = new LSMStore(stateDir, keepVersions = Constants.Store.stateKeepVersions)
+    val indexStore = new LSMStore(indexDir, keepVersions = Constants.Store.indexKeepVersions)
 
     log.info(s"Generating UTXO State from BH with ${bh.boxes.size} boxes")
 

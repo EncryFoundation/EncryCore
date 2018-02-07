@@ -10,7 +10,7 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings._
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
-import io.iohk.iodb.{ByteArrayWrapper, LogStore, Store}
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.ModifierId
 import scorex.core.consensus.History
 import scorex.core.consensus.History.ProgressInfo
@@ -154,7 +154,7 @@ object EncryHistory {
     val historyDir = getHistoryDir(settings)
     historyDir.mkdirs()
 
-    val db = new LogStore(historyDir, keepVersions = 0)
+    val db = new LSMStore(historyDir, keepVersions = 0)
 
     val _nodeSettings = settings.nodeSettings
 

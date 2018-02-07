@@ -7,7 +7,7 @@ import encry.account.Address
 import encry.local.TestHelper
 import encry.modifiers.mempool.PaymentTransaction
 import encry.settings.Constants
-import io.iohk.iodb.{ByteArrayWrapper, LogStore}
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import scorex.core.ModifierId
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.transaction.state.PrivateKey25519Companion
@@ -30,8 +30,8 @@ class UtxoStateTest extends org.scalatest.FunSuite {
       val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32, valueLengthOpt = None)
       bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
-      val stateStore = new LogStore(dir, keySize = 32, keepVersions = 0)
-      val indexStore = new LogStore(dir, keySize = 32, keepVersions = 0)
+      val stateStore = new LSMStore(dir, keySize = 32, keepVersions = 0)
+      val indexStore = new LSMStore(dir, keySize = 32, keepVersions = 0)
 
       new UtxoState(EncryState.genesisStateVersion, stateStore, indexStore, None) {
         override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
@@ -98,7 +98,7 @@ class UtxoStateTest extends org.scalatest.FunSuite {
 
     assert(dir.exists() && dir.isDirectory && dir.listFiles.isEmpty, "dir is invalid.")
 
-    val store = new LogStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
+    val store = new LSMStore(dir, keySize = 32, keepVersions = Constants.keepVersions)
 
     implicit val hf: Blake2b256Unsafe = new Blake2b256Unsafe
 

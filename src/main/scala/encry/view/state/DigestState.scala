@@ -7,7 +7,7 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.settings.{Algos, Constants, NodeSettings}
-import io.iohk.iodb.{ByteArrayWrapper, LogStore, Store}
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.VersionTag
 import scorex.core.transaction.state.ModifierValidation
 import scorex.core.utils.ScorexLogging
@@ -100,7 +100,7 @@ object DigestState {
              rootHashOpt: Option[ADDigest],
              dir: File,
              settings: NodeSettings): Try[DigestState] = Try {
-    val store = new LogStore(dir, keepVersions = Constants.keepVersions)
+    val store = new LSMStore(dir, keepVersions = Constants.keepVersions)
 
     (versionOpt, rootHashOpt) match {
 
