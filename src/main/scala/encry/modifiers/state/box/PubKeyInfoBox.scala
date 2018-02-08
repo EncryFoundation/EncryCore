@@ -2,6 +2,7 @@ package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.Address
+import encry.common.KeyPairType
 import encry.modifiers.mempool.EncryTransaction
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.AddressProposition
@@ -37,7 +38,10 @@ case class PubKeyInfoBox(override val proposition: AddressProposition,
     "id" -> Algos.encode(id).asJson,
     "proposition" -> proposition.address.toString.asJson,
     "nonce" -> nonce.asJson,
-    "publicKey" -> Algos.encode(pubKeyBytes).asJson
+    "publicKey" -> Algos.encode(pubKeyBytes).asJson,
+    "publicKeyProof" -> Algos.encode(pubKeyProofBytes).asJson,
+    "publicKeyInfo" -> Algos.encode(pubKeyInfoBytes).asJson,
+    "publicKeyTypeName" -> KeyPairType.pairTypeById(pubKeyTypeId).name.asJson
   ).asJson
 }
 
