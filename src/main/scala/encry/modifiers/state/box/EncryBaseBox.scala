@@ -1,5 +1,6 @@
 package encry.modifiers.state.box
 
+import com.google.common.primitives.Longs
 import encry.modifiers.mempool.EncryTransaction
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.settings.Algos
@@ -18,7 +19,9 @@ trait EncryBaseBox extends Box[Proposition] with JsonSerializable {
 
   val bxHash: Digest32
 
-  override lazy val id: ADKey = ADKey @@ bxHash.updated(0, typeId) // 32 bytes!
+  val nonce: Long
+
+  override lazy val id: ADKey = ADKey @@ Algos.hash(Longs.toByteArray(nonce)).updated(0, typeId) // 32 bytes!
 
   def unlockTry(modifier: EncryTransaction, script: Option[String], ctxOpt: Option[Context]): Try[Unit]
 

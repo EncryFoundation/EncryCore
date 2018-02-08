@@ -22,9 +22,7 @@ trait UtxoStateReader extends StateIndexManager with StateReader with ScorexLogg
   def stateHeight: Height = indexStorage.db.get(StateIndexManager.stateHeightKey)
     .map(d => Height @@ Ints.fromByteArray(d.data)).getOrElse(Height @@ 0)
 
-  // FIXME: Fixed valueSize causes errors during application of boxes of different types to state.
-  private lazy val np =
-    NodeParameters(keySize = EncryBox.BoxIdSize, labelSize = 32)
+  private lazy val np = NodeParameters(keySize = EncryBox.BoxIdSize, labelSize = 32)
 
   protected lazy val storage = new VersionedIODBAVLStorage(stateStore, np)
 

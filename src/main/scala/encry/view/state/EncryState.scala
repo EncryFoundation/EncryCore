@@ -58,7 +58,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 object EncryState extends ScorexLogging{
 
   // 33 bytes in Base58 encoding.
-  val afterGenesisStateDigestHex: String = "Uqp57y4Cn4Qn83poBi3LrpSYJoXAgjwn9iHUiHUpaLHae"
+  val afterGenesisStateDigestHex: String = "uy4Wqua2SzznkWwEiEjDFML8iboRmK75nRXdn1HU6LJx6"
 
   val afterGenesisStateDigest: ADDigest = ADDigest @@ Algos.decode(afterGenesisStateDigestHex).get
 

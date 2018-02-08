@@ -2,6 +2,8 @@ package encry.modifiers.state.box
 
 import scorex.core.transaction.box.proposition.Proposition
 
+// This trait is redundant
+// TODO: Remove
 trait EncryNoncedBox[P <: Proposition] extends EncryBox[P] {
 
   val nonce: Long
