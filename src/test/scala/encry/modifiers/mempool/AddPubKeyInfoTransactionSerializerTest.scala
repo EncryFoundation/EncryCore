@@ -16,5 +16,7 @@ class AddPubKeyInfoTransactionSerializerTest extends FunSuite {
     assert(txDeserialized.isSuccess, "Deserialization failed.")
 
     assert(tx.id sameElements txDeserialized.get.id, "Id mismatch.")
+
+    println(tx.json)
   }
 }

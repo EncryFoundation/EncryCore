@@ -1,43 +1,37 @@
 package encry.modifiers.state.box
 
-import com.google.common.primitives.{Bytes, Longs}
+import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.Address
 import encry.modifiers.mempool.EncryTransaction
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.AddressProposition
-import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
+import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition.AddressLength
-import scorex.crypto.hash.Digest32
-import scorex.crypto.signatures.PublicKey
+import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.{Failure, Success, Try}
 
 case class PubKeyInfoBox(override val proposition: AddressProposition,
                          override val nonce: Long,
-                         pubKeyBytes: PublicKey)
-  extends EncryNoncedBox[AddressProposition] {
+                         pubKeyBytes: PublicKey,
+                         pubKeyProofBytes: Signature,
+                         pubKeyInfoBytes: Array[Byte], // TODO: Tag?
+                         pubKeyTypeId: Byte)
+  extends EncryBox[AddressProposition] {
 
   override type M = PubKeyInfoBox
 
   override val typeId: BxTypeId = PubKeyInfoBox.typeId
-
-  override lazy val bxHash: Digest32 = Algos.hash(
-    Bytes.concat(
-      proposition.bytes,
-      Longs.toByteArray(nonce),
-      pubKeyBytes
-    )
-  )
 
   override def unlockTry(modifier: EncryTransaction, script: Option[String] = None,
                          ctxOpt: Option[Context] = None): Try[Unit] =
     if (modifier.proposition.address != proposition.address) Failure(new Error("Unlock failed"))
     else Success()
 
-  override def serializer: SizedCompanionSerializer[M] = PubKeyInfoBoxSerializer
+  override def serializer: Serializer[M] = PubKeyInfoBoxSerializer
 
   override def json: Json = Map(
     "id" -> Algos.encode(id).asJson,
@@ -52,15 +46,19 @@ object PubKeyInfoBox {
   val typeId: BxTypeId = 4.toByte
 }
 
-object PubKeyInfoBoxSerializer extends SizedCompanionSerializer[PubKeyInfoBox] {
-
-  val Size: Int = AddressLength + 40
+object PubKeyInfoBoxSerializer extends Serializer[PubKeyInfoBox] {
 
   override def toBytes(obj: PubKeyInfoBox): Array[Byte] = {
     Bytes.concat(
       AddressProposition.getAddrBytes(obj.proposition.address),
       Longs.toByteArray(obj.nonce),
-      obj.pubKeyBytes
+      Ints.toByteArray(obj.pubKeyBytes.length),
+      obj.pubKeyBytes,
+      Ints.toByteArray(obj.pubKeyProofBytes.length),
+      obj.pubKeyProofBytes,
+      Ints.toByteArray(obj.pubKeyInfoBytes.length),
+      obj.pubKeyInfoBytes,
+      Array(obj.pubKeyTypeId)
     )
   }
 
@@ -68,7 +66,15 @@ object PubKeyInfoBoxSerializer extends SizedCompanionSerializer[PubKeyInfoBox] {
     val proposition = new AddressProposition(Address @@ Algos.encode(bytes.slice(0, AddressLength)))
     val nonce = Longs.fromByteArray(bytes.slice(AddressLength, AddressLength + 8))
     val pubKeyDataStart = AddressLength + 8
-    val pubKeyBytes = PublicKey @@ bytes.slice(pubKeyDataStart, pubKeyDataStart + 32)
-    PubKeyInfoBox(proposition, nonce, pubKeyBytes)
+    val pubKeyBytesLen = Ints.fromByteArray(bytes.slice(pubKeyDataStart, pubKeyDataStart + 4))
+    val pubKeyBytes = PublicKey @@ bytes.slice(pubKeyDataStart + 4, pubKeyDataStart + 4 + pubKeyBytesLen)
+    val s1 = pubKeyDataStart + 4 + pubKeyBytesLen
+    val pubKeyProofBytesLen = Ints.fromByteArray(bytes.slice(s1, s1 + 4))
+    val pubKeyProofBytes = Signature @@ bytes.slice(s1 + 4, s1 + 4 + pubKeyProofBytesLen)
+    val s2 = s1 + 4 + pubKeyProofBytesLen
+    val pubKeyInfoBytesLen = Ints.fromByteArray(bytes.slice(s2, s2 + 4))
+    val pubKeyInfoBytes = bytes.slice(s2 + 4, s2 + 4 + pubKeyInfoBytesLen)
+    val pubKeyTypeId = bytes.last
+    PubKeyInfoBox(proposition, nonce, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
   }
 }

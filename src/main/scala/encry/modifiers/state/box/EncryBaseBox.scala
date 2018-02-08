@@ -17,8 +17,6 @@ trait EncryBaseBox extends Box[Proposition] with JsonSerializable {
 
   val typeId: BxTypeId
 
-  val bxHash: Digest32
-
   val nonce: Long
 
   override lazy val id: ADKey = ADKey @@ Algos.hash(Longs.toByteArray(nonce)).updated(0, typeId) // 32 bytes!

@@ -18,18 +18,11 @@ import scala.util.{Success, Try}
 // Now used currently.
 case class CoinbaseBox(override val proposition: HeightProposition,
                        override val nonce: Long,
-                       amount: Amount) extends EncryNoncedBox[HeightProposition] {
+                       amount: Amount) extends EncryBox[HeightProposition] {
 
   override type M = CoinbaseBox
 
   override val typeId: BxTypeId = CoinbaseBox.typeId
-
-  override lazy val bxHash: Digest32 = Algos.hash(
-    Bytes.concat(
-      Longs.toByteArray(nonce),
-      Longs.toByteArray(amount)
-    )
-  )
 
   override def unlockTry(modifier: EncryTransaction, script: Option[String], ctxOpt: Option[Context]): Try[Unit] = Success()
 

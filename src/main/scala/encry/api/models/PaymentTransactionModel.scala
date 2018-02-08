@@ -18,7 +18,7 @@ case class PaymentTransactionModel(proposition: String,
                                    createBoxes: IndexedSeq[(String, Long)])
   extends BaseModel[PaymentTransaction] {
 
-  override def toBaseObj: Option[PaymentTransaction] =
+  override def toBaseObjOpt: Option[PaymentTransaction] =
     Try {
       PaymentTransaction(
         PublicKey25519Proposition(PublicKey @@ Algos.decode(proposition).get),

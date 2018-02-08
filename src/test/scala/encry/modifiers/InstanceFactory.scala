@@ -59,20 +59,24 @@ object InstanceFactory {
       genHelper.genAssetBox(Address @@ key.publicImage.address), genHelper.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
     val pubKeyBytes = PublicKey @@ Random.randomBytes()
     val pubKeyProofBytes = Signature @@ Random.randomBytes(64)
-    val pubKeyInfo = "format:curve25519"
+    val pubKeyInfoBytes = Random.randomBytes(40)
+    val pubKeyTypeId = 99.toByte
     val sig = PrivateKey25519Companion.sign(
       key,
       AddPubKeyInfoTransaction.getMessageToSign(
-        proposition, fee, timestamp, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfo)
+        proposition, fee, timestamp, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
     )
     AddPubKeyInfoTransaction(
-      proposition, fee, timestamp, sig, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfo)
+      proposition, fee, timestamp, sig, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
   }
 
   val pubKeyInfoBox: PubKeyInfoBox =
     PubKeyInfoBox(
       AddressProposition(Address @@ key.publicImage.address),
       999L,
-      PublicKey @@ Random.randomBytes()
+      PublicKey @@ Random.randomBytes(),
+      Signature @@ Random.randomBytes(64),
+      Random.randomBytes(40),
+      99.toByte
     )
 }

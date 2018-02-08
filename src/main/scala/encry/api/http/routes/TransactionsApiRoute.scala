@@ -30,7 +30,7 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
   implicit val paymentTxCodec: RootJsonFormat[PaymentTransactionModel] = jsonFormat6(PaymentTransactionModel)
 
   implicit val addPubKeyInfoTxCodec: RootJsonFormat[AddPubKeyInfoTransactionModel] =
-    jsonFormat9(AddPubKeyInfoTransactionModel)
+    jsonFormat10(AddPubKeyInfoTransactionModel)
 
   override val route: Route = pathPrefix("transactions") {
     getUnconfirmedTransactionsR ~ transferTransactionR ~ addPubKeyInfoTransactionR ~ getTransactionByIdR
@@ -51,14 +51,14 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
   }.map(_.map(_.json).asJson)
 
   def transferTransactionR: Route = (path("transfer") & post & entity(as[PaymentTransactionModel])) { model =>
-    model.toBaseObj.map { ptx =>
+    model.toBaseObjOpt.map { ptx =>
       nodeViewActorRef ! LocallyGeneratedTransaction[Proposition, PaymentTransaction](ptx)
       complete(StatusCodes.OK)
     }.getOrElse(complete(StatusCodes.BadRequest))
   }
 
   def addPubKeyInfoTransactionR: Route = (path("add-key-info") & post & entity(as[AddPubKeyInfoTransactionModel])) { model =>
-    model.toBaseObj.map { tx =>
+    model.toBaseObjOpt.map { tx =>
       nodeViewActorRef ! LocallyGeneratedTransaction[Proposition, AddPubKeyInfoTransaction](tx)
       complete(StatusCodes.OK)
     }.getOrElse(complete(StatusCodes.BadRequest))

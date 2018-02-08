@@ -1,5 +1,6 @@
 package encry.api.models
 
+import encry.common.KeyPairType
 import encry.modifiers.mempool.AddPubKeyInfoTransaction
 import encry.settings.Algos
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
@@ -17,10 +18,11 @@ case class AddPubKeyInfoTransactionModel(proposition: String,
                                          change: Long,
                                          pubKey: String,
                                          pubKeyProof: String,
-                                         pubKeyInfo: String)
+                                         pubKeyInfo: String,
+                                         pubKeyTypeName: String)
   extends BaseModel[AddPubKeyInfoTransaction] {
 
-  override def toBaseObj: Option[AddPubKeyInfoTransaction] =
+  override def toBaseObjOpt: Option[AddPubKeyInfoTransaction] =
     Try {
       AddPubKeyInfoTransaction(
         PublicKey25519Proposition(PublicKey @@ Algos.decode(proposition).get),
@@ -31,7 +33,8 @@ case class AddPubKeyInfoTransactionModel(proposition: String,
         change,
         PublicKey @@ Algos.decode(pubKey).get,
         Signature @@ Algos.decode(pubKeyProof).get,
-        pubKeyInfo
+        Algos.decode(pubKeyInfo).get,
+        KeyPairType.pairTypeByName(pubKeyTypeName).typeId
       )
     }.toOption
 }

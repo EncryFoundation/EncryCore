@@ -34,40 +34,43 @@ object AddPubKeyInfo extends Command {
     */
   // TODO: Input validation.
   override def execute(nodeViewHolderRef: ActorRef,
-                       args: Array[String], settings: EncryAppSettings): Option[Response] = {
-    implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
-    Await.result((nodeViewHolderRef ?
-      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
-        Try {
-          val pubKeyBytes = PublicKey @@ Random.randomBytes()
-          val pubKeyProofBytes = Signature @@ Random.randomBytes(64)
-          val pubKeyInfo = ""
-          val fee = 20L
-          val proposition = view.vault.keyManager.keys.head.publicImage
-          val timestamp = System.currentTimeMillis() // TODO: Use NTP.
-          val boxes = view.vault.walletStorage.getAllBoxes.foldLeft(Seq[AssetBox]()) {
-            case (seq, box) => if (seq.map(_.amount).sum < fee) seq :+ box else seq
-          }
-          val useBoxes = boxes.map(_.id).toIndexedSeq
-          val change = boxes.map(_.amount).sum - fee
-          val sig = Signature25519(Curve25519.sign(
-            view.vault.keyManager.keys.head.privKeyBytes,
-            AddPubKeyInfoTransaction.getMessageToSign(
-              proposition, fee, timestamp, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfo)
-          ))
+                       args: Array[String], settings: EncryAppSettings): Option[Response] = ???
 
-          val tx = AddPubKeyInfoTransaction(
-            proposition, fee, timestamp, sig, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfo)
-
-          val txDeserTry = AddPubKeyInfoTransactionSerializer.parseBytes(tx.bytes)
-
-          assert(txDeserTry.isSuccess, "Cannot deserialize tx")
-          assert(tx.id sameElements txDeserTry.get.id, "Deserialization failed")
-
-          nodeViewHolderRef ! LocallyGeneratedTransaction[Proposition, AddPubKeyInfoTransaction](tx)
-
-          tx
-        }.toOption.map(tx => Some(Response(tx.toString))).getOrElse(Some(Response("Operation failed. Malformed data.")))
-      }).mapTo[Option[Response]], 5.second)
-  }
+//  TODO: We need command line arguments parsing here.
+//  {
+//    implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
+//    Await.result((nodeViewHolderRef ?
+//      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
+//        Try {
+//          val pubKeyBytes = PublicKey @@ Random.randomBytes()
+//          val pubKeyProofBytes = Signature @@ Random.randomBytes(64)
+//          val pubKeyInfo = ""
+//          val fee = 20L
+//          val proposition = view.vault.keyManager.keys.head.publicImage
+//          val timestamp = System.currentTimeMillis() // TODO: Use NTP.
+//          val boxes = view.vault.walletStorage.getAllBoxes.foldLeft(Seq[AssetBox]()) {
+//            case (seq, box) => if (seq.map(_.amount).sum < fee) seq :+ box else seq
+//          }
+//          val useBoxes = boxes.map(_.id).toIndexedSeq
+//          val change = boxes.map(_.amount).sum - fee
+//          val sig = Signature25519(Curve25519.sign(
+//            view.vault.keyManager.keys.head.privKeyBytes,
+//            AddPubKeyInfoTransaction.getMessageToSign(
+//              proposition, fee, timestamp, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfo)
+//          ))
+//
+//          val tx = AddPubKeyInfoTransaction(
+//            proposition, fee, timestamp, sig, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfo)
+//
+//          val txDeserTry = AddPubKeyInfoTransactionSerializer.parseBytes(tx.bytes)
+//
+//          assert(txDeserTry.isSuccess, "Cannot deserialize tx")
+//          assert(tx.id sameElements txDeserTry.get.id, "Deserialization failed")
+//
+//          nodeViewHolderRef ! LocallyGeneratedTransaction[Proposition, AddPubKeyInfoTransaction](tx)
+//
+//          tx
+//        }.toOption.map(tx => Some(Response(tx.toString))).getOrElse(Some(Response("Operation failed. Malformed data.")))
+//      }).mapTo[Option[Response]], 5.second)
+//  }
 }

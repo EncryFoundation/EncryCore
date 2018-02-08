@@ -3,14 +3,12 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
-import encry.local.TestHelper
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.{AddPubKeyInfoTransaction, CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box._
-import encry.modifiers.state.box.proposition.{AddressProposition, HeightProposition}
+import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.{Algos, Constants, EncryAppSettings, NodeSettings}
 import encry.view.history.Height
-import encry.view.state.index.StateIndexManager
 import scorex.core.VersionTag
 import scorex.core.transaction.state.MinimalState
 import scorex.core.utils.ScorexLogging
@@ -58,7 +56,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 object EncryState extends ScorexLogging{
 
   // 33 bytes in Base58 encoding.
-  val afterGenesisStateDigestHex: String = "uy4Wqua2SzznkWwEiEjDFML8iboRmK75nRXdn1HU6LJx6"
+  val afterGenesisStateDigestHex: String = "uhV2yRPb2p7msc7KL2mk3X2a1635WUPPWL5tPUjwMhv2T"
 
   val afterGenesisStateDigest: ADDigest = ADDigest @@ Algos.decode(afterGenesisStateDigestHex).get
 
@@ -95,7 +93,6 @@ object EncryState extends ScorexLogging{
     DigestState.create(Some(genesisStateVersion), Some(afterGenesisStateDigest), stateDir, settings).get //todo: .get
   }
 
-  // TODO:
   def readOrGenerate(settings: EncryAppSettings,
                      nodeViewHolderRef: Option[ActorRef]): Option[EncryState[_]] = {
     val stDir = getStateDir(settings)

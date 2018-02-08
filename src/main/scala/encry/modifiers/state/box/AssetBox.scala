@@ -19,19 +19,11 @@ import scala.util.{Failure, Success, Try}
 case class AssetBox(override val proposition: AddressProposition,
                     override val nonce: Long,
                     override val amount: Amount)
-  extends EncryNoncedBox[AddressProposition] with AmountCarryingBox {
+  extends EncryBox[AddressProposition] with AmountCarryingBox {
 
   override type M = AssetBox
 
   override val typeId: BxTypeId = AssetBox.typeId
-
-  override lazy val bxHash: Digest32 = Algos.hash(
-    Bytes.concat(
-      proposition.bytes,
-      Longs.toByteArray(nonce),
-      Longs.toByteArray(amount)
-    )
-  )
 
   override def unlockTry(modifier: EncryTransaction, script: Option[String] = None,
                          ctxOpt: Option[Context] = None): Try[Unit] =

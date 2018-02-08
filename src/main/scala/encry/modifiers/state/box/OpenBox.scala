@@ -17,19 +17,11 @@ import scala.util.{Failure, Success, Try}
 case class OpenBox(override val proposition: HeightProposition,
                    override val nonce: Long,
                    override val amount: Amount)
-  extends EncryNoncedBox[HeightProposition] with AmountCarryingBox {
+  extends EncryBox[HeightProposition] with AmountCarryingBox {
 
   override type M = OpenBox
 
   override val typeId: BxTypeId = OpenBox.typeId
-
-  override lazy val bxHash: Digest32 = Algos.hash(
-    Bytes.concat(
-      proposition.bytes,
-      Longs.toByteArray(nonce),
-      Longs.toByteArray(amount)
-    )
-  )
 
   override def unlockTry(modifier: EncryTransaction,
                          script: Option[String] = None, ctxOpt: Option[Context]): Try[Unit] =

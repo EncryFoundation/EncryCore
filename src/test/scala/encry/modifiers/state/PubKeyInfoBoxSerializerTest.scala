@@ -16,6 +16,6 @@ class PubKeyInfoBoxSerializerTest extends FunSuite {
 
     assert(bxDeserialized.isSuccess, "Deserialization failed.")
 
-    assert(bx.id sameElements bxDeserialized.get.id, "Id mismatch.")
+    assert(bx.bytes sameElements bxDeserialized.get.bytes, "Id mismatch.")
   }
 }

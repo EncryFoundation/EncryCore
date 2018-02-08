@@ -2,6 +2,7 @@ package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.Address
+import encry.common.KeyPairType
 import encry.modifiers.mempool.EncryTransaction.{TxTypeId, nonceFromDigest}
 import encry.modifiers.state.box.proposition.{AddressProposition, HeightProposition}
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox, PubKeyInfoBox}
@@ -27,11 +28,12 @@ case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Prop
                                     change: Amount,
                                     pubKeyBytes: PublicKey,
                                     pubKeyProofBytes: Signature,
-                                    pubKeyInfo: String) extends EncryTransaction {
+                                    pubKeyInfoBytes: Array[Byte], // TODO: Tag?
+                                    pubKeyTypeId: Byte) extends EncryTransaction {
 
   override type M = AddPubKeyInfoTransaction
 
-  override val length: Int = 216 + (32 * useBoxes.size) + pubKeyInfo.getBytes.length
+  override lazy val length: Int = this.bytes.length
 
   // Type of actual Tx type.
   override val typeId: TxTypeId = AddPubKeyInfoTransaction.typeId
@@ -43,7 +45,10 @@ case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Prop
     PubKeyInfoBox(
       AddressProposition(Address @@ proposition.address),
       nonceFromDigest(Algos.hash(txHash :+ PubKeyInfoBox.typeId)),
-      pubKeyBytes
+      pubKeyBytes,
+      pubKeyProofBytes,
+      pubKeyInfoBytes,
+      pubKeyTypeId
     )
 
   private val changeBox = if (change > 0) Some(AssetBox(
@@ -70,11 +75,13 @@ case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Prop
     }.asJson,
     "publicKey" -> Algos.encode(pubKeyBytes).asJson,
     "publicKeyProof" -> Algos.encode(pubKeyProofBytes).asJson,
-    "publicKeyInfo" -> pubKeyInfo.asJson
+    "publicKeyInfo" -> Algos.encode(pubKeyInfoBytes).asJson,
+    "publicKeyTypeName" -> KeyPairType.pairTypeById(pubKeyTypeId).name.asJson
   ).asJson
 
   override lazy val txHash: Digest32 = AddPubKeyInfoTransaction
-    .getHash(proposition, fee, timestamp, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfo)
+    .getHash(proposition, fee, timestamp, useBoxes,
+      change, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
 
   override lazy val semanticValidity: Try[Unit] = {
     // Signature validity checks.
@@ -102,7 +109,8 @@ object AddPubKeyInfoTransaction {
               change: Amount,
               pubKeyBytes: PublicKey,
               pubKeyProofBytes: Signature,
-              pubKeyInfo: String): Digest32 = Algos.hash(
+              pubKeyInfoBytes: Array[Byte],
+              pubKeyTypeId: Byte): Digest32 = Algos.hash(
     Bytes.concat(
       Array[Byte](typeId),
       proposition.pubKeyBytes,
@@ -111,7 +119,8 @@ object AddPubKeyInfoTransaction {
       Longs.toByteArray(fee),
       pubKeyBytes,
       pubKeyProofBytes,
-      pubKeyInfo.getBytes
+      pubKeyInfoBytes,
+      Array(pubKeyTypeId),
     )
   )
 
@@ -122,8 +131,10 @@ object AddPubKeyInfoTransaction {
                        change: Amount,
                        pubKeyBytes: PublicKey,
                        pubKeyProofBytes: Signature,
-                       pubKeyInfo: String): Array[Byte] =
-    getHash(proposition, fee, timestamp, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfo)
+                       pubKeyInfoBytes: Array[Byte],
+                       pubKeyTypeId: Byte): Array[Byte] =
+    getHash(proposition, fee, timestamp, useBoxes,
+      change, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
 }
 
 object AddPubKeyInfoTransactionSerializer extends Serializer[AddPubKeyInfoTransaction] {
@@ -137,9 +148,13 @@ object AddPubKeyInfoTransactionSerializer extends Serializer[AddPubKeyInfoTransa
       Ints.toByteArray(obj.useBoxes.length),
       obj.useBoxes.foldLeft(Array[Byte]())(_ ++ _),
       Longs.toByteArray(obj.change),
+      Ints.toByteArray(obj.pubKeyBytes.length),
       obj.pubKeyBytes,
+      Ints.toByteArray(obj.pubKeyProofBytes.length),
       obj.pubKeyProofBytes,
-      obj.pubKeyInfo.getBytes
+      Ints.toByteArray(obj.pubKeyInfoBytes.length),
+      obj.pubKeyInfoBytes,
+      Array(obj.pubKeyTypeId)
     )
   }
 
@@ -150,18 +165,25 @@ object AddPubKeyInfoTransactionSerializer extends Serializer[AddPubKeyInfoTransa
     val timestamp = Longs.fromByteArray(bytes.slice(40, 48))
     val signature = Signature25519(Signature @@ bytes.slice(48, 112))
     val inputLength = Ints.fromByteArray(bytes.slice(112, 116))
-    val s = 116
+    val s1 = 116
     val outElementLength = 32
     val useOutputs = (0 until inputLength).map { i =>
-      ADKey @@ bytes.slice(s + (i * outElementLength), s + (i + 1) * outElementLength)
+      ADKey @@ bytes.slice(s1 + (i * outElementLength), s1 + (i + 1) * outElementLength)
     }
-    val s2 = s + (outElementLength * inputLength)
+    val s2 = s1 + (outElementLength * inputLength)
     val change = Longs.fromByteArray(bytes.slice(s2, s2 + 8))
     val pubKeyDataStart = s2 + 8
-    val pubKeyBytes = PublicKey @@ bytes.slice(pubKeyDataStart, pubKeyDataStart + 32)
-    val pubKeyProofBytes = Signature @@ bytes.slice(pubKeyDataStart + 32, pubKeyDataStart + 32 + 64)
-    val pubKeyInfo = new String(bytes.slice(pubKeyDataStart + 32 + 64, bytes.length), "UTF-8")
-    AddPubKeyInfoTransaction(
-      sender, fee, timestamp, signature, useOutputs, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfo)
+    val pubKeyBytesLen = Ints.fromByteArray(bytes.slice(pubKeyDataStart, pubKeyDataStart + 4))
+    val pubKeyBytes = PublicKey @@ bytes.slice(pubKeyDataStart + 4, pubKeyDataStart + 4 + pubKeyBytesLen)
+    val s3 = pubKeyDataStart + 4 + pubKeyBytesLen
+    val pubKeyProofBytesLen = Ints.fromByteArray(bytes.slice(s3, s3 + 4))
+    val pubKeyProofBytes = Signature @@ bytes.slice(s3 + 4, s3 + 4 + pubKeyProofBytesLen)
+    val s4 = s3 + 4 + pubKeyProofBytesLen
+    val pubKeyInfoBytesLen = Ints.fromByteArray(bytes.slice(s4, s4 + 4))
+    val pubKeyInfoBytes = bytes.slice(s4 + 4, s4 + 4 + pubKeyInfoBytesLen)
+    val pubKeyCurveType = bytes.last
+
+    AddPubKeyInfoTransaction(sender, fee, timestamp, signature, useOutputs,
+      change, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyCurveType)
   }
 }
