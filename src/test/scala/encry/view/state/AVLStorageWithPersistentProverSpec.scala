@@ -3,6 +3,7 @@ package encry.view.state
 import java.io.File
 
 import io.iohk.iodb.{LSMStore, Store}
+import org.apache.commons.io.FileUtils
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
@@ -104,5 +105,7 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
     proof.get._2.sameElements(persistentProver.digest) shouldBe true
 
     mods128.forall(m => persistentProver.unauthenticatedLookup(m.key).isDefined) shouldBe true
+
+    FileUtils.deleteDirectory(dir)
   }
 }
