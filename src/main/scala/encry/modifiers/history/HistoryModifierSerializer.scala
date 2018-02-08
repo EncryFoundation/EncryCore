@@ -5,7 +5,7 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderS
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import scorex.core.serialization.Serializer
 
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 object HistoryModifierSerializer extends Serializer[EncryPersistentModifier] {
 
@@ -20,16 +20,15 @@ object HistoryModifierSerializer extends Serializer[EncryPersistentModifier] {
       throw new Error(s"Serialization for unknown modifier: ${m.json.noSpaces}")
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[EncryPersistentModifier] = Try {
-    bytes.head match {
+  override def parseBytes(bytes: Array[Byte]): Try[EncryPersistentModifier] =
+    Try(bytes.head).flatMap {
       case EncryBlockHeader.`modifierTypeId` =>
-        EncryBlockHeaderSerializer.parseBytes(bytes.tail).get
+        EncryBlockHeaderSerializer.parseBytes(bytes.tail)
       case ADProofs.`modifierTypeId` =>
-        ADProofSerializer.parseBytes(bytes.tail).get
+        ADProofSerializer.parseBytes(bytes.tail)
       case EncryBlockPayload.`modifierTypeId` =>
-        EncryBlockPayloadSerializer.parseBytes(bytes.tail).get
+        EncryBlockPayloadSerializer.parseBytes(bytes.tail)
       case m =>
-        throw new Error(s"Deserialization for unknown type byte: $m")
+        Failure(new Error(s"Deserialization for unknown type byte: $m"))
     }
-  }
 }

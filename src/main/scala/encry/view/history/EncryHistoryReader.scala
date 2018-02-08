@@ -134,6 +134,28 @@ trait EncryHistoryReader
     loop(Seq(Seq(header)))
   }
 
+  protected[history] def continuationHeaderChains(header: EncryBlockHeader,
+                                                  withFilter: EncryBlockHeader => Boolean): Seq[Seq[EncryBlockHeader]] = {
+    @tailrec
+    def loop(currentHeight: Option[Int], acc: Seq[Seq[EncryBlockHeader]]): Seq[Seq[EncryBlockHeader]] = {
+      val nextLevelHeaders = currentHeight.toList
+        .flatMap{ h => headerIdsAtHeight(h + 1) }
+        .flatMap { id => typedModifierById[EncryBlockHeader](id) }
+        .filter(withFilter)
+      if (nextLevelHeaders.isEmpty) {
+        acc.map(chain => chain.reverse)
+      } else {
+        val updatedChains = nextLevelHeaders.flatMap { h =>
+          acc.find(chain => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(c => h +: c)
+        }
+        val nonUpdatedChains = acc.filter(chain => !nextLevelHeaders.exists(_.parentId sameElements chain.head.id))
+        loop(currentHeight.map(_ + 1), updatedChains ++ nonUpdatedChains)
+      }
+    }
+
+    loop(heightOf(header.id), Seq(Seq(header)))
+  }
+
   protected def testApplicable(modifier: EncryPersistentModifier): Try[Unit] = {
     modifier match {
       case header: EncryBlockHeader => validate(header)

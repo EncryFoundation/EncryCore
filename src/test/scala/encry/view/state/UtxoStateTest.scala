@@ -7,15 +7,12 @@ import encry.account.Address
 import encry.local.TestHelper
 import encry.modifiers.mempool.PaymentTransaction
 import encry.settings.Constants
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
-import scorex.core.ModifierId
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
+import io.iohk.iodb.LSMStore
+import org.apache.commons.io.FileUtils
 import scorex.core.transaction.state.PrivateKey25519Companion
-import scorex.core.utils.NetworkTime
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADKey, ADValue}
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
-import scorex.utils.Random
 
 class UtxoStateTest extends org.scalatest.FunSuite {
 
@@ -89,6 +86,8 @@ class UtxoStateTest extends org.scalatest.FunSuite {
 
     assert(filteredValidAndInvalidTxs.size == validTxs.size, s"filterValid(validTxs + invalidTxs) " +
       s"return ${filteredValidAndInvalidTxs.size}, but ${validTxs.size} was expected.")
+
+    FileUtils.deleteDirectory(dir)
   }
 
   test("BatchAVLProver should have the same digest after rollback as before.") {
@@ -128,5 +127,7 @@ class UtxoStateTest extends org.scalatest.FunSuite {
     assert(afterRollbackDigest sameElements initialDigest, "Invalid digest after rollback.")
 
     store.close()
+
+    FileUtils.deleteDirectory(dir)
   }
 }

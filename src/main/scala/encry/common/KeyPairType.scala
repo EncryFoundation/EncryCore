@@ -22,7 +22,7 @@ object KeyPairType {
 
 case object Pair25519 extends KeyPairType {
 
-  val typeId: Byte = 99.toByte
+  val typeId: Byte = 1.toByte
 
   val name: String = "Pair25519"
 }
