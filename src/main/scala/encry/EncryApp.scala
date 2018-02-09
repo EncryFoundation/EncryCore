@@ -54,7 +54,7 @@ class EncryApp(args: Seq[String]) extends Application {
 
   override val apiRoutes: Seq[ApiRoute] = Seq(
     UtilsApiRoute(settings.restApi),
-    PeersApiRoute(peerManagerRef, networkController, settings.restApi),
+    PeersApiRoute(peerManagerRef, networkControllerRef, settings.restApi),
     InfoRoute(readersHolderRef, minerRef, peerManagerRef, encrySettings.nodeSettings.ADState, settings.restApi, nodeId),
     HistoryApiRoute(readersHolderRef, minerRef, encrySettings, nodeId, encrySettings.nodeSettings.ADState),
     TransactionsApiRoute(readersHolderRef, nodeViewHolderRef, settings.restApi, encrySettings.nodeSettings.ADState),
@@ -67,7 +67,7 @@ class EncryApp(args: Seq[String]) extends Application {
 
   override val nodeViewSynchronizer: ActorRef = actorSystem.actorOf(
     Props(new EncryNodeViewSynchronizer(
-      networkController, nodeViewHolderRef, localInterface, EncrySyncInfoMessageSpec, settings.network, timeProvider)))
+      networkControllerRef, nodeViewHolderRef, localInterface, EncrySyncInfoMessageSpec, settings.network, timeProvider)))
 
   if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) {
     minerRef ! StartMining

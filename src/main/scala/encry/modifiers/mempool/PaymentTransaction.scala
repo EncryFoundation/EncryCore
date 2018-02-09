@@ -81,8 +81,7 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
       Failure(new Error("Bad outputs"))
     } else if (fee < minimalFee) {
       Failure(new Error("Fee amount too small"))
-    } else
-      Success()
+    } else Success()
   }
 }
 
