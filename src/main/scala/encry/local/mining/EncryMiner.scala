@@ -133,14 +133,6 @@ object EncryMiner extends ScorexLogging {
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[PowCandidateBlock]] { view =>
         val bestHeaderOpt = view.history.bestFullBlockOpt.map(_.header)
 
-        if (bestHeaderOpt.isDefined) {
-          log.debug("BestHeader id:        " + Base16.encode(bestHeaderOpt.get.hHash))
-          log.debug("BestHeader timestamp: " + bestHeaderOpt.get.timestamp)
-          log.debug("BestHeader height:    " + bestHeaderOpt.get.height)
-        } else {
-          log.debug("BestHeader is undefined")
-        }
-
         if ((bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) &&
           !view.pool.isEmpty &&
           view.vault.keyManager.keys.nonEmpty) Try {
@@ -166,11 +158,9 @@ object EncryMiner extends ScorexLogging {
                 case _ => buff2
               }
             }) ++ view.state.getAvailableOpenBoxesAt(height)
-
           val amount = openBxs.map(_.amount).sum
           val cTxSignature = PrivateKey25519Companion.sign(privateKey,
             CoinbaseTransaction.getHash(minerProposition, openBxs.map(_.id), timestamp, amount, height))
-
           val coinbase =
             CoinbaseTransaction(minerProposition, timestamp, cTxSignature, openBxs.map(_.id), amount, height)
 
@@ -179,7 +169,6 @@ object EncryMiner extends ScorexLogging {
           val (adProof, adDigest) = view.state.proofsForTransactions(txs).get
           val difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
             .getOrElse(Difficulty @@ settings.chainSettings.initialDifficulty)
-
           val derivedFields = PowConsensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
           val blockSignature = PrivateKey25519Companion.sign(privateKey,
             EncryBlockHeader.getMessageToSign(derivedFields._1, minerProposition, derivedFields._2,

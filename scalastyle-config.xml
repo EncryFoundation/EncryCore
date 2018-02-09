@@ -69,20 +69,21 @@
             <parameter name="maxTypes"><![CDATA[30]]></parameter>
         </parameters>
     </check>
-    <check level="warning" class="org.scalastyle.scalariform.CyclomaticComplexityChecker" enabled="true">
+    <check level="warning" class="org.scalastyle.scalariform.CyclomaticComplexityChecker" enabled="false">
         <parameters>
             <parameter name="maximum"><![CDATA[10]]></parameter>
         </parameters>
     </check>
     <check level="warning" class="org.scalastyle.scalariform.UppercaseLChecker" enabled="false"></check>
     <check level="warning" class="org.scalastyle.scalariform.SimplifyBooleanExpressionChecker" enabled="true"></check>
-    <check level="warning" class="org.scalastyle.scalariform.IfBraceChecker" enabled="true">
+    <check level="warning" class="org.scalastyle.scalariform.IfBraceChecker" enabled="false">
         <parameters>
             <parameter name="singleLineAllowed"><![CDATA[true]]></parameter>
             <parameter name="doubleLineAllowed"><![CDATA[false]]></parameter>
         </parameters>
     </check>
-    <check level="warning" class="org.scalastyle.scalariform.MethodLengthChecker" enabled="true">
+    <!-- Enable it later -->
+    <check level="warning" class="org.scalastyle.scalariform.MethodLengthChecker" enabled="false">
         <parameters>
             <parameter name="maxLength"><![CDATA[50]]></parameter>
         </parameters>

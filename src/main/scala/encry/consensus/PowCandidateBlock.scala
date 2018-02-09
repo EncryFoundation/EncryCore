@@ -21,7 +21,16 @@ class PowCandidateBlock(val proposition: PublicKey25519Proposition,
                         val difficulty: Difficulty) extends JsonSerializable {
 
   override lazy val json: Json = Map(
-    // TODO: Add other fields serialization.
+    "minerProposition" -> Algos.encode(proposition.pubKeyBytes).asJson,
+    "signature" -> Algos.encode(signature.signature).asJson,
     "parentId" -> parentOpt.map(p => Algos.encode(p.id)).getOrElse("None").asJson,
+    "stateRoot" -> Algos.encode(stateRoot).asJson,
+    "adProofBytes" -> Algos.encode(adProofBytes).asJson,
+    "timestamp" -> timestamp.asJson,
+    "transactions" -> transactions.map(_.json).asJson,
+    "transactionsQty" -> transactions.length.asJson,
   ).asJson
+
+  override def toString: String = s"<CandidateBlock timestamp=$timestamp txQty=${transactions.size} " +
+    s"parentId=${parentOpt.map(p => Algos.encode(p.id)).getOrElse("None")}>"
 }
