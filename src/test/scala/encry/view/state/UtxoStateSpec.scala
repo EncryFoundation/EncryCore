@@ -6,8 +6,8 @@ import akka.actor.ActorRef
 import encry.account.Address
 import encry.local.TestHelper
 import encry.modifiers.mempool.PaymentTransaction
+import encry.utils.FileHelper
 import io.iohk.iodb.LSMStore
-import org.apache.commons.io.FileUtils
 import org.scalatest.{Matchers, PropSpec}
 import scorex.core.transaction.state.PrivateKey25519Companion
 import scorex.crypto.authds.ADValue
@@ -33,16 +33,11 @@ class UtxoStateSpec extends PropSpec with Matchers {
 
   property("FilterValid(txs) should return only valid txs (against current state).") {
 
-    val dir: File = new File(s"${System.getProperty("user.dir")}/test-data/state2")
-    dir.mkdir()
-
-    assert(dir.exists() && dir.isDirectory && dir.listFiles.isEmpty, "dir is invalid.")
-
     val bxs = TestHelper.genAssetBoxes
 
     val bh = BoxHolder(bxs)
 
-    val state = utxoFromBoxHolder(bh, dir, None)
+    val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None)
 
     val factory = TestHelper
     val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath)
@@ -85,7 +80,5 @@ class UtxoStateSpec extends PropSpec with Matchers {
     val filteredValidAndInvalidTxs = state.filterValid(validTxs ++ invalidTxs)
 
     filteredValidAndInvalidTxs.size shouldEqual validTxs.size
-
-    FileUtils.deleteDirectory(dir)
   }
 }

@@ -1,9 +1,7 @@
 package encry.view.state
 
-import java.io.File
-
+import encry.utils.FileHelper
 import io.iohk.iodb.{LSMStore, Store}
-import org.apache.commons.io.FileUtils
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
@@ -16,12 +14,7 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
 
   implicit val hf: Blake2b256Unsafe = new Blake2b256Unsafe
 
-  val dir: File = new File(s"${System.getProperty("user.dir")}/test-data/state1")
-  dir.mkdir()
-
-  assert(dir.exists() && dir.isDirectory && dir.listFiles.isEmpty, "dir is invalid.")
-
-  val stateStore: Store = new LSMStore(dir, keepVersions = 10)
+  val stateStore: Store = new LSMStore(FileHelper.getRandomTempDir)
 
   private lazy val np =
     NodeParameters(keySize = 32, labelSize = 32)
@@ -124,7 +117,5 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
     mods64.forall(m => persistentProver.unauthenticatedLookup(m.key).isDefined) shouldBe true
 
     mods32.forall(m => persistentProver.unauthenticatedLookup(m.key).isDefined) shouldBe true
-
-    FileUtils.deleteDirectory(dir)
   }
 }

@@ -1,23 +1,16 @@
 package encry.view.wallet.storage
 
-import java.io.File
-
+import encry.utils.FileHelper
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
-import org.apache.commons.io.FileUtils
 import org.scalatest.{Matchers, PropSpec}
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
+import scorex.utils.{Random => ScRand}
 
 import scala.util.Random
-import scorex.utils.{Random => ScRand}
 
 class WalletStorageSpec extends PropSpec with Matchers {
 
-  val dir: File = new File(s"${System.getProperty("user.dir")}/test-data/wallet2")
-  dir.mkdir()
-
-  assert(dir.exists() && dir.isDirectory && dir.listFiles.isEmpty, "dir is invalid.")
-
-  val store = new LSMStore(dir)
+  val store = new LSMStore(FileHelper.getRandomTempDir)
   val walletStorage = new WalletStorage(store, Set.empty[PublicKey25519Proposition])
 
   property("Complex value unpacking from storage") {
@@ -35,7 +28,5 @@ class WalletStorageSpec extends PropSpec with Matchers {
     values.size shouldEqual valuesUnpacked.size
 
     values.zip(valuesUnpacked).forall(t => t._1 sameElements t._2) shouldBe true
-
-    FileUtils.deleteDirectory(dir)
   }
 }

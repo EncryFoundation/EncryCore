@@ -1,2 +1,0 @@
-TODO: POW Algo (Equihash, maybe) -- Simple POW implemented
-s
