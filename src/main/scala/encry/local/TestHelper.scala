@@ -16,9 +16,11 @@ import scala.util.Random
 
 object TestHelper {
 
+  lazy val genesisSeed = Long.MaxValue
+  lazy val rndGen = new scala.util.Random(genesisSeed)
+
   object Props {
     lazy val keysQty = 1000
-    lazy val nonce = 0
     lazy val boxValue: Amount = 1000
     lazy val txAmount: Amount = 900
     lazy val txFee: Amount = 100
@@ -55,11 +57,11 @@ object TestHelper {
     getOrGenerateKeys(Props.keysFilePath).foldLeft(IndexedSeq[AssetBox]()) { case (bxs, pk) =>
       bxs :+ AssetBox(
         AddressProposition(Address @@ PublicKey25519Proposition(pk.publicKeyBytes).address),
-        Props.nonce, Props.boxValue)
+        rndGen.nextLong(), Props.boxValue)
     }
 
   def genAssetBox(address: Address): AssetBox =
-    AssetBox(AddressProposition(address), Props.nonce, Props.boxValue)
+    AssetBox(AddressProposition(address), 9L, Props.boxValue)
 
   def genTxOutputs(boxes: Traversable[EncryBaseBox]): IndexedSeq[ADKey] =
     boxes.foldLeft(IndexedSeq[ADKey]()) { case(s, box) =>

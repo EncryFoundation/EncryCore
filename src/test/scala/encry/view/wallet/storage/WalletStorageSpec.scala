@@ -3,6 +3,7 @@ package encry.view.wallet.storage
 import java.io.File
 
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import org.apache.commons.io.FileUtils
 import org.scalatest.{Matchers, PropSpec}
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 
@@ -34,5 +35,7 @@ class WalletStorageSpec extends PropSpec with Matchers {
     values.size shouldEqual valuesUnpacked.size
 
     values.zip(valuesUnpacked).forall(t => t._1 sameElements t._2) shouldBe true
+
+    FileUtils.deleteDirectory(dir)
   }
 }

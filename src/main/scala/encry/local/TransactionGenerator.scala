@@ -26,6 +26,9 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings, time
 
   var isStarted = false
 
+  lazy val genesisSeed = Long.MaxValue
+  lazy val rndGen = new scala.util.Random(genesisSeed)
+
   private lazy val factory = TestHelper
   private lazy val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath)
 

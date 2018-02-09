@@ -14,7 +14,7 @@ import scorex.utils.Random
 trait EncryGenerator {
 
   def genAssetBox(address: Address): AssetBox =
-    AssetBox(AddressProposition(address), Props.nonce, Props.boxValue)
+    AssetBox(AddressProposition(address), 9L, Props.boxValue)
 
   def genTxOutputs(boxes: Traversable[EncryBaseBox]): IndexedSeq[ADKey] =
     boxes.foldLeft(IndexedSeq[ADKey]()) { case (s, box) =>
