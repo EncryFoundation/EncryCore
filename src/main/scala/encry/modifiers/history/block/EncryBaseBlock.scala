@@ -22,5 +22,7 @@ trait EncryBaseBlock
   val toSeq: Seq[EncryPersistentModifier]
 
   def semanticValidity: Try[Unit]
+
+  override def toString: String = s"<Block timestamp=${header.timestamp} txQty=${payload.transactions.size} id=${header.encodedId}>"
 }
 

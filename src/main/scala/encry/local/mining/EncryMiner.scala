@@ -15,12 +15,10 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.Json
 import io.circe.syntax._
-import scorex.core.LocalInterface.LocallyGeneratedModifier
 import scorex.core.NodeViewHolder
 import scorex.core.NodeViewHolder.{GetDataFromCurrentView, SemanticallySuccessfulModifier, Subscribe}
 import scorex.core.transaction.state.{PrivateKey25519, PrivateKey25519Companion}
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
-import scorex.crypto.encode.Base16
 import scorex.utils.Random
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -28,36 +26,34 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Try}
 
-class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings,
-                 nodeId: Array[Byte], timeProvider: NetworkTimeProvider) extends Actor with ScorexLogging {
+class EncryMiner(viewHolderRef: ActorRef,
+                 settings: EncryAppSettings,
+                 nodeId: Array[Byte],
+                 timeProvider: NetworkTimeProvider) extends Actor with ScorexLogging {
 
   import EncryMiner._
 
-  private val consensus = new PowConsensus(settings.chainSettings)
+  private val startTime = timeProvider.time()
 
   private var isMining = false
-  private val startTime = timeProvider.time()
-  private var nonce = 0
   private var candidateOpt: Option[PowCandidateBlock] = None
+  private var miningThreads: Seq[ActorRef] = Seq.empty
 
   override def preStart(): Unit = {
     viewHolderRef ! Subscribe(Seq(NodeViewHolder.EventType.SuccessfulSemanticallyValidModifier))
   }
 
   override def receive: Receive = {
-
     case SemanticallySuccessfulModifier(mod) =>
       if (isMining) {
         mod match {
-          case block: EncryBlock =>
-            if (!candidateOpt.flatMap(_.parentOpt).exists(_.id sameElements block.header.id))
-              prepareCandidate(viewHolderRef, settings, nodeId, timeProvider)
-
+          case f: EncryBlock if !candidateOpt.flatMap(_.parentOpt).exists(_.id sameElements f.header.id) =>
+            produceCandidate(settings, nodeId).foreach(_.foreach(c => self ! c))
           case _ =>
         }
       } else if (settings.nodeSettings.mining) {
         mod match {
-          case block: EncryBlock if block.header.timestamp >= startTime =>
+          case f: EncryBlock if f.header.timestamp >= startTime =>
             self ! StartMining
 
           case _ =>
@@ -65,57 +61,110 @@ class EncryMiner(viewHolderRef: ActorRef, settings: EncryAppSettings,
       }
 
     case StartMining =>
-      if (!isMining && settings.nodeSettings.mining) {
-        log.info("Starting Mining")
-        isMining = true
-        self ! MineBlock
-      }
-
-    case StopMining =>
-      isMining = false
-
-    case PrepareCandidate =>
-      val cOpt = prepareCandidate(viewHolderRef, settings, nodeId, timeProvider)
-      cOpt onComplete(opt => candidateOpt = opt.get)
-
-    case MineBlock =>
-      nonce = nonce + 1
       candidateOpt match {
-        case Some(candidate) =>
-          consensus.verifyCandidate(candidate, nonce) match {
-            case Some(block) =>
-              log.info(s"New block found: $block")
-
-              viewHolderRef ! LocallyGeneratedModifier(block.header)
-              viewHolderRef ! LocallyGeneratedModifier(block.payload)
-              block.adProofsOpt.foreach { adp =>
-                viewHolderRef ! LocallyGeneratedModifier(adp)
-              }
-              candidateOpt = None
-              context.system.scheduler.scheduleOnce(settings.nodeSettings.miningDelay)(self ! MineBlock)
-            case None =>
-              if (isMining) self ! MineBlock
-          }
+        case Some(candidate) if !isMining && settings.nodeSettings.mining =>
+          log.info("Starting Mining")
+          miningThreads = Seq(context.actorOf(EncryMiningWorker.props(settings, viewHolderRef, candidate)))
+          isMining = true
         case None =>
-          log.info("Candidate is empty. Trying again in 1 sec.")
-          context.system.scheduler.scheduleOnce(1.second)(self ! PrepareCandidate)
-          context.system.scheduler.scheduleOnce(2.second)(self ! MineBlock)
+          context.system.scheduler.scheduleOnce(5.second) {
+            produceCandidate(settings, nodeId).foreach(_.foreach(c => {
+              self ! c
+              self ! StartMining
+            }))
+          }
+        case _ =>
       }
+
+    case c: PowCandidateBlock =>
+      val oldHeight = candidateOpt.flatMap(_.parentOpt).map(_.height).getOrElse(0)
+      val newHeight = c.parentOpt.map(_.height).getOrElse(0)
+      log.debug(s"New candidate $c. Height change $oldHeight -> $newHeight")
+      candidateOpt = Some(c)
+      miningThreads.foreach(t => t ! c)
 
     case MiningStatusRequest =>
       sender ! MiningStatusResponse(isMining, candidateOpt)
+
+    case m =>
+      log.warn(s"Unexpected message $m")
+  }
+
+  def produceCandidate(settings: EncryAppSettings, nodeId: Array[Byte]): Future[Option[PowCandidateBlock]] = {
+    implicit val timeout = Timeout(settings.scorexSettings.restApi.timeout)
+    (viewHolderRef ?
+      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[PowCandidateBlock]] { v =>
+      val history = v.history
+      val state = v.state
+      val pool = v.pool
+      val vault = v.vault
+
+      val bestHeaderOpt = history.bestFullBlockOpt.map(_.header)
+
+      if ((bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) &&
+        !pool.isEmpty &&
+        vault.keyManager.keys.nonEmpty) Try {
+
+        lazy val timestamp = timeProvider.time()
+        val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(-1) + 1)
+
+        var txs = state.filterValid(pool.takeAllUnordered.toSeq)
+          .foldLeft(Seq[EncryBaseTransaction]()) { case (txsBuff, tx) =>
+            // 124 is approximate CoinbaseTx.length in bytes.
+            if ((txsBuff.map(_.length).sum + tx.length) <= settings.chainSettings.blockMaxSize - 124) txsBuff :+ tx
+            else txsBuff
+          }
+
+        // TODO: Which PubK should we pick here?
+        val minerProposition = vault.publicKeys.head
+        val privateKey: PrivateKey25519 = vault.secretByPublicImage(minerProposition).get
+
+        val openBxs: IndexedSeq[OpenBox] = txs.foldLeft(IndexedSeq[OpenBox]())((buff, tx) =>
+          buff ++ tx.newBoxes.foldLeft(IndexedSeq[OpenBox]()) { case (buff2, bx) =>
+            bx match {
+              case obx: OpenBox => buff2 :+ obx
+              case _ => buff2
+            }
+          }) ++ state.getAvailableOpenBoxesAt(height)
+        val amount = openBxs.map(_.amount).sum
+        val cTxSignature = PrivateKey25519Companion.sign(privateKey,
+          CoinbaseTransaction.getHash(minerProposition, openBxs.map(_.id), timestamp, amount, height))
+        val coinbase =
+          CoinbaseTransaction(minerProposition, timestamp, cTxSignature, openBxs.map(_.id), amount, height)
+
+        txs = txs.sortBy(_.timestamp) :+ coinbase
+
+        val (adProof, adDigest) = state.proofsForTransactions(txs).get
+        val difficulty = bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
+          .getOrElse(Difficulty @@ settings.chainSettings.initialDifficulty)
+        val derivedFields = PowConsensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
+        val blockSignature = PrivateKey25519Companion.sign(privateKey,
+          EncryBlockHeader.getMessageToSign(derivedFields._1, minerProposition, derivedFields._2,
+            derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, difficulty))
+
+        val candidate = new PowCandidateBlock(minerProposition,
+          blockSignature, bestHeaderOpt, adProof, adDigest, txs, timestamp, difficulty)
+
+        log.debug(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
+          s"and 1 coinbase for height $height")
+
+        candidate
+      }.recoverWith { case thr =>
+        log.warn("Error when trying to generate candidate: ", thr)
+        Failure(thr)
+      }.toOption
+      else {
+        if (vault.keyManager.keys.isEmpty) vault.keyManager.initStorage(Random.randomBytes())
+        None
+      }
+    }).mapTo[Option[PowCandidateBlock]]
   }
 }
+
 
 object EncryMiner extends ScorexLogging {
 
   case object StartMining
-
-  case object StopMining
-
-  case object MineBlock
-
-  case object PrepareCandidate
 
   case object MiningStatusRequest
 
@@ -126,69 +175,4 @@ object EncryMiner extends ScorexLogging {
     ).asJson
   }
 
-  def prepareCandidate(viewHolderRef: ActorRef, settings: EncryAppSettings,
-                       nodeId: Array[Byte], timeProvider: NetworkTimeProvider): Future[Option[PowCandidateBlock]] = {
-    implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
-    (viewHolderRef ?
-      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[PowCandidateBlock]] { view =>
-        val bestHeaderOpt = view.history.bestFullBlockOpt.map(_.header)
-
-        if ((bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) &&
-          !view.pool.isEmpty &&
-          view.vault.keyManager.keys.nonEmpty) Try {
-
-          lazy val timestamp = timeProvider.time()
-          val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(-1) + 1)
-
-          var txs = view.state.filterValid(view.pool.takeAllUnordered.toSeq)
-            .foldLeft(Seq[EncryBaseTransaction]()) { case (txsBuff, tx) =>
-              // 124 is approximate CoinbaseTx.length in bytes.
-              if ((txsBuff.map(_.length).sum + tx.length) <= settings.chainSettings.blockMaxSize - 124) txsBuff :+ tx
-              else txsBuff
-            }
-
-          // TODO: Which PubK should we pick here?
-          val minerProposition = view.vault.publicKeys.head
-          val privateKey: PrivateKey25519 = view.vault.secretByPublicImage(minerProposition).get
-
-          val openBxs: IndexedSeq[OpenBox] = txs.foldLeft(IndexedSeq[OpenBox]())((buff, tx) =>
-            buff ++ tx.newBoxes.foldLeft(IndexedSeq[OpenBox]()) { case (buff2, bx) =>
-              bx match {
-                case obx: OpenBox => buff2 :+ obx
-                case _ => buff2
-              }
-            }) ++ view.state.getAvailableOpenBoxesAt(height)
-          val amount = openBxs.map(_.amount).sum
-          val cTxSignature = PrivateKey25519Companion.sign(privateKey,
-            CoinbaseTransaction.getHash(minerProposition, openBxs.map(_.id), timestamp, amount, height))
-          val coinbase =
-            CoinbaseTransaction(minerProposition, timestamp, cTxSignature, openBxs.map(_.id), amount, height)
-
-          txs = txs.sortBy(_.timestamp) :+ coinbase
-
-          val (adProof, adDigest) = view.state.proofsForTransactions(txs).get
-          val difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
-            .getOrElse(Difficulty @@ settings.chainSettings.initialDifficulty)
-          val derivedFields = PowConsensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
-          val blockSignature = PrivateKey25519Companion.sign(privateKey,
-            EncryBlockHeader.getMessageToSign(derivedFields._1, minerProposition, derivedFields._2,
-              derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, difficulty))
-
-          val candidate = new PowCandidateBlock(minerProposition,
-            blockSignature, bestHeaderOpt, adProof, adDigest, txs, timestamp, difficulty)
-
-          log.debug(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
-            s"and 1 coinbase for height=$height")
-
-          candidate
-        }.recoverWith { case thr =>
-          log.warn("Error when trying to generate candidate: ", thr)
-          Failure(thr)
-        }.toOption
-        else {
-          if (view.vault.keyManager.keys.isEmpty) view.vault.keyManager.initStorage(Random.randomBytes())
-          None
-        }
-    }).mapTo[Option[PowCandidateBlock]]
-  }
 }

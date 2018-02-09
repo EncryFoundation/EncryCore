@@ -32,5 +32,5 @@ class PowCandidateBlock(val proposition: PublicKey25519Proposition,
   ).asJson
 
   override def toString: String = s"<CandidateBlock timestamp=$timestamp txQty=${transactions.size} " +
-    s"parentId=${parentOpt.map(p => Algos.encode(p.id)).getOrElse("None")}>"
+    s"parentId=${parentOpt.map(_.encodedId).getOrElse("None")}>"
 }

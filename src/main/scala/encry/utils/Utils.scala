@@ -1,4 +1,4 @@
-package encry.local.mining.crypto
+package encry.utils
 
 import encry.utils.LittleEndianBytes._
 import org.bouncycastle.crypto.Digest
