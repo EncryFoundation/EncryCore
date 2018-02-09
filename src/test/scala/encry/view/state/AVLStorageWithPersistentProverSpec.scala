@@ -66,13 +66,13 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
       persistentProver.performOneOperation(m).ensuring(_.isSuccess, "Mod application failed.")
     })
 
-  private val initialMods32 = (0 until 100)
+  private val iMods32 = (0 until 100)
     .map(i => Insert(ADKey @@ Random.randomBytes(), ADValue @@ Array.fill(32)(i.toByte)))
 
-  private val initialMods64 = (0 until 100)
+  private val iMods64 = (0 until 100)
     .map(i => Insert(ADKey @@ Random.randomBytes(), ADValue @@ Array.fill(64)(i.toByte)))
 
-  private val initialMods128 = (0 until 100)
+  private val iMods128 = (0 until 100)
     .map(i => Insert(ADKey @@ Random.randomBytes(), ADValue @@ Array.fill(128)(i.toByte)))
 
   private val mods32 = (0 until 50)
@@ -84,10 +84,10 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
   private val mods128 = (0 until 50)
     .map(i => Insert(ADKey @@ Random.randomBytes(), ADValue @@ Array.fill(128)(i.toByte)))
 
-  property("Digest (proof) == Digest (actual) after mods application. mods64 at genesis, then mods128") {
+  property("Proof Digest should equal Actual Digest after mods application. 32-bytes values at genesis, then 128") {
 
     // Setting up initial state.
-    applyModifications(initialMods32)
+    applyModifications(iMods32)
 
     persistentProver.generateProofAndUpdateStorage()
 
@@ -105,6 +105,25 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
     proof.get._2.sameElements(persistentProver.digest) shouldBe true
 
     mods128.forall(m => persistentProver.unauthenticatedLookup(m.key).isDefined) shouldBe true
+  }
+
+  property("Modifiers should be found in storage after sequential application of modifiers of variable size.") {
+
+    applyModifications(iMods128)
+
+    persistentProver.generateProofAndUpdateStorage()
+
+    applyModifications(mods64)
+
+    applyModifications(mods32)
+
+    persistentProver.generateProofAndUpdateStorage()
+
+    iMods128.forall(m => persistentProver.unauthenticatedLookup(m.key).isDefined) shouldBe true
+
+    mods64.forall(m => persistentProver.unauthenticatedLookup(m.key).isDefined) shouldBe true
+
+    mods32.forall(m => persistentProver.unauthenticatedLookup(m.key).isDefined) shouldBe true
 
     FileUtils.deleteDirectory(dir)
   }

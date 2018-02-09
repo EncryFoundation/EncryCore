@@ -11,5 +11,5 @@ trait Signable25519 {
 
   val signature: Signature25519
 
-  lazy val validSignature: Boolean = signature.isValid(proposition, dataToSign)
+  def validSignature: Boolean = signature.isValid(proposition, dataToSign)
 }

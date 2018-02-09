@@ -35,6 +35,8 @@ case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Prop
 
   override lazy val length: Int = this.bytes.length
 
+  override val maxSize: Int = AddPubKeyInfoTransaction.maxSize
+
   // Type of actual Tx type.
   override val typeId: TxTypeId = AddPubKeyInfoTransaction.typeId
 
@@ -84,13 +86,13 @@ case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Prop
       change, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
 
   override lazy val semanticValidity: Try[Unit] = {
-    // Signature validity checks.
-    if (!validSignature) {
+    if (!validSize) {
+      Failure(new Error("Invalid size"))
+    } else if (!validSignature) {
       Failure(new Error("Invalid signature"))
     } else if (fee < minimalFee) {
       Failure(new Error("Fee amount too small"))
-    } else
-      Success()
+    } else Success()
   }
 
   // Message to sign for publicKey verification.
@@ -98,6 +100,8 @@ case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Prop
 }
 
 object AddPubKeyInfoTransaction {
+
+  val maxSize: Int = 400
 
   val typeId: TxTypeId = 3.toByte
 

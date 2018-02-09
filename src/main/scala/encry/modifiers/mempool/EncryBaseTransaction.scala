@@ -13,7 +13,7 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-trait EncryBaseTransaction extends Transaction[Proposition] with Signable25519 {
+trait EncryBaseTransaction extends Transaction[Proposition] with Signable25519 with ModifierWithSizeLimit {
 
   override val modifierTypeId: ModifierTypeId = EncryBaseTransaction.ModifierTypeId
 
@@ -23,20 +23,14 @@ trait EncryBaseTransaction extends Transaction[Proposition] with Signable25519 {
 
   val semanticValidity: Try[Unit]
 
-  // TODO: Do we need tx Version?
-
-  // TODO: Do we need `typeId` here?
   val typeId: TxTypeId
 
-  // TODO: ModifierId.length can not be 33 bytes as the value of 32 bytes hardcoded in scorex.
   // override lazy val id: ModifierId = ModifierId @@ (Array[Byte](typeId) ++ txHash)
   override lazy val id: ModifierId = ModifierId @@ txHash.updated(0, typeId)
 
   val fee: Long
 
   val timestamp: Long
-
-  val length: Int
 
   val feeBox: Option[OpenBox]
 
@@ -55,5 +49,6 @@ trait EncryBaseTransaction extends Transaction[Proposition] with Signable25519 {
 
 object EncryBaseTransaction {
 
+  // Type of the transaction as the whole class of modifiers.
   val ModifierTypeId: scorex.core.ModifierTypeId = scorex.core.ModifierTypeId @@ 2.toByte
 }

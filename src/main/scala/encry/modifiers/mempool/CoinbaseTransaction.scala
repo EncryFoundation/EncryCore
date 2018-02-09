@@ -32,6 +32,8 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
 
   override val length: Int = 72 + (41 * useBoxes.size)
 
+  override val maxSize: Int = CoinbaseTransaction.maxSize
+
   override val typeId: TxTypeId = CoinbaseTransaction.typeId
 
   // Zero for coinbase.
@@ -71,15 +73,17 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
   override lazy val txHash: Digest32 = CoinbaseTransaction.getHash(proposition, useBoxes, timestamp, amount, height)
 
   override lazy val semanticValidity: Try[Unit] = {
-    // Signature validity checks.
-    if (!validSignature) {
-      log.info(s"<TX: $txHash> Invalid signature provided.")
-      Failure(new Error("Invalid signature provided!"))
+    if (!validSize) {
+      Failure(new Error("Invalid size"))
+    } else if (!validSignature) {
+      Failure(new Error("Invalid signature"))
     } else Success()
   }
 }
 
 object CoinbaseTransaction {
+
+  val maxSize: Int = 300
 
   val typeId: TxTypeId = 0.toByte
 

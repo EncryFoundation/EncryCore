@@ -32,7 +32,8 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
 
   override val length: Int = 120 + (32 * useBoxes.size) + (45 * createBoxes.size)
 
-  // Type of actual Tx type.
+  override val maxSize: Int = PaymentTransaction.maxSize
+
   override val typeId: TxTypeId = PaymentTransaction.typeId
 
   override val feeBox: Option[OpenBox] =
@@ -70,8 +71,9 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
     PaymentTransaction.getHash(proposition, fee, timestamp, useBoxes, createBoxes)
 
   override lazy val semanticValidity: Try[Unit] = {
-    // Signature validity checks.
-    if (!validSignature) {
+    if (!validSize) {
+      Failure(new Error("Invalid size"))
+    } else if (!validSignature) {
       Failure(new Error("Invalid signature"))
     } else if (!createBoxes.forall { i =>
       i._2 > 0 && AddressProposition.validAddress(i._1)
@@ -85,6 +87,8 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
 }
 
 object PaymentTransaction {
+
+  val maxSize: Int = 350
 
   val typeId: TxTypeId = 1.toByte
 
