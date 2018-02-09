@@ -48,7 +48,7 @@ class EncryMiner(viewHolderRef: ActorRef,
       if (isMining) {
         mod match {
           case f: EncryBlock if !candidateOpt.flatMap(_.parentOpt).exists(_.id sameElements f.header.id) =>
-            produceCandidate(settings, nodeId).foreach(_.foreach(c => self ! c))
+            prepareCandidate(settings, nodeId).foreach(_.foreach(c => self ! c))
           case _ =>
         }
       } else if (settings.nodeSettings.mining) {
@@ -68,7 +68,7 @@ class EncryMiner(viewHolderRef: ActorRef,
           isMining = true
         case None =>
           context.system.scheduler.scheduleOnce(5.second) {
-            produceCandidate(settings, nodeId).foreach(_.foreach(c => {
+            prepareCandidate(settings, nodeId).foreach(_.foreach(c => {
               self ! c
               self ! StartMining
             }))
@@ -90,7 +90,7 @@ class EncryMiner(viewHolderRef: ActorRef,
       log.warn(s"Unexpected message $m")
   }
 
-  def produceCandidate(settings: EncryAppSettings, nodeId: Array[Byte]): Future[Option[PowCandidateBlock]] = {
+  def prepareCandidate(settings: EncryAppSettings, nodeId: Array[Byte]): Future[Option[PowCandidateBlock]] = {
     implicit val timeout = Timeout(settings.scorexSettings.restApi.timeout)
     (viewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[PowCandidateBlock]] { v =>

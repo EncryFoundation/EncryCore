@@ -262,12 +262,9 @@ class UtxoState(override val version: VersionTag,
       .foldLeft((Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) { case ((nonConflictTxs, bxs), tx) =>
       tx match {
         case tx: EncryBaseTransaction =>
-          val bxsNew = tx.useBoxes.map(ByteArrayWrapper.apply)
-          if (bxsNew.forall(k => {
-            if (bxs.contains(k)) println(Algos.encode(k.data))
-            !bxs.contains(k)
-          }) && bxsNew.size == bxsNew.toSet.size) {
-            (nonConflictTxs :+ tx) -> (bxs ++ bxsNew)
+          val bxsRaw = tx.useBoxes.map(ByteArrayWrapper.apply)
+          if (bxsRaw.forall(k => !bxs.contains(k)) && bxsRaw.size == bxsRaw.toSet.size) {
+            (nonConflictTxs :+ tx) -> (bxs ++ bxsRaw)
           } else {
             (nonConflictTxs, bxs)
           }
