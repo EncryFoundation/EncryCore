@@ -6,9 +6,9 @@ import encry.modifiers.mempool.EncryTransaction.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.{HeightProposition, HeightPropositionSerializer}
 import encry.modifiers.state.box.serializers.SizedCompanionSerializer
+import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
-import scorex.crypto.encode.Base58
 
 import scala.util.{Failure, Success, Try}
 
@@ -29,7 +29,7 @@ case class OpenBox(override val proposition: HeightProposition,
   override def serializer: SizedCompanionSerializer[M] = OpenBoxSerializer
 
   override def json: Json = Map(
-    "id" -> Base58.encode(id).asJson,
+    "id" -> Algos.encode(id).asJson,
     "proposition" -> s"Open after ${proposition.height}".asJson,
     "nonce" -> nonce.asJson,
     "value" -> value.asJson

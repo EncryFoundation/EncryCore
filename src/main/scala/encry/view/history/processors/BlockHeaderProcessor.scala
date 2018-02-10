@@ -77,7 +77,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
       log.info(s"Initialize header chain with genesis header ${Algos.encode(header.id)}")
       ProgressInfo(None, Seq(), Some(header), toDownload(header))
     } else if (bestHeaderIdOpt.get sameElements header.id) {
-      log.info(s"New best header ${Algos.encode(header.id)} at height ${header.height} with score $score")
+      log.info(s"New best header ${Algos.encode(header.id)} with height ${header.height} and score $score")
       ProgressInfo(None, Seq(), Some(header), toDownload(header))
     } else {
       log.info(s"New orphaned header ${header.encodedId} at height ${header.height} with score $score")

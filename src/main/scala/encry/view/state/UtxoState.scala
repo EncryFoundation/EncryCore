@@ -168,20 +168,16 @@ class UtxoState(override val version: VersionTag,
 
   override lazy val rootHash: ADDigest = persistentProver.digest
 
-  // TODO: Test.
-  // TODO: OPTIMISATION: Too many redundant signature validity checks here.
-  // TODO: Refactoring. Too many lines of code in one method.
-  // Carries out an exhaustive tx validation.
   /**
+    * Carries out an exhaustive validation of the given transaction.
+    *
     * Tx validation algorithm:
-    * 0. Check semantic validity of tx
-    * 1. Define tx type
-    *    For each useBxs in tx:
-    * 2. Check if bx is in the state
-    * 3. Define the type of bx
-    * 4. Deserialize bx
-    * 5. Call `unlockTry()`
-    * 6. Make sure inputs.sum >= outputs.sum
+    * 0. Check semantic validity of transaction
+    *    For each box referenced in transaction:
+    * 1. Check if box is in the state
+    * 2. Parse box from the state storage
+    * 3. Try to unlock the box, providing appropriate context
+    * 4. Make sure inputs.sum >= outputs.sum
    */
   override def validate(tx: EncryBaseTransaction): Try[Unit] = Try {
 
@@ -212,9 +208,11 @@ class UtxoState(override val version: VersionTag,
     else if (debit < credit) throw new Error(s"Non-positive balance in $tx")
   }
 
-  // Filters semantically valid and non conflicting transactions.
-  // Picks the transaction with highest fee if conflict detected.
-  // Note, this returns txs ordered chronologically.
+  /**
+    * Filters semantically valid and non conflicting transactions.
+    * Picks the transaction with highest fee if conflict detected.
+    * Note, this returns txs ordered chronologically.
+    */
   // TODO: OPTIMISATION: Too many sorting here.
   override def filterValid(txs: Seq[EncryBaseTransaction]): Seq[EncryBaseTransaction] =
     super.filterValid(txs.sortBy(_.timestamp))

@@ -16,5 +16,5 @@ case class ChainSettings(initialDifficulty: BigInt,
 
 object ChainSettings {
   val maxTarget = BigInt(1, Array.fill(32)(Byte.MinValue))  // 2^256
-  val genesisHeight: Height = Height @@ 0
+  val genesisHeight: Height = Height @@ 1
 }

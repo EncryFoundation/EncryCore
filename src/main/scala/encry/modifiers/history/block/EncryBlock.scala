@@ -5,7 +5,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
-import encry.modifiers.mempool.EncryBaseTransaction
+import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction}
 import io.circe.Json
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
@@ -23,18 +23,25 @@ class EncryBlock(override val header: EncryBlockHeader,
 
   override def transactions: Seq[EncryBaseTransaction] = payload.transactions
 
-  override def semanticValidity: Try[Unit] =
+  override def semanticValidity: Try[Unit] = {
+    def validCoinbase: Boolean = payload.transactions.last match {
+      case ctx: CoinbaseTransaction => ctx.height == header.height
+      case _ => false
+    }
     if (header.txsRoot != payload.digest) {
-      log.info(s"<BLOCK ${header.encodedId}> Invalid tx Merkle Root hash.")
+      log.info(s"<Block ${header.encodedId}> Invalid tx Merkle Root hash.")
       Failure(new Error("Invalid tx Merkle Root hash"))
+    } else if (!validCoinbase) {
+      log.info(s"<Block ${header.encodedId}> Invalid coinbase transaction.")
+      Failure(new Error("Invalid signature"))
     } else if (!header.validTimestamp) {
-      log.info(s"<BLOCK ${header.encodedId}> Invalid timestamp.")
+      log.info(s"<Block ${header.encodedId}> Invalid timestamp.")
       Failure(new Error("Invalid timestamp"))
     } else if (!header.validSignature) {
-      log.info(s"<BLOCK ${header.encodedId}> Invalid timestamp signature.")
+      log.info(s"<Block ${header.encodedId}> Invalid timestamp signature.")
       Failure(new Error("Invalid signature"))
-    } else
-      Success()
+    } else Success()
+  }
 
   override def parentId: ModifierId = header.parentId
 
@@ -52,6 +59,7 @@ class EncryBlock(override val header: EncryBlockHeader,
 }
 
 object EncryBlock {
+
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (-127: Byte)
 }
 
@@ -74,7 +82,7 @@ object EncryBlockSerializer extends Serializer[EncryBlock] {
   override def parseBytes(bytes: Array[Byte]): Try[EncryBlock] = Try{
     var pointer = 4
     val headerSize = Ints.fromByteArray(bytes.slice(0, pointer))
-    val header = EncryBlockHeaderSerializer.parseBytes(bytes.slice(pointer,pointer+headerSize))
+    val header = EncryBlockHeaderSerializer.parseBytes(bytes.slice(pointer, pointer + headerSize))
     pointer += headerSize
     val payloadSize = Ints.fromByteArray(bytes.slice(pointer, pointer + 4))
     val payload = EncryBlockPayloadSerializer.parseBytes(bytes.slice(pointer + 4, pointer + 4 + payloadSize))

@@ -77,9 +77,6 @@ class EncryMiner(viewHolderRef: ActorRef,
       }
 
     case c: PowCandidateBlock =>
-      val oldHeight = candidateOpt.flatMap(_.parentOpt).map(_.height).getOrElse(0)
-      val newHeight = c.parentOpt.map(_.height).getOrElse(0)
-      log.debug(s"New candidate $c. Height change $oldHeight -> $newHeight")
       candidateOpt = Some(c)
       miningThreads.foreach(t => t ! c)
 
@@ -106,7 +103,7 @@ class EncryMiner(viewHolderRef: ActorRef,
         vault.keyManager.keys.nonEmpty) Try {
 
         lazy val timestamp = timeProvider.time()
-        val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(-1) + 1)
+        val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(0) + 1)
 
         var txs = state.filterValid(pool.takeAllUnordered.toSeq)
           .foldLeft(Seq[EncryBaseTransaction]()) { case (txsBuff, tx) =>
@@ -125,7 +122,7 @@ class EncryMiner(viewHolderRef: ActorRef,
               case obx: OpenBox => buff2 :+ obx
               case _ => buff2
             }
-          }) ++ state.getAvailableOpenBoxesAt(height)
+          }) ++ state.getAvailableOpenBoxesAt(state.stateHeight)
         val amount = openBxs.map(_.amount).sum
         val cTxSignature = PrivateKey25519Companion.sign(privateKey,
           CoinbaseTransaction.getHash(minerProposition, openBxs.map(_.id), timestamp, amount, height))

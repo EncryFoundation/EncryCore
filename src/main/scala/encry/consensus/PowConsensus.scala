@@ -54,7 +54,7 @@ object PowConsensus {
     val parentId: ModifierId = ModifierId @@ parentOpt.map(_.id).getOrElse(EncryBlockHeader.GenesisParentId)
     val adProofsRoot = ADProofs.proofDigest(adProofBytes)
     val txsRoot = EncryBlockPayload.rootHash(transactions.map(_.id))
-    val height = parentOpt.map(_.height + 1).getOrElse(0)
+    val height = parentOpt.map(_.height).getOrElse(0) + 1
 
     (version, parentId, adProofsRoot, txsRoot, height)
   }
