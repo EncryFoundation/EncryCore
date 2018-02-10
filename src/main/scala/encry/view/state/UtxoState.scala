@@ -172,83 +172,44 @@ class UtxoState(override val version: VersionTag,
   // TODO: OPTIMISATION: Too many redundant signature validity checks here.
   // TODO: Refactoring. Too many lines of code in one method.
   // Carries out an exhaustive tx validation.
+  /**
+    * Tx validation algorithm:
+    * 0. Check semantic validity of tx
+    * 1. Define tx type
+    *    For each useBxs in tx:
+    * 2. Check if bx is in the state
+    * 3. Define the type of bx
+    * 4. Deserialize bx
+    * 5. Call `unlockTry()`
+    * 6. Make sure inputs.sum >= outputs.sum
+   */
   override def validate(tx: EncryBaseTransaction): Try[Unit] = Try {
 
-    tx.semanticValidity.failed
-    tx match {
-      case tx: PaymentTransaction =>
-        var inputsSumCounter: Long = 0
-        tx.useBoxes.foreach { bxId =>
-          persistentProver.unauthenticatedLookup(bxId) match {
-            case Some(data) =>
-              bxId.head match {
-                case OpenBox.typeId =>
-                  OpenBoxSerializer.parseBytes(data) match {
-                    case Success(box) =>
-                      box.unlockTry(tx, ctxOpt = Some(Context(stateHeight)))
-                      inputsSumCounter += box.amount
-                    case Failure(_) =>
-                      throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
-                  }
-                case AssetBox.typeId =>
-                  AssetBoxSerializer.parseBytes(data) match {
-                    case Success(box) =>
-                      box.unlockTry(tx)
-                      inputsSumCounter += box.amount
-                    case Failure(_) =>
-                      throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
-                  }
-                case _ => throw new Exception("Got Modifier of unknown type.")
-              }
-            case None =>
-              throw new Error(s"Cannot find Box referenced in TX ${tx.txHash}")
-          }
-        }
-        if (tx.createBoxes.map(i => i._2).sum > inputsSumCounter)
-          throw new Error("Inputs total amount mismatches Output sum.")
+    implicit val context: Option[Context] = Some(Context(stateHeight))
 
-      case tx: CoinbaseTransaction =>
-        tx.useBoxes.foreach { bxId =>
-          persistentProver.unauthenticatedLookup(bxId) match {
-            case Some(data) =>
-              bxId.head match {
-                case OpenBox.typeId =>
-                  OpenBoxSerializer.parseBytes(data) match {
-                    case Success(box) =>
-                      box.unlockTry(tx, ctxOpt = Some(Context(stateHeight)))
-                    case Failure(_) =>
-                      throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
-                  }
-                case _ =>
-                  throw new Error("Got Modifier of unknown type.")
-              }
-            case None =>
-              throw new Exception(s"Cannot find Box referenced in TX ${tx.txHash}")
-          }
-        }
+    tx.semanticValidity.get
 
-      case tx: AddPubKeyInfoTransaction =>
-        tx.useBoxes.foreach { bxId =>
-          persistentProver.unauthenticatedLookup(bxId) match {
-            case Some(data) =>
-              bxId.head match {
-                case AssetBox.typeId =>
-                  AssetBoxSerializer.parseBytes(data) match {
-                    case Success(box) =>
-                      box.unlockTry(tx)
-                    case Failure(_) =>
-                      throw new Error(s"Unable to parse Box referenced in TX ${tx.txHash}")
-                  }
-                case _ =>
-                  throw new Error("Got Modifier of unknown type.")
-              }
-            case None =>
-              throw new Exception(s"Cannot find Box referenced in TX ${tx.txHash}")
-          }
-        }
+    val bxs = tx.useBoxes.map(bxId => persistentProver.unauthenticatedLookup(bxId)
+      .map(bytes => StateModifierDeserializer.parseBytes(bytes, bxId.head))
+      .flatMap(_.toOption)).foldLeft(IndexedSeq[EncryBaseBox]())((acc, bxOpt) => bxOpt match {
+        case Some(bx) => acc :+ bx
+        case _ => acc
+      })
 
-      case _ => throw new Error("Got Modifier of unknown type.")
+    bxs.foreach(_.unlockTry(tx, None).get)
+
+    val debit = bxs.foldLeft(0L)((acc, bx) => bx match {
+      case acbx: AmountCarryingBox => acc + acbx.amount
+      case _ => acc
+    })
+
+    val credit = tx match {
+      case tx: PaymentTransaction => tx.createBoxes.foldLeft(0L)(_ + _._2) + tx.fee
+      case _ => tx.fee
     }
+
+    if (bxs.size < tx.useBoxes.size) throw new Error(s"Failed to parse some boxes referenced in $tx")
+    else if (debit < credit) throw new Error(s"Non-positive balance in $tx")
   }
 
   // Filters semantically valid and non conflicting transactions.

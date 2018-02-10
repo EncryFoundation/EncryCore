@@ -82,10 +82,8 @@ trait StateIndexManager extends ScorexLogging {
           }
         case bx: PubKeyInfoBox =>
           idxModificationsMap.get(bx.proposition.address) match {
-            case Some(t) =>
-              t._2.add(bx.id)
-            case None =>
-              idxModificationsMap.update(
+            case Some(t) => t._2.add(bx.id)
+            case None => idxModificationsMap.update(
               bx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
           }
         case bx: OpenBox =>

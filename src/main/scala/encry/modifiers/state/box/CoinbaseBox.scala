@@ -1,7 +1,7 @@
 package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs}
-import encry.modifiers.mempool.EncryTransaction
+import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.mempool.EncryTransaction.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.{HeightProposition, HeightPropositionSerializer}
@@ -10,8 +10,6 @@ import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
 import scorex.crypto.authds.ADValue
-import scorex.crypto.encode.Base58
-import scorex.crypto.hash.Digest32
 
 import scala.util.{Success, Try}
 
@@ -24,14 +22,15 @@ case class CoinbaseBox(override val proposition: HeightProposition,
 
   override val typeId: BxTypeId = CoinbaseBox.typeId
 
-  override def unlockTry(modifier: EncryTransaction, script: Option[String], ctxOpt: Option[Context]): Try[Unit] = Success()
+  override def unlockTry(modifier: EncryBaseTransaction,
+                         script: Option[String])(implicit ctxOpt: Option[Context] = None): Try[Unit] = Success()
 
   override def serializer: SizedCompanionSerializer[M] = CoinbaseBoxSerializer
 
   override lazy val bytes: ADValue = ADValue @@ serializer.toBytes(this)
 
   override def json: Json = Map(
-    "id" -> Base58.encode(id).asJson,
+    "id" -> Algos.encode(id).asJson,
     "proposition" -> s"Height proposition: ${proposition.height}".asJson,
     "nonce" -> nonce.asJson,
     "value" -> amount.asJson

@@ -1,16 +1,14 @@
 package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs}
-import encry.modifiers.mempool.EncryTransaction
+import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.mempool.EncryTransaction.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.{HeightProposition, HeightPropositionSerializer}
 import encry.modifiers.state.box.serializers.SizedCompanionSerializer
-import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Success, Try}
 
@@ -23,8 +21,8 @@ case class OpenBox(override val proposition: HeightProposition,
 
   override val typeId: BxTypeId = OpenBox.typeId
 
-  override def unlockTry(modifier: EncryTransaction,
-                         script: Option[String] = None, ctxOpt: Option[Context]): Try[Unit] =
+  override def unlockTry(modifier: EncryBaseTransaction,
+                         script: Option[String] = None)(implicit ctxOpt: Option[Context]): Try[Unit] =
     if (ctxOpt.isDefined && proposition.height <= ctxOpt.get.height) Success()
     else Failure(new Error("Unlock failed"))
 

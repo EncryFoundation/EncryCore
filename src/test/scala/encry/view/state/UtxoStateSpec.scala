@@ -47,7 +47,7 @@ class UtxoStateSpec extends PropSpec with Matchers {
       val fee = factory.Props.txFee
       val timestamp = 1234567L
       val useBoxes = IndexedSeq(bx).map(_.id)
-      val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
+      val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue - 100))
       val sig = PrivateKey25519Companion.sign(
         pk,
         PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)

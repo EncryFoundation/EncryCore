@@ -3,7 +3,7 @@ package encry.modifiers.state.box
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.Address
 import encry.common.KeyPairType
-import encry.modifiers.mempool.EncryTransaction
+import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.AddressProposition
 import encry.settings.Algos
@@ -27,8 +27,8 @@ case class PubKeyInfoBox(override val proposition: AddressProposition,
 
   override val typeId: BxTypeId = PubKeyInfoBox.typeId
 
-  override def unlockTry(modifier: EncryTransaction, script: Option[String] = None,
-                         ctxOpt: Option[Context] = None): Try[Unit] =
+  override def unlockTry(modifier: EncryBaseTransaction,
+                         script: Option[String] = None)(implicit ctxOpt: Option[Context] = None): Try[Unit] =
     if (modifier.proposition.address != proposition.address) Failure(new Error("Unlock failed"))
     else Success()
 
