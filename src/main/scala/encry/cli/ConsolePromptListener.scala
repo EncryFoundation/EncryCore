@@ -16,7 +16,7 @@ case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryApp
   val commands: mutable.HashMap[String,mutable.HashMap[String, Command]] = mutable.HashMap.empty
 
   commands.update("node", mutable.HashMap(
-    "-stop" -> NodeShutdown
+    "-shutdown" -> NodeShutdown
   ))
 
   commands.update("app", mutable.HashMap(
@@ -28,11 +28,10 @@ case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryApp
   ))
 
   commands.update("wallet", mutable.HashMap(
-    "-printMyAddrs" -> PrintMyAddrs,
+    "-addrs" -> PrintMyAddrs,
     "-addKey" -> AddKey,
     "-init" -> InitKeyStorage,
-    "-printPubKeys" -> PrintPubKeys,
-    "-printPrivKeys" -> PrintPrivKeys,
+    "-pubKeys" -> PrintPubKeys,
     "-balance" -> GetBalance,
     "-transfer" -> Transfer
   ))

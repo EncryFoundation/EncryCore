@@ -14,6 +14,7 @@ import scorex.core.NodeViewHolder.GetDataFromCurrentView
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
+// This cmd is unsafe.
 object PrintPrivKeys extends Command {
 
   override def execute(nodeViewHolderRef: ActorRef,
