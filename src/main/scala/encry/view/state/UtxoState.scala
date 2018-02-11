@@ -35,7 +35,7 @@ class UtxoState(override val version: VersionTag,
 
   private def onAdProofGenerated(proof: ADProofs): Unit = {
     if(nodeViewHolderRef.isEmpty) log.warn("Got proof while nodeViewHolderRef is empty")
-    nodeViewHolderRef.foreach(h => h ! LocallyGeneratedModifier(proof))
+    nodeViewHolderRef.foreach(_ ! LocallyGeneratedModifier(proof))
   }
 
   // TODO: Make sure all errors are being caught properly.

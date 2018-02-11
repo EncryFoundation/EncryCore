@@ -22,7 +22,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
                            nodeId: Array[Byte], digest: Boolean)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with ScorexLogging {
 
-  override val route: Route = pathPrefix("blocks") {
+  override val route: Route = pathPrefix("history") {
     getBlocksR ~
     getLastHeadersR ~
     getBlockIdsAtHeightR ~

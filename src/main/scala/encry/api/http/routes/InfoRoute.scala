@@ -22,15 +22,7 @@ case class InfoRoute(readersHolder: ActorRef,
                      override val settings: RESTApiSettings, nodeId: Array[Byte])
                     (implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
 
-  override val route: Route = info
-
-  private def getConnectedPeers: Future[Int] = (peerManager ? PeerManager.GetConnectedPeers).mapTo[Seq[Handshake]].map(_.size)
-
-  private def getStateType: String = if (digest) "digest" else "utxo"
-
-  private def getMinerInfo: Future[MiningStatusResponse] = (miner ? MiningStatusRequest).mapTo[MiningStatusResponse]
-
-  def info: Route = (path("info") & get) {
+  override val route: Route = (path("info") & get) {
     val minerInfoF = getMinerInfo
     val connectedPeersF = getConnectedPeers
     val readersF: Future[Readers] = (readersHolder ? GetReaders).mapTo[Readers]
@@ -42,6 +34,12 @@ case class InfoRoute(readersHolder: ActorRef,
       InfoRoute.makeInfoJson(nodeId, minerInfo, connectedPeers, readers, getStateType)
     }).okJson()
   }
+
+  private def getConnectedPeers: Future[Int] = (peerManager ? PeerManager.GetConnectedPeers).mapTo[Seq[Handshake]].map(_.size)
+
+  private def getStateType: String = if (digest) "digest" else "utxo"
+
+  private def getMinerInfo: Future[MiningStatusResponse] = (miner ? MiningStatusRequest).mapTo[MiningStatusResponse]
 }
 
 object InfoRoute {

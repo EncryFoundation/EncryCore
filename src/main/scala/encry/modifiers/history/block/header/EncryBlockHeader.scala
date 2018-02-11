@@ -14,6 +14,7 @@ import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.transaction.proof.Signature25519
 import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.crypto.authds.ADDigest
+import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{PublicKey, Signature}
 
@@ -60,9 +61,13 @@ case class EncryBlockHeader(override val version: Version,
 
   override lazy val json: Json = Map(
     "id" -> Algos.encode(id).asJson,
+    "hash" -> Base16.encode(id).asJson,
     "parentId" -> Algos.encode(payloadId).asJson,
     "stateRoot" -> Algos.encode(stateRoot).asJson,
     "txRoot" -> Algos.encode(txsRoot).asJson,
+    "timestamp" -> timestamp.asJson,
+    "height" -> height.asJson,
+    "difficulty" -> difficulty.untag(Difficulty).asJson,
   ).asJson
 }
 
