@@ -127,6 +127,7 @@ class UtxoState(override val version: VersionTag,
 
       val mods = getAllStateChanges(txs).operations.map(ADProofs.toModification)
 
+      // TODO: Refactoring.
       mods.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
         t.flatMap(_ => {
           val opRes = persistentProver.performOneOperation(m)
