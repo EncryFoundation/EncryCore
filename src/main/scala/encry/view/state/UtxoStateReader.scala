@@ -80,7 +80,7 @@ trait UtxoStateReader extends StateIndexManager with StateReader with ScorexLogg
     boxesByAddress(address) match {
       case Some(bxs) =>
         Some(Portfolio(address,
-          Balance @@ bxs.filter(_.isInstanceOf[AssetBox]).map(_.asInstanceOf[AssetBox].amount).sum, Some(bxs)))
+          Balance @@ bxs.filter(_.isInstanceOf[AssetBox]).map(_.asInstanceOf[AssetBox].amount).sum, bxs))
       case _ => None
     }
 }

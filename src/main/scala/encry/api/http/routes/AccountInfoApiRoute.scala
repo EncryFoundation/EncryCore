@@ -14,12 +14,12 @@ import scorex.core.settings.RESTApiSettings
 
 import scala.concurrent.Future
 
-case class StateInfoApiRoute(readersHolder: ActorRef, nodeViewActorRef: ActorRef,
-                             restApiSettings: RESTApiSettings, digest: Boolean)(implicit val context: ActorRefFactory)
+case class AccountInfoApiRoute(readersHolder: ActorRef, nodeViewActorRef: ActorRef,
+                               restApiSettings: RESTApiSettings, digest: Boolean)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
-  override val route: Route = pathPrefix("state") {
-    getKeyInfoByAddressR
+  override val route: Route = pathPrefix("account") {
+    getKeyInfoByAddressR ~ getBoxesByAddressR ~ getPortfolioByAddressR
   }
 
   override val settings: RESTApiSettings = restApiSettings
@@ -30,12 +30,20 @@ case class StateInfoApiRoute(readersHolder: ActorRef, nodeViewActorRef: ActorRef
     _.boxesByAddress(address)
   }.map(_.map(_.map(_.json).asJson))
 
+  private def getPortfolioByAddress(address: Address): Future[Option[Json]] = getState.map {
+    _.portfolioByAddress(address)
+  }.map(_.map(p => p.json))
+
   private def getKeyInfoByAddress(address: Address): Future[Option[Json]] = getState.map {
     _.boxesByAddress(address)
   }.map(_.map(_.filter(_.isInstanceOf[PubKeyInfoBox]).map(_.json).asJson))
 
   def getBoxesByAddressR: Route = (accountAddress & pathPrefix("boxes") & get) { addr =>
     getBoxesByAddress(addr).okJson()
+  }
+
+  def getPortfolioByAddressR: Route = (accountAddress & pathPrefix("portfolio") & get) { addr =>
+    getPortfolioByAddress(addr).okJson()
   }
 
   def getKeyInfoByAddressR: Route = (accountAddress & pathPrefix("keys") & get) { addr =>
