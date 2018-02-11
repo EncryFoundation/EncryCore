@@ -119,14 +119,14 @@ class UtxoState(override val version: VersionTag,
     ).flatten
 
     Try {
-      assert(txs.nonEmpty, "Empty transaction sequence passed.")
+      assert(txs.nonEmpty, "Got empty transaction sequence.")
 
       if (!(persistentProver.digest.sameElements(rootHash) &&
         storage.version.get.sameElements(rootHash) &&
         stateStore.lastVersionID.get.data.sameElements(rootHash))) Failure(new Error("Bad state version."))
 
       val mods = getAllStateChanges(txs).operations.map(ADProofs.toModification)
-      //todo .get
+
       mods.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
         t.flatMap(_ => {
           val opRes = persistentProver.performOneOperation(m)
@@ -171,7 +171,7 @@ class UtxoState(override val version: VersionTag,
   /**
     * Carries out an exhaustive validation of the given transaction.
     *
-    * Tx validation algorithm:
+    * Transaction validation algorithm:
     * 0. Check semantic validity of transaction
     *    For each box referenced in transaction:
     * 1. Check if box is in the state
@@ -179,34 +179,31 @@ class UtxoState(override val version: VersionTag,
     * 3. Try to unlock the box, providing appropriate context
     * 4. Make sure inputs.sum >= outputs.sum
    */
-  override def validate(tx: EncryBaseTransaction): Try[Unit] = Try {
+  override def validate(tx: EncryBaseTransaction): Try[Unit] =
+    tx.semanticValidity.map { _: Unit =>
 
-    implicit val context: Option[Context] = Some(Context(stateHeight))
+      implicit val context: Option[Context] = Some(Context(stateHeight))
 
-    tx.semanticValidity.get
+      val bxs = tx.useBoxes.map(bxId => persistentProver.unauthenticatedLookup(bxId)
+        .map(bytes => StateModifierDeserializer.parseBytes(bytes, bxId.head))
+        .flatMap(_.toOption)).foldLeft(IndexedSeq[EncryBaseBox]())((acc, bxOpt) => bxOpt match {
+          case Some(bx) if bx.unlockTry(tx, None).isSuccess => acc :+ bx
+          case _ => acc
+        })
 
-    val bxs = tx.useBoxes.map(bxId => persistentProver.unauthenticatedLookup(bxId)
-      .map(bytes => StateModifierDeserializer.parseBytes(bytes, bxId.head))
-      .flatMap(_.toOption)).foldLeft(IndexedSeq[EncryBaseBox]())((acc, bxOpt) => bxOpt match {
-        case Some(bx) => acc :+ bx
+      val debit = bxs.foldLeft(0L)((acc, bx) => bx match {
+        case acbx: AmountCarryingBox => acc + acbx.amount
         case _ => acc
       })
 
-    bxs.foreach(_.unlockTry(tx, None).get)
+      val credit = tx match {
+        case tx: PaymentTransaction => tx.createBoxes.foldLeft(0L)(_ + _._2) + tx.fee
+        case _ => tx.fee
+      }
 
-    val debit = bxs.foldLeft(0L)((acc, bx) => bx match {
-      case acbx: AmountCarryingBox => acc + acbx.amount
-      case _ => acc
-    })
-
-    val credit = tx match {
-      case tx: PaymentTransaction => tx.createBoxes.foldLeft(0L)(_ + _._2) + tx.fee
-      case _ => tx.fee
+      if (bxs.size < tx.useBoxes.size) throw new Error(s"Failed to spend some boxes referenced in $tx")
+      else if (debit < credit) throw new Error(s"Non-positive balance in $tx")
     }
-
-    if (bxs.size < tx.useBoxes.size) throw new Error(s"Failed to parse some boxes referenced in $tx")
-    else if (debit < credit) throw new Error(s"Non-positive balance in $tx")
-  }
 
   /**
     * Filters semantically valid and non conflicting transactions.
