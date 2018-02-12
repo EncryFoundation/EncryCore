@@ -1,7 +1,7 @@
 package encry
 
 import akka.actor.{ActorRef, Props}
-import encry.api.http.routes.{HistoryApiRoute, InfoRoute, AccountInfoApiRoute, TransactionsApiRoute}
+import encry.api.http.routes.{HistoryApiRoute, InfoApiRoute, AccountInfoApiRoute, TransactionsApiRoute}
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator.StartGeneration
@@ -55,7 +55,7 @@ class EncryApp(args: Seq[String]) extends Application {
   override val apiRoutes: Seq[ApiRoute] = Seq(
     UtilsApiRoute(settings.restApi),
     PeersApiRoute(peerManagerRef, networkControllerRef, settings.restApi),
-    InfoRoute(readersHolderRef, minerRef, peerManagerRef, encrySettings.nodeSettings.ADState, settings.restApi, nodeId),
+    InfoApiRoute(readersHolderRef, minerRef, peerManagerRef, encrySettings.nodeSettings.ADState, settings.restApi, nodeId),
     HistoryApiRoute(readersHolderRef, minerRef, encrySettings, nodeId, encrySettings.nodeSettings.ADState),
     TransactionsApiRoute(readersHolderRef, nodeViewHolderRef, settings.restApi, encrySettings.nodeSettings.ADState),
     AccountInfoApiRoute(readersHolderRef, nodeViewHolderRef, settings.restApi, encrySettings.nodeSettings.ADState)

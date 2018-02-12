@@ -18,6 +18,8 @@ import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.signatures.Curve25519
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import scala.util.Try
 
 object Transfer extends Command {
@@ -32,30 +34,34 @@ object Transfer extends Command {
     */
   // TODO: Input validation.
   override def execute(nodeViewHolderRef: ActorRef,
-                       args: Array[String], settings: EncryAppSettings): Option[Response] = Try {
+                       args: Array[String], settings: EncryAppSettings): Option[Response] = {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
-    nodeViewHolderRef ?
-      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Unit] { view =>
-        val recipient = args(1).split(";").head
-        val fee = args(1).split(";")(1).toLong
-        val amount = args(1).split(";").last.toLong
-        val proposition = view.vault.keyManager.keys.head.publicImage
-        val timestamp = System.currentTimeMillis()  // TODO: Use NTP.
-        val boxes = view.vault.walletStorage.getAllBoxes.foldLeft(Seq[AssetBox]()) {
-          case (seq, box) => if (seq.map(_.amount).sum < amount) seq :+ box else seq
-        }
-        val useBoxes = boxes.map(_.id).toIndexedSeq
-        val outputs = IndexedSeq(
-          (Address @@ recipient, amount),
-          (Address @@ proposition.address, boxes.map(_.amount).sum - amount))
-        val sig = Signature25519(Curve25519.sign(
-          view.vault.keyManager.keys.head.privKeyBytes,
-          PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
-        ))
+    Await.result((nodeViewHolderRef ?
+      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
+        Try {
+          val recipient = args(1).split(";").head
+          val fee = args(1).split(";")(1).toLong
+          val amount = args(1).split(";").last.toLong
+          val proposition = view.vault.keyManager.keys.head.publicImage
+          val timestamp = System.currentTimeMillis()  // TODO: Use NTP.
+          val boxes = view.vault.walletStorage.getAllBoxes.foldLeft(Seq[AssetBox]()) {
+            case (seq, box) => if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
+          }
+          val useBoxes = boxes.map(_.id).toIndexedSeq
+          val outputs = IndexedSeq(
+            (Address @@ recipient, amount),
+            (Address @@ proposition.address, boxes.map(_.amount).sum - (amount + fee)))
+          val sig = Signature25519(Curve25519.sign(
+            view.vault.keyManager.keys.head.privKeyBytes,
+            PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
+          ))
 
-        val tx = PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
+          val tx = PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
 
-        nodeViewHolderRef ! LocallyGeneratedTransaction[Proposition, PaymentTransaction](tx)
-      }
-  }.toOption.map(_ => Some(Response("OK"))).getOrElse(Some(Response("Operation failed")))
+          nodeViewHolderRef ! LocallyGeneratedTransaction[Proposition, PaymentTransaction](tx)
+
+          tx
+        }.toOption.map(tx => Some(Response(tx.toString))).getOrElse(Some(Response("Operation failed. Malformed data.")))
+      }).mapTo[Option[Response]], 5.second)
+  }
 }

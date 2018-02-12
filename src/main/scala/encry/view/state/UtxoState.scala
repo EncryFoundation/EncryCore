@@ -7,7 +7,8 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{AddPubKeyInfoTransaction, CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
+import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
+import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.{Algos, Constants}
@@ -15,8 +16,8 @@ import encry.view.history.Height
 import encry.view.state.index.StateIndexManager
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.LocalInterface.LocallyGeneratedModifier
+import scorex.core.VersionTag
 import scorex.core.utils.ScorexLogging
-import scorex.core.{ModifierId, VersionTag}
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}

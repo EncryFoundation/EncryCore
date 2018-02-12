@@ -2,6 +2,7 @@ package encry.view.state
 
 import com.google.common.primitives.Ints
 import encry.account.{Address, Balance, Portfolio}
+import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
 import encry.settings.Algos
 import encry.view.history.Height

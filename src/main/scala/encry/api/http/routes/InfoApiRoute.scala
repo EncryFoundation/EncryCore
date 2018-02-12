@@ -15,12 +15,12 @@ import scorex.crypto.encode.Base58
 
 import scala.concurrent.Future
 
-case class InfoRoute(readersHolder: ActorRef,
-                     miner: ActorRef,
-                     peerManager: ActorRef,
-                     digest: Boolean,
-                     override val settings: RESTApiSettings, nodeId: Array[Byte])
-                    (implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
+case class InfoApiRoute(readersHolder: ActorRef,
+                        miner: ActorRef,
+                        peerManager: ActorRef,
+                        digest: Boolean,
+                        override val settings: RESTApiSettings, nodeId: Array[Byte])
+                       (implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
 
   override val route: Route = (path("info") & get) {
     val minerInfoF = getMinerInfo
@@ -31,7 +31,7 @@ case class InfoRoute(readersHolder: ActorRef,
       connectedPeers <- connectedPeersF
       readers <- readersF
     } yield {
-      InfoRoute.makeInfoJson(nodeId, minerInfo, connectedPeers, readers, getStateType)
+      InfoApiRoute.makeInfoJson(nodeId, minerInfo, connectedPeers, readers, getStateType)
     }).okJson()
   }
 
@@ -42,7 +42,7 @@ case class InfoRoute(readersHolder: ActorRef,
   private def getMinerInfo: Future[MiningStatusResponse] = (miner ? MiningStatusRequest).mapTo[MiningStatusResponse]
 }
 
-object InfoRoute {
+object InfoApiRoute {
 
   def makeInfoJson(nodeId: Array[Byte],
                    minerInfo: MiningStatusResponse,
