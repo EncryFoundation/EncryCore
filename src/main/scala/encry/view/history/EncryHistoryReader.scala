@@ -216,11 +216,11 @@ trait EncryHistoryReader
 
   protected[history] def commonBlockThenSuffixes(header1: EncryBlockHeader,
                                                  header2: EncryBlockHeader): (EncryHeaderChain, EncryHeaderChain) = {
-    assert(contains(header1))
-    assert(contains(header2))
+    assert(contains(header1) && contains(header2), "Got non-existing header(s)")
+    val heightDelta = Math.max(header1.height - header2.height, 0)
 
     def loop(numberBack: Int, otherChain: EncryHeaderChain): (EncryHeaderChain, EncryHeaderChain) = {
-      val r = commonBlockThenSuffixes(otherChain, header1, numberBack)
+      val r = commonBlockThenSuffixes(otherChain, header1, numberBack + heightDelta)
       if (r._1.head == r._2.head) {
         r
       } else {
