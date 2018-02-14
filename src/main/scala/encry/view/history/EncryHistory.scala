@@ -10,6 +10,7 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings._
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
+import encry.view.history.storage.{FileHistoryObjectsStore, HistoryStorage}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.ModifierId
 import scorex.core.consensus.History
@@ -155,6 +156,8 @@ object EncryHistory {
     historyDir.mkdirs()
 
     val db = new LSMStore(historyDir, keepVersions = 0)
+    val objectsStore = new FileHistoryObjectsStore(historyDir.getAbsolutePath)
+    val storage = new HistoryStorage(db, objectsStore)
 
     val _nodeSettings = settings.nodeSettings
 
@@ -164,19 +167,19 @@ object EncryHistory {
         new EncryHistory with ADStateProofProcessor with BlockPayloadProcessor {
           override protected val chainSettings: ChainSettings = settings.chainSettings
           override protected val nodeSettings: NodeSettings = _nodeSettings
-          override protected val storage: Store = db
+          override protected val historyStorage: HistoryStorage = storage
         }
       case (false, true) =>
         new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
           override protected val chainSettings: ChainSettings = settings.chainSettings
           override protected val nodeSettings: NodeSettings = _nodeSettings
-          override protected val storage: Store = db
+          override protected val historyStorage: HistoryStorage = storage
         }
       case (true, false) =>
         new EncryHistory with ADStateProofProcessor with EmptyBlockPayloadProcessor {
           override protected val chainSettings: ChainSettings = settings.chainSettings
           override protected val nodeSettings: NodeSettings = _nodeSettings
-          override protected val storage: Store = db
+          override protected val historyStorage: HistoryStorage = storage
         }
       case m =>
         throw new Error(s"Unsupported settings combination ADState==${m._1}, verifyTransactions==${m._2}, ")

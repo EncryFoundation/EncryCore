@@ -47,7 +47,7 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition
 
   def putTransaction(tx: EncryBaseTransaction): Unit = {
     if(getTransactionById(tx.id).isEmpty){
-      val txIdsRaw = getRawValue(transactionIdsKey).getOrElse(Array[Byte]())
+      val txIdsRaw = get(transactionIdsKey).getOrElse(Array[Byte]())
       nonVersionedUpdateWithReplacement(Seq(transactionIdsKey),
         Seq(transactionIdsKey -> ByteArrayWrapper(txIdsRaw ++ tx.id)))
       nonVersionedInsert(Seq(txKeyById(tx.id) -> ByteArrayWrapper(tx.bytes)))

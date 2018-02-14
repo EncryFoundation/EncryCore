@@ -104,11 +104,12 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
     .foreach(h => pruneBlockDataAt(Seq(h - nodeSettings.blocksToKeep)))
 
   private def pruneBlockDataAt(heights: Seq[Int]): Try[Unit] = Try {
-    val mid: ModifierId = ModifierId @@ Algos.hash(heights.flatMap(_.toString.getBytes).toArray)
-    val toRemove: Seq[ByteArrayWrapper] = heights.flatMap(h => headerIdsAtHeight(h))
-      .flatMap(id => typedModifierById[EncryBlockHeader](id))
-      .flatMap(h => Seq(ByteArrayWrapper(h.adProofsId), ByteArrayWrapper(h.payloadId)))
-    historyStorage.update(mid, toRemove, Seq())
+    val toRemove: Seq[ModifierId] = heights.flatMap(h => headerIdsAtHeight(h))
+      .flatMap { id => typedModifierById[EncryBlockHeader](id) }
+      .flatMap { h =>
+        Seq(h.adProofsId, h.payloadId)
+      }
+    historyStorage.removeObjects(toRemove)
   }
 
   private def updateStorage(newModRow: (ByteArrayWrapper, ByteArrayWrapper),

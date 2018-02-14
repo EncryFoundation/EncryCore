@@ -69,8 +69,8 @@ trait BlockHeaderProcessor extends ScorexLogging {
     * @return ProgressInfo - info required for State to be consistent with History
     */
   protected def process(header: EncryBlockHeader): History.ProgressInfo[EncryPersistentModifier] = {
-    val dataToInsert = toInsert(header)
-    historyStorage.insert(header.id, dataToInsert)
+    val dataToInsert = getDataToInsert(header)
+    historyStorage.bulkInsert(header.id, dataToInsert._1, Seq(dataToInsert._2))
     val score = scoreOf(header.id).getOrElse(-1)
 
     if (bestHeaderIdOpt.isEmpty) {
@@ -119,15 +119,15 @@ trait BlockHeaderProcessor extends ScorexLogging {
     }
   }
 
-  private def toInsert(header: EncryBlockHeader): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
+  private def getDataToInsert(header: EncryBlockHeader): (Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier) = {
     val requiredDifficulty: Difficulty = header.difficulty
     if (header.isGenesis) {
-      Seq(
-        ByteArrayWrapper(header.id) -> ByteArrayWrapper(HistoryModifierSerializer.toBytes(header)),
+      (Seq(
         BestHeaderKey -> ByteArrayWrapper(header.id),
         heightIdsKey(ChainSettings.genesisHeight) -> ByteArrayWrapper(header.id),
         headerHeightKey(header.id) -> ByteArrayWrapper(Ints.toByteArray(ChainSettings.genesisHeight)),
-        headerScoreKey(header.id) -> ByteArrayWrapper(requiredDifficulty.toByteArray))
+        headerScoreKey(header.id) -> ByteArrayWrapper(requiredDifficulty.toByteArray)),
+        header)
     } else {
       val blockScore = scoreOf(header.parentId).get + requiredDifficulty
       val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
@@ -152,8 +152,8 @@ trait BlockHeaderProcessor extends ScorexLogging {
         // Orphaned block. Put id to the end
         Seq(heightIdsKey(header.height) -> ByteArrayWrapper((headerIdsAtHeight(header.height) :+ header.id).flatten.toArray))
       }
-      val modifierRow = ByteArrayWrapper(header.id) -> ByteArrayWrapper(HistoryModifierSerializer.toBytes(header))
-      Seq(scoreRow, heightRow, modifierRow) ++ bestRow ++ headerIdsRow
+
+      (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
     }
   }
 

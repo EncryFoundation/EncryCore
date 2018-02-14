@@ -29,10 +29,6 @@ trait EncryHistoryReader
   protected val chainSettings: ChainSettings
   protected val nodeSettings: NodeSettings
 
-  protected val storage: Store
-
-  override protected lazy val historyStorage: HistoryStorage = new HistoryStorage(storage)
-
   /**
     * Is there's no history, even genesis block
     */
@@ -214,6 +210,9 @@ trait EncryHistoryReader
     }
   }
 
+  /**
+    * Finds common block and subchains from common block to header1 and header2.
+    */
   protected[history] def commonBlockThenSuffixes(header1: EncryBlockHeader,
                                                  header2: EncryBlockHeader): (EncryHeaderChain, EncryHeaderChain) = {
     assert(contains(header1) && contains(header2), "Got non-existing header(s)")
