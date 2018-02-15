@@ -80,7 +80,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     */
   override def restoreState: Option[NodeView] = {
     EncryState.readOrGenerate(settings, Some(self)).map { stateIn =>
-      //todo: ensure that history is in certain mode
+      // TODO: Ensure that history is in certain mode
       val history = EncryHistory.readOrGenerate(settings)
       val wallet = EncryWallet.readOrGenerate(settings)
       val memPool = EncryMempool.empty(settings, timeProvider)

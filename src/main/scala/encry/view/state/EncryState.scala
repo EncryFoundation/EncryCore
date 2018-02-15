@@ -62,15 +62,15 @@ object EncryState extends ScorexLogging{
 
   lazy val genesisStateVersion: VersionTag = VersionTag @@ Algos.hash(afterGenesisStateDigest.tail)
 
-  def getStateDir(settings: EncryAppSettings) = new File(s"${settings.directory}/state")
+  def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
-  def getIndexDir(settings: EncryAppSettings) = new File(s"${settings.directory}/index")
+  def getIndexDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/index")
 
   def genesisBoxes: IndexedSeq[OpenBox] = {
     lazy val genesisSeed = Long.MaxValue
     lazy val rndGen = new scala.util.Random(genesisSeed)
-    (0 until Constants.genesisBoxesQty).map(_ =>
-      OpenBox(HeightProposition(Height @@ -1), rndGen.nextLong(), 20L))
+    (0 until Constants.Chain.genesisBoxesQty).map(_ =>
+      OpenBox(HeightProposition(Height @@ -1), rndGen.nextLong(), Constants.Chain.genesisBoxesAmount))
   }
 
   def generateGenesisUtxoState(stateDir: File, indexDir: File,

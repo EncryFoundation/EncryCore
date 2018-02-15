@@ -1,7 +1,5 @@
 package encry.view.history.processors.proofs
 
-import java.awt.HeadlessException
-
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{ADProofs, HistoryModifierSerializer}
 import encry.modifiers.history.block.EncryBlock

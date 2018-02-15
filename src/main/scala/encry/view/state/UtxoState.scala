@@ -237,8 +237,8 @@ object UtxoState extends ScorexLogging {
   def create(stateDir: File, indexDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
     val stateStore = new LSMStore(stateDir, keepVersions = Constants.Store.stateKeepVersions)
     val indexStore = new LSMStore(indexDir, keepVersions = Constants.Store.indexKeepVersions)
-    val dbVersion = stateStore.get(ByteArrayWrapper(bestVersionKey)).map( _.data)
-    new UtxoState(VersionTag @@ dbVersion.getOrElse(EncryState.genesisStateVersion),
+    val stateVersion = stateStore.get(ByteArrayWrapper(bestVersionKey)).map( _.data)
+    new UtxoState(VersionTag @@ stateVersion.getOrElse(EncryState.genesisStateVersion),
       stateStore, indexStore, nodeViewHolderRef)
   }
 
@@ -269,8 +269,9 @@ object UtxoState extends ScorexLogging {
   }
 
   def newOpenBoxAt(height: Height, seed: Long): OpenBox = {
-    val perBlockEmissionAmount = 2000L
-    OpenBox(HeightProposition(Height @@ (height + Constants.coinbaseHeightLock)),
+    val perBlockEmissionAmount: Long =
+      ((height / Constants.Chain.deflationInterval).floor * Constants.Chain.deflationFactor).toLong
+    OpenBox(HeightProposition(Height @@ (height + Constants.Chain.coinbaseHeightLock)),
       seed * height, perBlockEmissionAmount)
   }
 }
