@@ -46,7 +46,7 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
     nonce = nonceFromDigest(Algos.hash(txHash)),
     amount = amount)) else None
 
-  override val newBoxes: Traversable[EncryBaseBox] = {
+  override val newBoxes: Seq[EncryBaseBox] = {
     val openBox = UtxoState.newOpenBoxAt(height, seed = timestamp * length)
     commissionBox.map(cbx => Seq(openBox, cbx)).getOrElse(Seq(openBox))
   }
