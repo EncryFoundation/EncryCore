@@ -57,7 +57,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
       case (Some(prevBest), _, Some(score)) if header.parentId sameElements prevBest.header.id =>
         log.info(s"New best full block with header ${bestHeaderNew.encodedId}. " +
           s"Height = ${bestHeaderNew.height}, score = $score")
-        if (nodeSettings.blocksToKeep >= 0) pruneOnNewBestBlock(header)
+        if (nodeSettings.blocksToKeep >= 0) clipHistoryOnNewBestBlock(header)
         updateStorage(newModRow, storageVersion, block, bestHeaderNew.id)
 
       case (Some(prevBest), Some(prevBestScore), Some(score)) if score > prevBestScore =>
@@ -75,7 +75,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
             val bestHeight: Int = bestHeaderNew.height
             val diff = bestHeaderNew.height - prevBest.header.height
             val lastKept = bestHeight - nodeSettings.blocksToKeep
-            pruneBlockDataAt(((lastKept - diff) until lastKept).filter(_ >= 0))
+            clipHistoryDataAt(((lastKept - diff) until lastKept).filter(_ >= 0))
           }
           ProgressInfo(Some(prevChain.head.id), toRemove, toApply.headOption, Seq.empty)
         } else {
@@ -93,11 +93,11 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
     }
   }
 
-  private def pruneOnNewBestBlock(header: EncryBlockHeader): Unit =
+  private def clipHistoryOnNewBestBlock(header: EncryBlockHeader): Unit =
     heightOf(header.id).filter(h => h > nodeSettings.blocksToKeep)
-    .foreach(h => pruneBlockDataAt(Seq(h - nodeSettings.blocksToKeep)))
+    .foreach(h => clipHistoryDataAt(Seq(h - nodeSettings.blocksToKeep)))
 
-  private def pruneBlockDataAt(heights: Seq[Int]): Try[Unit] = Try {
+  private def clipHistoryDataAt(heights: Seq[Int]): Try[Unit] = Try {
     val toRemove: Seq[ModifierId] = heights.flatMap(h => headerIdsAtHeight(h))
       .flatMap { id => typedModifierById[EncryBlockHeader](id) }
       .flatMap { h =>
