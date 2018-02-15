@@ -5,7 +5,6 @@ import encry.modifiers.history._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.settings.Algos
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
 import scorex.core.consensus.History.ProgressInfo
@@ -18,84 +17,79 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
   /**
     * Id of header that contains transactions and proofs
     */
-  override def bestFullBlockIdOpt: Option[ModifierId] =
-    historyStorage.db.get(BestFullBlockKey).map(ModifierId @@ _.data)
+  override def bestFullBlockIdOpt: Option[ModifierId] = historyStorage.get(BestFullBlockKey).map(ModifierId @@ _)
 
   protected def getFullBlock(h: EncryBlockHeader): Option[EncryBlock]
 
   protected def commonBlockThenSuffixes(header1: EncryBlockHeader,
                                         header2: EncryBlockHeader): (EncryHeaderChain, EncryHeaderChain)
 
-  protected[history] def continuationHeaderChains(header: EncryBlockHeader): Seq[EncryHeaderChain]
+  protected[history] def continuationHeaderChains(header: EncryBlockHeader,
+                                                  filterCond: EncryBlockHeader => Boolean): Seq[Seq[EncryBlockHeader]]
 
   /**
-    * Process full block when we have one.
+    * Processes EncryBlock.
     *
-    * @param fullBlock - block to process
-    * @param txsAreNew - flag, that transactions where added last
+    * @param block - block to process
+    * @param isNewerPayload - flag, that blockPayload where added last
     * @return ProgressInfo required for State to process to be consistent with History
     */
-  protected def processFullBlock(fullBlock: EncryBlock,
-                                 txsAreNew: Boolean): ProgressInfo[EncryPersistentModifier] = {
-    val header: EncryBlockHeader = fullBlock.header
-    val payload: EncryBlockPayload = fullBlock.payload
-     val adProofsOpt: Option[ADProofs] = fullBlock.adProofsOpt
-      .ensuring(_.isDefined || txsAreNew, "Only transactions can be new when proofs are empty")
-
-    val newModRow = if (txsAreNew) {
-      val pBefore = payload
-      val pAfter = HistoryModifierSerializer.parseBytes(HistoryModifierSerializer.toBytes(payload)).get
-      (ByteArrayWrapper(payload.id), ByteArrayWrapper(HistoryModifierSerializer.toBytes(payload)))
-    } else {
-      (ByteArrayWrapper(adProofsOpt.get.id), ByteArrayWrapper(HistoryModifierSerializer.toBytes(adProofsOpt.get)))
-    }
-    val storageVersion = if (txsAreNew) payload.id else adProofsOpt.get.id
-
-    val continuations = continuationHeaderChains(header).map(_.headers.tail)
+  protected def processBlock(block: EncryBlock,
+                             isNewerPayload: Boolean): ProgressInfo[EncryPersistentModifier] = {
+    val header: EncryBlockHeader = block.header
+    val blockPayload: EncryBlockPayload = block.payload
+    val adProofsOpt: Option[ADProofs] = block.adProofsOpt
+      .ensuring(_.isDefined || isNewerPayload, "Only block payload can be new when proofs are empty")
+    val newModRow = if (isNewerPayload) blockPayload else adProofsOpt.get
+    val storageVersion = ByteArrayWrapper(if (isNewerPayload) blockPayload.id else adProofsOpt.get.id)
+    val continuations = continuationHeaderChains(header, _ => true).map(_.tail)
     val bestFullChain = continuations.map(hc => hc.map(getFullBlock).takeWhile(_.isDefined).flatten.map(_.header))
       .map(c => header +: c)
       .maxBy(c => scoreOf(c.last.id))
 
-    val bestChainNew = bestFullChain.last
+    val bestHeaderNew = bestFullChain.last
 
-    (bestFullBlockOpt, bestFullBlockIdOpt.flatMap(scoreOf), scoreOf(bestChainNew.id)) match {
-      case (None, _, _) if nodeSettings.blocksToKeep < 0 && header.isGenesis =>
-        log.info(s"Initialize full block chain with genesis header ${header.encodedId} with transactions and proofs")
-        updateStorage(newModRow, storageVersion, fullBlock, fullBlock.header.id)
-      case (None, _, _) if nodeSettings.blocksToKeep >= 0 =>
-        log.info(s"Initialize full block chain with new best header ${header.encodedId} with transactions and proofs")
-        updateStorage(newModRow, storageVersion, fullBlock, fullBlock.header.id)
+    (bestFullBlockOpt, bestFullBlockIdOpt.flatMap(scoreOf), scoreOf(bestHeaderNew.id)) match {
+      case (None, _, _) if header.isGenesis =>
+        log.info(s"Initialize block chain with genesis header ${bestHeaderNew.encodedId} with transactions and proofs")
+        updateStorage(newModRow, storageVersion, block, bestHeaderNew.id)
+
       case (Some(prevBest), _, Some(score)) if header.parentId sameElements prevBest.header.id =>
-        log.info(s"New best full block with header ${bestChainNew.encodedId}. " +
-          s"Height = ${bestChainNew.height}, score = $score")
+        log.info(s"New best full block with header ${bestHeaderNew.encodedId}. " +
+          s"Height = ${bestHeaderNew.height}, score = $score")
         if (nodeSettings.blocksToKeep >= 0) pruneOnNewBestBlock(header)
-        updateStorage(newModRow, storageVersion, fullBlock, bestChainNew.id)
+        updateStorage(newModRow, storageVersion, block, bestHeaderNew.id)
 
       case (Some(prevBest), Some(prevBestScore), Some(score)) if score > prevBestScore =>
-        //TODO currentScore == prevBestScore
         val (prevChain, newChain) = commonBlockThenSuffixes(prevBest.header, header)
         val toRemove: Seq[EncryBlock] = prevChain.tail.headers.flatMap(getFullBlock)
-        if(toRemove.nonEmpty) {
-          log.info(s"Process fork for new best full block with header ${bestChainNew.encodedId}. " +
-            s"Height = ${bestChainNew.height}, score = $score")
-          updateStorage(newModRow, storageVersion, fullBlock, bestChainNew.id)
+        val toApply: Seq[EncryBlock] = newChain.tail.headers
+          .flatMap(h => if(h == block.header) Some(block) else getFullBlock(h))
+
+        if (toApply.lengthCompare(newChain.length - 1) == 0) {
+          log.info(s"Process fork for new best full block with header ${bestHeaderNew.encodedId}. " +
+            s"Height = ${bestHeaderNew.height}, score = $score")
+          updateStorage(newModRow, storageVersion, block, bestHeaderNew.id)
 
           if (nodeSettings.blocksToKeep >= 0) {
-            val bestHeight: Int = bestChainNew.height
-            val diff = bestChainNew.height - prevBest.header.height
+            val bestHeight: Int = bestHeaderNew.height
+            val diff = bestHeaderNew.height - prevBest.header.height
             val lastKept = bestHeight - nodeSettings.blocksToKeep
             pruneBlockDataAt(((lastKept - diff) until lastKept).filter(_ >= 0))
           }
-          ProgressInfo(Some(getFullBlock(prevChain.head).get.id), toRemove, Some(getFullBlock(newChain(1)).get), Seq())
+          ProgressInfo(Some(prevChain.head.id), toRemove, toApply.headOption, Seq.empty)
         } else {
           log.info(s"Got transactions and proofs for header ${header.encodedId} with no connection to genesis")
-          historyStorage.insert(storageVersion, Seq(newModRow))
-          ProgressInfo(None, Seq(), None, Seq())
+          historyStorage.bulkInsert(storageVersion, Seq.empty, Seq(newModRow))
+          ProgressInfo(None, Seq.empty, None, Seq.empty)
         }
+
+      // TODO: currentScore == prevBestScore
+
       case _ =>
         log.info(s"Got transactions and proofs for non-best header ${header.encodedId}")
-        historyStorage.insert(storageVersion, Seq(newModRow))
-        ProgressInfo(None, Seq(), None, Seq())
+        historyStorage.bulkInsert(storageVersion, Seq.empty, Seq(newModRow))
+        ProgressInfo(None, Seq.empty, None, Seq.empty)
     }
   }
 
@@ -112,11 +106,11 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
     historyStorage.removeObjects(toRemove)
   }
 
-  private def updateStorage(newModRow: (ByteArrayWrapper, ByteArrayWrapper),
-                            storageVersion: ModifierId,
+  private def updateStorage(newModRow: EncryPersistentModifier,
+                            storageVersion: ByteArrayWrapper,
                             toApply: EncryBlock,
                             bestFullHeaderId: ModifierId): ProgressInfo[EncryPersistentModifier] = {
-    historyStorage.insert(storageVersion, Seq(newModRow, (BestFullBlockKey, ByteArrayWrapper(bestFullHeaderId))))
-    ProgressInfo(None, Seq(), Some(toApply), Seq())
+    historyStorage.bulkInsert(storageVersion, Seq((BestFullBlockKey, ByteArrayWrapper(bestFullHeaderId))), Seq(newModRow))
+    ProgressInfo(None, Seq.empty, Some(toApply), Seq.empty)
   }
 }

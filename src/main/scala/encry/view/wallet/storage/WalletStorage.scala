@@ -36,10 +36,10 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition
     new ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
 
   def getBoxIds: Seq[ADKey] =
-    getAndUnpackComplexValue(boxIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
+    parseComplexValue(boxIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
 
   def getTransactionIds: Seq[ModifierId] =
-    getAndUnpackComplexValue(transactionIdsKey, 32).map(ModifierId @@ _).getOrElse(Seq())
+    parseComplexValue(transactionIdsKey, 32).map(ModifierId @@ _).getOrElse(Seq())
 
   def updateBalance(newBalance: Long): Unit =
     nonVersionedUpdateWithReplacement(Seq(balanceKey),

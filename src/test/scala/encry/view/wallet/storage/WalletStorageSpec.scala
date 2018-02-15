@@ -23,7 +23,7 @@ class WalletStorageSpec extends PropSpec with Matchers {
 
     walletStorage.db.update(Random.nextLong(), Seq(), Seq(key -> packedValues))
 
-    val valuesUnpacked = walletStorage.getAndUnpackComplexValue(key, 32).get
+    val valuesUnpacked = walletStorage.parseComplexValue(key, 32).get
 
     values.size shouldEqual valuesUnpacked.size
 

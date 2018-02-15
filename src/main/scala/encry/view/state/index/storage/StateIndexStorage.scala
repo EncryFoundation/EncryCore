@@ -11,7 +11,7 @@ import scorex.crypto.authds.ADKey
 class StateIndexStorage(val db: Store) extends EncryBaseStorage {
 
   def boxIdsByAddress(addr: Address): Option[Seq[ADKey]] =
-    getAndUnpackComplexValue(StateIndexManager.keyByAddress(addr), 32).map(ADKey @@ _)
+    parseComplexValue(StateIndexManager.keyByAddress(addr), 32).map(ADKey @@ _)
 
   def updateWithReplacement(id: ModifierId,
                             idsToRemove: Seq[ByteArrayWrapper],

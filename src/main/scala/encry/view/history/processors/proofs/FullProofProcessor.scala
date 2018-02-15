@@ -23,10 +23,10 @@ trait FullProofProcessor extends BaseADProofProcessor with BlockProcessor {
       case Some(header: EncryBlockHeader) =>
         historyStorage.modifierById(header.payloadId) match {
           case Some(txs: EncryBlockPayload) if adState =>
-            processFullBlock(new EncryBlock(header, txs, Some(m)), txsAreNew = false)
+            processBlock(new EncryBlock(header, txs, Some(m)), isNewerPayload = false)
           case _ =>
             val modifierRow = Seq((ByteArrayWrapper(m.id), ByteArrayWrapper(HistoryModifierSerializer.toBytes(m))))
-            historyStorage.insert(m.id, modifierRow)
+            historyStorage.insert(ByteArrayWrapper(m.id), modifierRow)
             ProgressInfo(None, Seq(), None, Seq())
         }
       case _ =>
@@ -36,7 +36,7 @@ trait FullProofProcessor extends BaseADProofProcessor with BlockProcessor {
 
   // TODO: Replace usage of `require()`.
   override protected def validate(m: ADProofs): Try[Unit] = Try {
-    require(!historyStorage.contains(m.id), s"Modifier $m is already in history")
+    require(!historyStorage.containsObject(m.id), s"Modifier $m is already in history")
     historyStorage.modifierById(m.headerId) match {
       case Some(header: EncryBlockHeader) =>
         require(header.adProofsRoot sameElements m.digest,

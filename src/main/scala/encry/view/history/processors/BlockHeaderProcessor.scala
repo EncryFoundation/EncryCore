@@ -29,6 +29,8 @@ trait BlockHeaderProcessor extends ScorexLogging {
   // TODO: Move consensus selection to the settings.
   protected lazy val consensusAlgo = new PowConsensus(chainSettings)
 
+  protected val charsetName: String = "UTF-8"
+
   protected val BestHeaderKey: ByteArrayWrapper =
     ByteArrayWrapper(Array.fill(hashLength)(EncryBlockHeader.modifierTypeId))
 
@@ -38,17 +40,20 @@ trait BlockHeaderProcessor extends ScorexLogging {
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
-  protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage.db.get(BestHeaderKey).map(ModifierId @@ _.data)
+  protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
 
   def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity.Value
 
   private def heightIdsKey(height: Int): ByteArrayWrapper = ByteArrayWrapper(Algos.hash(Ints.toByteArray(height)))
 
-  protected def headerScoreKey(id: ModifierId): ByteArrayWrapper = ByteArrayWrapper(Algos.hash("score".getBytes ++ id))
+  protected def headerScoreKey(id: ModifierId): ByteArrayWrapper =
+    ByteArrayWrapper(Algos.hash("score".getBytes(charsetName) ++ id))
 
-  protected def headerHeightKey(id: ModifierId): ByteArrayWrapper = ByteArrayWrapper(Algos.hash("height".getBytes ++ id))
+  protected def headerHeightKey(id: ModifierId): ByteArrayWrapper =
+    ByteArrayWrapper(Algos.hash("height".getBytes(charsetName) ++ id))
 
-  protected def validityKey(id: Array[Byte]): ByteArrayWrapper = ByteArrayWrapper(Algos.hash("validity".getBytes ++ id))
+  protected def validityKey(id: Array[Byte]): ByteArrayWrapper =
+    ByteArrayWrapper(Algos.hash("validity".getBytes(charsetName) ++ id))
 
   // Defined if `scorex.core.consensus.HistoryReader`.
   def contains(id: ModifierId): Boolean
@@ -66,11 +71,16 @@ trait BlockHeaderProcessor extends ScorexLogging {
   def bestHeaderHeight: Int = bestHeaderIdOpt.flatMap(id => heightOf(id)).getOrElse(-1)
 
   /**
+    * @return height of best header with transacions and proofs
+    */
+  def bestFullBlockHeight: Int = bestFullBlockIdOpt.flatMap(id => heightOf(id)).getOrElse(-1)
+
+  /**
     * @return ProgressInfo - info required for State to be consistent with History
     */
   protected def process(header: EncryBlockHeader): History.ProgressInfo[EncryPersistentModifier] = {
     val dataToInsert = getDataToInsert(header)
-    historyStorage.bulkInsert(header.id, dataToInsert._1, Seq(dataToInsert._2))
+    historyStorage.bulkInsert(ByteArrayWrapper(header.id), dataToInsert._1, Seq(dataToInsert._2))
     val score = scoreOf(header.id).getOrElse(-1)
 
     if (bestHeaderIdOpt.isEmpty) {
@@ -120,16 +130,16 @@ trait BlockHeaderProcessor extends ScorexLogging {
   }
 
   private def getDataToInsert(header: EncryBlockHeader): (Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier) = {
-    val requiredDifficulty: Difficulty = header.difficulty
+    val difficulty = header.difficulty
     if (header.isGenesis) {
       (Seq(
         BestHeaderKey -> ByteArrayWrapper(header.id),
         heightIdsKey(ChainSettings.genesisHeight) -> ByteArrayWrapper(header.id),
         headerHeightKey(header.id) -> ByteArrayWrapper(Ints.toByteArray(ChainSettings.genesisHeight)),
-        headerScoreKey(header.id) -> ByteArrayWrapper(requiredDifficulty.toByteArray)),
+        headerScoreKey(header.id) -> ByteArrayWrapper(difficulty.toByteArray)),
         header)
     } else {
-      val blockScore = scoreOf(header.parentId).get + requiredDifficulty
+      val blockScore = scoreOf(header.parentId).get + difficulty
       val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
         if (blockScore > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(header.id)) else Seq()
 
@@ -149,7 +159,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
         }
         forkIds :+ self
       } else {
-        // Orphaned block. Put id to the end
+        // Orphaned block. Put its ID to the end.
         Seq(heightIdsKey(header.height) -> ByteArrayWrapper((headerIdsAtHeight(header.height) :+ header.id).flatten.toArray))
       }
 
@@ -170,7 +180,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
   protected def reportInvalid(header: EncryBlockHeader): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
 
     val modifierId = header.id
-    val payloadModifiers = Seq(header.payloadId, header.adProofsId).filter(id => historyStorage.contains(id))
+    val payloadModifiers = Seq(header.payloadId, header.adProofsId).filter(id => historyStorage.containsObject(id))
       .map(id => ByteArrayWrapper(id))
 
     val toRemove = Seq(headerScoreKey(modifierId), ByteArrayWrapper(modifierId)) ++ payloadModifiers
@@ -193,15 +203,10 @@ trait BlockHeaderProcessor extends ScorexLogging {
 
   private def bestHeadersChainScore: BigInt = scoreOf(bestHeaderIdOpt.get).get
 
-  protected def scoreOf(id: ModifierId): Option[BigInt] =
-    historyStorage.db
-      .get(headerScoreKey(id))
-      .map(b => BigInt(b.data))
+  protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))
 
-  def heightOf(id: ModifierId): Option[Height] =
-    historyStorage.db
-      .get(headerHeightKey(id))
-      .map(b => Height @@ Ints.fromByteArray(b.data))
+  def heightOf(id: ModifierId): Option[Height] = historyStorage.get(headerHeightKey(id))
+    .map(d => Height @@ Ints.fromByteArray(d))
 
   /**
     * @param height - block height
@@ -241,6 +246,21 @@ trait BlockHeaderProcessor extends ScorexLogging {
 
     if (bestHeaderIdOpt.isEmpty || (limit == 0)) EncryHeaderChain(Seq())
     else EncryHeaderChain(loop(startHeader, Seq(startHeader)).reverse)
+  }
+
+  /**
+    * Find first header with the best height <= $height which id satisfies condition $p
+    * @param height - start height
+    * @param p - condition to satisfy
+    * @return found header
+    */
+  @tailrec
+  protected final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[EncryBlockHeader] = {
+    headerIdsAtHeight(height).find(id => p(id)).flatMap(id => typedModifierById[EncryBlockHeader](id)) match {
+      case Some(header) => Some(header)
+      case None if height > 0 => loopHeightDown(height - 1, p)
+      case None => None
+    }
   }
 
   def requiredDifficultyAfter(parent: EncryBlockHeader): Difficulty = {

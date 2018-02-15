@@ -25,7 +25,7 @@ class HistoryStorage(val db: Store, val objectsStore: ObjectsStore) extends Encr
   def insertObjects(objectsToInsert: Seq[EncryPersistentModifier]): Unit =
     objectsToInsert.foreach(o => objectsStore.put(o))
 
-  def bulkInsert(version: Array[Byte],
+  def bulkInsert(version: ByteArrayWrapper,
                  indexesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)],
                  objectsToInsert: Seq[EncryPersistentModifier]): Unit = {
     insertObjects(objectsToInsert)

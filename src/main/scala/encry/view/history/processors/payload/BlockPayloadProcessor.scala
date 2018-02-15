@@ -24,12 +24,12 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
       case Some(header: EncryBlockHeader) =>
         historyStorage.modifierById(header.adProofsId) match {
           case Some(adProof: ADProofs) =>
-            processFullBlock(new EncryBlock(header, txs, Some(adProof)), txsAreNew = true)
+            processBlock(new EncryBlock(header, txs, Some(adProof)), isNewerPayload = true)
           case None if !adState =>
-            processFullBlock(new EncryBlock(header, txs, None), txsAreNew = true)
+            processBlock(new EncryBlock(header, txs, None), isNewerPayload = true)
           case _ =>
             val modifierRow = Seq((ByteArrayWrapper(txs.id), ByteArrayWrapper(HistoryModifierSerializer.toBytes(txs))))
-            historyStorage.insert(txs.id, modifierRow)
+            historyStorage.insert(ByteArrayWrapper(txs.id), modifierRow)
             ProgressInfo(None, Seq(), None, Seq())
         }
       case _ =>
@@ -39,7 +39,7 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
 
   override protected def validate(m: EncryBlockPayload): Try[Unit] = Try {
 
-    if (historyStorage.contains(m.id))
+    if (historyStorage.containsObject(m.id))
       Failure(new Error(s"Modifier $m is already in history"))
 
     historyStorage.modifierById(m.headerId) match {
