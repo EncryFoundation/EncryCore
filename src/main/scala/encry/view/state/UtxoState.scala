@@ -271,7 +271,7 @@ object UtxoState extends ScorexLogging {
   def newOpenBoxAt(height: Height, seed: Long): OpenBox = {
     val perBlockEmissionAmount: Long =
       if (height >= Constants.Chain.deflationInterval) {
-        (((height / Constants.Chain.deflationInterval).floor * Constants.Chain.deflationFactor) *
+        (scala.math.pow(Constants.Chain.deflationFactor, (height / Constants.Chain.deflationInterval).floor) *
           Constants.Chain.initialEmissionAmount).toLong
       } else Constants.Chain.initialEmissionAmount
     OpenBox(HeightProposition(Height @@ (height + Constants.Chain.coinbaseHeightLock)),
