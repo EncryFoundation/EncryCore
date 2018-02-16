@@ -3,6 +3,8 @@ package encry.view
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.core.utils.ScorexLogging
 
+import scala.util.Random
+
 trait EncryBaseStorage extends AutoCloseable with ScorexLogging {
 
   val db: Store
@@ -10,6 +12,13 @@ trait EncryBaseStorage extends AutoCloseable with ScorexLogging {
   def insert(version: ByteArrayWrapper,
              toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit =
     db.update(version, Seq.empty, toInsert)
+
+  def updateWithReplacement(version: ByteArrayWrapper,
+                            idsToReplace: Seq[ByteArrayWrapper],
+                            toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit = {
+    db.update(Random.nextLong(), idsToReplace, Seq())
+    db.update(version, Seq(), toInsert)
+  }
 
   def get(key: ByteArrayWrapper): Option[Array[Byte]] = db.get(key).map(_.data)
 

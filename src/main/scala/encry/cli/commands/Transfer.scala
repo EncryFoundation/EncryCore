@@ -26,7 +26,7 @@ object Transfer extends Command {
 
   /**
     * Command "wallet -transfer=toAddress;Fee;Amount"
-    * Example "wallet -transfer=3Y49ihvfesPcSfCxRLW4q4jjwzJhkFS8tFdN6KWMgcHSUvcngy;10;100"
+    * Example "wallet -transfer=31sVyJTL5nAaxogr1TBV7Y8tCDBwAaruGMQPAp1Qv7ZvSrjDHN;10;100"
     *
     * @param nodeViewHolderRef
     * @param args

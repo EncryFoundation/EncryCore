@@ -11,7 +11,7 @@ import encry.settings._
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
 import encry.view.history.storage.{FileHistoryObjectsStore, HistoryStorage}
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import scorex.core.ModifierId
 import scorex.core.consensus.History
 import scorex.core.consensus.History.ProgressInfo

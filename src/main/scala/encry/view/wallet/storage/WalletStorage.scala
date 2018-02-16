@@ -17,6 +17,11 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition
 
   import WalletStorage._
 
+  def updateWithReplacement(id: ModifierId,
+                            idsToReplace: Seq[ByteArrayWrapper],
+                            toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit =
+    updateWithReplacement(ByteArrayWrapper(id), idsToReplace, toInsert)
+
   def nonVersionedUpdateWithReplacement(idsToRemove: Seq[ByteArrayWrapper],
                                         toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit = {
     db.update(Random.nextLong(), idsToRemove, Seq())
@@ -35,6 +40,9 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition
   def packBoxIds(ids: Seq[ADKey]): ByteArrayWrapper =
     new ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
 
+  def packTransactionIds(ids: Seq[ModifierId]): ByteArrayWrapper =
+    new ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
+
   def getBoxIds: Seq[ADKey] =
     parseComplexValue(boxIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
 
@@ -46,7 +54,7 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition
       Seq(balanceKey -> ByteArrayWrapper(Longs.toByteArray(newBalance))))
 
   def putTransaction(tx: EncryBaseTransaction): Unit = {
-    if(getTransactionById(tx.id).isEmpty){
+    if(getTransactionById(tx.id).isEmpty) {
       val txIdsRaw = get(transactionIdsKey).getOrElse(Array[Byte]())
       nonVersionedUpdateWithReplacement(Seq(transactionIdsKey),
         Seq(transactionIdsKey -> ByteArrayWrapper(txIdsRaw ++ tx.id)))
