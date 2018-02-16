@@ -7,7 +7,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.AddressProposition
 import encry.modifiers.state.box.{AmountCarryingBox, EncryBaseBox}
-import encry.settings.EncryAppSettings
+import encry.settings.{Constants, EncryAppSettings}
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
@@ -92,13 +92,13 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
       walletStorage.packBoxIds(currentBxIds.filter(id =>
         !bxIdsToRemove.exists(_ sameElements id)) ++ bxsToInsert.map(_.id))
 
-    val newBlanceRaw = ByteArrayWrapper(Longs.toByteArray(getAvailableBoxes.filter(bx =>
+    val newBalanceRaw = ByteArrayWrapper(Longs.toByteArray(getAvailableBoxes.filter(bx =>
       !bxIdsToRemove.exists(_ sameElements bx.id)).foldLeft(0L)(_ + _.amount) +
         extractAcBxs(bxsToInsert).foldLeft(0L)(_ + _.amount)))
 
     val toRemoveSummary = bxIdsToRemove.map(boxKeyById) ++ Seq(balanceKey, transactionIdsKey, boxIdsKey)
     val toInsertSummary =
-      Seq(transactionIdsKey -> txIdsToInsertRaw, boxIdsKey -> bxIdsToInsertRaw, balanceKey -> newBlanceRaw) ++
+      Seq(transactionIdsKey -> txIdsToInsertRaw, boxIdsKey -> bxIdsToInsertRaw, balanceKey -> newBalanceRaw) ++
         bxsToInsert.map(bx => boxKeyById(bx.id) -> ByteArrayWrapper(bx.bytes)) ++
         newTxs.map(tx => txKeyById(tx.id) -> ByteArrayWrapper(tx.bytes))
 
@@ -115,7 +115,7 @@ object EncryWallet {
     val walletDir = getWalletDir(settings)
     walletDir.mkdirs()
 
-    val walletStore = new LSMStore(walletDir, keepVersions = 100)  // TODO: Move to constants.
+    val walletStore = new LSMStore(walletDir, keepVersions = Constants.Store.walletKeepVersions)
 
     new EncryWallet(walletStore, keyManager = KeyManager.readOrGenerate(settings))
   }

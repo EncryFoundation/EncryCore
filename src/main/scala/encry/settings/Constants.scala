@@ -34,9 +34,11 @@ object Constants {
   // TODO: Move to node settings.
   object Store {
 
-    val stateKeepVersions: Int = 200
+    val stateKeepVersions: Int = 100
 
-    val indexKeepVersions: Int = 200
+    val indexKeepVersions: Int = 100
+
+    val walletKeepVersions: Int = 100
 
     val stateStoreKeyLength: Int = 32
 
