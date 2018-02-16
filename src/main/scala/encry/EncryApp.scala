@@ -55,7 +55,7 @@ class EncryApp(args: Seq[String]) extends Application {
   override val apiRoutes: Seq[ApiRoute] = Seq(
     UtilsApiRoute(settings.restApi),
     PeersApiRoute(peerManagerRef, networkControllerRef, settings.restApi),
-    InfoApiRoute(readersHolderRef, minerRef, peerManagerRef, encrySettings.nodeSettings.ADState, settings.restApi, nodeId),
+    InfoApiRoute(readersHolderRef, minerRef, peerManagerRef, encrySettings, nodeId),
     HistoryApiRoute(readersHolderRef, minerRef, encrySettings, nodeId, encrySettings.nodeSettings.ADState),
     TransactionsApiRoute(readersHolderRef, nodeViewHolderRef, settings.restApi, encrySettings.nodeSettings.ADState),
     AccountInfoApiRoute(readersHolderRef, nodeViewHolderRef, settings.restApi, encrySettings.nodeSettings.ADState)

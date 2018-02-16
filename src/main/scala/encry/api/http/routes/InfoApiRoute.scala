@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.local.mining.EncryMiner.{MiningStatusRequest, MiningStatusResponse}
-import encry.settings.Algos
+import encry.settings.{Algos, EncryAppSettings}
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import io.circe.Json
 import io.circe.syntax._
@@ -18,9 +18,11 @@ import scala.concurrent.Future
 case class InfoApiRoute(readersHolder: ActorRef,
                         miner: ActorRef,
                         peerManager: ActorRef,
-                        digest: Boolean,
-                        override val settings: RESTApiSettings, nodeId: Array[Byte])
+                        appSettings: EncryAppSettings,
+                        nodeId: Array[Byte])
                        (implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
+
+  override val settings: RESTApiSettings = appSettings.scorexSettings.restApi
 
   override val route: Route = (path("info") & get) {
     val minerInfoF = getMinerInfo
@@ -31,13 +33,15 @@ case class InfoApiRoute(readersHolder: ActorRef,
       connectedPeers <- connectedPeersF
       readers <- readersF
     } yield {
-      InfoApiRoute.makeInfoJson(nodeId, minerInfo, connectedPeers, readers, getStateType)
+      InfoApiRoute.makeInfoJson(nodeId, minerInfo, connectedPeers, readers, getStateType, getNodeName)
     }).okJson()
   }
 
   private def getConnectedPeers: Future[Int] = (peerManager ? PeerManager.GetConnectedPeers).mapTo[Seq[Handshake]].map(_.size)
 
-  private def getStateType: String = if (digest) "digest" else "utxo"
+  private def getStateType: String = if (appSettings.nodeSettings.ADState) "digest" else "utxo"
+
+  private def getNodeName: String = appSettings.scorexSettings.network.nodeName
 
   private def getMinerInfo: Future[MiningStatusResponse] = (miner ? MiningStatusRequest).mapTo[MiningStatusResponse]
 }
@@ -48,13 +52,14 @@ object InfoApiRoute {
                    minerInfo: MiningStatusResponse,
                    connectedPeersLength: Int,
                    readers: Readers,
-                   stateType: String): Json = {
+                   stateType: String,
+                   nodeName: String): Json = {
     val stateVersion = readers.s.map(_.version).map(Algos.encode)
     val bestHeader = readers.h.flatMap(_.bestHeaderOpt)
     val bestFullBlock = readers.h.flatMap(_.bestFullBlockOpt)
     val unconfirmedCount = readers.m.map(_.size).getOrElse(0)
     Map(
-      "name" -> Algos.encode(nodeId).asJson,
+      "name" -> nodeName.asJson,
       "headersHeight" -> bestHeader.map(_.height).getOrElse(0).asJson,
       "fullHeight" -> bestFullBlock.map(_.header.height).getOrElse(0).asJson,
       "bestHeaderId" -> bestHeader.map(_.encodedId).getOrElse("null").asJson,
