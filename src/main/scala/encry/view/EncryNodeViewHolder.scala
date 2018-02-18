@@ -6,7 +6,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
-import encry.modifiers.mempool.{CoinbaseTransactionSerializer, EncryBaseTransaction}
+import encry.modifiers.mempool.{CoinbaseTransactionSerializer, EncryBaseTransaction, MempoolModifierSerializer}
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.{EncryHistory, EncrySyncInfo}
 import encry.view.mempool.EncryMempool
@@ -33,13 +33,11 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
   override type VL = EncryWallet
   override type MP = EncryMempool
 
-  // TODO: What about transactions of different types?
-  // TODO: We're likely to have to implement `modifierSerializer` item for each tx type.
   override lazy val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     EncryBlockHeader.modifierTypeId     -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId    -> EncryBlockPayloadSerializer,
     ADProofs.modifierTypeId             -> ADProofSerializer,
-    EncryBaseTransaction.ModifierTypeId -> CoinbaseTransactionSerializer
+    EncryBaseTransaction.ModifierTypeId -> MempoolModifierSerializer
   )
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -90,8 +88,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
   private def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): StateType = {
     val dir = EncryState.getStateDir(settings)
     dir.mkdirs()
-
-    if (dir.listFiles.nonEmpty) dir.listFiles.foreach(_.delete())
+    dir.listFiles.foreach(_.delete())
 
     {
       (version, digest) match {
@@ -104,22 +101,22 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
       .ensuring(_.rootHash sameElements digest.getOrElse(EncryState.afterGenesisStateDigest), "State root is incorrect")
   }
 
-  private def restoreConsistentState(state: StateType, history: EncryHistory): StateType = Try {
-    (state.version, history.bestBlockOpt, state) match {
+  private def restoreConsistentState(stateIn: StateType, history: EncryHistory): StateType = Try {
+    (stateIn.version, history.bestBlockOpt, stateIn) match {
       case (stateId, None, _) if stateId sameElements EncryState.genesisStateVersion =>
         log.debug("State and history are both empty on startup")
-        state
+        stateIn
       case (stateId, Some(block), _) if stateId sameElements block.id =>
         log.debug(s"State and history have the same version ${Algos.encode(stateId)}, no recovery needed.")
-        state
+        stateIn
       case (_, None, _) =>
         log.debug("State and history are inconsistent. History is empty on startup, rollback state to genesis.")
         getRecreatedState()
       case (_, Some(bestBlock), _: DigestState) =>
-        // Update state.digest only.
+        // Update state.digest.
         log.debug(s"State and history are inconsistent. Going to switch state to version ${bestBlock.encodedId}")
         getRecreatedState(Some(VersionTag @@ bestBlock.id), Some(bestBlock.header.stateRoot))
-      case (stateId, Some(historyBestBlock), state: StateType) =>
+      case (stateId, Some(historyBestBlock), state: StateType@unchecked) =>
         val stateBestHeaderOpt = history.typedModifierById[EncryBlockHeader](ModifierId @@ stateId)
         val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
         log.debug(s"State and history are inconsistent. Going to rollback to ${rollbackId.map(Algos.encode)} and " +
