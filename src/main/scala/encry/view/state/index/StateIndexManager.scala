@@ -135,7 +135,7 @@ trait StateIndexManager extends ScorexLogging {
   protected def rollbackIndex(to: VersionTag): Try[Unit] = {
     val wrappedVersion = ByteArrayWrapper(to)
     Try(indexStore.rollback(wrappedVersion))
-      .map(_ => indexStore.clean(Constants.Store.indexKeepVersions))
+      .map(_ => indexStore.clean(Constants.keepVersions))
   }
 }
 

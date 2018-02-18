@@ -153,7 +153,7 @@ class UtxoState(override val version: VersionTag,
             override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] = prover
           }
         }
-        stateStore.clean(Constants.Store.stateKeepVersions)
+        stateStore.clean(Constants.keepVersions)
         rollbackIndex(VersionTag @@ v.data)
         rollbackResult
       case None =>
@@ -232,8 +232,8 @@ object UtxoState extends ScorexLogging {
   private lazy val bestVersionKey = Algos.hash("best_state_version")
 
   def create(stateDir: File, indexDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val stateStore = new LSMStore(stateDir, keepVersions = Constants.Store.stateKeepVersions)
-    val indexStore = new LSMStore(indexDir, keepVersions = Constants.Store.indexKeepVersions)
+    val stateStore = new LSMStore(stateDir, keepVersions = Constants.keepVersions)
+    val indexStore = new LSMStore(indexDir, keepVersions = Constants.keepVersions)
     val stateVersion = stateStore.get(ByteArrayWrapper(bestVersionKey)).map( _.data)
     new UtxoState(VersionTag @@ stateVersion.getOrElse(EncryState.genesisStateVersion),
       stateStore, indexStore, nodeViewHolderRef)
@@ -252,8 +252,8 @@ object UtxoState extends ScorexLogging {
     val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = EncryBox.BoxIdSize, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
-    val stateStore = new LSMStore(stateDir, keepVersions = Constants.Store.stateKeepVersions)
-    val indexStore = new LSMStore(indexDir, keepVersions = Constants.Store.indexKeepVersions)
+    val stateStore = new LSMStore(stateDir, keepVersions = Constants.keepVersions)
+    val indexStore = new LSMStore(indexDir, keepVersions = Constants.keepVersions)
 
     log.info(s"Generating UTXO State from BH with ${bh.boxes.size} boxes")
 
