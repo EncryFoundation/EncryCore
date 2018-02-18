@@ -32,7 +32,6 @@ object Transfer extends Command {
     * @param args
     * @return
     */
-  // TODO: Input validation.
   override def execute(nodeViewHolderRef: ActorRef,
                        args: Array[String], settings: EncryAppSettings): Option[Response] = {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)

@@ -1,9 +1,10 @@
 package encry.local
 
-import akka.actor.{Actor, ActorRef, Cancellable}
+import akka.actor.{Actor, ActorRef, ActorRefFactory, Cancellable, Props}
 import encry.account.Address
-import encry.local.TransactionGenerator.{FetchBoxes, StartGeneration, StopGeneration}
+import encry.local.TransactionGenerator.{GeneratePaymentTransactions, StartGeneration, StopGeneration}
 import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
+import encry.modifiers.state.box.AssetBox
 import encry.settings.TestingSettings
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
@@ -12,8 +13,9 @@ import encry.view.wallet.EncryWallet
 import scorex.core.LocalInterface.LocallyGeneratedTransaction
 import scorex.core.NodeViewHolder.GetDataFromCurrentView
 import scorex.core.transaction.box.proposition.Proposition
-import scorex.core.transaction.state.{PrivateKey25519, PrivateKey25519Companion}
+import scorex.core.transaction.proof.Signature25519
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
+import scorex.crypto.signatures.Curve25519
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -26,53 +28,56 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings, time
 
   var isStarted = false
 
-  lazy val genesisSeed = Long.MaxValue
-  lazy val rndGen = new scala.util.Random(genesisSeed)
-
   private lazy val factory = TestHelper
-  private lazy val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath)
-
-  private var currentSlice = (0, 7)
-  private var txsGenerated = 0
 
   override def receive: Receive = {
     case StartGeneration =>
       if (!isStarted) {
         log.info("Starting transaction generation.")
-        context.system.scheduler.scheduleOnce(1500.millis)(self ! FetchBoxes)
+        context.system.scheduler.scheduleOnce(1500.millis)(self ! GeneratePaymentTransactions)
       }
 
-    case FetchBoxes =>
+    case GeneratePaymentTransactions =>
       viewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool,
-        Seq[EncryBaseTransaction]] { v =>
+        Seq[PaymentTransaction]] { v =>
         if (v.pool.size < settings.keepPoolSize) {
-          var keysSlice = Seq[PrivateKey25519]()
-          if (currentSlice._2 <= TestHelper.Props.keysQty) {
-            keysSlice = keys.slice(currentSlice._1, currentSlice._2)
-            txsGenerated += currentSlice._2 - currentSlice._1
-          } else {
-            keysSlice = keys.slice(currentSlice._1, TestHelper.Props.keysQty)
-            txsGenerated += TestHelper.Props.keysQty - currentSlice._1
-          }
-          val randShift = Random.nextInt(10) + 2
-          currentSlice = (currentSlice._2, currentSlice._2 + randShift)
-          keysSlice.map { key =>
-            val proposition = key.publicImage
-            val fee = factory.Props.txFee
+          (0 until settings.keepPoolSize - v.pool.size).map { _ =>
+            val pubKey = v.vault.publicKeys.head
+            val recipient = pubKey.address
+            val fee = 15L
+            val amount: Long = Random.nextInt(30) + 9
+            val proposition = v.vault.keyManager.keys.head.publicImage
             val timestamp = timeProvider.time()
-            val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
-            val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
-            val sig = PrivateKey25519Companion.sign(
-              key, PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs))
-            PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
+            if (v.vault.balance > 1000) {
+              // Generate valid txs if vault's balance is enough.
+              val boxes = v.vault.walletStorage.getAllBoxes.foldLeft(Seq[AssetBox]()) {
+                case (seq, box) => if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
+              }
+              val useBoxes = boxes.map(_.id).toIndexedSeq
+              val outputs = IndexedSeq(
+                (Address @@ recipient, amount),
+                (Address @@ proposition.address, boxes.map(_.amount).sum - (amount + fee)))
+              val sig = Signature25519(Curve25519.sign(
+                v.vault.keyManager.keys.head.privKeyBytes,
+                PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
+              ))
+
+              PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
+            } else {
+              // Generate semantically valid but stateful-invalid txs otherwise.
+              val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ pubKey.address)).map(_.id)
+              val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
+              val sig = Signature25519(Curve25519.sign(
+                v.vault.keyManager.keys.head.privKeyBytes,
+                PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
+              ))
+              PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
+            }
           }
         } else {
-          Seq()
+          Seq.empty
         }
       }
-      if (txsGenerated < TestHelper.Props.keysQty)
-        log.info(s"$txsGenerated transactions generated, repeating in 5sec ...")
-        context.system.scheduler.scheduleOnce(10.seconds)(self ! FetchBoxes)
 
     case txs: Seq[EncryBaseTransaction]@unchecked =>
       txs.foreach { tx =>
@@ -86,9 +91,20 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings, time
 
 object TransactionGenerator {
 
+  def props(viewHolder: ActorRef, settings: TestingSettings, timeProvider: NetworkTimeProvider): Props =
+    Props(new TransactionGenerator(viewHolder, settings, timeProvider))
+
+  def apply(viewHolder: ActorRef, settings: TestingSettings, timeProvider: NetworkTimeProvider)
+           (implicit context: ActorRefFactory): ActorRef =
+    context.actorOf(props(viewHolder, settings, timeProvider))
+
+  def apply(viewHolder: ActorRef, settings: TestingSettings, timeProvider: NetworkTimeProvider, name: String)
+           (implicit context: ActorRefFactory): ActorRef =
+    context.actorOf(props(viewHolder, settings, timeProvider), name)
+
   case object StartGeneration
 
-  case object FetchBoxes
+  case object GeneratePaymentTransactions
 
   case object StopGeneration
 }

@@ -48,8 +48,6 @@ class EncryApp(args: Seq[String]) extends Application {
   val minerRef: ActorRef =
     actorSystem.actorOf(Props(classOf[EncryMiner], nodeViewHolderRef, encrySettings, nodeId, timeProvider))
 
-  val cliListenerRef: ActorRef = actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolderRef, encrySettings))
-
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
 
   override val apiRoutes: Seq[ApiRoute] = Seq(
@@ -74,11 +72,13 @@ class EncryApp(args: Seq[String]) extends Application {
   }
 
   if (encrySettings.testingSettings.transactionGeneration) {
-    val txGen = actorSystem.actorOf(
-      Props(classOf[TransactionGenerator], nodeViewHolderRef, encrySettings.testingSettings, timeProvider))
+    val txGen =
+      actorSystem.actorOf(TransactionGenerator.props(nodeViewHolderRef, encrySettings.testingSettings, timeProvider))
     txGen ! StartGeneration
   }
 
+  val cliListenerRef: ActorRef =
+    actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolderRef, encrySettings))
   cliListenerRef ! StartListening
 }
 
