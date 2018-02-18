@@ -47,7 +47,7 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
 
   protected def initializeToDownload(): Unit = {
     viewHolderRef ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, MissedModifiers] { v =>
-      MissedModifiers(v.history.missedModifiersForFullChain())
+      MissedModifiers(v.history.missedModifiersForFullChain)
     }
   }
 

@@ -16,11 +16,11 @@ import scorex.core.transaction.box.proposition.{Proposition, PublicKey25519Propo
 import scorex.core.transaction.state.PrivateKey25519
 import scorex.core.transaction.wallet.Vault
 import scorex.core.utils.ScorexLogging
-import scorex.core.{ModifierId, TransactionsCarryingPersistentNodeViewModifier, VersionTag}
+import scorex.core.{ModifierId, VersionTag}
 import scorex.crypto.authds.ADKey
 
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.util.Try
 
 class EncryWallet(val walletStore: Store, val keyManager: KeyManager)

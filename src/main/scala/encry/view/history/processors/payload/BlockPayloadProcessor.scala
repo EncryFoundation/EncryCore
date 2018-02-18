@@ -47,7 +47,7 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
         if (!(header.txsRoot sameElements m.digest))
           Failure(new Error(s"Header transactions root ${Base58.encode(header.txsRoot)} differs from block transactions $m digest"))
 
-        bestFullBlockIdOpt match {
+        bestBlockIdOpt match {
           case None if nodeSettings.blocksToKeep < 0 =>
             if (!header.isGenesis)
               Failure(new Error("Trying to apply non-genesis block to empty history in fullnode mode"))

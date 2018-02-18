@@ -96,7 +96,7 @@ class EncryMiner(viewHolderRef: ActorRef,
       val pool = v.pool
       val vault = v.vault
 
-      val bestHeaderOpt = history.bestFullBlockOpt.map(_.header)
+      val bestHeaderOpt = history.bestBlockOpt.map(_.header)
 
       if ((bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) &&
         !pool.isEmpty &&

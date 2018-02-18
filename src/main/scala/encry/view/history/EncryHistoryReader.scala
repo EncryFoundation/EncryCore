@@ -9,8 +9,6 @@ import encry.settings.{ChainSettings, NodeSettings}
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
-import encry.view.history.storage.HistoryStorage
-import io.iohk.iodb.Store
 import scorex.core.consensus.History.{HistoryComparisonResult, ModifierIds}
 import scorex.core.consensus.{History, HistoryReader, ModifierSemanticValidity}
 import scorex.core.utils.ScorexLogging
@@ -45,8 +43,8 @@ trait EncryHistoryReader
     * Complete block of the best chain with transactions.
     * Always None for an SPV mode, Some(fullBLock) for fullnode regime after initial bootstrap.
     */
-  def bestFullBlockOpt: Option[EncryBlock] =
-    bestFullBlockIdOpt.flatMap(id => typedModifierById[EncryBlockHeader](id)).flatMap(getFullBlock)
+  def bestBlockOpt: Option[EncryBlock] =
+    bestBlockIdOpt.flatMap(id => typedModifierById[EncryBlockHeader](id)).flatMap(getBlock)
 
   /**
     * @return ids of count headers starting from offset
@@ -57,7 +55,7 @@ trait EncryHistoryReader
   /**
     * Id of best block to mine
     */
-  override def openSurfaceIds(): Seq[ModifierId] = bestFullBlockIdOpt.orElse(bestHeaderIdOpt).toSeq
+  override def openSurfaceIds(): Seq[ModifierId] = bestBlockIdOpt.orElse(bestHeaderIdOpt).toSeq
 
   // Compares node`s `SyncInfo` with another`s.
   override def compare(other: EncrySyncInfo): History.HistoryComparisonResult.Value = {
@@ -150,27 +148,25 @@ trait EncryHistoryReader
   def lastHeaders(count: Int): EncryHeaderChain = bestHeaderOpt
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(EncryHeaderChain.empty)
 
-  // Gets EncryPersistentModifier by it's id if it is in history.
   override def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
     historyStorage.modifierById(id) match {
       case Some(mod) if mod.id sameElements id => Some(mod)
       case _ => None
     }
 
-  // Gets EncryPersistentModifier of type T by it's id if it is in history.
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T] = modifierById(id) match {
     case Some(m: T@unchecked) if m.isInstanceOf[T] => Some(m)
     case _ => None
   }
 
-  def getFullBlock(header: EncryBlockHeader): Option[EncryBlock] = {
+  def getBlock(header: EncryBlockHeader): Option[EncryBlock] = {
     val aDProofs = typedModifierById[ADProofs](header.adProofsId)
     typedModifierById[EncryBlockPayload](header.payloadId).map { txs =>
       new EncryBlock(header, txs, aDProofs)
     }
   }
 
-  def missedModifiersForFullChain(): Seq[(ModifierTypeId, ModifierId)] = {
+  def missedModifiersForFullChain: Seq[(ModifierTypeId, ModifierId)] = {
     if (nodeSettings.verifyTransactions) {
       bestHeaderOpt.toSeq
         .flatMap(h => headerChainBack(bestHeaderHeight + 1, h, _ => false).headers)
@@ -182,14 +178,21 @@ trait EncryHistoryReader
     }
   }
 
-  def fullBlocksAfter(fromBlockOpt: Option[EncryBlock]): Try[Seq[EncryBlock]] = Try {
-    bestFullBlockOpt match {
-      case Some(bestFull) if !fromBlockOpt.contains(bestFull) =>
-        val until = (h: EncryBlockHeader) => fromBlockOpt.exists(fb => h.parentId sameElements fb.header.id)
-        headerChainBack(bestFull.header.height + 1, bestFull.header, until).headers
-          .map(h => getFullBlock(h).get)
-      case _ =>
-        Seq()
+  /**
+    * Return headers, required to apply to reach header2 if you are at header1 position.
+    *
+    * @param fromHeaderOpt - initial position
+    * @param toHeader - header you should reach
+    * @return (Modifier required to rollback first, header chain to apply)
+    */
+  def getChainToHeader(fromHeaderOpt: Option[EncryBlockHeader],
+                       toHeader: EncryBlockHeader): (Option[ModifierId], EncryHeaderChain) = {
+    fromHeaderOpt match {
+      case Some(h1) =>
+        val (prevChain, newChain) = commonBlockThenSuffixes(h1, toHeader)
+        (prevChain.headOption.map(_.id), newChain.tail)
+      case None =>
+        (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
     }
   }
 

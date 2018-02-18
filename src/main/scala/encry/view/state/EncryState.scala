@@ -90,23 +90,23 @@ object EncryState extends ScorexLogging{
   }
 
   def generateGenesisDigestState(stateDir: File, settings: NodeSettings): DigestState = {
-    DigestState.create(Some(genesisStateVersion), Some(afterGenesisStateDigest), stateDir, settings).get //todo: .get
+    DigestState.create(Some(genesisStateVersion), Some(afterGenesisStateDigest), stateDir, settings)
   }
 
   def readOrGenerate(settings: EncryAppSettings,
-                     nodeViewHolderRef: Option[ActorRef]): Option[EncryState[_]] = {
-    val stDir = getStateDir(settings)
-    stDir.mkdirs()
+                     nodeViewHolderRef: Option[ActorRef]): EncryState[_] = {
+    val stateDir = getStateDir(settings)
+    stateDir.mkdirs()
 
-    val idxDir = getIndexDir(settings)
-    idxDir.mkdirs()
+    val indexDir = getIndexDir(settings)
+    indexDir.mkdirs()
 
-    if (stDir.listFiles().isEmpty) {
-      None
+    if (settings.nodeSettings.ADState) {
+      DigestState.create(None, None, stateDir, settings.nodeSettings)
+    } else if (stateDir.listFiles().isEmpty) {
+      EncryState.generateGenesisUtxoState(stateDir, indexDir, nodeViewHolderRef)._1
     } else {
-      //todo: considering db state
-      if (settings.nodeSettings.ADState) DigestState.create(None, None, stDir, settings.nodeSettings).toOption
-      else Some(UtxoState.create(stDir, idxDir, nodeViewHolderRef))
+      UtxoState.create(stateDir, indexDir, nodeViewHolderRef)
     }
   }
 }

@@ -9,7 +9,7 @@ import scorex.core.ModifierId
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.crypto.authds.ADKey
 
-import scala.util.{Random, Try}
+import scala.util.Try
 
 class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition])
   extends EncryBaseStorage {
@@ -20,10 +20,6 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition
                             idsToReplace: Seq[ByteArrayWrapper],
                             toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit =
     updateWithReplacement(ByteArrayWrapper(id), idsToReplace, toInsert)
-
-  def nonVersionedInsert(toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit = {
-    db.update(Random.nextLong(), Seq(), toInsert)
-  }
 
   def packBoxIds(ids: Seq[ADKey]): ByteArrayWrapper =
     new ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))

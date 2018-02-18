@@ -7,7 +7,7 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderS
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{CoinbaseTransactionSerializer, EncryBaseTransaction}
-import encry.settings.EncryAppSettings
+import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.{EncryHistory, EncrySyncInfo}
 import encry.view.mempool.EncryMempool
 import encry.view.state.{DigestState, EncryState, UtxoState}
@@ -15,9 +15,10 @@ import encry.view.wallet.EncryWallet
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.utils.NetworkTimeProvider
-import scorex.core.{ModifierId, ModifierTypeId, NodeViewHolder, NodeViewModifier}
+import scorex.core._
+import scorex.crypto.authds.ADDigest
 
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings,
                                                                        timeProvider: NetworkTimeProvider)
@@ -78,46 +79,67 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     * Restore a local view during a node startup. If no any stored view found
     * (e.g. if it is a first launch of a node) None is to be returned
     */
-  override def restoreState: Option[NodeView] = {
-    EncryState.readOrGenerate(settings, Some(self)).map { stateIn =>
-      // TODO: Ensure that history is in certain mode
-      val history = EncryHistory.readOrGenerate(settings)
-      val wallet = EncryWallet.readOrGenerate(settings)
-      val memPool = EncryMempool.empty(settings, timeProvider)
-      val state = restoreConsistentState(stateIn.asInstanceOf[MS], history)
-      (history, state, wallet, memPool)
-    }
+  override def restoreState: Option[NodeView] = if (EncryHistory.getHistoryDir(settings).listFiles.nonEmpty) {
+    val history = EncryHistory.readOrGenerate(settings)
+    val wallet = EncryWallet.readOrGenerate(settings)
+    val memPool = EncryMempool.empty(settings, timeProvider)
+    val state = restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[MS], history)
+    Some((history, state, wallet, memPool))
+  } else None
+
+  private def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): StateType = {
+    val dir = EncryState.getStateDir(settings)
+    dir.mkdirs()
+
+    if (dir.listFiles.nonEmpty) dir.listFiles.foreach(_.delete())
+
+    {
+      (version, digest) match {
+        case (Some(_), Some(_)) if settings.nodeSettings.ADState =>
+          DigestState.create(version, digest, dir, settings.nodeSettings)
+        case _ =>
+          EncryState.readOrGenerate(settings, Some(self))
+      }
+    }.asInstanceOf[StateType]
+      .ensuring(_.rootHash sameElements digest.getOrElse(EncryState.afterGenesisStateDigest), "State root is incorrect")
   }
 
-  private def restoreConsistentState(state: StateType, history: EncryHistory): StateType = {
-    if (history.bestFullBlockIdOpt.isEmpty) {
-      state
-    } else {
-      val stateBestBlockId = if (state.version sameElements EncryState.genesisStateVersion) None else Some(state.version)
-      val hFrom = stateBestBlockId.flatMap(id => history.typedModifierById[EncryBlockHeader](ModifierId @@ id))
-      val fbFrom = hFrom.flatMap(h => history.getFullBlock(h))
-      history.fullBlocksAfter(fbFrom).map { toApply =>
-        if (toApply.nonEmpty) {
-          log.info(s"State and History are inconsistent on startup. Going to apply ${toApply.length} modifiers")
-        } else {
-          assert(stateBestBlockId.get sameElements history.bestFullBlockIdOpt.get,
-            "State version should always equal to best full block id.")
-          log.info(s"State and History are consistent on startup.")
-        }
-        toApply.foldLeft(state) { (s, m) =>
-          s.applyModifier(m) match {
-            case Success(newState) =>
-              newState
-            case Failure(_) =>
-              throw new Error(s"Failed to apply missed modifier ${m.encodedId}")
+  private def restoreConsistentState(state: StateType, history: EncryHistory): StateType = Try {
+    (state.version, history.bestBlockOpt, state) match {
+      case (stateId, None, _) if stateId sameElements EncryState.genesisStateVersion =>
+        log.debug("State and history are both empty on startup")
+        state
+      case (stateId, Some(block), _) if stateId sameElements block.id =>
+        log.debug(s"State and history have the same version ${Algos.encode(stateId)}, no recovery needed.")
+        state
+      case (_, None, _) =>
+        log.debug("State and history are inconsistent. History is empty on startup, rollback state to genesis.")
+        getRecreatedState()
+      case (_, Some(bestBlock), _: DigestState) =>
+        // Update state.digest only.
+        log.debug(s"State and history are inconsistent. Going to switch state to version ${bestBlock.encodedId}")
+        getRecreatedState(Some(VersionTag @@ bestBlock.id), Some(bestBlock.header.stateRoot))
+      case (stateId, Some(historyBestBlock), state: StateType) =>
+        val stateBestHeaderOpt = history.typedModifierById[EncryBlockHeader](ModifierId @@ stateId)
+        val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
+        log.debug(s"State and history are inconsistent. Going to rollback to ${rollbackId.map(Algos.encode)} and " +
+          s"apply ${newChain.length} modifiers")
+        val startState = rollbackId.map(id => state.rollbackTo(VersionTag @@ id).get)
+          .getOrElse(getRecreatedState())
+        val toApply = newChain.headers.map{h =>
+          history.getBlock(h) match {
+            case Some(fb) => fb
+            case None => throw new Error(s"Failed to get full block for header $h")
           }
         }
-      }.recoverWith { case e =>
-        log.error("Failed to recover state, try to resync from genesis manually", e)
-        EncryApp.forceStopApplication(500)
-      }.get
+        toApply.foldLeft(startState) { (s, m) =>
+          s.applyModifier(m).get
+        }
     }
-  }
+  }.recoverWith { case e =>
+    log.error("Failed to recover state.", e)
+    EncryApp.forceStopApplication(500)
+  }.get
 }
 
 private[view] class DigestEncryNodeViewHolder(settings: EncryAppSettings, timeProvider: NetworkTimeProvider)

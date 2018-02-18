@@ -99,7 +99,7 @@ object DigestState {
   def create(versionOpt: Option[VersionTag],
              rootHashOpt: Option[ADDigest],
              dir: File,
-             settings: NodeSettings): Try[DigestState] = Try {
+             settings: NodeSettings): DigestState = Try {
     val store = new LSMStore(dir, keepVersions = Constants.keepVersions)
 
     (versionOpt, rootHashOpt) match {
@@ -120,5 +120,5 @@ object DigestState {
 
       case _ => throw new Error("Unsupported argument combination.")
     }
-  }
+  }.getOrElse(EncryState.generateGenesisDigestState(dir, settings))
 }

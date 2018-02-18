@@ -56,7 +56,7 @@ object InfoApiRoute {
                    nodeName: String): Json = {
     val stateVersion = readers.s.map(_.version).map(Algos.encode)
     val bestHeader = readers.h.flatMap(_.bestHeaderOpt)
-    val bestFullBlock = readers.h.flatMap(_.bestFullBlockOpt)
+    val bestFullBlock = readers.h.flatMap(_.bestBlockOpt)
     val unconfirmedCount = readers.m.map(_.size).getOrElse(0)
     Map(
       "name" -> nodeName.asJson,

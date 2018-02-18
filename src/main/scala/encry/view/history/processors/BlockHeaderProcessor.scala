@@ -58,12 +58,12 @@ trait BlockHeaderProcessor extends ScorexLogging {
   // Defined if `scorex.core.consensus.HistoryReader`.
   def contains(id: ModifierId): Boolean
 
-  def bestFullBlockOpt: Option[EncryBlock]
+  def bestBlockOpt: Option[EncryBlock]
 
   /**
     * Id of best header with transactions and proofs. None in regime that do not process transactions
     */
-  def bestFullBlockIdOpt: Option[ModifierId]
+  def bestBlockIdOpt: Option[ModifierId]
 
   /**
     * @return height of best header
@@ -73,7 +73,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
   /**
     * @return height of best header with transacions and proofs
     */
-  def bestFullBlockHeight: Int = bestFullBlockIdOpt.flatMap(id => heightOf(id)).getOrElse(-1)
+  def bestFullBlockHeight: Int = bestBlockIdOpt.flatMap(id => heightOf(id)).getOrElse(-1)
 
   /**
     * @return ProgressInfo - info required for State to be consistent with History
@@ -187,7 +187,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
     val bestHeaderKeyUpdate = if (bestHeaderIdOpt.exists(_ sameElements modifierId)) {
       Seq(BestHeaderKey -> ByteArrayWrapper(header.parentId))
     } else Seq()
-    val bestFullBlockKeyUpdate = if (bestFullBlockIdOpt.exists(_ sameElements modifierId)) {
+    val bestFullBlockKeyUpdate = if (bestBlockIdOpt.exists(_ sameElements modifierId)) {
       Seq(BestFullBlockKey -> ByteArrayWrapper(header.parentId))
     } else Seq()
     (toRemove, bestFullBlockKeyUpdate ++ bestHeaderKeyUpdate)

@@ -17,9 +17,9 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
   /**
     * Id of header that contains transactions and proofs
     */
-  override def bestFullBlockIdOpt: Option[ModifierId] = historyStorage.get(BestFullBlockKey).map(ModifierId @@ _)
+  override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestFullBlockKey).map(ModifierId @@ _)
 
-  protected def getFullBlock(h: EncryBlockHeader): Option[EncryBlock]
+  protected def getBlock(header: EncryBlockHeader): Option[EncryBlock]
 
   protected def commonBlockThenSuffixes(header1: EncryBlockHeader,
                                         header2: EncryBlockHeader): (EncryHeaderChain, EncryHeaderChain)
@@ -43,13 +43,13 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
     val newModRow = if (isNewerPayload) blockPayload else adProofsOpt.get
     val storageVersion = ByteArrayWrapper(if (isNewerPayload) blockPayload.id else adProofsOpt.get.id)
     val continuations = continuationHeaderChains(header, _ => true).map(_.tail)
-    val bestFullChain = continuations.map(hc => hc.map(getFullBlock).takeWhile(_.isDefined).flatten.map(_.header))
+    val bestFullChain = continuations.map(hc => hc.map(getBlock).takeWhile(_.isDefined).flatten.map(_.header))
       .map(c => header +: c)
       .maxBy(c => scoreOf(c.last.id))
 
     val bestHeaderNew = bestFullChain.last
 
-    (bestFullBlockOpt, bestFullBlockIdOpt.flatMap(scoreOf), scoreOf(bestHeaderNew.id)) match {
+    (bestBlockOpt, bestBlockIdOpt.flatMap(scoreOf), scoreOf(bestHeaderNew.id)) match {
       case (None, _, _) if header.isGenesis =>
         log.info(s"Initialize block chain with genesis header ${bestHeaderNew.encodedId} with transactions and proofs")
         updateStorage(newModRow, storageVersion, block, bestHeaderNew.id)
@@ -62,9 +62,9 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
 
       case (Some(prevBest), Some(prevBestScore), Some(score)) if score > prevBestScore =>
         val (prevChain, newChain) = commonBlockThenSuffixes(prevBest.header, header)
-        val toRemove: Seq[EncryBlock] = prevChain.tail.headers.flatMap(getFullBlock)
+        val toRemove: Seq[EncryBlock] = prevChain.tail.headers.flatMap(getBlock)
         val toApply: Seq[EncryBlock] = newChain.tail.headers
-          .flatMap(h => if(h == block.header) Some(block) else getFullBlock(h))
+          .flatMap(h => if(h == block.header) Some(block) else getBlock(h))
 
         if (toApply.lengthCompare(newChain.length - 1) == 0) {
           log.info(s"Process fork for new best full block with header ${bestHeaderNew.encodedId}. " +

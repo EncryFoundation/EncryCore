@@ -49,7 +49,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
   }
 
   private def getFullBlockByHeaderId(headerId: ModifierId): Future[Option[EncryBlock]] = getHistory.map { history =>
-    history.typedModifierById[EncryBlockHeader](headerId).flatMap(history.getFullBlock)
+    history.typedModifierById[EncryBlockHeader](headerId).flatMap(history.getBlock)
   }
 
   def getBlocksR: Route = (pathEndOrSingleSlash & get & paging) { (offset, limit) =>
