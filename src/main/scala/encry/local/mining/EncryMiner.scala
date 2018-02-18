@@ -15,6 +15,7 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.Json
 import io.circe.syntax._
+import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.NodeViewHolder
 import scorex.core.NodeViewHolder.{GetDataFromCurrentView, SemanticallySuccessfulModifier, Subscribe}
 import scorex.core.transaction.state.{PrivateKey25519, PrivateKey25519Companion}
@@ -105,18 +106,32 @@ class EncryMiner(viewHolderRef: ActorRef,
         lazy val timestamp = timeProvider.time()
         val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(0) + 1)
 
-        var txs = state.filterValid(pool.takeAllUnordered.toSeq)
-          .foldLeft(Seq[EncryBaseTransaction]()) { case (txsBuff, tx) =>
-            // 124 is approximate CoinbaseTx.length in bytes.
-            if ((txsBuff.map(_.length).sum + tx.length) <= Constants.Chain.blockMaxSize - 124) txsBuff :+ tx
-            else txsBuff
+        // Picks valid, non-conflicting txs with respect to its fee amount.
+        // `txsToDrop` - invalidated txs to be dropped from mempool.
+        val (txsToPut, txsToDrop, _) = pool.takeAll.toSeq.sortBy(_.fee).reverse
+          .foldLeft((Seq[EncryBaseTransaction](), Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) {
+            case ((validTxs, invalidTxs, bxsAcc), tx) =>
+              val bxsRaw = tx.useBoxes.map(ByteArrayWrapper.apply)
+              if ((validTxs.map(_.length).sum + tx.length) <= Constants.Chain.blockMaxSize - 124) {
+                if (state.validate(tx).isSuccess && bxsRaw.forall(k => !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size) {
+                  (validTxs :+ tx, invalidTxs, bxsAcc ++ bxsRaw)
+                } else {
+                  (validTxs, invalidTxs :+ tx, bxsAcc)
+                }
+              } else {
+                (validTxs, invalidTxs, bxsAcc)
+              }
           }
+
+        // Remove stateful-invalid txs from mempool.
+        if (txsToPut.size + txsToDrop.size >= pool.size) pool.removeAsync(txsToDrop.tail)
+        else pool.removeAsync(txsToDrop)
 
         // TODO: Which PubK should we pick here?
         val minerProposition = vault.publicKeys.head
         val privateKey: PrivateKey25519 = vault.secretByPublicImage(minerProposition).get
 
-        val openBxs: IndexedSeq[OpenBox] = txs.foldLeft(IndexedSeq[OpenBox]())((buff, tx) =>
+        val openBxs: IndexedSeq[OpenBox] = txsToPut.foldLeft(IndexedSeq[OpenBox]())((buff, tx) =>
           buff ++ tx.newBoxes.foldLeft(IndexedSeq[OpenBox]()) { case (buff2, bx) =>
             bx match {
               case obx: OpenBox => buff2 :+ obx
@@ -129,7 +144,7 @@ class EncryMiner(viewHolderRef: ActorRef,
         val coinbase =
           CoinbaseTransaction(minerProposition, timestamp, cTxSignature, openBxs.map(_.id), amount, height)
 
-        txs = txs.sortBy(_.timestamp) :+ coinbase
+        val txs = txsToPut.sortBy(_.timestamp) :+ coinbase
 
         val (adProof, adDigest) = state.proofsForTransactions(txs).get
         val difficulty = bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))

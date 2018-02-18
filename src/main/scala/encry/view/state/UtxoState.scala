@@ -203,28 +203,6 @@ class UtxoState(override val version: VersionTag,
       if (bxs.size < tx.useBoxes.size) throw new Error(s"Failed to spend some boxes referenced in $tx")
       else if (debit < credit) throw new Error(s"Non-positive balance in $tx")
     }
-
-  /**
-    * Filters semantically valid and non conflicting transactions.
-    * Picks the transaction with highest fee if conflict detected.
-    * Note, this returns txs ordered chronologically.
-    */
-  // TODO: OPTIMISATION: Too many sorting here.
-  override def filterValid(txs: Seq[EncryBaseTransaction]): Seq[EncryBaseTransaction] =
-    super.filterValid(txs.sortBy(_.timestamp))
-      .sortBy(_.fee)
-      .reverse
-      .foldLeft((Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) { case ((nonConflictTxs, bxs), tx) =>
-      tx match {
-        case tx: EncryBaseTransaction =>
-          val bxsRaw = tx.useBoxes.map(ByteArrayWrapper.apply)
-          if (bxsRaw.forall(k => !bxs.contains(k)) && bxsRaw.size == bxsRaw.toSet.size) {
-            (nonConflictTxs :+ tx) -> (bxs ++ bxsRaw)
-          } else {
-            (nonConflictTxs, bxs)
-          }
-      }
-    }._1.sortBy(_.timestamp)
 }
 
 object UtxoState extends ScorexLogging {

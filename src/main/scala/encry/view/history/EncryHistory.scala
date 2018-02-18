@@ -161,12 +161,15 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
 
 object EncryHistory {
 
-  def getHistoryDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/history")
+  def getHistoryDir(settings: EncryAppSettings): File = {
+    val dir = new File(s"${settings.directory}/history")
+    dir.mkdirs()
+    dir
+  }
 
   def readOrGenerate(settings: EncryAppSettings): EncryHistory = {
 
     val historyDir = getHistoryDir(settings)
-    historyDir.mkdirs()
 
     val db = new LSMStore(historyDir, keepVersions = 0)
     val objectsStore = new FileHistoryObjectsStore(historyDir.getAbsolutePath)

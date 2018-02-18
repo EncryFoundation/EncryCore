@@ -53,9 +53,13 @@ class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTra
     this
   }
 
+  def removeAsync(txs: Seq[EncryBaseTransaction]): Unit = Task {
+    txs.foreach(remove)
+  }.runAsync
+
   override def take(limit: Int): Iterable[EncryBaseTransaction] = unconfirmed.values.toSeq.take(limit)
 
-  def takeAllUnordered: Iterable[EncryBaseTransaction] = unconfirmed.values.toSeq
+  def takeAll: Iterable[EncryBaseTransaction] = unconfirmed.values.toSeq
 
   override def filter(condition: (EncryBaseTransaction) => Boolean): EncryMempool = {
     unconfirmed.retain { (_, v) =>

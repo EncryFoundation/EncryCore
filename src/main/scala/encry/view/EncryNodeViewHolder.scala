@@ -77,7 +77,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     * Restore a local view during a node startup. If no any stored view found
     * (e.g. if it is a first launch of a node) None is to be returned
     */
-  override def restoreState: Option[NodeView] = if (EncryHistory.getHistoryDir(settings).listFiles.nonEmpty) {
+  override def restoreState: Option[NodeView] = if (!EncryHistory.getHistoryDir(settings).listFiles.isEmpty) {
     val history = EncryHistory.readOrGenerate(settings)
     val wallet = EncryWallet.readOrGenerate(settings)
     val memPool = EncryMempool.empty(settings, timeProvider)
