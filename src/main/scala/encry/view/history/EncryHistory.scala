@@ -177,19 +177,16 @@ object EncryHistory {
     val history: EncryHistory = (_nodeSettings.ADState, _nodeSettings.verifyTransactions) match {
       case (true, true) =>
         new EncryHistory with ADStateProofProcessor with BlockPayloadProcessor {
-          override protected val chainSettings: ChainSettings = settings.chainSettings
           override protected val nodeSettings: NodeSettings = _nodeSettings
           override protected val historyStorage: HistoryStorage = storage
         }
       case (false, true) =>
         new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
-          override protected val chainSettings: ChainSettings = settings.chainSettings
           override protected val nodeSettings: NodeSettings = _nodeSettings
           override protected val historyStorage: HistoryStorage = storage
         }
       case (true, false) =>
         new EncryHistory with ADStateProofProcessor with EmptyBlockPayloadProcessor {
-          override protected val chainSettings: ChainSettings = settings.chainSettings
           override protected val nodeSettings: NodeSettings = _nodeSettings
           override protected val historyStorage: HistoryStorage = storage
         }

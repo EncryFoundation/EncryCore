@@ -3,12 +3,12 @@ package encry.view.history.processors
 import com.google.common.primitives.Ints
 import encry.consensus.{Difficulty, PowConsensus}
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.{ADProofs, HistoryModifierSerializer}
+import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.Constants._
-import encry.settings.{Algos, ChainSettings, NodeSettings}
+import encry.settings.{Algos, Constants, NodeSettings}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
@@ -24,10 +24,9 @@ trait BlockHeaderProcessor extends ScorexLogging {
 
   protected val nodeSettings: NodeSettings
 
-  protected val chainSettings: ChainSettings
+  private val chainParams = Constants.Chain
 
-  // TODO: Move consensus selection to the settings.
-  protected lazy val consensusAlgo = new PowConsensus(chainSettings)
+  private val consensusAlgo = PowConsensus
 
   protected val charsetName: String = "UTF-8"
 
@@ -100,7 +99,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
     if (header.parentId sameElements EncryBlockHeader.GenesisParentId) {
       if (bestHeaderIdOpt.nonEmpty) {
         Failure(new Error("Trying to append genesis block to non-empty history."))
-      } else if (header.height != ChainSettings.genesisHeight) {
+      } else if (header.height != chainParams.genesisHeight) {
         Failure(new Error("Invalid height for genesis block header."))
       } else {
         Success()
@@ -117,7 +116,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
       Failure(new Error("Header <id: ${header.id}> difficulty too low."))
     } else if (!consensusAlgo.validator.validatePow(header.hHash, header.difficulty)) {
       Failure(new Error(s"Invalid POW in header <id: ${header.id}>"))
-    } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainSettings.maxRollback)) {
+    } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainParams.maxRollback)) {
       Failure(new Error("Header is too old to be applied."))
     } else if (!header.validSignature) {
       Failure(new Error("Block signature is invalid."))
@@ -134,8 +133,8 @@ trait BlockHeaderProcessor extends ScorexLogging {
     if (header.isGenesis) {
       (Seq(
         BestHeaderKey -> ByteArrayWrapper(header.id),
-        heightIdsKey(ChainSettings.genesisHeight) -> ByteArrayWrapper(header.id),
-        headerHeightKey(header.id) -> ByteArrayWrapper(Ints.toByteArray(ChainSettings.genesisHeight)),
+        heightIdsKey(chainParams.genesisHeight) -> ByteArrayWrapper(header.id),
+        headerHeightKey(header.id) -> ByteArrayWrapper(Ints.toByteArray(chainParams.genesisHeight)),
         headerScoreKey(header.id) -> ByteArrayWrapper(difficulty.toByteArray)),
         header)
     } else {
@@ -266,7 +265,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
   def requiredDifficultyAfter(parent: EncryBlockHeader): Difficulty = {
     val parentHeight = heightOf(parent.id).get
     if (parentHeight <= 2) {
-      Difficulty @@ chainSettings.initialDifficulty
+      chainParams.initialDifficulty
     } else {
       val requiredHeights =
         consensusAlgo.difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))

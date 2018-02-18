@@ -8,7 +8,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction}
 import encry.modifiers.state.box.OpenBox
-import encry.settings.EncryAppSettings
+import encry.settings.{Constants, EncryAppSettings}
 import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
@@ -88,7 +88,7 @@ class EncryMiner(viewHolderRef: ActorRef,
   }
 
   def prepareCandidate(settings: EncryAppSettings, nodeId: Array[Byte]): Future[Option[PowCandidateBlock]] = {
-    implicit val timeout = Timeout(settings.scorexSettings.restApi.timeout)
+    implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
     (viewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[PowCandidateBlock]] { v =>
       val history = v.history
@@ -108,7 +108,7 @@ class EncryMiner(viewHolderRef: ActorRef,
         var txs = state.filterValid(pool.takeAllUnordered.toSeq)
           .foldLeft(Seq[EncryBaseTransaction]()) { case (txsBuff, tx) =>
             // 124 is approximate CoinbaseTx.length in bytes.
-            if ((txsBuff.map(_.length).sum + tx.length) <= settings.chainSettings.blockMaxSize - 124) txsBuff :+ tx
+            if ((txsBuff.map(_.length).sum + tx.length) <= Constants.Chain.blockMaxSize - 124) txsBuff :+ tx
             else txsBuff
           }
 
@@ -133,7 +133,7 @@ class EncryMiner(viewHolderRef: ActorRef,
 
         val (adProof, adDigest) = state.proofsForTransactions(txs).get
         val difficulty = bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
-          .getOrElse(Difficulty @@ settings.chainSettings.initialDifficulty)
+          .getOrElse(Constants.Chain.initialDifficulty)
         val derivedFields = PowConsensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
         val blockSignature = PrivateKey25519Companion.sign(privateKey,
           EncryBlockHeader.getMessageToSign(derivedFields._1, minerProposition, derivedFields._2,
@@ -171,5 +171,4 @@ object EncryMiner extends ScorexLogging {
       "candidateBlock" -> candidateBlock.map(_.json).getOrElse("None".asJson)
     ).asJson
   }
-
 }

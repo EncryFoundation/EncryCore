@@ -14,7 +14,7 @@ class EncryMiningWorker(settings: EncryAppSettings,
                         viewHolderRef: ActorRef,
                         initialCandidate: PowCandidateBlock) extends Actor with ScorexLogging {
 
-  private val consensus = new PowConsensus(settings.chainSettings)
+  private val consensus = PowConsensus
 
   private var candidate: PowCandidateBlock = initialCandidate
 

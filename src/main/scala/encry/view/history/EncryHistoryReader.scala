@@ -5,7 +5,7 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.settings.{ChainSettings, NodeSettings}
+import encry.settings.NodeSettings
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
@@ -24,7 +24,6 @@ trait EncryHistoryReader
     with BaseADProofProcessor
     with ScorexLogging {
 
-  protected val chainSettings: ChainSettings
   protected val nodeSettings: NodeSettings
 
   /**

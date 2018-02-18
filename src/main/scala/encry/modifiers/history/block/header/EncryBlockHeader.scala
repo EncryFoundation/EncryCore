@@ -5,7 +5,7 @@ import encry.consensus.Difficulty
 import encry.modifiers.ModifierWithDigest
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.settings.{Algos, ChainSettings, Constants}
+import encry.settings.{Algos, Constants}
 import io.circe.Json
 import io.circe.syntax._
 import scorex.core.block.Block._
@@ -50,7 +50,7 @@ case class EncryBlockHeader(override val version: Version,
   // two hours in the future (7200000ms) (allowing for time errors).
   val validTimestamp: Boolean = (timestamp - System.currentTimeMillis()) < 7200000L
 
-  lazy val isGenesis: Boolean = height == ChainSettings.genesisHeight
+  lazy val isGenesis: Boolean = height == Constants.Chain.genesisHeight
 
   lazy val payloadId: ModifierId =
     ModifierWithDigest.computeId(EncryBlockPayload.modifierTypeId, id, txsRoot)

@@ -6,16 +6,13 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.settings.ChainSettings
 import scorex.core.ModifierId
 import scorex.crypto.authds.SerializedAdProof
 import scorex.crypto.hash.Digest32
 
-class PowConsensus(chainSettings: ChainSettings) {
+object PowConsensus {
 
-  import PowConsensus._
-
-  val difficultyController: PowLinearController = new PowLinearController(chainSettings)
+  val difficultyController: PowLinearController.type = PowLinearController
   val validator: PowConsensusValidator.type = PowConsensusValidator
 
   def verifyCandidate(candidate: PowCandidateBlock, nonce: Long): Option[EncryBlock] = {
@@ -43,9 +40,6 @@ class PowConsensus(chainSettings: ChainSettings) {
       Option(new EncryBlock(header, payload, Some(adProofs)))
     } else None
   }
-}
-
-object PowConsensus {
 
   def getDerivedHeaderFields(parentOpt: Option[EncryBlockHeader], adProofBytes: SerializedAdProof,
                              transactions: Seq[EncryBaseTransaction]): (Byte, ModifierId, Digest32, Digest32, Int) = {
