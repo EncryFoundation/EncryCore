@@ -39,13 +39,8 @@ class UtxoState(override val version: VersionTag,
     nodeViewHolderRef.foreach(_ ! LocallyGeneratedModifier(proof))
   }
 
-  // TODO: Make sure all errors are being caught properly.
   private[state] def applyTransactions(txs: Seq[EncryBaseTransaction],
                                        expectedDigest: ADDigest): Try[Unit] = Try {
-
-    def rollback(): Try[Unit] = persistentProver.rollback(rootHash)
-      .ensuring(persistentProver.digest.sameElements(rootHash))
-
     var appliedModCounter: Int = 0
 
     txs.foreach { tx =>
@@ -59,7 +54,8 @@ class UtxoState(override val version: VersionTag,
           }
         }
       } else {
-        if (appliedModCounter > 0) rollback()
+        if (appliedModCounter > 0) persistentProver.rollback(rootHash)
+          .ensuring(persistentProver.digest.sameElements(rootHash))
         throw new Error(s"Error while applying modifier $tx.")
       }
     }
@@ -151,13 +147,14 @@ class UtxoState(override val version: VersionTag,
     val prover = persistentProver
     log.info(s"Rollback UtxoState to version ${Algos.encoder.encode(version)}")
     stateStore.get(ByteArrayWrapper(version)) match {
-      case Some(hash) =>
-        val rollbackResult = prover.rollback(ADDigest @@ hash.data).map { _ =>
+      case Some(v) =>
+        val rollbackResult = prover.rollback(ADDigest @@ v.data).map { _ =>
           new UtxoState(version, stateStore, indexStore, nodeViewHolderRef) {
             override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] = prover
           }
         }
-        stateStore.clean(Constants.keepVersions)
+        stateStore.clean(Constants.Store.stateKeepVersions)
+        rollbackIndex(VersionTag @@ v.data)
         rollbackResult
       case None =>
         Failure(new Error(s"Unable to get root hash at version ${Algos.encoder.encode(version)}"))

@@ -4,6 +4,7 @@ import java.io.File
 
 import com.google.common.primitives.Longs
 import encry.modifiers.EncryPersistentModifier
+import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.AddressProposition
 import encry.modifiers.state.box.{AmountCarryingBox, EncryBaseBox}
@@ -44,19 +45,22 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
 
   override def scanOffchain(txs: Seq[EncryBaseTransaction]): EncryWallet = this
 
-  override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = modifier match {
-    case tcpMod: TransactionsCarryingPersistentNodeViewModifier[Proposition, EncryBaseTransaction]@unchecked =>
-      val accountRelTxs = tcpMod.transactions.foldLeft(Seq[EncryBaseTransaction]())((acc, tx) => {
-        val accountRelBxs = tx.newBoxes.foldLeft(Seq[EncryBaseBox]())((acc2, bx) => bx.proposition match {
-          case ap: AddressProposition if publicKeys.exists(_.address == ap.address) => acc2 :+ bx
-          case _ => acc2
+  override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = {
+    modifier match {
+      case block: EncryBlock =>
+        val accountRelTxs = block.transactions.foldLeft(Seq[EncryBaseTransaction]())((acc, tx) => {
+          val accountRelBxs = tx.newBoxes.foldLeft(Seq[EncryBaseBox]())((acc2, bx) => bx.proposition match {
+            case ap: AddressProposition if publicKeys.exists(_.address == ap.address) => acc2 :+ bx
+            case _ => acc2
+          })
+          if (accountRelBxs.nonEmpty || publicKeys.exists(_.pubKeyBytes.sameElements(tx.proposition.pubKeyBytes))) acc :+ tx
+          else acc
         })
-        if (accountRelBxs.nonEmpty || publicKeys.exists(_.pubKeyBytes.sameElements(tx.proposition.pubKeyBytes))) acc :+ tx
-        else acc
-      })
-      updateWallet(modifier.id, accountRelTxs)
-      this
-    case _ => this
+        updateWallet(modifier.id, accountRelTxs)
+        this
+      case _ =>
+        this
+    }
   }
 
   override def rollback(to: VersionTag): Try[EncryWallet] = {
@@ -68,7 +72,7 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
 
     import WalletStorage._
 
-    def extractAcBxs(bxs: Seq[EncryBaseBox]): Seq[AmountCarryingBox] =
+    def extractACBxs(bxs: Seq[EncryBaseBox]): Seq[AmountCarryingBox] =
       bxs.foldLeft(Seq[AmountCarryingBox]())((acc, bx) => bx match {
         case acbx: AmountCarryingBox => acc :+ acbx
         case _ => acc
@@ -94,7 +98,7 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
 
     val newBalanceRaw = ByteArrayWrapper(Longs.toByteArray(getAvailableBoxes.filter(bx =>
       !bxIdsToRemove.exists(_ sameElements bx.id)).foldLeft(0L)(_ + _.amount) +
-        extractAcBxs(bxsToInsert).foldLeft(0L)(_ + _.amount)))
+        extractACBxs(bxsToInsert).foldLeft(0L)(_ + _.amount)))
 
     val toRemoveSummary = bxIdsToRemove.map(boxKeyById) ++ Seq(balanceKey, transactionIdsKey, boxIdsKey)
     val toInsertSummary =

@@ -8,17 +8,18 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.{AssetBox, OpenBox, PubKeyInfoBox}
 import encry.modifiers.state.box.proposition.AddressProposition
-import encry.settings.Algos
+import encry.settings.{Algos, Constants}
 import encry.view.history.Height
 import encry.view.state.index.storage.StateIndexStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
-import scorex.core.ModifierId
+import scorex.core.{ModifierId, VersionTag}
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.Try
 
 trait StateIndexManager extends ScorexLogging {
 
@@ -129,6 +130,12 @@ trait StateIndexManager extends ScorexLogging {
     }
 
     indexStorage.updateWithReplacement(version, toRemove, toInsert)
+  }
+
+  protected def rollbackIndex(to: VersionTag): Try[Unit] = {
+    val wrappedVersion = ByteArrayWrapper(to)
+    Try(indexStore.rollback(wrappedVersion))
+      .map(_ => indexStore.clean(Constants.Store.indexKeepVersions))
   }
 }
 
