@@ -18,7 +18,7 @@ class EncryDeliveryTracker(context: ActorContext,
 
   val toDownload: mutable.Map[ModifierIdAsKey, ToDownloadStatus] = mutable.Map[ModifierIdAsKey, ToDownloadStatus]()
 
-  //TODO move to config?
+  // TODO: move to config?
   private val ToDownloadRetryInterval = 30.seconds
   private val ToDownloadLifetime = 24.hours
   private val MaxModifiersToDownload = 100

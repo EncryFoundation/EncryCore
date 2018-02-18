@@ -1,6 +1,6 @@
 package encry.network
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, ActorRefFactory, Props}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
@@ -64,8 +64,12 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
       broadcastModifierInv(mod)
   }
 
-  override protected def viewHolderEvents: Receive = onSemanticallySuccessfulModifier orElse onDownloadRequest orElse
-    onCheckModifiersToDownload orElse onMissedModifiers orElse super.viewHolderEvents
+  override protected def viewHolderEvents: Receive =
+    onSemanticallySuccessfulModifier orElse
+      onDownloadRequest orElse
+      onCheckModifiersToDownload orElse
+      onMissedModifiers orElse
+      super.viewHolderEvents
 
   def onDownloadRequest: Receive = {
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
@@ -90,7 +94,37 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
 
 object EncryNodeViewSynchronizer {
 
+  def props(networkControllerRef: ActorRef,
+            viewHolderRef: ActorRef,
+            localInterfaceRef: ActorRef,
+            syncInfoSpec: EncrySyncInfoMessageSpec.type,
+            networkSettings: NetworkSettings,
+            timeProvider: NetworkTimeProvider): Props =
+    Props(new EncryNodeViewSynchronizer(networkControllerRef, viewHolderRef, localInterfaceRef,
+      syncInfoSpec, networkSettings, timeProvider))
+
+  def apply(networkControllerRef: ActorRef,
+            viewHolderRef: ActorRef,
+            localInterfaceRef: ActorRef,
+            syncInfoSpec: EncrySyncInfoMessageSpec.type,
+            networkSettings: NetworkSettings,
+            timeProvider: NetworkTimeProvider)
+           (implicit context: ActorRefFactory): ActorRef =
+    context.actorOf(props(networkControllerRef, viewHolderRef, localInterfaceRef,
+      syncInfoSpec, networkSettings, timeProvider))
+
+  def apply(networkControllerRef: ActorRef,
+            viewHolderRef: ActorRef,
+            localInterfaceRef: ActorRef,
+            syncInfoSpec: EncrySyncInfoMessageSpec.type,
+            networkSettings: NetworkSettings,
+            timeProvider: NetworkTimeProvider,
+            name: String)
+           (implicit context: ActorRefFactory): ActorRef =
+    context.actorOf(props(networkControllerRef, viewHolderRef, localInterfaceRef,
+      syncInfoSpec, networkSettings, timeProvider), name)
+
   case object CheckModifiersToDownload
 
-  case class MissedModifiers(m: Seq[(ModifierTypeId, ModifierId)])
+  case class MissedModifiers(mods: Seq[(ModifierTypeId, ModifierId)])
 }
