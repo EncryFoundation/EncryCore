@@ -99,9 +99,7 @@ class EncryMiner(viewHolderRef: ActorRef,
 
       val bestHeaderOpt = history.bestBlockOpt.map(_.header)
 
-      if ((bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) &&
-        !pool.isEmpty &&
-        vault.keyManager.keys.nonEmpty) Try {
+      if ((bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) && vault.keyManager.keys.nonEmpty) Try {
 
         lazy val timestamp = timeProvider.time()
         val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(0) + 1)
@@ -124,8 +122,7 @@ class EncryMiner(viewHolderRef: ActorRef,
           }
 
         // Remove stateful-invalid txs from mempool.
-        if (txsToPut.size + txsToDrop.size >= pool.size) pool.removeAsync(txsToDrop.tail)
-        else pool.removeAsync(txsToDrop)
+        pool.removeAsync(txsToDrop)
 
         // TODO: Which PubK should we pick here?
         val minerProposition = vault.publicKeys.head

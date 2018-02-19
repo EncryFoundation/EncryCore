@@ -35,7 +35,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
   protected val BestHeaderKey: ByteArrayWrapper =
     ByteArrayWrapper(Array.fill(hashLength)(EncryBlockHeader.modifierTypeId))
 
-  protected val BestFullBlockKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(hashLength)(-1))
+  protected val BestBlockKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(hashLength)(-1))
 
   protected val historyStorage: HistoryStorage
 
@@ -189,7 +189,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
       Seq(BestHeaderKey -> ByteArrayWrapper(header.parentId))
     } else Seq()
     val bestFullBlockKeyUpdate = if (bestBlockIdOpt.exists(_ sameElements modifierId)) {
-      Seq(BestFullBlockKey -> ByteArrayWrapper(header.parentId))
+      Seq(BestBlockKey -> ByteArrayWrapper(header.parentId))
     } else Seq()
     (toRemove, bestFullBlockKeyUpdate ++ bestHeaderKeyUpdate)
 

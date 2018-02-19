@@ -17,7 +17,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
   /**
     * Id of header that contains transactions and proofs
     */
-  override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestFullBlockKey).map(ModifierId @@ _)
+  override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
 
   protected def getBlock(header: EncryBlockHeader): Option[EncryBlock]
 
@@ -110,7 +110,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
                             storageVersion: ByteArrayWrapper,
                             toApply: EncryBlock,
                             bestFullHeaderId: ModifierId): ProgressInfo[EncryPersistentModifier] = {
-    historyStorage.bulkInsert(storageVersion, Seq((BestFullBlockKey, ByteArrayWrapper(bestFullHeaderId))), Seq(newModRow))
+    historyStorage.bulkInsert(storageVersion, Seq((BestBlockKey, ByteArrayWrapper(bestFullHeaderId))), Seq(newModRow))
     ProgressInfo(None, Seq.empty, Some(toApply), Seq.empty)
   }
 }
