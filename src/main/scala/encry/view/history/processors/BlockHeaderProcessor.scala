@@ -14,7 +14,7 @@ import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.consensus.History.ProgressInfo
 import scorex.core.consensus.{History, ModifierSemanticValidity}
-import scorex.core.utils.ScorexLogging
+import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 import scorex.core.{ModifierId, ModifierTypeId}
 
 import scala.annotation.tailrec
@@ -23,6 +23,8 @@ import scala.util.{Failure, Success, Try}
 trait BlockHeaderProcessor extends ScorexLogging {
 
   protected val nodeSettings: NodeSettings
+
+  protected val timeProvider: NetworkTimeProvider
 
   private val chainParams = Constants.Chain
 
@@ -108,7 +110,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
       Failure(new Error(s"Parental header <id: ${header.parentId}> does not exist!"))
     } else if (header.height != parentOpt.get.height + 1) {
       Failure(new Error(s"Invalid height in header <id: ${header.id}>"))
-    } else if (!header.validTimestamp) {
+    } else if (header.timestamp - timeProvider.time() > Constants.Chain.maxTimeDrift) {
       Failure(new Error(s"Invalid timestamp in header <id: ${header.id}>"))
     } else if (header.timestamp < parentOpt.get.timestamp) {
       Failure(new Error("Header timestamp is less than parental`s"))

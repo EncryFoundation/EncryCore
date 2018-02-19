@@ -46,10 +46,6 @@ case class EncryBlockHeader(override val version: Version,
   override val dataToSign: Array[Byte] =
     getMessageToSign(version, proposition, parentId, adProofsRoot, stateRoot, txsRoot, timestamp, height, difficulty)
 
-  // Checks whether the block timestamp is less than
-  // two hours in the future (7200000ms) (allowing for time errors).
-  val validTimestamp: Boolean = (timestamp - System.currentTimeMillis()) < 7200000L
-
   lazy val isGenesis: Boolean = height == Constants.Chain.genesisHeight
 
   lazy val payloadId: ModifierId =

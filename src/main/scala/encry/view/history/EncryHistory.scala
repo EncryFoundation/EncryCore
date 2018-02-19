@@ -15,6 +15,7 @@ import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import scorex.core.ModifierId
 import scorex.core.consensus.History
 import scorex.core.consensus.History.ProgressInfo
+import scorex.core.utils.NetworkTimeProvider
 import scorex.crypto.encode.Base58
 
 import scala.util.Try
@@ -167,7 +168,7 @@ object EncryHistory {
     dir
   }
 
-  def readOrGenerate(settings: EncryAppSettings): EncryHistory = {
+  def readOrGenerate(settings: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistory = {
 
     val historyDir = getHistoryDir(settings)
 
@@ -182,16 +183,19 @@ object EncryHistory {
         new EncryHistory with ADStateProofProcessor with BlockPayloadProcessor {
           override protected val nodeSettings: NodeSettings = _nodeSettings
           override protected val historyStorage: HistoryStorage = storage
+          override protected val timeProvider: NetworkTimeProvider = ntp
         }
       case (false, true) =>
         new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
           override protected val nodeSettings: NodeSettings = _nodeSettings
           override protected val historyStorage: HistoryStorage = storage
+          override protected val timeProvider: NetworkTimeProvider = ntp
         }
       case (true, false) =>
         new EncryHistory with ADStateProofProcessor with EmptyBlockPayloadProcessor {
           override protected val nodeSettings: NodeSettings = _nodeSettings
           override protected val historyStorage: HistoryStorage = storage
+          override protected val timeProvider: NetworkTimeProvider = ntp
         }
       case m =>
         throw new Error(s"Unsupported settings combination ADState==${m._1}, verifyTransactions==${m._2}, ")

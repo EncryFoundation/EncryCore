@@ -64,7 +64,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     }.asInstanceOf[MS]
 
     //todo: ensure that history is in certain mode
-    val history = EncryHistory.readOrGenerate(settings)
+    val history = EncryHistory.readOrGenerate(settings, timeProvider)
 
     val wallet = EncryWallet.readOrGenerate(settings)
 
@@ -78,7 +78,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     * (e.g. if it is a first launch of a node) None is to be returned
     */
   override def restoreState: Option[NodeView] = if (!EncryHistory.getHistoryDir(settings).listFiles.isEmpty) {
-    val history = EncryHistory.readOrGenerate(settings)
+    val history = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet = EncryWallet.readOrGenerate(settings)
     val memPool = EncryMempool.empty(settings, timeProvider)
     val state = restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[MS], history)

@@ -34,9 +34,6 @@ class EncryBlock(override val header: EncryBlockHeader,
     } else if (!validCoinbase) {
       log.info(s"<Block ${header.encodedId}> Invalid coinbase transaction.")
       Failure(new Error("Invalid signature"))
-    } else if (!header.validTimestamp) {
-      log.info(s"<Block ${header.encodedId}> Invalid timestamp.")
-      Failure(new Error("Invalid timestamp"))
     } else if (!header.validSignature) {
       log.info(s"<Block ${header.encodedId}> Invalid timestamp signature.")
       Failure(new Error("Invalid signature"))

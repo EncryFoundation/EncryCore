@@ -3,7 +3,7 @@ package encry.local.mining
 import akka.actor.{Actor, ActorRef}
 import akka.pattern._
 import akka.util.Timeout
-import encry.consensus.{Difficulty, PowCandidateBlock, PowConsensus}
+import encry.consensus.{PowCandidateBlock, PowConsensus}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction}
@@ -106,7 +106,7 @@ class EncryMiner(viewHolderRef: ActorRef,
         lazy val timestamp = timeProvider.time()
         val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(0) + 1)
 
-        // Picks valid, non-conflicting txs with respect to its fee amount.
+        // `txsToPut` - valid, non-conflicting txs with respect to its fee amount.
         // `txsToDrop` - invalidated txs to be dropped from mempool.
         val (txsToPut, txsToDrop, _) = pool.takeAll.toSeq.sortBy(_.fee).reverse
           .foldLeft((Seq[EncryBaseTransaction](), Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) {
