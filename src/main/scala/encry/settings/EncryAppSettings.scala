@@ -12,7 +12,6 @@ import scorex.core.utils.ScorexLogging
 case class EncryAppSettings(directory: String,
                             testingSettings: TestingSettings,
                             nodeSettings: NodeSettings,
-                            walletSettings: WalletSettings,
                             keyManagerSettings: KeyManagerSettings,
                             scorexSettings: ScorexSettings)
 
@@ -30,11 +29,10 @@ object EncryAppSettings extends ScorexLogging with SettingsReaders {
     val directory = config.as[String](s"$configPath.directory")
     val nodeSettings = config.as[NodeSettings](s"$configPath.node")
     val testingSettings = config.as[TestingSettings](s"$configPath.testing")
-    val walletSettings = config.as[WalletSettings](s"$configPath.wallet")
     val keyManagerSettings = config.as[KeyManagerSettings](s"$configPath.keyManager")
     val scorexSettings = config.as[ScorexSettings](scorexConfigPath)
 
-    EncryAppSettings(directory, testingSettings, nodeSettings, walletSettings, keyManagerSettings, scorexSettings)
+    EncryAppSettings(directory, testingSettings, nodeSettings, keyManagerSettings, scorexSettings)
   }
 
   private def readConfigFromPath(userConfigPath: Option[String]): Config = {
