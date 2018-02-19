@@ -6,19 +6,19 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
-import encry.modifiers.mempool.{CoinbaseTransactionSerializer, EncryBaseTransaction, MempoolModifierSerializer}
+import encry.modifiers.mempool.{EncryBaseTransaction, MempoolModifierSerializer}
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.{EncryHistory, EncrySyncInfo}
 import encry.view.mempool.EncryMempool
 import encry.view.state.{DigestState, EncryState, UtxoState}
 import encry.view.wallet.EncryWallet
+import scorex.core._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.utils.NetworkTimeProvider
-import scorex.core._
 import scorex.crypto.authds.ADDigest
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings,
                                                                        timeProvider: NetworkTimeProvider)

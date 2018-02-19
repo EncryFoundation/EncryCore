@@ -1,17 +1,16 @@
 package encry.view.history.processors.payload
 
 import encry.modifiers.EncryPersistentModifier
+import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.{ADProofs, HistoryModifierSerializer}
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.view.history.storage.HistoryStorage
+import encry.settings.Algos
 import encry.view.history.processors.BlockProcessor
-import io.iohk.iodb.ByteArrayWrapper
+import encry.view.history.storage.HistoryStorage
 import scorex.core.consensus.History.ProgressInfo
-import scorex.crypto.encode.Base58
 
-import scala.util.{Failure, Try}
+import scala.util.{Failure, Success, Try}
 
 trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcessor {
 
@@ -23,44 +22,38 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
     historyStorage.modifierById(txs.headerId) match {
       case Some(header: EncryBlockHeader) =>
         historyStorage.modifierById(header.adProofsId) match {
+          case _ if !header.isGenesis && bestBlockIdOpt.isEmpty =>
+            //TODO light mode when start from different block ?
+            putToHistory(txs)
           case Some(adProof: ADProofs) =>
-            processBlock(new EncryBlock(header, txs, Some(adProof)), isNewerPayload = true)
+            processBlock(EncryBlock(header, txs, Some(adProof)), isNewerPayload = true)
           case None if !adState =>
-            processBlock(new EncryBlock(header, txs, None), isNewerPayload = true)
+            processBlock(EncryBlock(header, txs, None), isNewerPayload = true)
           case _ =>
-            val modifierRow = Seq((ByteArrayWrapper(txs.id), ByteArrayWrapper(HistoryModifierSerializer.toBytes(txs))))
-            historyStorage.insert(ByteArrayWrapper(txs.id), modifierRow)
-            ProgressInfo(None, Seq(), None, Seq())
+            putToHistory(txs)
         }
       case _ =>
         throw new Error(s"Header for modifier $txs is no defined")
     }
   }
 
-  override protected def validate(m: EncryBlockPayload): Try[Unit] = Try {
-
-    if (historyStorage.containsObject(m.id))
+  override protected def validate(m: EncryBlockPayload): Try[Unit] = {
+    if(historyStorage.containsObject(m.id)) {
       Failure(new Error(s"Modifier $m is already in history"))
-
-    historyStorage.modifierById(m.headerId) match {
-      case Some(header: EncryBlockHeader) =>
-        if (!(header.txsRoot sameElements m.digest))
-          Failure(new Error(s"Header transactions root ${Base58.encode(header.txsRoot)} differs from block transactions $m digest"))
-
-        bestBlockIdOpt match {
-          case None if nodeSettings.blocksToKeep < 0 =>
-            if (!header.isGenesis)
-              Failure(new Error("Trying to apply non-genesis block to empty history in fullnode mode"))
-          case None if nodeSettings.blocksToKeep >= 0 =>
-          // TODO: State should be at this version!
-          case Some(_) =>
-            // TODO: `contains()` is unimplemented.
-            if (!typedModifierById[EncryBlockHeader](header.parentId).exists(h => contains(h.payloadId)))
-              Failure(new Error("Trying to apply transactions for header, which parent transactions are empty"))
-        }
-
-      case _ =>
-        throw new Error(s"Header for modifier $m does not exist")
+    } else {
+      historyStorage.modifierById(m.headerId) match {
+        case None =>
+          Failure(new Error(s"Header for modifier $m is undefined"))
+        case Some(header: EncryBlockHeader) if !(header.txsRoot sameElements m.digest) =>
+          Failure(new Error(s"Header transactions root ${Algos.encode(header.adProofsRoot)} differs from $m digest"))
+        case Some(_: EncryBlockHeader) =>
+          Success()
+      }
     }
+  }
+
+  private def putToHistory(txs: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] = {
+    historyStorage.insertObjects(Seq(txs))
+    ProgressInfo(None, Seq.empty, None, Seq.empty)
   }
 }

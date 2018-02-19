@@ -13,9 +13,9 @@ import scorex.core.{ModifierId, ModifierTypeId}
 
 import scala.util.{Failure, Success, Try}
 
-class EncryBlock(override val header: EncryBlockHeader,
-                 override val payload: EncryBlockPayload,
-                 val adProofsOpt: Option[ADProofs]) extends EncryBaseBlock {
+case class EncryBlock(override val header: EncryBlockHeader,
+                      override val payload: EncryBlockPayload,
+                      adProofsOpt: Option[ADProofs]) extends EncryBaseBlock {
 
   override type M = EncryBlock
 
