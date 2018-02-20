@@ -25,17 +25,16 @@ object AddressProposition {
 
   def getAddrBytes(address: Address): Array[Byte] = Base58.decode(address).get
 
-  // TODO: Use this in transaction.semanticValidity.
   def validAddress(address: Address): Boolean = {
     val addrBytes: Array[Byte] = getAddrBytes(address)
-      if (addrBytes.length != AddressLength) false
-      else {
-        val checkSum = addrBytes.takeRight(ChecksumLength)
-        val checkSumGenerated = calcCheckSum(addrBytes.dropRight(ChecksumLength))
-        if (checkSum.sameElements(checkSumGenerated)) true
-        else false
-      }
+    if (addrBytes.length != AddressLength) false
+    else {
+      val checkSum = addrBytes.takeRight(ChecksumLength)
+      val checkSumGenerated = calcCheckSum(addrBytes.dropRight(ChecksumLength))
+      if (checkSum.sameElements(checkSumGenerated)) true
+      else false
     }
+  }
 }
 
 object AddressPropositionSerializer extends Serializer[AddressProposition] {
