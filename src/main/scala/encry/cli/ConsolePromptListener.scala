@@ -45,7 +45,7 @@ case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryApp
             parseCommand(input).slice(1, parseCommand(input).length).foreach { command =>
               value.get(command.split("=").head) match {
                 case Some(cmd) =>
-                  println(cmd.execute(nodeViewHolderRef, command.split("="), settings).map(_.inner).getOrElse(""))
+                  println(cmd.execute(nodeViewHolderRef, command.split("="), settings).map(_.msg).getOrElse(""))
                 case None =>
                   println("Unsupported command. Type 'app -help' to get commands list")
               }

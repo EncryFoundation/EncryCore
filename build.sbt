@@ -61,6 +61,8 @@ libraryDependencies ++= Seq(
   "io.monix" %% "monix" % "2.3.3"
 ) ++ networkDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
 
+fork := true
+
 val opts = Seq(
   "-server",
   // JVM memory tuning for 2g ram
@@ -86,6 +88,17 @@ val opts = Seq(
 
 // -J prefix is required by the bash script
 javaOptions in run ++= opts
+
+mainClass in assembly := Some("encry.EncryApp")
+
+test in assembly := {}
+
+assemblyMergeStrategy in assembly := {
+  case "logback.xml" => MergeStrategy.first
+  case "module-info.class" => MergeStrategy.discard
+  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+  case other => MergeStrategy.first
+}
 
 sourceGenerators in Compile += Def.task {
   val versionFile = (sourceManaged in Compile).value / "encry" / "Version.scala"
