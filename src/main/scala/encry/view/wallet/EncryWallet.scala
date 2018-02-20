@@ -68,7 +68,7 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
     Try(walletStore.rollback(wrappedVersion)).map(_ => this)
   }
 
-  private def updateWallet(modifierId: ModifierId, newTxs: Seq[EncryBaseTransaction]): Unit = Future {
+  private def updateWallet(modifierId: ModifierId, newTxs: Seq[EncryBaseTransaction]): Future[Unit] = Future {
 
     import WalletStorage._
 
