@@ -51,56 +51,56 @@ trait StateIndexManager extends ScorexLogging {
 
   // TODO: Refactoring. Too many lines of code in one method.
   private def toIndexModificationsMap(txs: Seq[EncryBaseTransaction]) = {
-    val idxModificationsMap = mutable.HashMap.empty[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]
+    val modifications = mutable.TreeMap.empty[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]
     txs.foreach { tx =>
       tx.useBoxes.foreach { id =>
         id.head match {
           case AssetBox.typeId =>
-            idxModificationsMap.get(Address @@ tx.proposition.address) match {
+            modifications.get(Address @@ tx.proposition.address) match {
               case Some(t) =>
                 if (t._2.exists(_.sameElements(id))) t._2.remove(id)
                 else t._1.add(id)
               case None =>
-                idxModificationsMap.update(
+                modifications.update(
                   Address @@ tx.proposition.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
             }
           case OpenBox.typeId =>
-            idxModificationsMap.get(openBoxesAddress) match {
+            modifications.get(openBoxesAddress) match {
               case Some(t) =>
                 if (t._2.exists(_.sameElements(id))) t._2.remove(id)
                 else t._1.add(id)
               case None =>
-                idxModificationsMap.update(openBoxesAddress, mutable.Set(id) -> mutable.Set.empty[ADKey])
+                modifications.update(openBoxesAddress, mutable.Set(id) -> mutable.Set.empty[ADKey])
             }
         }
       }
       tx.newBoxes.foreach {
         case bx: AssetBox =>
-          idxModificationsMap.get(bx.proposition.address) match {
+          modifications.get(bx.proposition.address) match {
             case Some(t) => t._2.add(bx.id)
-            case None => idxModificationsMap.update(
+            case None => modifications.update(
               bx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
           }
         case bx: PubKeyInfoBox =>
-          idxModificationsMap.get(bx.proposition.address) match {
+          modifications.get(bx.proposition.address) match {
             case Some(t) => t._2.add(bx.id)
-            case None => idxModificationsMap.update(
+            case None => modifications.update(
               bx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
           }
         case bx: OpenBox =>
-          idxModificationsMap.get(openBoxesAddress) match {
+          modifications.get(openBoxesAddress) match {
             case Some(t) => t._2.add(bx.id)
-            case None => idxModificationsMap.update(openBoxesAddress, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
+            case None => modifications.update(openBoxesAddress, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
           }
       }
     }
-    idxModificationsMap
+    modifications.toIndexedSeq
   }
 
   def bulkUpdateIndex(version: ModifierId,
-                      opsMap: mutable.HashMap[Address, (mutable.Set[ADKey], mutable.Set[ADKey])],
+                      modifications: IndexedSeq[(Address, (mutable.Set[ADKey], mutable.Set[ADKey]))],
                       modHeightOpt: Option[Height]): Unit = {
-    val opsFinal = opsMap
+    val modSummary = modifications
       .foldLeft(Seq[(Address, Seq[ADKey])](), Seq[(Address, Seq[ADKey])]()) {
         case ((bNew, bExs), (addr, (toRem, toIns))) =>
           val bxsOpt = indexStorage.boxIdsByAddress(addr)
@@ -116,17 +116,15 @@ trait StateIndexManager extends ScorexLogging {
 
     log.info(s"Updating StateIndex for mod: ${Algos.encode(version)}")
 
-    val toRemove = {
-      if (modHeightOpt.isDefined) opsFinal._2.map(i => keyByAddress(i._1)) :+ stateHeightKey
-      else opsFinal._2.map(i => keyByAddress(i._1))
-    }
+    val toRemove = modHeightOpt.map(_ => modSummary._2.map(i => keyByAddress(i._1)) :+ stateHeightKey)
+      .getOrElse(modSummary._2.map(i => keyByAddress(i._1)))
 
     val toInsert = {
-      val bxsOps = (opsFinal._1 ++ opsFinal._2).map { case (addr, ids) =>
+      val bxsOps = (modSummary._1 ++ modSummary._2).map { case (addr, ids) =>
         keyByAddress(addr) -> ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
       }
-      if (modHeightOpt.isDefined) bxsOps :+ (stateHeightKey, ByteArrayWrapper(Ints.toByteArray(modHeightOpt.get)))
-      else bxsOps
+      modHeightOpt.map(_ => bxsOps :+ (stateHeightKey, ByteArrayWrapper(Ints.toByteArray(modHeightOpt.get))))
+        .getOrElse(bxsOps)
     }
 
     indexStorage.updateWithReplacement(version, toRemove, toInsert)
@@ -141,8 +139,8 @@ trait StateIndexManager extends ScorexLogging {
 
 object StateIndexManager {
 
-  // OpenBoxes are stored in index under this addr for consensus.
-  val openBoxesAddress: Address = Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp"
+  // OpenBoxes are stored in index under this addr.
+  val openBoxesAddress: Address = Address @@ "4kYwt36bmG7U9Stumey79nYN7NEEV4VEibsXWnce7RUT4FRaM3"
 
   val stateHeightKey: ByteArrayWrapper = ByteArrayWrapper(Algos.hash("state_height".getBytes))
 
