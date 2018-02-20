@@ -23,10 +23,10 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition
     updateWithReplacement(ByteArrayWrapper(id), idsToReplace, toInsert)
 
   def packBoxIds(ids: Seq[ADKey]): ByteArrayWrapper =
-    new ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
+    ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
 
   def packTransactionIds(ids: Seq[ModifierId]): ByteArrayWrapper =
-    new ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
+    ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
 
   def getBoxIds: Seq[ADKey] =
     parseComplexValue(boxIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
