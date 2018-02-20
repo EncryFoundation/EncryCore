@@ -10,7 +10,7 @@ import org.scalatest.{Matchers, PropSpec}
 
 class TransactionsApiRouteSpec extends PropSpec with Matchers {
 
-  private val tx = InstanceFactory.paymentTransactionValid
+  private val tx = InstanceFactory.paymentTransactionValid()
 
   property("payment tx deserialization in sendTransactionR") {
 

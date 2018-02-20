@@ -242,7 +242,7 @@ object KeyManager extends ScorexLogging {
 
   val countKey = new ByteArrayWrapper(Algos.hash("count"))
 
-  def getKeysDir(settings: EncryAppSettings) = new File(s"${settings.directory}/keys")
+  def getKeysDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/keys")
 
   def readOrGenerate(settings: EncryAppSettings,
                      password: Option[Array[Byte]] = Option(Array[Byte]()),

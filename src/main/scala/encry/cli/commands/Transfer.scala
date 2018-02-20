@@ -43,7 +43,7 @@ object Transfer extends Command {
           val amount = args(1).split(";").last.toLong
           val proposition = view.vault.keyManager.keys.head.publicImage
           val timestamp = System.currentTimeMillis()  // TODO: Use NTP.
-          val boxes = view.vault.walletStorage.getAllBoxes.foldLeft(Seq[AssetBox]()) {
+          val boxes = view.vault.walletStorage.getAllBoxes.filter(_.isInstanceOf[AssetBox]).map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) {
             case (seq, box) => if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
           }
           val useBoxes = boxes.map(_.id).toIndexedSeq

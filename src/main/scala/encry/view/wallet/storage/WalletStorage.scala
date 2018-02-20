@@ -1,7 +1,7 @@
 package encry.view.wallet.storage
 
 import encry.modifiers.mempool.{PaymentTransaction, PaymentTransactionSerializer}
-import encry.modifiers.state.box.{AssetBox, AssetBoxSerializer}
+import encry.modifiers.state.box._
 import encry.settings.Algos
 import encry.view.EncryBaseStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
@@ -33,12 +33,25 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition
   def getTransactionIds: Seq[ModifierId] =
     parseComplexValue(transactionIdsKey, 32).map(ModifierId @@ _).getOrElse(Seq())
 
-  def getBoxById(id: ADKey): Option[AssetBox] = Try {
-      AssetBoxSerializer.parseBytes(db.get(boxKeyById(id)).get.data).get
+  def getBoxById(id: ADKey): Option[EncryBaseBox] = Try {
+
+    val boxRaw = db.get(boxKeyById(id)).map(_.data).getOrElse(Array(-1: Byte))
+    val box = boxRaw.head match {
+      case AssetBox.typeId => {
+        val boxBB = AssetBoxSerializer.parseBytes(boxRaw.slice(1, boxRaw.length)).get
+        boxBB
+      }
+      case PubKeyInfoBox.typeId => {
+        val boxBB = PubKeyInfoBoxSerializer.parseBytes(boxRaw.slice(1, boxRaw.length)).get
+        boxBB
+      }
+      case -1 => throw new Error("Box doesn't exist in store")
+    }
+    box
     }.toOption
 
-  def getAllBoxes: Seq[AssetBox] =
-    getBoxIds.foldLeft(Seq[AssetBox]()) { case (buff, id) =>
+  def getAllBoxes: Seq[EncryBaseBox] =
+    getBoxIds.foldLeft(Seq[EncryBaseBox]()) { case (buff, id) =>
       val bx = getBoxById(id)
       if (bx.isDefined) buff :+ bx.get else buff
     }

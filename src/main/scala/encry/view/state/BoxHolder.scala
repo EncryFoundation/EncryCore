@@ -22,7 +22,7 @@ class BoxHolder(val boxes: SortedMap[ByteArrayWrapper, EncryBaseBox]) {
 
   def sortedBoxes: Set[EncryBaseBox] = boxes.keySet.map(k => boxes(k))
 
-  override def toString = s"BoxHolder(${boxes.size} boxes inside)"
+  override def toString: String = s"BoxHolder(${boxes.size} boxes inside)"
 }
 
 object BoxHolder {
