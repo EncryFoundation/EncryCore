@@ -2,14 +2,13 @@ package encry.view.wallet
 
 import java.io.File
 
-import akka.actor.Status.Success
 import com.google.common.primitives.Longs
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.AddressProposition
-import encry.modifiers.state.box.{AmountCarryingBox, AssetBox, AssetBoxSerializer, EncryBaseBox}
-import encry.settings.{Algos, Constants, EncryAppSettings}
+import encry.modifiers.state.box.{AmountCarryingBox, EncryBaseBox}
+import encry.settings.{Constants, EncryAppSettings}
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
@@ -20,11 +19,8 @@ import scorex.core.utils.ScorexLogging
 import scorex.core.{ModifierId, VersionTag}
 import scorex.crypto.authds.ADKey
 
-
-import scala.concurrent.Await
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.util.Try
 
 class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
@@ -60,7 +56,7 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
           if (accountRelBxs.nonEmpty || publicKeys.exists(_.pubKeyBytes.sameElements(tx.proposition.pubKeyBytes))) acc :+ tx
           else acc
         })
-        Await.result(updateWallet(modifier.id, accountRelTxs), 5.seconds)
+        updateWallet(modifier.id, accountRelTxs)
         this
       }
         case _ =>
@@ -77,7 +73,7 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
 
     import WalletStorage._
 
-    def extractACBxs(bxs: Seq[EncryBaseBox]): Seq[AmountCarryingBox] =
+    def extractAcbxs(bxs: Seq[EncryBaseBox]): Seq[AmountCarryingBox] =
       bxs.foldLeft(Seq[AmountCarryingBox]())((acc, bx) => bx match {
         case acbx: AmountCarryingBox => acc :+ acbx
         case _ => acc
@@ -101,15 +97,15 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
       walletStorage.packBoxIds(currentBxIds.filter(id =>
         !bxIdsToRemove.exists(_ sameElements id)) ++ bxsToInsert.map(_.id))
 
-    val newBalanceRaw = ByteArrayWrapper(Longs.toByteArray(getAvailableBoxes
-      .filter(bx => !bxIdsToRemove.contains(bx.id) & bx.isInstanceOf[AssetBox])
-      .foldLeft(0L)(_ + _.asInstanceOf[AssetBox].amount) + extractACBxs(bxsToInsert).foldLeft(0L)(_ + _.amount)))
+    val newBalanceRaw = ByteArrayWrapper(Longs.toByteArray(extractAcbxs(getAvailableBoxes.filter(bx =>
+      !bxIdsToRemove.exists(_ sameElements bx.id))).foldLeft(0L)(_ + _.amount) +
+      extractAcbxs(bxsToInsert).foldLeft(0L)(_ + _.amount)))
 
     val toRemoveSummary = bxIdsToRemove.map(boxKeyById) ++ Seq(balanceKey, transactionIdsKey, boxIdsKey)
     val toInsertSummary =
       Seq(transactionIdsKey -> txIdsToInsertRaw, boxIdsKey -> bxIdsToInsertRaw, balanceKey -> newBalanceRaw) ++
-        bxsToInsert.map(bx => boxKeyById(bx.id) -> ByteArrayWrapper(bx.typeId +: bx.bytes)) ++
-        newTxs.map(tx => txKeyById(tx.id) -> ByteArrayWrapper(tx.typeId +:tx.bytes))
+        bxsToInsert.map(bx => boxKeyById(bx.id) -> ByteArrayWrapper(bx.bytes)) ++
+        newTxs.map(tx => txKeyById(tx.id) -> ByteArrayWrapper(tx.bytes))
 
     walletStorage.updateWithReplacement(modifierId, toRemoveSummary, toInsertSummary)
   }
