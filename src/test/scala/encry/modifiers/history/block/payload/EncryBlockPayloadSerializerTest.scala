@@ -27,7 +27,7 @@ class EncryBlockPayloadSerializerTest extends FunSuite {
         PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
       )
       PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
-    } :+ InstanceFactory.addPubKeyInfoTransaction :+ InstanceFactory.coinbaseTransaction
+    } :+ InstanceFactory.addPubKeyInfoTransaction() :+ InstanceFactory.coinbaseTransaction
 
     val blockPayload = new EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), txs)
 

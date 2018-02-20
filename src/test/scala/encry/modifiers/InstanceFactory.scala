@@ -19,8 +19,7 @@ object InstanceFactory {
   private val key = genHelper.getOrGenerateKeys(genHelper.Props.keysFilePath).head
   private val timestamp = System.currentTimeMillis()
 
-  val paymentTransactionValid: PaymentTransaction = {
-    val proposition = key.publicImage
+  def paymentTransactionValid(proposition: PublicKey25519Proposition = key.publicImage): PaymentTransaction = {
     val fee = genHelper.Props.txFee
     val useBoxes = IndexedSeq(genHelper.genAssetBox(Address @@ key.publicImage.address),
       genHelper.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
@@ -33,8 +32,7 @@ object InstanceFactory {
     PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
   }
 
-  val paymentTransactionInvalid: PaymentTransaction = {
-    val proposition = key.publicImage
+  def paymentTransactionInvalid(proposition: PublicKey25519Proposition = key.publicImage): PaymentTransaction = {
     val fee = genHelper.Props.txFee
     val useBoxes = IndexedSeq(genHelper.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
     val outputs = IndexedSeq((Address @@ genHelper.Props.recipientAddr, genHelper.Props.boxValue))
@@ -51,8 +49,7 @@ object InstanceFactory {
     Height @@ 0
   )
 
-  val addPubKeyInfoTransaction: AddPubKeyInfoTransaction = {
-    val proposition = key.publicImage
+  def addPubKeyInfoTransaction(proposition: PublicKey25519Proposition = key.publicImage): AddPubKeyInfoTransaction = {
     val fee = genHelper.Props.txFee
     val change = 20L
     val useBoxes = IndexedSeq(genHelper.genAssetBox(Address @@ key.publicImage.address),

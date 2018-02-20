@@ -1,5 +1,6 @@
 package encry.view
 
+import encry.settings.Algos
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.core.utils.ScorexLogging
 

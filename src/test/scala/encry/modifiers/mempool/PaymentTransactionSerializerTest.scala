@@ -7,7 +7,7 @@ class PaymentTransactionSerializerTest extends FunSuite {
 
   test("toBytes & parseBytes") {
 
-    val tx = InstanceFactory.paymentTransactionValid
+    val tx = InstanceFactory.paymentTransactionValid()
 
     val txSerialized = tx.bytes
 

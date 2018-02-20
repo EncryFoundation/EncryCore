@@ -47,7 +47,7 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
 
   override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = {
     modifier match {
-      case block: EncryBlock =>
+      case block: EncryBlock => {
         val accountRelTxs = block.transactions.foldLeft(Seq[EncryBaseTransaction]())((acc, tx) => {
           val accountRelBxs = tx.newBoxes.foldLeft(Seq[EncryBaseBox]())((acc2, bx) => bx.proposition match {
             case ap: AddressProposition if publicKeys.exists(_.address == ap.address) => acc2 :+ bx
@@ -58,8 +58,9 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
         })
         updateWallet(modifier.id, accountRelTxs)
         this
-      case _ =>
-        this
+      }
+        case _ =>
+          this
     }
   }
 
@@ -72,7 +73,7 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
 
     import WalletStorage._
 
-    def extractACBxs(bxs: Seq[EncryBaseBox]): Seq[AmountCarryingBox] =
+    def extractAcbxs(bxs: Seq[EncryBaseBox]): Seq[AmountCarryingBox] =
       bxs.foldLeft(Seq[AmountCarryingBox]())((acc, bx) => bx match {
         case acbx: AmountCarryingBox => acc :+ acbx
         case _ => acc
@@ -96,9 +97,9 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
       walletStorage.packBoxIds(currentBxIds.filter(id =>
         !bxIdsToRemove.exists(_ sameElements id)) ++ bxsToInsert.map(_.id))
 
-    val newBalanceRaw = ByteArrayWrapper(Longs.toByteArray(getAvailableBoxes.filter(bx =>
-      !bxIdsToRemove.exists(_ sameElements bx.id)).foldLeft(0L)(_ + _.amount) +
-        extractACBxs(bxsToInsert).foldLeft(0L)(_ + _.amount)))
+    val newBalanceRaw = ByteArrayWrapper(Longs.toByteArray(extractAcbxs(getAvailableBoxes.filter(bx =>
+      !bxIdsToRemove.exists(_ sameElements bx.id))).foldLeft(0L)(_ + _.amount) +
+      extractAcbxs(bxsToInsert).foldLeft(0L)(_ + _.amount)))
 
     val toRemoveSummary = bxIdsToRemove.map(boxKeyById) ++ Seq(balanceKey, transactionIdsKey, boxIdsKey)
     val toInsertSummary =

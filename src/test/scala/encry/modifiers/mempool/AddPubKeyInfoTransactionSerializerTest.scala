@@ -7,7 +7,7 @@ class AddPubKeyInfoTransactionSerializerTest extends FunSuite {
 
   test("toBytes & parseBytes") {
 
-    val tx = InstanceFactory.addPubKeyInfoTransaction
+    val tx = InstanceFactory.addPubKeyInfoTransaction()
 
     val txSerialized = tx.bytes
 

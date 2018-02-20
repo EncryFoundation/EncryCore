@@ -1,7 +1,8 @@
 package encry.view.wallet.storage
 
 import encry.modifiers.mempool.{PaymentTransaction, PaymentTransactionSerializer}
-import encry.modifiers.state.box.{AssetBox, AssetBoxSerializer}
+import encry.modifiers.state.StateModifierDeserializer
+import encry.modifiers.state.box._
 import encry.settings.Algos
 import encry.view.EncryBaseStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
@@ -22,10 +23,10 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition
     updateWithReplacement(ByteArrayWrapper(id), idsToReplace, toInsert)
 
   def packBoxIds(ids: Seq[ADKey]): ByteArrayWrapper =
-    new ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
+    ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
 
   def packTransactionIds(ids: Seq[ModifierId]): ByteArrayWrapper =
-    new ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
+    ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
 
   def getBoxIds: Seq[ADKey] =
     parseComplexValue(boxIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
@@ -33,12 +34,11 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition
   def getTransactionIds: Seq[ModifierId] =
     parseComplexValue(transactionIdsKey, 32).map(ModifierId @@ _).getOrElse(Seq())
 
-  def getBoxById(id: ADKey): Option[AssetBox] = Try {
-      AssetBoxSerializer.parseBytes(db.get(boxKeyById(id)).get.data).get
-    }.toOption
+  def getBoxById(id: ADKey): Option[EncryBaseBox] = db.get(boxKeyById(id))
+    .flatMap(d => StateModifierDeserializer.parseBytes(d.data, id.head).toOption)
 
-  def getAllBoxes: Seq[AssetBox] =
-    getBoxIds.foldLeft(Seq[AssetBox]()) { case (buff, id) =>
+  def getAllBoxes: Seq[EncryBaseBox] =
+    getBoxIds.foldLeft(Seq[EncryBaseBox]()) { case (buff, id) =>
       val bx = getBoxById(id)
       if (bx.isDefined) buff :+ bx.get else buff
     }

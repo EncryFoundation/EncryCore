@@ -3,7 +3,6 @@
 ### Milestone 0
 - POW Consensus Algo implementation
 - Distributed State Machine implementation
-- 
 - 2 hardcoded types of transactions:
     + PaymentTransaction (Provides user with the ability to transfer intrinsic tokens (ETT))
     + AddPubKeyInfoTransaction (PKI)
