@@ -5,7 +5,7 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.settings.NodeSettings
+import encry.settings.{Algos, NodeSettings}
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
@@ -148,10 +148,8 @@ trait EncryHistoryReader
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(EncryHeaderChain.empty)
 
   override def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
-    historyStorage.modifierById(id) match {
-      case Some(mod) if mod.id sameElements id => Some(mod)
-      case _ => None
-    }
+    historyStorage.modifierById(id)
+      .ensuring(_.forall(_.id sameElements id), s"Modifier ${Algos.encode(id)} id mismatch")
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T] = modifierById(id) match {
     case Some(m: T@unchecked) if m.isInstanceOf[T] => Some(m)
