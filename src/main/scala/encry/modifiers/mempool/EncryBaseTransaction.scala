@@ -15,8 +15,6 @@ import scala.util.Try
 
 trait EncryBaseTransaction extends Transaction[Proposition] with Signable25519 with ModifierWithSizeLimit {
 
-  override val modifierTypeId: ModifierTypeId = EncryBaseTransaction.ModifierTypeId
-
   val txHash: Digest32
 
   val dataToSign: Array[Byte] = txHash
@@ -45,10 +43,4 @@ trait EncryBaseTransaction extends Transaction[Proposition] with Signable25519 w
 
   // Shadowed.
   override val messageToSign: Array[TxTypeId] = Array.fill(32)(1.toByte)
-}
-
-object EncryBaseTransaction {
-
-  // Type of the transaction as the whole class of modifiers.
-  val ModifierTypeId: scorex.core.ModifierTypeId = scorex.core.ModifierTypeId @@ 2.toByte
 }

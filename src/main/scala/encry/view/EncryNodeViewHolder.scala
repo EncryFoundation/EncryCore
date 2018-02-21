@@ -14,6 +14,7 @@ import encry.view.state.{DigestState, EncryState, UtxoState}
 import encry.view.wallet.EncryWallet
 import scorex.core._
 import scorex.core.serialization.Serializer
+import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.utils.NetworkTimeProvider
 import scorex.crypto.authds.ADDigest
@@ -24,8 +25,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
                                                                        timeProvider: NetworkTimeProvider)
   extends NodeViewHolder[Proposition, EncryBaseTransaction, EncryPersistentModifier] {
 
-  // TODO: `settings.scorexSettings.network.networkChunkSize` should be used here.
-  override val networkChunkSize: Int = 400
+  override val networkChunkSize: Int = settings.scorexSettings.network.networkChunkSize
 
   override type MS = StateType
   override type SI = EncrySyncInfo
@@ -37,7 +37,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     EncryBlockHeader.modifierTypeId     -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId    -> EncryBlockPayloadSerializer,
     ADProofs.modifierTypeId             -> ADProofSerializer,
-    EncryBaseTransaction.ModifierTypeId -> MempoolModifierSerializer
+    Transaction.ModifierTypeId          -> MempoolModifierSerializer
   )
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
