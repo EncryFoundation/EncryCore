@@ -141,7 +141,7 @@ trait EncryHistoryReader
     }
   }
 
-  // Checks whether the `modifier` is applicable to the `history`.
+  // Checks whether the modifier is applicable to the history.
   override def applicable(modifier: EncryPersistentModifier): Boolean = testApplicable(modifier).isSuccess
 
   def lastHeaders(count: Int): EncryHeaderChain = bestHeaderOpt
@@ -159,7 +159,7 @@ trait EncryHistoryReader
   def getBlock(header: EncryBlockHeader): Option[EncryBlock] = {
     val aDProofs = typedModifierById[ADProofs](header.adProofsId)
     typedModifierById[EncryBlockPayload](header.payloadId).map { txs =>
-      new EncryBlock(header, txs, aDProofs)
+      EncryBlock(header, txs, aDProofs)
     }
   }
 
@@ -169,9 +169,8 @@ trait EncryHistoryReader
         .flatMap(h => headerChainBack(bestHeaderHeight + 1, h, _ => false).headers)
         .flatMap(h => Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId)))
         .filter(id => !contains(id._2))
-    }
-    else {
-      Seq()
+    } else {
+      Seq.empty
     }
   }
 
@@ -230,7 +229,7 @@ trait EncryHistoryReader
   }
 
   override def syncInfo: EncrySyncInfo = if (isEmpty) {
-    EncrySyncInfo(Seq())
+    EncrySyncInfo(Seq.empty)
   } else {
     EncrySyncInfo(lastHeaders(EncrySyncInfo.MaxBlockIds).headers.map(_.id))
   }
