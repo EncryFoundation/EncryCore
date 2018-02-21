@@ -4,7 +4,6 @@ import io.iohk.iodb.Store
 import scorex.crypto.authds.{ADKey, Balance}
 import scorex.crypto.hash.{Digest, ThreadUnsafeHash}
 
-
 class ProxyInternalProverNode[D <: Digest](protected var pk: ADKey,
                                            val lkey: ADKey,
                                            val rkey: ADKey,
@@ -24,5 +23,3 @@ class ProxyInternalProverNode[D <: Digest](protected var pk: ADKey,
     r
   }
 }
-
-

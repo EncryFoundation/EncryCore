@@ -1,9 +1,8 @@
-package encry.view.state
+package scorex.crypto.authds.avltree.batch
 
 import encry.utils.FileHelper
 import io.iohk.iodb.{LSMStore, Store}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 import scorex.utils.Random
@@ -17,7 +16,7 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
   val stateStore: Store = new LSMStore(FileHelper.getRandomTempDir)
 
   private lazy val np =
-    NodeParameters(keySize = 32, labelSize = 32)
+    NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
 
   protected lazy val storage = new VersionedIODBAVLStorage(stateStore, np)
 

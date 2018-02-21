@@ -54,7 +54,6 @@ libraryDependencies ++= Seq(
   "org.rudogma" %% "supertagged" % "1.+",
   "org.scorexfoundation" %% "scorex-core" % scorexVersion,
   "org.scorexfoundation" %% "iodb" % "0.3.2",
-//  "org.scorexfoundation" %% "avl-iodb" % "0.2.11",
   "org.scorexfoundation" %% "scrypto" % "2.0.3",
   "com.storm-enroute" %% "scalameter" % "0.8.+",
   "io.spray" %%  "spray-json" % "1.3.3",
@@ -96,8 +95,7 @@ test in assembly := {}
 assemblyMergeStrategy in assembly := {
   case "logback.xml" => MergeStrategy.first
   case "module-info.class" => MergeStrategy.discard
-  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
-  case other => MergeStrategy.first
+  case _ => MergeStrategy.first
 }
 
 sourceGenerators in Compile += Def.task {
