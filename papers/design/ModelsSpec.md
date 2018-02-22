@@ -1,3 +1,7 @@
+## Address Type
+Identifies particular instance of proposition.
+
+    type Address = String             // Base58 encoded string.  
 
 ## Account Model
 Represents the owner of the Public/Private key pair.

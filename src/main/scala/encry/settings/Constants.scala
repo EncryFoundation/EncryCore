@@ -7,9 +7,9 @@ import scala.concurrent.duration._
 
 object Constants {
 
-  val hashLength: Int = 32
+  val digestLength: Int = 32
 
-  val ModifierIdSize: Int = hashLength
+  val ModifierIdSize: Int = digestLength
 
   val keepVersions: Int = 200
 
@@ -43,7 +43,7 @@ object Constants {
 
     val blockMaxSize = 10000
 
-    val maxTarget = BigInt(1, Array.fill(hashLength)((-1).toByte))
+    val maxTarget = BigInt(1, Array.fill(digestLength)((-1).toByte))
 
     val genesisHeight: Height = Height @@ 1
 

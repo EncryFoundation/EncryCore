@@ -71,7 +71,7 @@ object EncryBlockHeader {
 
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (101: Byte)
 
-  lazy val GenesisParentId: ModifierId = ModifierId @@ Array.fill(Constants.hashLength)(0: Byte)
+  lazy val GenesisParentId: ModifierId = ModifierId @@ Array.fill(Constants.digestLength)(0: Byte)
 
   def getHash(version: Version,
               proposition: PublicKey25519Proposition,

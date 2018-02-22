@@ -33,9 +33,9 @@ trait BlockHeaderProcessor extends ScorexLogging {
   protected val charsetName: String = "UTF-8"
 
   protected val BestHeaderKey: ByteArrayWrapper =
-    ByteArrayWrapper(Array.fill(hashLength)(EncryBlockHeader.modifierTypeId))
+    ByteArrayWrapper(Array.fill(digestLength)(EncryBlockHeader.modifierTypeId))
 
-  protected val BestBlockKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(hashLength)(-1))
+  protected val BestBlockKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(digestLength)(-1))
 
   protected val historyStorage: HistoryStorage
 
