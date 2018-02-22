@@ -1,18 +1,13 @@
-## Address Type
-Identifies particular instance of proposition.
-
-    type Address = String             // Base58 encoded string.  
 
 ## Account Model
 Represents the owner of the Public/Private key pair.
 
-    publicKey: PublicKey
+    address: String             // Derived from PublicKey. Base58Check encoded string.  
 
 ## Base Proposition Model
 Defines requirements for box unlocking.
 
-    baseData: Array[Byte]       // pubKeyBytes, Script, etc.
-    address: String             // Derived from baseData.
+    ???: Array[Byte]            // pubKeyBytes, Script, etc.
     
 ## Context Model
 Context holds the external information. (required for box unlocking)
