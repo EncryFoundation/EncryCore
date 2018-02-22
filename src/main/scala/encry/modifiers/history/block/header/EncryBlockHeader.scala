@@ -1,7 +1,7 @@
 package encry.modifiers.history.block.header
 
 import com.google.common.primitives.{Ints, _}
-import encry.consensus.Difficulty
+import encry.consensus.{Difficulty, DifficultySerializer}
 import encry.modifiers.ModifierWithDigest
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.payload.EncryBlockPayload
@@ -93,7 +93,7 @@ object EncryBlockHeader {
       Longs.toByteArray(timestamp),
       Ints.toByteArray(height),
       Longs.toByteArray(nonce),
-      difficulty.toByteArray
+      DifficultySerializer.toBytes(difficulty)
     )
   )
 
@@ -115,14 +115,14 @@ object EncryBlockHeader {
       txsRoot,
       Longs.toByteArray(timestamp),
       Ints.toByteArray(height),
-      difficulty.toByteArray
+      DifficultySerializer.toBytes(difficulty)
     )
   )
 }
 
 object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
 
-  override def toBytes(obj: EncryBlockHeader): Array[Byte] = {
+  override def toBytes(obj: EncryBlockHeader): Array[Byte] =
     Bytes.concat(
       Array(obj.version),
       obj.proposition.pubKeyBytes,
@@ -134,9 +134,9 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
       Longs.toByteArray(obj.timestamp),
       Ints.toByteArray(obj.height),
       Longs.toByteArray(obj.nonce),
-      obj.difficulty.toByteArray
+      DifficultySerializer.toBytes(obj.difficulty)
     )
-  }
+
 
   override def parseBytes(bytes: Array[Byte]): Try[EncryBlockHeader] = Try {
     val version = bytes.head
@@ -149,7 +149,7 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
     val timestamp = Longs.fromByteArray(bytes.slice(226, 234))
     val height = Ints.fromByteArray(bytes.slice(234, 238))
     val nonce = Longs.fromByteArray(bytes.slice(238, 246))
-    val difficulty = Difficulty @@ BigInt.apply(bytes.slice(246, bytes.length))
+    val difficulty = DifficultySerializer.parseBytes(bytes.slice(246, 250))
 
     EncryBlockHeader(
       version, proposition, signature, parentId, adProofsRoot, stateRoot, txsRoot, timestamp, height, nonce, difficulty)
