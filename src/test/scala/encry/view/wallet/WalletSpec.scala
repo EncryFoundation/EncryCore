@@ -2,6 +2,7 @@ package encry.view.wallet
 
 import encry.account.Address
 import encry.consensus.Difficulty
+import encry.crypto.{PublicKey25519, Signature25519}
 import encry.local.TestHelper
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.ADProofs
@@ -17,12 +18,9 @@ import encry.view.wallet.keys.KeyManager
 import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
 import scorex.core.ModifierId
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
-import scorex.core.transaction.proof.Signature25519
-import scorex.core.transaction.state.PrivateKey25519Companion
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scorex.crypto.hash.Digest32
-import scorex.crypto.signatures.{PublicKey, Signature}
+import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 import scorex.utils.Random
 
 class WalletSpec extends PropSpec with Matchers{
@@ -31,7 +29,7 @@ class WalletSpec extends PropSpec with Matchers{
 
     val blockHeader = EncryBlockHeader(
       99: Byte,
-      new PublicKey25519Proposition(PublicKey @@ Random.randomBytes()),
+      PublicKey25519(PublicKey @@ Random.randomBytes()),
       Signature25519(Signature @@ Random.randomBytes(64)),
       ModifierId @@ Random.randomBytes(),
       Digest32 @@ Random.randomBytes(),
@@ -61,15 +59,15 @@ class WalletSpec extends PropSpec with Matchers{
     val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath)
 
     val validTxs = keys.zip(bxs).map { case (pk, bx) =>
-      val proposition = pk.publicImage
+      val proposition = PublicKey25519(pk.publicKeyBytes)
       val fee = factory.Props.txFee
       val timestamp = 1234567L
       val useBoxes = IndexedSeq(bx).map(_.id)
       val outputs = IndexedSeq((Address @@ wallet.publicKeys.head.address, factory.Props.boxValue - 100))
-      val sig = PrivateKey25519Companion.sign(
-        pk,
+      val sig = Signature25519(Curve25519.sign(
+        pk.privKeyBytes,
         PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
-      )
+      ))
       PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
     }.slice(0, 4)
 

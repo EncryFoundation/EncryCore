@@ -24,7 +24,7 @@ case class AssetBox(override val proposition: AccountProposition,
 
   override def unlockTry(modifier: EncryBaseTransaction,
                          script: Option[String] = None)(implicit ctxOpt: Option[Context]): Try[Unit] =
-    if (Account(modifier.proposition.pubKeyBytes) != proposition.account) Failure(new Error("Unlock failed"))
+    if (Account(modifier.accountPubKey.pubKeyBytes) != proposition.account) Failure(new Error("Unlock failed"))
     else Success()
 
   override def serializer: SizedCompanionSerializer[M] = AssetBoxSerializer

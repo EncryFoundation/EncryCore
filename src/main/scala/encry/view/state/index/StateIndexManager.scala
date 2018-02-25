@@ -56,13 +56,13 @@ trait StateIndexManager extends ScorexLogging {
       tx.useBoxes.foreach { id =>
         id.head match {
           case AssetBox.TypeId =>
-            modifications.get(Address @@ tx.proposition.address) match {
+            modifications.get(Address @@ tx.accountPubKey.address) match {
               case Some(t) =>
                 if (t._2.exists(_.sameElements(id))) t._2.remove(id)
                 else t._1.add(id)
               case None =>
                 modifications.update(
-                  Address @@ tx.proposition.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
+                  Address @@ tx.accountPubKey.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
             }
           case OpenBox.typeId =>
             modifications.get(openBoxesAddress) match {
@@ -82,10 +82,10 @@ trait StateIndexManager extends ScorexLogging {
               bx.proposition.account.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
           }
         case bx: PubKeyInfoBox =>
-          modifications.get(bx.proposition.address) match {
+          modifications.get(bx.proposition.account.address) match {
             case Some(t) => t._2.add(bx.id)
             case None => modifications.update(
-              bx.proposition.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
+              bx.proposition.account.address, mutable.Set.empty[ADKey] -> mutable.Set(bx.id))
           }
         case bx: OpenBox =>
           modifications.get(openBoxesAddress) match {

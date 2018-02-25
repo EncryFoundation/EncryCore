@@ -1,7 +1,7 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import encry.account.Address
+import encry.crypto.{PublicKey25519, Signature25519}
 import encry.modifiers.mempool.EncryTransaction.{TxTypeId, _}
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox}
@@ -12,8 +12,6 @@ import io.circe.Json
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
-import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
@@ -21,7 +19,7 @@ import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.{Failure, Success, Try}
 
-case class CoinbaseTransaction(override val proposition: PublicKey25519Proposition,
+case class CoinbaseTransaction(override val accountPubKey: PublicKey25519,
                                override val timestamp: Long,
                                override val signature: Signature25519,
                                override val useBoxes: IndexedSeq[ADKey],
@@ -42,7 +40,7 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
   override val feeBox: Option[OpenBox] = None
 
   private val commissionBox = if (amount > 0) Some(AssetBox(
-    proposition = AccountProposition(Address @@ proposition.address),
+    proposition = AccountProposition(accountPubKey.address),
     nonce = nonceFromDigest(Algos.hash(txHash)),
     amount = amount)) else None
 
@@ -70,7 +68,7 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
 
   override lazy val serializer: Serializer[M] = CoinbaseTransactionSerializer
 
-  override lazy val txHash: Digest32 = CoinbaseTransaction.getHash(proposition, useBoxes, timestamp, amount, height)
+  override lazy val txHash: Digest32 = CoinbaseTransaction.getHash(accountPubKey, useBoxes, timestamp, amount, height)
 
   override lazy val semanticValidity: Try[Unit] = {
     if (!validSize) {
@@ -87,14 +85,14 @@ object CoinbaseTransaction {
 
   val typeId: TxTypeId = 0.toByte
 
-  def getHash(proposition: PublicKey25519Proposition,
+  def getHash(accountPubKey: PublicKey25519,
               useBoxes: IndexedSeq[ADKey],
               timestamp: Long,
               amount: Amount,
               height: Height): Digest32 = Algos.hash(
     Bytes.concat(
       Array[Byte](typeId),
-      proposition.pubKeyBytes,
+      accountPubKey.pubKeyBytes,
       Longs.toByteArray(timestamp),
       useBoxes.foldLeft(Array[Byte]()) { case (arr, key) =>
         arr ++ key
@@ -104,18 +102,18 @@ object CoinbaseTransaction {
     )
   )
 
-  def getMessageToSign(proposition: PublicKey25519Proposition,
+  def getMessageToSign(accountPubKey: PublicKey25519,
                        useBoxes: IndexedSeq[ADKey],
                        timestamp: Long,
                        amount: Amount,
-                       height: Height): Array[Byte] = getHash(proposition, useBoxes, timestamp, amount, height)
+                       height: Height): Array[Byte] = getHash(accountPubKey, useBoxes, timestamp, amount, height)
 }
 
 object CoinbaseTransactionSerializer extends Serializer[CoinbaseTransaction] {
 
   override def toBytes(obj: CoinbaseTransaction): Array[Byte] = {
     Bytes.concat(
-      obj.proposition.pubKeyBytes,
+      obj.accountPubKey.pubKeyBytes,
       Longs.toByteArray(obj.timestamp),
       obj.signature.signature,
       Longs.toByteArray(obj.amount),
@@ -129,7 +127,7 @@ object CoinbaseTransactionSerializer extends Serializer[CoinbaseTransaction] {
 
   override def parseBytes(bytes: Array[Byte]): Try[CoinbaseTransaction] = Try {
 
-    val sender = new PublicKey25519Proposition(PublicKey @@ bytes.slice(0, 32))
+    val sender = PublicKey25519(PublicKey @@ bytes.slice(0, 32))
     val timestamp = Longs.fromByteArray(bytes.slice(32, 40))
     val signature = Signature25519(Signature @@ bytes.slice(40, 104))
     val amount = Longs.fromByteArray(bytes.slice(104, 112))

@@ -15,7 +15,7 @@ class TransactionsApiRouteSpec extends PropSpec with Matchers {
   property("payment tx deserialization in sendTransactionR") {
 
     val txWrapped = PaymentTransactionModel(
-      Algos.encode(tx.proposition.pubKeyBytes),
+      Algos.encode(tx.accountPubKey.pubKeyBytes),
       tx.fee,
       tx.timestamp,
       Algos.encode(tx.signature.signature),

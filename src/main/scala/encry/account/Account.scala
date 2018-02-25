@@ -22,6 +22,8 @@ case class Account(address: Address) extends BytesSerializable {
     case acc: Account if acc.address == address => true
     case _ => false
   }
+
+  override def toString: String = address
 }
 
 object AccountSerializer extends Serializer[Account] {

@@ -1,5 +1,6 @@
 package encry.consensus
 
+import encry.crypto.{PublicKey25519, Signature25519}
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.settings.Algos
@@ -7,11 +8,9 @@ import io.circe.Json
 import io.circe.syntax._
 import scorex.core.block.Block.Timestamp
 import scorex.core.serialization.JsonSerializable
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
-import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 
-class PowCandidateBlock(val proposition: PublicKey25519Proposition,
+class PowCandidateBlock(val accountPubKey: PublicKey25519,
                         val signature: Signature25519,
                         val parentOpt: Option[EncryBlockHeader],
                         val adProofBytes: SerializedAdProof,
@@ -21,7 +20,7 @@ class PowCandidateBlock(val proposition: PublicKey25519Proposition,
                         val difficulty: Difficulty) extends JsonSerializable {
 
   override lazy val json: Json = Map(
-    "minerProposition" -> Algos.encode(proposition.pubKeyBytes).asJson,
+    "minerProposition" -> Algos.encode(accountPubKey.pubKeyBytes).asJson,
     "signature" -> Algos.encode(signature.signature).asJson,
     "parentId" -> parentOpt.map(p => Algos.encode(p.id)).getOrElse("None").asJson,
     "stateRoot" -> Algos.encode(stateRoot).asJson,

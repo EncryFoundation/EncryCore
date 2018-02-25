@@ -1,15 +1,14 @@
 package encry.modifiers
 
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
-import scorex.core.transaction.proof.Signature25519
+import encry.crypto.{PublicKey25519, Signature25519}
 
 trait Signable25519 {
 
-  val proposition: PublicKey25519Proposition
+  val accountPubKey: PublicKey25519
 
   val dataToSign: Array[Byte]
 
   val signature: Signature25519
 
-  def validSignature: Boolean = signature.isValid(proposition, dataToSign)
+  def validSignature: Boolean = signature.isValid(accountPubKey, dataToSign)
 }

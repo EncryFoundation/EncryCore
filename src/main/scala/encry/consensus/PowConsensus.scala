@@ -22,7 +22,7 @@ object PowConsensus {
 
     val header = EncryBlockHeader(
       derivedHeaderFields._1,
-      candidate.proposition,
+      candidate.accountPubKey,
       candidate.signature,
       derivedHeaderFields._2,
       derivedHeaderFields._3,

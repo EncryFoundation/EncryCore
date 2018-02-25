@@ -2,6 +2,7 @@ package encry.modifiers.history.block.header
 
 import com.google.common.primitives.{Ints, _}
 import encry.consensus.{Difficulty, DifficultySerializer}
+import encry.crypto.{PublicKey25519, Signature25519}
 import encry.modifiers.ModifierWithDigest
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.payload.EncryBlockPayload
@@ -10,8 +11,6 @@ import io.circe.Json
 import io.circe.syntax._
 import scorex.core.block.Block._
 import scorex.core.serialization.Serializer
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
-import scorex.core.transaction.proof.Signature25519
 import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base16
@@ -21,7 +20,7 @@ import scorex.crypto.signatures.{PublicKey, Signature}
 import scala.util.Try
 
 case class EncryBlockHeader(override val version: Version,
-                            override val proposition: PublicKey25519Proposition,
+                            override val accountPubKey: PublicKey25519,
                             override val signature: Signature25519,
                             override val parentId: ModifierId,
                             override val adProofsRoot: Digest32,
@@ -41,10 +40,10 @@ case class EncryBlockHeader(override val version: Version,
   override lazy val id: ModifierId = ModifierId @@ hHash
 
   val hHash: Digest32 =
-    getHash(version, proposition, parentId, adProofsRoot, stateRoot, txsRoot, timestamp, height, nonce, difficulty)
+    getHash(version, accountPubKey, parentId, adProofsRoot, stateRoot, txsRoot, timestamp, height, nonce, difficulty)
 
   override val dataToSign: Array[Byte] =
-    getMessageToSign(version, proposition, parentId, adProofsRoot, stateRoot, txsRoot, timestamp, height, difficulty)
+    getMessageToSign(version, accountPubKey, parentId, adProofsRoot, stateRoot, txsRoot, timestamp, height, difficulty)
 
   lazy val isGenesis: Boolean = height == Constants.Chain.genesisHeight
 
@@ -74,7 +73,7 @@ object EncryBlockHeader {
   lazy val GenesisParentId: ModifierId = ModifierId @@ Array.fill(Constants.digestLength)(0: Byte)
 
   def getHash(version: Version,
-              proposition: PublicKey25519Proposition,
+              accountPubKey: PublicKey25519,
               parentId: ModifierId,
               adProofsRoot: Digest32,
               stateRoot: ADDigest, // 32 bytes + 1 (tree height)
@@ -85,7 +84,7 @@ object EncryBlockHeader {
               difficulty: Difficulty): Digest32 = Algos.hash(
     Bytes.concat(
       Array(version),
-      proposition.pubKeyBytes,
+      accountPubKey.pubKeyBytes,
       parentId,
       adProofsRoot,
       stateRoot,
@@ -98,7 +97,7 @@ object EncryBlockHeader {
   )
 
   def getMessageToSign(version: Version,
-                       proposition: PublicKey25519Proposition,
+                       accountPubKey: PublicKey25519,
                        parentId: ModifierId,
                        adProofsRoot: Digest32,
                        stateRoot: ADDigest, // 32 bytes + 1 (tree height)
@@ -108,7 +107,7 @@ object EncryBlockHeader {
                        difficulty: Difficulty): Array[Byte] = Algos.hash(
     Bytes.concat(
       Array(version),
-      proposition.pubKeyBytes,
+      accountPubKey.pubKeyBytes,
       parentId,
       adProofsRoot,
       stateRoot,
@@ -125,7 +124,7 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
   override def toBytes(obj: EncryBlockHeader): Array[Byte] =
     Bytes.concat(
       Array(obj.version),
-      obj.proposition.pubKeyBytes,
+      obj.accountPubKey.pubKeyBytes,
       obj.signature.signature,
       obj.parentId,
       obj.adProofsRoot,
@@ -140,7 +139,7 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
 
   override def parseBytes(bytes: Array[Byte]): Try[EncryBlockHeader] = Try {
     val version = bytes.head
-    val proposition = new PublicKey25519Proposition(PublicKey @@ bytes.slice(1, 33))
+    val proposition = PublicKey25519(PublicKey @@ bytes.slice(1, 33))
     val signature = Signature25519(Signature @@ bytes.slice(33, 97))
     val parentId = ModifierId @@ bytes.slice(97, 129)
     val adProofsRoot = Digest32 @@ bytes.slice(129, 161)

@@ -2,6 +2,7 @@ package encry.local
 
 import akka.actor.{Actor, ActorRef, ActorRefFactory, Cancellable, Props}
 import encry.account.Address
+import encry.crypto.{PublicKey25519, Signature25519}
 import encry.local.TransactionGenerator.{GeneratePaymentTransactions, StartGeneration, StopGeneration}
 import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box.AssetBox
@@ -13,7 +14,6 @@ import encry.view.wallet.EncryWallet
 import scorex.core.LocalInterface.LocallyGeneratedTransaction
 import scorex.core.NodeViewHolder.GetDataFromCurrentView
 import scorex.core.transaction.box.proposition.Proposition
-import scorex.core.transaction.proof.Signature25519
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 import scorex.crypto.signatures.Curve25519
 
@@ -46,32 +46,33 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings, time
             val recipient = pubKey.address
             val fee = 15L
             val amount: Long = Random.nextInt(30) + 9
-            val proposition = v.vault.keyManager.keys.head.publicImage
+            val accountPubKey = PublicKey25519(v.vault.keyManager.keys.head.publicImage.pubKeyBytes)
             val timestamp = timeProvider.time()
             if (v.vault.balance > 1000) {
               // Generate valid txs if vault's balance is enough.
-              val boxes = v.vault.walletStorage.getAllBoxes.filter(_.isInstanceOf[AssetBox]).map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) {
+              val boxes = v.vault.walletStorage.getAllBoxes.filter(_.isInstanceOf[AssetBox])
+                .map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) {
                 case (seq, box) => if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
               }
               val useBoxes = boxes.map(_.id).toIndexedSeq
               val outputs = IndexedSeq(
                 (Address @@ recipient, amount),
-                (Address @@ proposition.address, boxes.map(_.amount).sum - (amount + fee)))
+                (Address @@ accountPubKey.address, boxes.map(_.amount).sum - (amount + fee)))
               val sig = Signature25519(Curve25519.sign(
                 v.vault.keyManager.keys.head.privKeyBytes,
-                PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
+                PaymentTransaction.getMessageToSign(accountPubKey, fee, timestamp, useBoxes, outputs)
               ))
 
-              PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
+              PaymentTransaction(accountPubKey, fee, timestamp, sig, useBoxes, outputs)
             } else {
               // Generate semantically valid but stateful-invalid txs otherwise.
               val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ pubKey.address)).map(_.id)
               val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
               val sig = Signature25519(Curve25519.sign(
                 v.vault.keyManager.keys.head.privKeyBytes,
-                PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
+                PaymentTransaction.getMessageToSign(accountPubKey, fee, timestamp, useBoxes, outputs)
               ))
-              PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
+              PaymentTransaction(accountPubKey, fee, timestamp, sig, useBoxes, outputs)
             }
           }
         } else {

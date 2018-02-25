@@ -1,5 +1,6 @@
 package encry.modifiers.mempool
 
+import encry.account.Account
 import encry.modifiers.Signable25519
 import encry.modifiers.mempool.EncryTransaction.TxTypeId
 import encry.modifiers.state.box.{EncryBaseBox, OpenBox}
@@ -35,6 +36,8 @@ trait EncryBaseTransaction extends Transaction[Proposition] with Signable25519 w
   val useBoxes: IndexedSeq[ADKey]
 
   val newBoxes: Traversable[EncryBaseBox]
+
+  lazy val account: Account = Account(accountPubKey.pubKeyBytes)
 
   val minimalFee: Float = Constants.feeMinAmount + Constants.txByteCost * length
 

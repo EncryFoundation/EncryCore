@@ -1,10 +1,10 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import encry.account.Address
 import encry.common.KeyPairType
+import encry.crypto.{PublicKey25519, Signature25519}
 import encry.modifiers.mempool.EncryTransaction.{TxTypeId, nonceFromDigest}
-import encry.modifiers.state.box.proposition.{AccountProposition, AddressProposition, HeightProposition}
+import encry.modifiers.state.box.proposition.{AccountProposition, HeightProposition}
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox, PubKeyInfoBox}
 import encry.settings.Algos
 import encry.view.history.Height
@@ -12,15 +12,13 @@ import io.circe.Json
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
-import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.authds.ADKey
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.{Failure, Success, Try}
 
-case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Proposition,
+case class AddPubKeyInfoTransaction(override val accountPubKey: PublicKey25519,
                                     override val fee: Amount,
                                     override val timestamp: Long,
                                     override val signature: Signature25519,
@@ -45,7 +43,7 @@ case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Prop
 
   private val pubKeyInfoBox =
     PubKeyInfoBox(
-      AddressProposition(Address @@ proposition.address),
+      AccountProposition(accountPubKey.address),
       nonceFromDigest(Algos.hash(txHash :+ PubKeyInfoBox.typeId)),
       pubKeyBytes,
       pubKeyProofBytes,
@@ -54,7 +52,7 @@ case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Prop
     )
 
   private val changeBox = if (change > 0) Some(AssetBox(
-        AccountProposition(Address @@ proposition.address),
+        AccountProposition(accountPubKey.address),
         nonceFromDigest(Algos.hash(txHash :+ OpenBox.typeId)),
         change)
       ) else None
@@ -66,7 +64,7 @@ case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Prop
 
   override def json: Json = Map(
     "id" -> Algos.encode(id).asJson,
-    "proposition" -> Algos.encode(proposition.pubKeyBytes).asJson,
+    "proposition" -> Algos.encode(accountPubKey.pubKeyBytes).asJson,
     "fee" -> fee.asJson,
     "timestamp" -> timestamp.asJson,
     "signature" -> Algos.encode(signature.signature).asJson,
@@ -82,7 +80,7 @@ case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Prop
   ).asJson
 
   override lazy val txHash: Digest32 = AddPubKeyInfoTransaction
-    .getHash(proposition, fee, timestamp, useBoxes,
+    .getHash(accountPubKey, fee, timestamp, useBoxes,
       change, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
 
   override lazy val semanticValidity: Try[Unit] = {
@@ -96,7 +94,7 @@ case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Prop
   }
 
   // Message to sign for publicKey verification.
-  lazy val pubKeyVerificationMessage: Array[Byte] = Algos.hash(proposition.bytes ++ signature.bytes)
+  lazy val pubKeyVerificationMessage: Array[Byte] = Algos.hash(accountPubKey.bytes ++ signature.bytes)
 }
 
 object AddPubKeyInfoTransaction {
@@ -105,8 +103,7 @@ object AddPubKeyInfoTransaction {
 
   val typeId: TxTypeId = 3.toByte
 
-  // TODO: Use proposition.publicKeyBytes instead of PublicKeyProposition instance here.
-  def getHash(proposition: PublicKey25519Proposition,
+  def getHash(accountPubKey: PublicKey25519,
               fee: Amount,
               timestamp: Long,
               useBoxes: IndexedSeq[ADKey],
@@ -117,7 +114,7 @@ object AddPubKeyInfoTransaction {
               pubKeyTypeId: Byte): Digest32 = Algos.hash(
     Bytes.concat(
       Array[Byte](typeId),
-      proposition.pubKeyBytes,
+      accountPubKey.pubKeyBytes,
       useBoxes.foldLeft(Array[Byte]())(_ ++ _),
       Longs.toByteArray(timestamp),
       Longs.toByteArray(fee),
@@ -128,7 +125,7 @@ object AddPubKeyInfoTransaction {
     )
   )
 
-  def getMessageToSign(proposition: PublicKey25519Proposition,
+  def getMessageToSign(accountPubKey: PublicKey25519,
                        fee: Amount,
                        timestamp: Long,
                        useBoxes: IndexedSeq[ADKey],
@@ -137,7 +134,7 @@ object AddPubKeyInfoTransaction {
                        pubKeyProofBytes: Signature,
                        pubKeyInfoBytes: Array[Byte],
                        pubKeyTypeId: Byte): Array[Byte] =
-    getHash(proposition, fee, timestamp, useBoxes,
+    getHash(accountPubKey, fee, timestamp, useBoxes,
       change, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
 }
 
@@ -145,7 +142,7 @@ object AddPubKeyInfoTransactionSerializer extends Serializer[AddPubKeyInfoTransa
 
   override def toBytes(obj: AddPubKeyInfoTransaction): Array[Byte] = {
     Bytes.concat(
-      obj.proposition.pubKeyBytes,
+      obj.accountPubKey.pubKeyBytes,
       Longs.toByteArray(obj.fee),
       Longs.toByteArray(obj.timestamp),
       obj.signature.signature,
@@ -164,7 +161,7 @@ object AddPubKeyInfoTransactionSerializer extends Serializer[AddPubKeyInfoTransa
 
   override def parseBytes(bytes: Array[Byte]): Try[AddPubKeyInfoTransaction] = Try {
 
-    val sender = new PublicKey25519Proposition(PublicKey @@ bytes.slice(0, 32))
+    val sender = PublicKey25519(PublicKey @@ bytes.slice(0, 32))
     val fee = Longs.fromByteArray(bytes.slice(32, 40))
     val timestamp = Longs.fromByteArray(bytes.slice(40, 48))
     val signature = Signature25519(Signature @@ bytes.slice(48, 112))

@@ -2,6 +2,7 @@ package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.{Account, Address}
+import encry.crypto.{PublicKey25519, Signature25519}
 import encry.modifiers.mempool.EncryTransaction._
 import encry.modifiers.state.box.proposition.{AddressProposition, HeightProposition}
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox}
@@ -11,8 +12,6 @@ import io.circe.Json
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
-import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
@@ -20,7 +19,7 @@ import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.{Failure, Success, Try}
 
-case class PaymentTransaction(override val proposition: PublicKey25519Proposition,
+case class PaymentTransaction(override val accountPubKey: PublicKey25519,
                               override val fee: Amount,
                               override val timestamp: Long,
                               override val signature: Signature25519,
@@ -50,7 +49,7 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
 
   override def json: Json = Map(
     "id" -> Algos.encode(id).asJson,
-    "proposition" -> Algos.encode(proposition.pubKeyBytes).asJson,
+    "proposition" -> account.toString.asJson,
     "fee" -> fee.asJson,
     "timestamp" -> timestamp.asJson,
     "signature" -> Algos.encode(signature.signature).asJson,
@@ -68,7 +67,7 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
   ).asJson
 
   override lazy val txHash: Digest32 =
-    PaymentTransaction.getHash(proposition, fee, timestamp, useBoxes, createBoxes)
+    PaymentTransaction.getHash(accountPubKey, fee, timestamp, useBoxes, createBoxes)
 
   override lazy val semanticValidity: Try[Unit] = {
     if (!validSize) {
@@ -91,14 +90,14 @@ object PaymentTransaction {
 
   val typeId: TxTypeId = 1.toByte
 
-  def getHash(proposition: PublicKey25519Proposition,
+  def getHash(accountPubKey: PublicKey25519,
               fee: Amount,
               timestamp: Long,
               useBoxes: IndexedSeq[ADKey],
               createBoxes: IndexedSeq[(Address, Amount)]): Digest32 = Algos.hash(
     Bytes.concat(
       Array[Byte](typeId),
-      proposition.pubKeyBytes,
+      accountPubKey.pubKeyBytes,
       useBoxes.foldLeft(Array[Byte]())(_ ++ _),
       createBoxes.foldLeft(Array[Byte]())((buff, t) =>
         buff ++ Account.decodeAddress(t._1) ++ Longs.toByteArray(t._2)),
@@ -107,19 +106,19 @@ object PaymentTransaction {
     )
   )
 
-  def getMessageToSign(proposition: PublicKey25519Proposition,
+  def getMessageToSign(accountPubKey: PublicKey25519,
                        fee: Amount,
                        timestamp: Long,
                        useBoxes: IndexedSeq[ADKey],
                        createBoxes: IndexedSeq[(Address, Amount)]): Array[Byte] =
-    getHash(proposition, fee, timestamp, useBoxes, createBoxes)
+    getHash(accountPubKey, fee, timestamp, useBoxes, createBoxes)
 }
 
 object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
 
   override def toBytes(obj: PaymentTransaction): Array[Byte] = {
     Bytes.concat(
-      obj.proposition.pubKeyBytes,
+      obj.accountPubKey.pubKeyBytes,
       Longs.toByteArray(obj.fee),
       Longs.toByteArray(obj.timestamp),
       obj.signature.signature,
@@ -133,7 +132,7 @@ object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
 
   override def parseBytes(bytes: Array[Byte]): Try[PaymentTransaction] = Try {
 
-    val sender = new PublicKey25519Proposition(PublicKey @@ bytes.slice(0, 32))
+    val accPubKey = new PublicKey25519(PublicKey @@ bytes.slice(0, 32))
     val fee = Longs.fromByteArray(bytes.slice(32, 40))
     val timestamp = Longs.fromByteArray(bytes.slice(40, 48))
     val signature = Signature25519(Signature @@ bytes.slice(48, 112))
@@ -150,6 +149,6 @@ object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
       (Address @@ Base58.encode(bytes.slice(s2 + i * inElementLength, s2 + (i * inElementLength) + 37)),
         Longs.fromByteArray(bytes.slice(s2 + (i * inElementLength) + 37, s2 + (i + 1) * inElementLength)))
     }
-    PaymentTransaction(sender, fee, timestamp, signature, useOutputs, createOutputs)
+    PaymentTransaction(accPubKey, fee, timestamp, signature, useOutputs, createOutputs)
   }
 }

@@ -1,10 +1,9 @@
 package encry.modifiers.history.block.header
 
 import encry.consensus.Difficulty
+import encry.crypto.{PublicKey25519, Signature25519}
 import org.scalatest.FunSuite
 import scorex.core.ModifierId
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
-import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{PublicKey, Signature}
@@ -17,7 +16,7 @@ class EncryBlockHeaderSerializerTest extends FunSuite {
 
     val blockHeader = EncryBlockHeader(
       99: Byte,
-      new PublicKey25519Proposition(PublicKey @@ Random.randomBytes()),
+      PublicKey25519(PublicKey @@ Random.randomBytes()),
       Signature25519(Signature @@ Random.randomBytes(64)),
       ModifierId @@ Random.randomBytes(),
       Digest32 @@ Random.randomBytes(),

@@ -4,6 +4,7 @@ import java.io.File
 
 import akka.actor.ActorRef
 import encry.account.{Account, Address}
+import encry.crypto.{PublicKey25519, Signature25519}
 import encry.local.TestHelper
 import encry.modifiers.mempool.PaymentTransaction
 import encry.utils.FileHelper
@@ -13,6 +14,7 @@ import scorex.core.transaction.state.PrivateKey25519Companion
 import scorex.crypto.authds.ADValue
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
+import scorex.crypto.signatures.Curve25519
 
 class UtxoStateSpec extends PropSpec with Matchers {
 
@@ -43,29 +45,29 @@ class UtxoStateSpec extends PropSpec with Matchers {
     val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath)
 
     val validTxs = keys.zip(bxs).map { case (pk, bx) =>
-      val proposition = pk.publicImage
+      val proposition = PublicKey25519(pk.publicKeyBytes)
       val fee = factory.Props.txFee
       val timestamp = 1234567L
       val useBoxes = IndexedSeq(bx).map(_.id)
       val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue - 100))
-      val sig = PrivateKey25519Companion.sign(
-        pk,
+      val sig = Signature25519(Curve25519.sign(
+        pk.privKeyBytes,
         PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
-      )
+      ))
       PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
     }
 
     val invalidTxs = keys.map { pk =>
-      val proposition = pk.publicImage
+      val proposition = PublicKey25519(pk.publicKeyBytes)
       val fee = factory.Props.txFee
       val timestamp = 123456789L
       val useBoxes =
         IndexedSeq(factory.genAssetBox(Address @@ "4iGUxZy1uy9m1xsEL26VuUZ8Q23W961PPvDTPW3t2jXuCJCPuy")).map(_.id)
       val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, 30000L))
-      val sig = PrivateKey25519Companion.sign(
-        pk,
+      val sig = Signature25519(Curve25519.sign(
+        pk.privKeyBytes,
         PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
-      )
+      ))
       PaymentTransaction(proposition, fee, timestamp, sig, useBoxes, outputs)
     }
 

@@ -1,16 +1,15 @@
 package encry.api.models
 
 import encry.common.KeyPairType
+import encry.crypto.{PublicKey25519, Signature25519}
 import encry.modifiers.mempool.AddPubKeyInfoTransaction
 import encry.settings.Algos
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
-import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.authds.ADKey
 import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.Try
 
-case class AddPubKeyInfoTransactionModel(proposition: String,
+case class AddPubKeyInfoTransactionModel(accountPubKey: String,
                                          fee: Long,
                                          timestamp: Long,
                                          signature: String,
@@ -25,7 +24,7 @@ case class AddPubKeyInfoTransactionModel(proposition: String,
   override def toBaseObjOpt: Option[AddPubKeyInfoTransaction] =
     Try {
       AddPubKeyInfoTransaction(
-        PublicKey25519Proposition(PublicKey @@ Algos.decode(proposition).get),
+        PublicKey25519(PublicKey @@ Algos.decode(accountPubKey).get),
         fee,
         timestamp,
         Signature25519(Signature @@ Algos.decode(signature).get),

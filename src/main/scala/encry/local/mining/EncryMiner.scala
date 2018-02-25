@@ -4,6 +4,7 @@ import akka.actor.{Actor, ActorRef}
 import akka.pattern._
 import akka.util.Timeout
 import encry.consensus.{PowCandidateBlock, PowConsensus}
+import encry.crypto.{PublicKey25519, Signature25519}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction}
@@ -18,8 +19,9 @@ import io.circe.syntax._
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.NodeViewHolder
 import scorex.core.NodeViewHolder.{GetDataFromCurrentView, SemanticallySuccessfulModifier, Subscribe}
-import scorex.core.transaction.state.{PrivateKey25519, PrivateKey25519Companion}
+import scorex.core.transaction.state.PrivateKey25519
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
+import scorex.crypto.signatures.Curve25519
 import scorex.utils.Random
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -125,8 +127,10 @@ class EncryMiner(viewHolderRef: ActorRef,
         pool.removeAsync(txsToDrop)
 
         // TODO: Which PubK should we pick here?
+        // TODO: Replace usage of `scorex.PrivateKey25519` with its custom implementation.
         val minerProposition = vault.publicKeys.head
         val privateKey: PrivateKey25519 = vault.secretByPublicImage(minerProposition).get
+        val minerPubKey = PublicKey25519(vault.publicKeys.head.pubKeyBytes)
 
         val openBxs: IndexedSeq[OpenBox] = txsToPut.foldLeft(IndexedSeq[OpenBox]())((buff, tx) =>
           buff ++ tx.newBoxes.foldLeft(IndexedSeq[OpenBox]()) { case (buff2, bx) =>
@@ -136,10 +140,10 @@ class EncryMiner(viewHolderRef: ActorRef,
             }
           }) ++ state.getAvailableOpenBoxesAt(state.stateHeight)
         val amount = openBxs.map(_.amount).sum
-        val cTxSignature = PrivateKey25519Companion.sign(privateKey,
-          CoinbaseTransaction.getHash(minerProposition, openBxs.map(_.id), timestamp, amount, height))
+        val cTxSignature = Signature25519(Curve25519.sign(privateKey.privKeyBytes,
+          CoinbaseTransaction.getHash(minerPubKey, openBxs.map(_.id), timestamp, amount, height)))
         val coinbase =
-          CoinbaseTransaction(minerProposition, timestamp, cTxSignature, openBxs.map(_.id), amount, height)
+          CoinbaseTransaction(minerPubKey, timestamp, cTxSignature, openBxs.map(_.id), amount, height)
 
         val txs = txsToPut.sortBy(_.timestamp) :+ coinbase
 
@@ -147,11 +151,11 @@ class EncryMiner(viewHolderRef: ActorRef,
         val difficulty = bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
           .getOrElse(Constants.Chain.initialDifficulty)
         val derivedFields = PowConsensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
-        val blockSignature = PrivateKey25519Companion.sign(privateKey,
-          EncryBlockHeader.getMessageToSign(derivedFields._1, minerProposition, derivedFields._2,
-            derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, difficulty))
+        val blockSignature = Signature25519(Curve25519.sign(privateKey.privKeyBytes,
+          EncryBlockHeader.getMessageToSign(derivedFields._1, minerPubKey, derivedFields._2,
+            derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, difficulty)))
 
-        val candidate = new PowCandidateBlock(minerProposition,
+        val candidate = new PowCandidateBlock(minerPubKey,
           blockSignature, bestHeaderOpt, adProof, adDigest, txs, timestamp, difficulty)
 
         log.debug(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +

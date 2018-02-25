@@ -5,6 +5,7 @@ import akka.pattern._
 import akka.util.Timeout
 import encry.cli.Response
 import encry.common.KeyPairType
+import encry.crypto.{PublicKey25519, Signature25519}
 import encry.modifiers.mempool.{AddPubKeyInfoTransaction, AddPubKeyInfoTransactionSerializer}
 import encry.modifiers.state.box.AssetBox
 import encry.settings.{Algos, EncryAppSettings}
@@ -15,7 +16,6 @@ import encry.view.wallet.EncryWallet
 import scorex.core.LocalInterface.LocallyGeneratedTransaction
 import scorex.core.NodeViewHolder.GetDataFromCurrentView
 import scorex.core.transaction.box.proposition.Proposition
-import scorex.core.transaction.proof.Signature25519
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 import scala.concurrent.Await
@@ -44,7 +44,7 @@ object AddPubKeyInfo extends Command {
           val pubKeyInfoBytes = Algos.decode(cArgs(2)).get
           val pubKeyTypeId = KeyPairType.pairTypeByName(cArgs(3)).typeId
           val fee = cArgs(4).toLong
-          val proposition = view.vault.keyManager.keys.head.publicImage
+          val accountPubKey = PublicKey25519(view.vault.keyManager.keys.head.publicImage.pubKeyBytes)
           val timestamp = System.currentTimeMillis() // TODO: Use NTP.
           val boxes = view.vault.walletStorage.getAllBoxes.filter(_.isInstanceOf[AssetBox]).map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) {
             case (seq, box) => if (seq.map(_.amount).sum < fee) seq :+ box else seq
@@ -53,11 +53,11 @@ object AddPubKeyInfo extends Command {
           val change = boxes.map(_.amount).sum - fee
           val sig = Signature25519(Curve25519.sign(
             view.vault.keyManager.keys.head.privKeyBytes,
-            AddPubKeyInfoTransaction.getMessageToSign(proposition, fee, timestamp,
+            AddPubKeyInfoTransaction.getMessageToSign(accountPubKey, fee, timestamp,
               useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
           ))
 
-          val tx = AddPubKeyInfoTransaction(proposition, fee, timestamp, sig,
+          val tx = AddPubKeyInfoTransaction(accountPubKey, fee, timestamp, sig,
             useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
 
           val txDeserTry = AddPubKeyInfoTransactionSerializer.parseBytes(tx.bytes)

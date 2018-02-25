@@ -53,7 +53,7 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
             case ap: AddressProposition if publicKeys.exists(_.address == ap.address) => acc2 :+ bx
             case _ => acc2
           })
-          if (accountRelBxs.nonEmpty || publicKeys.exists(_.pubKeyBytes.sameElements(tx.proposition.pubKeyBytes))) acc :+ tx
+          if (accountRelBxs.nonEmpty || publicKeys.exists(_.pubKeyBytes.sameElements(tx.accountPubKey.pubKeyBytes))) acc :+ tx
           else acc
         })
         updateWallet(modifier.id, accountRelTxs)
@@ -83,7 +83,7 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
 
     val txIdsToInsertRaw = ByteArrayWrapper(walletStorage.get(transactionIdsKey).getOrElse(Array[Byte]()) ++
       newTxs.map(_.id).foldLeft(Array[Byte]())(_ ++ _))
-    val spentBxIds = newTxs.filter(tx => publicKeys.exists(_.pubKeyBytes sameElements tx.proposition.pubKeyBytes))
+    val spentBxIds = newTxs.filter(tx => publicKeys.exists(_.pubKeyBytes sameElements tx.accountPubKey.pubKeyBytes))
       .flatMap(_.useBoxes)
     val bxIdsToRemove = spentBxIds.foldLeft(Seq[ADKey]())((acc, id) =>
       if (currentBxIds.exists(_ sameElements id)) acc :+ id else acc)
