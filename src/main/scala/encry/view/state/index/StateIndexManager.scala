@@ -55,13 +55,12 @@ trait StateIndexManager extends ScorexLogging {
       tx.useBoxes.foreach { id =>
         id.head match {
           case AssetBox.TypeId =>
-            modifications.get(Address @@ tx.accountPubKey.address) match {
+            modifications.get(tx.accountPubKey.address) match {
               case Some(t) =>
                 if (t._2.exists(_.sameElements(id))) t._2.remove(id)
                 else t._1.add(id)
               case None =>
-                modifications.update(
-                  Address @@ tx.accountPubKey.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
+                modifications.update(tx.accountPubKey.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
             }
           case OpenBox.typeId =>
             modifications.get(openBoxesAddress) match {

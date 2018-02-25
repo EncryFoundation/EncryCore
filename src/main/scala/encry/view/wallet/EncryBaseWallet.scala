@@ -1,7 +1,7 @@
 package encry.view.wallet
 
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
-import scorex.core.transaction.state.PrivateKey25519
+import encry.crypto.{PrivateKey25519, PublicKey25519}
+
 
 trait EncryBaseWallet extends WalletReader {
 
@@ -9,10 +9,9 @@ trait EncryBaseWallet extends WalletReader {
 
   def boxes: Seq[WalletBox] = getAvailableBoxes.map(WalletBox)
 
-  def publicKeys: Set[PublicKey25519Proposition]
+  def publicKeys: Set[PublicKey25519]
 
-  //todo: protection?
   def secrets: Set[PrivateKey25519]
 
-  def secretByPublicImage(publicImage: PublicKey25519Proposition): Option[PrivateKey25519]
+  def secretByPublicImage(publicImage: PublicKey25519): Option[PrivateKey25519]
 }

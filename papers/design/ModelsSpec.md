@@ -33,14 +33,16 @@ Key method:
                                                 // with data provided by `proof` and `context` to figure out
                                                 // if the box can be unlocked.
                                                 
-## Directive Model
+## Base Directive Model
 Defines operation on state. 
 
-    boxes: [Box]
+    boxes: [Box]                                // Transforms directive into boxes.
+    cost: Amount                                // Will be used for `transaction.fee` minimal amount calculating.
 
 ## Base Transaction Model
 
     senderPubKey: PublicKey
     senderSignature: Signature
+    fee: Amount
     useBoxes: [(BoxId, Option[Proof])]          // If `proof` is None, then `senderSignature` is used as proof.
     directives: [Directive]

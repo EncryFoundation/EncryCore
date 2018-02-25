@@ -1,5 +1,6 @@
 package encry.view.wallet.storage
 
+import encry.crypto.PublicKey25519
 import encry.modifiers.mempool.{PaymentTransaction, PaymentTransactionSerializer}
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
@@ -7,12 +8,11 @@ import encry.settings.Algos
 import encry.view.EncryBaseStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.core.ModifierId
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.crypto.authds.ADKey
 
 import scala.util.Try
 
-class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519Proposition])
+class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519])
   extends EncryBaseStorage {
 
   import WalletStorage._

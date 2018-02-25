@@ -3,6 +3,7 @@ package encry.view.wallet
 import java.io.File
 
 import com.google.common.primitives.Longs
+import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
@@ -12,8 +13,7 @@ import encry.settings.{Constants, EncryAppSettings}
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import scorex.core.transaction.box.proposition.{Proposition, PublicKey25519Proposition}
-import scorex.core.transaction.state.PrivateKey25519
+import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.wallet.Vault
 import scorex.core.utils.ScorexLogging
 import scorex.core.{ModifierId, VersionTag}
@@ -30,13 +30,13 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
 
   override type NVCT = this.type
 
-  override def secretByPublicImage(publicImage: PublicKey25519Proposition): Option[PrivateKey25519] =
+  override def secretByPublicImage(publicImage: PublicKey25519): Option[PrivateKey25519] =
     keyManager.keys.find(k => k.publicImage.address == publicImage.address)
 
   override def secrets: Set[PrivateKey25519] = keyManager.keys.toSet
 
-  override def publicKeys: Set[PublicKey25519Proposition] = secrets.foldLeft(Seq[PublicKey25519Proposition]()){
-    case (set, key) => set :+ PublicKey25519Proposition(key.publicKeyBytes)
+  override def publicKeys: Set[PublicKey25519] = secrets.foldLeft(Seq[PublicKey25519]()){
+    case (set, key) => set :+ PublicKey25519(key.publicKeyBytes)
   }.toSet
 
   val walletStorage: WalletStorage = new WalletStorage(walletStore, publicKeys)

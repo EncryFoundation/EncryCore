@@ -1,9 +1,9 @@
 package encry.view.wallet.storage
 
+import encry.crypto.PublicKey25519
 import encry.utils.FileHelper
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.utils.{Random => ScRand}
 
 import scala.util.Random
@@ -11,7 +11,7 @@ import scala.util.Random
 class WalletStorageSpec extends PropSpec with Matchers {
 
   val store = new LSMStore(FileHelper.getRandomTempDir)
-  val walletStorage = new WalletStorage(store, Set.empty[PublicKey25519Proposition])
+  val walletStorage = new WalletStorage(store, Set.empty[PublicKey25519])
 
   property("Complex value unpacking from storage") {
 
