@@ -16,6 +16,11 @@ case class Account(address: Address) extends BytesSerializable {
     if (bytes.length == PublicKey25519.Length) Success(bytes) else Failure(new Exception("Length mismatch"))).isSuccess
 
   override def serializer: Serializer[M] = AccountSerializer
+
+  override def equals(obj: scala.Any): Boolean = obj match {
+    case acc: Account if acc.address == address => true
+    case _ => false
+  }
 }
 
 object AccountSerializer extends Serializer[Account] {
@@ -26,6 +31,8 @@ object AccountSerializer extends Serializer[Account] {
 }
 
 object Account {
+
+  val AddressLength: Int = 1 + PublicKey25519.Length + Base58Check.ChecksumLength
 
   def apply(publicKey: PublicKey): Account = Account(Address @@ Base58Check.encode(publicKey))
 }

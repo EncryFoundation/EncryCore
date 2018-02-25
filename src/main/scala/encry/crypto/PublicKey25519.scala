@@ -1,5 +1,6 @@
 package encry.crypto
 
+import encry.account.Address
 import encry.crypto.encoding.Base58Check
 import scorex.core.serialization.Serializer
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
@@ -13,7 +14,7 @@ case class PublicKey25519(pubKeyBytes: PublicKey) extends PublicKeyWrapper {
 
   override type M = PublicKey25519
 
-  lazy val address: String = Base58Check.encode(pubKeyBytes)
+  lazy val address: Address = Address @@ Base58Check.encode(pubKeyBytes)
 
   def verify(message: Array[Byte], signature: Signature): Boolean = Curve25519.verify(signature, message, pubKeyBytes)
 
@@ -24,7 +25,7 @@ case class PublicKey25519(pubKeyBytes: PublicKey) extends PublicKeyWrapper {
     case _ => false
   }
 
-  override def hashCode(): Int = (BigInt(pubKeyBytes) % Int.MaxValue).toInt
+  override def hashCode: Int = (BigInt(pubKeyBytes) % Int.MaxValue).toInt
 }
 
 object PublicKey25519Serializer extends Serializer[PublicKey25519] {
@@ -37,6 +38,4 @@ object PublicKey25519Serializer extends Serializer[PublicKey25519] {
 object PublicKey25519 {
 
   val Length: Int = 32
-
-  val AddressLength: Int = 1 + Length + Base58Check.ChecksumLength
 }
