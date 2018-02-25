@@ -4,10 +4,9 @@ import encry.account.Address
 import encry.crypto.{PublicKey25519, Signature25519}
 import encry.local.TestHelper.Props
 import encry.modifiers.mempool.PaymentTransaction
-import encry.modifiers.state.box.proposition.{AccountProposition, AddressProposition}
+import encry.modifiers.state.box.proposition.AccountProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
-import scorex.core.transaction.state.{PrivateKey25519, PrivateKey25519Companion}
+import scorex.core.transaction.state.PrivateKey25519
 import scorex.crypto.authds.ADKey
 import scorex.crypto.signatures.{Curve25519, PublicKey}
 import scorex.utils.Random

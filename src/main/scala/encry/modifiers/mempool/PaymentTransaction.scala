@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.{Account, Address}
 import encry.crypto.{PublicKey25519, Signature25519}
 import encry.modifiers.mempool.EncryTransaction._
-import encry.modifiers.state.box.proposition.{AddressProposition, HeightProposition}
+import encry.modifiers.state.box.proposition.HeightProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox}
 import encry.settings.Algos
 import encry.view.history.Height
@@ -126,7 +126,7 @@ object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
       Ints.toByteArray(obj.createBoxes.length),
       obj.useBoxes.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b)),
       obj.createBoxes.foldLeft(Array[Byte]())((a, b) =>
-        Bytes.concat(a, AddressProposition.getAddrBytes(b._1), Longs.toByteArray(b._2)))
+        Bytes.concat(a, Account.decodeAddress(b._1), Longs.toByteArray(b._2)))
     )
   }
 

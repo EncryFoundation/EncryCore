@@ -1,19 +1,18 @@
 package encry.view.state.index
 
 import com.google.common.primitives.Ints
-import encry.account.Address
+import encry.account.{Account, Address}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.{AssetBox, OpenBox, PubKeyInfoBox}
-import encry.modifiers.state.box.proposition.AddressProposition
 import encry.settings.{Algos, Constants}
 import encry.view.history.Height
 import encry.view.state.index.storage.StateIndexStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
-import scorex.core.{ModifierId, VersionTag}
 import scorex.core.utils.ScorexLogging
+import scorex.core.{ModifierId, VersionTag}
 import scorex.crypto.authds.ADKey
 
 import scala.collection.mutable
@@ -145,5 +144,5 @@ object StateIndexManager {
   val stateHeightKey: ByteArrayWrapper = ByteArrayWrapper(Algos.hash("state_height".getBytes))
 
   def keyByAddress(address: Address): ByteArrayWrapper =
-    ByteArrayWrapper(Algos.hash(AddressProposition.getAddrBytes(address)))
+    ByteArrayWrapper(Algos.hash(Account.decodeAddress(address)))
 }

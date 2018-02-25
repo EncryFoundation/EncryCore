@@ -6,7 +6,7 @@ import com.google.common.primitives.Longs
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.state.box.proposition.AddressProposition
+import encry.modifiers.state.box.proposition.AccountProposition
 import encry.modifiers.state.box.{AmountCarryingBox, EncryBaseBox}
 import encry.settings.{Constants, EncryAppSettings}
 import encry.view.wallet.keys.KeyManager
@@ -47,10 +47,10 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
 
   override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = {
     modifier match {
-      case block: EncryBlock => {
+      case block: EncryBlock =>
         val accountRelTxs = block.transactions.foldLeft(Seq[EncryBaseTransaction]())((acc, tx) => {
           val accountRelBxs = tx.newBoxes.foldLeft(Seq[EncryBaseBox]())((acc2, bx) => bx.proposition match {
-            case ap: AddressProposition if publicKeys.exists(_.address == ap.address) => acc2 :+ bx
+            case ap: AccountProposition if publicKeys.exists(_.address == ap.account.address) => acc2 :+ bx
             case _ => acc2
           })
           if (accountRelBxs.nonEmpty || publicKeys.exists(_.pubKeyBytes.sameElements(tx.accountPubKey.pubKeyBytes))) acc :+ tx
@@ -58,8 +58,7 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
         })
         updateWallet(modifier.id, accountRelTxs)
         this
-      }
-        case _ =>
+      case _ =>
           this
     }
   }
@@ -88,8 +87,8 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
     val bxIdsToRemove = spentBxIds.foldLeft(Seq[ADKey]())((acc, id) =>
       if (currentBxIds.exists(_ sameElements id)) acc :+ id else acc)
     val bxsToInsert = newTxs.flatMap(_.newBoxes).foldLeft(Seq[EncryBaseBox]())((acc, bx) => bx.proposition match {
-      case ap: AddressProposition
-        if publicKeys.exists(_.address == ap.address) && !spentBxIds.exists(_ sameElements bx.id) => acc :+ bx
+      case ap: AccountProposition
+        if publicKeys.exists(_.address == ap.account.address) && !spentBxIds.exists(_ sameElements bx.id) => acc :+ bx
       case _ => acc
     })
 
