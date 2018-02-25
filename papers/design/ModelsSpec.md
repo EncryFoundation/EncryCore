@@ -34,12 +34,13 @@ Key method:
                                                 // if the box can be unlocked.
                                                 
 ## Directive Model
+Defines operation on state. 
 
-    
+    boxes: [Box]
 
 ## Base Transaction Model
 
     senderPubKey: PublicKey
     senderSignature: Signature
     useBoxes: [(BoxId, Option[Proof])]          // If `proof` is None, then `senderSignature` is used as proof.
-    createBoxes: [(Proposition, Amount)]
+    directives: [Directive]

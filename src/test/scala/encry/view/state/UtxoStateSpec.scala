@@ -57,7 +57,6 @@ class UtxoStateSpec extends PropSpec with Matchers {
 
     val invalidTxs = keys.map { pk =>
       val proposition = pk.publicImage
-      println(Account(pk.publicImage.pubKeyBytes).address)
       val fee = factory.Props.txFee
       val timestamp = 123456789L
       val useBoxes =

@@ -24,7 +24,7 @@ case class AssetBox(override val proposition: AccountProposition,
 
   override def unlockTry(modifier: EncryBaseTransaction,
                          script: Option[String] = None)(implicit ctxOpt: Option[Context]): Try[Unit] =
-    if (modifier.proposition.address != proposition.account.address) Failure(new Error("Unlock failed"))
+    if (Account(modifier.proposition.pubKeyBytes) != proposition.account) Failure(new Error("Unlock failed"))
     else Success()
 
   override def serializer: SizedCompanionSerializer[M] = AssetBoxSerializer
@@ -63,9 +63,10 @@ object AssetBoxSerializer extends SizedCompanionSerializer[AssetBox] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[AssetBox] = Try {
-    val proposition = AccountPropositionSerializer.parseBytes(bytes.take(AccountPropositionSerializer.Length)).get
-    val nonce = Longs.fromByteArray(bytes.slice(AddressLength, AddressLength + 8))
-    val amount = Longs.fromByteArray(bytes.slice(AddressLength + 8, AddressLength + 16))
+    val accountPropositionLen = AccountPropositionSerializer.Length
+    val proposition = AccountPropositionSerializer.parseBytes(bytes.take(accountPropositionLen)).get
+    val nonce = Longs.fromByteArray(bytes.slice(accountPropositionLen, accountPropositionLen + 8))
+    val amount = Longs.fromByteArray(bytes.slice(accountPropositionLen + 8, accountPropositionLen + 16))
     AssetBox(proposition, nonce, amount)
   }
 }
