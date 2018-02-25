@@ -2,7 +2,7 @@
 ## Account Model
 Represents the owner of the Public/Private key pair.
 
-    address: String             // Derived from PublicKey. Base58Check encoded string.  
+    address: String                 // Derived from PublicKey. Base58Check encoded string.  
 
 ## Base Proposition Model
 Defines requirements for box unlocking.
