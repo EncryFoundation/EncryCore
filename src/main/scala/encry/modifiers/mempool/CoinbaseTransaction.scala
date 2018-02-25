@@ -3,7 +3,7 @@ package encry.modifiers.mempool
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.Address
 import encry.modifiers.mempool.EncryTransaction.{TxTypeId, _}
-import encry.modifiers.state.box.proposition.AddressProposition
+import encry.modifiers.state.box.proposition.AccountProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox}
 import encry.settings.Algos
 import encry.view.history.Height
@@ -42,7 +42,7 @@ case class CoinbaseTransaction(override val proposition: PublicKey25519Propositi
   override val feeBox: Option[OpenBox] = None
 
   private val commissionBox = if (amount > 0) Some(AssetBox(
-    proposition = AddressProposition(Address @@ proposition.address),
+    proposition = AccountProposition(Address @@ proposition.address),
     nonce = nonceFromDigest(Algos.hash(txHash)),
     amount = amount)) else None
 

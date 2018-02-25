@@ -4,9 +4,9 @@ import encry.modifiers.Signable25519
 import encry.modifiers.mempool.EncryTransaction.TxTypeId
 import encry.modifiers.state.box.{EncryBaseBox, OpenBox}
 import encry.settings.Constants
+import scorex.core.ModifierId
 import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.proposition.Proposition
-import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
@@ -32,9 +32,8 @@ trait EncryBaseTransaction extends Transaction[Proposition] with Signable25519 w
 
   val feeBox: Option[OpenBox]
 
-  // Holds IDs of the boxes to be opened.
   val useBoxes: IndexedSeq[ADKey]
-  // Sequence of `Tx Outputs`.
+
   val newBoxes: Traversable[EncryBaseBox]
 
   val minimalFee: Float = Constants.feeMinAmount + Constants.txByteCost * length

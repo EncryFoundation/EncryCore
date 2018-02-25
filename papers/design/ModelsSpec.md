@@ -2,7 +2,7 @@
 ## Account Model
 Represents the owner of the Public/Private key pair.
 
-    address: String                 // Derived from PublicKey. Base58Check encoded string.  
+    address: String             // Derived from PublicKey. Base58Check encoded string.  
 
 ## Base Proposition Model
 Defines requirements for box unlocking.
@@ -32,6 +32,10 @@ Key method:
     unlockTry(proof: Proof, context: Context)   // Executes manipulations defined by proposition type 
                                                 // with data provided by `proof` and `context` to figure out
                                                 // if the box can be unlocked.
+                                                
+## Directive Model
+
+    
 
 ## Base Transaction Model
 

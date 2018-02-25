@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.Address
 import encry.common.KeyPairType
 import encry.modifiers.mempool.EncryTransaction.{TxTypeId, nonceFromDigest}
-import encry.modifiers.state.box.proposition.{AddressProposition, HeightProposition}
+import encry.modifiers.state.box.proposition.{AccountProposition, AddressProposition, HeightProposition}
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox, PubKeyInfoBox}
 import encry.settings.Algos
 import encry.view.history.Height
@@ -54,7 +54,7 @@ case class AddPubKeyInfoTransaction(override val proposition: PublicKey25519Prop
     )
 
   private val changeBox = if (change > 0) Some(AssetBox(
-        AddressProposition(Address @@ proposition.address),
+        AccountProposition(Address @@ proposition.address),
         nonceFromDigest(Algos.hash(txHash :+ OpenBox.typeId)),
         change)
       ) else None

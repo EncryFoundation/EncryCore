@@ -4,7 +4,7 @@ import java.io.File
 
 import akka.actor.ActorRef
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.mempool.{AddPubKeyInfoTransaction, CoinbaseTransaction, EncryBaseTransaction, PaymentTransaction}
+import encry.modifiers.mempool._
 import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.{Algos, Constants, EncryAppSettings, NodeSettings}
@@ -31,7 +31,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
     EncryBoxStateChanges(
       txs.flatMap { tx =>
         tx match {
-          case tx @ (_: PaymentTransaction | _: CoinbaseTransaction | _: AddPubKeyInfoTransaction) =>
+          case tx: EncryTransaction =>
             tx.useBoxes.map(bxId => Removal(bxId)) ++
               tx.newBoxes.map(bx => Insertion(bx))
         }

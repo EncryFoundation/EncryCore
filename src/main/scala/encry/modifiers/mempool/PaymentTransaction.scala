@@ -1,7 +1,7 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import encry.account.Address
+import encry.account.{Account, Address}
 import encry.modifiers.mempool.EncryTransaction._
 import encry.modifiers.state.box.proposition.{AddressProposition, HeightProposition}
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox}
@@ -43,7 +43,7 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
     Seq(feeBox.get) ++
       createBoxes.zipWithIndex.map { case ((addr, amount), idx) =>
         val nonce = nonceFromDigest(Algos.hash(txHash ++ Ints.toByteArray(idx)))
-        AssetBox(AddressProposition(addr), nonce, amount)
+        AssetBox(addr, nonce, amount)
       }
 
   override lazy val serializer: Serializer[M] = PaymentTransactionSerializer
@@ -76,7 +76,7 @@ case class PaymentTransaction(override val proposition: PublicKey25519Propositio
     } else if (!validSignature) {
       Failure(new Error("Invalid signature"))
     } else if (!createBoxes.forall { i =>
-      i._2 > 0 && AddressProposition.validAddress(i._1)
+      i._2 > 0 && Account.validAddress(i._1)
     }) {
       Failure(new Error("Bad outputs"))
     } else if (fee < minimalFee) {
@@ -101,7 +101,7 @@ object PaymentTransaction {
       proposition.pubKeyBytes,
       useBoxes.foldLeft(Array[Byte]())(_ ++ _),
       createBoxes.foldLeft(Array[Byte]())((buff, t) =>
-        buff ++ AddressProposition.getAddrBytes(t._1) ++ Longs.toByteArray(t._2)),
+        buff ++ Account.decodeAddress(t._1) ++ Longs.toByteArray(t._2)),
       Longs.toByteArray(timestamp),
       Longs.toByteArray(fee)
     )

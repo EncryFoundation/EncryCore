@@ -3,7 +3,7 @@ package encry.utils
 import encry.account.Address
 import encry.local.TestHelper.Props
 import encry.modifiers.mempool.PaymentTransaction
-import encry.modifiers.state.box.proposition.AddressProposition
+import encry.modifiers.state.box.proposition.{AccountProposition, AddressProposition}
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.transaction.state.{PrivateKey25519, PrivateKey25519Companion}
@@ -14,7 +14,7 @@ import scorex.utils.Random
 trait EncryGenerator {
 
   def genAssetBox(address: Address): AssetBox =
-    AssetBox(AddressProposition(address), 9L, Props.boxValue)
+    AssetBox(AccountProposition(address), 9L, Props.boxValue)
 
   def genTxOutputs(boxes: Traversable[EncryBaseBox]): IndexedSeq[ADKey] =
     boxes.foldLeft(IndexedSeq[ADKey]()) { case (s, box) =>

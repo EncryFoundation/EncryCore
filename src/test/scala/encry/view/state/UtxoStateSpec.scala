@@ -3,7 +3,7 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
-import encry.account.Address
+import encry.account.{Account, Address}
 import encry.local.TestHelper
 import encry.modifiers.mempool.PaymentTransaction
 import encry.utils.FileHelper
@@ -57,10 +57,11 @@ class UtxoStateSpec extends PropSpec with Matchers {
 
     val invalidTxs = keys.map { pk =>
       val proposition = pk.publicImage
+      println(Account(pk.publicImage.pubKeyBytes).address)
       val fee = factory.Props.txFee
       val timestamp = 123456789L
       val useBoxes =
-        IndexedSeq(factory.genAssetBox(Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp")).map(_.id)
+        IndexedSeq(factory.genAssetBox(Address @@ "4iGUxZy1uy9m1xsEL26VuUZ8Q23W961PPvDTPW3t2jXuCJCPuy")).map(_.id)
       val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, 30000L))
       val sig = PrivateKey25519Companion.sign(
         pk,
