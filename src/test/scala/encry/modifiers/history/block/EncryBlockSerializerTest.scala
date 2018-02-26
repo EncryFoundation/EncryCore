@@ -5,10 +5,12 @@ import encry.consensus.Difficulty
 import encry.crypto.{PublicKey25519, Signature25519}
 import encry.local.TestHelper
 import encry.modifiers.InstanceFactory
+import encry.modifiers.InstanceFactory.genHelper
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.PaymentTransaction
+import encry.modifiers.mempool.directive.TransferDirective
 import org.scalatest.FunSuite
 import scorex.core.ModifierId
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
@@ -42,7 +44,10 @@ class EncryBlockSerializerTest extends FunSuite {
       val fee = factory.Props.txFee
       val timestamp = 12345678L
       val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
-      val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
+      val outputs = IndexedSeq(
+        TransferDirective(factory.Props.recipientAddr, factory.Props.boxValue, 1),
+        TransferDirective(factory.Props.recipientAddr, factory.Props.boxValue, 2)
+      )
       val sig = Signature25519(Curve25519.sign(
         key.privKeyBytes,
         PaymentTransaction.getMessageToSign(pubKey, fee, timestamp, useBoxes, outputs)

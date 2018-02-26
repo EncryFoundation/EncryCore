@@ -2,10 +2,11 @@ package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.crypto.{PublicKey25519, Signature25519}
-import encry.modifiers.mempool.EncryTransaction.{TxTypeId, _}
+import encry.modifiers.mempool.EncryTransaction.TxTypeId
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox}
 import encry.settings.Algos
+import encry.utils.Utils
 import encry.view.history.Height
 import encry.view.state.UtxoState
 import io.circe.Json
@@ -41,7 +42,7 @@ case class CoinbaseTransaction(override val accountPubKey: PublicKey25519,
 
   private val commissionBox = if (amount > 0) Some(AssetBox(
     proposition = AccountProposition(accountPubKey.address),
-    nonce = nonceFromDigest(Algos.hash(txHash)),
+    nonce = Utils.nonceFromDigest(Algos.hash(txHash)),
     amount = amount)) else None
 
   override val newBoxes: Seq[EncryBaseBox] = {

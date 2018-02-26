@@ -3,6 +3,7 @@ package encry.modifiers
 import encry.account.Address
 import encry.crypto.{PublicKey25519, Signature25519}
 import encry.local.TestHelper
+import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.mempool.{AddPubKeyInfoTransaction, CoinbaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box.PubKeyInfoBox
 import encry.modifiers.state.box.proposition.AccountProposition
@@ -22,8 +23,11 @@ object InstanceFactory {
     val fee = genHelper.Props.txFee
     val useBoxes = IndexedSeq(genHelper.genAssetBox(Address @@ key.publicImage.address),
       genHelper.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
-    val outputs = IndexedSeq((Address @@ genHelper.Props.recipientAddr, genHelper.Props.boxValue),
-      (Address @@ genHelper.Props.recipientAddr, genHelper.Props.boxValue))
+    val outputs = IndexedSeq(
+      TransferDirective(genHelper.Props.recipientAddr, genHelper.Props.boxValue, 1),
+      TransferDirective(genHelper.Props.recipientAddr, genHelper.Props.boxValue, 2),
+      TransferDirective(genHelper.Props.recipientAddr, genHelper.Props.boxValue, 3)
+    )
     val sig = Signature25519(Curve25519.sign(
       key.privKeyBytes,
       PaymentTransaction.getMessageToSign(pubKey, fee, timestamp, useBoxes, outputs)
@@ -34,7 +38,10 @@ object InstanceFactory {
   def paymentTransactionInvalid(pubKey: PublicKey25519 = publicKey): PaymentTransaction = {
     val fee = genHelper.Props.txFee
     val useBoxes = IndexedSeq(genHelper.genAssetBox(Address @@ key.publicImage.address)).map(_.id)
-    val outputs = IndexedSeq((Address @@ genHelper.Props.recipientAddr, genHelper.Props.boxValue))
+    val outputs = IndexedSeq(
+      TransferDirective(genHelper.Props.recipientAddr, genHelper.Props.boxValue, 1),
+      TransferDirective(genHelper.Props.recipientAddr, genHelper.Props.boxValue, 2)
+    )
     val sig = Signature25519(Signature @@ Random.randomBytes(64))
     PaymentTransaction(pubKey, fee, timestamp, sig, useBoxes, outputs)
   }

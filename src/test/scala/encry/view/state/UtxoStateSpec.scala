@@ -7,6 +7,7 @@ import encry.account.{Account, Address}
 import encry.crypto.{PublicKey25519, Signature25519}
 import encry.local.TestHelper
 import encry.modifiers.mempool.PaymentTransaction
+import encry.modifiers.mempool.directive.TransferDirective
 import encry.utils.FileHelper
 import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
@@ -49,7 +50,7 @@ class UtxoStateSpec extends PropSpec with Matchers {
       val fee = factory.Props.txFee
       val timestamp = 1234567L
       val useBoxes = IndexedSeq(bx).map(_.id)
-      val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue - 100))
+      val outputs = IndexedSeq(TransferDirective(factory.Props.recipientAddr, factory.Props.boxValue - 100, 1))
       val sig = Signature25519(Curve25519.sign(
         pk.privKeyBytes,
         PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)
@@ -63,7 +64,7 @@ class UtxoStateSpec extends PropSpec with Matchers {
       val timestamp = 123456789L
       val useBoxes =
         IndexedSeq(factory.genAssetBox(Address @@ "4iGUxZy1uy9m1xsEL26VuUZ8Q23W961PPvDTPW3t2jXuCJCPuy")).map(_.id)
-      val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, 30000L))
+      val outputs = IndexedSeq(TransferDirective(factory.Props.recipientAddr, 30000L, 1))
       val sig = Signature25519(Curve25519.sign(
         pk.privKeyBytes,
         PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)

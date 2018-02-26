@@ -19,13 +19,15 @@ case class PaymentTransactionModel(proposition: String,
 
   override def toBaseObjOpt: Option[PaymentTransaction] =
     Try {
-      PaymentTransaction(
-        PublicKey25519(PublicKey @@ Algos.decode(proposition).get),
-        fee,
-        timestamp,
-        Signature25519(Signature @@ Algos.decode(signature).get),
-        useBoxes.map(id => ADKey @@ Algos.decode(id).get),
-        createBoxes.map { case (addr, am) => Address @@ addr -> am }
-      )
+      // TODO: Implement Directive  json serializer.
+//      PaymentTransaction(
+//        PublicKey25519(PublicKey @@ Algos.decode(proposition).get),
+//        fee,
+//        timestamp,
+//        Signature25519(Signature @@ Algos.decode(signature).get),
+//        useBoxes.map(id => ADKey @@ Algos.decode(id).get),
+//        createBoxes.map { case (addr, am) => Address @@ addr -> am }
+//      )
+      throw new Exception("")
     }.toOption
 }

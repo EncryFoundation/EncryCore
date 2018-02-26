@@ -7,6 +7,7 @@ import encry.account.Address
 import encry.cli.Response
 import encry.crypto.{PublicKey25519, Signature25519}
 import encry.modifiers.mempool.PaymentTransaction
+import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.state.box.AssetBox
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
@@ -38,7 +39,7 @@ object Transfer extends Command {
     Await.result((nodeViewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
         Try {
-          val recipient = args(1).split(";").head
+          val recipient = Address @@ args(1).split(";").head
           val fee = args(1).split(";")(1).toLong
           val amount = args(1).split(";").last.toLong
           val accountPubKey = PublicKey25519(view.vault.keyManager.keys.head.publicImage.pubKeyBytes)
@@ -48,8 +49,8 @@ object Transfer extends Command {
           }
           val useBoxes = boxes.map(_.id).toIndexedSeq
           val outputs = IndexedSeq(
-            (Address @@ recipient, amount),
-            (Address @@ accountPubKey.address, boxes.map(_.amount).sum - (amount + fee)))
+            TransferDirective(recipient, amount, 1),
+            TransferDirective(accountPubKey.address, boxes.map(_.amount).sum - (amount + fee), 2))
           val sig = Signature25519(Curve25519.sign(
             view.vault.keyManager.keys.head.privKeyBytes,
             PaymentTransaction.getMessageToSign(accountPubKey, fee, timestamp, useBoxes, outputs)

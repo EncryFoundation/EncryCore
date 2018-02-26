@@ -4,6 +4,7 @@ import akka.actor.{Actor, ActorRef, ActorRefFactory, Cancellable, Props}
 import encry.account.Address
 import encry.crypto.{PublicKey25519, Signature25519}
 import encry.local.TransactionGenerator.{GeneratePaymentTransactions, StartGeneration, StopGeneration}
+import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box.AssetBox
 import encry.settings.TestingSettings
@@ -56,8 +57,8 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings, time
               }
               val useBoxes = boxes.map(_.id).toIndexedSeq
               val outputs = IndexedSeq(
-                (Address @@ recipient, amount),
-                (Address @@ accountPubKey.address, boxes.map(_.amount).sum - (amount + fee)))
+                TransferDirective(recipient, amount, 1),
+                TransferDirective(accountPubKey.address, boxes.map(_.amount).sum - (amount + fee), 2))
               val sig = Signature25519(Curve25519.sign(
                 v.vault.keyManager.keys.head.privKeyBytes,
                 PaymentTransaction.getMessageToSign(accountPubKey, fee, timestamp, useBoxes, outputs)
@@ -66,8 +67,8 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings, time
               PaymentTransaction(accountPubKey, fee, timestamp, sig, useBoxes, outputs)
             } else {
               // Generate semantically valid but stateful-invalid txs otherwise.
-              val useBoxes = IndexedSeq(factory.genAssetBox(Address @@ pubKey.address)).map(_.id)
-              val outputs = IndexedSeq((Address @@ factory.Props.recipientAddr, factory.Props.boxValue))
+              val useBoxes = IndexedSeq(factory.genAssetBox(pubKey.address)).map(_.id)
+              val outputs = IndexedSeq(TransferDirective(factory.Props.recipientAddr, factory.Props.boxValue, 1))
               val sig = Signature25519(Curve25519.sign(
                 v.vault.keyManager.keys.head.privKeyBytes,
                 PaymentTransaction.getMessageToSign(accountPubKey, fee, timestamp, useBoxes, outputs)

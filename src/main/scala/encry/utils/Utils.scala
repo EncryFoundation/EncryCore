@@ -1,5 +1,7 @@
 package encry.utils
 
+import com.google.common.primitives.Longs
+import encry.modifiers.mempool.EncryTransaction.Nonce
 import encry.utils.LittleEndianBytes._
 import org.bouncycastle.crypto.Digest
 
@@ -27,4 +29,6 @@ object Utils {
   def validateSolution(solution: Array[Byte], target: Double): Boolean = {
     countLeadingZeroes(solution) >= target
   }
+
+  def nonceFromDigest(digest: Array[Byte]): Nonce = Longs.fromByteArray(digest.take(8))
 }

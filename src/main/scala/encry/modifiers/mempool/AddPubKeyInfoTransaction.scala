@@ -3,10 +3,11 @@ package encry.modifiers.mempool
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.common.KeyPairType
 import encry.crypto.{PublicKey25519, Signature25519}
-import encry.modifiers.mempool.EncryTransaction.{TxTypeId, nonceFromDigest}
+import encry.modifiers.mempool.EncryTransaction.TxTypeId
 import encry.modifiers.state.box.proposition.{AccountProposition, HeightProposition}
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox, PubKeyInfoBox}
 import encry.settings.Algos
+import encry.utils.Utils
 import encry.view.history.Height
 import io.circe.Json
 import io.circe.syntax._
@@ -39,12 +40,12 @@ case class AddPubKeyInfoTransaction(override val accountPubKey: PublicKey25519,
   override val typeId: TxTypeId = AddPubKeyInfoTransaction.typeId
 
   override val feeBox: Option[OpenBox] =
-    Some(OpenBox(HeightProposition(Height @@ 0), nonceFromDigest(Algos.hash(txHash :+ OpenBox.typeId)), fee))
+    Some(OpenBox(HeightProposition(Height @@ 0), Utils.nonceFromDigest(Algos.hash(txHash :+ OpenBox.typeId)), fee))
 
   private val pubKeyInfoBox =
     PubKeyInfoBox(
       AccountProposition(accountPubKey.address),
-      nonceFromDigest(Algos.hash(txHash :+ PubKeyInfoBox.typeId)),
+      Utils.nonceFromDigest(Algos.hash(txHash :+ PubKeyInfoBox.typeId)),
       pubKeyBytes,
       pubKeyProofBytes,
       pubKeyInfoBytes,
@@ -53,7 +54,7 @@ case class AddPubKeyInfoTransaction(override val accountPubKey: PublicKey25519,
 
   private val changeBox = if (change > 0) Some(AssetBox(
         AccountProposition(accountPubKey.address),
-        nonceFromDigest(Algos.hash(txHash :+ OpenBox.typeId)),
+        Utils.nonceFromDigest(Algos.hash(txHash :+ OpenBox.typeId)),
         change)
       ) else None
 

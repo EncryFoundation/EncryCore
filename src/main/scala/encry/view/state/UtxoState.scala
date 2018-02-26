@@ -195,8 +195,9 @@ class UtxoState(override val version: VersionTag,
         case _ => acc
       })
 
+      // TODO: Fix credit calculating when directives will be added to tx base class.
       val credit = tx match {
-        case tx: PaymentTransaction => tx.createBoxes.foldLeft(0L)(_ + _._2) + tx.fee
+        case tx: PaymentTransaction => tx.fee
         case _ => tx.fee
       }
 

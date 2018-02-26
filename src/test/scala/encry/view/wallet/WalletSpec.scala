@@ -10,6 +10,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.PaymentTransaction
+import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.state.box.AssetBox
 import encry.settings.{Constants, EncryAppSettings}
 import encry.utils.FileHelper
@@ -63,7 +64,7 @@ class WalletSpec extends PropSpec with Matchers{
       val fee = factory.Props.txFee
       val timestamp = 1234567L
       val useBoxes = IndexedSeq(bx).map(_.id)
-      val outputs = IndexedSeq((Address @@ wallet.publicKeys.head.address, factory.Props.boxValue - 100))
+      val outputs = IndexedSeq(TransferDirective(wallet.publicKeys.head.address, factory.Props.boxValue - 100, 1))
       val sig = Signature25519(Curve25519.sign(
         pk.privKeyBytes,
         PaymentTransaction.getMessageToSign(proposition, fee, timestamp, useBoxes, outputs)

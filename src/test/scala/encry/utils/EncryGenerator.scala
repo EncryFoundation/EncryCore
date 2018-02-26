@@ -4,6 +4,7 @@ import encry.account.Address
 import encry.crypto.{PublicKey25519, Signature25519}
 import encry.local.TestHelper.Props
 import encry.modifiers.mempool.PaymentTransaction
+import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import scorex.core.transaction.state.PrivateKey25519
@@ -32,7 +33,7 @@ trait EncryGenerator {
       val proposition = PublicKey25519(key.publicKeyBytes)
       val timestamp = System.currentTimeMillis()
       val useBoxes = IndexedSeq(genAssetBox(proposition.address)).map(_.id)
-      val outputs = IndexedSeq((Address @@ Props.recipientAddr, Props.boxValue))
+      val outputs = IndexedSeq(TransferDirective(Props.recipientAddr, Props.boxValue, 1))
       val sig = Signature25519(Curve25519.sign(
         key.privKeyBytes, PaymentTransaction.getMessageToSign(proposition, Props.txFee, timestamp, useBoxes, outputs)))
       PaymentTransaction(proposition, Props.txFee, timestamp, sig, useBoxes, outputs)
@@ -45,7 +46,7 @@ trait EncryGenerator {
       val proposition = PublicKey25519(PublicKey @@ Random.randomBytes())
       val timestamp = System.currentTimeMillis()
       val useBoxes = IndexedSeq(genAssetBox(proposition.address)).map(_.id)
-      val outputs = IndexedSeq((Address @@ Props.recipientAddr, Props.boxValue))
+      val outputs = IndexedSeq(TransferDirective(Props.recipientAddr, Props.boxValue, 1))
       val sig = Signature25519(Curve25519.sign(
        key.privKeyBytes, PaymentTransaction.getMessageToSign(proposition, Props.txFee, timestamp, useBoxes, outputs)))
       PaymentTransaction(proposition, Props.txFee, timestamp, sig, useBoxes, outputs)
