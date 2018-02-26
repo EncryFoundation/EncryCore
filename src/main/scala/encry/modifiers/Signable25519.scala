@@ -1,6 +1,7 @@
 package encry.modifiers
 
-import encry.crypto.{PublicKey25519, Signature25519}
+import encry.crypto.PublicKey25519
+import encry.modifiers.state.box.proof.Signature25519
 
 trait Signable25519 {
 

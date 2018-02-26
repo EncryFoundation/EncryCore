@@ -2,7 +2,7 @@ package encry.modifiers.history.block
 
 import encry.account.Address
 import encry.consensus.Difficulty
-import encry.crypto.{PublicKey25519, Signature25519}
+import encry.crypto.PublicKey25519
 import encry.local.TestHelper
 import encry.modifiers.InstanceFactory
 import encry.modifiers.InstanceFactory.genHelper
@@ -11,6 +11,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.PaymentTransaction
 import encry.modifiers.mempool.directive.TransferDirective
+import encry.modifiers.state.box.proof.Signature25519
 import org.scalatest.FunSuite
 import scorex.core.ModifierId
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}

@@ -1,9 +1,9 @@
 package encry.modifiers.mempool.directive
 
-import encry.modifiers.mempool.EncryTransaction.Amount
 import encry.modifiers.mempool.directive.Directive.DirTypeId
 import encry.modifiers.state.box.EncryBaseBox
 import scorex.core.serialization.{BytesSerializable, JsonSerializable}
+import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.hash.Digest32
 
 // Directive is sub-modifier of the state.

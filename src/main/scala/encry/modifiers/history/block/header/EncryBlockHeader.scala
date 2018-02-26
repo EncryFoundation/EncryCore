@@ -2,10 +2,11 @@ package encry.modifiers.history.block.header
 
 import com.google.common.primitives.{Ints, _}
 import encry.consensus.{Difficulty, DifficultySerializer}
-import encry.crypto.{PublicKey25519, Signature25519}
+import encry.crypto.PublicKey25519
 import encry.modifiers.ModifierWithDigest
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.state.box.proof.Signature25519
 import encry.settings.{Algos, Constants}
 import io.circe.Json
 import io.circe.syntax._

@@ -4,10 +4,11 @@ import java.io.File
 
 import akka.actor.ActorRef
 import encry.account.{Account, Address}
-import encry.crypto.{PublicKey25519, Signature25519}
+import encry.crypto.PublicKey25519
 import encry.local.TestHelper
 import encry.modifiers.mempool.PaymentTransaction
 import encry.modifiers.mempool.directive.TransferDirective
+import encry.modifiers.state.box.proof.Signature25519
 import encry.utils.FileHelper
 import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}

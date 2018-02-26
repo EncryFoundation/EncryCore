@@ -2,18 +2,18 @@ package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs}
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.mempool.EncryTransaction.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.{HeightProposition, HeightPropositionSerializer}
 import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
+import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.ADValue
 
 import scala.util.{Success, Try}
 
-// Now used currently.
+// Not used currently.
 case class CoinbaseBox(override val proposition: HeightProposition,
                        override val nonce: Long,
                        amount: Amount) extends EncryBox[HeightProposition] {

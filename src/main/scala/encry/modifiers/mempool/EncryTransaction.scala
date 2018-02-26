@@ -20,15 +20,14 @@ import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.{Failure, Success, Try}
 
-case class PaymentTransaction(override val accountPubKey: PublicKey25519,
-                              override val fee: Amount,
-                              override val timestamp: Long,
-                              override val signature: Signature25519,
-                              override val useBoxes: IndexedSeq[ADKey],
-                              directives: IndexedSeq[Directive])
-  extends EncryBaseTransaction {
+case class EncryTransaction(override val accountPubKey: PublicKey25519,
+                            override val fee: Amount,
+                            override val timestamp: Long,
+                            override val signature: Signature25519,
+                            override val useBoxes: IndexedSeq[ADKey],
+                            directives: IndexedSeq[Directive]) extends EncryBaseTransaction {
 
-  override type M = PaymentTransaction
+  override type M = EncryTransaction
 
   override val length: Int = 120 + (32 * useBoxes.size) + (45 * directives.size)
 
@@ -42,7 +41,7 @@ case class PaymentTransaction(override val accountPubKey: PublicKey25519,
   override val newBoxes: Traversable[EncryBaseBox] =
     Seq(feeBox.get) ++ directives.flatMap(_.boxes(txHash))
 
-  override lazy val serializer: Serializer[M] = PaymentTransactionSerializer
+  override lazy val serializer: Serializer[M] = EncryTransactionSerializer
 
   override def json: Json = Map(
     "id" -> Algos.encode(id).asJson,
@@ -59,7 +58,7 @@ case class PaymentTransaction(override val accountPubKey: PublicKey25519,
   ).asJson
 
   override lazy val txHash: Digest32 =
-    PaymentTransaction.getHash(accountPubKey, fee, timestamp, useBoxes, directives)
+    EncryTransaction.getHash(accountPubKey, fee, timestamp, useBoxes, directives)
 
   override lazy val semanticValidity: Try[Unit] = {
     if (!validSize) {
@@ -68,17 +67,19 @@ case class PaymentTransaction(override val accountPubKey: PublicKey25519,
       Failure(new Error("Invalid signature"))
     } else if (!directives.forall(_.isValid)) {
       Failure(new Error("Bad outputs"))
+    } else if (directives.map(_.idx).toSet.size != directives.size) {
+      Failure(new Error("Non-unique directive indexes"))
     } else if (fee < minimalFee) {
       Failure(new Error("Fee amount too small"))
     } else Success()
   }
 }
 
-object PaymentTransaction {
+object EncryTransaction {
 
-  val maxSize: Int = 350
+  val MaxSize: Int = 350
 
-  val typeId: TxTypeId = 1.toByte
+  val TypeId: TxTypeId = 8.toByte
 
   def getHash(accountPubKey: PublicKey25519,
               fee: Amount,
@@ -86,7 +87,7 @@ object PaymentTransaction {
               useBoxes: IndexedSeq[ADKey],
               directives: IndexedSeq[Directive]): Digest32 = Algos.hash(
     Bytes.concat(
-      Array[Byte](typeId),
+      Array[Byte](TypeId),
       accountPubKey.pubKeyBytes,
       useBoxes.foldLeft(Array[Byte]())(_ ++ _),
       directives.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
@@ -103,9 +104,9 @@ object PaymentTransaction {
     getHash(accountPubKey, fee, timestamp, useBoxes, directives)
 }
 
-object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
+object EncryTransactionSerializer extends Serializer[EncryTransaction] {
 
-  override def toBytes(obj: PaymentTransaction): Array[Byte] = {
+  override def toBytes(obj: EncryTransaction): Array[Byte] = {
     Bytes.concat(
       obj.accountPubKey.pubKeyBytes,
       Longs.toByteArray(obj.fee),
@@ -118,7 +119,7 @@ object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
     )
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[PaymentTransaction] = Try {
+  override def parseBytes(bytes: Array[Byte]): Try[EncryTransaction] = Try {
 
     val accPubKey = PublicKey25519(PublicKey @@ bytes.slice(0, 32))
     val fee = Longs.fromByteArray(bytes.slice(32, 40))
@@ -134,11 +135,11 @@ object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
     val s2 = s + (inputsQty * outElementLength)
     val leftBytes = bytes.drop(s2)
     val directives = (0 until directivesQty).foldLeft(Seq[Directive](), leftBytes) { case ((acc, bs), _) =>
-        val len = Ints.fromByteArray(bs.take(4))
-        DirectiveDeserializer.parseBytes(bs.slice(5, 5 + len), bs(5)).map(d => (acc :+ d, bs.drop(5 + len)))
-          .getOrElse(throw new Exception("Serialization failed."))
-      }._1.toIndexedSeq
+      val len = Ints.fromByteArray(bs.take(4))
+      DirectiveDeserializer.parseBytes(bs.slice(5, 5 + len), bs(5)).map(d => (acc :+ d, bs.drop(5 + len)))
+        .getOrElse(throw new Exception("Serialization failed."))
+    }._1.toIndexedSeq
 
-    PaymentTransaction(accPubKey, fee, timestamp, signature, useOutputs, directives)
+    EncryTransaction(accPubKey, fee, timestamp, signature, useOutputs, directives)
   }
 }

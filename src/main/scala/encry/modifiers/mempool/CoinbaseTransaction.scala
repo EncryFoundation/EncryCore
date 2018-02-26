@@ -1,8 +1,9 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import encry.crypto.{PublicKey25519, Signature25519}
+import encry.crypto.PublicKey25519
 import encry.modifiers.mempool.EncryBaseTransaction.TxTypeId
+import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox}
 import encry.settings.Algos

@@ -1,8 +1,9 @@
 package encry.api.models
 
 import encry.common.KeyPairType
-import encry.crypto.{PublicKey25519, Signature25519}
+import encry.crypto.PublicKey25519
 import encry.modifiers.mempool.AddPubKeyInfoTransaction
+import encry.modifiers.state.box.proof.Signature25519
 import encry.settings.Algos
 import scorex.crypto.authds.ADKey
 import scorex.crypto.signatures.{PublicKey, Signature}

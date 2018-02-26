@@ -1,12 +1,12 @@
 package encry.local
 
 import akka.actor.{Actor, ActorRef, ActorRefFactory, Cancellable, Props}
-import encry.account.Address
-import encry.crypto.{PublicKey25519, Signature25519}
+import encry.crypto.PublicKey25519
 import encry.local.TransactionGenerator.{GeneratePaymentTransactions, StartGeneration, StopGeneration}
 import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box.AssetBox
+import encry.modifiers.state.box.proof.Signature25519
 import encry.settings.TestingSettings
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool

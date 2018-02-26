@@ -2,7 +2,6 @@ package encry.modifiers.mempool.directive
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.{Account, Address}
-import encry.modifiers.mempool.EncryTransaction.Amount
 import encry.modifiers.mempool.directive.Directive.DirTypeId
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.Algos
@@ -10,6 +9,7 @@ import encry.utils.Utils
 import io.circe.Json
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
+import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 

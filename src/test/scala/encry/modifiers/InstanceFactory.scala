@@ -1,11 +1,12 @@
 package encry.modifiers
 
 import encry.account.Address
-import encry.crypto.{PublicKey25519, Signature25519}
+import encry.crypto.PublicKey25519
 import encry.local.TestHelper
 import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.mempool.{AddPubKeyInfoTransaction, CoinbaseTransaction, PaymentTransaction}
 import encry.modifiers.state.box.PubKeyInfoBox
+import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.view.history.Height
 import scorex.crypto.authds.ADKey

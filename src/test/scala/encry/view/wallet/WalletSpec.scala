@@ -2,7 +2,7 @@ package encry.view.wallet
 
 import encry.account.Address
 import encry.consensus.Difficulty
-import encry.crypto.{PublicKey25519, Signature25519}
+import encry.crypto.PublicKey25519
 import encry.local.TestHelper
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.ADProofs
@@ -12,6 +12,7 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.PaymentTransaction
 import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.state.box.AssetBox
+import encry.modifiers.state.box.proof.Signature25519
 import encry.settings.{Constants, EncryAppSettings}
 import encry.utils.FileHelper
 import encry.view.state.BoxHolder

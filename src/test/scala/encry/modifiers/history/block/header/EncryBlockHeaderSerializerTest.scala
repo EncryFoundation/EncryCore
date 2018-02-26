@@ -1,7 +1,8 @@
 package encry.modifiers.history.block.header
 
 import encry.consensus.Difficulty
-import encry.crypto.{PublicKey25519, Signature25519}
+import encry.crypto.PublicKey25519
+import encry.modifiers.state.box.proof.Signature25519
 import org.scalatest.FunSuite
 import scorex.core.ModifierId
 import scorex.crypto.authds.ADDigest

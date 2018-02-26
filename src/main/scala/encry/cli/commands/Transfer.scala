@@ -5,10 +5,11 @@ import akka.pattern._
 import akka.util.Timeout
 import encry.account.Address
 import encry.cli.Response
-import encry.crypto.{PublicKey25519, Signature25519}
+import encry.crypto.PublicKey25519
 import encry.modifiers.mempool.PaymentTransaction
 import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.state.box.AssetBox
+import encry.modifiers.state.box.proof.Signature25519
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool

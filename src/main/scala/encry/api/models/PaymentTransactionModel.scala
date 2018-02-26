@@ -1,7 +1,7 @@
 package encry.api.models
 
 import encry.account.Address
-import encry.crypto.{PublicKey25519, Signature25519}
+import encry.crypto.PublicKey25519
 import encry.modifiers.mempool.PaymentTransaction
 import encry.settings.Algos
 import scorex.crypto.authds.ADKey

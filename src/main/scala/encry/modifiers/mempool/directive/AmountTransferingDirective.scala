@@ -1,6 +1,6 @@
 package encry.modifiers.mempool.directive
 
-import encry.modifiers.mempool.EncryTransaction.Amount
+import scorex.core.transaction.box.Box.Amount
 
 trait AmountTransferingDirective {
 
