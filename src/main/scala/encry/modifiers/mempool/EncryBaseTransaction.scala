@@ -2,10 +2,11 @@ package encry.modifiers.mempool
 
 import encry.account.Account
 import encry.modifiers.Signable25519
-import encry.modifiers.mempool.EncryTransaction.TxTypeId
+import encry.modifiers.mempool.EncryBaseTransaction.TxTypeId
 import encry.modifiers.state.box.{EncryBaseBox, OpenBox}
 import encry.settings.Constants
 import scorex.core.ModifierId
+import scorex.core.serialization.JsonSerializable
 import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.crypto.authds.ADKey
@@ -14,7 +15,8 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-trait EncryBaseTransaction extends Transaction[Proposition] with Signable25519 with ModifierWithSizeLimit {
+trait EncryBaseTransaction extends Transaction[Proposition]
+  with Signable25519 with ModifierWithSizeLimit with JsonSerializable {
 
   val txHash: Digest32
 
@@ -44,5 +46,11 @@ trait EncryBaseTransaction extends Transaction[Proposition] with Signable25519 w
   override def toString: String = s"<TX: type=$typeId id=${Base58.encode(id)}>"
 
   // Shadowed.
-  override val messageToSign: Array[TxTypeId] = Array.fill(32)(1.toByte)
+  override val messageToSign: Array[Byte] = Array.fill(32)(1.toByte)
+}
+
+object EncryBaseTransaction {
+
+  type TxTypeId = Byte
+  type Nonce = Long
 }

@@ -3,7 +3,7 @@ package encry.modifiers.mempool
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.common.KeyPairType
 import encry.crypto.{PublicKey25519, Signature25519}
-import encry.modifiers.mempool.EncryTransaction.TxTypeId
+import encry.modifiers.mempool.EncryBaseTransaction.TxTypeId
 import encry.modifiers.state.box.proposition.{AccountProposition, HeightProposition}
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox, PubKeyInfoBox}
 import encry.settings.Algos
@@ -28,7 +28,7 @@ case class AddPubKeyInfoTransaction(override val accountPubKey: PublicKey25519,
                                     pubKeyBytes: PublicKey,
                                     pubKeyProofBytes: Signature,
                                     pubKeyInfoBytes: Array[Byte], // TODO: Tag?
-                                    pubKeyTypeId: Byte) extends EncryTransaction {
+                                    pubKeyTypeId: Byte) extends EncryBaseTransaction {
 
   override type M = AddPubKeyInfoTransaction
 

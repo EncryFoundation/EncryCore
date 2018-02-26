@@ -1,7 +1,7 @@
 package encry.utils
 
 import com.google.common.primitives.Longs
-import encry.modifiers.mempool.EncryTransaction.Nonce
+import encry.modifiers.mempool.EncryBaseTransaction.Nonce
 import encry.utils.LittleEndianBytes._
 import org.bouncycastle.crypto.Digest
 

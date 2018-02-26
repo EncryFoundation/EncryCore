@@ -1,6 +1,6 @@
 package encry.modifiers.state.box
 
-import encry.modifiers.mempool.EncryTransaction.Amount
+import scorex.core.transaction.box.Box.Amount
 
 trait AmountCarryingBox {
 

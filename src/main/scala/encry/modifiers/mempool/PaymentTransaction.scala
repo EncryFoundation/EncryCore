@@ -2,7 +2,7 @@ package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.crypto.{PublicKey25519, Signature25519}
-import encry.modifiers.mempool.EncryTransaction._
+import encry.modifiers.mempool.EncryBaseTransaction.TxTypeId
 import encry.modifiers.mempool.directive.{Directive, DirectiveDeserializer}
 import encry.modifiers.state.box.proposition.HeightProposition
 import encry.modifiers.state.box.{EncryBaseBox, OpenBox}
@@ -25,7 +25,7 @@ case class PaymentTransaction(override val accountPubKey: PublicKey25519,
                               override val signature: Signature25519,
                               override val useBoxes: IndexedSeq[ADKey],
                               directives: IndexedSeq[Directive])
-  extends EncryTransaction {
+  extends EncryBaseTransaction {
 
   override type M = PaymentTransaction
 

@@ -2,7 +2,7 @@ package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.crypto.{PublicKey25519, Signature25519}
-import encry.modifiers.mempool.EncryTransaction.TxTypeId
+import encry.modifiers.mempool.EncryBaseTransaction.TxTypeId
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, OpenBox}
 import encry.settings.Algos
@@ -25,7 +25,7 @@ case class CoinbaseTransaction(override val accountPubKey: PublicKey25519,
                                override val signature: Signature25519,
                                override val useBoxes: IndexedSeq[ADKey],
                                amount: Amount,
-                               height: Height) extends EncryTransaction {
+                               height: Height) extends EncryBaseTransaction {
 
   override type M = CoinbaseTransaction
 

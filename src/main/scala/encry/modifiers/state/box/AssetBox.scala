@@ -3,12 +3,12 @@ package encry.modifiers.state.box
 import com.google.common.primitives.{Bytes, Longs}
 import encry.account.{Account, Address}
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.mempool.EncryTransaction.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.{AccountProposition, AccountPropositionSerializer}
 import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import io.circe.Json
 import io.circe.syntax._
+import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.encode.Base58
 
 import scala.util.{Failure, Success, Try}
