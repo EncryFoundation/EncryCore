@@ -2,10 +2,12 @@ package encry.crypto
 
 import encry.account.Address
 import encry.crypto.encoding.Base58Check
-import scorex.core.serialization.Serializer
+import scorex.core.serialization.{BytesSerializable, Serializer}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 import scala.util.Try
+
+trait PublicKeyWrapper extends BytesSerializable
 
 case class PublicKey25519(pubKeyBytes: PublicKey) extends PublicKeyWrapper {
 

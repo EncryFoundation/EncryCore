@@ -6,9 +6,9 @@ import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
 import scala.util.Try
 
-trait Secret extends BytesSerializable
+trait SecretWrapper extends BytesSerializable
 
-case class PrivateKey25519(privKeyBytes: PrivateKey, publicKeyBytes: PublicKey) extends Secret {
+case class PrivateKey25519(privKeyBytes: PrivateKey, publicKeyBytes: PublicKey) extends SecretWrapper {
 
   override type M = PrivateKey25519
 

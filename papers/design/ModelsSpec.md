@@ -40,9 +40,10 @@ Defines operation on state.
     cost: Amount                                // Will be used for `transaction.fee` minimal amount calculating.
 
 ## Base Transaction Model
+Atomic state modifier.
 
     senderPubKey: PublicKey
     senderSignature: Signature
     fee: Amount
     useBoxes: [(BoxId, Option[Proof])]          // If `proof` is None, then `senderSignature` is used as proof.
-    directives: [Directive]
+    directives: [Directive]                     // List of state modifications which should be applied atomically.
