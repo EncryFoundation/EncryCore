@@ -24,13 +24,13 @@ import scala.util.{Failure, Success, Try}
 case class CoinbaseTransaction(override val accountPubKey: PublicKey25519,
                                override val timestamp: Long,
                                override val signature: Signature25519,
-                               override val useBoxes: IndexedSeq[ADKey],
+                               override val unlockers: IndexedSeq[ADKey],
                                amount: Amount,
                                height: Height) extends EncryBaseTransaction {
 
   override type M = CoinbaseTransaction
 
-  override val length: Int = 72 + (41 * useBoxes.size)
+  override val length: Int = 72 + (41 * unlockers.size)
 
   override val maxSize: Int = CoinbaseTransaction.maxSize
 
@@ -54,7 +54,7 @@ case class CoinbaseTransaction(override val accountPubKey: PublicKey25519,
   override def json: Json = Map(
     "type" -> "Coinbase".asJson,
     "id" -> Base58.encode(id).asJson,
-    "inputs" -> useBoxes.map { id =>
+    "inputs" -> unlockers.map { id =>
       Map(
         "id" -> Algos.encode(id).asJson,
         "signature" -> Base58.encode(signature.bytes).asJson
@@ -70,7 +70,7 @@ case class CoinbaseTransaction(override val accountPubKey: PublicKey25519,
 
   override lazy val serializer: Serializer[M] = CoinbaseTransactionSerializer
 
-  override lazy val txHash: Digest32 = CoinbaseTransaction.getHash(accountPubKey, useBoxes, timestamp, amount, height)
+  override lazy val txHash: Digest32 = CoinbaseTransaction.getHash(accountPubKey, unlockers, timestamp, amount, height)
 
   override lazy val semanticValidity: Try[Unit] = {
     if (!validSize) {
@@ -120,8 +120,8 @@ object CoinbaseTransactionSerializer extends Serializer[CoinbaseTransaction] {
       obj.signature.signature,
       Longs.toByteArray(obj.amount),
       Ints.toByteArray(obj.height),
-      Ints.toByteArray(obj.useBoxes.length),
-      obj.useBoxes.foldLeft(Array[Byte]()) { case (arr, key) =>
+      Ints.toByteArray(obj.unlockers.length),
+      obj.unlockers.foldLeft(Array[Byte]()) { case (arr, key) =>
         arr ++ key
       }
     )

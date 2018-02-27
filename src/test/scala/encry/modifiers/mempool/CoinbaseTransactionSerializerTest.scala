@@ -23,7 +23,7 @@ class CoinbaseTransactionSerializerTest extends FunSuite {
 
     assert(coinbase.txHash sameElements coinbaseDeserialized.get.txHash, "Deserialization result mismatch")
 
-    assert(coinbase.useBoxes.zip(coinbaseDeserialized.get.useBoxes).forall(i => i._1 sameElements i._2),
+    assert(coinbase.unlockers.zip(coinbaseDeserialized.get.unlockers).forall(i => i._1 sameElements i._2),
       "Deserialization result mismatch. ADKeys were parsed incorrectly.")
   }
 

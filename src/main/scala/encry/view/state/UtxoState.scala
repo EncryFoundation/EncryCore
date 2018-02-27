@@ -183,7 +183,7 @@ class UtxoState(override val version: VersionTag,
 
       implicit val context: Option[Context] = Some(Context(stateHeight))
 
-      val bxs = tx.useBoxes.map(bxId => persistentProver.unauthenticatedLookup(bxId)
+      val bxs = tx.unlockers.map(bxId => persistentProver.unauthenticatedLookup(bxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, bxId.head))
         .flatMap(_.toOption)).foldLeft(IndexedSeq[EncryBaseBox]())((acc, bxOpt) => bxOpt match {
           case Some(bx) if bx.unlockTry(tx, None).isSuccess => acc :+ bx
@@ -201,7 +201,7 @@ class UtxoState(override val version: VersionTag,
         case _ => tx.fee
       }
 
-      if (bxs.size < tx.useBoxes.size) throw new Error(s"Failed to spend some boxes referenced in $tx")
+      if (bxs.size < tx.unlockers.size) throw new Error(s"Failed to spend some boxes referenced in $tx")
       else if (debit < credit) throw new Error(s"Non-positive balance in $tx")
     }
 }

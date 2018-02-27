@@ -24,13 +24,13 @@ case class PaymentTransaction(override val accountPubKey: PublicKey25519,
                               override val fee: Amount,
                               override val timestamp: Long,
                               override val signature: Signature25519,
-                              override val useBoxes: IndexedSeq[ADKey],
+                              override val unlockers: IndexedSeq[ADKey],
                               directives: IndexedSeq[Directive])
   extends EncryBaseTransaction {
 
   override type M = PaymentTransaction
 
-  override val length: Int = 120 + (32 * useBoxes.size) + (45 * directives.size)
+  override val length: Int = 120 + (32 * unlockers.size) + (45 * directives.size)
 
   override val maxSize: Int = PaymentTransaction.maxSize
 
@@ -50,7 +50,7 @@ case class PaymentTransaction(override val accountPubKey: PublicKey25519,
     "fee" -> fee.asJson,
     "timestamp" -> timestamp.asJson,
     "signature" -> Algos.encode(signature.signature).asJson,
-    "inputs" -> useBoxes.map { id =>
+    "inputs" -> unlockers.map { id =>
       Map(
         "id" -> Algos.encode(id).asJson,
       ).asJson
@@ -59,7 +59,7 @@ case class PaymentTransaction(override val accountPubKey: PublicKey25519,
   ).asJson
 
   override lazy val txHash: Digest32 =
-    PaymentTransaction.getHash(accountPubKey, fee, timestamp, useBoxes, directives)
+    PaymentTransaction.getHash(accountPubKey, fee, timestamp, unlockers, directives)
 
   override lazy val semanticValidity: Try[Unit] = {
     if (!validSize) {
@@ -111,9 +111,9 @@ object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
       Longs.toByteArray(obj.fee),
       Longs.toByteArray(obj.timestamp),
       obj.signature.signature,
-      Ints.toByteArray(obj.useBoxes.length),
+      Ints.toByteArray(obj.unlockers.length),
       Ints.toByteArray(obj.directives.length),
-      obj.useBoxes.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b)),
+      obj.unlockers.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b)),
       obj.directives.map(d => Ints.toByteArray(d.bytes.length) ++ DirectiveSerializer.toBytes(d)).foldLeft(Array[Byte]())(_ ++ _)
     )
   }

@@ -24,7 +24,7 @@ case class AddPubKeyInfoTransaction(override val accountPubKey: PublicKey25519,
                                     override val fee: Amount,
                                     override val timestamp: Long,
                                     override val signature: Signature25519,
-                                    override val useBoxes: IndexedSeq[ADKey],
+                                    override val unlockers: IndexedSeq[ADKey],
                                     change: Amount,
                                     pubKeyBytes: PublicKey,
                                     pubKeyProofBytes: Signature,
@@ -70,7 +70,7 @@ case class AddPubKeyInfoTransaction(override val accountPubKey: PublicKey25519,
     "fee" -> fee.asJson,
     "timestamp" -> timestamp.asJson,
     "signature" -> Algos.encode(signature.signature).asJson,
-    "inputs" -> useBoxes.map { id =>
+    "inputs" -> unlockers.map { id =>
       Map(
         "id" -> Algos.encode(id).asJson,
       ).asJson
@@ -82,7 +82,7 @@ case class AddPubKeyInfoTransaction(override val accountPubKey: PublicKey25519,
   ).asJson
 
   override lazy val txHash: Digest32 = AddPubKeyInfoTransaction
-    .getHash(accountPubKey, fee, timestamp, useBoxes,
+    .getHash(accountPubKey, fee, timestamp, unlockers,
       change, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
 
   override lazy val semanticValidity: Try[Unit] = {
@@ -148,8 +148,8 @@ object AddPubKeyInfoTransactionSerializer extends Serializer[AddPubKeyInfoTransa
       Longs.toByteArray(obj.fee),
       Longs.toByteArray(obj.timestamp),
       obj.signature.signature,
-      Ints.toByteArray(obj.useBoxes.length),
-      obj.useBoxes.foldLeft(Array[Byte]())(_ ++ _),
+      Ints.toByteArray(obj.unlockers.length),
+      obj.unlockers.foldLeft(Array[Byte]())(_ ++ _),
       Longs.toByteArray(obj.change),
       Ints.toByteArray(obj.pubKeyBytes.length),
       obj.pubKeyBytes,

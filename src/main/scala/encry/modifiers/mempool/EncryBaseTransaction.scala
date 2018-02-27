@@ -35,7 +35,7 @@ trait EncryBaseTransaction extends Transaction[Proposition]
 
   val feeBox: Option[OpenBox]
 
-  val useBoxes: IndexedSeq[ADKey]
+  val unlockers: IndexedSeq[ADKey]
 
   val newBoxes: Traversable[EncryBaseBox]
 

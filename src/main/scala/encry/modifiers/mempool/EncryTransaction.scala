@@ -14,7 +14,6 @@ import io.circe.Json
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
-import scorex.crypto.authds.ADKey
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{PublicKey, Signature}
 
@@ -24,12 +23,12 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
                             override val fee: Amount,
                             override val timestamp: Long,
                             override val signature: Signature25519,
-                            override val useBoxes: IndexedSeq[ADKey],
+                            override val unlockers: IndexedSeq[Unlocker],
                             directives: IndexedSeq[Directive]) extends EncryBaseTransaction {
 
   override type M = EncryTransaction
 
-  override val length: Int = 120 + (32 * useBoxes.size) + (45 * directives.size)
+  override val length: Int = 120 + (32 * unlockers.size) + (45 * directives.size)
 
   override val maxSize: Int = PaymentTransaction.maxSize
 
@@ -49,16 +48,12 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
     "fee" -> fee.asJson,
     "timestamp" -> timestamp.asJson,
     "signature" -> Algos.encode(signature.signature).asJson,
-    "inputs" -> useBoxes.map { id =>
-      Map(
-        "id" -> Algos.encode(id).asJson,
-      ).asJson
-    }.asJson,
+    "inputs" -> unlockers.map(_.json).asJson,
     "directives" -> directives.map(_.json).asJson
   ).asJson
 
   override lazy val txHash: Digest32 =
-    EncryTransaction.getHash(accountPubKey, fee, timestamp, useBoxes, directives)
+    EncryTransaction.getHash(accountPubKey, fee, timestamp, unlockers, directives)
 
   override lazy val semanticValidity: Try[Unit] = {
     if (!validSize) {
@@ -84,12 +79,12 @@ object EncryTransaction {
   def getHash(accountPubKey: PublicKey25519,
               fee: Amount,
               timestamp: Long,
-              useBoxes: IndexedSeq[ADKey],
+              unlockers: IndexedSeq[Unlocker],
               directives: IndexedSeq[Directive]): Digest32 = Algos.hash(
     Bytes.concat(
       Array[Byte](TypeId),
       accountPubKey.pubKeyBytes,
-      useBoxes.foldLeft(Array[Byte]())(_ ++ _),
+      unlockers.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
       directives.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
       Longs.toByteArray(timestamp),
       Longs.toByteArray(fee)
@@ -99,9 +94,9 @@ object EncryTransaction {
   def getMessageToSign(accountPubKey: PublicKey25519,
                        fee: Amount,
                        timestamp: Long,
-                       useBoxes: IndexedSeq[ADKey],
+                       unlockers: IndexedSeq[Unlocker],
                        directives: IndexedSeq[Directive]): Array[Byte] =
-    getHash(accountPubKey, fee, timestamp, useBoxes, directives)
+    getHash(accountPubKey, fee, timestamp, unlockers, directives)
 }
 
 object EncryTransactionSerializer extends Serializer[EncryTransaction] {
@@ -112,9 +107,10 @@ object EncryTransactionSerializer extends Serializer[EncryTransaction] {
       Longs.toByteArray(obj.fee),
       Longs.toByteArray(obj.timestamp),
       obj.signature.signature,
-      Ints.toByteArray(obj.useBoxes.length),
-      Ints.toByteArray(obj.directives.length),
-      obj.useBoxes.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b)),
+      Ints.toByteArray(obj.unlockers.size),
+      Ints.toByteArray(obj.directives.size),
+      obj.unlockers.map(u => Ints.toByteArray(u.bytes.length) ++ u.bytes)
+        .foldLeft(Array[Byte]())(_ ++ _),
       obj.directives.map(d => Ints.toByteArray(d.bytes.length) ++ DirectiveSerializer.toBytes(d))
         .foldLeft(Array[Byte]())(_ ++ _)
     )
@@ -126,20 +122,21 @@ object EncryTransactionSerializer extends Serializer[EncryTransaction] {
     val fee = Longs.fromByteArray(bytes.slice(32, 40))
     val timestamp = Longs.fromByteArray(bytes.slice(40, 48))
     val signature = Signature25519(Signature @@ bytes.slice(48, 112))
-    val inputsQty = Ints.fromByteArray(bytes.slice(112, 116))
+    val unlockersQty = Ints.fromByteArray(bytes.slice(112, 116))
     val directivesQty = Ints.fromByteArray(bytes.slice(116, 120))
-    val s = 120
-    val outElementLength = 32
-    val useOutputs = (0 until inputsQty).map { i =>
-      ADKey @@ bytes.slice(s + (i * outElementLength), s + (i + 1) * outElementLength)
+    val leftBytes1 = bytes.drop(120)
+    val (unlockers, unlockersLen) = (0 until unlockersQty).foldLeft(IndexedSeq[Unlocker](), 0) { case ((acc, shift), _) =>
+      val len = Ints.fromByteArray(leftBytes1.slice(shift, shift + 4))
+      UnlockerSerializer.parseBytes(leftBytes1.slice(shift + 4, shift + 4 + len)).map(u => (acc :+ u, shift + len))
+        .getOrElse(throw new Exception("Serialization failed."))
     }
-    val leftBytes = bytes.drop(s + (inputsQty * outElementLength))
-    val directives = (0 until directivesQty).foldLeft(Seq[Directive](), leftBytes) { case ((acc, bs), _) =>
+    val leftBytes2 = leftBytes1.drop(unlockersLen)
+    val directives = (0 until directivesQty).foldLeft(IndexedSeq[Directive](), leftBytes2) { case ((acc, bs), _) =>
       val len = Ints.fromByteArray(bs.take(4))
       DirectiveSerializer.parseBytes(bs.slice(5, 5 + len)).map(d => (acc :+ d, bs.drop(5 + len)))
         .getOrElse(throw new Exception("Serialization failed."))
-    }._1.toIndexedSeq
+    }._1
 
-    EncryTransaction(accPubKey, fee, timestamp, signature, useOutputs, directives)
+    EncryTransaction(accPubKey, fee, timestamp, signature, unlockers, directives)
   }
 }

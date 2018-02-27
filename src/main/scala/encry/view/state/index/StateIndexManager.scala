@@ -52,7 +52,7 @@ trait StateIndexManager extends ScorexLogging {
   private def toIndexModificationsMap(txs: Seq[EncryBaseTransaction]) = {
     val modifications = mutable.TreeMap.empty[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]
     txs.foreach { tx =>
-      tx.useBoxes.foreach { id =>
+      tx.unlockers.foreach { id =>
         id.head match {
           case AssetBox.TypeId =>
             modifications.get(tx.accountPubKey.address) match {

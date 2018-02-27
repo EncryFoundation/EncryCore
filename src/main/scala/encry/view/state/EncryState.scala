@@ -32,7 +32,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
       txs.flatMap { tx =>
         tx match {
           case tx: EncryBaseTransaction =>
-            tx.useBoxes.map(bxId => Removal(bxId)) ++
+            tx.unlockers.map(bxId => Removal(bxId)) ++
               tx.newBoxes.map(bx => Insertion(bx))
         }
       }
