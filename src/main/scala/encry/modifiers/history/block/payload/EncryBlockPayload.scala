@@ -60,9 +60,8 @@ object EncryBlockPayloadSerializer extends Serializer[EncryBlockPayload] {
     val txs = (0 until txQty).foldLeft(Seq[EncryBaseTransaction]()) { case (seq, _) =>
       val txSize = Ints.fromByteArray(bytes.slice(slicePointer, slicePointer + 4))
       val txTypeId = bytes.slice(slicePointer + 4, slicePointer + 5).head
+      // TODO: Fix transaction deserialization when new transaction model is introduced.
       val tx: Option[EncryBaseTransaction] = txTypeId match {
-        case PaymentTransaction.typeId =>
-          Some(PaymentTransactionSerializer.parseBytes(bytes.slice(slicePointer + 5, slicePointer + 5 + txSize)).get)
         case CoinbaseTransaction.typeId =>
           Some(CoinbaseTransactionSerializer.parseBytes(bytes.slice(slicePointer + 5, slicePointer + 5 + txSize)).get)
         case AddPubKeyInfoTransaction.typeId =>

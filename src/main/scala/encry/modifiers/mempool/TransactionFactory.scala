@@ -30,11 +30,5 @@ object TransactionFactory {
     EncryTransaction(pubKey, fee, timestamp, signature, unlockers, directives)
   }
 
-  def defaultPaymentTransactionsFromSecrets(keys: Seq[PrivateKey25519],
-                                            fee: Amount,
-                                            timestamp: Long,
-                                            useBoxes: Seq[AssetBox],
-                                            recipient: Address,
-                                            amount: Amount): Seq[EncryTransaction] =
-    keys.map(k => defaultPaymentTransaction(k.publicImage, k, fee, timestamp, useBoxes, recipient, amount))
+
 }

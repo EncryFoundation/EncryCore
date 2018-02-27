@@ -4,13 +4,12 @@ import scorex.core.serialization.Serializer
 
 import scala.util.{Failure, Try}
 
+// TODO: Depreciated. Remove when Transaction model will be introduced.
 object MempoolModifierSerializer extends Serializer[EncryBaseTransaction] {
 
   override def toBytes(obj: EncryBaseTransaction): Array[Byte] = obj match {
     case m: CoinbaseTransaction =>
       CoinbaseTransaction.typeId +: CoinbaseTransactionSerializer.toBytes(m)
-    case m: PaymentTransaction =>
-      PaymentTransaction.typeId +: PaymentTransactionSerializer.toBytes(m)
     case m: AddPubKeyInfoTransaction =>
       AddPubKeyInfoTransaction.typeId +: AddPubKeyInfoTransactionSerializer.toBytes(m)
     case m =>
@@ -21,8 +20,6 @@ object MempoolModifierSerializer extends Serializer[EncryBaseTransaction] {
     Try(bytes.head).flatMap {
       case CoinbaseTransaction.`typeId` =>
         CoinbaseTransactionSerializer.parseBytes(bytes.tail)
-      case PaymentTransaction.`typeId` =>
-        PaymentTransactionSerializer.parseBytes(bytes.tail)
       case AddPubKeyInfoTransaction.`typeId` =>
         AddPubKeyInfoTransactionSerializer.parseBytes(bytes.tail)
       case m =>

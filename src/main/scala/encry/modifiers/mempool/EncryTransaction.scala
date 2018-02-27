@@ -30,9 +30,9 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
 
   override lazy val length: Int = this.bytes.length
 
-  override val maxSize: Int = PaymentTransaction.maxSize
+  override val maxSize: Int = EncryTransaction.MaxSize
 
-  override val typeId: TxTypeId = PaymentTransaction.typeId
+  override val typeId: TxTypeId = EncryTransaction.TypeId
 
   override val feeBox: Option[OpenBox] =
     Some(OpenBox(HeightProposition(Height @@ 0), Utils.nonceFromDigest(Algos.hash(txHash)), fee))

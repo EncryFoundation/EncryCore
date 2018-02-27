@@ -52,23 +52,23 @@ trait StateIndexManager extends ScorexLogging {
   private def toIndexModificationsMap(txs: Seq[EncryBaseTransaction]) = {
     val modifications = mutable.TreeMap.empty[Address, (mutable.Set[ADKey], mutable.Set[ADKey])]
     txs.foreach { tx =>
-      tx.unlockers.foreach { id =>
-        id.head match {
+      tx.unlockers.foreach { u =>
+        u.boxId.head match {
           case AssetBox.TypeId =>
             modifications.get(tx.accountPubKey.address) match {
               case Some(t) =>
-                if (t._2.exists(_.sameElements(id))) t._2.remove(id)
-                else t._1.add(id)
+                if (t._2.exists(_.sameElements(u.boxId))) t._2.remove(u.boxId)
+                else t._1.add(u.boxId)
               case None =>
-                modifications.update(tx.accountPubKey.address, mutable.Set(id) -> mutable.Set.empty[ADKey])
+                modifications.update(tx.accountPubKey.address, mutable.Set(u.boxId) -> mutable.Set.empty[ADKey])
             }
           case OpenBox.typeId =>
             modifications.get(openBoxesAddress) match {
               case Some(t) =>
-                if (t._2.exists(_.sameElements(id))) t._2.remove(id)
-                else t._1.add(id)
+                if (t._2.exists(_.sameElements(u.boxId))) t._2.remove(u.boxId)
+                else t._1.add(u.boxId)
               case None =>
-                modifications.update(openBoxesAddress, mutable.Set(id) -> mutable.Set.empty[ADKey])
+                modifications.update(openBoxesAddress, mutable.Set(u.boxId) -> mutable.Set.empty[ADKey])
             }
         }
       }

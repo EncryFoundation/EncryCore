@@ -84,11 +84,11 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
       newTxs.map(_.id).foldLeft(Array[Byte]())(_ ++ _))
     val spentBxIds = newTxs.filter(tx => publicKeys.exists(_.pubKeyBytes sameElements tx.accountPubKey.pubKeyBytes))
       .flatMap(_.unlockers)
-    val bxIdsToRemove = spentBxIds.foldLeft(Seq[ADKey]())((acc, id) =>
-      if (currentBxIds.exists(_ sameElements id)) acc :+ id else acc)
+    val bxIdsToRemove = spentBxIds.foldLeft(Seq[ADKey]())((acc, u) =>
+      if (currentBxIds.exists(_ sameElements u.boxId)) acc :+ u.boxId else acc)
     val bxsToInsert = newTxs.flatMap(_.newBoxes).foldLeft(Seq[EncryBaseBox]())((acc, bx) => bx.proposition match {
       case ap: AccountProposition
-        if publicKeys.exists(_.address == ap.account.address) && !spentBxIds.exists(_ sameElements bx.id) => acc :+ bx
+        if publicKeys.exists(_.address == ap.account.address) && !spentBxIds.exists(_.boxId sameElements bx.id) => acc :+ bx
       case _ => acc
     })
 

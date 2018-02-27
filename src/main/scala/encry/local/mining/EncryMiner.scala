@@ -108,7 +108,7 @@ class EncryMiner(viewHolderRef: ActorRef,
         val (txsToPut, txsToDrop, _) = pool.takeAll.toSeq.sortBy(_.fee).reverse
           .foldLeft((Seq[EncryBaseTransaction](), Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) {
             case ((validTxs, invalidTxs, bxsAcc), tx) =>
-              val bxsRaw = tx.unlockers.map(ByteArrayWrapper.apply)
+              val bxsRaw = tx.unlockers.map(u => ByteArrayWrapper(u.boxId))
               if ((validTxs.map(_.length).sum + tx.length) <= Constants.Chain.blockMaxSize - 124) {
                 if (state.validate(tx).isSuccess && bxsRaw.forall(k => !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size) {
                   (validTxs :+ tx, invalidTxs, bxsAcc ++ bxsRaw)

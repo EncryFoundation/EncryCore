@@ -7,7 +7,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
+import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.HeightProposition

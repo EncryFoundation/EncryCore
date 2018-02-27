@@ -1,8 +1,8 @@
 package encry.view.wallet
 
 import com.google.common.primitives.Longs
-import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
+import encry.modifiers.mempool.EncryBaseTransaction
+import encry.modifiers.state.box.EncryBaseBox
 import encry.view.wallet.storage.WalletStorage
 import io.iohk.iodb.Store
 import scorex.crypto.authds.ADKey
