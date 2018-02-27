@@ -5,11 +5,8 @@ import akka.pattern._
 import akka.util.Timeout
 import encry.account.Address
 import encry.cli.Response
-import encry.crypto.PublicKey25519
-import encry.modifiers.mempool.PaymentTransaction
-import encry.modifiers.mempool.directive.TransferDirective
+import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
-import encry.modifiers.state.box.proof.Signature25519
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
@@ -18,7 +15,6 @@ import encry.view.wallet.EncryWallet
 import scorex.core.LocalInterface.LocallyGeneratedTransaction
 import scorex.core.NodeViewHolder.GetDataFromCurrentView
 import scorex.core.transaction.box.proposition.Proposition
-import scorex.crypto.signatures.Curve25519
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -40,26 +36,20 @@ object Transfer extends Command {
     Await.result((nodeViewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
         Try {
+          val secret = view.vault.keyManager.keys.head
+          val pubKey = secret.publicImage
           val recipient = Address @@ args(1).split(";").head
           val fee = args(1).split(";")(1).toLong
           val amount = args(1).split(";").last.toLong
-          val accountPubKey = PublicKey25519(view.vault.keyManager.keys.head.publicImage.pubKeyBytes)
           val timestamp = System.currentTimeMillis()  // TODO: Use NTP.
           val boxes = view.vault.walletStorage.getAllBoxes.filter(_.isInstanceOf[AssetBox]).map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) {
             case (seq, box) => if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
           }
           val useBoxes = boxes.map(_.id).toIndexedSeq
-          val outputs = IndexedSeq(
-            TransferDirective(recipient, amount, 1),
-            TransferDirective(accountPubKey.address, boxes.map(_.amount).sum - (amount + fee), 2))
-          val sig = Signature25519(Curve25519.sign(
-            view.vault.keyManager.keys.head.privKeyBytes,
-            PaymentTransaction.getMessageToSign(accountPubKey, fee, timestamp, useBoxes, outputs)
-          ))
 
-          val tx = PaymentTransaction(accountPubKey, fee, timestamp, sig, useBoxes, outputs)
+          val tx = TransactionFactory.defaultPaymentTransaction(pubKey, secret, fee, timestamp, boxes, recipient, amount)
 
-          nodeViewHolderRef ! LocallyGeneratedTransaction[Proposition, PaymentTransaction](tx)
+          nodeViewHolderRef ! LocallyGeneratedTransaction[Proposition, EncryTransaction](tx)
 
           tx
         }.toOption.map(tx => Some(Response(tx.toString))).getOrElse(Some(Response("Operation failed. Malformed data.")))

@@ -9,7 +9,6 @@ import scorex.core.ModifierId
 import scorex.core.serialization.JsonSerializable
 import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.proposition.Proposition
-import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
@@ -35,7 +34,7 @@ trait EncryBaseTransaction extends Transaction[Proposition]
 
   val feeBox: Option[OpenBox]
 
-  val unlockers: IndexedSeq[ADKey]
+  val unlockers: IndexedSeq[Unlocker]
 
   val newBoxes: Traversable[EncryBaseBox]
 

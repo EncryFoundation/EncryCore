@@ -28,7 +28,7 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
 
   override type M = EncryTransaction
 
-  override val length: Int = 120 + (32 * unlockers.size) + (45 * directives.size)
+  override lazy val length: Int = this.bytes.length
 
   override val maxSize: Int = PaymentTransaction.maxSize
 

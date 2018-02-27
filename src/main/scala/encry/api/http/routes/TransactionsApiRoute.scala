@@ -5,8 +5,8 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.api.models.{AddPubKeyInfoTransactionModel, PaymentTransactionModel}
-import encry.modifiers.mempool.{AddPubKeyInfoTransaction, PaymentTransaction}
+import encry.api.models.{AddPubKeyInfoTransactionModel, EncryTransactionModel}
+import encry.modifiers.mempool.{AddPubKeyInfoTransaction, EncryTransaction}
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import encry.view.history.EncryHistoryReader
 import encry.view.mempool.EncryMempoolReader
@@ -27,7 +27,7 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
                                 restApiSettings: RESTApiSettings, digest: Boolean)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
-  implicit val paymentTxCodec: RootJsonFormat[PaymentTransactionModel] = jsonFormat6(PaymentTransactionModel)
+  implicit val paymentTxCodec: RootJsonFormat[EncryTransactionModel] = jsonFormat6(EncryTransactionModel)
 
   implicit val addPubKeyInfoTxCodec: RootJsonFormat[AddPubKeyInfoTransactionModel] =
     jsonFormat10(AddPubKeyInfoTransactionModel)
@@ -50,9 +50,9 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
     _.take(limit).toSeq
   }.map(_.map(_.json).asJson)
 
-  def transferTransactionR: Route = (path("transfer") & post & entity(as[PaymentTransactionModel])) { model =>
+  def transferTransactionR: Route = (path("transfer") & post & entity(as[EncryTransactionModel])) { model =>
     model.toBaseObjOpt.map { ptx =>
-      nodeViewActorRef ! LocallyGeneratedTransaction[Proposition, PaymentTransaction](ptx)
+      nodeViewActorRef ! LocallyGeneratedTransaction[Proposition, EncryTransaction](ptx)
       complete(StatusCodes.OK)
     }.getOrElse(complete(StatusCodes.BadRequest))
   }

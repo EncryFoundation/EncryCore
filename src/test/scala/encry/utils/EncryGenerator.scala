@@ -1,14 +1,11 @@
 package encry.utils
 
 import encry.account.Address
-import encry.crypto.PublicKey25519
+import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.local.TestHelper.Props
-import encry.modifiers.mempool.PaymentTransaction
-import encry.modifiers.mempool.directive.TransferDirective
-import encry.modifiers.state.box.proof.Signature25519
+import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
-import scorex.core.transaction.state.PrivateKey25519
 import scorex.crypto.authds.ADKey
 import scorex.crypto.signatures.{Curve25519, PublicKey}
 import scorex.utils.Random
@@ -28,29 +25,25 @@ trait EncryGenerator {
     PrivateKey25519(keys._1, keys._2)
   }
 
-  def genValidPaymentTxs(qty: Int): Seq[PaymentTransaction] = {
+  def genValidPaymentTxs(qty: Int): Seq[EncryTransaction] = {
     val pks = genPrivKeys(qty)
-    pks.map { key =>
-      val proposition = PublicKey25519(key.publicKeyBytes)
-      val timestamp = System.currentTimeMillis()
-      val useBoxes = IndexedSeq(genAssetBox(proposition.address)).map(_.id)
-      val outputs = IndexedSeq(TransferDirective(Props.recipientAddr, Props.boxValue, 1))
-      val sig = Signature25519(Curve25519.sign(
-        key.privKeyBytes, PaymentTransaction.getMessageToSign(proposition, Props.txFee, timestamp, useBoxes, outputs)))
-      PaymentTransaction(proposition, Props.txFee, timestamp, sig, useBoxes, outputs)
+    val timestamp = System.currentTimeMillis()
+
+    pks.map { k =>
+      val useBoxes = IndexedSeq(genAssetBox(k.publicImage.address))
+      TransactionFactory.defaultPaymentTransaction(k.publicImage, k, Props.txFee,
+        timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
     }
   }
 
-  def genInvalidPaymentTxs(qty: Int): Seq[PaymentTransaction] = {
+  def genInvalidPaymentTxs(qty: Int): Seq[EncryTransaction] = {
     val pks = genPrivKeys(qty)
-    pks.map { key =>
-      val proposition = PublicKey25519(PublicKey @@ Random.randomBytes())
-      val timestamp = System.currentTimeMillis()
-      val useBoxes = IndexedSeq(genAssetBox(proposition.address)).map(_.id)
-      val outputs = IndexedSeq(TransferDirective(Props.recipientAddr, Props.boxValue, 1))
-      val sig = Signature25519(Curve25519.sign(
-       key.privKeyBytes, PaymentTransaction.getMessageToSign(proposition, Props.txFee, timestamp, useBoxes, outputs)))
-      PaymentTransaction(proposition, Props.txFee, timestamp, sig, useBoxes, outputs)
+    val timestamp = System.currentTimeMillis()
+
+    pks.map { k =>
+      val useBoxes = IndexedSeq(genAssetBox(PublicKey25519(PublicKey @@ Random.randomBytes(32)).address))
+      TransactionFactory.defaultPaymentTransaction(k.publicImage, k, Props.txFee,
+        timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
     }
   }
 }

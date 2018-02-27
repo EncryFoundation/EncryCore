@@ -181,25 +181,23 @@ class UtxoState(override val version: VersionTag,
   override def validate(tx: EncryBaseTransaction): Try[Unit] =
     tx.semanticValidity.map { _: Unit =>
 
+      def totalAmountOf(boxes: Traversable[EncryBaseBox]): Long =
+        boxes.foldLeft(0L)((acc, bx) => bx match {
+          case acbx: AmountCarryingBox => acc + acbx.amount
+          case _ => acc
+        })
+
       implicit val context: Option[Context] = Some(Context(stateHeight))
 
-      val bxs = tx.unlockers.map(bxId => persistentProver.unauthenticatedLookup(bxId)
-        .map(bytes => StateModifierDeserializer.parseBytes(bytes, bxId.head))
+      val bxs = tx.unlockers.map(u => persistentProver.unauthenticatedLookup(u.boxId)
+        .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
         .flatMap(_.toOption)).foldLeft(IndexedSeq[EncryBaseBox]())((acc, bxOpt) => bxOpt match {
           case Some(bx) if bx.unlockTry(tx, None).isSuccess => acc :+ bx
           case _ => acc
         })
 
-      val debit = bxs.foldLeft(0L)((acc, bx) => bx match {
-        case acbx: AmountCarryingBox => acc + acbx.amount
-        case _ => acc
-      })
-
-      // TODO: Fix credit calculating when directives will be added to tx base class.
-      val credit = tx match {
-        case tx: PaymentTransaction => tx.fee
-        case _ => tx.fee
-      }
+      val debit = totalAmountOf(bxs)
+      val credit = totalAmountOf(tx.newBoxes)
 
       if (bxs.size < tx.unlockers.size) throw new Error(s"Failed to spend some boxes referenced in $tx")
       else if (debit < credit) throw new Error(s"Non-positive balance in $tx")

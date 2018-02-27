@@ -1,12 +1,9 @@
 package encry.local
 
 import akka.actor.{Actor, ActorRef, ActorRefFactory, Cancellable, Props}
-import encry.crypto.PublicKey25519
 import encry.local.TransactionGenerator.{GeneratePaymentTransactions, StartGeneration, StopGeneration}
-import encry.modifiers.mempool.directive.TransferDirective
-import encry.modifiers.mempool.{EncryBaseTransaction, PaymentTransaction}
+import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
-import encry.modifiers.state.box.proof.Signature25519
 import encry.settings.TestingSettings
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
@@ -16,7 +13,6 @@ import scorex.core.LocalInterface.LocallyGeneratedTransaction
 import scorex.core.NodeViewHolder.GetDataFromCurrentView
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
-import scorex.crypto.signatures.Curve25519
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -40,14 +36,14 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings, time
 
     case GeneratePaymentTransactions =>
       viewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool,
-        Seq[PaymentTransaction]] { v =>
+        Seq[EncryTransaction]] { v =>
         if (v.pool.size < settings.keepPoolSize) {
           (0 until settings.keepPoolSize - v.pool.size).map { _ =>
-            val pubKey = v.vault.publicKeys.head
+            val secret = v.vault.keyManager.keys.head
+            val pubKey = secret.publicImage
             val recipient = pubKey.address
             val fee = 15L
             val amount: Long = Random.nextInt(30) + 9
-            val accountPubKey = PublicKey25519(v.vault.keyManager.keys.head.publicImage.pubKeyBytes)
             val timestamp = timeProvider.time()
             if (v.vault.balance > 1000) {
               // Generate valid txs if vault's balance is enough.
@@ -55,25 +51,13 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings, time
                 .map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) {
                 case (seq, box) => if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
               }
-              val useBoxes = boxes.map(_.id).toIndexedSeq
-              val outputs = IndexedSeq(
-                TransferDirective(recipient, amount, 1),
-                TransferDirective(accountPubKey.address, boxes.map(_.amount).sum - (amount + fee), 2))
-              val sig = Signature25519(Curve25519.sign(
-                v.vault.keyManager.keys.head.privKeyBytes,
-                PaymentTransaction.getMessageToSign(accountPubKey, fee, timestamp, useBoxes, outputs)
-              ))
 
-              PaymentTransaction(accountPubKey, fee, timestamp, sig, useBoxes, outputs)
+              TransactionFactory.defaultPaymentTransaction(pubKey, secret, fee, timestamp, boxes, recipient, amount)
             } else {
               // Generate semantically valid but stateful-invalid txs otherwise.
-              val useBoxes = IndexedSeq(factory.genAssetBox(pubKey.address)).map(_.id)
-              val outputs = IndexedSeq(TransferDirective(factory.Props.recipientAddr, factory.Props.boxValue, 1))
-              val sig = Signature25519(Curve25519.sign(
-                v.vault.keyManager.keys.head.privKeyBytes,
-                PaymentTransaction.getMessageToSign(accountPubKey, fee, timestamp, useBoxes, outputs)
-              ))
-              PaymentTransaction(accountPubKey, fee, timestamp, sig, useBoxes, outputs)
+              val boxes = IndexedSeq(factory.genAssetBox(pubKey.address))
+
+              TransactionFactory.defaultPaymentTransaction(pubKey, secret, fee, timestamp, boxes, recipient, amount)
             }
           }
         } else {

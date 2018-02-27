@@ -1,7 +1,7 @@
 package encry.view.wallet.storage
 
 import encry.crypto.PublicKey25519
-import encry.modifiers.mempool.{PaymentTransaction, PaymentTransactionSerializer}
+import encry.modifiers.mempool.{EncryTransaction, EncryTransactionSerializer}
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
 import encry.settings.Algos
@@ -43,8 +43,8 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519])
       if (bx.isDefined) buff :+ bx.get else buff
     }
 
-  def getTransactionById(id: ModifierId): Option[PaymentTransaction] = Try {
-    PaymentTransactionSerializer.parseBytes(db.get(ByteArrayWrapper(id)).get.data).get
+  def getTransactionById(id: ModifierId): Option[EncryTransaction] = Try {
+    EncryTransactionSerializer.parseBytes(db.get(ByteArrayWrapper(id)).get.data).get
   }.toOption
 }
 

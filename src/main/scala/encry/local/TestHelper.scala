@@ -3,10 +3,10 @@ package encry.local
 import java.io.{File, FileWriter}
 
 import encry.account.{Account, Address}
+import encry.crypto.PrivateKey25519
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import scorex.core.transaction.box.Box.Amount
-import scorex.core.transaction.state.PrivateKey25519
 import scorex.crypto.authds.ADKey
 import scorex.crypto.signatures.Curve25519
 

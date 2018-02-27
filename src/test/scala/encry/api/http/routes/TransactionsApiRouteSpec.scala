@@ -1,6 +1,6 @@
 package encry.api.http.routes
 
-import encry.api.models.PaymentTransactionModel
+import encry.api.models.EncryTransactionModel
 import encry.modifiers.InstanceFactory
 import encry.settings.Algos
 import io.circe.generic.auto._
