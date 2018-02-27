@@ -38,6 +38,12 @@ Defines operation on state.
 
     boxes: [Box]                                // Transforms directive into boxes.
     cost: Amount                                // Will be used for `transaction.fee` minimal amount calculating.
+    
+## Unlocker
+Holds the boxId/proof pair.
+
+    boxId: ADKey
+    proof: Option[Proof]
 
 ## Base Transaction Model
 Atomic state modifier.
@@ -45,5 +51,5 @@ Atomic state modifier.
     senderPubKey: PublicKey
     senderSignature: Signature
     fee: Amount
-    useBoxes: [(BoxId, Option[Proof])]          // If `proof` is None, then `senderSignature` is used as proof.
+    useBoxes: [Unlocker]                        // If `proof` is None, then `senderSignature` is used as proof.
     directives: [Directive]                     // List of state modifications which should be applied atomically.

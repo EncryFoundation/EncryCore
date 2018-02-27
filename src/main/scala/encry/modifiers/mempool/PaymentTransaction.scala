@@ -3,7 +3,7 @@ package encry.modifiers.mempool
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.crypto.PublicKey25519
 import encry.modifiers.mempool.EncryBaseTransaction.TxTypeId
-import encry.modifiers.mempool.directive.{Directive, DirectiveDeserializer}
+import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
 import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.proposition.HeightProposition
 import encry.modifiers.state.box.{EncryBaseBox, OpenBox}
@@ -114,7 +114,7 @@ object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
       Ints.toByteArray(obj.useBoxes.length),
       Ints.toByteArray(obj.directives.length),
       obj.useBoxes.foldLeft(Array[Byte]())((a, b) => Bytes.concat(a, b)),
-      obj.directives.map(d => Ints.toByteArray(d.bytes.length) ++ (d.typeId +: d.bytes)).foldLeft(Array[Byte]())(_ ++ _)
+      obj.directives.map(d => Ints.toByteArray(d.bytes.length) ++ DirectiveSerializer.toBytes(d)).foldLeft(Array[Byte]())(_ ++ _)
     )
   }
 
@@ -135,7 +135,7 @@ object PaymentTransactionSerializer extends Serializer[PaymentTransaction] {
     val leftBytes = bytes.drop(s2)
     val directives = (0 until directivesQty).foldLeft(Seq[Directive](), leftBytes) { case ((acc, bs), _) =>
         val len = Ints.fromByteArray(bs.take(4))
-        DirectiveDeserializer.parseBytes(bs.slice(5, 5 + len), bs(5)).map(d => (acc :+ d, bs.drop(5 + len)))
+        DirectiveSerializer.parseBytes(bs.slice(5, 5 + len)).map(d => (acc :+ d, bs.drop(5 + len)))
           .getOrElse(throw new Exception("Serialization failed."))
       }._1.toIndexedSeq
 
