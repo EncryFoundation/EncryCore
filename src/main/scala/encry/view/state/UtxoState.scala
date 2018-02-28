@@ -196,6 +196,7 @@ class UtxoState(override val version: VersionTag,
           case _ => acc
         })
 
+      // TODO: Assume Coinbase validation. Implement CoinbaseBox.
       val debit = totalAmountOf(bxs)
       val credit = totalAmountOf(tx.newBoxes)
 

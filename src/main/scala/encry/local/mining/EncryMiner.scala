@@ -6,7 +6,7 @@ import akka.util.Timeout
 import encry.consensus.{PowCandidateBlock, PowConsensus}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{CoinbaseTransaction, EncryBaseTransaction}
+import encry.modifiers.mempool.{EncryBaseTransaction, TransactionFactory}
 import encry.modifiers.state.box.OpenBox
 import encry.settings.{Constants, EncryAppSettings}
 import encry.view.history.{EncryHistory, Height}
@@ -134,11 +134,8 @@ class EncryMiner(viewHolderRef: ActorRef,
               case _ => buff2
             }
           }) ++ state.getAvailableOpenBoxesAt(state.stateHeight)
-        val amount = openBxs.map(_.amount).sum
-        val cTxSignature = minerSecret.sign(
-          CoinbaseTransaction.getHash(minerSecret.publicImage, openBxs.map(_.id), timestamp, amount, height))
-        val coinbase =
-          CoinbaseTransaction(minerSecret.publicImage, timestamp, cTxSignature, openBxs.map(_.id), amount, height)
+
+        val coinbase = TransactionFactory.coinbaseTransaction(minerSecret, 10, timestamp, openBxs, height)
 
         val txs = txsToPut.sortBy(_.timestamp) :+ coinbase
 

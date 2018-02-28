@@ -3,6 +3,7 @@ package encry.modifiers.mempool
 import encry.account.Account
 import encry.modifiers.Signable25519
 import encry.modifiers.mempool.EncryBaseTransaction.TxTypeId
+import encry.modifiers.mempool.directive.Directive
 import encry.modifiers.state.box.{EncryBaseBox, OpenBox}
 import encry.settings.Constants
 import scorex.core.ModifierId
@@ -23,6 +24,7 @@ trait EncryBaseTransaction extends Transaction[Proposition]
 
   val semanticValidity: Try[Unit]
 
+  // TODO: Depreciated. Remove
   val typeId: TxTypeId
 
   // override lazy val id: ModifierId = ModifierId @@ (Array[Byte](typeId) ++ txHash)
@@ -38,11 +40,15 @@ trait EncryBaseTransaction extends Transaction[Proposition]
 
   val unlockers: IndexedSeq[Unlocker]
 
-  val newBoxes: Traversable[EncryBaseBox]
+  val directives: IndexedSeq[Directive]
+
+  lazy val newBoxes: Traversable[EncryBaseBox] =
+     directives.flatMap(_.boxes(txHash)) ++ feeBox.map(fb => Seq(fb)).getOrElse(Seq.empty)
 
   lazy val account: Account = Account(accountPubKey.pubKeyBytes)
 
-  val minimalFee: Float = Constants.feeMinAmount + Constants.txByteCost * length
+  // TODO: Fee checks should be on the another layer.
+  lazy val minimalFee: Float = Constants.feeMinAmount + Constants.txByteCost * length
 
   override def toString: String = s"<TX: type=$typeId id=${Base58.encode(id)}>"
 

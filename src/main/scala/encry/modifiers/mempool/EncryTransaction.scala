@@ -4,9 +4,9 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.crypto.PublicKey25519
 import encry.modifiers.mempool.EncryBaseTransaction.TxTypeId
 import encry.modifiers.mempool.directive.{CoinbaseDirective, Directive, DirectiveSerializer}
+import encry.modifiers.state.box.OpenBox
 import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.proposition.HeightProposition
-import encry.modifiers.state.box.{EncryBaseBox, OpenBox}
 import encry.settings.Algos
 import encry.utils.Utils
 import encry.view.history.Height
@@ -37,9 +37,6 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
   override val feeBox: Option[OpenBox] =
     Some(OpenBox(HeightProposition(Height @@ 0), Utils.nonceFromDigest(Algos.hash(txHash)), fee))
 
-  override val newBoxes: Traversable[EncryBaseBox] =
-    Seq(feeBox.get) ++ directives.flatMap(_.boxes(txHash))
-
   override lazy val serializer: Serializer[M] = EncryTransactionSerializer
 
   override def json: Json = Map(
@@ -59,20 +56,17 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
 
   override lazy val semanticValidity: Try[Unit] = {
 
-    def checkOrder(s: Seq[Int]): Boolean =
-      Try(s.foldLeft(0)((a, b) => if (b > a) b else throw new Error("Invalid order"))).isSuccess
+    def validOrder(s: Seq[Int]): Boolean =
+      Try(s.foldLeft(-1)((a, b) => if (b > a) b else throw new Error("Invalid order"))).isSuccess
 
-    // TODO: Check directives order.
     if (!validSize) {
       Failure(new Error("Invalid size"))
     } else if (!validSignature) {
       Failure(new Error("Invalid signature"))
     } else if (!directives.forall(_.isValid)) {
       Failure(new Error("Bad outputs"))
-    } else if (directives.map(_.idx).toSet.size != directives.size) {
-      Failure(new Error("Non-unique directive indexes"))
-    } else if (fee < minimalFee) {
-      Failure(new Error("Fee amount too small"))
+    } else if (!validOrder(directives.map(_.idx))) {
+      Failure(new Error("Illegal directives order"))
     } else Success()
   }
 }

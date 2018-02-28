@@ -7,7 +7,6 @@ import encry.modifiers.state.box.PubKeyInfoBox
 import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.view.history.Height
-import scorex.crypto.authds.ADKey
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 import scorex.utils.Random
 
@@ -23,7 +22,7 @@ object InstanceFactory {
     val useBoxes = IndexedSeq(genHelper.genAssetBox(pubKey.address),
       genHelper.genAssetBox(pubKey.address))
 
-    TransactionFactory.defaultPaymentTransaction(pubKey, secret, fee, timestamp, useBoxes,
+    TransactionFactory.defaultPaymentTransaction(secret, fee, timestamp, useBoxes,
       genHelper.Props.recipientAddr, genHelper.Props.txAmount)
   }
 
@@ -31,18 +30,14 @@ object InstanceFactory {
     val fee = genHelper.Props.txFee
     val useBoxes = IndexedSeq(genHelper.genAssetBox(pubKey.address))
 
-    TransactionFactory.defaultPaymentTransaction(pubKey, secret, fee, timestamp, useBoxes,
+    TransactionFactory.defaultPaymentTransaction(secret, fee, timestamp, useBoxes,
       genHelper.Props.recipientAddr, genHelper.Props.txAmount)
   }
 
-  val coinbaseTransaction = CoinbaseTransaction(
-    PublicKey25519(PublicKey @@ Random.randomBytes()),
-    timestamp,
-    Signature25519(Signature @@ Random.randomBytes(64)),
-    IndexedSeq(ADKey @@ Random.randomBytes(), ADKey @@ Random.randomBytes()),
-    999L,
-    Height @@ 0
-  )
+  val coinbaseTransaction: EncryTransaction = {
+    val useBoxes = IndexedSeq(genHelper.genAssetBox(secret.publicImage.address))
+    TransactionFactory.coinbaseTransaction(secret, 10, timestamp, useBoxes, Height @@ 0)
+  }
 
   def addPubKeyInfoTransaction(pubKey: PublicKey25519 = publicKey): AddPubKeyInfoTransaction = {
     val fee = genHelper.Props.txFee

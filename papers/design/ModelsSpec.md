@@ -38,6 +38,7 @@ Defines operation on state.
 
     boxes: [Box]                                // Transforms directive into boxes.
     cost: Amount                                // Will be used for `transaction.fee` minimal amount calculating.
+    idx: Int                                    // Index of directive inside the transaction
     
 ## Unlocker
 Holds the boxId/proof pair.
@@ -52,4 +53,5 @@ Atomic state modifier.
     senderSignature: Signature
     fee: Amount
     useBoxes: [Unlocker]                        // If `proof` is None, then `senderSignature` is used as proof.
-    directives: [Directive]                     // List of state modifications which should be applied atomically.
+    directives: [Directive]                     // List of state modifications which should be applied atomically. 
+                                                // Should be ordered in descending order by `idx`. 
