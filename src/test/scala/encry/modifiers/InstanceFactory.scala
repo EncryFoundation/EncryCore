@@ -21,14 +21,13 @@ object InstanceFactory {
       genHelper.genAssetBox(publicKey.address))
 
     TransactionFactory.defaultPaymentTransaction(secret, fee, timestamp, useBoxes,
-      genHelper.Props.recipientAddr, genHelper.Props.txAmount)
+      publicKey.address, genHelper.Props.txAmount)
   }
 
   def paymentTransactionInvalid: EncryTransaction = {
-    val fee = genHelper.Props.txFee
     val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address))
 
-    TransactionFactory.defaultPaymentTransaction(secret, fee, timestamp, useBoxes,
+    TransactionFactory.defaultPaymentTransaction(secret, -100, timestamp, useBoxes,
       genHelper.Props.recipientAddr, genHelper.Props.txAmount)
   }
 

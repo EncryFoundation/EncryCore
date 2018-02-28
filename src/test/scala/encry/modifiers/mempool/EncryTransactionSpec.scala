@@ -11,15 +11,11 @@ class EncryTransactionSpec extends PropSpec with Matchers {
 
   property("semanticValidity of valid tx") {
 
-    val checkValidityTry = txValid.semanticValidity
-
-    checkValidityTry.isSuccess shouldBe true
+    txValid.semanticValidity.isSuccess shouldBe true
   }
 
   property("semanticValidity of invalid tx") {
 
-    val checkValidityTry = txInvalid.semanticValidity
-
-    checkValidityTry.isSuccess shouldBe false
+    txInvalid.semanticValidity.isSuccess shouldBe false
   }
 }

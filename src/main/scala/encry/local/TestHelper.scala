@@ -25,7 +25,7 @@ object TestHelper {
     lazy val txFee: Amount = 100
     lazy val testDir = "test-data/"
     lazy val keysFilePath = s"${testDir}seeds"
-    lazy val recipientAddr: Address = Address @@ "3goCpFrrBakKJwxk7d4oY5HN54dYMQZbmVWKvQBPZPDvbL3hHp"
+    lazy val recipientAddr: Address = Address @@ "3EkkRFTepVFHqWdAqR5WQrvHkKjNJ26V35UthTMqTpGJHxnCYj"
   }
 
   def genKeysFile(qty: Int, filePath: String): Unit = {

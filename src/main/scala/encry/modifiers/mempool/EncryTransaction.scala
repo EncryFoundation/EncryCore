@@ -62,6 +62,8 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
 
     if (!validSize) {
       Failure(new Error("Invalid size"))
+    } else if (fee < 0) {
+      Failure(new Error("Negative fee"))
     } else if (!validSignature) {
       Failure(new Error("Invalid signature"))
     } else if (!directives.forall(_.isValid)) {
@@ -127,13 +129,13 @@ object EncryTransactionSerializer extends Serializer[EncryTransaction] {
     val leftBytes1 = bytes.drop(120)
     val (unlockers, unlockersLen) = (0 until unlockersQty).foldLeft(IndexedSeq[Unlocker](), 0) { case ((acc, shift), _) =>
       val len = Ints.fromByteArray(leftBytes1.slice(shift, shift + 4))
-      UnlockerSerializer.parseBytes(leftBytes1.slice(shift + 4, shift + 4 + len)).map(u => (acc :+ u, shift + len))
+      UnlockerSerializer.parseBytes(leftBytes1.slice(shift + 4, shift + 4 + len)).map(u => (acc :+ u, shift + 4 + len))
         .getOrElse(throw new Exception("Serialization failed."))
     }
     val leftBytes2 = leftBytes1.drop(unlockersLen)
     val directives = (0 until directivesQty).foldLeft(IndexedSeq[Directive](), 0) { case ((acc, shift), _) =>
       val len = Ints.fromByteArray(leftBytes2.slice(shift, shift + 4))
-      DirectiveSerializer.parseBytes(leftBytes2.slice(shift + 4, shift + 4 + len)).map(d => (acc :+ d, shift + len))
+      DirectiveSerializer.parseBytes(leftBytes2.slice(shift + 4, shift + 4 + len)).map(d => (acc :+ d, shift + 4 + len))
         .getOrElse(throw new Exception("Serialization failed."))
     }._1
 

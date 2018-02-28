@@ -17,7 +17,7 @@ object Base58Check {
 
   def decode(input: String): Try[Array[Byte]] = Base58.decode(input).flatMap { bytes =>
     val checksum = bytes.takeRight(ChecksumLength)
-    val checksumActual = getChecksum(bytes.dropRight(ChecksumLength))
+    val checksumActual = getChecksum(bytes.dropRight(ChecksumLength).tail)
 
     if (checksum.sameElements(checksumActual))
       Success(bytes.dropRight(ChecksumLength).tail)

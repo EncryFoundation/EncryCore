@@ -14,7 +14,8 @@ case class Account(address: Address) extends BytesSerializable {
   override type M = Account
 
   lazy val isValid: Boolean = Base58Check.decode(address).flatMap(bytes =>
-    if (bytes.length == PublicKey25519.Length) Success(bytes) else Failure(new Exception("Length mismatch"))).isSuccess
+    if (bytes.length == PublicKey25519.Length) Success(bytes)
+    else Failure(new Exception("Length mismatch"))).isSuccess
 
   override def serializer: Serializer[M] = AccountSerializer
 
