@@ -86,6 +86,6 @@ class WalletSpec extends PropSpec with Matchers{
 
     wallet.scanPersistent(block)
 
-    // TODO: Fix test result.
+    // TODO: Fix test case.
   }
 }

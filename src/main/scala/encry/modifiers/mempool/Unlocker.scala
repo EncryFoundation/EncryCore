@@ -10,6 +10,7 @@ import scorex.crypto.authds.ADKey
 
 import scala.util.Try
 
+// Holds the boxId/proof pair.
 case class Unlocker(boxId: ADKey, proofOpt: Option[Proof]) extends BytesSerializable with JsonSerializable {
 
   override type M = Unlocker

@@ -32,6 +32,8 @@ trait EncryBaseTransaction extends Transaction[Proposition]
 
   val timestamp: Long
 
+  val isCoinbase: Boolean = false
+
   val feeBox: Option[OpenBox]
 
   val unlockers: IndexedSeq[Unlocker]

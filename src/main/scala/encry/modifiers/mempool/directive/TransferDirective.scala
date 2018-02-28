@@ -4,7 +4,6 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.{Account, Address}
 import encry.modifiers.mempool.directive.Directive.DirTypeId
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
-import encry.settings.Algos
 import encry.utils.Utils
 import io.circe.Json
 import io.circe.syntax._
@@ -22,9 +21,6 @@ case class TransferDirective(address: Address,
   override type M = TransferDirective
 
   override val typeId: DirTypeId = TransferDirective.TypeId
-
-  override val hash: Digest32 =
-    Algos.hash(Account.decodeAddress(address) ++ Longs.toByteArray(amount) ++ Ints.toByteArray(idx))
 
   override def boxes(digest: Digest32): Seq[EncryBaseBox] =
     Seq(AssetBox(address, Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)), amount))

@@ -3,7 +3,7 @@ package encry.modifiers.mempool
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.crypto.PublicKey25519
 import encry.modifiers.mempool.EncryBaseTransaction.TxTypeId
-import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
+import encry.modifiers.mempool.directive.{CoinbaseDirective, Directive, DirectiveSerializer}
 import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.proposition.HeightProposition
 import encry.modifiers.state.box.{EncryBaseBox, OpenBox}
@@ -55,7 +55,14 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
   override lazy val txHash: Digest32 =
     EncryTransaction.getHash(accountPubKey, fee, timestamp, unlockers, directives)
 
+  override lazy val isCoinbase: Boolean = directives.head.isInstanceOf[CoinbaseDirective]
+
   override lazy val semanticValidity: Try[Unit] = {
+
+    def checkOrder(s: Seq[Int]): Boolean =
+      Try(s.foldLeft(0)((a, b) => if (b > a) b else throw new Error("Invalid order"))).isSuccess
+
+    // TODO: Check directives order.
     if (!validSize) {
       Failure(new Error("Invalid size"))
     } else if (!validSignature) {
@@ -84,8 +91,8 @@ object EncryTransaction {
     Bytes.concat(
       Array[Byte](TypeId),
       accountPubKey.pubKeyBytes,
-      unlockers.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
-      directives.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
+      unlockers.map(_.bytes).reduceLeft(_ ++ _),
+      directives.map(_.bytes).reduceLeft(_ ++ _),
       Longs.toByteArray(timestamp),
       Longs.toByteArray(fee)
     )
@@ -109,10 +116,8 @@ object EncryTransactionSerializer extends Serializer[EncryTransaction] {
       obj.signature.signature,
       Ints.toByteArray(obj.unlockers.size),
       Ints.toByteArray(obj.directives.size),
-      obj.unlockers.map(u => Ints.toByteArray(u.bytes.length) ++ u.bytes)
-        .foldLeft(Array[Byte]())(_ ++ _),
-      obj.directives.map(d => Ints.toByteArray(d.bytes.length) ++ DirectiveSerializer.toBytes(d))
-        .foldLeft(Array[Byte]())(_ ++ _)
+      obj.unlockers.map(u => Ints.toByteArray(u.bytes.length) ++ u.bytes).reduceLeft(_ ++ _),
+      obj.directives.map(d => Ints.toByteArray(d.bytes.length) ++ DirectiveSerializer.toBytes(d)).reduceLeft(_ ++ _)
     )
   }
 

@@ -175,7 +175,7 @@ class UtxoState(override val version: VersionTag,
     *    For each box referenced in transaction:
     * 1. Check if box is in the state
     * 2. Parse box from the state storage
-    * 3. Try to unlock the box, providing appropriate context
+    * 3. Try to unlock the box, providing appropriate context and proof
     * 4. Make sure inputs.sum >= outputs.sum
    */
   override def validate(tx: EncryBaseTransaction): Try[Unit] =

@@ -11,8 +11,6 @@ trait Directive extends BytesSerializable with JsonSerializable {
 
   val typeId: DirTypeId
 
-  val hash: Digest32
-
   val idx: Int
 
   val cost: Amount
