@@ -5,10 +5,8 @@ import akka.pattern._
 import akka.util.Timeout
 import encry.cli.Response
 import encry.common.KeyPairType
-import encry.crypto.PublicKey25519
-import encry.modifiers.mempool.{AddPubKeyInfoTransaction, AddPubKeyInfoTransactionSerializer}
+import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
-import encry.modifiers.state.box.proof.Signature25519
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
@@ -17,7 +15,7 @@ import encry.view.wallet.EncryWallet
 import scorex.core.LocalInterface.LocallyGeneratedTransaction
 import scorex.core.NodeViewHolder.GetDataFromCurrentView
 import scorex.core.transaction.box.proposition.Proposition
-import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
+import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -39,34 +37,22 @@ object AddPubKeyInfo extends Command {
     Await.result((nodeViewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
         Try {
+          val secret = view.vault.keyManager.keys.head
           val cArgs = args(1).split(";")
           val pubKeyBytes = PublicKey @@ Algos.decode(cArgs.head).get
           val pubKeyProofBytes = Signature @@ Algos.decode(cArgs(1)).get
           val pubKeyInfoBytes = Algos.decode(cArgs(2)).get
           val pubKeyTypeId = KeyPairType.pairTypeByName(cArgs(3)).typeId
           val fee = cArgs(4).toLong
-          val accountPubKey = PublicKey25519(view.vault.keyManager.keys.head.publicImage.pubKeyBytes)
           val timestamp = System.currentTimeMillis() // TODO: Use NTP.
           val boxes = view.vault.walletStorage.getAllBoxes.filter(_.isInstanceOf[AssetBox]).map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) {
             case (seq, box) => if (seq.map(_.amount).sum < fee) seq :+ box else seq
           }
-          val useBoxes = boxes.map(_.id).toIndexedSeq
-          val change = boxes.map(_.amount).sum - fee
-          val sig = Signature25519(Curve25519.sign(
-            view.vault.keyManager.keys.head.privKeyBytes,
-            AddPubKeyInfoTransaction.getMessageToSign(accountPubKey, fee, timestamp,
-              useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
-          ))
 
-          val tx = AddPubKeyInfoTransaction(accountPubKey, fee, timestamp, sig,
-            useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
+          val tx = TransactionFactory.addPubKeyInfoTransaction(secret, fee, timestamp,
+            boxes, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
 
-          val txDeserTry = AddPubKeyInfoTransactionSerializer.parseBytes(tx.bytes)
-
-          assert(txDeserTry.isSuccess, "Cannot deserialize tx")
-          assert(tx.id sameElements txDeserTry.get.id, "Deserialization failed")
-
-          nodeViewHolderRef ! LocallyGeneratedTransaction[Proposition, AddPubKeyInfoTransaction](tx)
+          nodeViewHolderRef ! LocallyGeneratedTransaction[Proposition, EncryTransaction](tx)
 
           tx
         }.toOption.map(tx => Some(Response(tx.toString))).getOrElse(Some(Response("Operation failed. Malformed data.")))

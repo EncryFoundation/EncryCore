@@ -2,6 +2,7 @@ package encry.modifiers.history.block.payload
 
 import com.google.common.primitives.{Bytes, Ints}
 import encry.modifiers.mempool._
+import encry.modifiers.mempool.directive.DirectiveSerializer
 import encry.settings.Algos
 import io.circe.Json
 import io.circe.syntax._
@@ -48,32 +49,18 @@ object EncryBlockPayloadSerializer extends Serializer[EncryBlockPayload] {
     Bytes.concat(
       obj.headerId,
       Ints.toByteArray(obj.transactions.size),
-      obj.transactions.foldLeft(Seq[Array[Byte]]()){ case (arr, tx) =>
-        arr :+ (Ints.toByteArray(tx.bytes.length) ++ Array[Byte](tx.typeId) ++ tx.bytes)
-      }.flatten.toArray
+      obj.transactions.map(tx => Ints.toByteArray(tx.bytes.length) ++ tx.bytes).reduceLeft(_ ++ _)
     )
 
   override def parseBytes(bytes: Array[Byte]): Try[EncryBlockPayload] = Try {
     val headerId = bytes.slice(0, 32)
     val txQty = Ints.fromByteArray(bytes.slice(32, 36))
-    var slicePointer = 36
-    val txs = (0 until txQty).foldLeft(Seq[EncryBaseTransaction]()) { case (seq, _) =>
-      val txSize = Ints.fromByteArray(bytes.slice(slicePointer, slicePointer + 4))
-      val txTypeId = bytes.slice(slicePointer + 4, slicePointer + 5).head
-      // TODO: Fix transaction deserialization when new transaction model is introduced.
-      val tx: Option[EncryBaseTransaction] = txTypeId match {
-        case CoinbaseTransaction.typeId =>
-          Some(CoinbaseTransactionSerializer.parseBytes(bytes.slice(slicePointer + 5, slicePointer + 5 + txSize)).get)
-        case AddPubKeyInfoTransaction.typeId =>
-          Some(AddPubKeyInfoTransactionSerializer.parseBytes(bytes.slice(slicePointer + 5, slicePointer + 5 + txSize)).get)
-        case _ =>
-          Failure(new Error("Got unhandled modifier."))
-          None
-      }
-      slicePointer += 5 + txSize
-      if (tx.isDefined) seq :+ tx.get
-      else seq
-    }
+    val leftBytes = bytes.drop(36)
+    val txs = (0 until txQty).foldLeft(Seq[EncryBaseTransaction](), 0) { case ((acc, shift), _) =>
+      val len = Ints.fromByteArray(leftBytes.slice(shift, shift + 4))
+      EncryTransactionSerializer.parseBytes(leftBytes.slice(shift + 4, shift + 4 + len)).map(d => (acc :+ d, shift + len))
+        .getOrElse(throw new Exception("Serialization failed."))
+    }._1
     new EncryBlockPayload(ModifierId @@ headerId, txs)
   }
 }

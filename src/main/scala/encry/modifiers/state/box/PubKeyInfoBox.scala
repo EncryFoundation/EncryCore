@@ -1,6 +1,7 @@
 package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import encry.account.{Account, Address}
 import encry.common.KeyPairType
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.EncryBox.BxTypeId
@@ -17,7 +18,7 @@ case class PubKeyInfoBox(override val proposition: AccountProposition,
                          override val nonce: Long,
                          pubKeyBytes: PublicKey,
                          pubKeyProofBytes: Signature,
-                         pubKeyInfoBytes: Array[Byte], // TODO: Tag?
+                         pubKeyInfoBytes: Array[Byte],
                          pubKeyTypeId: Byte)
   extends EncryBox[AccountProposition] {
 
@@ -46,6 +47,22 @@ case class PubKeyInfoBox(override val proposition: AccountProposition,
 object PubKeyInfoBox {
 
   val typeId: BxTypeId = 4.toByte
+
+  def apply(address: Address,
+            nonce: Long,
+            pubKeyBytes: PublicKey,
+            pubKeyProofBytes: Signature,
+            pubKeyInfoBytes: Array[Byte],
+            pubKeyTypeId: Byte): PubKeyInfoBox =
+    PubKeyInfoBox(AccountProposition(address), nonce, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
+
+  def apply(account: Account,
+            nonce: Long,
+            pubKeyBytes: PublicKey,
+            pubKeyProofBytes: Signature,
+            pubKeyInfoBytes: Array[Byte],
+            pubKeyTypeId: Byte): PubKeyInfoBox =
+    PubKeyInfoBox(AccountProposition(account), nonce, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
 }
 
 object PubKeyInfoBoxSerializer extends Serializer[PubKeyInfoBox] {

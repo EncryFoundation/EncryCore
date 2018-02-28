@@ -52,12 +52,12 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings, time
                 case (seq, box) => if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
               }
 
-              TransactionFactory.defaultPaymentTransaction(pubKey, secret, fee, timestamp, boxes, recipient, amount)
+              TransactionFactory.defaultPaymentTransaction(secret, fee, timestamp, boxes, recipient, amount)
             } else {
               // Generate semantically valid but stateful-invalid txs otherwise.
               val boxes = IndexedSeq(factory.genAssetBox(pubKey.address))
 
-              TransactionFactory.defaultPaymentTransaction(pubKey, secret, fee, timestamp, boxes, recipient, amount)
+              TransactionFactory.defaultPaymentTransaction(secret, fee, timestamp, boxes, recipient, amount)
             }
           }
         } else {

@@ -1,13 +1,11 @@
 package encry.modifiers
 
-import encry.crypto.PublicKey25519
 import encry.local.TestHelper
 import encry.modifiers.mempool._
 import encry.modifiers.state.box.PubKeyInfoBox
-import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.view.history.Height
-import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
+import scorex.crypto.signatures.{PublicKey, Signature}
 import scorex.utils.Random
 
 object InstanceFactory {
@@ -17,18 +15,18 @@ object InstanceFactory {
   private val publicKey = secret.publicImage
   private val timestamp = System.currentTimeMillis()
 
-  def paymentTransactionValid(pubKey: PublicKey25519 = publicKey): EncryTransaction = {
+  def paymentTransactionValid: EncryTransaction = {
     val fee = genHelper.Props.txFee
-    val useBoxes = IndexedSeq(genHelper.genAssetBox(pubKey.address),
-      genHelper.genAssetBox(pubKey.address))
+    val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address),
+      genHelper.genAssetBox(publicKey.address))
 
     TransactionFactory.defaultPaymentTransaction(secret, fee, timestamp, useBoxes,
       genHelper.Props.recipientAddr, genHelper.Props.txAmount)
   }
 
-  def paymentTransactionInvalid(pubKey: PublicKey25519 = publicKey): EncryTransaction = {
+  def paymentTransactionInvalid: EncryTransaction = {
     val fee = genHelper.Props.txFee
-    val useBoxes = IndexedSeq(genHelper.genAssetBox(pubKey.address))
+    val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address))
 
     TransactionFactory.defaultPaymentTransaction(secret, fee, timestamp, useBoxes,
       genHelper.Props.recipientAddr, genHelper.Props.txAmount)
@@ -39,22 +37,17 @@ object InstanceFactory {
     TransactionFactory.coinbaseTransaction(secret, 10, timestamp, useBoxes, Height @@ 0)
   }
 
-  def addPubKeyInfoTransaction(pubKey: PublicKey25519 = publicKey): AddPubKeyInfoTransaction = {
+  def addPubKeyInfoTransaction: EncryTransaction = {
     val fee = genHelper.Props.txFee
-    val change = 20L
-    val useBoxes = IndexedSeq(genHelper.genAssetBox(pubKey.address),
-      genHelper.genAssetBox(pubKey.address), genHelper.genAssetBox(pubKey.address)).map(_.id)
+    val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address),
+      genHelper.genAssetBox(publicKey.address), genHelper.genAssetBox(publicKey.address))
     val pubKeyBytes = PublicKey @@ Random.randomBytes()
     val pubKeyProofBytes = Signature @@ Random.randomBytes(64)
     val pubKeyInfoBytes = Random.randomBytes(40)
     val pubKeyTypeId = 99.toByte
-    val sig = Signature25519(Curve25519.sign(
-      secret.privKeyBytes,
-      AddPubKeyInfoTransaction.getMessageToSign(
-        pubKey, fee, timestamp, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
-    ))
-    AddPubKeyInfoTransaction(
-      pubKey, fee, timestamp, sig, useBoxes, change, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
+
+    TransactionFactory.addPubKeyInfoTransaction(
+      secret, fee, timestamp, useBoxes, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
   }
 
   val pubKeyInfoBox: PubKeyInfoBox =

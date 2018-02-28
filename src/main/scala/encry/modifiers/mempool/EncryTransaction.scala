@@ -24,7 +24,7 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
                             override val timestamp: Long,
                             override val signature: Signature25519,
                             override val unlockers: IndexedSeq[Unlocker],
-                            directives: IndexedSeq[Directive]) extends EncryBaseTransaction {
+                            override val directives: IndexedSeq[Directive]) extends EncryBaseTransaction {
 
   override type M = EncryTransaction
 
@@ -35,7 +35,8 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
   override val typeId: TxTypeId = EncryTransaction.TypeId
 
   override val feeBox: Option[OpenBox] =
-    Some(OpenBox(HeightProposition(Height @@ 0), Utils.nonceFromDigest(Algos.hash(txHash)), fee))
+    if (fee > 0) Some(OpenBox(HeightProposition(Height @@ 0), Utils.nonceFromDigest(Algos.hash(txHash)), fee))
+    else None
 
   override lazy val serializer: Serializer[M] = EncryTransactionSerializer
 
@@ -111,7 +112,7 @@ object EncryTransactionSerializer extends Serializer[EncryTransaction] {
       Ints.toByteArray(obj.unlockers.size),
       Ints.toByteArray(obj.directives.size),
       obj.unlockers.map(u => Ints.toByteArray(u.bytes.length) ++ u.bytes).reduceLeft(_ ++ _),
-      obj.directives.map(d => Ints.toByteArray(d.bytes.length) ++ DirectiveSerializer.toBytes(d)).reduceLeft(_ ++ _)
+      obj.directives.map(d => Ints.toByteArray(d.bytes.length) ++ d.bytes).reduceLeft(_ ++ _)
     )
   }
 
@@ -130,9 +131,9 @@ object EncryTransactionSerializer extends Serializer[EncryTransaction] {
         .getOrElse(throw new Exception("Serialization failed."))
     }
     val leftBytes2 = leftBytes1.drop(unlockersLen)
-    val directives = (0 until directivesQty).foldLeft(IndexedSeq[Directive](), leftBytes2) { case ((acc, bs), _) =>
-      val len = Ints.fromByteArray(bs.take(4))
-      DirectiveSerializer.parseBytes(bs.slice(5, 5 + len)).map(d => (acc :+ d, bs.drop(5 + len)))
+    val directives = (0 until directivesQty).foldLeft(IndexedSeq[Directive](), 0) { case ((acc, shift), _) =>
+      val len = Ints.fromByteArray(leftBytes2.slice(shift, shift + 4))
+      DirectiveSerializer.parseBytes(leftBytes2.slice(shift + 4, shift + 4 + len)).map(d => (acc :+ d, shift + len))
         .getOrElse(throw new Exception("Serialization failed."))
     }._1
 

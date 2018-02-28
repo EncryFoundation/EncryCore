@@ -16,7 +16,7 @@ import scala.util.Try
 
 case class TransferDirective(address: Address,
                              amount: Amount,
-                             override val idx: Int) extends Directive with AmountTransferingDirective {
+                             override val idx: Int) extends AmountTransferingDirective {
 
   override type M = TransferDirective
 

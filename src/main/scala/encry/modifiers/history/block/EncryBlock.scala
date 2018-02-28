@@ -32,13 +32,13 @@ case class EncryBlock(override val header: EncryBlockHeader,
       }
 
     if (header.txsRoot != payload.digest) {
-      log.info(s"<Block ${header.encodedId}> Invalid tx Merkle Root hash.")
+      log.info(s"$this Invalid tx Merkle Root hash.")
       Failure(new Error("Invalid tx Merkle Root hash"))
-    } else if (!validCoinbase) {
-      log.info(s"<Block ${header.encodedId}> Invalid coinbase transaction.")
+    } else if (!(validCoinbase && payload.transactions.count(_.isCoinbase) == 1)) {
+      log.info(s"$this Invalid coinbase transaction.")
       Failure(new Error("Invalid signature"))
     } else if (!header.validSignature) {
-      log.info(s"<Block ${header.encodedId}> Invalid timestamp signature.")
+      log.info(s"$this Invalid timestamp signature.")
       Failure(new Error("Invalid signature"))
     } else Success()
   }

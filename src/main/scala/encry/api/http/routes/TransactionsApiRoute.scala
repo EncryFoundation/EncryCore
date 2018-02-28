@@ -5,8 +5,8 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.api.models.{AddPubKeyInfoTransactionModel, EncryTransactionModel}
-import encry.modifiers.mempool.{AddPubKeyInfoTransaction, EncryTransaction}
+import encry.api.models.EncryTransactionModel
+import encry.modifiers.mempool.EncryTransaction
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import encry.view.history.EncryHistoryReader
 import encry.view.mempool.EncryMempoolReader
@@ -27,10 +27,7 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
                                 restApiSettings: RESTApiSettings, digest: Boolean)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
-  implicit val paymentTxCodec: RootJsonFormat[EncryTransactionModel] = jsonFormat6(EncryTransactionModel)
-
-  implicit val addPubKeyInfoTxCodec: RootJsonFormat[AddPubKeyInfoTransactionModel] =
-    jsonFormat10(AddPubKeyInfoTransactionModel)
+  implicit val transactionCodec: RootJsonFormat[EncryTransactionModel] = jsonFormat6(EncryTransactionModel)
 
   override val route: Route = pathPrefix("transactions") {
     getUnconfirmedTransactionsR ~ transferTransactionR ~ addPubKeyInfoTransactionR ~ getTransactionByIdR
@@ -57,9 +54,9 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
     }.getOrElse(complete(StatusCodes.BadRequest))
   }
 
-  def addPubKeyInfoTransactionR: Route = (path("add-key-info") & post & entity(as[AddPubKeyInfoTransactionModel])) { model =>
+  def addPubKeyInfoTransactionR: Route = (path("add-key-info") & post & entity(as[EncryTransactionModel])) { model =>
     model.toBaseObjOpt.map { tx =>
-      nodeViewActorRef ! LocallyGeneratedTransaction[Proposition, AddPubKeyInfoTransaction](tx)
+      nodeViewActorRef ! LocallyGeneratedTransaction[Proposition, EncryTransaction](tx)
       complete(StatusCodes.OK)
     }.getOrElse(complete(StatusCodes.BadRequest))
   }

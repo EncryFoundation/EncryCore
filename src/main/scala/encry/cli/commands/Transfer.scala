@@ -37,7 +37,6 @@ object Transfer extends Command {
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
         Try {
           val secret = view.vault.keyManager.keys.head
-          val pubKey = secret.publicImage
           val recipient = Address @@ args(1).split(";").head
           val fee = args(1).split(";")(1).toLong
           val amount = args(1).split(";").last.toLong
@@ -47,7 +46,7 @@ object Transfer extends Command {
           }
           val useBoxes = boxes.map(_.id).toIndexedSeq
 
-          val tx = TransactionFactory.defaultPaymentTransaction(pubKey, secret, fee, timestamp, boxes, recipient, amount)
+          val tx = TransactionFactory.defaultPaymentTransaction(secret, fee, timestamp, boxes, recipient, amount)
 
           nodeViewHolderRef ! LocallyGeneratedTransaction[Proposition, EncryTransaction](tx)
 
