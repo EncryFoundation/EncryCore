@@ -11,6 +11,7 @@ import io.circe.Json
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
+import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{PublicKey, Signature}
 
@@ -68,7 +69,7 @@ object AddPubKeyInfoDirectiveSerializer extends Serializer[AddPubKeyInfoDirectiv
   )
 
   override def parseBytes(bytes: Array[DirTypeId]): Try[AddPubKeyInfoDirective] = Try {
-    val address = Address @@ bytes.take(Account.AddressLength)
+    val address = Address @@ Base58.encode(bytes.take(Account.AddressLength))
     val pubKeyDataStart = Account.AddressLength + 8
     val pubKeyBytesLen = Ints.fromByteArray(bytes.slice(pubKeyDataStart, pubKeyDataStart + 4))
     val pubKeyBytes = PublicKey @@ bytes.slice(pubKeyDataStart + 4, pubKeyDataStart + 4 + pubKeyBytesLen)

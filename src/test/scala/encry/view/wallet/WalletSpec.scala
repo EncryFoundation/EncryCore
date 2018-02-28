@@ -62,7 +62,7 @@ class WalletSpec extends PropSpec with Matchers{
 
     val validTxs = keys.zip(bxs).map { case (k, bx) =>
       val useBoxes = IndexedSeq(bx)
-      TransactionFactory.defaultPaymentTransaction(k.publicImage, k, fee,
+      TransactionFactory.defaultPaymentTransaction(k, fee,
         timestamp, useBoxes, factory.Props.recipientAddr, factory.Props.boxValue - 100)
     }.slice(0, 4)
 
@@ -78,7 +78,8 @@ class WalletSpec extends PropSpec with Matchers{
       }
     }
 
-    val blockPayload = new EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs.slice(0, 4) :+ InstanceFactory.addPubKeyInfoTransaction())
+    val blockPayload = new EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs.slice(0, 4) :+
+      InstanceFactory.addPubKeyInfoTransaction)
 
     val adProofs = ADProofs(ModifierId @@ Random.randomBytes(), SerializedAdProof @@ Random.randomBytes())
 

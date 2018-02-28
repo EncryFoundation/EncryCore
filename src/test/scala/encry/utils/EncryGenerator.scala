@@ -31,7 +31,7 @@ trait EncryGenerator {
 
     pks.map { k =>
       val useBoxes = IndexedSeq(genAssetBox(k.publicImage.address))
-      TransactionFactory.defaultPaymentTransaction(k.publicImage, k, Props.txFee,
+      TransactionFactory.defaultPaymentTransaction(k, Props.txFee,
         timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
     }
   }
@@ -42,7 +42,7 @@ trait EncryGenerator {
 
     pks.map { k =>
       val useBoxes = IndexedSeq(genAssetBox(PublicKey25519(PublicKey @@ Random.randomBytes(32)).address))
-      TransactionFactory.defaultPaymentTransaction(k.publicImage, k, Props.txFee,
+      TransactionFactory.defaultPaymentTransaction(k, Props.txFee,
         timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
     }
   }

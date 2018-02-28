@@ -34,7 +34,7 @@ trait EncryBaseTransaction extends Transaction[Proposition]
 
   val timestamp: Long
 
-  val isCoinbase: Boolean = false
+  val isCoinbase: Boolean
 
   val feeBox: Option[OpenBox]
 

@@ -3,15 +3,15 @@ package encry.modifiers.mempool
 import encry.modifiers.InstanceFactory
 import org.scalatest.FunSuite
 
-class PaymentTransactionSerializerTest extends FunSuite {
+class EncryTransactionSerializerTest extends FunSuite {
 
   test("toBytes & parseBytes") {
 
-    val tx = InstanceFactory.paymentTransactionValid()
+    val tx = InstanceFactory.paymentTransactionValid
 
     val txSerialized = tx.bytes
 
-    val txDeserialized = PaymentTransactionSerializer.parseBytes(txSerialized)
+    val txDeserialized = EncryTransactionSerializer.parseBytes(txSerialized)
 
     assert(txDeserialized.isSuccess, "Deserialization failed.")
 

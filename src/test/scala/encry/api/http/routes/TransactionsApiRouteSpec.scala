@@ -1,16 +1,11 @@
 package encry.api.http.routes
 
-import encry.api.models.EncryTransactionModel
 import encry.modifiers.InstanceFactory
-import encry.settings.Algos
-import io.circe.generic.auto._
-import io.circe.syntax._
-import io.circe.parser._
 import org.scalatest.{Matchers, PropSpec}
 
 class TransactionsApiRouteSpec extends PropSpec with Matchers {
 
-  private val tx = InstanceFactory.paymentTransactionValid()
+  private val tx = InstanceFactory.paymentTransactionValid
 
   property("payment tx deserialization in sendTransactionR") {
 
