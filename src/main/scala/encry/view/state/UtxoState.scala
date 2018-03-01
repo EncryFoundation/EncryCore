@@ -188,14 +188,16 @@ class UtxoState(override val version: VersionTag,
           case _ => acc
         })
 
-      implicit val context: Option[Context] = Some(Context(stateHeight))
+      implicit val context: Context = Context(tx, stateHeight)
 
-      val bxs = tx.unlockers.map(u => persistentProver.unauthenticatedLookup(u.boxId)
+      val bxs = tx.unlockers.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
-        .flatMap(_.toOption)).foldLeft(IndexedSeq[EncryBaseBox]())((acc, bxOpt) => bxOpt match {
-          case Some(bx) if bx.unlockTry(tx, None).isSuccess => acc :+ bx
-          case _ => acc
-        })
+        .map(t => t.toOption -> u.proofOpt)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, proofOpt)) =>
+          bxOpt match {
+            case Some(bx) if bx.unlockTry(proofOpt.getOrElse(tx.signature)).isSuccess => acc :+ bx
+            case _ => acc
+          }
+        }
 
       val debit = totalAmountOf(bxs)
       val credit = totalAmountOf(tx.newBoxes) - totalAmountOf(tx.newBoxes.filter(_.isInstanceOf[CoinbaseBox]))

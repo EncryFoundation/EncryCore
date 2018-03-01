@@ -1,8 +1,8 @@
 package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs}
-import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.EncryBox.BxTypeId
+import encry.modifiers.state.box.proof.Proof
 import encry.modifiers.state.box.proposition.{HeightProposition, HeightPropositionSerializer}
 import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.settings.Algos
@@ -11,7 +11,7 @@ import io.circe.syntax._
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.ADValue
 
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 case class CoinbaseBox(override val proposition: HeightProposition,
                        override val nonce: Long,
@@ -21,8 +21,9 @@ case class CoinbaseBox(override val proposition: HeightProposition,
 
   override val typeId: BxTypeId = CoinbaseBox.typeId
 
-  override def unlockTry(modifier: EncryBaseTransaction,
-                         script: Option[String])(implicit ctxOpt: Option[Context] = None): Try[Unit] = Success()
+  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
+    if (proposition.height <= ctx.height) Success()
+    else Failure(new Error("Unlock failed"))
 
   override def serializer: SizedCompanionSerializer[M] = CoinbaseBoxSerializer
 

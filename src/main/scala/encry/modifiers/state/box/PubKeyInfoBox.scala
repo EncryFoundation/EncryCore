@@ -3,8 +3,8 @@ package encry.modifiers.state.box
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.{Account, Address}
 import encry.common.KeyPairType
-import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.EncryBox.BxTypeId
+import encry.modifiers.state.box.proof.Proof
 import encry.modifiers.state.box.proposition.{AccountProposition, AccountPropositionSerializer}
 import encry.settings.Algos
 import io.circe.Json
@@ -26,9 +26,8 @@ case class PubKeyInfoBox(override val proposition: AccountProposition,
 
   override val typeId: BxTypeId = PubKeyInfoBox.typeId
 
-  override def unlockTry(modifier: EncryBaseTransaction,
-                         script: Option[String] = None)(implicit ctxOpt: Option[Context] = None): Try[Unit] =
-    if (modifier.accountPubKey.address != proposition.account.address) Failure(new Error("Unlock failed"))
+  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
+    if (ctx.transaction.accountPubKey.address != proposition.account.address) Failure(new Error("Unlock failed"))
     else Success()
 
   override def serializer: Serializer[M] = PubKeyInfoBoxSerializer

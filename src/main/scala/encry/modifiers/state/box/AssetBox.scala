@@ -2,8 +2,8 @@ package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs}
 import encry.account.{Account, Address}
-import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.EncryBox.BxTypeId
+import encry.modifiers.state.box.proof.Proof
 import encry.modifiers.state.box.proposition.{AccountProposition, AccountPropositionSerializer}
 import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import io.circe.Json
@@ -22,9 +22,8 @@ case class AssetBox(override val proposition: AccountProposition,
 
   override val typeId: BxTypeId = AssetBox.TypeId
 
-  override def unlockTry(modifier: EncryBaseTransaction,
-                         script: Option[String] = None)(implicit ctxOpt: Option[Context]): Try[Unit] =
-    if (Account(modifier.accountPubKey.pubKeyBytes) != proposition.account) Failure(new Error("Unlock failed"))
+  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
+    if (Account(ctx.transaction.accountPubKey.pubKeyBytes) != proposition.account) Failure(new Error("Unlock failed"))
     else Success()
 
   override def serializer: SizedCompanionSerializer[M] = AssetBoxSerializer

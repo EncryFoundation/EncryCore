@@ -22,7 +22,6 @@ trait EncryBaseTransaction extends Transaction[Proposition]
 
   val semanticValidity: Try[Unit]
 
-  // override lazy val id: ModifierId = ModifierId @@ (Array[Byte](typeId) ++ txHash)
   override lazy val id: ModifierId = ModifierId @@ txHash
 
   val fee: Long
