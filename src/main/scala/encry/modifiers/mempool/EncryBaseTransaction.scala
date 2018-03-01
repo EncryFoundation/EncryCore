@@ -2,15 +2,13 @@ package encry.modifiers.mempool
 
 import encry.account.Account
 import encry.modifiers.Signable25519
-import encry.modifiers.mempool.EncryBaseTransaction.TxTypeId
 import encry.modifiers.mempool.directive.Directive
 import encry.modifiers.state.box.{EncryBaseBox, OpenBox}
-import encry.settings.Constants
+import encry.settings.{Algos, Constants}
 import scorex.core.ModifierId
 import scorex.core.serialization.JsonSerializable
 import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.proposition.Proposition
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
 import scala.util.Try
@@ -24,11 +22,8 @@ trait EncryBaseTransaction extends Transaction[Proposition]
 
   val semanticValidity: Try[Unit]
 
-  // TODO: Depreciated. Remove
-  val typeId: TxTypeId
-
   // override lazy val id: ModifierId = ModifierId @@ (Array[Byte](typeId) ++ txHash)
-  override lazy val id: ModifierId = ModifierId @@ txHash.updated(0, typeId)
+  override lazy val id: ModifierId = ModifierId @@ txHash
 
   val fee: Long
 
@@ -50,7 +45,7 @@ trait EncryBaseTransaction extends Transaction[Proposition]
   // TODO: Fee checks should be on the another layer.
   lazy val minimalFee: Float = Constants.feeMinAmount + Constants.txByteCost * length
 
-  override def toString: String = s"<TX: type=$typeId id=${Base58.encode(id)}>"
+  override def toString: String = s"<TX: id=${Algos.encode(id)} isCoinbase=$isCoinbase>"
 
   // Shadowed.
   override val messageToSign: Array[Byte] = Array.fill(32)(1.toByte)

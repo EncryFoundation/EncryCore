@@ -44,8 +44,13 @@ object TransactionFactory {
 
     val unlockers = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
 
-    val directives = IndexedSeq(CoinbaseDirective(height),
-      TransferDirective(pubKey.address, useBoxes.map(_.amount).sum, 1))
+    val directives = if (useBoxes.nonEmpty) {
+      IndexedSeq(CoinbaseDirective(height),
+        TransferDirective(pubKey.address, useBoxes.map(_.amount).sum, 1))
+    } else {
+      IndexedSeq(CoinbaseDirective(height))
+    }
+
 
     val signature = privKey.sign(EncryTransaction.getMessageToSign(pubKey, fee, timestamp, unlockers, directives))
 

@@ -2,7 +2,6 @@ package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.crypto.PublicKey25519
-import encry.modifiers.mempool.EncryBaseTransaction.TxTypeId
 import encry.modifiers.mempool.directive.{CoinbaseDirective, Directive, DirectiveSerializer}
 import encry.modifiers.state.box.OpenBox
 import encry.modifiers.state.box.proof.Signature25519
@@ -31,8 +30,6 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
   override lazy val length: Int = this.bytes.length
 
   override val maxSize: Int = EncryTransaction.MaxSize
-
-  override val typeId: TxTypeId = EncryTransaction.TypeId
 
   override val feeBox: Option[OpenBox] =
     if (fee > 0) Some(OpenBox(HeightProposition(Height @@ 0), Utils.nonceFromDigest(Algos.hash(txHash)), fee))
@@ -78,17 +75,14 @@ object EncryTransaction {
 
   val MaxSize: Int = 350
 
-  val TypeId: TxTypeId = 8.toByte
-
   def getHash(accountPubKey: PublicKey25519,
               fee: Amount,
               timestamp: Long,
               unlockers: IndexedSeq[Unlocker],
               directives: IndexedSeq[Directive]): Digest32 = Algos.hash(
     Bytes.concat(
-      Array[Byte](TypeId),
       accountPubKey.pubKeyBytes,
-      unlockers.map(_.bytes).reduceLeft(_ ++ _),
+      unlockers.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
       directives.map(_.bytes).reduceLeft(_ ++ _),
       Longs.toByteArray(timestamp),
       Longs.toByteArray(fee)
@@ -113,8 +107,11 @@ object EncryTransactionSerializer extends Serializer[EncryTransaction] {
       obj.signature.signature,
       Ints.toByteArray(obj.unlockers.size),
       Ints.toByteArray(obj.directives.size),
-      obj.unlockers.map(u => Ints.toByteArray(u.bytes.length) ++ u.bytes).reduceLeft(_ ++ _),
-      obj.directives.map(d => Ints.toByteArray(d.bytes.length) ++ d.bytes).reduceLeft(_ ++ _)
+      obj.unlockers.map(u => Ints.toByteArray(u.bytes.length) ++ u.bytes).foldLeft(Array[Byte]())(_ ++ _),
+      obj.directives.map { d =>
+        val bytes = DirectiveSerializer.toBytes(d)
+        Ints.toByteArray(bytes.length) ++ bytes
+      }.reduceLeft(_ ++ _)
     )
   }
 

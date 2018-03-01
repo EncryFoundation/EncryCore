@@ -70,7 +70,7 @@ object AddPubKeyInfoDirectiveSerializer extends Serializer[AddPubKeyInfoDirectiv
 
   override def parseBytes(bytes: Array[DirTypeId]): Try[AddPubKeyInfoDirective] = Try {
     val address = Address @@ Base58.encode(bytes.take(Account.AddressLength))
-    val pubKeyDataStart = Account.AddressLength + 8
+    val pubKeyDataStart = Account.AddressLength
     val pubKeyBytesLen = Ints.fromByteArray(bytes.slice(pubKeyDataStart, pubKeyDataStart + 4))
     val pubKeyBytes = PublicKey @@ bytes.slice(pubKeyDataStart + 4, pubKeyDataStart + 4 + pubKeyBytesLen)
     val s1 = pubKeyDataStart + 4 + pubKeyBytesLen

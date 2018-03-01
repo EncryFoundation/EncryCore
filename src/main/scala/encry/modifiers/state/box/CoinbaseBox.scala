@@ -13,10 +13,9 @@ import scorex.crypto.authds.ADValue
 
 import scala.util.{Success, Try}
 
-// Not used currently.
 case class CoinbaseBox(override val proposition: HeightProposition,
                        override val nonce: Long,
-                       amount: Amount) extends EncryBox[HeightProposition] {
+                       override val amount: Amount) extends EncryBox[HeightProposition] with AmountCarryingBox {
 
   override type M = CoinbaseBox
 
@@ -39,7 +38,7 @@ case class CoinbaseBox(override val proposition: HeightProposition,
 
 object CoinbaseBox {
 
-  val typeId: BxTypeId = 3.toByte
+  val typeId: BxTypeId = 0.toByte
 }
 
 object CoinbaseBoxSerializer extends SizedCompanionSerializer[CoinbaseBox] {

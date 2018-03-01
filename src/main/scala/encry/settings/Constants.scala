@@ -23,13 +23,16 @@ object Constants {
 
     val genesisBoxesQty = 100
 
-    val genesisBoxesAmount = 20L
+    val genesisBoxesAmount = 1L
 
-    val initialEmissionAmount = 2000L
+    // Number of fractions in one Encry Token.
+    val fractionsPerToken = 1000000
 
-    val deflationInterval = 20
+    val initialEmissionAmount: Int = 2 * fractionsPerToken
 
-    val deflationFactor = 0.8
+    val deflationInterval = 100
+
+    val deflationFactor = 0.9998
 
     // Desired time interval between blocks
     val desiredBlockInterval: FiniteDuration = 30.seconds

@@ -3,6 +3,7 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
+import encry.consensus.emission.TokenSupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -196,9 +197,8 @@ class UtxoState(override val version: VersionTag,
           case _ => acc
         })
 
-      // TODO: Assume Coinbase validation. Implement CoinbaseBox.
       val debit = totalAmountOf(bxs)
-      val credit = totalAmountOf(tx.newBoxes)
+      val credit = totalAmountOf(tx.newBoxes) - totalAmountOf(tx.newBoxes.filter(_.isInstanceOf[CoinbaseBox]))
 
       if (bxs.size < tx.unlockers.size) throw new Error(s"Failed to spend some boxes referenced in $tx")
       else if (debit < credit) throw new Error(s"Non-positive balance in $tx")
@@ -243,13 +243,9 @@ object UtxoState extends ScorexLogging {
     }
   }
 
-  def newOpenBoxAt(height: Height, seed: Long): OpenBox = {
-    val perBlockEmissionAmount: Long =
-      if (height >= Constants.Chain.deflationInterval) {
-        (scala.math.pow(Constants.Chain.deflationFactor, (height / Constants.Chain.deflationInterval).floor) *
-          Constants.Chain.initialEmissionAmount).toLong
-      } else Constants.Chain.initialEmissionAmount
-    OpenBox(HeightProposition(Height @@ (height + Constants.Chain.coinbaseHeightLock)),
-      seed * height, perBlockEmissionAmount)
+  def supplyBoxesAt(height: Height, seed: Long): CoinbaseBox = {
+    val supplyAmount: Long = TokenSupplyController.supplyAt(height)
+    CoinbaseBox(HeightProposition(Height @@ (height + Constants.Chain.coinbaseHeightLock)),
+      seed * height, supplyAmount)
   }
 }

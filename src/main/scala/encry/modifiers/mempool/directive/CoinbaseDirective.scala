@@ -23,7 +23,7 @@ case class CoinbaseDirective(height: Height) extends Directive {
   override val typeId: DirTypeId = CoinbaseDirective.TypeId
 
   override def boxes(digest: Digest32): Seq[EncryBaseBox] =
-    Seq(UtxoState.newOpenBoxAt(height, seed = Longs.fromByteArray(digest.take(8))))
+    Seq(UtxoState.supplyBoxesAt(height, seed = Longs.fromByteArray(digest.take(8))))
 
   override val cost: Amount = 0
 

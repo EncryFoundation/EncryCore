@@ -135,7 +135,8 @@ class EncryMiner(viewHolderRef: ActorRef,
             }
           }) ++ state.getAvailableOpenBoxesAt(state.stateHeight)
 
-        val coinbase = TransactionFactory.coinbaseTransaction(minerSecret, 10, timestamp, openBxs, height)
+        // TODO: Remove fee from `coinbaseTransaction()` args.
+        val coinbase = TransactionFactory.coinbaseTransaction(minerSecret, 0, timestamp, openBxs, height)
 
         val txs = txsToPut.sortBy(_.timestamp) :+ coinbase
 
