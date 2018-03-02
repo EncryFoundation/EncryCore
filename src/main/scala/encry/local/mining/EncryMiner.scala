@@ -133,7 +133,7 @@ class EncryMiner(viewHolderRef: ActorRef,
               case obx: OpenBox => buff2 :+ obx
               case _ => buff2
             }
-          }) ++ state.getAvailableOpenBoxesAt(state.stateHeight)
+          })/* ++ state.getAvailableOpenBoxesAt(state.height) */ // TODO: Substitute this functionality.
 
         // TODO: Remove fee from `coinbaseTransaction()` args.
         val coinbase = TransactionFactory.coinbaseTransaction(minerSecret, 0, timestamp, openBxs, height)

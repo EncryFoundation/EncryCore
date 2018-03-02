@@ -3,6 +3,7 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
+import com.google.common.primitives.Ints
 import encry.consensus.emission.TokenSupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
@@ -14,7 +15,6 @@ import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.{Algos, Constants}
 import encry.view.history.Height
-import encry.view.state.index.StateIndexManager
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.LocalInterface.LocallyGeneratedModifier
 import scorex.core.VersionTag
@@ -26,10 +26,10 @@ import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 import scala.util.{Failure, Success, Try}
 
 class UtxoState(override val version: VersionTag,
+                override val height: Height,
                 override val stateStore: Store,
-                override val indexStore: Store,
                 nodeViewHolderRef: Option[ActorRef])
-  extends EncryState[UtxoState] with UtxoStateReader with StateIndexManager with TransactionValidator {
+  extends EncryState[UtxoState] with UtxoStateReader with TransactionValidator {
 
   import UtxoState.metadata
 
@@ -74,12 +74,14 @@ class UtxoState(override val version: VersionTag,
 
     case block: EncryBlock =>
       log.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
-        s"root hash ${Algos.encode(rootHash)} at height $stateHeight")
+        s"root hash ${Algos.encode(rootHash)} at height $height")
 
       applyTransactions(block.payload.transactions, block.header.stateRoot).map { _: Unit =>
-        val md = metadata(VersionTag @@ block.id, block.header.stateRoot)
+        val md = metadata(VersionTag @@ block.id, block.header.stateRoot, Height @@ block.header.height)
         val proofBytes = persistentProver.generateProofAndUpdateStorage(md)
         val proofHash = ADProofs.proofDigest(proofBytes)
+
+        println(s"Current state height is: $height")
 
         if (block.adProofsOpt.isEmpty) onAdProofGenerated(ADProofs(block.header.id, proofBytes))
         log.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with " +
@@ -94,10 +96,7 @@ class UtxoState(override val version: VersionTag,
         else if (!(block.header.stateRoot sameElements persistentProver.digest))
           throw new Error("Calculated stateRoot is not equal to the declared one.")
 
-        // Update state index.
-        updateIndex(block)
-
-        new UtxoState(VersionTag @@ block.id, stateStore, indexStore, nodeViewHolderRef)
+        new UtxoState(VersionTag @@ block.id, Height @@ block.header.height, stateStore, nodeViewHolderRef)
       }.recoverWith[UtxoState] { case e =>
         log.warn(s"Error while applying block with header ${block.header.encodedId} to UTXOState with root" +
           s" ${Algos.encode(rootHash)}: ", e)
@@ -105,7 +104,7 @@ class UtxoState(override val version: VersionTag,
       }
 
     case header: EncryBlockHeader =>
-      Success(new UtxoState(VersionTag @@ header.id, stateStore, indexStore, nodeViewHolderRef))
+      Success(new UtxoState(VersionTag @@ header.id, height, stateStore, nodeViewHolderRef))
 
     case _ => Failure(new Error("Got Modifier of unknown type."))
   }
@@ -150,12 +149,13 @@ class UtxoState(override val version: VersionTag,
     stateStore.get(ByteArrayWrapper(version)) match {
       case Some(v) =>
         val rollbackResult = prover.rollback(ADDigest @@ v.data).map { _ =>
-          new UtxoState(version, stateStore, indexStore, nodeViewHolderRef) {
+          val stateHeight = stateStore.get(ByteArrayWrapper(UtxoState.bestHeightKey))
+            .map(d => Ints.fromByteArray(d.data)).getOrElse(Constants.Chain.genesisHeight)
+          new UtxoState(version, Height @@ stateHeight, stateStore, nodeViewHolderRef) {
             override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] = prover
           }
         }
         stateStore.clean(Constants.keepVersions)
-        rollbackIndex(VersionTag @@ v.data)
         rollbackResult
       case None =>
         Failure(new Error(s"Unable to get root hash at version ${Algos.encoder.encode(version)}"))
@@ -188,7 +188,7 @@ class UtxoState(override val version: VersionTag,
           case _ => acc
         })
 
-      implicit val context: Context = Context(tx, stateHeight)
+      implicit val context: Context = Context(tx, height)
 
       val bxs = tx.unlockers.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
@@ -211,36 +211,38 @@ object UtxoState extends ScorexLogging {
 
   private lazy val bestVersionKey = Algos.hash("best_state_version")
 
-  def create(stateDir: File, indexDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
+  private lazy val bestHeightKey = Algos.hash("state_height")
+
+  def create(stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
     val stateStore = new LSMStore(stateDir, keepVersions = Constants.keepVersions)
-    val indexStore = new LSMStore(indexDir, keepVersions = Constants.keepVersions)
-    val stateVersion = stateStore.get(ByteArrayWrapper(bestVersionKey)).map( _.data)
-    new UtxoState(VersionTag @@ stateVersion.getOrElse(EncryState.genesisStateVersion),
-      stateStore, indexStore, nodeViewHolderRef)
+    val stateVersion = stateStore.get(ByteArrayWrapper(bestVersionKey))
+      .map(_.data).getOrElse(EncryState.genesisStateVersion)
+    val stateHeight = stateStore.get(ByteArrayWrapper(bestHeightKey))
+      .map(d => Ints.fromByteArray(d.data)).getOrElse(Constants.Chain.genesisHeight)
+    new UtxoState(VersionTag @@ stateVersion, Height @@ stateHeight, stateStore, nodeViewHolderRef)
   }
 
-  private def metadata(modId: VersionTag, stateRoot: ADDigest): Seq[(Array[Byte], Array[Byte])] = {
+  private def metadata(modId: VersionTag, stateRoot: ADDigest, height: Height): Seq[(Array[Byte], Array[Byte])] = {
     val idStateDigestIdxElem: (Array[Byte], Array[Byte]) = modId -> stateRoot
     val stateDigestIdIdxElem = Algos.hash(stateRoot) -> modId
     val bestVersion = bestVersionKey -> modId
+    val stateHeight = bestHeightKey -> Ints.toByteArray(height)
 
     Seq(idStateDigestIdxElem, stateDigestIdIdxElem, bestVersion)
   }
 
-  def fromBoxHolder(bh: BoxHolder, stateDir: File,
-                    indexDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
+  def fromBoxHolder(bh: BoxHolder, stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
     val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = EncryBox.BoxIdSize, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
     val stateStore = new LSMStore(stateDir, keepVersions = Constants.keepVersions)
-    val indexStore = new LSMStore(indexDir, keepVersions = Constants.keepVersions)
 
     log.info(s"Generating UTXO State from BH with ${bh.boxes.size} boxes")
 
-    new UtxoState(EncryState.genesisStateVersion, stateStore, indexStore, nodeViewHolderRef) {
+    new UtxoState(EncryState.genesisStateVersion, Constants.Chain.genesisHeight, stateStore, nodeViewHolderRef) {
       override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
         PersistentBatchAVLProver.create(
-          p, storage, metadata(EncryState.genesisStateVersion, p.digest), paranoidChecks = true
+          p, storage, metadata(EncryState.genesisStateVersion, p.digest, Constants.Chain.genesisHeight), paranoidChecks = true
         ).get.ensuring(_.digest sameElements storage.version.get)
     }
   }

@@ -12,7 +12,7 @@ import scorex.crypto.authds.ADKey
 
 import scala.util.Try
 
-class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519])
+class WalletStorage(val store: Store, val publicKeys: Set[PublicKey25519])
   extends EncryBaseStorage {
 
   import WalletStorage._
@@ -34,7 +34,7 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519])
   def getTransactionIds: Seq[ModifierId] =
     parseComplexValue(transactionIdsKey, 32).map(ModifierId @@ _).getOrElse(Seq())
 
-  def getBoxById(id: ADKey): Option[EncryBaseBox] = db.get(boxKeyById(id))
+  def getBoxById(id: ADKey): Option[EncryBaseBox] = store.get(boxKeyById(id))
     .flatMap(d => StateModifierDeserializer.parseBytes(d.data, id.head).toOption)
 
   def getAllBoxes: Seq[EncryBaseBox] =
@@ -44,7 +44,7 @@ class WalletStorage(val db: Store, val publicKeys: Set[PublicKey25519])
     }
 
   def getTransactionById(id: ModifierId): Option[EncryTransaction] = Try {
-    EncryTransactionSerializer.parseBytes(db.get(ByteArrayWrapper(id)).get.data).get
+    EncryTransactionSerializer.parseBytes(store.get(ByteArrayWrapper(id)).get.data).get
   }.toOption
 }
 

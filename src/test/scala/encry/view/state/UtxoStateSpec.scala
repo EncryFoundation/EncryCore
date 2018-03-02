@@ -6,6 +6,7 @@ import akka.actor.ActorRef
 import encry.account.Address
 import encry.local.TestHelper
 import encry.modifiers.mempool.TransactionFactory
+import encry.settings.Constants
 import encry.utils.FileHelper
 import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
@@ -20,9 +21,8 @@ class UtxoStateSpec extends PropSpec with Matchers {
     bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
     val stateStore = new LSMStore(dir, keySize = 32, keepVersions = 10)
-    val indexStore = new LSMStore(dir, keySize = 32, keepVersions = 10)
 
-    new UtxoState(EncryState.genesisStateVersion, stateStore, indexStore, None) {
+    new UtxoState(EncryState.genesisStateVersion, Constants.Chain.genesisHeight, stateStore, None) {
       override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
         PersistentBatchAVLProver.create(
           p, storage, paranoidChecks = true

@@ -1,7 +1,7 @@
 package encry
 
 import akka.actor.{ActorRef, Props}
-import encry.api.http.routes.{HistoryApiRoute, InfoApiRoute, AccountInfoApiRoute, TransactionsApiRoute}
+import encry.api.http.routes.{AccountInfoApiRoute, HistoryApiRoute, InfoApiRoute, TransactionsApiRoute}
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator.StartGeneration
@@ -12,8 +12,8 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.network.EncryNodeViewSynchronizer
 import encry.settings.{Algos, EncryAppSettings}
-import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import encry.view.history.EncrySyncInfoMessageSpec
+import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import scorex.core.api.http.{ApiRoute, PeersApiRoute, UtilsApiRoute}
 import scorex.core.app.Application
 import scorex.core.network.message.MessageSpec

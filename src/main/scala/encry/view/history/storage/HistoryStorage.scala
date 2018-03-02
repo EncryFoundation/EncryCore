@@ -9,7 +9,7 @@ import scorex.core.serialization.Serializer
 
 import scala.util.{Failure, Success}
 
-class HistoryStorage(val db: Store, val objectsStore: ObjectsStore) extends EncryBaseStorage {
+class HistoryStorage(override val store: Store, val objectsStore: ObjectsStore) extends EncryBaseStorage {
 
   def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
     objectsStore.get(id).flatMap { bytes =>

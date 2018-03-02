@@ -21,7 +21,7 @@ class WalletStorageSpec extends PropSpec with Matchers {
 
     val key = ByteArrayWrapper(ScRand.randomBytes())
 
-    walletStorage.db.update(Random.nextLong(), Seq(), Seq(key -> packedValues))
+    walletStorage.store.update(Random.nextLong(), Seq(), Seq(key -> packedValues))
 
     val valuesUnpacked = walletStorage.parseComplexValue(key, 32).get
 

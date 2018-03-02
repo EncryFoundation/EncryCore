@@ -66,6 +66,7 @@ object EncryState extends ScorexLogging{
 
   def getIndexDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/index")
 
+  // TODO: Generate CoinbaseBox'es at the genesis stage.
   def genesisBoxes: IndexedSeq[OpenBox] = {
     lazy val genesisSeed = Long.MaxValue
     lazy val rndGen = new scala.util.Random(genesisSeed)
@@ -73,7 +74,7 @@ object EncryState extends ScorexLogging{
       OpenBox(HeightProposition(Height @@ -1), rndGen.nextLong(), Constants.Chain.genesisBoxesAmount))
   }
 
-  def generateGenesisUtxoState(stateDir: File, indexDir: File,
+  def generateGenesisUtxoState(stateDir: File,
                                nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
     log.info("Generating genesis UTXO state.")
 
@@ -81,7 +82,7 @@ object EncryState extends ScorexLogging{
 
     val bh = BoxHolder(initialBoxes)
 
-    UtxoState.fromBoxHolder(bh, stateDir, indexDir, nodeViewHolderRef).ensuring(us => {
+    UtxoState.fromBoxHolder(bh, stateDir, nodeViewHolderRef).ensuring(us => {
       log.debug(s"Expected afterGenesisDigest: $afterGenesisStateDigestHex")
       log.debug(s"Actual afterGenesisDigest:   ${Base58.encode(us.rootHash)}")
       log.info(s"Generated UTXO state with ${bh.boxes.size} boxes inside.")
@@ -98,15 +99,12 @@ object EncryState extends ScorexLogging{
     val stateDir = getStateDir(settings)
     stateDir.mkdirs()
 
-    val indexDir = getIndexDir(settings)
-    indexDir.mkdirs()
-
     if (settings.nodeSettings.ADState) {
       DigestState.create(None, None, stateDir, settings.nodeSettings)
     } else if (stateDir.listFiles().isEmpty) {
-      EncryState.generateGenesisUtxoState(stateDir, indexDir, nodeViewHolderRef)._1
+      EncryState.generateGenesisUtxoState(stateDir, nodeViewHolderRef)._1
     } else {
-      UtxoState.create(stateDir, indexDir, nodeViewHolderRef)
+      UtxoState.create(stateDir, nodeViewHolderRef)
     }
   }
 }

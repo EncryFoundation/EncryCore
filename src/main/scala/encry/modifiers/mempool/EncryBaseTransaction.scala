@@ -41,7 +41,6 @@ trait EncryBaseTransaction extends Transaction[Proposition]
 
   lazy val account: Account = Account(accountPubKey.pubKeyBytes)
 
-  // TODO: Fee checks should be on the another layer.
   lazy val minimalFee: Float = Constants.feeMinAmount + Constants.txByteCost * length
 
   override def toString: String = s"<TX: id=${Algos.encode(id)} isCoinbase=$isCoinbase>"
