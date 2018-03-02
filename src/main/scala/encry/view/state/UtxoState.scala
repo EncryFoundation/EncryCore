@@ -81,7 +81,7 @@ class UtxoState(override val version: VersionTag,
         val proofBytes = persistentProver.generateProofAndUpdateStorage(md)
         val proofHash = ADProofs.proofDigest(proofBytes)
 
-        println(s"Current state height is: $height")
+        println(s"Applying ${block.header.height}. Current state height is: $height")
 
         if (block.adProofsOpt.isEmpty) onAdProofGenerated(ADProofs(block.header.id, proofBytes))
         log.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with " +
@@ -228,7 +228,7 @@ object UtxoState extends ScorexLogging {
     val bestVersion = bestVersionKey -> modId
     val stateHeight = bestHeightKey -> Ints.toByteArray(height)
 
-    Seq(idStateDigestIdxElem, stateDigestIdIdxElem, bestVersion)
+    Seq(idStateDigestIdxElem, stateDigestIdIdxElem, bestVersion, stateHeight)
   }
 
   def fromBoxHolder(bh: BoxHolder, stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
