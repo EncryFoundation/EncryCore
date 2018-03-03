@@ -5,9 +5,9 @@ import encry.crypto.{PrivateKey25519, PublicKey25519}
 
 trait EncryBaseWallet extends WalletReader {
 
-  def historyTransactions: Seq[WalletTransaction] = getAllTransactions.map(WalletTransaction)
+  def historyTransactions: Seq[WalletTransaction] = allTransactions.map(WalletTransaction)
 
-  def boxes: Seq[WalletBox] = getAvailableBoxes.map(WalletBox)
+  def boxes: Seq[WalletBox] = availableBoxes.map(WalletBox)
 
   def publicKeys: Set[PublicKey25519]
 

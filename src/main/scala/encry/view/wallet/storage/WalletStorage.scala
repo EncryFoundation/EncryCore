@@ -28,19 +28,21 @@ class WalletStorage(val store: Store, val publicKeys: Set[PublicKey25519])
   def packTransactionIds(ids: Seq[ModifierId]): ByteArrayWrapper =
     ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
 
-  def getBoxIds: Seq[ADKey] =
+  def boxIds: Seq[ADKey] =
     parseComplexValue(boxIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
 
-  def getTransactionIds: Seq[ModifierId] =
+  def openBoxIds: Seq[ADKey] =
+    parseComplexValue(openBoxesIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
+
+  def transactionIds: Seq[ModifierId] =
     parseComplexValue(transactionIdsKey, 32).map(ModifierId @@ _).getOrElse(Seq())
 
   def getBoxById(id: ADKey): Option[EncryBaseBox] = store.get(boxKeyById(id))
     .flatMap(d => StateModifierDeserializer.parseBytes(d.data, id.head).toOption)
 
-  def getAllBoxes: Seq[EncryBaseBox] =
-    getBoxIds.foldLeft(Seq[EncryBaseBox]()) { case (buff, id) =>
-      val bx = getBoxById(id)
-      if (bx.isDefined) buff :+ bx.get else buff
+  def allBoxes: Seq[EncryBaseBox] =
+    boxIds.foldLeft(Seq[EncryBaseBox]()) { case (acc, id) =>
+      getBoxById(id).map(bx => acc :+ bx).getOrElse(acc)
     }
 
   def getTransactionById(id: ModifierId): Option[EncryTransaction] = Try {
@@ -50,11 +52,13 @@ class WalletStorage(val store: Store, val publicKeys: Set[PublicKey25519])
 
 object WalletStorage {
 
-  val boxIdsKey = ByteArrayWrapper(Algos.hash("listOfBoxesKeys"))
+  val boxIdsKey = ByteArrayWrapper(Algos.hash("account_boxes"))
 
-  val transactionIdsKey = ByteArrayWrapper(Algos.hash("listOfTransactions"))
+  val openBoxesIdsKey = ByteArrayWrapper(Algos.hash("open_boxes"))
 
-  val balanceKey = ByteArrayWrapper(Algos.hash("balance"))
+  val transactionIdsKey = ByteArrayWrapper(Algos.hash("account_transactions"))
+
+  val balanceKey = ByteArrayWrapper(Algos.hash("account_balance"))
 
   def boxKeyById(id: ADKey): ByteArrayWrapper = ByteArrayWrapper(id)
 

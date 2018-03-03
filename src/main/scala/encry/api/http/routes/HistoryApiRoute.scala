@@ -9,6 +9,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.settings.EncryAppSettings
 import encry.view.EncryViewReadersHolder.GetDataFromHistory
 import encry.view.history.EncryHistoryReader
+import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
 import scorex.core.ModifierId
@@ -19,7 +20,7 @@ import scorex.crypto.encode.Base58
 import scala.concurrent.Future
 
 case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings: EncryAppSettings,
-                           nodeId: Array[Byte], digest: Boolean)(implicit val context: ActorRefFactory)
+                           nodeId: Array[Byte], stateMode: StateMode)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with ScorexLogging {
 
   override val route: Route = pathPrefix("history") {

@@ -64,8 +64,6 @@ object EncryState extends ScorexLogging{
 
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
-  def getIndexDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/index")
-
   // TODO: Generate CoinbaseBox'es at the genesis stage.
   def genesisBoxes: IndexedSeq[OpenBox] = {
     lazy val genesisSeed = Long.MaxValue

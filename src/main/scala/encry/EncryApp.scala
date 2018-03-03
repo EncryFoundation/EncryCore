@@ -7,7 +7,7 @@ import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator.StartGeneration
 import encry.local.mining.EncryMiner
 import encry.local.mining.EncryMiner.StartMining
-import encry.local.{EncryLocalInterface, TransactionGenerator}
+import encry.local.{EncryLocalInterfaceRef, TransactionGenerator}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.network.EncryNodeViewSynchronizer
@@ -54,14 +54,13 @@ class EncryApp(args: Seq[String]) extends Application {
     UtilsApiRoute(settings.restApi),
     PeersApiRoute(peerManagerRef, networkControllerRef, settings.restApi),
     InfoApiRoute(readersHolderRef, minerRef, peerManagerRef, encrySettings, nodeId),
-    HistoryApiRoute(readersHolderRef, minerRef, encrySettings, nodeId, encrySettings.nodeSettings.ADState),
-    TransactionsApiRoute(readersHolderRef, nodeViewHolderRef, settings.restApi, encrySettings.nodeSettings.ADState),
-    AccountInfoApiRoute(readersHolderRef, nodeViewHolderRef, settings.restApi, encrySettings.nodeSettings.ADState)
+    HistoryApiRoute(readersHolderRef, minerRef, encrySettings, nodeId, encrySettings.nodeSettings.stateMode),
+    TransactionsApiRoute(readersHolderRef, nodeViewHolderRef, settings.restApi, encrySettings.nodeSettings.stateMode),
+    AccountInfoApiRoute(readersHolderRef, nodeViewHolderRef, settings.restApi, encrySettings.nodeSettings.stateMode)
   )
 
-  override val localInterface: ActorRef = actorSystem.actorOf(
-    Props(classOf[EncryLocalInterface], nodeViewHolderRef, minerRef, encrySettings)
-  )
+  override val localInterface: ActorRef =
+    EncryLocalInterfaceRef(nodeViewHolderRef, peerManagerRef, encrySettings, timeProvider)
 
   override val nodeViewSynchronizer: ActorRef = actorSystem.actorOf(
     Props(new EncryNodeViewSynchronizer(

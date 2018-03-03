@@ -45,7 +45,7 @@ object AddPubKeyInfo extends Command {
           val pubKeyTypeId = KeyPairType.pairTypeByName(cArgs(3)).typeId
           val fee = cArgs(4).toLong
           val timestamp = System.currentTimeMillis() // TODO: Use NTP.
-          val boxes = view.vault.walletStorage.getAllBoxes.filter(_.isInstanceOf[AssetBox]).map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) {
+          val boxes = view.vault.walletStorage.allBoxes.filter(_.isInstanceOf[AssetBox]).map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) {
             case (seq, box) => if (seq.map(_.amount).sum < fee) seq :+ box else seq
           }
 

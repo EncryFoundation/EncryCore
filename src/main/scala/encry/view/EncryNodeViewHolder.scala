@@ -53,9 +53,6 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     val stateDir = EncryState.getStateDir(settings)
     stateDir.mkdir()
 
-    val idxDir = EncryState.getIndexDir(settings)
-    idxDir.mkdirs()
-
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
 
     val state = {

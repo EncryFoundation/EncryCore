@@ -6,14 +6,14 @@ import akka.pattern.ask
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.account.Address
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
-import encry.view.state.UtxoStateReader
+import encry.view.state.{StateMode, UtxoStateReader}
 import io.circe.Json
 import scorex.core.settings.RESTApiSettings
 
 import scala.concurrent.Future
 
 case class AccountInfoApiRoute(readersHolder: ActorRef, nodeViewActorRef: ActorRef,
-                               restApiSettings: RESTApiSettings, digest: Boolean)(implicit val context: ActorRefFactory)
+                               restApiSettings: RESTApiSettings, stateMode: StateMode)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
   override val route: Route = pathPrefix("account") {

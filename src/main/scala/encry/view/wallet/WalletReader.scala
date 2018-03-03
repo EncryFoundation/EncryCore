@@ -15,12 +15,11 @@ trait WalletReader {
 
   def getBoxById(id: ADKey): Option[EncryBaseBox] = walletStorage.getBoxById(id)
 
-  def getAvailableBoxes: Seq[EncryBaseBox] = walletStorage.getAllBoxes
+  def availableBoxes: Seq[EncryBaseBox] = walletStorage.allBoxes
 
-  def getAllTransactions: Seq[EncryBaseTransaction] =
-    walletStorage.getTransactionIds.foldLeft(Seq[EncryBaseTransaction]()) { case (buff, id) =>
-      val bxOpt = walletStorage.getTransactionById(id)
-      if (bxOpt.isDefined) buff :+ bxOpt.get else buff
+  def allTransactions: Seq[EncryBaseTransaction] =
+    walletStorage.transactionIds.foldLeft(Seq[EncryBaseTransaction]()) { case (acc, id) =>
+      walletStorage.getTransactionById(id).map(bx => acc :+ bx).getOrElse(acc)
     }
 
   def balance: Long = walletStore.get(WalletStorage.balanceKey).map(v => Longs.fromByteArray(v.data)).getOrElse(0L)

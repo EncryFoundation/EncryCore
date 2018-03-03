@@ -10,6 +10,7 @@ import encry.modifiers.mempool.EncryTransaction
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import encry.view.history.EncryHistoryReader
 import encry.view.mempool.EncryMempoolReader
+import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.generic.auto._
 import io.circe.syntax._
@@ -24,7 +25,7 @@ import spray.json.RootJsonFormat
 import scala.concurrent.Future
 
 case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: ActorRef,
-                                restApiSettings: RESTApiSettings, digest: Boolean)(implicit val context: ActorRefFactory)
+                                restApiSettings: RESTApiSettings, stateMode: StateMode)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
   implicit val transactionCodec: RootJsonFormat[EncryTransactionModel] = jsonFormat6(EncryTransactionModel)
