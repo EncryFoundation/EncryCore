@@ -15,10 +15,11 @@ case class Unlocker(boxId: ADKey, proofOpt: Option[Proof]) extends BytesSerializ
 
   override type M = Unlocker
 
-  override def serializer: Serializer[Unlocker] = UnlockerSerializer
+  override def serializer: Serializer[M] = UnlockerSerializer
 
   override def json: Json = Map(
-    "boxId" -> Algos.encode(boxId)
+    "boxId" -> Algos.encode(boxId).asJson,
+    "proof" -> proofOpt.map(_.json).getOrElse("None".asJson)
   ).asJson
 }
 

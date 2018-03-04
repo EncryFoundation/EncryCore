@@ -44,7 +44,6 @@ object Transfer extends Command {
           val boxes = view.vault.walletStorage.allBoxes.filter(_.isInstanceOf[AssetBox]).map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) {
             case (seq, box) => if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
           }
-          val useBoxes = boxes.map(_.id).toIndexedSeq
 
           val tx = TransactionFactory.defaultPaymentTransaction(secret, fee, timestamp, boxes, recipient, amount)
 

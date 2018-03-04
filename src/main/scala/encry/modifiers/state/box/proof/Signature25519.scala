@@ -22,7 +22,7 @@ case class Signature25519(signature: Signature) extends Proof {
 
   override def serializer: Serializer[Signature25519] = Signature25519Serializer
 
-  override def json: Json = Map(
+  override lazy val json: Json = Map(
     "signature" -> Algos.encode(signature).asJson
   ).asJson
 }

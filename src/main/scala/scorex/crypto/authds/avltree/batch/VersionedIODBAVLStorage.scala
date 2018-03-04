@@ -1,6 +1,7 @@
 package scorex.crypto.authds.avltree.batch
 
 import com.google.common.primitives.Ints
+import io.iohk.iodb.Store.{K, V}
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.crypto.authds.avltree.batch.VersionedIODBAVLStorage.{InternalNodePrefix, LeafPrefix}
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue, Balance}
@@ -40,7 +41,7 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
 
   def rollbackVersions: Iterable[ADDigest] = store.rollbackVersions().map(d => ADDigest @@ d.data)
 
-  def leafsIterator() = store.getAll().filter { case (_, v) => v.data.head == LeafPrefix }
+  def leafsIterator(): Iterator[(K, V)] = store.getAll().filter { case (_, v) => v.data.head == LeafPrefix }
 
   private def serializedVisitedNodes(node: ProverNodes[D]): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
     if (node.isNew) {
