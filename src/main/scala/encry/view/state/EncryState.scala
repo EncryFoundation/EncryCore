@@ -26,15 +26,9 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 
   // Extracts `state changes` from the given sequence of transactions.
   def getAllStateChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
-    // Use neither `.filter` nor any validity checks here!
-    // This method should be invoked when all txs are already validated.
     EncryBoxStateChanges(
       txs.flatMap { tx =>
-        tx match {
-          case tx: EncryBaseTransaction =>
-            tx.unlockers.map(u => Removal(u.boxId)) ++
-              tx.newBoxes.map(bx => Insertion(bx))
-        }
+        tx.unlockers.map(u => Removal(u.boxId)) ++ tx.newBoxes.map(bx => Insertion(bx))
       }
     )
   }

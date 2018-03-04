@@ -19,8 +19,6 @@ import scorex.core.utils.ScorexLogging
 import scorex.core.{ModifierId, VersionTag}
 import scorex.crypto.authds.ADKey
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.util.Try
 
 class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
@@ -92,7 +90,7 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
                            newBxs: Seq[EncryBaseBox],
                            newOpenBxs: Seq[EncryBaseBox],
                            spentBxsIds: Seq[ADKey],
-                           spentOpenBxsIds: Seq[ADKey]): Future[Unit] = Future {
+                           spentOpenBxsIds: Seq[ADKey]): Unit = {
 
     import WalletStorage._
 

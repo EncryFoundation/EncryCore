@@ -124,7 +124,6 @@ class EncryMiner(viewHolderRef: ActorRef,
         pool.removeAsync(txsToDrop)
 
         // TODO: Which PubK should we pick here?
-        // TODO: Replace usage of `scorex.PrivateKey25519` with its custom implementation.
         val minerSecret = vault.keyManager.keys.head
 
         val openBxs: IndexedSeq[AmountCarryingBox] = txsToPut.foldLeft(IndexedSeq[OpenBox]())((buff, tx) =>
