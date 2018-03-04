@@ -5,8 +5,8 @@ import encry.api.http.routes.{AccountInfoApiRoute, HistoryApiRoute, InfoApiRoute
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator.StartGeneration
-import encry.local.mining.EncryMiner
 import encry.local.mining.EncryMiner.StartMining
+import encry.local.mining.EncryMinerRef
 import encry.local.{EncryLocalInterfaceRef, TransactionGenerator}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
@@ -45,8 +45,7 @@ class EncryApp(args: Seq[String]) extends Application {
 
   val readersHolderRef: ActorRef = actorSystem.actorOf(Props(classOf[EncryViewReadersHolder], nodeViewHolderRef))
 
-  val minerRef: ActorRef =
-    actorSystem.actorOf(Props(classOf[EncryMiner], nodeViewHolderRef, encrySettings, nodeId, timeProvider))
+  val minerRef: ActorRef = EncryMinerRef(encrySettings, nodeViewHolderRef, nodeId, timeProvider)
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
 

@@ -35,7 +35,6 @@ object TransactionFactory {
   }
 
   def coinbaseTransaction(privKey: PrivateKey25519,
-                          fee: Amount,
                           timestamp: Long,
                           useBoxes: Seq[AmountCarryingBox],
                           height: Height): EncryTransaction = {
@@ -52,9 +51,9 @@ object TransactionFactory {
     }
 
 
-    val signature = privKey.sign(EncryTransaction.getMessageToSign(pubKey, fee, timestamp, unlockers, directives))
+    val signature = privKey.sign(EncryTransaction.getMessageToSign(pubKey, 0, timestamp, unlockers, directives))
 
-    EncryTransaction(pubKey, fee, timestamp, signature, unlockers, directives)
+    EncryTransaction(pubKey, 0, timestamp, signature, unlockers, directives)
   }
 
   def addPubKeyInfoTransaction(privKey: PrivateKey25519,

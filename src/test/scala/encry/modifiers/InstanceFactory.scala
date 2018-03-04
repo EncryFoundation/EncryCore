@@ -33,7 +33,7 @@ object InstanceFactory {
 
   val coinbaseTransaction: EncryTransaction = {
     val useBoxes = IndexedSeq(genHelper.genAssetBox(secret.publicImage.address))
-    TransactionFactory.coinbaseTransaction(secret, 0, timestamp, useBoxes, Height @@ 0)
+    TransactionFactory.coinbaseTransaction(secret, timestamp, useBoxes, Height @@ 0)
   }
 
   def addPubKeyInfoTransaction: EncryTransaction = {

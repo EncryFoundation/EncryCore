@@ -1,6 +1,6 @@
 package encry.local.mining
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, ActorRef, ActorRefFactory, Props}
 import akka.pattern._
 import akka.util.Timeout
 import encry.consensus.{PowCandidateBlock, PowConsensus}
@@ -26,8 +26,8 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Try}
 
-class EncryMiner(viewHolderRef: ActorRef,
-                 settings: EncryAppSettings,
+class EncryMiner(settings: EncryAppSettings,
+                 viewHolderRef: ActorRef,
                  nodeId: Array[Byte],
                  timeProvider: NetworkTimeProvider) extends Actor with ScorexLogging {
 
@@ -123,19 +123,18 @@ class EncryMiner(viewHolderRef: ActorRef,
         // Remove stateful-invalid txs from mempool.
         pool.removeAsync(txsToDrop)
 
-        // TODO: Which PubK should we pick here?
+        // TODO: Add ability to select key.
         val minerSecret = vault.keyManager.keys.head
 
         val openBxs: IndexedSeq[AmountCarryingBox] = txsToPut.foldLeft(IndexedSeq[OpenBox]())((buff, tx) =>
-          buff ++ tx.newBoxes.foldLeft(IndexedSeq[OpenBox]()) { case (buff2, bx) =>
+          buff ++ tx.newBoxes.foldLeft(IndexedSeq[OpenBox]()) { case (acc, bx) =>
             bx match {
-              case obx: OpenBox => buff2 :+ obx
-              case _ => buff2
+              case obx: OpenBox => acc :+ obx
+              case _ => acc
             }
           }) ++ vault.getAvailableCoinbaseBoxesAt(state.height)
 
-        // TODO: Remove fee from `coinbaseTransaction()` args.
-        val coinbase = TransactionFactory.coinbaseTransaction(minerSecret, 0, timestamp, openBxs, height)
+        val coinbase = TransactionFactory.coinbaseTransaction(minerSecret, timestamp, openBxs, height)
 
         val txs = txsToPut.sortBy(_.timestamp) :+ coinbase
 
@@ -179,4 +178,28 @@ object EncryMiner extends ScorexLogging {
       "candidateBlock" -> candidateBlock.map(_.json).getOrElse("None".asJson)
     ).asJson
   }
+}
+
+object EncryMinerRef {
+
+  def props(settings: EncryAppSettings,
+            viewHolderRef: ActorRef,
+            nodeId: Array[Byte],
+            timeProvider: NetworkTimeProvider): Props =
+    Props(new EncryMiner(settings, viewHolderRef, nodeId, timeProvider))
+
+  def apply(settings: EncryAppSettings,
+            viewHolderRef: ActorRef,
+            nodeId: Array[Byte],
+            timeProvider: NetworkTimeProvider)
+           (implicit context: ActorRefFactory): ActorRef =
+    context.actorOf(props(settings, viewHolderRef, nodeId, timeProvider))
+
+  def apply(settings: EncryAppSettings,
+            viewHolderRef: ActorRef,
+            nodeId: Array[Byte],
+            timeProvider: NetworkTimeProvider,
+            name: String)
+           (implicit context: ActorRefFactory): ActorRef =
+    context.actorOf(props(settings, viewHolderRef, nodeId, timeProvider), name)
 }
