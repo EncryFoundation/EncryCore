@@ -120,7 +120,7 @@ case class KeyManager(store: LSMStore,
     * @return
     */
   def unlock(key: Array[Byte] = passwdBytes.getOrElse(Array[Byte]())): Unit = {
-    updateKey(KeyManager.seedKey ,decryptAES(key))
+    updateKey(KeyManager.seedKey, decryptAES(key))
     updateKey(KeyManager.lockKey, KeyManager.unlockFlag)
   }
 
@@ -129,9 +129,9 @@ case class KeyManager(store: LSMStore,
     */
   def lock(key: Array[Byte] = passwdBytes.getOrElse(Array[Byte]())): Unit = {
     val (encryptSeed, iv, salt) = encryptAES(key)
-    updateKey(KeyManager.seedKey ,encryptSeed)
-    updateKey(KeyManager.ivKey ,iv)
-    updateKey(KeyManager.saltKey ,salt)
+    updateKey(KeyManager.seedKey, encryptSeed)
+    updateKey(KeyManager.ivKey, iv)
+    updateKey(KeyManager.saltKey, salt)
     updateKey(KeyManager.lockKey, KeyManager.lockFlag)
   }
 
@@ -257,7 +257,7 @@ object KeyManager extends ScorexLogging {
 
     if (keyManager.keys.isEmpty) {
       keyManager.initStorage(seed)
-      if (settings.keyManagerSettings.lock && !keyManager.isLocked) {
+      if (settings.keyManagerSettings.encryption && !keyManager.isLocked) {
         keyManager.lock()
       }
     }

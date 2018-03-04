@@ -1,4 +1,3 @@
 package encry.settings
 
-case class KeyManagerSettings(lock: Boolean,
-                              cypherAlgorithm: String)
+case class KeyManagerSettings(encryption: Boolean)
