@@ -36,39 +36,6 @@ trait UtxoStateReader extends StateReader with ScorexLogging {
       case _ => None
     }
 
-//  def getAvailableOpenBoxesAt(height: Height): Seq[OpenBox] =
-//    boxesByAddress(StateIndexManager.openBoxesAddress)
-//      .map(bxs => bxs.filter(bx => bx.isInstanceOf[OpenBox] &&
-//        bx.asInstanceOf[OpenBox].proposition.height <= height)
-//        .map(_.asInstanceOf[OpenBox])).getOrElse(Seq())
-
-//  def getOpenBoxIdsAtHeight(height: Height): Seq[ADKey] =
-//    boxIdsByAddress(StateIndexManager.openBoxesAddress).getOrElse(Seq())
-
   def getRandomBox: Option[EncryBaseBox] =
     persistentProver.avlProver.randomWalk().map(_._1).flatMap(boxById)
-
-//  def boxesByAddress(address: Address): Option[Seq[EncryBaseBox]] =
-//    boxIdsByAddress(address) match {
-//      case Some(bxIds) =>
-//        val bxs = bxIds.foldLeft(Seq[EncryBaseBox]()) { case (buff, id) =>
-//          boxById(id) match {
-//            case Some(bx) =>
-//              buff :+ bx
-//            case None =>
-//              log.warn(s"Box: ${Algos.encode(id)} exists in index, but was not found in state.")
-//              buff
-//          }
-//        }
-//        if (bxs.nonEmpty) Some(bxs) else None
-//      case _ => None
-//    }
-
-//  def portfolioByAddress(address: Address): Option[Portfolio] =
-//    boxesByAddress(address) match {
-//      case Some(bxs) =>
-//        Some(Portfolio(address,
-//          Balance @@ bxs.filter(_.isInstanceOf[AssetBox]).map(_.asInstanceOf[AssetBox].amount).sum, bxs))
-//      case _ => None
-//    }
 }
