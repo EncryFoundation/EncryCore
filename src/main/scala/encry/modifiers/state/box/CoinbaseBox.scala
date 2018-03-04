@@ -55,9 +55,9 @@ object CoinbaseBoxSerializer extends SizedCompanionSerializer[CoinbaseBox] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[CoinbaseBox] = Try {
-    val proposition = HeightPropositionSerializer.parseBytes(bytes.slice(0, 4)).get
-    val nonce = Longs.fromByteArray(bytes.slice(Size, Size + 8))
-    val amount = Longs.fromByteArray(bytes.slice(Size + 8, Size + 16))
+    val proposition = HeightPropositionSerializer.parseBytes(bytes.slice(0, HeightPropositionSerializer.Size)).get
+    val nonce = Longs.fromByteArray(bytes.slice(HeightPropositionSerializer.Size, HeightPropositionSerializer.Size + 8))
+    val amount = Longs.fromByteArray(bytes.slice(HeightPropositionSerializer.Size + 8, HeightPropositionSerializer.Size + 16))
     CoinbaseBox(proposition, nonce, amount)
   }
 }

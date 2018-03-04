@@ -178,7 +178,7 @@ object EncryHistory {
 
     val ns = settings.nodeSettings
 
-    val history: EncryHistory = (ns.ADState, ns.verifyTransactions) match {
+    val history: EncryHistory = (ns.stateMode.isDigest, ns.verifyTransactions) match {
       case (true, true) =>
         new EncryHistory with ADStateProofProcessor with BlockPayloadProcessor {
           override protected val nodeSettings: NodeSettings = ns

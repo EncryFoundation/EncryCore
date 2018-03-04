@@ -3,6 +3,7 @@ package encry.modifiers.mempool.directive
 import com.google.common.primitives.{Ints, Longs}
 import encry.modifiers.mempool.directive.Directive.DirTypeId
 import encry.modifiers.state.box.EncryBaseBox
+import encry.settings.Constants
 import encry.view.history.Height
 import encry.view.state.UtxoState
 import io.circe.Json
@@ -27,7 +28,7 @@ case class CoinbaseDirective(height: Height) extends Directive {
 
   override val cost: Amount = 0
 
-  override val isValid: Boolean = height > 0
+  override val isValid: Boolean = height > Constants.Chain.preGenesisHeight
 
   override def serializer: Serializer[M] = CoinbaseDirectiveSerializer
 

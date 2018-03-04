@@ -4,6 +4,7 @@ import encry.settings.EncryAppSettings
 import akka.actor.{Actor, ActorRef, Props}
 import encry.consensus.{PowCandidateBlock, PowConsensus}
 import encry.local.mining.EncryMiningWorker.MineBlock
+import encry.view.state.StateMode
 import scorex.core.LocalInterface.LocallyGeneratedModifier
 import scorex.core.utils.ScorexLogging
 
@@ -34,7 +35,7 @@ class EncryMiningWorker(settings: EncryAppSettings,
 
           viewHolderRef ! LocallyGeneratedModifier(block.header)
           viewHolderRef ! LocallyGeneratedModifier(block.payload)
-          if (settings.nodeSettings.ADState) {
+          if (settings.nodeSettings.stateMode == StateMode.Digest) {
             block.adProofsOpt.foreach { adp =>
               viewHolderRef ! LocallyGeneratedModifier(adp)
             }

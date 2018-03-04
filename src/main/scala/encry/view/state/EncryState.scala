@@ -97,7 +97,7 @@ object EncryState extends ScorexLogging{
     val stateDir = getStateDir(settings)
     stateDir.mkdirs()
 
-    if (settings.nodeSettings.ADState) {
+    if (settings.nodeSettings.stateMode.isDigest) {
       DigestState.create(None, None, stateDir, settings.nodeSettings)
     } else if (stateDir.listFiles().isEmpty) {
       EncryState.generateGenesisUtxoState(stateDir, nodeViewHolderRef)._1

@@ -169,7 +169,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
   }
 
   private def toDownload(h: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] = {
-    (nodeSettings.verifyTransactions, nodeSettings.ADState) match {
+    (nodeSettings.verifyTransactions, nodeSettings.stateMode.isDigest) match {
       case (true, true) =>
         Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId))
       case (true, false) =>

@@ -6,6 +6,10 @@ sealed trait StateMode {
 
   def verboseName: String
 
+  def isDigest: Boolean = this == StateMode.Digest
+
+  def isUtxo: Boolean = !isDigest
+
   override def toString: String = verboseName
 }
 

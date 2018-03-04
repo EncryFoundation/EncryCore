@@ -50,6 +50,8 @@ object Constants {
 
     val genesisHeight: Height = Height @@ 1
 
+    val preGenesisHeight: Height = Height @@ (genesisHeight - 1)
+
     val maxRollback: Long = 600.days.toMillis / desiredBlockInterval.toMillis
 
     val maxTimeDrift: Long = 10 * desiredBlockInterval.toMillis

@@ -7,7 +7,7 @@ import encry.consensus.{PowCandidateBlock, PowConsensus}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryBaseTransaction, TransactionFactory}
-import encry.modifiers.state.box.OpenBox
+import encry.modifiers.state.box.{AmountCarryingBox, OpenBox}
 import encry.settings.{Constants, EncryAppSettings}
 import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
@@ -127,13 +127,13 @@ class EncryMiner(viewHolderRef: ActorRef,
         // TODO: Replace usage of `scorex.PrivateKey25519` with its custom implementation.
         val minerSecret = vault.keyManager.keys.head
 
-        val openBxs: IndexedSeq[OpenBox] = txsToPut.foldLeft(IndexedSeq[OpenBox]())((buff, tx) =>
+        val openBxs: IndexedSeq[AmountCarryingBox] = txsToPut.foldLeft(IndexedSeq[OpenBox]())((buff, tx) =>
           buff ++ tx.newBoxes.foldLeft(IndexedSeq[OpenBox]()) { case (buff2, bx) =>
             bx match {
               case obx: OpenBox => buff2 :+ obx
               case _ => buff2
             }
-          })/* ++ state.getAvailableOpenBoxesAt(state.height) */ // TODO: Substitute this functionality.
+          }) ++ vault.getAvailableCoinbaseBoxesAt(state.height)
 
         // TODO: Remove fee from `coinbaseTransaction()` args.
         val coinbase = TransactionFactory.coinbaseTransaction(minerSecret, 0, timestamp, openBxs, height)

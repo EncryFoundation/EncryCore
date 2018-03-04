@@ -56,7 +56,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
 
     val state = {
-      if (settings.nodeSettings.ADState) EncryState.generateGenesisDigestState(stateDir, settings.nodeSettings)
+      if (settings.nodeSettings.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings.nodeSettings)
       else EncryState.generateGenesisUtxoState(stateDir, Some(self))._1
     }.asInstanceOf[MS]
 
@@ -89,7 +89,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
 
     {
       (version, digest) match {
-        case (Some(_), Some(_)) if settings.nodeSettings.ADState =>
+        case (Some(_), Some(_)) if settings.nodeSettings.stateMode.isDigest =>
           DigestState.create(version, digest, dir, settings.nodeSettings)
         case _ =>
           EncryState.readOrGenerate(settings, Some(self))
@@ -144,7 +144,7 @@ private[view] class UtxoEncryNodeViewHolder(settings: EncryAppSettings, timeProv
 
 object EncryNodeViewHolder {
   def createActor(system: ActorSystem, settings: EncryAppSettings, timeProvider: NetworkTimeProvider): ActorRef = {
-    if (settings.nodeSettings.ADState) system.actorOf(Props.create(classOf[DigestEncryNodeViewHolder], settings, timeProvider))
+    if (settings.nodeSettings.stateMode.isDigest) system.actorOf(Props.create(classOf[DigestEncryNodeViewHolder], settings, timeProvider))
     else system.actorOf(Props.create(classOf[UtxoEncryNodeViewHolder], settings, timeProvider))
   }
 }

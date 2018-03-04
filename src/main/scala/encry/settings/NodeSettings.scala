@@ -18,7 +18,7 @@ case class NodeSettings(stateMode: StateMode,
                         mempoolCleanupInterval: FiniteDuration,
                         mempoolMaxCapacity: Int)
 
-object NodeSettingsReader {
+trait NodeSettingsReader {
 
   implicit val nodeSettingsReader: ValueReader[NodeSettings] = { (cfg, path) =>
     val stateModeKey = s"$path.stateMode"

@@ -81,8 +81,6 @@ class UtxoState(override val version: VersionTag,
         val proofBytes = persistentProver.generateProofAndUpdateStorage(md)
         val proofHash = ADProofs.proofDigest(proofBytes)
 
-        println(s"Applying ${block.header.height}. Current state height is: $height")
-
         if (block.adProofsOpt.isEmpty) onAdProofGenerated(ADProofs(block.header.id, proofBytes))
         log.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with " +
           s"root hash ${Algos.encode(rootHash)}")
@@ -218,7 +216,7 @@ object UtxoState extends ScorexLogging {
     val stateVersion = stateStore.get(ByteArrayWrapper(bestVersionKey))
       .map(_.data).getOrElse(EncryState.genesisStateVersion)
     val stateHeight = stateStore.get(ByteArrayWrapper(bestHeightKey))
-      .map(d => Ints.fromByteArray(d.data)).getOrElse(Constants.Chain.genesisHeight)
+      .map(d => Ints.fromByteArray(d.data)).getOrElse(Constants.Chain.preGenesisHeight)
     new UtxoState(VersionTag @@ stateVersion, Height @@ stateHeight, stateStore, nodeViewHolderRef)
   }
 
@@ -239,10 +237,10 @@ object UtxoState extends ScorexLogging {
 
     log.info(s"Generating UTXO State from BH with ${bh.boxes.size} boxes")
 
-    new UtxoState(EncryState.genesisStateVersion, Constants.Chain.genesisHeight, stateStore, nodeViewHolderRef) {
+    new UtxoState(EncryState.genesisStateVersion, Constants.Chain.preGenesisHeight, stateStore, nodeViewHolderRef) {
       override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
         PersistentBatchAVLProver.create(
-          p, storage, metadata(EncryState.genesisStateVersion, p.digest, Constants.Chain.genesisHeight), paranoidChecks = true
+          p, storage, metadata(EncryState.genesisStateVersion, p.digest, Constants.Chain.preGenesisHeight), paranoidChecks = true
         ).get.ensuring(_.digest sameElements storage.version.get)
     }
   }

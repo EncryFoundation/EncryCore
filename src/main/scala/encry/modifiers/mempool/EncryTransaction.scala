@@ -43,7 +43,7 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
     "fee" -> fee.asJson,
     "timestamp" -> timestamp.asJson,
     "signature" -> Algos.encode(signature.signature).asJson,
-    "inputs" -> unlockers.map(_.json).asJson,
+    "unlockers" -> unlockers.map(_.json).asJson,
     "directives" -> directives.map(_.json).asJson
   ).asJson
 

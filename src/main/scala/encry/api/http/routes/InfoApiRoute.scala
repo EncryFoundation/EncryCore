@@ -39,7 +39,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
 
   private def getConnectedPeers: Future[Int] = (peerManager ? PeerManager.GetConnectedPeers).mapTo[Seq[Handshake]].map(_.size)
 
-  private def getStateType: String = if (appSettings.nodeSettings.ADState) "digest" else "utxo"
+  private def getStateType: String = appSettings.nodeSettings.stateMode.verboseName
 
   private def getNodeName: String = appSettings.scorexSettings.network.nodeName
 

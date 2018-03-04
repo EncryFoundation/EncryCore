@@ -15,7 +15,8 @@ case class EncryAppSettings(directory: String,
                             keyManagerSettings: KeyManagerSettings,
                             scorexSettings: ScorexSettings)
 
-object EncryAppSettings extends ScorexLogging with SettingsReaders {
+object EncryAppSettings
+  extends ScorexLogging with SettingsReaders with NodeSettingsReader {
 
   val configPath: String = "encry"
   val scorexConfigPath: String = "scorex"
