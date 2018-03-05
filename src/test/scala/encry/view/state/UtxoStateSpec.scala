@@ -46,14 +46,14 @@ class UtxoStateSpec extends PropSpec with Matchers {
 
     val validTxs = keys.zip(bxs).map { case (k, bx) =>
       val useBoxes = IndexedSeq(bx)
-      TransactionFactory.defaultPaymentTransaction(k, fee,
+      TransactionFactory.defaultPaymentTransactionScratch(k, fee,
         timestamp, useBoxes, factory.Props.recipientAddr, factory.Props.boxValue - 100)
     }
 
     val invalidTxs = keys.map { k =>
       val useBoxes =
         IndexedSeq(factory.genAssetBox(Address @@ "4iGUxZy1uy9m1xsEL26VuUZ8Q23W961PPvDTPW3t2jXuCJCPuy"))
-      TransactionFactory.defaultPaymentTransaction(k, fee,
+      TransactionFactory.defaultPaymentTransactionScratch(k, fee,
         timestamp, useBoxes, factory.Props.recipientAddr, 3000000L)
     }
 

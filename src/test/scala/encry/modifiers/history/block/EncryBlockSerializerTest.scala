@@ -41,7 +41,7 @@ class EncryBlockSerializerTest extends FunSuite {
 
     val txs = keys.map { k =>
       val useBoxes = IndexedSeq(factory.genAssetBox(k.publicImage.address))
-      TransactionFactory.defaultPaymentTransaction(k, fee,
+      TransactionFactory.defaultPaymentTransactionScratch(k, fee,
         timestamp, useBoxes, factory.Props.recipientAddr, factory.Props.boxValue)
     }
 

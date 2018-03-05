@@ -47,9 +47,9 @@ object AddPubKeyInfo extends Command {
           val timestamp = System.currentTimeMillis() // TODO: Use NTP.
           val boxes = view.vault.walletStorage.allBoxes.filter(_.isInstanceOf[AssetBox]).map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) {
             case (seq, box) => if (seq.map(_.amount).sum < fee) seq :+ box else seq
-          }
+          }.toIndexedSeq
 
-          val tx = TransactionFactory.addPubKeyInfoTransaction(secret, fee, timestamp,
+          val tx = TransactionFactory.addPubKeyInfoTransactionScratch(secret, fee, timestamp,
             boxes, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
 
           nodeViewHolderRef ! LocallyGeneratedTransaction[Proposition, EncryTransaction](tx)

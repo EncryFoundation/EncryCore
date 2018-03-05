@@ -43,9 +43,9 @@ object Transfer extends Command {
           val timestamp = System.currentTimeMillis()  // TODO: Use NTP.
           val boxes = view.vault.walletStorage.allBoxes.filter(_.isInstanceOf[AssetBox]).map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) {
             case (seq, box) => if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
-          }
+          }.toIndexedSeq
 
-          val tx = TransactionFactory.defaultPaymentTransaction(secret, fee, timestamp, boxes, recipient, amount)
+          val tx = TransactionFactory.defaultPaymentTransactionScratch(secret, fee, timestamp, boxes, recipient, amount)
 
           nodeViewHolderRef ! LocallyGeneratedTransaction[Proposition, EncryTransaction](tx)
 

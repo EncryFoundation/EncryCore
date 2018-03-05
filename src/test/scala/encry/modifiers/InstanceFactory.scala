@@ -20,20 +20,20 @@ object InstanceFactory {
     val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address),
       genHelper.genAssetBox(publicKey.address))
 
-    TransactionFactory.defaultPaymentTransaction(secret, fee, timestamp, useBoxes,
+    TransactionFactory.defaultPaymentTransactionScratch(secret, fee, timestamp, useBoxes,
       publicKey.address, genHelper.Props.txAmount)
   }
 
   def paymentTransactionInvalid: EncryTransaction = {
     val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address))
 
-    TransactionFactory.defaultPaymentTransaction(secret, -100, timestamp, useBoxes,
+    TransactionFactory.defaultPaymentTransactionScratch(secret, -100, timestamp, useBoxes,
       genHelper.Props.recipientAddr, genHelper.Props.txAmount)
   }
 
   val coinbaseTransaction: EncryTransaction = {
     val useBoxes = IndexedSeq(genHelper.genAssetBox(secret.publicImage.address))
-    TransactionFactory.coinbaseTransaction(secret, timestamp, useBoxes, Height @@ 0)
+    TransactionFactory.coinbaseTransactionScratch(secret, timestamp, useBoxes, Height @@ 0)
   }
 
   def addPubKeyInfoTransaction: EncryTransaction = {
@@ -45,7 +45,7 @@ object InstanceFactory {
     val pubKeyInfoBytes = Random.randomBytes(40)
     val pubKeyTypeId = 99.toByte
 
-    TransactionFactory.addPubKeyInfoTransaction(
+    TransactionFactory.addPubKeyInfoTransactionScratch(
       secret, fee, timestamp, useBoxes, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
   }
 

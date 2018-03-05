@@ -1,21 +1,23 @@
 package encry.modifiers.mempool
 
 import encry.account.Address
-import encry.crypto.PrivateKey25519
+import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.modifiers.mempool.directive.{AddPubKeyInfoDirective, CoinbaseDirective, TransferDirective}
 import encry.modifiers.state.box.AmountCarryingBox
+import encry.modifiers.state.box.proof.Signature25519
 import encry.view.history.Height
 import scorex.core.transaction.box.Box.Amount
+import scorex.crypto.authds.ADKey
 import scorex.crypto.signatures.{PublicKey, Signature}
 
 object TransactionFactory {
 
-  def defaultPaymentTransaction(privKey: PrivateKey25519,
-                                fee: Amount,
-                                timestamp: Long,
-                                useBoxes: Seq[AmountCarryingBox],
-                                recipient: Address,
-                                amount: Amount): EncryTransaction = {
+  def defaultPaymentTransactionScratch(privKey: PrivateKey25519,
+                                       fee: Amount,
+                                       timestamp: Long,
+                                       useBoxes: IndexedSeq[AmountCarryingBox],
+                                       recipient: Address,
+                                       amount: Amount): EncryTransaction = {
 
     val pubKey = privKey.publicImage
 
@@ -34,10 +36,30 @@ object TransactionFactory {
     EncryTransaction(pubKey, fee, timestamp, signature, unlockers, directives)
   }
 
-  def coinbaseTransaction(privKey: PrivateKey25519,
-                          timestamp: Long,
-                          useBoxes: Seq[AmountCarryingBox],
-                          height: Height): EncryTransaction = {
+  def defaultPaymentTransaction(accPubKey: PublicKey25519,
+                                signature: Signature25519,
+                                fee: Amount,
+                                change: Amount,
+                                timestamp: Long,
+                                useBoxesIds: IndexedSeq[ADKey],
+                                recipient: Address,
+                                amount: Amount): EncryTransaction = {
+
+    val unlockers = useBoxesIds.map(id => Unlocker(id, None)).toIndexedSeq
+
+    val directives = if (change > 0) {
+      IndexedSeq(TransferDirective(recipient, amount, 0), TransferDirective(accPubKey.address, change, 1))
+    } else {
+      IndexedSeq(TransferDirective(recipient, amount, 0))
+    }
+
+    EncryTransaction(accPubKey, fee, timestamp, signature, unlockers, directives)
+  }
+
+  def coinbaseTransactionScratch(privKey: PrivateKey25519,
+                                 timestamp: Long,
+                                 useBoxes: Seq[AmountCarryingBox],
+                                 height: Height): EncryTransaction = {
 
     val pubKey = privKey.publicImage
 
@@ -56,14 +78,14 @@ object TransactionFactory {
     EncryTransaction(pubKey, 0, timestamp, signature, unlockers, directives)
   }
 
-  def addPubKeyInfoTransaction(privKey: PrivateKey25519,
-                               fee: Amount,
-                               timestamp: Long,
-                               useBoxes: Seq[AmountCarryingBox],
-                               pubKeyBytes: PublicKey,
-                               pubKeyProofBytes: Signature,
-                               pubKeyInfoBytes: Array[Byte],
-                               pubKeyTypeId: Byte): EncryTransaction = {
+  def addPubKeyInfoTransactionScratch(privKey: PrivateKey25519,
+                                      fee: Amount,
+                                      timestamp: Long,
+                                      useBoxes: IndexedSeq[AmountCarryingBox],
+                                      pubKeyBytes: PublicKey,
+                                      pubKeyProofBytes: Signature,
+                                      pubKeyInfoBytes: Array[Byte],
+                                      pubKeyTypeId: Byte): EncryTransaction = {
 
     val pubKey = privKey.publicImage
 
@@ -83,6 +105,31 @@ object TransactionFactory {
     val signature = privKey.sign(EncryTransaction.getMessageToSign(pubKey, fee, timestamp, unlockers, directives))
 
     EncryTransaction(pubKey, fee, timestamp, signature, unlockers, directives)
+  }
+
+  def addPubKeyInfoTransaction(accPubKey: PublicKey25519,
+                               signature: Signature25519,
+                               fee: Amount,
+                               change: Amount,
+                               timestamp: Long,
+                               useBoxesIds: IndexedSeq[ADKey],
+                               pubKeyBytes: PublicKey,
+                               pubKeyProofBytes: Signature,
+                               pubKeyInfoBytes: Array[Byte],
+                               pubKeyTypeId: Byte): EncryTransaction = {
+
+    val unlockers = useBoxesIds.map(id => Unlocker(id, None)).toIndexedSeq
+
+    val directives = if (change > 0) {
+      IndexedSeq(
+        AddPubKeyInfoDirective(accPubKey.address, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId, 0),
+        TransferDirective(accPubKey.address, change, 1))
+    } else {
+      IndexedSeq(
+        AddPubKeyInfoDirective(accPubKey.address, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId, 0))
+    }
+
+    EncryTransaction(accPubKey, fee, timestamp, signature, unlockers, directives)
   }
 
 }

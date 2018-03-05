@@ -134,7 +134,7 @@ class EncryMiner(settings: EncryAppSettings,
             }
           }) ++ vault.getAvailableCoinbaseBoxesAt(state.height)
 
-        val coinbase = TransactionFactory.coinbaseTransaction(minerSecret, timestamp, openBxs, height)
+        val coinbase = TransactionFactory.coinbaseTransactionScratch(minerSecret, timestamp, openBxs, height)
 
         val txs = txsToPut.sortBy(_.timestamp) :+ coinbase
 

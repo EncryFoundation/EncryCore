@@ -62,7 +62,7 @@ class WalletSpec extends PropSpec with Matchers{
 
     val validTxs = keys.zip(bxs).map { case (k, bx) =>
       val useBoxes = IndexedSeq(bx)
-      TransactionFactory.defaultPaymentTransaction(k, fee,
+      TransactionFactory.defaultPaymentTransactionScratch(k, fee,
         timestamp, useBoxes, factory.Props.recipientAddr, factory.Props.boxValue - 100)
     }.slice(0, 4)
 
