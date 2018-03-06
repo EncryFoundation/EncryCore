@@ -7,6 +7,7 @@ import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator.StartGeneration
 import encry.local.miner.EncryMiner.StartMining
 import encry.local.miner.EncryMinerRef
+import encry.local.scanner.EncryScannerRef
 import encry.local.{EncryLocalInterfaceRef, TransactionGenerator}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
@@ -46,6 +47,8 @@ class EncryApp(args: Seq[String]) extends Application {
   val readersHolderRef: ActorRef = actorSystem.actorOf(Props(classOf[EncryViewReadersHolder], nodeViewHolderRef))
 
   val minerRef: ActorRef = EncryMinerRef(encrySettings, nodeViewHolderRef, nodeId, timeProvider)
+
+  val scannerRef: ActorRef = EncryScannerRef(encrySettings, nodeViewHolderRef)
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
 
