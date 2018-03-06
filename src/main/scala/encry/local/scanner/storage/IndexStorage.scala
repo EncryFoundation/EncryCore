@@ -1,7 +1,7 @@
 package encry.local.scanner.storage
 
 import encry.settings.Algos
-import encry.view.EncryBaseStorage
+import encry.storage.EncryBaseStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.crypto.authds.ADKey

@@ -5,7 +5,7 @@ import encry.modifiers.mempool.{EncryTransaction, EncryTransactionSerializer}
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
 import encry.settings.Algos
-import encry.view.EncryBaseStorage
+import encry.storage.EncryBaseStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.core.ModifierId
 import scorex.crypto.authds.ADKey
@@ -17,11 +17,6 @@ class WalletStorage(val store: Store, val publicKeys: Set[PublicKey25519])
 
   import WalletStorage._
 
-  def updateWithReplacement(id: ModifierId,
-                            idsToReplace: Seq[ByteArrayWrapper],
-                            toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit =
-    updateWithReplacement(ByteArrayWrapper(id), idsToReplace, toInsert)
-
   def packBoxIds(ids: Seq[ADKey]): ByteArrayWrapper =
     ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
 
@@ -29,15 +24,15 @@ class WalletStorage(val store: Store, val publicKeys: Set[PublicKey25519])
     ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
 
   def boxIds: Seq[ADKey] =
-    parseComplexValue(boxIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
+    readComplexValue(boxIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
 
   def openBoxIds: Seq[ADKey] =
-    parseComplexValue(openBoxesIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
+    readComplexValue(openBoxesIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
 
   def transactionIds: Seq[ModifierId] =
-    parseComplexValue(transactionIdsKey, 32).map(ModifierId @@ _).getOrElse(Seq())
+    readComplexValue(transactionIdsKey, 32).map(ModifierId @@ _).getOrElse(Seq())
 
-  def getBoxById(id: ADKey): Option[EncryBaseBox] = store.get(boxKeyById(id))
+  def getBoxById(id: ADKey): Option[EncryBaseBox] = store.get(keyByBoxId(id))
     .flatMap(d => StateModifierDeserializer.parseBytes(d.data, id.head).toOption)
 
   def allBoxes: Seq[EncryBaseBox] =
@@ -60,7 +55,7 @@ object WalletStorage {
 
   val balanceKey = ByteArrayWrapper(Algos.hash("account_balance"))
 
-  def boxKeyById(id: ADKey): ByteArrayWrapper = ByteArrayWrapper(id)
+  def keyByBoxId(id: ADKey): ByteArrayWrapper = ByteArrayWrapper(id)
 
   def txKeyById(id: ModifierId): ByteArrayWrapper = ByteArrayWrapper(id)
 }

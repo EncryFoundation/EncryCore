@@ -122,15 +122,14 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
       !spentBxsIds.exists(_ sameElements bx.id))).foldLeft(0L)(_ + _.amount) +
         filterAcbxs(bxsToInsert).foldLeft(0L)(_ + _.amount)))
 
-    val toRemoveSummary =
-      (spentBxsIds ++ spentOpenBxsIds).map(boxKeyById) ++ Seq(balanceKey, transactionIdsKey, boxIdsKey)
+    val toRemoveSummary = (spentBxsIds ++ spentOpenBxsIds).map(keyByBoxId)
     val toInsertSummary =
       Seq(transactionIdsKey -> txIdsToInsertRaw, boxIdsKey -> bxIdsPacked,
         openBoxesIdsKey -> openBxIdsPacked, balanceKey -> newBalanceRaw) ++
-        (bxsToInsert ++ openBxsToInsert).map(bx => boxKeyById(bx.id) -> ByteArrayWrapper(bx.bytes)) ++
+        (bxsToInsert ++ openBxsToInsert).map(bx => keyByBoxId(bx.id) -> ByteArrayWrapper(bx.bytes)) ++
         newTxs.map(tx => txKeyById(tx.id) -> ByteArrayWrapper(tx.bytes))
 
-    walletStorage.updateWithReplacement(modifierId, toRemoveSummary, toInsertSummary)
+    walletStorage.update(ByteArrayWrapper(modifierId), toRemoveSummary, toInsertSummary)
   }
 }
 
