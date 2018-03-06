@@ -1,9 +1,9 @@
-package encry.local.mining
+package encry.local.miner
 
 import encry.settings.EncryAppSettings
 import akka.actor.{Actor, ActorRef, Props}
 import encry.consensus.{PowCandidateBlock, PowConsensus}
-import encry.local.mining.EncryMiningWorker.MineBlock
+import encry.local.miner.EncryMiningWorker.MineBlock
 import encry.view.state.StateMode
 import scorex.core.LocalInterface.LocallyGeneratedModifier
 import scorex.core.utils.ScorexLogging

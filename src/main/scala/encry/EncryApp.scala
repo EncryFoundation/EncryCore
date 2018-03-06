@@ -5,8 +5,8 @@ import encry.api.http.routes.{AccountInfoApiRoute, HistoryApiRoute, InfoApiRoute
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator.StartGeneration
-import encry.local.mining.EncryMiner.StartMining
-import encry.local.mining.EncryMinerRef
+import encry.local.miner.EncryMiner.StartMining
+import encry.local.miner.EncryMinerRef
 import encry.local.{EncryLocalInterfaceRef, TransactionGenerator}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction

@@ -3,7 +3,7 @@ package encry.api.http.routes
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.local.mining.EncryMiner.{MiningStatusRequest, MiningStatusResponse}
+import encry.local.miner.EncryMiner.{MiningStatusRequest, MiningStatusResponse}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.settings.EncryAppSettings
