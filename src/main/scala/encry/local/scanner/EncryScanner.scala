@@ -20,4 +20,17 @@ class EncryScanner(settings: EncryAppSettings,
   }
 
   override def receive: Receive = ???
+
+//  private def scanPersistent(mod: EncryPersistentModifier): Unit = {
+//
+//    def scanTransactions(txs: Traversable[EncryBaseTransaction]): Unit = {
+//      val boxesToRemove = txs.flatMap(_.unlockers.map(_.boxId))
+//      val balanceSheet = txs.map(_.newBoxes).foldLeft(mutable.TreeMap.empty[ByteArrayWrapper, mutable.Set[ADKey]]) { (cache, bx) =>
+//        ???
+//      }
+//    }
+//
+//    case block: EncryBlock => scanTransactions(block.payload.transactions)
+//    case payload: EncryBlockPayload => scanTransactions(payload.transactions)
+//  }
 }
