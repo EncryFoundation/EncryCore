@@ -80,8 +80,8 @@ class EncryMiner(settings: EncryAppSettings,
       candidateOpt = Some(c)
       miningThreads.foreach(t => t ! c)
 
-    case MiningStatusRequest =>
-      sender ! MiningStatusResponse(isMining, candidateOpt)
+    case MinerStatusRequest =>
+      sender ! MinerStatus(isMining, candidateOpt)
 
     case m =>
       log.warn(s"Unexpected message $m")
@@ -170,9 +170,9 @@ object EncryMiner extends ScorexLogging {
 
   case object StartMining
 
-  case object MiningStatusRequest
+  case object MinerStatusRequest
 
-  case class MiningStatusResponse(isMining: Boolean, candidateBlock: Option[PowCandidateBlock]) {
+  case class MinerStatus(isMining: Boolean, candidateBlock: Option[PowCandidateBlock]) {
     lazy val json: Json = Map(
       "isMining" -> isMining.asJson,
       "candidateBlock" -> candidateBlock.map(_.json).getOrElse("None".asJson)

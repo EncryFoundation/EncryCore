@@ -3,15 +3,16 @@ package encry.local.scanner
 import java.io.File
 
 import akka.actor.{Actor, ActorRef, ActorRefFactory, Props}
-import encry.local.scanner.EncryScanner.InitialVersion
-import encry.local.scanner.storage.IndexStorage
+import encry.local.scanner.storage.{EncryIndexReader, IndexStorage}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.{EncryBaseBox, EncryBox}
 import encry.settings.{Algos, Constants, EncryAppSettings}
 import encry.storage.codec.FixLenComplexValueCodec
+import io.circe.Json
+import io.circe.syntax._
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.NodeViewHolder.{SemanticallySuccessfulModifier, Subscribe}
 import scorex.core.utils.ScorexLogging
@@ -20,20 +21,22 @@ import scorex.crypto.authds.ADKey
 
 import scala.collection.mutable
 
-case class ScanningResult(newIndexes: Seq[(ByteArrayWrapper, Seq[ADKey])],
-                          toInsert: Seq[EncryBaseBox],
-                          toRemove: Seq[ADKey])
-
 class EncryScanner(settings: EncryAppSettings,
                    viewHolderRef: ActorRef,
                    indexStore: Store) extends Actor with ScorexLogging {
 
+  import EncryScanner._
   import IndexStorage._
 
   protected lazy val storage: IndexStorage = new IndexStorage(indexStore)
 
-  lazy val version: VersionTag = indexStore.get(IndexStorage.IndexVersionKey)
-    .map(r => VersionTag @@ r.data).getOrElse(InitialVersion)
+  protected lazy val indexReader: EncryIndexReader = new EncryIndexReader(storage)
+
+  lazy val version: VersionTag = storage.get(IndexStorage.IndexVersionKey)
+    .map(VersionTag @@ _).getOrElse(InitialVersion)
+
+  lazy val lastScannedHeaderOpt: Option[EncryBlockHeader] = storage.get(IndexStorage.LastScannedBlockKey)
+    .flatMap(r => EncryBlockHeaderSerializer.parseBytes(r).toOption)
 
   override def preStart(): Unit = {
     val events = Seq(
@@ -44,15 +47,20 @@ class EncryScanner(settings: EncryAppSettings,
   }
 
   override def receive: Receive = {
+
     case SemanticallySuccessfulModifier(mod: EncryPersistentModifier) =>
       scanPersistent(mod)
+
+    case IndexReaderRequest =>
+      IndexReader(indexReader)
+
+    case ScannerStatusRequest =>
+      ScannerStatus(version, lastScannedHeaderOpt)
   }
 
   private def scanPersistent(mod: EncryPersistentModifier): Unit = mod match {
       case block: EncryBlock =>
-        updateIndex(VersionTag @@ block.id, scanTransactions(block.payload.transactions))
-      case payload: EncryBlockPayload =>
-        updateIndex(VersionTag @@ payload.headerId, scanTransactions(payload.transactions))
+        updateIndex(IndexMetadata(VersionTag @@ block.id, block.header), scanTransactions(block.payload.transactions))
       case _ => // Do nothing.
     }
 
@@ -73,7 +81,7 @@ class EncryScanner(settings: EncryAppSettings,
     ScanningResult(newIndexes.toSeq, boxesToInsert, boxIdsToRemove)
   }
 
-  private def updateIndex(version: VersionTag, sr: ScanningResult): Unit = {
+  private def updateIndex(md: IndexMetadata, sr: ScanningResult): Unit = {
     val currentIndexes = sr.newIndexes ++ sr.toRemove.foldLeft(Seq[(ByteArrayWrapper, Seq[ADKey])]())((acc, id) =>
       storage.get(keyByBoxId(id)).map(r => acc :+ ByteArrayWrapper(r) -> Seq.empty).getOrElse(acc))
     val finalIndexes = currentIndexes.foldLeft(Seq[(ByteArrayWrapper, Seq[ADKey])]()) { case (acc, (pk, ids))  =>
@@ -86,11 +94,30 @@ class EncryScanner(settings: EncryAppSettings,
     } ++ sr.toInsert.map(bx => keyByBoxId(bx.id) -> ByteArrayWrapper(bx.bytes))
     val toRemove = sr.toRemove.map(ByteArrayWrapper.apply)
 
-    storage.update(ByteArrayWrapper(version), toRemove, toInsert)
+    storage.update(ByteArrayWrapper(md.version), toRemove, toInsert)
   }
 }
 
 object EncryScanner {
+
+  case object IndexReaderRequest
+
+  case class IndexReader(reader: EncryIndexReader)
+
+  case class ScanningResult(newIndexes: Seq[(ByteArrayWrapper, Seq[ADKey])],
+                            toInsert: Seq[EncryBaseBox],
+                            toRemove: Seq[ADKey])
+
+  case class IndexMetadata(version: VersionTag, header: EncryBlockHeader)
+
+  case object ScannerStatusRequest
+
+  case class ScannerStatus(version: VersionTag, lastScannedHeader: Option[EncryBlockHeader]) {
+    lazy val json: Json = Map(
+      "version" -> Algos.encode(version).asJson,
+      "lastScannedHeader" -> lastScannedHeader.map(_.json).getOrElse("None".asJson)
+    ).asJson
+  }
 
   val InitialVersion: VersionTag = VersionTag @@ Algos.hash("initial_version")
 

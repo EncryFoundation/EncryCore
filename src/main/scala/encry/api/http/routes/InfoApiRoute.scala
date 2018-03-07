@@ -3,7 +3,7 @@ package encry.api.http.routes
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.local.miner.EncryMiner.{MiningStatusRequest, MiningStatusResponse}
+import encry.local.miner.EncryMiner.{MinerStatusRequest, MinerStatus}
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import io.circe.Json
@@ -43,13 +43,13 @@ case class InfoApiRoute(readersHolder: ActorRef,
 
   private def getNodeName: String = appSettings.scorexSettings.network.nodeName
 
-  private def getMinerInfo: Future[MiningStatusResponse] = (miner ? MiningStatusRequest).mapTo[MiningStatusResponse]
+  private def getMinerInfo: Future[MinerStatus] = (miner ? MinerStatusRequest).mapTo[MinerStatus]
 }
 
 object InfoApiRoute {
 
   def makeInfoJson(nodeId: Array[Byte],
-                   minerInfo: MiningStatusResponse,
+                   minerInfo: MinerStatus,
                    connectedPeersLength: Int,
                    readers: Readers,
                    stateType: String,

@@ -3,7 +3,7 @@ package encry.api.http.routes
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.local.miner.EncryMiner.{MiningStatusRequest, MiningStatusResponse}
+import encry.local.miner.EncryMiner.{MinerStatusRequest, MinerStatus}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.settings.EncryAppSettings
@@ -72,7 +72,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
   }
 
   def candidateBlockR: Route = (path("candidateBlock") & pathEndOrSingleSlash & get) {
-    (miner ? MiningStatusRequest).mapTo[MiningStatusResponse].map(_.json).okJson()
+    (miner ? MinerStatusRequest).mapTo[MinerStatus].map(_.json).okJson()
   }
 
   def getFullBlockByHeaderIdR: Route = (headerId & get) { id =>

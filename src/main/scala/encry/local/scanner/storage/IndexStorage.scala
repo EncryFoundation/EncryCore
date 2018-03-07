@@ -10,7 +10,9 @@ class IndexStorage(val store: Store) extends EncryBaseStorage
 
 object IndexStorage {
 
-  val IndexVersionKey: ByteArrayWrapper = ByteArrayWrapper(Algos.hash("sync_state_version"))
+  lazy val IndexVersionKey: ByteArrayWrapper = ByteArrayWrapper(Algos.hash("sync_state_version"))
+
+  lazy val LastScannedBlockKey: ByteArrayWrapper = ByteArrayWrapper(Algos.hash("last_scanned_block"))
 
   def keyByBoxId(id: ADKey): ByteArrayWrapper = ByteArrayWrapper(id)
 
