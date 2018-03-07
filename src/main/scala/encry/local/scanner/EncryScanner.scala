@@ -19,7 +19,6 @@ import scorex.core.{NodeViewHolder, VersionTag}
 import scorex.crypto.authds.ADKey
 
 import scala.collection.mutable
-import scala.util.Try
 
 case class ScanningResult(newIndexes: Seq[(ByteArrayWrapper, Seq[ADKey])],
                           toInsert: Seq[EncryBaseBox],
@@ -51,11 +50,9 @@ class EncryScanner(settings: EncryAppSettings,
 
   private def scanPersistent(mod: EncryPersistentModifier): Unit = mod match {
       case block: EncryBlock =>
-        val version = VersionTag @@ block.id
-        updateIndex(version, scanTransactions(block.payload.transactions))
+        updateIndex(VersionTag @@ block.id, scanTransactions(block.payload.transactions))
       case payload: EncryBlockPayload =>
-        val version = VersionTag @@ payload.headerId
-        updateIndex(version, scanTransactions(payload.transactions))
+        updateIndex(VersionTag @@ payload.headerId, scanTransactions(payload.transactions))
       case _ => // Do nothing.
     }
 
@@ -76,13 +73,13 @@ class EncryScanner(settings: EncryAppSettings,
     ScanningResult(newIndexes.toSeq, boxesToInsert, boxIdsToRemove)
   }
 
-  // TODO: Use Try here or not?
-  private def updateIndex(version: VersionTag, sr: ScanningResult): Try[Unit] = Try {
+  private def updateIndex(version: VersionTag, sr: ScanningResult): Unit = {
     val currentIndexes = sr.newIndexes ++ sr.toRemove.foldLeft(Seq[(ByteArrayWrapper, Seq[ADKey])]())((acc, id) =>
       storage.get(keyByBoxId(id)).map(r => acc :+ ByteArrayWrapper(r) -> Seq.empty).getOrElse(acc))
     val finalIndexes = currentIndexes.foldLeft(Seq[(ByteArrayWrapper, Seq[ADKey])]()) { case (acc, (pk, ids))  =>
-      storage.get(pk).map(r => acc :+ pk -> (FixLenComplexValueCodec.parseComplexValue(r, EncryBox.BoxIdSize).get
-          .filter(id => !sr.toRemove.exists(_.sameElements(id))).map(ADKey @@ _) ++ ids)).getOrElse(acc)
+      storage.get(pk).map(r => acc :+ pk -> FixLenComplexValueCodec.parseComplexValue(r, EncryBox.BoxIdSize)
+        .map(bxIds => bxIds.filter(id => !sr.toRemove.exists(_.sameElements(id))).map(ADKey @@ _) ++ ids).getOrElse(Seq.empty))
+        .getOrElse(acc)
     }
     val toInsert = finalIndexes.map { case (pk, ids) =>
       pk -> FixLenComplexValueCodec.toComplexValue(ids)
