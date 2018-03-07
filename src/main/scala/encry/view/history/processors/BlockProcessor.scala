@@ -45,7 +45,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
     val continuations = continuationHeaderChains(header, _ => true).map(_.tail)
     val bestFullChain = continuations.map(hc => hc.map(getBlock).takeWhile(_.isDefined).flatten.map(_.header))
       .map(c => header +: c)
-      .maxBy(c => scoreOf(c.last.id))
+      .maxBy(c => c.last.difficulty)
 
     val bestHeaderNew = bestFullChain.last
 
