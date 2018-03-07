@@ -32,10 +32,10 @@ class EncryScanner(settings: EncryAppSettings,
 
   protected lazy val indexReader: EncryIndexReader = new EncryIndexReader(storage)
 
-  lazy val version: VersionTag = storage.get(IndexStorage.IndexVersionKey)
+  def version: VersionTag = storage.get(IndexStorage.IndexVersionKey)
     .map(VersionTag @@ _).getOrElse(InitialVersion)
 
-  lazy val lastScannedHeaderOpt: Option[EncryBlockHeader] = storage.get(IndexStorage.LastScannedBlockKey)
+  def lastScannedHeaderOpt: Option[EncryBlockHeader] = storage.get(IndexStorage.LastScannedBlockKey)
     .flatMap(r => EncryBlockHeaderSerializer.parseBytes(r).toOption)
 
   override def preStart(): Unit = {
@@ -51,10 +51,10 @@ class EncryScanner(settings: EncryAppSettings,
     case SemanticallySuccessfulModifier(mod: EncryPersistentModifier) =>
       scanPersistent(mod)
 
-    case IndexReaderRequest =>
+    case GetIndexReader =>
       IndexReader(indexReader)
 
-    case ScannerStatusRequest =>
+    case GetScannerStatus =>
       ScannerStatus(version, lastScannedHeaderOpt)
   }
 
@@ -100,7 +100,7 @@ class EncryScanner(settings: EncryAppSettings,
 
 object EncryScanner {
 
-  case object IndexReaderRequest
+  case object GetIndexReader
 
   case class IndexReader(reader: EncryIndexReader)
 
@@ -110,7 +110,7 @@ object EncryScanner {
 
   case class IndexMetadata(version: VersionTag, header: EncryBlockHeader)
 
-  case object ScannerStatusRequest
+  case object GetScannerStatus
 
   case class ScannerStatus(version: VersionTag, lastScannedHeader: Option[EncryBlockHeader]) {
     lazy val json: Json = Map(

@@ -30,6 +30,9 @@ trait UtxoStateReader extends StateReader with ScorexLogging {
   def boxById(boxId: ADKey): Option[EncryBaseBox] = persistentProver.unauthenticatedLookup(boxId)
     .map(bytes => StateModifierDeserializer.parseBytes(bytes, boxId.head)).flatMap(_.toOption)
 
+  def boxesByIds(ids: Seq[ADKey]): Seq[EncryBaseBox] = ids.foldLeft(Seq[EncryBaseBox]())((acc, id) =>
+    boxById(id).map(bx => acc :+ bx).getOrElse(acc))
+
   def typedBoxById[B <: EncryBaseBox](boxId: ADKey): Option[EncryBaseBox] =
     boxById(boxId) match {
       case Some(bx: B@unchecked) if bx.isInstanceOf[B] => Some(bx)

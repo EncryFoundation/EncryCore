@@ -80,7 +80,7 @@ class EncryMiner(settings: EncryAppSettings,
       candidateOpt = Some(c)
       miningThreads.foreach(t => t ! c)
 
-    case MinerStatusRequest =>
+    case GetMinerStatus =>
       sender ! MinerStatus(isMining, candidateOpt)
 
     case m =>
@@ -170,7 +170,7 @@ object EncryMiner extends ScorexLogging {
 
   case object StartMining
 
-  case object MinerStatusRequest
+  case object GetMinerStatus
 
   case class MinerStatus(isMining: Boolean, candidateBlock: Option[PowCandidateBlock]) {
     lazy val json: Json = Map(
