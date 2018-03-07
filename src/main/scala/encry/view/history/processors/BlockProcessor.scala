@@ -1,5 +1,6 @@
 package encry.view.history.processors
 
+import encry.consensus.Difficulty
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history._
 import encry.modifiers.history.block.EncryBlock
@@ -45,7 +46,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
     val continuations = continuationHeaderChains(header, _ => true).map(_.tail)
     val bestFullChain = continuations.map(hc => hc.map(getBlock).takeWhile(_.isDefined).flatten.map(_.header))
       .map(c => header +: c)
-      .maxBy(c => c.last.difficulty)
+      .maxBy(c => c.last.difficulty.untag(Difficulty))
 
     val bestHeaderNew = bestFullChain.last
 
