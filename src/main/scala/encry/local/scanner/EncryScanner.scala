@@ -52,10 +52,10 @@ class EncryScanner(settings: EncryAppSettings,
       scanPersistent(mod)
 
     case GetIndexReader =>
-      IndexReader(indexReader)
+      sender ! IndexReader(indexReader)
 
     case GetScannerStatus =>
-      ScannerStatus(version, lastScannedHeaderOpt)
+      sender ! ScannerStatus(version, lastScannedHeaderOpt)
   }
 
   private def scanPersistent(mod: EncryPersistentModifier): Unit = mod match {
@@ -86,12 +86,12 @@ class EncryScanner(settings: EncryAppSettings,
       storage.get(keyByBoxId(id)).map(r => acc :+ ByteArrayWrapper(r) -> Seq.empty).getOrElse(acc))
     val finalIndexes = currentIndexes.foldLeft(Seq[(ByteArrayWrapper, Seq[ADKey])]()) { case (acc, (pk, ids))  =>
       storage.get(pk).map(r => acc :+ pk -> FixLenComplexValueCodec.parseComplexValue(r, EncryBox.BoxIdSize)
-        .map(bxIds => bxIds.filter(id => !sr.toRemove.exists(_.sameElements(id))).map(ADKey @@ _) ++ ids).getOrElse(Seq.empty))
-        .getOrElse(acc)
+        .map(bxIds => bxIds.filter(id => !sr.toRemove.exists(_.sameElements(id))).map(ADKey @@ _) ++ ids)
+        .getOrElse(Seq.empty)).getOrElse(acc :+ pk -> ids)
     }
     val toInsert = finalIndexes.map { case (pk, ids) =>
       pk -> FixLenComplexValueCodec.toComplexValue(ids)
-    } ++ sr.toInsert.map(bx => keyByBoxId(bx.id) -> ByteArrayWrapper(bx.bytes))
+    } ++ sr.toInsert.map(bx => keyByBoxId(bx.id) -> ByteArrayWrapper(Algos.hash(bx.proposition.bytes)))
     val toRemove = sr.toRemove.map(ByteArrayWrapper.apply)
 
     storage.update(ByteArrayWrapper(md.version), toRemove, toInsert)

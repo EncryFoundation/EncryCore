@@ -13,8 +13,7 @@ class EncryIndexReader(val index: IndexStorage) extends ScorexLogging {
   def boxIdsByProposition(p: Proposition): Option[Seq[ADKey]] = {
     index.get(IndexStorage.keyByProposition(p))
       .map(r => FixLenComplexValueCodec.parseComplexValue(r, EncryBox.BoxIdSize)
-        .getOrElse(Seq.empty)
-        .map(ADKey @@ _))
+        .getOrElse(Seq.empty).map(ADKey @@ _))
   }
 
   def boxIdsByAddress(address: Address): Option[Seq[ADKey]] =

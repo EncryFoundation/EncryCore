@@ -58,7 +58,7 @@ class EncryApp(args: Seq[String]) extends Application {
     InfoApiRoute(readersHolderRef, minerRef, peerManagerRef, encrySettings, nodeId),
     HistoryApiRoute(readersHolderRef, minerRef, encrySettings, nodeId, encrySettings.nodeSettings.stateMode),
     TransactionsApiRoute(readersHolderRef, nodeViewHolderRef, settings.restApi, encrySettings.nodeSettings.stateMode),
-    AccountInfoApiRoute(readersHolderRef, nodeViewHolderRef, settings.restApi, encrySettings.nodeSettings.stateMode)
+    AccountInfoApiRoute(readersHolderRef, nodeViewHolderRef, scannerRef, settings.restApi, encrySettings.nodeSettings.stateMode)
   )
 
   override val localInterface: ActorRef =
