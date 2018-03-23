@@ -96,6 +96,7 @@ test in assembly := {}
 assemblyMergeStrategy in assembly := {
   case "logback.xml" => MergeStrategy.first
   case "module-info.class" => MergeStrategy.discard
+  case "META-INF/MANIFEST.MF" => MergeStrategy.discard
   case _ => MergeStrategy.first
 }
 
