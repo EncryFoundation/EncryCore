@@ -186,7 +186,7 @@ class UtxoState(override val version: VersionTag,
           case _ => acc
         })
 
-      implicit val context: Context = Context(tx, height)
+      implicit val context: Context = Context(tx, height, rootHash)
 
       val bxs = tx.unlockers.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
