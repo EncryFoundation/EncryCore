@@ -43,7 +43,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
 
   protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
 
-  def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity.Value
+  def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity
 
   private def heightIdsKey(height: Int): ByteArrayWrapper = ByteArrayWrapper(Algos.hash(Ints.toByteArray(height)))
 

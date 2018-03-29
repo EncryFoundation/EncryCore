@@ -9,7 +9,7 @@ import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import io.circe.Json
 import io.circe.syntax._
 import scorex.core.network.Handshake
-import scorex.core.network.peer.PeerManager
+import scorex.core.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import scorex.core.settings.RESTApiSettings
 import scorex.crypto.encode.Base58
 
@@ -37,7 +37,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
     }).okJson()
   }
 
-  private def getConnectedPeers: Future[Int] = (peerManager ? PeerManager.GetConnectedPeers).mapTo[Seq[Handshake]].map(_.size)
+  private def getConnectedPeers: Future[Int] = (peerManager ? GetConnectedPeers).mapTo[Seq[Handshake]].map(_.size)
 
   private def getStateType: String = appSettings.nodeSettings.stateMode.verboseName
 

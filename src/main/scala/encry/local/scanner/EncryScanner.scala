@@ -14,7 +14,8 @@ import encry.storage.codec.FixLenComplexValueCodec
 import io.circe.Json
 import io.circe.syntax._
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import scorex.core.NodeViewHolder.{SemanticallySuccessfulModifier, Subscribe}
+import scorex.core.NodeViewHolder.ReceivableMessages.Subscribe
+import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import scorex.core.utils.ScorexLogging
 import scorex.core.{NodeViewHolder, VersionTag}
 import scorex.crypto.authds.ADKey
@@ -115,7 +116,7 @@ object EncryScanner {
   case class ScannerStatus(version: VersionTag, lastScannedHeader: Option[EncryBlockHeader]) {
     lazy val json: Json = Map(
       "version" -> Algos.encode(version).asJson,
-      "lastScannedHeader" -> lastScannedHeader.map(_.json).getOrElse("None".asJson)
+      "lastScannedHeader" -> lastScannedHeader.map(_.asJson).getOrElse("None".asJson)
     ).asJson
   }
 

@@ -7,7 +7,7 @@ import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proof.Proof
 import encry.modifiers.state.box.proposition.{AccountProposition, AccountPropositionSerializer}
 import encry.settings.Algos
-import io.circe.Json
+import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.crypto.signatures.{PublicKey, Signature}
@@ -31,21 +31,21 @@ case class PubKeyInfoBox(override val proposition: AccountProposition,
     else Success()
 
   override def serializer: Serializer[M] = PubKeyInfoBoxSerializer
-
-  override def json: Json = Map(
-    "id" -> Algos.encode(id).asJson,
-    "proposition" -> proposition.account.toString.asJson,
-    "nonce" -> nonce.asJson,
-    "publicKey" -> Algos.encode(pubKeyBytes).asJson,
-    "publicKeyProof" -> Algos.encode(pubKeyProofBytes).asJson,
-    "publicKeyInfo" -> Algos.encode(pubKeyInfoBytes).asJson,
-    "publicKeyTypeName" -> KeyPairType.pairTypeById(pubKeyTypeId).name.asJson
-  ).asJson
 }
 
 object PubKeyInfoBox {
 
   val typeId: BxTypeId = 4.toByte
+
+  implicit val jsonEncoder: Encoder[PubKeyInfoBox] = (bx: PubKeyInfoBox) => Map(
+    "id" -> Algos.encode(bx.id).asJson,
+    "proposition" -> bx.proposition.account.toString.asJson,
+    "nonce" -> bx.nonce.asJson,
+    "publicKey" -> Algos.encode(bx.pubKeyBytes).asJson,
+    "publicKeyProof" -> Algos.encode(bx.pubKeyProofBytes).asJson,
+    "publicKeyInfo" -> Algos.encode(bx.pubKeyInfoBytes).asJson,
+    "publicKeyTypeName" -> KeyPairType.pairTypeById(bx.pubKeyTypeId).name.asJson
+  ).asJson
 
   def apply(address: Address,
             nonce: Long,

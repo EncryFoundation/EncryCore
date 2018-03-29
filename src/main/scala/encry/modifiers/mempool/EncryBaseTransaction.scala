@@ -5,8 +5,8 @@ import encry.modifiers.Signable25519
 import encry.modifiers.mempool.directive.Directive
 import encry.modifiers.state.box.{EncryBaseBox, OpenBox}
 import encry.settings.{Algos, Constants}
+import io.circe.Encoder
 import scorex.core.ModifierId
-import scorex.core.serialization.JsonSerializable
 import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.crypto.hash.Digest32
@@ -14,7 +14,7 @@ import scorex.crypto.hash.Digest32
 import scala.util.Try
 
 trait EncryBaseTransaction extends Transaction[Proposition]
-  with Signable25519 with ModifierWithSizeLimit with JsonSerializable {
+  with Signable25519 with ModifierWithSizeLimit {
 
   val txHash: Digest32
 
@@ -53,4 +53,8 @@ object EncryBaseTransaction {
 
   type TxTypeId = Byte
   type Nonce = Long
+
+  implicit val jsonEncoder: Encoder[EncryBaseTransaction] = {
+    case tx: EncryTransaction => EncryTransaction.jsonEncoder(tx)
+  }
 }

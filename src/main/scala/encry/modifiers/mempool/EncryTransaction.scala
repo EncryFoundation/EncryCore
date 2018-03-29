@@ -9,7 +9,7 @@ import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.Algos
 import encry.utils.Utils
 import encry.view.history.Height
-import io.circe.Json
+import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
@@ -36,16 +36,6 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
     else None
 
   override lazy val serializer: Serializer[M] = EncryTransactionSerializer
-
-  override def json: Json = Map(
-    "id" -> Algos.encode(id).asJson,
-    "proposition" -> account.toString.asJson,
-    "fee" -> fee.asJson,
-    "timestamp" -> timestamp.asJson,
-    "signature" -> Algos.encode(signature.signature).asJson,
-    "unlockers" -> unlockers.map(_.json).asJson,
-    "directives" -> directives.map(_.json).asJson
-  ).asJson
 
   override lazy val txHash: Digest32 =
     EncryTransaction.getHash(accountPubKey, fee, timestamp, unlockers, directives)
@@ -74,6 +64,16 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
 object EncryTransaction {
 
   val MaxSize: Int = 350
+
+  implicit val jsonEncoder: Encoder[EncryTransaction] = (tx: EncryTransaction) => Map(
+    "id" -> Algos.encode(tx.id).asJson,
+    "proposition" -> tx.account.toString.asJson,
+    "fee" -> tx.fee.asJson,
+    "timestamp" -> tx.timestamp.asJson,
+    "signature" -> Algos.encode(tx.signature.signature).asJson,
+    "unlockers" -> tx.unlockers.map(_.asJson).asJson,
+    "directives" -> tx.directives.map(_.asJson).asJson
+  ).asJson
 
   def getHash(accountPubKey: PublicKey25519,
               fee: Amount,

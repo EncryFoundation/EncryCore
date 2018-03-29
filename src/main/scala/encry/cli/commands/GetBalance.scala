@@ -8,7 +8,7 @@ import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
-import scorex.core.NodeViewHolder.GetDataFromCurrentView
+import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 
 import scala.concurrent.Await
 import scala.concurrent.duration._

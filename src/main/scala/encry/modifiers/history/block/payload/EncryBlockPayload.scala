@@ -2,9 +2,8 @@ package encry.modifiers.history.block.payload
 
 import com.google.common.primitives.{Bytes, Ints}
 import encry.modifiers.mempool._
-import encry.modifiers.mempool.directive.DirectiveSerializer
 import encry.settings.Algos
-import io.circe.Json
+import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.{ModifierId, ModifierTypeId}
@@ -12,9 +11,9 @@ import scorex.crypto.authds.LeafData
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
-import scala.util.{Failure, Try}
+import scala.util.Try
 
-class EncryBlockPayload(override val headerId: ModifierId, txs: Seq[EncryBaseTransaction])
+class EncryBlockPayload(override val headerId: ModifierId, val txs: Seq[EncryBaseTransaction])
   extends EncryBaseBlockPayload {
 
   assert(txs.nonEmpty, "Block should contain at least 1 coinbase-like transaction")
@@ -27,16 +26,16 @@ class EncryBlockPayload(override val headerId: ModifierId, txs: Seq[EncryBaseTra
 
   override lazy val digest: Digest32 = EncryBlockPayload.rootHash(txs.map(_.id))
 
-  override lazy val json: Json = Map(
-    "headerId" -> Base58.encode(headerId).asJson,
-    "transactions" -> txs.map(_.json).asJson
-  ).asJson
-
   override def serializer: Serializer[EncryBlockPayload] = EncryBlockPayloadSerializer
 
 }
 
 object EncryBlockPayload {
+
+  implicit val jsonEncoder: Encoder[EncryBlockPayload] = (bp: EncryBlockPayload) => Map(
+    "headerId" -> Base58.encode(bp.headerId).asJson,
+    "transactions" -> bp.txs.map(_.asJson).asJson
+  ).asJson
 
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (102: Byte)
 

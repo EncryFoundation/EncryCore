@@ -7,7 +7,7 @@ import encry.modifiers.mempool.directive.Directive.DirTypeId
 import encry.modifiers.state.box.{EncryBaseBox, PubKeyInfoBox}
 import encry.settings.Algos
 import encry.utils.Utils
-import io.circe.Json
+import io.circe.{Encoder, Json}
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
@@ -37,21 +37,21 @@ case class AddPubKeyInfoDirective(address: Address,
   override val isValid: Boolean = pubKeyBytes.length >= 20 && pubKeyBytes.length <= 128
 
   override def serializer: Serializer[M] = AddPubKeyInfoDirectiveSerializer
-
-  override def json: Json = Map(
-    "typeId" -> typeId.asJson,
-    "verboseType" -> "ADD_PUBKEY_INFO".asJson,
-    "publicKey" -> Algos.encode(pubKeyBytes).asJson,
-    "publicKeyProof" -> Algos.encode(pubKeyProofBytes).asJson,
-    "publicKeyInfo" -> Algos.encode(pubKeyInfoBytes).asJson,
-    "publicKeyTypeName" -> KeyPairType.pairTypeById(pubKeyTypeId).name.asJson,
-    "idx" -> idx.asJson
-  ).asJson
 }
 
 object AddPubKeyInfoDirective {
 
   val TypeId: DirTypeId = 2.toByte
+
+  implicit val jsonEncoder: Encoder[AddPubKeyInfoDirective] = (d: AddPubKeyInfoDirective) => Map(
+    "typeId" -> d.typeId.asJson,
+    "verboseType" -> "ADD_PUBKEY_INFO".asJson,
+    "publicKey" -> Algos.encode(d.pubKeyBytes).asJson,
+    "publicKeyProof" -> Algos.encode(d.pubKeyProofBytes).asJson,
+    "publicKeyInfo" -> Algos.encode(d.pubKeyInfoBytes).asJson,
+    "publicKeyTypeName" -> KeyPairType.pairTypeById(d.pubKeyTypeId).name.asJson,
+    "idx" -> d.idx.asJson
+  ).asJson
 }
 
 object AddPubKeyInfoDirectiveSerializer extends Serializer[AddPubKeyInfoDirective] {

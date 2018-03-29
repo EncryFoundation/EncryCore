@@ -40,7 +40,7 @@ case class AccountInfoApiRoute(readersHolder: ActorRef,
 
   private def getBoxesByAddress(address: Address): Future[Option[Json]] = getState.flatMap { s =>
     getBoxIdsByAddress(address).map(_.map(ids => s.boxesByIds(ids)))
-  }.map(_.map(_.map(_.json).asJson))
+  }.map(_.map(_.map(_.asJson).asJson))
 
   private def getPortfolioByAddress(address: Address): Future[Option[Json]] = getState.flatMap { s =>
     getBoxIdsByAddress(address).map(_.map { ids =>
@@ -48,11 +48,11 @@ case class AccountInfoApiRoute(readersHolder: ActorRef,
       val balance = Balance @@ BoxFilter.filterAmountCarryingBxs(bxs).map(_.amount).sum
       Some(Portfolio(address, balance, bxs))
     })
-  }.map(_.map(_.map(_.json).asJson))
+  }.map(_.map(_.map(_.asJson).asJson))
 
   private def getPubKeyInfoBxsByAddress(address: Address): Future[Option[Json]] = getState.flatMap { s =>
     getBoxIdsByAddress(address).map(_.map(ids => s.boxesByIds(ids)))
-  }.map(_.map(bxs => BoxFilter.filterPubKeyInfoBxs(bxs).map(_.json).asJson))
+  }.map(_.map(bxs => BoxFilter.filterPubKeyInfoBxs(bxs).map(_.asJson).asJson))
 
   def getBoxesByAddressR: Route = (accountAddress & pathPrefix("boxes") & get) { addr =>
     getBoxesByAddress(addr).okJson()

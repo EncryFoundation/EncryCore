@@ -14,7 +14,7 @@ import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
 import io.circe.generic.auto._
-import scorex.core.LocalInterface.LocallyGeneratedTransaction
+import scorex.core.LocallyGeneratedModifiersMessages.ReceivableMessages.LocallyGeneratedTransaction
 import scorex.core.settings.RESTApiSettings
 import scorex.core.transaction.box.proposition.Proposition
 import spray.json.DefaultJsonProtocol._
@@ -44,7 +44,7 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
 
   private def getUnconfirmedTransactions(limit: Int): Future[Json] = getMempool.map {
     _.take(limit).toSeq
-  }.map(_.map(_.json).asJson)
+  }.map(_.map(_.asJson).asJson)
 
   def defaultTransferTransactionR: Route = (path("transfer") & post & entity(as[DefaultPaymentTransactionTemplate])) { model =>
     model.origin.map { ptx =>

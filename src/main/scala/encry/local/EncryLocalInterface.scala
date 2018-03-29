@@ -12,9 +12,11 @@ import encry.view.history.EncryHistory
 import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
-import scorex.core.NodeViewHolder.{ChangedHistory, ChangedMempool, Subscribe}
+import scorex.core.NodeViewHolder.ReceivableMessages.Subscribe
 import scorex.core.network.Handshake
+import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool}
 import scorex.core.network.peer.PeerManager
+import scorex.core.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.utils.NetworkTimeProvider
 import scorex.core.{LocalInterface, ModifierId, NodeViewHolder}
@@ -38,7 +40,7 @@ class EncryLocalInterface(override val viewHolderRef: ActorRef,
       NodeViewHolder.EventType.MempoolChanged
     )
     viewHolderRef ! Subscribe(events)
-    context.system.scheduler.schedule(10.second, 10.second)(peerManager ! PeerManager.GetConnectedPeers)
+    context.system.scheduler.schedule(10.second, 10.second)(peerManager ! GetConnectedPeers)
   }
 
   private val votes = Algos.encode(Algos.hash(settings.scorexSettings.network.nodeName).take(5))

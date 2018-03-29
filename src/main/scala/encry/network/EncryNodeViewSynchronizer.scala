@@ -8,8 +8,10 @@ import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
+import scorex.core.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, Subscribe}
 import scorex.core.NodeViewHolder._
-import scorex.core.network.NetworkController.SendToNetwork
+import scorex.core.network.NetworkController.ReceivableMessages.SendToNetwork
+import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import scorex.core.network.message.Message
 import scorex.core.network.{NodeViewSynchronizer, SendToRandom}
 import scorex.core.settings.NetworkSettings
@@ -86,7 +88,7 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
     val msg = Message(requestModifierSpec, Right(modifierTypeId -> Seq(modifierId)), None)
-    //Full nodes should be here, not a random peer
+    // Full nodes should be here, not a random peer
     networkControllerRef ! SendToNetwork(msg, SendToRandom)
     deliveryTracker.downloadRequested(modifierTypeId, modifierId)
   }

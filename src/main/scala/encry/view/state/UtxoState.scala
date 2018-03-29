@@ -16,7 +16,7 @@ import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.{Algos, Constants}
 import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import scorex.core.LocalInterface.LocallyGeneratedModifier
+import scorex.core.LocallyGeneratedModifiersMessages.ReceivableMessages.LocallyGeneratedModifier
 import scorex.core.VersionTag
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.avltree.batch._

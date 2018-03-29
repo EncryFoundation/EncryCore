@@ -4,7 +4,7 @@ import com.google.common.primitives.Bytes
 import encry.modifiers.state.box._
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
 import encry.settings.{Algos, Constants}
-import io.circe.Json
+import io.circe.{Encoder, Json}
 import io.circe.syntax._
 import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.core.serialization.Serializer
@@ -25,12 +25,6 @@ case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
   override type M = ADProofs
 
   override lazy val serializer: Serializer[ADProofs] = ADProofSerializer
-
-  override lazy val json: Json = Map(
-    "headerId" -> Base58.encode(headerId).asJson,
-    "proofBytes" -> Base58.encode(proofBytes).asJson,
-    "digest" -> Base58.encode(digest).asJson
-  ).asJson
 
   override def toString: String = s"ADProofs(${Base58.encode(id)},${Base58.encode(headerId)},${Base58.encode(proofBytes)})"
 
@@ -76,8 +70,13 @@ object ADProofs {
 
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (104: Byte)
 
-  // TODO: WARN
   val KL = 32
+
+  implicit val jsonEncoder: Encoder[ADProofs] = (p: ADProofs) => Map(
+    "headerId" -> Base58.encode(p.headerId).asJson,
+    "proofBytes" -> Base58.encode(p.proofBytes).asJson,
+    "digest" -> Base58.encode(p.digest).asJson
+  ).asJson
 
   def proofDigest(proofBytes: SerializedAdProof): Digest32 = Algos.hash(proofBytes)
 

@@ -9,10 +9,10 @@ import encry.settings.{Algos, NodeSettings}
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
-import scorex.core.consensus.History.{HistoryComparisonResult, ModifierIds}
-import scorex.core.consensus.{History, HistoryReader, ModifierSemanticValidity}
+import scorex.core._
+import scorex.core.consensus.History._
+import scorex.core.consensus.{Unknown => _, _}
 import scorex.core.utils.ScorexLogging
-import scorex.core.{ModifierId, ModifierTypeId}
 
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
@@ -57,25 +57,21 @@ trait EncryHistoryReader
   override def openSurfaceIds(): Seq[ModifierId] = bestBlockIdOpt.orElse(bestHeaderIdOpt).toSeq
 
   // Compares node`s `SyncInfo` with another`s.
-  override def compare(other: EncrySyncInfo): History.HistoryComparisonResult.Value = {
+  override def compare(other: EncrySyncInfo): HistoryComparisonResult = {
     bestHeaderIdOpt match {
-      case Some(id) if other.lastHeaderIds.lastOption.exists(_ sameElements id) =>
-        HistoryComparisonResult.Equal
-      case Some(id) if other.lastHeaderIds.exists(_ sameElements id) =>
-        HistoryComparisonResult.Older
-      case Some(_) if other.lastHeaderIds.isEmpty =>
-        HistoryComparisonResult.Younger
+      case Some(id) if other.lastHeaderIds.lastOption.exists(_ sameElements id) => Equal
+      case Some(id) if other.lastHeaderIds.exists(_ sameElements id) => Older
+      case Some(_) if other.lastHeaderIds.isEmpty => Younger
       case Some(_) =>
         // Compare headers chain
         val ids = other.lastHeaderIds
         ids.view.reverse.find(m => contains(m)) match {
-          case Some(_) =>
-            HistoryComparisonResult.Younger
-          case None => HistoryComparisonResult.Nonsense
+          case Some(_) => Younger
+          case None => Nonsense
         }
       case None =>
         log.warn("Trying to compare with other node while our history is empty")
-        HistoryComparisonResult.Older
+        Older
     }
   }
 
@@ -234,15 +230,15 @@ trait EncryHistoryReader
     EncrySyncInfo(lastHeaders(EncrySyncInfo.MaxBlockIds).headers.map(_.id))
   }
 
-  override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity.Value = {
+  override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity= {
     historyStorage.store.get(validityKey(modifierId)) match {
-      case Some(b) if b.data.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
-      case Some(b) if b.data.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
-      case None if contains(modifierId) => ModifierSemanticValidity.Unknown
-      case None => ModifierSemanticValidity.Absent
+      case Some(b) if b.data.headOption.contains(1.toByte) => Valid
+      case Some(b) if b.data.headOption.contains(0.toByte) => Invalid
+      case None if contains(modifierId) => scorex.core.consensus.Unknown
+      case None => Absent
       case m =>
         log.error(s"Incorrect validity status: $m")
-        ModifierSemanticValidity.Absent
+        Absent
     }
   }
 }

@@ -6,7 +6,7 @@ import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.Constants
 import encry.view.history.Height
 import encry.view.state.UtxoState
-import io.circe.Json
+import io.circe.{Encoder, Json}
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
@@ -31,18 +31,18 @@ case class CoinbaseDirective(height: Height) extends Directive {
   override val isValid: Boolean = height > Constants.Chain.preGenesisHeight
 
   override def serializer: Serializer[M] = CoinbaseDirectiveSerializer
-
-  override def json: Json = Map(
-    "typeId" -> typeId.asJson,
-    "verboseType" -> "COINBASE".asJson,
-    "height" -> height.toString.asJson,
-    "idx" -> idx.asJson
-  ).asJson
 }
 
 object CoinbaseDirective {
 
   val TypeId: DirTypeId = 0.toByte
+
+  implicit val jsonEncoder: Encoder[CoinbaseDirective] = (d: CoinbaseDirective) => Map(
+    "typeId" -> d.typeId.asJson,
+    "verboseType" -> "COINBASE".asJson,
+    "height" -> d.height.toString.asJson,
+    "idx" -> d.idx.asJson
+  ).asJson
 }
 
 object CoinbaseDirectiveSerializer extends Serializer[CoinbaseDirective] {

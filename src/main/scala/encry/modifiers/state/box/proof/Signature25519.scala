@@ -3,7 +3,7 @@ package encry.modifiers.state.box.proof
 import encry.crypto.PublicKey25519
 import encry.modifiers.state.box.proof.Proof.ProofTypeId
 import encry.settings.Algos
-import io.circe.Json
+import io.circe.{Encoder, Json}
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.crypto.signatures.{Curve25519, Signature}
@@ -21,10 +21,6 @@ case class Signature25519(signature: Signature) extends Proof {
       Curve25519.verify(signature, message, pubKey.pubKeyBytes)
 
   override def serializer: Serializer[Signature25519] = Signature25519Serializer
-
-  override lazy val json: Json = Map(
-    "signature" -> Algos.encode(signature).asJson
-  ).asJson
 }
 
 object Signature25519 {
@@ -32,6 +28,10 @@ object Signature25519 {
   val TypeId: ProofTypeId = 1.toByte
 
   lazy val SignatureSize: Int = Curve25519.SignatureLength
+
+  implicit val jsonEncoder: Encoder[Signature25519] = (p: Signature25519) => Map(
+    "signature" -> Algos.encode(p.signature).asJson
+  ).asJson
 }
 
 object Signature25519Serializer extends Serializer[Signature25519] {

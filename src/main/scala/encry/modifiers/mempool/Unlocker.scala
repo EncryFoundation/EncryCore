@@ -3,23 +3,26 @@ package encry.modifiers.mempool
 import encry.modifiers.state.box.EncryBox
 import encry.modifiers.state.box.proof.{Proof, ProofSerializer}
 import encry.settings.Algos
-import io.circe.Json
+import io.circe.{Encoder, Json}
 import io.circe.syntax._
-import scorex.core.serialization.{BytesSerializable, JsonSerializable, Serializer}
+import scorex.core.serialization.{BytesSerializable, Serializer}
 import scorex.crypto.authds.ADKey
 
 import scala.util.Try
 
 // Holds the boxId/proof pair.
-case class Unlocker(boxId: ADKey, proofOpt: Option[Proof]) extends BytesSerializable with JsonSerializable {
+case class Unlocker(boxId: ADKey, proofOpt: Option[Proof]) extends BytesSerializable {
 
   override type M = Unlocker
 
   override def serializer: Serializer[M] = UnlockerSerializer
+}
 
-  override def json: Json = Map(
-    "boxId" -> Algos.encode(boxId).asJson,
-    "proof" -> proofOpt.map(_.json).getOrElse("None".asJson)
+object Unlocker {
+
+  implicit val jsonEncoder: Encoder[Unlocker] = (u: Unlocker) => Map(
+    "boxId" -> Algos.encode(u.boxId).asJson,
+    "proof" -> u.proofOpt.map(_.asJson).getOrElse("None".asJson)
   ).asJson
 }
 

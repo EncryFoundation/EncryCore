@@ -7,7 +7,7 @@ import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPaylo
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.mempool.directive.CoinbaseDirective
-import io.circe.Json
+import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.{ModifierId, ModifierTypeId}
@@ -50,17 +50,17 @@ case class EncryBlock(override val header: EncryBlockHeader,
   override lazy val id: ModifierId = header.id
 
   override def serializer: Serializer[EncryBlock] = EncryBlockSerializer
-
-  override lazy val json: Json = Map(
-    "header" -> header.json,
-    "payload" -> payload.json,
-    "adPoofs" -> adProofsOpt.map(_.json).getOrElse(Map.empty[String, String].asJson)
-  ).asJson
 }
 
 object EncryBlock {
 
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (-127: Byte)
+
+  implicit val jsonEncoder: Encoder[EncryBlock] = (b: EncryBlock) => Map(
+    "header" -> b.header.asJson,
+    "payload" -> b.payload.asJson,
+    "adPoofs" -> b.adProofsOpt.map(_.asJson).getOrElse(Map.empty[String, String].asJson)
+  ).asJson
 }
 
 object EncryBlockSerializer extends Serializer[EncryBlock] {

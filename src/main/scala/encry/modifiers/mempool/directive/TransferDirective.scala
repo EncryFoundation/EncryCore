@@ -5,7 +5,7 @@ import encry.account.{Account, Address}
 import encry.modifiers.mempool.directive.Directive.DirTypeId
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.utils.Utils
-import io.circe.Json
+import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
@@ -30,19 +30,19 @@ case class TransferDirective(address: Address,
   override lazy val isValid: Boolean = amount > 0 && Account.validAddress(address)
 
   override def serializer: Serializer[M] = TransferDirectiveSerializer
-
-  override def json: Json = Map(
-    "typeId" -> typeId.asJson,
-    "verboseType" -> "TRANSFER".asJson,
-    "address" -> address.toString.asJson,
-    "amount" -> amount.asJson,
-    "idx" -> idx.asJson
-  ).asJson
 }
 
 object TransferDirective {
 
   val TypeId: DirTypeId = 1.toByte
+
+  implicit val jsonEncoder: Encoder[TransferDirective] = (d: TransferDirective) => Map(
+    "typeId" -> d.typeId.asJson,
+    "verboseType" -> "TRANSFER".asJson,
+    "address" -> d.address.toString.asJson,
+    "amount" -> d.amount.asJson,
+    "idx" -> d.idx.asJson
+  ).asJson
 }
 
 object TransferDirectiveSerializer extends Serializer[TransferDirective] {

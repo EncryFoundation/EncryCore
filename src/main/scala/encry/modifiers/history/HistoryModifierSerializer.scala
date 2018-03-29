@@ -17,7 +17,7 @@ object HistoryModifierSerializer extends Serializer[EncryPersistentModifier] {
     case m: EncryBlockPayload =>
       EncryBlockPayload.modifierTypeId +: EncryBlockPayloadSerializer.toBytes(m)
     case m =>
-      throw new Error(s"Serialization for unknown modifier: ${m.json.noSpaces}")
+      throw new Error(s"Serialization for unknown modifier: $m")
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[EncryPersistentModifier] =

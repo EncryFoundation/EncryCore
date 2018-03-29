@@ -6,7 +6,7 @@ import encry.modifiers.state.box.proof.Proof
 import encry.modifiers.state.box.proposition.{HeightProposition, HeightPropositionSerializer}
 import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.settings.Algos
-import io.circe.Json
+import io.circe.{Encoder, Json}
 import io.circe.syntax._
 import scorex.core.transaction.box.Box.Amount
 
@@ -26,18 +26,18 @@ case class OpenBox(override val proposition: HeightProposition,
     else Failure(new Error("Unlock failed"))
 
   override def serializer: SizedCompanionSerializer[M] = OpenBoxSerializer
-
-  override def json: Json = Map(
-    "id" -> Algos.encode(id).asJson,
-    "proposition" -> s"Open after ${proposition.height}".asJson,
-    "nonce" -> nonce.asJson,
-    "value" -> value.asJson
-  ).asJson
 }
 
 object OpenBox {
 
    val typeId: BxTypeId = 2.toByte
+
+  implicit val jsonEncoder: Encoder[OpenBox] = (bx: OpenBox) => Map(
+    "id" -> Algos.encode(bx.id).asJson,
+    "proposition" -> s"Open after ${bx.proposition.height}".asJson,
+    "nonce" -> bx.nonce.asJson,
+    "value" -> bx.value.asJson
+  ).asJson
 }
 
 object OpenBoxSerializer extends SizedCompanionSerializer[OpenBox] {

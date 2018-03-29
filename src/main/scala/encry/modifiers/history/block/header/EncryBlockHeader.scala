@@ -8,7 +8,7 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.state.box.proof.Signature25519
 import encry.settings.{Algos, Constants}
-import io.circe.Json
+import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.block.Block._
 import scorex.core.serialization.Serializer
@@ -54,17 +54,6 @@ case class EncryBlockHeader(override val version: Version,
   lazy val adProofsId: ModifierId = ModifierWithDigest.computeId(ADProofs.modifierTypeId, id, adProofsRoot)
 
   override def serializer: Serializer[M] = EncryBlockHeaderSerializer
-
-  override lazy val json: Json = Map(
-    "id" -> Algos.encode(id).asJson,
-    "hash" -> Base16.encode(id).asJson,
-    "parentId" -> Algos.encode(payloadId).asJson,
-    "stateRoot" -> Algos.encode(stateRoot).asJson,
-    "txRoot" -> Algos.encode(txsRoot).asJson,
-    "timestamp" -> timestamp.asJson,
-    "height" -> height.asJson,
-    "difficulty" -> difficulty.untag(Difficulty).asJson,
-  ).asJson
 }
 
 object EncryBlockHeader {
@@ -72,6 +61,17 @@ object EncryBlockHeader {
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (101: Byte)
 
   lazy val GenesisParentId: ModifierId = ModifierId @@ Array.fill(Constants.digestLength)(0: Byte)
+
+  implicit val jsonEncoder: Encoder[EncryBlockHeader] = (h: EncryBlockHeader) => Map(
+    "id" -> Algos.encode(h.id).asJson,
+    "hash" -> Base16.encode(h.id).asJson,
+    "parentId" -> Algos.encode(h.payloadId).asJson,
+    "stateRoot" -> Algos.encode(h.stateRoot).asJson,
+    "txRoot" -> Algos.encode(h.txsRoot).asJson,
+    "timestamp" -> h.timestamp.asJson,
+    "height" -> h.height.asJson,
+    "difficulty" -> h.difficulty.untag(Difficulty).asJson,
+  ).asJson
 
   def getHash(version: Version,
               accountPubKey: PublicKey25519,

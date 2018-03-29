@@ -6,7 +6,7 @@ import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proof.Proof
 import encry.modifiers.state.box.proposition.{AccountProposition, AccountPropositionSerializer}
 import encry.modifiers.state.box.serializers.SizedCompanionSerializer
-import io.circe.Json
+import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.encode.Base58
@@ -27,18 +27,18 @@ case class AssetBox(override val proposition: AccountProposition,
     else Success()
 
   override def serializer: SizedCompanionSerializer[M] = AssetBoxSerializer
-
-  override def json: Json = Map(
-    "id" -> Base58.encode(id).asJson,
-    "proposition" -> proposition.account.address.toString.asJson,
-    "nonce" -> nonce.asJson,
-    "value" -> amount.asJson
-  ).asJson
 }
 
 object AssetBox {
 
   val TypeId: BxTypeId = 1.toByte
+
+  implicit val jsonEncoder: Encoder[AssetBox] = (bx: AssetBox) => Map(
+    "id" -> Base58.encode(bx.id).asJson,
+    "proposition" -> bx.proposition.account.address.toString.asJson,
+    "nonce" -> bx.nonce.asJson,
+    "value" -> bx.amount.asJson
+  ).asJson
 
   def apply(address: Address, nonce: Long, amount: Amount): AssetBox =
     AssetBox(AccountProposition(address), nonce, amount)

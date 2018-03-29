@@ -17,7 +17,8 @@ import io.circe.Json
 import io.circe.syntax._
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.NodeViewHolder
-import scorex.core.NodeViewHolder.{GetDataFromCurrentView, SemanticallySuccessfulModifier, Subscribe}
+import scorex.core.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, Subscribe}
+import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 import scorex.utils.Random
 
@@ -175,7 +176,7 @@ object EncryMiner extends ScorexLogging {
   case class MinerStatus(isMining: Boolean, candidateBlock: Option[PowCandidateBlock]) {
     lazy val json: Json = Map(
       "isMining" -> isMining.asJson,
-      "candidateBlock" -> candidateBlock.map(_.json).getOrElse("None".asJson)
+      "candidateBlock" -> candidateBlock.map(_.asJson).getOrElse("None".asJson)
     ).asJson
   }
 }

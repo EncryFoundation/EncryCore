@@ -9,7 +9,7 @@ import akka.pattern._
 import akka.util.Timeout
 import encry.cli.Response
 import encry.settings.EncryAppSettings
-import scorex.core.NodeViewHolder.GetDataFromCurrentView
+import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import scorex.crypto.encode.Base58
 
 import scala.util.Try
