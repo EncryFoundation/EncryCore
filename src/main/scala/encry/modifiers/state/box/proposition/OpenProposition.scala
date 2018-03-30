@@ -14,6 +14,8 @@ object OpenProposition extends ProofOfKnowledgeProposition[Nothing] {
 
 object OpenPropositionSerializer extends Serializer[OpenProposition.type] {
 
+  val TypeId: Byte = 0
+
   val Length = 1
   val ByteValue: Array[Byte] = Array.fill(Length)(-127: Byte)
 

@@ -3,7 +3,7 @@ package encry.modifiers.state.box.proof
 import encry.crypto.PublicKey25519
 import encry.modifiers.state.box.proof.Proof.ProofTypeId
 import encry.settings.Algos
-import io.circe.{Encoder, Json}
+import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.crypto.signatures.{Curve25519, Signature}

@@ -15,6 +15,13 @@ case class AccountProposition(account: Account) extends Proposition {
   override def serializer: Serializer[M] = AccountPropositionSerializer
 }
 
+object AccountProposition {
+
+  val TypeId: Byte = 2
+
+  def apply(address: Address): AccountProposition = AccountProposition(Account(address))
+}
+
 object AccountPropositionSerializer extends Serializer[AccountProposition] {
 
   val Length: Int = Account.AddressLength + 1
@@ -26,11 +33,4 @@ object AccountPropositionSerializer extends Serializer[AccountProposition] {
     AccountSerializer.parseBytes(bytes.tail).map(AccountProposition.apply)
       .getOrElse(throw new Exception("Deserialization failed."))
   }
-}
-
-object AccountProposition {
-
-  val TypeId: Byte = 1
-
-  def apply(address: Address): AccountProposition = AccountProposition(Account(address))
 }

@@ -3,7 +3,7 @@ package encry.modifiers.mempool.directive
 import com.google.common.primitives.{Bytes, Ints}
 import encry.account.{Account, Address}
 import encry.common.KeyPairType
-import encry.modifiers.mempool.directive.Directive.DirTypeId
+import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.{EncryBaseBox, PubKeyInfoBox}
 import encry.settings.Algos
 import encry.utils.Utils
@@ -26,7 +26,7 @@ case class AddPubKeyInfoDirective(address: Address,
 
   override type M = AddPubKeyInfoDirective
 
-  override val typeId: DirTypeId = AddPubKeyInfoDirective.TypeId
+  override val typeId: DTypeId = AddPubKeyInfoDirective.TypeId
 
   override def boxes(digest: Digest32): Seq[EncryBaseBox] =
     Seq(PubKeyInfoBox(address, Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)),
@@ -41,7 +41,7 @@ case class AddPubKeyInfoDirective(address: Address,
 
 object AddPubKeyInfoDirective {
 
-  val TypeId: DirTypeId = 2.toByte
+  val TypeId: DTypeId = 2.toByte
 
   implicit val jsonEncoder: Encoder[AddPubKeyInfoDirective] = (d: AddPubKeyInfoDirective) => Map(
     "typeId" -> d.typeId.asJson,
@@ -56,7 +56,7 @@ object AddPubKeyInfoDirective {
 
 object AddPubKeyInfoDirectiveSerializer extends Serializer[AddPubKeyInfoDirective] {
 
-  override def toBytes(obj: AddPubKeyInfoDirective): Array[DirTypeId] = Bytes.concat(
+  override def toBytes(obj: AddPubKeyInfoDirective): Array[DTypeId] = Bytes.concat(
     Account.decodeAddress(obj.address),
     Ints.toByteArray(obj.pubKeyBytes.length),
     obj.pubKeyBytes,
@@ -68,7 +68,7 @@ object AddPubKeyInfoDirectiveSerializer extends Serializer[AddPubKeyInfoDirectiv
     Ints.toByteArray(obj.idx)
   )
 
-  override def parseBytes(bytes: Array[DirTypeId]): Try[AddPubKeyInfoDirective] = Try {
+  override def parseBytes(bytes: Array[DTypeId]): Try[AddPubKeyInfoDirective] = Try {
     val address = Address @@ Base58.encode(bytes.take(Account.AddressLength))
     val pubKeyDataStart = Account.AddressLength
     val pubKeyBytesLen = Ints.fromByteArray(bytes.slice(pubKeyDataStart, pubKeyDataStart + 4))

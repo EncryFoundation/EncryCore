@@ -1,7 +1,7 @@
 package encry.modifiers.mempool.directive
 
 import com.google.common.primitives.{Ints, Longs}
-import encry.modifiers.mempool.directive.Directive.DirTypeId
+import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.Constants
 import encry.view.history.Height
@@ -21,7 +21,7 @@ case class CoinbaseDirective(height: Height) extends Directive {
   // Coinbase directive always comes first in transaction.
   override val idx: Int = 0
 
-  override val typeId: DirTypeId = CoinbaseDirective.TypeId
+  override val typeId: DTypeId = CoinbaseDirective.TypeId
 
   override def boxes(digest: Digest32): Seq[EncryBaseBox] =
     Seq(UtxoState.supplyBoxesAt(height, seed = Longs.fromByteArray(digest.take(8))))
@@ -35,7 +35,7 @@ case class CoinbaseDirective(height: Height) extends Directive {
 
 object CoinbaseDirective {
 
-  val TypeId: DirTypeId = 0.toByte
+  val TypeId: DTypeId = 0.toByte
 
   implicit val jsonEncoder: Encoder[CoinbaseDirective] = (d: CoinbaseDirective) => Map(
     "typeId" -> d.typeId.asJson,

@@ -2,7 +2,7 @@ package encry.modifiers.mempool.directive
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.{Account, Address}
-import encry.modifiers.mempool.directive.Directive.DirTypeId
+import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.utils.Utils
 import io.circe.Encoder
@@ -20,7 +20,7 @@ case class TransferDirective(address: Address,
 
   override type M = TransferDirective
 
-  override val typeId: DirTypeId = TransferDirective.TypeId
+  override val typeId: DTypeId = TransferDirective.TypeId
 
   override def boxes(digest: Digest32): Seq[EncryBaseBox] =
     Seq(AssetBox(address, Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)), amount))
@@ -34,7 +34,7 @@ case class TransferDirective(address: Address,
 
 object TransferDirective {
 
-  val TypeId: DirTypeId = 1.toByte
+  val TypeId: DTypeId = 1.toByte
 
   implicit val jsonEncoder: Encoder[TransferDirective] = (d: TransferDirective) => Map(
     "typeId" -> d.typeId.asJson,

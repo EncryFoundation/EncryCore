@@ -17,7 +17,7 @@ case class HeightProposition(height: Height) extends Proposition {
 
 object HeightPropositionSerializer extends SizedCompanionSerializer[HeightProposition] {
 
-  val Size = 4
+  val Size = 3
 
   override def toBytes(obj: HeightProposition): Array[Byte] = Ints.toByteArray(obj.height)
 

@@ -58,7 +58,8 @@ libraryDependencies ++= Seq(
   "org.scorexfoundation" %% "scrypto" % "2.0.3",
   "com.storm-enroute" %% "scalameter" % "0.8.+",
   "io.spray" %%  "spray-json" % "1.3.3",
-  "io.monix" %% "monix" % "2.3.3"
+  "io.monix" %% "monix" % "2.3.3",
+  "com.github.oskin1" %% "encryscript" % "0.2.1"
 ) ++ networkDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
 
 fork := true
