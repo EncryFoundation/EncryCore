@@ -219,6 +219,7 @@ object UtxoState extends ScorexLogging {
     new UtxoState(VersionTag @@ stateVersion, Height @@ stateHeight, stateStore, nodeViewHolderRef)
   }
 
+  // TODO: Add `lastBlockTimestamp`.
   private def metadata(modId: VersionTag, stateRoot: ADDigest, height: Height): Seq[(Array[Byte], Array[Byte])] = {
     val idStateDigestIdxElem: (Array[Byte], Array[Byte]) = modId -> stateRoot
     val stateDigestIdIdxElem = Algos.hash(stateRoot) -> modId

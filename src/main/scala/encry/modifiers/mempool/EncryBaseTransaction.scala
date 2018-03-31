@@ -6,6 +6,7 @@ import encry.modifiers.mempool.directive.Directive
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.modifiers.state.box.{EncryBaseBox, OpenBox}
 import encry.settings.{Algos, Constants}
+import encrywm.core.predef.env.ESEnvConvertable
 import io.circe.Encoder
 import scorex.core.ModifierId
 import scorex.core.transaction.Transaction
@@ -14,7 +15,7 @@ import scorex.crypto.hash.Digest32
 import scala.util.Try
 
 trait EncryBaseTransaction extends Transaction[EncryProposition]
-  with Signable25519 with ModifierWithSizeLimit {
+  with Signable25519 with ModifierWithSizeLimit with ESEnvConvertable {
 
   val txHash: Digest32
 

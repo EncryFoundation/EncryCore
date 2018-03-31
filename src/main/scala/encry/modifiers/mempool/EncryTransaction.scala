@@ -9,6 +9,8 @@ import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.Algos
 import encry.utils.Utils
 import encry.view.history.Height
+import encrywm.backend.env.{ESObject, ESValue}
+import encrywm.core.Types.{ESByteVector, ESLong, ESTransaction}
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
@@ -58,6 +60,19 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
     } else if (!validOrder(directives.map(_.idx))) {
       Failure(new Error("Illegal directives order"))
     } else Success()
+  }
+
+  override def asVal: ESValue = ESValue("transaction", ESTransaction)(convert)
+
+  // TODO: Add converters for boxes.
+  override def convert: ESObject = {
+    val fields = Map(
+      "accountPubKey" -> ESValue("accountPubKey", ESByteVector)(accountPubKey.pubKeyBytes),
+      "signature" -> ESValue("signature", ESByteVector)(signature.signature),
+      "bodyBytes" -> ESValue("bodyBytes", ESByteVector)(bytes),
+      "timestamp" -> ESValue("timestamp", ESLong)(timestamp)
+    )
+    ESObject(ESTransaction.ident, fields)
   }
 }
 

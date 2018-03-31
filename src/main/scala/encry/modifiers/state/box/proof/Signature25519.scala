@@ -3,6 +3,9 @@ package encry.modifiers.state.box.proof
 import encry.crypto.PublicKey25519
 import encry.modifiers.state.box.proof.Proof.ProofTypeId
 import encry.settings.Algos
+import encrywm.backend.env.{ESObject, ESValue}
+import encrywm.core.Types
+import encrywm.core.Types.{ESByteVector, ESInt, ESProof}
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
@@ -21,6 +24,16 @@ case class Signature25519(signature: Signature) extends Proof {
       Curve25519.verify(signature, message, pubKey.pubKeyBytes)
 
   override def serializer: Serializer[Signature25519] = Signature25519Serializer
+
+  override def asVal: ESValue = ESValue("proof", ESProof)(convert)
+
+  override def convert: ESObject = {
+    val fields = Map(
+      "sigBytes" -> ESValue("sigBytes", ESByteVector)(signature),
+      "typeId" -> ESValue("typeId", ESInt)(typeId)
+    )
+    ESObject(Types.Signature25519.ident, fields)
+  }
 }
 
 object Signature25519 {

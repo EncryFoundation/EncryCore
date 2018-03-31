@@ -1,10 +1,11 @@
 package encry.modifiers.state.box.proof
 
 import encry.modifiers.state.box.proof.Proof.ProofTypeId
+import encrywm.core.predef.env.ESEnvConvertable
 import io.circe.Encoder
 import scorex.core.serialization.BytesSerializable
 
-trait Proof extends BytesSerializable {
+trait Proof extends ESEnvConvertable with BytesSerializable {
 
   val typeId: ProofTypeId
 }
