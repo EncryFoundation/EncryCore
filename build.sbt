@@ -1,7 +1,7 @@
 import sbt.Keys._
 import sbt._
 
-name := "Encry"
+name := "EncryCore"
 
 version := "0.2.0"
 

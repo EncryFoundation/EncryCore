@@ -4,6 +4,7 @@ import akka.actor.{Actor, ActorRef, ActorRefFactory, Cancellable, Props}
 import encry.local.TransactionGenerator.{GeneratePaymentTransactions, StartGeneration, StopGeneration}
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.TestingSettings
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
@@ -11,7 +12,6 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import scorex.core.LocallyGeneratedModifiersMessages.ReceivableMessages.LocallyGeneratedTransaction
 import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
-import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -67,7 +67,7 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings, time
 
     case txs: Seq[EncryBaseTransaction]@unchecked =>
       txs.foreach { tx =>
-        viewHolder ! LocallyGeneratedTransaction[Proposition, EncryBaseTransaction](tx)
+        viewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryBaseTransaction](tx)
       }
 
     case StopGeneration =>

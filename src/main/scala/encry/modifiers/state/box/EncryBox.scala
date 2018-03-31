@@ -1,9 +1,9 @@
 package encry.modifiers.state.box
 
+import encry.modifiers.state.box.proposition.EncryProposition
 import scorex.core.transaction.box.Box.Amount
-import scorex.core.transaction.box.proposition.Proposition
 
-trait EncryBox[P <: Proposition] extends EncryBaseBox {
+trait EncryBox[P <: EncryProposition] extends EncryBaseBox {
 
   override val proposition: P
 

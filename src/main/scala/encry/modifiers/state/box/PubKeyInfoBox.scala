@@ -26,10 +26,6 @@ case class PubKeyInfoBox(override val proposition: AccountProposition,
 
   override val typeId: BxTypeId = PubKeyInfoBox.typeId
 
-  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
-    if (ctx.transaction.accountPubKey.address != proposition.account.address) Failure(new Error("Unlock failed"))
-    else Success()
-
   override def serializer: Serializer[M] = PubKeyInfoBoxSerializer
 }
 

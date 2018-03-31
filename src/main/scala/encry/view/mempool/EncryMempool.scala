@@ -30,6 +30,7 @@ class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTra
 
   override def put(tx: EncryBaseTransaction): Try[EncryMempool] = put(Seq(tx))
 
+  // TODO: Double semantic validity check (here and in NodeViewHolder).
   override def put(txs: Iterable[EncryBaseTransaction]): Try[EncryMempool] = {
     val validTxs = txs.filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
     if (validTxs.nonEmpty) {

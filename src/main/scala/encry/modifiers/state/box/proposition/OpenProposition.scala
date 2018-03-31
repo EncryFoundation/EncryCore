@@ -1,15 +1,19 @@
 package encry.modifiers.state.box.proposition
 
+import encry.modifiers.state.box.Context
+import encry.modifiers.state.box.proof.Proof
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.ProofOfKnowledgeProposition
 
 import scala.util.{Failure, Success, Try}
 
-object OpenProposition extends ProofOfKnowledgeProposition[Nothing] {
+object OpenProposition extends ProofOfKnowledgeProposition[Nothing] with EncryProposition {
 
   override type M = OpenProposition.type
 
   override lazy val serializer: Serializer[OpenProposition.type] = OpenPropositionSerializer
+
+  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] = Success()
 }
 
 object OpenPropositionSerializer extends Serializer[OpenProposition.type] {

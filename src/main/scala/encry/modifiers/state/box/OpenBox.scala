@@ -21,10 +21,6 @@ case class OpenBox(override val proposition: HeightProposition,
 
   override val typeId: BxTypeId = OpenBox.typeId
 
-  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
-    if (proposition.height <= ctx.height) Success()
-    else Failure(new Error("Unlock failed"))
-
   override def serializer: SizedCompanionSerializer[M] = OpenBoxSerializer
 }
 

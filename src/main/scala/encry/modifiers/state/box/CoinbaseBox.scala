@@ -21,10 +21,6 @@ case class CoinbaseBox(override val proposition: HeightProposition,
 
   override val typeId: BxTypeId = CoinbaseBox.typeId
 
-  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
-    if (proposition.height <= ctx.height) Success()
-    else Failure(new Error("Unlock failed"))
-
   override def serializer: SizedCompanionSerializer[M] = CoinbaseBoxSerializer
 
   override lazy val bytes: ADValue = ADValue @@ serializer.toBytes(this)

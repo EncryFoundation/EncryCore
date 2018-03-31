@@ -7,6 +7,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.EncryBaseTransaction
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncryHistory
 import encry.view.state.StateMode
@@ -17,7 +18,6 @@ import scorex.core.network.Handshake
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool}
 import scorex.core.network.peer.PeerManager
 import scorex.core.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
-import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.utils.NetworkTimeProvider
 import scorex.core.{LocalInterface, ModifierId, NodeViewHolder}
 
@@ -31,7 +31,7 @@ class EncryLocalInterface(override val viewHolderRef: ActorRef,
                           peerManager: ActorRef,
                           settings: EncryAppSettings,
                           timeProvider: NetworkTimeProvider)
-  extends LocalInterface[Proposition, EncryBaseTransaction, EncryPersistentModifier] {
+  extends LocalInterface[EncryProposition, EncryBaseTransaction, EncryPersistentModifier] {
 
   override def preStart(): Unit = {
     val events = Seq(

@@ -3,17 +3,17 @@ package encry.modifiers.mempool
 import encry.account.Account
 import encry.modifiers.Signable25519
 import encry.modifiers.mempool.directive.Directive
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.modifiers.state.box.{EncryBaseBox, OpenBox}
 import encry.settings.{Algos, Constants}
 import io.circe.Encoder
 import scorex.core.ModifierId
 import scorex.core.transaction.Transaction
-import scorex.core.transaction.box.proposition.Proposition
 import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-trait EncryBaseTransaction extends Transaction[Proposition]
+trait EncryBaseTransaction extends Transaction[EncryProposition]
   with Signable25519 with ModifierWithSizeLimit {
 
   val txHash: Digest32

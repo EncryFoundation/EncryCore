@@ -4,6 +4,7 @@ import akka.actor.{ActorRef, ActorRefFactory, Props}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
@@ -15,7 +16,6 @@ import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallyS
 import scorex.core.network.message.Message
 import scorex.core.network.{NodeViewSynchronizer, SendToRandom}
 import scorex.core.settings.NetworkSettings
-import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.utils.NetworkTimeProvider
 import scorex.core.{ModifierId, ModifierTypeId, NodeViewHolder}
 
@@ -28,7 +28,7 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
                                 syncInfoSpec: EncrySyncInfoMessageSpec.type,
                                 networkSettings: NetworkSettings,
                                 timeProvider: NetworkTimeProvider)
-  extends NodeViewSynchronizer[Proposition, EncryBaseTransaction,
+  extends NodeViewSynchronizer[EncryProposition, EncryBaseTransaction,
     EncrySyncInfo, EncrySyncInfoMessageSpec.type, EncryPersistentModifier, EncryHistory,
     EncryMempool](networkControllerRef, viewHolderRef, localInterfaceRef,
     syncInfoSpec, networkSettings, timeProvider) {

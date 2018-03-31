@@ -192,16 +192,15 @@ class UtxoState(override val version: VersionTag,
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
         .map(t => t.toOption -> u.proofOpt)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, proofOpt)) =>
           bxOpt match {
-            case Some(bx) if bx.unlockTry(proofOpt.getOrElse(tx.signature)).isSuccess => acc :+ bx
-            case _ => acc
+            case Some(bx) if bx.proposition.unlockTry(proofOpt.getOrElse(tx.signature)).isSuccess => acc :+ bx
+            case _ => throw new Error(s"Failed to spend some boxes referenced in $tx")
           }
         }
 
       val debit = totalAmountOf(bxs)
-      val credit = totalAmountOf(tx.newBoxes) - totalAmountOf(tx.newBoxes.filter(_.isInstanceOf[CoinbaseBox]))
+      val credit = totalAmountOf(tx.newBoxes) - totalAmountOf(tx.newBoxes.filter(_.isCoinbase))
 
-      if (bxs.size < tx.unlockers.size) throw new Error(s"Failed to spend some boxes referenced in $tx")
-      else if (debit < credit) throw new Error(s"Non-positive balance in $tx")
+      if (debit < credit) throw new Error(s"Non-positive balance in $tx")
     }
 }
 

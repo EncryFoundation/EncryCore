@@ -7,6 +7,7 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderS
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer}
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.{EncryHistory, EncrySyncInfo}
 import encry.view.mempool.EncryMempool
@@ -15,7 +16,6 @@ import encry.view.wallet.EncryWallet
 import scorex.core._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.Transaction
-import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.utils.NetworkTimeProvider
 import scorex.crypto.authds.ADDigest
 
@@ -23,7 +23,7 @@ import scala.util.Try
 
 abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings,
                                                                        timeProvider: NetworkTimeProvider)
-  extends NodeViewHolder[Proposition, EncryBaseTransaction, EncryPersistentModifier] {
+  extends NodeViewHolder[EncryProposition, EncryBaseTransaction, EncryPersistentModifier] {
 
   override val networkChunkSize: Int = settings.scorexSettings.network.networkChunkSize
 

@@ -7,6 +7,7 @@ import akka.pattern.ask
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.api.templates.{AddPubKeyInfoTransactionTemplate, DefaultPaymentTransactionTemplate}
 import encry.modifiers.mempool.EncryTransaction
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import encry.view.history.EncryHistoryReader
 import encry.view.mempool.EncryMempoolReader
@@ -16,7 +17,6 @@ import io.circe.syntax._
 import io.circe.generic.auto._
 import scorex.core.LocallyGeneratedModifiersMessages.ReceivableMessages.LocallyGeneratedTransaction
 import scorex.core.settings.RESTApiSettings
-import scorex.core.transaction.box.proposition.Proposition
 import spray.json.DefaultJsonProtocol._
 import spray.json.RootJsonFormat
 
@@ -48,14 +48,14 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
 
   def defaultTransferTransactionR: Route = (path("transfer") & post & entity(as[DefaultPaymentTransactionTemplate])) { model =>
     model.origin.map { ptx =>
-      nodeViewActorRef ! LocallyGeneratedTransaction[Proposition, EncryTransaction](ptx)
+      nodeViewActorRef ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](ptx)
       complete(StatusCodes.OK)
     }.getOrElse(complete(StatusCodes.BadRequest))
   }
 
   def addPubKeyInfoTransactionR: Route = (path("add-key-info") & post & entity(as[AddPubKeyInfoTransactionTemplate])) { model =>
     model.origin.map { tx =>
-      nodeViewActorRef ! LocallyGeneratedTransaction[Proposition, EncryTransaction](tx)
+      nodeViewActorRef ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
       complete(StatusCodes.OK)
     }.getOrElse(complete(StatusCodes.BadRequest))
   }

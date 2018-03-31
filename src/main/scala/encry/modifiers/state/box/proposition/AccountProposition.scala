@@ -1,18 +1,23 @@
 package encry.modifiers.state.box.proposition
 
 import encry.account.{Account, AccountSerializer, Address}
+import encry.modifiers.state.box.Context
+import encry.modifiers.state.box.proof.Proof
 import scorex.core.serialization.Serializer
-import scorex.core.transaction.box.proposition.Proposition
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 // This type of proposition requires non-interactive proof of knowledge of
 // `PrivateKey` corresponding to `account.address`.
-case class AccountProposition(account: Account) extends Proposition {
+case class AccountProposition(account: Account) extends EncryProposition {
 
   override type M = AccountProposition
 
   override def serializer: Serializer[M] = AccountPropositionSerializer
+
+  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
+    if (Account(ctx.transaction.accountPubKey.pubKeyBytes) != account) Failure(new Error("Unlock failed"))
+    else Success()
 }
 
 object AccountProposition {

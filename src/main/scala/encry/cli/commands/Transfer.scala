@@ -7,6 +7,7 @@ import encry.account.Address
 import encry.cli.Response
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
@@ -14,7 +15,6 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import scorex.core.LocallyGeneratedModifiersMessages.ReceivableMessages.LocallyGeneratedTransaction
 import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
-import scorex.core.transaction.box.proposition.Proposition
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -47,7 +47,7 @@ object Transfer extends Command {
 
           val tx = TransactionFactory.defaultPaymentTransactionScratch(secret, fee, timestamp, boxes, recipient, amount)
 
-          nodeViewHolderRef ! LocallyGeneratedTransaction[Proposition, EncryTransaction](tx)
+          nodeViewHolderRef ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
 
           tx
         }.toOption.map(tx => Some(Response(tx.toString))).getOrElse(Some(Response("Operation failed. Malformed data.")))

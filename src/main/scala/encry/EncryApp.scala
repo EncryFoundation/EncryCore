@@ -11,6 +11,7 @@ import encry.local.scanner.EncryScannerRef
 import encry.local.{EncryLocalInterfaceRef, TransactionGenerator}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.network.EncryNodeViewSynchronizer
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncrySyncInfoMessageSpec
@@ -19,7 +20,6 @@ import scorex.core.api.http.{ApiRoute, PeersApiRoute, UtilsApiRoute}
 import scorex.core.app.Application
 import scorex.core.network.message.MessageSpec
 import scorex.core.settings.ScorexSettings
-import scorex.core.transaction.box.proposition.Proposition
 
 import scala.concurrent.ExecutionContextExecutor
 import scala.io.Source
@@ -27,7 +27,7 @@ import scala.io.Source
 
 class EncryApp(args: Seq[String]) extends Application {
 
-  override type P = Proposition
+  override type P = EncryProposition
   override type TX = EncryBaseTransaction
   override type PMOD = EncryPersistentModifier
   override type NVHT = EncryNodeViewHolder[_]
