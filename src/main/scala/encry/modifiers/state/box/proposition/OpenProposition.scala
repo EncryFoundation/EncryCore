@@ -11,14 +11,14 @@ object OpenProposition extends ProofOfKnowledgeProposition[Nothing] with EncryPr
 
   override type M = OpenProposition.type
 
+  val TypeId: Byte = 0
+
   override lazy val serializer: Serializer[OpenProposition.type] = OpenPropositionSerializer
 
   override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] = Success()
 }
 
 object OpenPropositionSerializer extends Serializer[OpenProposition.type] {
-
-  val TypeId: Byte = 0
 
   val Length = 1
   val ByteValue: Array[Byte] = Array.fill(Length)(-127: Byte)

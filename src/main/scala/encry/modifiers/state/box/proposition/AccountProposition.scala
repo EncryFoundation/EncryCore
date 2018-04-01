@@ -3,6 +3,8 @@ package encry.modifiers.state.box.proposition
 import encry.account.{Account, AccountSerializer, Address}
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
+import io.circe.Encoder
+import io.circe.syntax._
 import scorex.core.serialization.Serializer
 
 import scala.util.{Failure, Success, Try}
@@ -23,6 +25,11 @@ case class AccountProposition(account: Account) extends EncryProposition {
 object AccountProposition {
 
   val TypeId: Byte = 2
+
+  implicit val jsonEncoder: Encoder[AccountProposition] = (p: AccountProposition) => Map(
+    "typeId" -> TypeId.toInt.asJson,
+    "address" -> p.account.address.toString.asJson
+  ).asJson
 
   def apply(address: Address): AccountProposition = AccountProposition(Account(address))
 }

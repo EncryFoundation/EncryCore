@@ -9,7 +9,10 @@ import encrywm.backend.executor.Executor
 import encrywm.common.ScriptPreprocessor.SerializedContract
 import encrywm.common.{ESContract, ScriptMeta, ScriptSerializer}
 import encrywm.frontend.semantics.ComplexityAnalyzer.ScriptComplexityScore
+import io.circe.Encoder
+import io.circe.syntax._
 import scorex.core.serialization.Serializer
+import scorex.crypto.encode.Base58
 
 import scala.util.Try
 
@@ -31,6 +34,11 @@ case class ContractProposition(contract: ESContract) extends EncryProposition {
 object ContractProposition {
 
   val TypeId: Byte = 1
+
+  implicit val jsonEncoder: Encoder[ContractProposition] = (p: ContractProposition) => Map(
+    "typeId" -> TypeId.toInt.asJson,
+    "script" -> Base58.encode(p.contract.serializedScript).asJson
+  ).asJson
 
   def apply(sc: SerializedContract, scs: ScriptComplexityScore): ContractProposition =
     ContractProposition(ESContract(sc, ScriptMeta(scs)))

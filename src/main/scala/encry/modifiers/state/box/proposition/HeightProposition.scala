@@ -5,6 +5,8 @@ import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
 import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.view.history.Height
+import io.circe.Encoder
+import io.circe.syntax._
 import scorex.core.serialization.Serializer
 
 import scala.util.{Failure, Success, Try}
@@ -18,6 +20,16 @@ case class HeightProposition(height: Height) extends EncryProposition {
   override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
     if (height <= ctx.height) Success()
     else Failure(new Error("Unlock failed"))
+}
+
+object HeightProposition {
+
+  val TypeId = 3
+
+  implicit val jsonEncoder: Encoder[HeightProposition] = (p: HeightProposition) => Map(
+    "typeId" -> TypeId.toInt.asJson,
+    "height" -> p.height.toInt.asJson
+  ).asJson
 }
 
 object HeightPropositionSerializer extends SizedCompanionSerializer[HeightProposition] {

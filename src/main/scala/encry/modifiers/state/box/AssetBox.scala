@@ -31,7 +31,7 @@ object AssetBox {
 
   implicit val jsonEncoder: Encoder[AssetBox] = (bx: AssetBox) => Map(
     "id" -> Base58.encode(bx.id).asJson,
-    "proposition" -> "".asJson, // TODO: JsonEncoder for Proposition.
+    "proposition" -> bx.proposition.asJson,
     "nonce" -> bx.nonce.asJson,
     "value" -> bx.amount.asJson
   ).asJson
