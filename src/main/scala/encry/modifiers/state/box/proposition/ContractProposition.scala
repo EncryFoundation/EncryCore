@@ -6,7 +6,7 @@ import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
 import encrywm.backend.env.ScopedRuntimeEnv
 import encrywm.backend.executor.Executor
-import encrywm.common.ScriptPreprocessor.SerializedContract
+import encrywm.common.SourceProcessor.SerializedContract
 import encrywm.common.{ESContract, ScriptMeta, ScriptSerializer}
 import encrywm.frontend.semantics.ComplexityAnalyzer.ScriptComplexityScore
 import io.circe.Encoder
