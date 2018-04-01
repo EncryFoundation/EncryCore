@@ -2,8 +2,8 @@ package encry.modifiers
 
 import encry.local.TestHelper
 import encry.modifiers.mempool._
-import encry.modifiers.state.box.PubKeyInfoBox
-import encry.modifiers.state.box.proposition.AccountProposition
+import encry.modifiers.state.box.{AssetBox, PubKeyInfoBox}
+import encry.modifiers.state.box.proposition.{AccountProposition, OpenProposition}
 import encry.view.history.Height
 import scorex.crypto.signatures.{PublicKey, Signature}
 import scorex.utils.Random
@@ -48,6 +48,20 @@ object InstanceFactory {
     TransactionFactory.addPubKeyInfoTransactionScratch(
       secret, fee, timestamp, useBoxes, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
   }
+
+  val assetBox: AssetBox =
+    AssetBox(
+      AccountProposition(secret.publicImage.address),
+      999L,
+      100000L
+    )
+
+  val openAssetBox: AssetBox =
+    AssetBox(
+      OpenProposition,
+      999L,
+      100000L
+    )
 
   val pubKeyInfoBox: PubKeyInfoBox =
     PubKeyInfoBox(
