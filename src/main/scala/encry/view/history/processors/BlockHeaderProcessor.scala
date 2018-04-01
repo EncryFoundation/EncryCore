@@ -1,6 +1,7 @@
 package encry.view.history.processors
 
 import com.google.common.primitives.Ints
+import encry.EncryApp
 import encry.consensus.{Difficulty, PowConsensus}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
@@ -13,7 +14,7 @@ import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.consensus.History.ProgressInfo
-import scorex.core.consensus.{History, ModifierSemanticValidity}
+import scorex.core.consensus.{Invalid, ModifierSemanticValidity}
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 import scorex.core.{ModifierId, ModifierTypeId}
 
@@ -79,94 +80,76 @@ trait BlockHeaderProcessor extends ScorexLogging {
   /**
     * @return ProgressInfo - info required for State to be consistent with History
     */
-  protected def process(header: EncryBlockHeader): History.ProgressInfo[EncryPersistentModifier] = {
-    val dataToInsert = getDataToInsert(header)
-    historyStorage.bulkInsert(ByteArrayWrapper(header.id), dataToInsert._1, Seq(dataToInsert._2))
-    val score = scoreOf(header.id).getOrElse(-1)
+  protected def process(h: EncryBlockHeader): ProgressInfo[EncryPersistentModifier] = {
+    val dataToInsert: (Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier) = getHeaderInfoToInsert(h)
 
-    if (bestHeaderIdOpt.isEmpty) {
-      log.info(s"Initialize header chain with genesis header ${Algos.encode(header.id)}")
-      ProgressInfo(None, Seq(), Some(header), toDownload(header))
-    } else if (bestHeaderIdOpt.get sameElements header.id) {
-      log.info(s"New best header ${Algos.encode(header.id)} with height ${header.height} and score $score")
-      ProgressInfo(None, Seq(), Some(header), toDownload(header))
-    } else {
-      log.info(s"New orphaned header ${header.encodedId} at height ${header.height} with score $score")
-      ProgressInfo(None, Seq(), None, toDownload(header))
+    historyStorage.bulkInsert(ByteArrayWrapper(h.id), dataToInsert._1, Seq(dataToInsert._2))
+
+    bestHeaderIdOpt match {
+      case Some(bestHeaderId) =>
+        // If we verify transactions, we don't need to send this header to state.
+        // If we don't and this is the best header, we should send this header to state to update state root hash
+        val toProcess = if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) None else Some(h)
+        ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
+      case None =>
+        log.error("Should always have best header after header application")
+        EncryApp.forceStopApplication()
     }
   }
 
-  protected def validate(header: EncryBlockHeader): Try[Unit] = {
-    lazy val parentOpt = typedModifierById[EncryBlockHeader](header.parentId)
-    if (header.parentId sameElements EncryBlockHeader.GenesisParentId) {
-      if (bestHeaderIdOpt.nonEmpty) {
-        Failure(new Error("Trying to append genesis block to non-empty history."))
-      } else if (header.height != chainParams.genesisHeight) {
-        Failure(new Error("Invalid height for genesis block header."))
-      } else {
-        Success()
-      }
-    } else if (parentOpt.isEmpty) {
-      Failure(new Error(s"Parental header <id: ${header.parentId}> does not exist!"))
-    } else if (header.height != parentOpt.get.height + 1) {
-      Failure(new Error(s"Invalid height in header <id: ${header.id}>"))
-    } else if (header.timestamp - timeProvider.time() > Constants.Chain.maxTimeDrift) {
-      Failure(new Error(s"Invalid timestamp in header <id: ${header.id}>"))
-    } else if (header.timestamp < parentOpt.get.timestamp) {
-      Failure(new Error("Header timestamp is less than parental`s"))
-    } else if (requiredDifficultyAfter(parentOpt.get) > header.difficulty) {
-      Failure(new Error("Header <id: ${header.id}> difficulty too low."))
-    } else if (!consensusAlgo.validator.validatePow(header.hHash, header.difficulty)) {
-      Failure(new Error(s"Invalid POW in header <id: ${header.id}>"))
-    } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainParams.maxRollback)) {
-      Failure(new Error("Header is too old to be applied."))
-    } else if (!header.validSignature) {
-      Failure(new Error("Block signature is invalid."))
-    } else {
-      Success()
-    }.recoverWith { case err =>
-      log.warn("Validation error: ", err)
-      Failure(err)
-    }
-  }
-
-  private def getDataToInsert(header: EncryBlockHeader): (Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier) = {
-    val difficulty = header.difficulty
-    if (header.isGenesis) {
+  private def getHeaderInfoToInsert(h: EncryBlockHeader): (Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier) = {
+    val difficulty: Difficulty = h.difficulty
+    if (h.isGenesis) {
+      log.info(s"Initialize header chain with genesis header ${h.encodedId}")
       (Seq(
-        BestHeaderKey -> ByteArrayWrapper(header.id),
-        heightIdsKey(chainParams.genesisHeight) -> ByteArrayWrapper(header.id),
-        headerHeightKey(header.id) -> ByteArrayWrapper(Ints.toByteArray(chainParams.genesisHeight)),
-        headerScoreKey(header.id) -> ByteArrayWrapper(difficulty.toByteArray)),
-        header)
+        BestHeaderKey -> ByteArrayWrapper(h.id),
+        heightIdsKey(chainParams.genesisHeight) -> ByteArrayWrapper(h.id),
+        headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(chainParams.genesisHeight)),
+        headerScoreKey(h.id) -> ByteArrayWrapper(difficulty.toByteArray)), h)
     } else {
-      val blockScore = scoreOf(header.parentId).get + difficulty
+      val score = Difficulty @@ (scoreOf(h.parentId).get + difficulty)
       val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-        if (blockScore > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(header.id)) else Seq()
-
-      val scoreRow = headerScoreKey(header.id) -> ByteArrayWrapper(blockScore.toByteArray)
-      val heightRow = headerHeightKey(header.id) -> ByteArrayWrapper(Ints.toByteArray(header.height))
-      val headerIdsRow = if (blockScore > bestHeadersChainScore) {
-        // Best block. All blocks back should have their id in the first position
-        val self: (ByteArrayWrapper, ByteArrayWrapper) =
-          heightIdsKey(header.height) -> ByteArrayWrapper((Seq(header.id) ++ headerIdsAtHeight(header.height)).flatten.toArray)
-        val parentHeaderOpt: Option[EncryBlockHeader] = typedModifierById[EncryBlockHeader](header.parentId)
-        val forkHeaders = parentHeaderOpt.toSeq
-          .flatMap(parent => headerChainBack(header.height, parent, h => isInBestChain(h)).headers)
-          .filter(h => !isInBestChain(h))
-        val forkIds: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = forkHeaders.map { header =>
-          val otherIds = headerIdsAtHeight(header.height).filter(id => !(id sameElements header.id))
-          heightIdsKey(header.height) -> ByteArrayWrapper((Seq(header.id) ++ otherIds).flatten.toArray)
-        }
-        forkIds :+ self
+        if (score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
+      val scoreRow = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
+      val heightRow = headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
+      val headerIdsRow = if (score > bestHeadersChainScore) {
+        bestBlockHeaderIdsRow(h, score)
       } else {
-        // Orphaned block. Put its ID to the end.
-        Seq(heightIdsKey(header.height) -> ByteArrayWrapper((headerIdsAtHeight(header.height) :+ header.id).flatten.toArray))
+        orphanedBlockHeaderIdsRow(h, score)
       }
-
-      (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
+      (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, h)
     }
   }
+
+  /**
+    * Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
+    * header ids at this height
+    */
+  private def bestBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty) = {
+    val prevHeight = bestHeaderHeight
+    log.info(s"New best header ${h.encodedId} with score $score. Hew height ${h.height}, old height $prevHeight")
+    val self: (ByteArrayWrapper, ByteArrayWrapper) =
+      heightIdsKey(h.height) -> ByteArrayWrapper((Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray)
+    val parentHeaderOpt: Option[EncryBlockHeader] = typedModifierById[EncryBlockHeader](h.parentId)
+    val forkHeaders = parentHeaderOpt.toSeq
+      .flatMap(parent => headerChainBack(h.height, parent, h => isInBestChain(h)).headers)
+      .filter(h => !isInBestChain(h))
+    val forkIds: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = forkHeaders.map { header =>
+      val otherIds = headerIdsAtHeight(header.height).filter(id => !(id sameElements header.id))
+      heightIdsKey(header.height) -> ByteArrayWrapper((Seq(header.id) ++ otherIds).flatten.toArray)
+    }
+    forkIds :+ self
+  }
+
+  /**
+    * Row to storage, that put this orphaned block id to the end of header ids at this height
+    */
+  private def orphanedBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty) = {
+    log.info(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
+    Seq(heightIdsKey(h.height) -> ByteArrayWrapper((headerIdsAtHeight(h.height) :+ h.id).flatten.toArray))
+  }
+
+  protected def validate(header: EncryBlockHeader): Try[Unit] = BlockHeaderValidator.validate(header)
 
   private def toDownload(h: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] = {
     (nodeSettings.verifyTransactions, nodeSettings.stateMode.isDigest) match {
@@ -179,7 +162,6 @@ trait BlockHeaderProcessor extends ScorexLogging {
   }
 
   protected def reportInvalid(header: EncryBlockHeader): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
-
     val modifierId = header.id
     val payloadModifiers = Seq(header.payloadId, header.adProofsId).filter(id => historyStorage.containsObject(id))
       .map(id => ByteArrayWrapper(id))
@@ -192,7 +174,6 @@ trait BlockHeaderProcessor extends ScorexLogging {
       Seq(BestBlockKey -> ByteArrayWrapper(header.parentId))
     } else Seq()
     (toRemove, bestFullBlockKeyUpdate ++ bestHeaderKeyUpdate)
-
   }
 
   def isInBestChain(id: ModifierId): Boolean = heightOf(id).flatMap(h => bestHeaderIdAtHeight(h))
@@ -280,5 +261,68 @@ trait BlockHeaderProcessor extends ScorexLogging {
         s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}")
       consensusAlgo.difficultyController.getDifficulty(requiredHeaders)
     }
+  }
+
+  object BlockHeaderValidator {
+
+    type ValidationResult = Try[Unit]
+
+    def validate(header: EncryBlockHeader): ValidationResult = {
+      if (header.isGenesis) {
+        validateGenesis(header)
+      } else {
+        validateNonGenesis(header)
+      }
+    }
+
+    def validateGenesis(header: EncryBlockHeader): ValidationResult = {
+      if (!(header.parentId sameElements EncryBlockHeader.GenesisParentId)) {
+        fatal(s"Genesis block should have genesis parent id ${Algos.encode(EncryBlockHeader.GenesisParentId)}." +
+          s"Found: ${Algos.encode(header.parentId)}")
+      } else if (bestHeaderIdOpt.nonEmpty) {
+        fatal("Trying to append genesis block to non-empty history")
+      } else if (header.height != chainParams.genesisHeight) {
+        fatal(s"Height of genesis block $header is incorrect")
+      } else {
+        success
+      }
+    }
+
+    def validateNonGenesis(header: EncryBlockHeader): ValidationResult = {
+      val parentOpt = typedModifierById[EncryBlockHeader](header.parentId)
+      parentOpt.fold(error(s"Parent header with id ${Algos.encode(header.parentId)} not defined")) { parent =>
+        if (header.timestamp - timeProvider.time() > Constants.Chain.maxTimeDrift) {
+          error(s"Invalid timestamp in header <id: ${header.id}>")
+        } else if (header.height != parent.height + 1) {
+          fatal(s"Invalid height in header <id: ${header.id}>")
+        } else if (header.timestamp < parent.timestamp) {
+          fatal("Header timestamp is less than parental`s")
+        } else if (requiredDifficultyAfter(parent) > header.difficulty) {
+          fatal("Header <id: ${header.id}> difficulty too low.")
+        } else if (!consensusAlgo.validator.validatePow(header.hHash, header.difficulty)) {
+          fatal(s"Invalid POW in header <id: ${header.id}>")
+        } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainParams.maxRollback)) {
+          fatal("Header is too old to be applied.")
+        } else if (!header.validSignature) {
+          fatal("Block signature is invalid.")
+        } else if (isSemanticallyValid(header.parentId) == Invalid) {
+          fatal("Parent header is marked as semantically invalid")
+        } else {
+          success
+        }
+      }
+    }
+
+    def fatal(msg: String): ValidationResult = {
+      log.warn("Fatal error: ", msg)
+      Failure(new Error(msg))
+    }
+
+    def error(msg: String): ValidationResult = {
+      log.warn("Validation error: ", msg)
+      Failure(new Error(msg))
+    }
+
+    def success: ValidationResult = Success(())
   }
 }
