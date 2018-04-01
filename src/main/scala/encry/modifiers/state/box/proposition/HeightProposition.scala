@@ -24,7 +24,7 @@ case class HeightProposition(height: Height) extends EncryProposition {
 
 object HeightProposition {
 
-  val TypeId = 3
+  val TypeId = 3.toByte
 
   implicit val jsonEncoder: Encoder[HeightProposition] = (p: HeightProposition) => Map(
     "typeId" -> TypeId.toInt.asJson,
