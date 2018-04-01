@@ -21,7 +21,7 @@ object OpenProposition extends ProofOfKnowledgeProposition[Nothing] with EncryPr
 object OpenPropositionSerializer extends Serializer[OpenProposition.type] {
 
   val Length = 1
-  val ByteValue: Array[Byte] = Array.fill(Length)(-127: Byte)
+  val ByteValue: Array[Byte] = Array.fill(Length)(127: Byte)
 
   override def toBytes(obj: OpenProposition.type): Array[Byte] = ByteValue
 

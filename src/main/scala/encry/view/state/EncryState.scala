@@ -6,8 +6,9 @@ import akka.actor.ActorRef
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
 import encry.modifiers.state.box._
-import encry.modifiers.state.box.proposition.OpenProposition
+import encry.modifiers.state.box.proposition.{HeightProposition, OpenProposition}
 import encry.settings.{Algos, Constants, EncryAppSettings, NodeSettings}
+import encry.view.history.Height
 import scorex.core.VersionTag
 import scorex.core.transaction.state.MinimalState
 import scorex.core.utils.ScorexLogging
@@ -49,7 +50,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 object EncryState extends ScorexLogging{
 
   // 33 bytes in Base58 encoding.
-  val afterGenesisStateDigestHex: String = "SAGc1HGQ73sA225pW6voRGRCQYfXu7AnvghhyGE5mMHWP"
+  val afterGenesisStateDigestHex: String = "RndNpwnYRCxR85QsnVAhRhbn5BjrsomEcZcRvXPuKT9SF"
 
   val afterGenesisStateDigest: ADDigest = ADDigest @@ Algos.decode(afterGenesisStateDigestHex).get
 
@@ -62,7 +63,7 @@ object EncryState extends ScorexLogging{
     lazy val genesisSeed = Long.MaxValue
     lazy val rndGen = new scala.util.Random(genesisSeed)
     (0 until Constants.Chain.genesisBoxesQty).map(_ =>
-      AssetBox(OpenProposition, rndGen.nextLong(), Constants.Chain.genesisBoxesAmount))
+      AssetBox(HeightProposition(Height @@ -1), rndGen.nextLong(), Constants.Chain.genesisBoxesAmount))
   }
 
   def generateGenesisUtxoState(stateDir: File,

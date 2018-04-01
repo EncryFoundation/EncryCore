@@ -34,7 +34,7 @@ object HeightProposition {
 
 object HeightPropositionSerializer extends SizedCompanionSerializer[HeightProposition] {
 
-  val Size = 3
+  val Size = 4
 
   override def toBytes(obj: HeightProposition): Array[Byte] = Ints.toByteArray(obj.height)
 
