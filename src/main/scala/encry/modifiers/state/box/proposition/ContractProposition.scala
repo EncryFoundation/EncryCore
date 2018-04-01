@@ -21,7 +21,7 @@ case class ContractProposition(contract: ESContract) extends EncryProposition {
 
   override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] = Try {
     val contractDeserialized = ScriptSerializer.deserialize(contract.serializedScript).get
-    val contractContext = new ContractContext(proof, ctx.transaction, CStateInfo(ctx.height, 1234567L, ctx.stateDigest))  // TODO: Use real timestamp when field is added to state meta.
+    val contractContext = new ContractContext(proof, ctx.transaction, CStateInfo(ctx.height, ctx.lastBlockTimestamp, ctx.stateDigest))
     val executor = new Executor(ScopedRuntimeEnv.initialized("global", 1, Map("context" -> contractContext.asVal)))
     if (!executor.executeContract(contractDeserialized).right.get.r.isInstanceOf[Executor.Unlocked.type])
       throw new Error("Unlock failed.")
