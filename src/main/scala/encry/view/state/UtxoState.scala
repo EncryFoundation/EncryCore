@@ -189,6 +189,8 @@ class UtxoState(override val version: VersionTag,
 
       implicit val context: Context = Context(tx, height, lastBlockTimestamp, rootHash)
 
+      if (tx.fee < tx.minimalFee && !tx.isCoinbase) throw new Error(s"Low fee in $tx")
+
       val bxs = tx.unlockers.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
         .map(t => t.toOption -> u.proofOpt)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, proofOpt)) =>
