@@ -2,7 +2,7 @@ package encry.modifiers.state.box
 
 import com.google.common.primitives.Longs
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import encry.modifiers.state.box.proposition.EncryProposition
+import encry.modifiers.state.box.proposition.{EncryProposition, HeightProposition, OpenProposition}
 import encry.settings.Algos
 import io.circe.Encoder
 import scorex.core.transaction.box.Box
@@ -20,6 +20,8 @@ trait EncryBaseBox extends Box[EncryProposition] {
 
   def isCoinbase: Boolean = this.isInstanceOf[CoinbaseBox]
   def isAmountCarrying: Boolean = this.isInstanceOf[AmountCarryingBox]
+  def isOpen: Boolean = this.proposition.isInstanceOf[OpenProposition.type]
+  def isHeightLocked: Boolean = this.proposition.isInstanceOf[HeightProposition]
 }
 
 object EncryBaseBox {
@@ -27,7 +29,6 @@ object EncryBaseBox {
   implicit val jsonEncoder: Encoder[EncryBaseBox] = {
     case ab: AssetBox => AssetBox.jsonEncoder(ab)
     case cb: CoinbaseBox => CoinbaseBox.jsonEncoder(cb)
-    case op: OpenBox => OpenBox.jsonEncoder(op)
     case pkb: PubKeyInfoBox => PubKeyInfoBox.jsonEncoder(pkb)
   }
 }

@@ -3,12 +3,11 @@ package encry.modifiers.mempool
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.crypto.PublicKey25519
 import encry.modifiers.mempool.directive.{CoinbaseDirective, Directive, DirectiveSerializer}
-import encry.modifiers.state.box.OpenBox
+import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.proof.Signature25519
-import encry.modifiers.state.box.proposition.HeightProposition
+import encry.modifiers.state.box.proposition.OpenProposition
 import encry.settings.Algos
 import encry.utils.Utils
-import encry.view.history.Height
 import encrywm.backend.env.{ESObject, ESValue}
 import encrywm.core.Types.{ESByteVector, ESLong, ESTransaction}
 import io.circe.Encoder
@@ -33,8 +32,8 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
 
   override val maxSize: Int = EncryTransaction.MaxSize
 
-  override val feeBox: Option[OpenBox] =
-    if (fee > 0) Some(OpenBox(HeightProposition(Height @@ 0), Utils.nonceFromDigest(Algos.hash(txHash)), fee))
+  override val feeBox: Option[AssetBox] =
+    if (fee > 0) Some(AssetBox(OpenProposition, Utils.nonceFromDigest(Algos.hash(txHash)), fee))
     else None
 
   override lazy val serializer: Serializer[M] = EncryTransactionSerializer

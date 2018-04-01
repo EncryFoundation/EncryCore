@@ -7,7 +7,7 @@ import encry.consensus.{PowCandidateBlock, PowConsensus}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryBaseTransaction, TransactionFactory}
-import encry.modifiers.state.box.{AmountCarryingBox, OpenBox}
+import encry.modifiers.state.box.{AmountCarryingBox, AssetBox}
 import encry.settings.{Constants, EncryAppSettings}
 import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
@@ -124,13 +124,13 @@ class EncryMiner(settings: EncryAppSettings,
         // Remove stateful-invalid txs from mempool.
         pool.removeAsync(txsToDrop)
 
-        // TODO: Add ability to select key.
+        // TODO: Add ability to select the key.
         val minerSecret = vault.keyManager.keys.head
 
-        val openBxs: IndexedSeq[AmountCarryingBox] = txsToPut.foldLeft(IndexedSeq[OpenBox]())((buff, tx) =>
-          buff ++ tx.newBoxes.foldLeft(IndexedSeq[OpenBox]()) { case (acc, bx) =>
+        val openBxs: IndexedSeq[AmountCarryingBox] = txsToPut.foldLeft(IndexedSeq[AssetBox]())((buff, tx) =>
+          buff ++ tx.newBoxes.foldLeft(IndexedSeq[AssetBox]()) { case (acc, bx) =>
             bx match {
-              case obx: OpenBox => acc :+ obx
+              case ab: AssetBox if ab.isOpen => acc :+ ab
               case _ => acc
             }
           }) ++ vault.getAvailableCoinbaseBoxesAt(state.height)

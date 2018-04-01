@@ -7,7 +7,6 @@ import scala.util.{Failure, Try}
 object StateModifierDeserializer {
 
   def parseBytes(bytes: Array[Byte], typeId: Byte): Try[EncryBaseBox] = typeId match {
-    case OpenBox.`typeId` => OpenBoxSerializer.parseBytes(bytes)
     case CoinbaseBox.`typeId` => CoinbaseBoxSerializer.parseBytes(bytes)
     case AssetBox.TypeId => AssetBoxSerializer.parseBytes(bytes)
     case PubKeyInfoBox.`typeId` => PubKeyInfoBoxSerializer.parseBytes(bytes)

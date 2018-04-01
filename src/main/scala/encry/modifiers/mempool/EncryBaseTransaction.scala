@@ -4,7 +4,7 @@ import encry.account.Account
 import encry.modifiers.Signable25519
 import encry.modifiers.mempool.directive.Directive
 import encry.modifiers.state.box.proposition.EncryProposition
-import encry.modifiers.state.box.{EncryBaseBox, OpenBox}
+import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.{Algos, Constants}
 import encrywm.core.predef.env.ESEnvConvertable
 import io.circe.Encoder
@@ -31,7 +31,7 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
 
   val isCoinbase: Boolean
 
-  val feeBox: Option[OpenBox]
+  val feeBox: Option[AssetBox]
 
   val unlockers: IndexedSeq[Unlocker]
 

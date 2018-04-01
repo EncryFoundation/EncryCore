@@ -1,9 +1,9 @@
 package encry.modifiers.state.box
 
-import com.google.common.primitives.{Bytes, Longs}
+import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.account.{Account, Address}
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import encry.modifiers.state.box.proposition.{AccountProposition, AccountPropositionSerializer, EncryProposition}
+import encry.modifiers.state.box.proposition.{AccountProposition, EncryProposition, PropositionSerializer}
 import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import io.circe.Encoder
 import io.circe.syntax._
@@ -12,8 +12,7 @@ import scorex.crypto.encode.Base58
 
 import scala.util.Try
 
-// TODO: Switch AccountProposition to generic EncryProposition.
-case class AssetBox(override val proposition: AccountProposition,
+case class AssetBox(override val proposition: EncryProposition,
                     override val nonce: Long,
                     override val amount: Amount)
   extends EncryBox[EncryProposition] with AmountCarryingBox {
@@ -50,18 +49,21 @@ object AssetBoxSerializer extends SizedCompanionSerializer[AssetBox] {
   val Size: Int = AddressLength + 16
 
   override def toBytes(obj: AssetBox): Array[Byte] = {
+    val propBytes = PropositionSerializer.toBytes(obj.proposition)
     Bytes.concat(
-      obj.proposition.bytes,
+      Shorts.toByteArray(propBytes.length.toShort),
+      propBytes,
       Longs.toByteArray(obj.nonce),
       Longs.toByteArray(obj.amount)
     )
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[AssetBox] = Try {
-    val accountPropositionLen = AccountPropositionSerializer.Length
-    val proposition = AccountPropositionSerializer.parseBytes(bytes.take(accountPropositionLen)).get // TODO: Use generic PropositionSerializer
-    val nonce = Longs.fromByteArray(bytes.slice(accountPropositionLen, accountPropositionLen + 8))
-    val amount = Longs.fromByteArray(bytes.slice(accountPropositionLen + 8, accountPropositionLen + 16))
+    val accountPropositionLen = Shorts.fromByteArray(bytes.take(2))
+    val iBytes = bytes.drop(2)
+    val proposition = PropositionSerializer.parseBytes(iBytes.take(accountPropositionLen)).get
+    val nonce = Longs.fromByteArray(iBytes.slice(accountPropositionLen, accountPropositionLen + 8))
+    val amount = Longs.fromByteArray(iBytes.slice(accountPropositionLen + 8, accountPropositionLen + 16))
     AssetBox(proposition, nonce, amount)
   }
 }

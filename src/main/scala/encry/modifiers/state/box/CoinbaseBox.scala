@@ -2,16 +2,15 @@ package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs}
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import encry.modifiers.state.box.proof.Proof
 import encry.modifiers.state.box.proposition.{HeightProposition, HeightPropositionSerializer}
 import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.settings.Algos
-import io.circe.{Encoder, Json}
+import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.ADValue
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class CoinbaseBox(override val proposition: HeightProposition,
                        override val nonce: Long,
@@ -32,7 +31,7 @@ object CoinbaseBox {
 
   implicit val jsonEncoder: Encoder[CoinbaseBox] = (bx: CoinbaseBox) => Map(
     "id" -> Algos.encode(bx.id).asJson,
-    "proposition" -> s"Height proposition: ${bx.proposition.height}".asJson,
+    "proposition" -> bx.proposition.asJson,
     "nonce" -> bx.nonce.asJson,
     "value" -> bx.amount.asJson
   ).asJson

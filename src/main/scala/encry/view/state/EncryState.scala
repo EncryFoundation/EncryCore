@@ -6,9 +6,8 @@ import akka.actor.ActorRef
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
 import encry.modifiers.state.box._
-import encry.modifiers.state.box.proposition.HeightProposition
+import encry.modifiers.state.box.proposition.OpenProposition
 import encry.settings.{Algos, Constants, EncryAppSettings, NodeSettings}
-import encry.view.history.Height
 import scorex.core.VersionTag
 import scorex.core.transaction.state.MinimalState
 import scorex.core.utils.ScorexLogging
@@ -59,11 +58,11 @@ object EncryState extends ScorexLogging{
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
   // TODO: Generate CoinbaseBox'es at the genesis stage.
-  def genesisBoxes: IndexedSeq[OpenBox] = {
+  def genesisBoxes: IndexedSeq[AssetBox] = {
     lazy val genesisSeed = Long.MaxValue
     lazy val rndGen = new scala.util.Random(genesisSeed)
     (0 until Constants.Chain.genesisBoxesQty).map(_ =>
-      OpenBox(HeightProposition(Height @@ -1), rndGen.nextLong(), Constants.Chain.genesisBoxesAmount))
+      AssetBox(OpenProposition, rndGen.nextLong(), Constants.Chain.genesisBoxesAmount))
   }
 
   def generateGenesisUtxoState(stateDir: File,
