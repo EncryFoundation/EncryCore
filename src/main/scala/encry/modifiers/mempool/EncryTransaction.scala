@@ -50,14 +50,14 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
 
     if (!validSize) {
       Failure(new Error("Invalid size"))
-    } else if (fee < 0) {
-      Failure(new Error("Negative fee"))
     } else if (!validSignature) {
       Failure(new Error("Invalid signature"))
     } else if (!directives.forall(_.isValid)) {
       Failure(new Error("Bad outputs"))
     } else if (!validOrder(directives.map(_.idx))) {
       Failure(new Error("Illegal directives order"))
+    } else if (fee < minimalFee) {
+      Failure(new Error("Low fee"))
     } else Success()
   }
 
