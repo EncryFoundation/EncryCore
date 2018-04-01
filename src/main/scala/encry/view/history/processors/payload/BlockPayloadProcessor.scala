@@ -44,7 +44,7 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
       historyStorage.modifierById(m.headerId) match {
         case None =>
           Failure(new Error(s"Header for modifier $m is undefined"))
-        case Some(header: EncryBlockHeader) if !(header.txsRoot sameElements m.digest) =>
+        case Some(header: EncryBlockHeader) if !(header.transactionsRoot sameElements m.digest) =>
           Failure(new Error(s"Header transactions root ${Algos.encode(header.adProofsRoot)} differs from $m digest"))
         case Some(_: EncryBlockHeader) =>
           Success()

@@ -16,7 +16,7 @@ trait EncryBaseBlockHeader extends EncryPersistentModifier with Signable25519 {
 
   val stateRoot: ADDigest
 
-  val txsRoot: Digest32
+  val transactionsRoot: Digest32
 
   val timestamp: Timestamp
 

@@ -3,7 +3,7 @@ package encry.modifiers.history.block.header
 import com.google.common.primitives.{Ints, _}
 import encry.consensus.{Difficulty, DifficultySerializer}
 import encry.crypto.PublicKey25519
-import encry.modifiers.ModifierWithDigest
+import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.state.box.proof.Signature25519
@@ -26,7 +26,7 @@ case class EncryBlockHeader(override val version: Version,
                             override val parentId: ModifierId,
                             override val adProofsRoot: Digest32,
                             override val stateRoot: ADDigest, // 32 bytes + 1 (tree height)
-                            override val txsRoot: Digest32,
+                            override val transactionsRoot: Digest32,
                             override val timestamp: Timestamp,
                             override val height: Int, // TODO: @@ Height
                             var nonce: Long = 0L,
@@ -41,17 +41,23 @@ case class EncryBlockHeader(override val version: Version,
   override lazy val id: ModifierId = ModifierId @@ hHash
 
   val hHash: Digest32 =
-    getHash(version, accountPubKey, parentId, adProofsRoot, stateRoot, txsRoot, timestamp, height, nonce, difficulty)
+    getHash(version, accountPubKey, parentId, adProofsRoot, stateRoot, transactionsRoot, timestamp, height, nonce, difficulty)
 
   override val dataToSign: Array[Byte] =
-    getMessageToSign(version, accountPubKey, parentId, adProofsRoot, stateRoot, txsRoot, timestamp, height, difficulty)
+    getMessageToSign(version, accountPubKey, parentId, adProofsRoot, stateRoot, transactionsRoot, timestamp, height, difficulty)
 
   lazy val isGenesis: Boolean = height == Constants.Chain.genesisHeight
 
   lazy val payloadId: ModifierId =
-    ModifierWithDigest.computeId(EncryBlockPayload.modifierTypeId, id, txsRoot)
+    ModifierWithDigest.computeId(EncryBlockPayload.modifierTypeId, id, transactionsRoot)
 
   lazy val adProofsId: ModifierId = ModifierWithDigest.computeId(ADProofs.modifierTypeId, id, adProofsRoot)
+
+  def isRelated(mod: EncryPersistentModifier): Boolean = mod match {
+    case p: ADProofs => adProofsRoot sameElements p.digest
+    case t: EncryBlockPayload => transactionsRoot sameElements t.digest
+    case _ => false
+  }
 
   override def serializer: Serializer[M] = EncryBlockHeaderSerializer
 }
@@ -67,7 +73,7 @@ object EncryBlockHeader {
     "hash" -> Base16.encode(h.id).asJson,
     "parentId" -> Algos.encode(h.payloadId).asJson,
     "stateRoot" -> Algos.encode(h.stateRoot).asJson,
-    "txRoot" -> Algos.encode(h.txsRoot).asJson,
+    "txRoot" -> Algos.encode(h.transactionsRoot).asJson,
     "timestamp" -> h.timestamp.asJson,
     "height" -> h.height.asJson,
     "difficulty" -> h.difficulty.untag(Difficulty).asJson,
@@ -130,7 +136,7 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
       obj.parentId,
       obj.adProofsRoot,
       obj.stateRoot,
-      obj.txsRoot,
+      obj.transactionsRoot,
       Longs.toByteArray(obj.timestamp),
       Ints.toByteArray(obj.height),
       Longs.toByteArray(obj.nonce),

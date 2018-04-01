@@ -31,7 +31,7 @@ case class EncryBlock(override val header: EncryBlockHeader,
         case _ => false
       }
 
-    if (header.txsRoot != payload.digest) {
+    if (header.transactionsRoot != payload.digest) {
       log.info(s"$this Invalid tx Merkle Root hash.")
       Failure(new Error("Invalid tx Merkle Root hash"))
     } else if (!(validCoinbase && payload.transactions.count(_.isCoinbase) == 1)) {

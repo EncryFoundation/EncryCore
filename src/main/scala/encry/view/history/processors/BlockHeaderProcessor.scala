@@ -81,9 +81,9 @@ trait BlockHeaderProcessor extends ScorexLogging {
     * @return ProgressInfo - info required for State to be consistent with History
     */
   protected def process(h: EncryBlockHeader): ProgressInfo[EncryPersistentModifier] = {
-    val dataToInsert: (Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier) = getHeaderInfoToInsert(h)
+    val dataToUpdate: (Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier) = getHeaderInfoUpdate(h)
 
-    historyStorage.bulkInsert(ByteArrayWrapper(h.id), dataToInsert._1, Seq(dataToInsert._2))
+    historyStorage.bulkInsert(ByteArrayWrapper(h.id), dataToUpdate._1, Seq(dataToUpdate._2))
 
     bestHeaderIdOpt match {
       case Some(bestHeaderId) =>
@@ -97,7 +97,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
     }
   }
 
-  private def getHeaderInfoToInsert(h: EncryBlockHeader): (Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier) = {
+  private def getHeaderInfoUpdate(h: EncryBlockHeader): (Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier) = {
     val difficulty: Difficulty = h.difficulty
     if (h.isGenesis) {
       log.info(s"Initialize header chain with genesis header ${h.encodedId}")
