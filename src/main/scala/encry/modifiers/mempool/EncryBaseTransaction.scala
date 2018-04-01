@@ -10,6 +10,7 @@ import encrywm.core.predef.env.ESEnvConvertable
 import io.circe.Encoder
 import scorex.core.ModifierId
 import scorex.core.transaction.Transaction
+import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.hash.Digest32
 
 import scala.util.Try
@@ -42,7 +43,8 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
 
   lazy val account: Account = Account(accountPubKey.pubKeyBytes)
 
-  lazy val minimalFee: Float = Constants.feeMinAmount + Constants.txByteCost * length
+  lazy val minimalFee: Amount = Constants.feeMinAmount +
+    directives.map(_.cost).sum + (Constants.txByteCost * length).toLong
 
   override def toString: String = s"<TX: id=${Algos.encode(id)} isCoinbase=$isCoinbase>"
 

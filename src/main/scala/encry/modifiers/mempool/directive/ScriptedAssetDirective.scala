@@ -26,7 +26,7 @@ case class ScriptedAssetDirective(script: ESContract,
   override def boxes(digest: Digest32): Seq[EncryBaseBox] =
     Seq(AssetBox(ContractProposition(script), Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)), amount))
 
-  override val cost: Amount = 4
+  override val cost: Amount = 4 * script.meta.complexityScore
 
   override lazy val isValid: Boolean = amount > 0 && script.validMeta
 
