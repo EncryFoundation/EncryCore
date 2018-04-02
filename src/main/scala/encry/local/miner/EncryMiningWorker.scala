@@ -21,7 +21,7 @@ class EncryMiningWorker(settings: EncryAppSettings,
 
   override def preStart(): Unit = {
     log.info("Booting new mining worker")
-    context.system.scheduler.scheduleOnce(settings.nodeSettings.miningDelay) (self ! MineBlock(Random.nextLong()))
+    context.system.scheduler.scheduleOnce(settings.nodeSettings.blockInterval) (self ! MineBlock(Random.nextLong()))
   }
 
   override def receive: Receive = {
@@ -40,7 +40,7 @@ class EncryMiningWorker(settings: EncryAppSettings,
               viewHolderRef ! LocallyGeneratedModifier(adp)
             }
           }
-          context.system.scheduler.scheduleOnce(settings.nodeSettings.miningDelay) {
+          context.system.scheduler.scheduleOnce(settings.nodeSettings.blockInterval) {
             self ! MineBlock(Random.nextLong())
           }
         case None =>

@@ -131,7 +131,6 @@ class UtxoState(override val version: VersionTag,
           opRes
         })
       }.get
-
       val proof = persistentProver.generateProofAndUpdateStorage()
       val digest = persistentProver.digest
 
