@@ -149,7 +149,10 @@ trait BlockHeaderProcessor extends ScorexLogging {
     Seq(heightIdsKey(h.height) -> ByteArrayWrapper((headerIdsAtHeight(h.height) :+ h.id).flatten.toArray))
   }
 
-  protected def validate(header: EncryBlockHeader): Try[Unit] = BlockHeaderValidator.validate(header)
+  protected def validate(header: EncryBlockHeader): Try[Unit] = {
+    val validator = new BlockHeaderValidator
+    validator.validate(header)
+  }
 
   private def toDownload(h: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] = {
     (nodeSettings.verifyTransactions, nodeSettings.stateMode.isDigest) match {
@@ -263,7 +266,7 @@ trait BlockHeaderProcessor extends ScorexLogging {
     }
   }
 
-  object BlockHeaderValidator {
+  class BlockHeaderValidator {
 
     type ValidationResult = Try[Unit]
 
