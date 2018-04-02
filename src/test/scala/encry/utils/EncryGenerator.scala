@@ -1,13 +1,18 @@
 package encry.utils
 
 import encry.account.Address
+import encry.consensus.Difficulty
 import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.local.TestHelper.Props
+import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
+import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
-import scorex.crypto.authds.ADKey
-import scorex.crypto.signatures.{Curve25519, PublicKey}
+import scorex.core.ModifierId
+import scorex.crypto.authds.{ADDigest, ADKey}
+import scorex.crypto.hash.Digest32
+import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 import scorex.utils.Random
 
 trait EncryGenerator {
@@ -45,5 +50,22 @@ trait EncryGenerator {
       TransactionFactory.defaultPaymentTransactionScratch(k, -100,
         timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
     }
+  }
+
+  def genHeader: EncryBlockHeader = {
+    val rand = new scala.util.Random
+    EncryBlockHeader(
+      Random.randomBytes(32)(rand.nextInt(32)),
+      PublicKey25519(PublicKey @@ Random.randomBytes()),
+      Signature25519(Signature @@ Random.randomBytes(64)),
+      ModifierId @@ Random.randomBytes(),
+      Digest32 @@ Random.randomBytes(),
+      ADDigest @@ Random.randomBytes(33),
+      Digest32 @@ Random.randomBytes(),
+      rand.nextLong(),
+      rand.nextInt(),
+      rand.nextLong(),
+      Difficulty @@ BigInt(999999999999999L)
+    )
   }
 }
