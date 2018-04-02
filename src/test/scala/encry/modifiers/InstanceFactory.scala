@@ -15,7 +15,16 @@ object InstanceFactory {
   private val publicKey = secret.publicImage
   private val timestamp = System.currentTimeMillis()
 
-  def paymentTransactionValid: EncryTransaction = {
+  lazy val fakeTransaction: EncryTransaction = {
+    val fee = genHelper.Props.txFee
+    val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address),
+      genHelper.genAssetBox(publicKey.address))
+
+    TransactionFactory.defaultPaymentTransactionScratch(secret, fee, timestamp, useBoxes,
+      publicKey.address, 12345678L)
+  }
+
+  lazy val paymentTransactionValid: EncryTransaction = {
     val fee = genHelper.Props.txFee
     val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address),
       genHelper.genAssetBox(publicKey.address))
@@ -24,19 +33,19 @@ object InstanceFactory {
       publicKey.address, genHelper.Props.txAmount)
   }
 
-  def paymentTransactionInvalid: EncryTransaction = {
+  lazy val paymentTransactionInvalid: EncryTransaction = {
     val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address))
 
     TransactionFactory.defaultPaymentTransactionScratch(secret, -100, timestamp, useBoxes,
       genHelper.Props.recipientAddr, genHelper.Props.txAmount)
   }
 
-  val coinbaseTransaction: EncryTransaction = {
+  lazy val coinbaseTransaction: EncryTransaction = {
     val useBoxes = IndexedSeq(genHelper.genAssetBox(secret.publicImage.address))
     TransactionFactory.coinbaseTransactionScratch(secret, timestamp, useBoxes, Height @@ 0)
   }
 
-  def addPubKeyInfoTransaction: EncryTransaction = {
+  lazy val addPubKeyInfoTransaction: EncryTransaction = {
     val fee = genHelper.Props.txFee
     val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address),
       genHelper.genAssetBox(publicKey.address), genHelper.genAssetBox(publicKey.address))
@@ -49,21 +58,21 @@ object InstanceFactory {
       secret, fee, timestamp, useBoxes, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
   }
 
-  val assetBox: AssetBox =
+  lazy val assetBox: AssetBox =
     AssetBox(
       AccountProposition(secret.publicImage.address),
       999L,
       100000L
     )
 
-  val openAssetBox: AssetBox =
+  lazy val openAssetBox: AssetBox =
     AssetBox(
       OpenProposition,
       999L,
       100000L
     )
 
-  val pubKeyInfoBox: PubKeyInfoBox =
+  lazy val pubKeyInfoBox: PubKeyInfoBox =
     PubKeyInfoBox(
       AccountProposition(secret.publicImage.address),
       999L,

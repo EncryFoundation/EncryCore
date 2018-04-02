@@ -7,13 +7,14 @@ import org.scalatest.{Matchers, PropSpec}
 
 class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts with StateContext {
 
+  import InstanceFactory._
+
   property("Unlocking proposition with dummy contract") {
 
-    // TODO: Use real case transaction for more complex testing.
-    implicit val defaultCtx: Context = Context(InstanceFactory.paymentTransactionValid, height, lastBlockTimestamp, stateDigest)
+    implicit val defaultCtx: Context = Context(fakeTransaction, height, lastBlockTimestamp, stateDigest)
 
     val proposition = ContractProposition(DummyContract)
-    val fakeProof = InstanceFactory.paymentTransactionValid.signature
+    val fakeProof = fakeTransaction.signature
 
     val unlockR = proposition.unlockTry(fakeProof)
 
@@ -22,10 +23,10 @@ class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts
 
   property("Unlocking proposition with HeightLock contract (Should unlock)") {
 
-    implicit val ctx: Context = Context(InstanceFactory.paymentTransactionValid, Height @@ 1269, lastBlockTimestamp, stateDigest)
+    implicit val ctx: Context = Context(fakeTransaction, Height @@ 1269, lastBlockTimestamp, stateDigest)
 
     val proposition = ContractProposition(HLContract)
-    val fakeProof = InstanceFactory.paymentTransactionValid.signature
+    val fakeProof = fakeTransaction.signature
 
     val unlockR = proposition.unlockTry(fakeProof)
 
@@ -34,10 +35,10 @@ class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts
 
   property("Unlocking proposition with HeightLock contract (Should fail)") {
 
-    implicit val ctx: Context = Context(InstanceFactory.paymentTransactionValid, Height @@ 561, lastBlockTimestamp, stateDigest)
+    implicit val ctx: Context = Context(fakeTransaction, Height @@ 561, lastBlockTimestamp, stateDigest)
 
     val proposition = ContractProposition(HLContract)
-    val fakeProof = InstanceFactory.paymentTransactionValid.signature
+    val fakeProof = fakeTransaction.signature
 
     val unlockR = proposition.unlockTry(fakeProof)
 
