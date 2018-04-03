@@ -10,6 +10,8 @@ import scorex.crypto.authds.ADDigest
 
 case class CStateInfo(height: Height, lastBlockTimestamp: Long, stateDigest: ADDigest) extends ESEnvConvertable {
 
+  override val esType: ESProduct = ESState
+
   override def asVal: ESValue = ESValue("state", ESState)(convert)
 
   override def convert: ESObject = {
@@ -18,13 +20,15 @@ case class CStateInfo(height: Height, lastBlockTimestamp: Long, stateDigest: ADD
       "lastBlockTimestamp" -> ESValue("lastBlockTimestamp", ESLong)(lastBlockTimestamp),
       "stateDigest" -> ESValue("stateDigest", ESByteVector)(stateDigest)
     )
-    ESObject(ESState.ident, fields)
+    ESObject(ESState.ident, fields, esType)
   }
 }
 
 class ContractContext(proof: Proof,
                       transaction: EncryBaseTransaction,
                       si: CStateInfo) extends ESEnvConvertable {
+
+  override val esType: ESProduct = ESContext
 
   override def asVal: ESValue = ESValue("context", ESContext)(convert)
 
@@ -34,6 +38,6 @@ class ContractContext(proof: Proof,
       "transaction" -> transaction.asVal,
       "state" -> si.asVal
     )
-    ESObject(ESContext.ident, fields)
+    ESObject(ESContext.ident, fields, esType)
   }
 }

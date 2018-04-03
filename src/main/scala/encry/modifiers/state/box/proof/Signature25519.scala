@@ -25,6 +25,8 @@ case class Signature25519(signature: Signature) extends Proof {
 
   override def serializer: Serializer[Signature25519] = Signature25519Serializer
 
+  override val esType: Types.ESProduct = Types.Signature25519
+
   override def asVal: ESValue = ESValue("proof", ESProof)(convert)
 
   override def convert: ESObject = {
@@ -32,7 +34,7 @@ case class Signature25519(signature: Signature) extends Proof {
       "sigBytes" -> ESValue("sigBytes", ESByteVector)(signature),
       "typeId" -> ESValue("typeId", ESInt)(typeId)
     )
-    ESObject(Types.Signature25519.ident, fields)
+    ESObject(Types.Signature25519.ident, fields, esType)
   }
 }
 

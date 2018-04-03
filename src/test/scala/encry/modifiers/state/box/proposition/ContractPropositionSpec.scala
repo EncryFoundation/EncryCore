@@ -44,4 +44,16 @@ class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts
 
     unlockR.isSuccess shouldBe false
   }
+
+  property("Unlocking proposition with AccountLock contract (Should unlock)") {
+
+    implicit val ctx: Context = Context(TransactionForContract, Height @@ 561, lastBlockTimestamp, stateDigest)
+
+    val proposition = ContractProposition(ALContract)
+    val proof = TransactionForContract.signature
+
+    val unlockR = proposition.unlockTry(proof)
+
+    unlockR.isSuccess shouldBe true
+  }
 }

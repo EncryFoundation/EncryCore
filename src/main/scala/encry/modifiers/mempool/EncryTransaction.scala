@@ -9,6 +9,7 @@ import encry.modifiers.state.box.proposition.OpenProposition
 import encry.settings.Algos
 import encry.utils.Utils
 import encrywm.backend.env.{ESObject, ESValue}
+import encrywm.core.Types
 import encrywm.core.Types.{ESByteVector, ESLong, ESTransaction}
 import io.circe.Encoder
 import io.circe.syntax._
@@ -61,6 +62,8 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
     } else Success()
   }
 
+  override val esType: Types.ESProduct = ESTransaction
+
   override def asVal: ESValue = ESValue("transaction", ESTransaction)(convert)
 
   // TODO: Add converters for boxes.
@@ -71,7 +74,7 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
       "messageToSign" -> ESValue("messageToSign", ESByteVector)(txHash),
       "timestamp" -> ESValue("timestamp", ESLong)(timestamp)
     )
-    ESObject(ESTransaction.ident, fields)
+    ESObject(ESTransaction.ident, fields, esType)
   }
 }
 
