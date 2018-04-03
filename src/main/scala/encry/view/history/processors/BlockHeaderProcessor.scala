@@ -21,7 +21,7 @@ import scorex.core.{ModifierId, ModifierTypeId}
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
-trait BlockHeaderProcessor extends ScorexLogging {
+trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
   protected val nodeSettings: NodeSettings
 
@@ -152,16 +152,6 @@ trait BlockHeaderProcessor extends ScorexLogging {
   protected def validate(header: EncryBlockHeader): Try[Unit] = {
     val validator = new BlockHeaderValidator
     validator.validate(header)
-  }
-
-  private def toDownload(h: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] = {
-    (nodeSettings.verifyTransactions, nodeSettings.stateMode.isDigest) match {
-      case (true, true) =>
-        Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId))
-      case (true, false) =>
-        Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
-      case (false, _) => Seq()
-    }
   }
 
   protected def reportInvalid(header: EncryBlockHeader): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
