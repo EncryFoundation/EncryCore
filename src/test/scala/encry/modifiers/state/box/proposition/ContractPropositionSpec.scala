@@ -56,4 +56,28 @@ class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts
 
     unlockR.isSuccess shouldBe true
   }
+
+  property("Unlocking proposition with AccountLock contract (Should fail - wrong signature)") {
+
+    implicit val ctx: Context = Context(TransactionForContract, Height @@ 561, lastBlockTimestamp, stateDigest)
+
+    val proposition = ContractProposition(ALContract)
+    val proof = fakeTransaction.signature
+
+    val unlockR = proposition.unlockTry(proof)
+
+    unlockR.isSuccess shouldBe true
+  }
+
+  property("Unlocking proposition with AccountLock contract (Should unlock, complex contract)") {
+
+    implicit val ctx: Context = Context(TransactionForContract, Height @@ 561, lastBlockTimestamp, stateDigest)
+
+    val proposition = ContractProposition(ALContract2)
+    val proof = TransactionForContract.signature
+
+    val unlockR = proposition.unlockTry(proof)
+
+    unlockR.isSuccess shouldBe true
+  }
 }

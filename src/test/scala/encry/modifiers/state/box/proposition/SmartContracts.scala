@@ -12,7 +12,7 @@ trait SmartContracts extends Keys {
     val source =
       """
         |unlock if true
-    """.stripMargin
+      """.stripMargin
 
     SourceProcessor.source2Contract(source).get
   }
@@ -35,6 +35,20 @@ trait SmartContracts extends Keys {
       s"""
         |let ownerPubKey = base58"${Base58.encode(publicKey.pubKeyBytes)}"
         |unlock if checkSig(context.transaction.signature, context.transaction.messageToSign, ownerPubKey)
+      """.stripMargin
+
+    SourceProcessor.source2Contract(source).get
+  }
+
+  val ALContract2: ESContract = {
+    val source =
+      s"""
+         |let ownerPubKey = base58"${Base58.encode(publicKey.pubKeyBytes)}"
+         |match context.proof:
+         |    case sig -> Signature25519:
+         |        unlock if checkSig(sig.sigBytes, context.transaction.messageToSign, ownerPubKey)
+         |    case _:
+         |        abort
       """.stripMargin
 
     SourceProcessor.source2Contract(source).get
