@@ -16,7 +16,6 @@ import io.circe.syntax._
 import scorex.core.NodeViewHolder.ReceivableMessages.Subscribe
 import scorex.core.network.Handshake
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool}
-import scorex.core.network.peer.PeerManager
 import scorex.core.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import scorex.core.utils.NetworkTimeProvider
 import scorex.core.{LocalInterface, ModifierId, NodeViewHolder}

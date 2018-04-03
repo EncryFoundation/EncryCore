@@ -5,9 +5,9 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.settings.NodeSettings
+import encry.settings.{Constants, NodeSettings}
 import encry.view.history.Height
-import encry.view.history.storage.FullBlockDownloaderProcessor
+import encry.view.history.storage.FullBlockDownloadProcessor
 import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 
@@ -17,7 +17,7 @@ trait DownloadProcessor extends ScorexLogging {
 
   protected val timeProvider: NetworkTimeProvider
 
-  protected[history] lazy val FBDProcessor: FullBlockDownloaderProcessor = FullBlockDownloaderProcessor(nodeSettings)
+  protected[history] lazy val FBDProcessor: FullBlockDownloadProcessor = FullBlockDownloadProcessor(nodeSettings)
 
   private var isHeadersChainSyncedVar: Boolean = false
 
@@ -35,7 +35,7 @@ trait DownloadProcessor extends ScorexLogging {
 
   def modifiersToDownload(howMany: Int, excluding: Iterable[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
     def contitution(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] = {
-      if(acc.lengthCompare(howMany) >= 0) acc
+      if (acc.lengthCompare(howMany) >= 0) acc
       else {
         headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[EncryBlockHeader](id)) match {
           case Some(bestHeaderAtThisHeight) =>
@@ -56,7 +56,7 @@ trait DownloadProcessor extends ScorexLogging {
   }
 
   protected def toDownload(header: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] = {
-    if(!nodeSettings.verifyTransactions){
+    if (!nodeSettings.verifyTransactions){
       Seq.empty
     } else if (header.height >= FBDProcessor.minimalHeightOfBlock) requiredModifiersForHeader(header)
     else if (!isHeadersChainSynced && isNewHeader(header)) {
@@ -68,12 +68,11 @@ trait DownloadProcessor extends ScorexLogging {
   }
 
   private def requiredModifiersForHeader(header: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] =
-    if(!nodeSettings.verifyTransactions) Seq.empty
+    if (!nodeSettings.verifyTransactions) Seq.empty
     else Seq((EncryBlockPayload.modifierTypeId, header.id), (ADProofs.modifierTypeId, header.adProofsId))
 
   private def isNewHeader(header: EncryBlockHeader): Boolean = {
-    //TODO: Magic Number
-    timeProvider.time() - header.timestamp < nodeSettings.blockInterval.toMillis * 3
+    // TODO: Magic Number
+    timeProvider.time() - header.timestamp < Constants.Chain.desiredBlockInterval.toMillis * 3
   }
-
 }

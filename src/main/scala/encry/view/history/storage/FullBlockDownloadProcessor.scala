@@ -4,7 +4,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.settings.NodeSettings
 import encry.view.history.Height
 
-case class FullBlockDownloaderProcessor(nodeSettings: NodeSettings){
+case class FullBlockDownloadProcessor(nodeSettings: NodeSettings){
 
   private[history] var minimalHeightOfBlock: Height = Height @@ -1
 
@@ -19,5 +19,4 @@ case class FullBlockDownloaderProcessor(nodeSettings: NodeSettings){
       else Height @@ Math.max(header.height - nodeSettings.blocksToKeep + 1, 0)
     } else Height @@ Math.max(header.height - nodeSettings.blocksToKeep + 1, minimalHeightOfBlock)
   }
-
 }

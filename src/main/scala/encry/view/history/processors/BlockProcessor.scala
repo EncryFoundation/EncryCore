@@ -66,7 +66,6 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
         prevBestScore <- scoreOf(bestFullBlockId)
         score <- scoreOf(newBestHeaderId)
         if score > prevBestScore
-        //TODO currentScore == prevBestScore
       } yield applyBetterChain(block, newModRow, prevBestFullBlock, newBestHeaderId, storageVersion)
 
   private def applyBetterChain(block: EncryBlock,
