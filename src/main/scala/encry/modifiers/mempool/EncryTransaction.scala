@@ -9,8 +9,8 @@ import encry.modifiers.state.box.proposition.OpenProposition
 import encry.settings.Algos
 import encry.utils.Utils
 import encrywm.backend.env.{ESObject, ESValue}
-import encrywm.core.Types
-import encrywm.core.Types.{ESByteVector, ESLong, ESTransaction}
+import encrywm.lib.Types
+import encrywm.lib.Types.{ESByteVector, ESLong, ESTransaction}
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer

@@ -1,7 +1,7 @@
 package encry.modifiers.state.box.proof
 
 import encry.modifiers.state.box.proof.Proof.ProofTypeId
-import encrywm.core.predef.env.ESEnvConvertable
+import encrywm.lib.predef.env.ESEnvConvertable
 import io.circe.Encoder
 import scorex.core.serialization.BytesSerializable
 

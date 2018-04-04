@@ -4,8 +4,8 @@ import encry.crypto.PublicKey25519
 import encry.modifiers.state.box.proof.Proof.ProofTypeId
 import encry.settings.Algos
 import encrywm.backend.env.{ESObject, ESValue}
-import encrywm.core.Types
-import encrywm.core.Types.{ESByteVector, ESInt, ESProof}
+import encrywm.lib.Types
+import encrywm.lib.Types.{ESByteVector, ESInt, ESProof}
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer

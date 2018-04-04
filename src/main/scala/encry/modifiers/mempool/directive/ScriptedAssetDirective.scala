@@ -53,6 +53,7 @@ object ScriptedAssetDirectiveSerializer extends Serializer[ScriptedAssetDirectiv
       Shorts.toByteArray(obj.script.serializedScript.length.toShort),
       obj.script.serializedScript,
       Ints.toByteArray(obj.script.meta.complexityScore),
+      obj.script.meta.scriptFingerprint,
       Longs.toByteArray(obj.amount),
       Ints.toByteArray(obj.idx)
     )
@@ -60,8 +61,9 @@ object ScriptedAssetDirectiveSerializer extends Serializer[ScriptedAssetDirectiv
   override def parseBytes(bytes: Array[Byte]): Try[ScriptedAssetDirective] = Try {
     val scriptLen = Shorts.fromByteArray(bytes.take(2))
     val complexity = Ints.fromByteArray(bytes.slice(scriptLen + 2, scriptLen + 2 + 4))
-    val contract = ESContract(bytes.slice(2, scriptLen), ScriptMeta(complexity))
-    val amount = Longs.fromByteArray(bytes.slice(scriptLen + 2 + 4, scriptLen + 2 + 4 + 8))
+    val fingerprint = bytes.slice(scriptLen + 2 + 4, scriptLen + 2 + 4 + 8)
+    val contract = ESContract(bytes.slice(2, scriptLen), ScriptMeta(complexity, fingerprint))
+    val amount = Longs.fromByteArray(bytes.slice(scriptLen + 2 + 4 + 8, scriptLen + 2 + 4 + 8 + 8))
     val idx = Ints.fromByteArray(bytes.takeRight(4))
     ScriptedAssetDirective(contract, amount, idx)
   }

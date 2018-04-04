@@ -1,13 +1,13 @@
 package encry.modifiers.state.box.proposition
 
-import com.google.common.primitives.Ints
+import com.google.common.primitives.{Bytes, Ints}
 import encry.contracts.{CStateInfo, ContractContext}
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
 import encrywm.backend.env.ScopedRuntimeEnv
 import encrywm.backend.executor.Executor
 import encrywm.common.SourceProcessor.SerializedContract
-import encrywm.common.{ESContract, ScriptMeta, ScriptSerializer}
+import encrywm.common.{ESContract, ScriptFingerprint, ScriptMeta, ScriptSerializer}
 import encrywm.frontend.semantics.ComplexityAnalyzer.ScriptComplexityScore
 import io.circe.Encoder
 import io.circe.syntax._
@@ -40,18 +40,22 @@ object ContractProposition {
     "script" -> Base58.encode(p.contract.serializedScript).asJson
   ).asJson
 
-  def apply(sc: SerializedContract, scs: ScriptComplexityScore): ContractProposition =
-    ContractProposition(ESContract(sc, ScriptMeta(scs)))
+  def apply(sc: SerializedContract, scs: ScriptComplexityScore, sf: ScriptFingerprint): ContractProposition =
+    ContractProposition(ESContract(sc, ScriptMeta(scs, sf)))
 }
 
 object ContractPropositionSerializer extends Serializer[ContractProposition] {
 
   // TODO: Move contract serialization logic to EncryScript library.
-  override def toBytes(obj: ContractProposition): Array[Byte] =
-    obj.contract.serializedScript ++ Ints.toByteArray(obj.contract.meta.complexityScore)
+  override def toBytes(obj: ContractProposition): Array[Byte] = Bytes.concat(
+      obj.contract.serializedScript,
+      Ints.toByteArray(obj.contract.meta.complexityScore),
+      obj.contract.meta.scriptFingerprint
+    )
 
   override def parseBytes(bytes: Array[Byte]): Try[ContractProposition] = Try {
-    val complexity = Ints.fromByteArray(bytes.takeRight(4))
-    ContractProposition(ESContract(bytes.dropRight(4), ScriptMeta(complexity)))
+    val complexity = Ints.fromByteArray(bytes.dropRight(8).takeRight(4))
+    val fingerprint = bytes.takeRight(8)
+    ContractProposition(ESContract(bytes.dropRight(12), ScriptMeta(complexity, fingerprint)))
   }
 }
