@@ -1,0 +1,1 @@
+## EncryCore protocol specification
