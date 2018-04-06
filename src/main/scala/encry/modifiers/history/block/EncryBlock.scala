@@ -54,7 +54,7 @@ case class EncryBlock(override val header: EncryBlockHeader,
 
 object EncryBlock {
 
-  val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (-127: Byte)
+  val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (100: Byte)
 
   implicit val jsonEncoder: Encoder[EncryBlock] = (b: EncryBlock) => Map(
     "header" -> b.header.asJson,

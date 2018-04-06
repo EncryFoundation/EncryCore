@@ -41,7 +41,7 @@ case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
              expectedHash: ADDigest): Try[Unit] = {
 
     def applyChanges(verifier: BatchAVLVerifier[Digest32, Blake2b256Unsafe],
-                     changes: EncryBoxStateChanges) =
+                     changes: EncryBoxStateChanges): Try[Option[ADValue]] =
       changes.operations.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, o) =>
         t.flatMap(_ => {
           verifier.performOneOperation(ADProofs.toModification(o))

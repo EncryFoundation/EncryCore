@@ -261,61 +261,37 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
     type ValidationResult = Try[Unit]
 
     def validate(header: EncryBlockHeader): ValidationResult = {
-      if (header.isGenesis) {
-        validateGenesis(header)
-      } else {
-        validateNonGenesis(header)
-      }
-    }
-
-    def validateGenesis(header: EncryBlockHeader): ValidationResult = {
-      if (!(header.parentId sameElements EncryBlockHeader.GenesisParentId)) {
-        fatal(s"Genesis block should have genesis parent id ${Algos.encode(EncryBlockHeader.GenesisParentId)}." +
-          s"Found: ${Algos.encode(header.parentId)}")
-      } else if (bestHeaderIdOpt.nonEmpty) {
-        fatal("Trying to append genesis block to non-empty history")
-      } else if (header.height != chainParams.genesisHeight) {
-        fatal(s"Height of genesis block $header is incorrect")
-      } else {
-        success
-      }
-    }
-
-    def validateNonGenesis(header: EncryBlockHeader): ValidationResult = {
-      val parentOpt = typedModifierById[EncryBlockHeader](header.parentId)
-      parentOpt.fold(error(s"Parent header with id ${Algos.encode(header.parentId)} not defined")) { parent =>
-        if (header.timestamp - timeProvider.time() > Constants.Chain.maxTimeDrift) {
-          error(s"Invalid timestamp in header <id: ${header.id}>")
-        } else if (header.height != parent.height + 1) {
-          fatal(s"Invalid height in header <id: ${header.id}>")
-        } else if (header.timestamp < parent.timestamp) {
-          fatal("Header timestamp is less than parental`s")
-        } else if (requiredDifficultyAfter(parent) > header.difficulty) {
-          fatal("Header <id: ${header.id}> difficulty too low.")
-        } else if (!consensusAlgo.validator.validatePow(header.hHash, header.difficulty)) {
-          fatal(s"Invalid POW in header <id: ${header.id}>")
-        } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainParams.maxRollback)) {
-          fatal("Header is too old to be applied.")
-        } else if (!header.validSignature) {
-          fatal("Block signature is invalid.")
-        } else if (isSemanticallyValid(header.parentId) == Invalid) {
-          fatal("Parent header is marked as semantically invalid")
+      lazy val parentOpt = typedModifierById[EncryBlockHeader](header.parentId)
+      if (header.parentId sameElements EncryBlockHeader.GenesisParentId) {
+        if (bestHeaderIdOpt.nonEmpty) {
+          Failure(new Error("Trying to append genesis block to non-empty history."))
+        } else if (header.height != chainParams.genesisHeight) {
+          Failure(new Error("Invalid height for genesis block header."))
         } else {
-          success
+          Success()
         }
+      } else if (parentOpt.isEmpty) {
+        Failure(new Error(s"Parental header <id: ${header.parentId}> does not exist!"))
+      } else if (header.height != parentOpt.get.height + 1) {
+        Failure(new Error(s"Invalid height in header <id: ${header.id}>"))
+      } else if (header.timestamp - timeProvider.time() > Constants.Chain.maxTimeDrift) {
+        Failure(new Error(s"Invalid timestamp in header <id: ${header.id}>"))
+      } else if (header.timestamp < parentOpt.get.timestamp) {
+        Failure(new Error("Header timestamp is less than parental`s"))
+      } else if (requiredDifficultyAfter(parentOpt.get) > header.difficulty) {
+        Failure(new Error("Header <id: ${header.id}> difficulty too low."))
+      } else if (!consensusAlgo.validator.validatePow(header.hHash, header.difficulty)) {
+        Failure(new Error(s"Invalid POW in header <id: ${header.id}>"))
+      } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainParams.maxRollback)) {
+        Failure(new Error("Header is too old to be applied."))
+      } else if (!header.validSignature) {
+        Failure(new Error("Block signature is invalid."))
+      } else {
+        Success()
+      }.recoverWith { case err =>
+        log.warn("Validation error: ", err)
+        Failure(err)
       }
     }
-
-    def fatal(msg: String): ValidationResult = {
-      log.warn("Fatal error: ", msg)
-      Failure(new Error(msg))
-    }
-
-    def error(msg: String): ValidationResult = {
-      log.warn("Validation error: ", msg)
-      Failure(new Error(msg))
-    }
-
-    def success: ValidationResult = Success(())
   }
 }
