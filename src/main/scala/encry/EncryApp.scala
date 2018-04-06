@@ -1,6 +1,6 @@
 package encry
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import encry.api.http.routes.{AccountInfoApiRoute, HistoryApiRoute, InfoApiRoute, TransactionsApiRoute}
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
@@ -20,8 +20,10 @@ import scorex.core.api.http.{ApiRoute, PeersApiRoute, UtilsApiRoute}
 import scorex.core.app.Application
 import scorex.core.network.message.MessageSpec
 import scorex.core.settings.ScorexSettings
+import scorex.core.utils.ScorexLogging
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{Await, ExecutionContextExecutor}
+import scala.concurrent.duration._
 import scala.io.Source
 
 
@@ -81,14 +83,33 @@ class EncryApp(args: Seq[String]) extends Application {
   val cliListenerRef: ActorRef =
     actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolderRef, encrySettings))
   cliListenerRef ! StartListening
+
+  val allActors = Seq(
+    nodeViewHolderRef,
+    nodeViewSynchronizer,
+    readersHolderRef,
+    networkControllerRef,
+    localInterface,
+    cliListenerRef,
+    scannerRef,
+    minerRef
+  )
+
+  sys.addShutdownHook(EncryApp.shutdown(actorSystem, allActors))
 }
 
-object EncryApp {
+object EncryApp extends ScorexLogging {
 
   def main(args: Array[String]): Unit = new EncryApp(args).run()
 
-  def forceStopApplication(code: Int = 1) = {
-    new Thread(() => System.exit(code), "encry-shutdown-thread").start()
-    throw new Error("Exit")
+  def forceStopApplication(code: Int = 1): Nothing = sys.exit(code)
+
+  def shutdown(system: ActorSystem, actors: Seq[ActorRef]): Unit = {
+    log.warn("Terminating Actors")
+    actors.foreach{ a => a ! PoisonPill }
+    log.warn("Terminating ActorSystem")
+    val termination = system.terminate()
+    Await.result(termination, 60 seconds)
+    log.warn("Application has been terminated.")
   }
 }

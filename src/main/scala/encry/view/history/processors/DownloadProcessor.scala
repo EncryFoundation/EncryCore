@@ -34,7 +34,7 @@ trait DownloadProcessor extends ScorexLogging {
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
 
   def modifiersToDownload(howMany: Int, excluding: Iterable[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
-    def contitution(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] = {
+    def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] = {
       if (acc.lengthCompare(howMany) >= 0) acc
       else {
         headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[EncryBlockHeader](id)) match {
@@ -42,7 +42,7 @@ trait DownloadProcessor extends ScorexLogging {
             val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
               .filter(m => !excluding.exists(ex => ex sameElements m._2))
               .filter(m => !contains(m._2))
-            contitution(Height @@ (height + 1), acc ++ toDownload)
+            continuation(Height @@ (height + 1), acc ++ toDownload)
           case None => acc
         }
       }
@@ -50,8 +50,8 @@ trait DownloadProcessor extends ScorexLogging {
 
     bestBlockOpt match {
       case _ if !isHeadersChainSynced => Seq.empty
-      case Some(fb) => contitution(Height @@ (fb.header.height + 1), Seq.empty)
-      case None => contitution(FBDProcessor.minimalHeightOfBlock, Seq.empty)
+      case Some(fb) => continuation(Height @@ (fb.header.height + 1), Seq.empty)
+      case None => continuation(FBDProcessor.minimalHeightOfBlock, Seq.empty)
     }
   }
 

@@ -157,7 +157,11 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
 
   override def reportSemanticValidity(modifier: EncryPersistentModifier, valid: Boolean,
                                       unusedParam: ModifierId): (EncryHistory, ProgressInfo[EncryPersistentModifier]) =
-    if (valid) this -> markModifierValid(modifier) else this -> markModifierInvalid(modifier)
+    if (valid) {
+      this -> markModifierValid(modifier)
+    } else {
+      this -> markModifierInvalid(modifier)
+    }
 }
 
 object EncryHistory {
