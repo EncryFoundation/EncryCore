@@ -106,10 +106,10 @@ object EncryApp extends ScorexLogging {
 
   def shutdown(system: ActorSystem, actors: Seq[ActorRef]): Unit = {
     log.warn("Terminating Actors")
-    actors.foreach{ a => a ! PoisonPill }
+    actors.foreach(_ ! PoisonPill)
     log.warn("Terminating ActorSystem")
     val termination = system.terminate()
-    Await.result(termination, 60 seconds)
+    Await.result(termination, 60.seconds)
     log.warn("Application has been terminated.")
   }
 }

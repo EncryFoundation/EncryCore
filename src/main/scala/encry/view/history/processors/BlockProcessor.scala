@@ -11,7 +11,7 @@ import scorex.core.ModifierId
 import scorex.core.consensus.History.ProgressInfo
 import scorex.core.utils.ScorexLogging
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
 
@@ -107,7 +107,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
   }
 
   protected def isValidFirstFullBlock(header: EncryBlockHeader): Boolean =
-    header.height == FBDProcessor.minimalHeightOfBlock && bestBlockOpt.isEmpty
+    header.height == blockDownloadProcessor.minimalBlockHeightVar && bestBlockOpt.isEmpty
 
   private def getModRowFromBlock(block: EncryBlock, isNewerPayload: Boolean): EncryPersistentModifier =
     if(isNewerPayload) block.payload
@@ -135,5 +135,24 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
                             bestFullHeaderId: ModifierId): Option[ProgressInfo[EncryPersistentModifier]] = {
     historyStorage.bulkInsert(storageVersion, Seq((BestBlockKey, ByteArrayWrapper(bestFullHeaderId))), Seq(newModRow))
     Option(ProgressInfo(None, Seq.empty, Some(toApply), Seq.empty))
+  }
+
+  protected def modifierValidation(m: EncryPersistentModifier,
+                                   headerOpt: Option[EncryBlockHeader]): Try[Unit] = {
+    if (historyStorage.containsObject(m.id)) {
+      Failure(new Error(s"Modifier $m is already in history"))
+    } else {
+      val minimalHeight = blockDownloadProcessor.minimalBlockHeight
+      headerOpt match {
+        case None =>
+          Failure(new Error(s"Header for modifier $m is not defined"))
+        case Some(header: EncryBlockHeader) if header.height < minimalHeight =>
+          Failure(new Error(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight"))
+        case Some(header: EncryBlockHeader) if !header.isRelated(m) =>
+          Failure(new Error(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}"))
+        case Some(_) =>
+          Success()
+      }
+    }
   }
 }

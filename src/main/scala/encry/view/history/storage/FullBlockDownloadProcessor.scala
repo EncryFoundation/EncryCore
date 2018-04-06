@@ -6,17 +6,26 @@ import encry.view.history.Height
 
 case class FullBlockDownloadProcessor(nodeSettings: NodeSettings){
 
-  private[history] var minimalHeightOfBlock: Height = Height @@ -1
+  private[history] var minimalBlockHeightVar: Height = Height @@ -1
 
-  def getMinimalHeightOfBlock: Height = minimalHeightOfBlock
+  def minimalBlockHeight: Height = minimalBlockHeightVar
 
-  def setMinimalHeightOfBlock(header: EncryBlockHeader): Unit =
-    minimalHeightOfBlock = minimalFullBlockAfter(header)
+  def updateMinimalHeightOfBlock(header: EncryBlockHeader): Unit =
+    minimalBlockHeightVar = minimalFullBlockAfter(header)
 
-  private def minimalFullBlockAfter(header: EncryBlockHeader): Height = {
-    if(minimalHeightOfBlock == -1) {
-      if (nodeSettings.blocksToKeep < 0) Height @@ 0
-      else Height @@ Math.max(header.height - nodeSettings.blocksToKeep + 1, 0)
-    } else Height @@ Math.max(header.height - nodeSettings.blocksToKeep + 1, minimalHeightOfBlock)
+  private def minimalFullBlockAfter(header: EncryBlockHeader): Height = Height @@ {
+    if (!nodeSettings.verifyTransactions) {
+      Int.MaxValue
+    } else if (minimalBlockHeightVar == Int.MaxValue) {
+      // just synced with the headers chain - determine first full block to apply
+      if (nodeSettings.blocksToKeep < 0) 0
+      else if (!nodeSettings.stateMode.isDigest) 0
+      else Math.max(0, header.height - nodeSettings.blocksToKeep + 1)
+
+    } else if (nodeSettings.blocksToKeep >= 0) {
+      Math.max(header.height - nodeSettings.blocksToKeep + 1, minimalBlockHeightVar)
+    } else {
+      0
+    }
   }
 }

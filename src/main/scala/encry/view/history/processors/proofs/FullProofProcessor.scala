@@ -30,18 +30,6 @@ trait FullProofProcessor extends BaseADProofProcessor with BlockProcessor {
     }
   }
 
-  override protected def validate(m: ADProofs): Try[Unit] = {
-    if (historyStorage.containsObject(m.id)) {
-      Failure(new Error(s"Modifier $m is already in history"))
-    } else {
-      historyStorage.modifierById(m.headerId) match {
-        case None =>
-          Failure(new Error(s"Header for modifier $m is no defined"))
-        case Some(header: EncryBlockHeader) if !(header.adProofsRoot sameElements m.digest) =>
-          Failure(new Error(s"Header ADProofs root ${Base58.encode(header.adProofsRoot)} differs from $m digest"))
-        case Some(_: EncryBlockHeader) =>
-          Success()
-      }
-    }
-  }
+  override protected def validate(m: ADProofs): Try[Unit] =
+    modifierValidation(m, typedModifierById[EncryBlockHeader](m.headerId))
 }

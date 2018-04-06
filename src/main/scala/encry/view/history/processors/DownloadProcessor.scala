@@ -17,7 +17,7 @@ trait DownloadProcessor extends ScorexLogging {
 
   protected val timeProvider: NetworkTimeProvider
 
-  protected[history] lazy val FBDProcessor: FullBlockDownloadProcessor = FullBlockDownloadProcessor(nodeSettings)
+  protected[history] lazy val blockDownloadProcessor: FullBlockDownloadProcessor = FullBlockDownloadProcessor(nodeSettings)
 
   private var isHeadersChainSyncedVar: Boolean = false
 
@@ -51,18 +51,18 @@ trait DownloadProcessor extends ScorexLogging {
     bestBlockOpt match {
       case _ if !isHeadersChainSynced => Seq.empty
       case Some(fb) => continuation(Height @@ (fb.header.height + 1), Seq.empty)
-      case None => continuation(FBDProcessor.minimalHeightOfBlock, Seq.empty)
+      case None => continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
 
   protected def toDownload(header: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] = {
     if (!nodeSettings.verifyTransactions){
       Seq.empty
-    } else if (header.height >= FBDProcessor.minimalHeightOfBlock) requiredModifiersForHeader(header)
+    } else if (header.height >= blockDownloadProcessor.minimalBlockHeightVar) requiredModifiersForHeader(header)
     else if (!isHeadersChainSynced && isNewHeader(header)) {
       log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
       isHeadersChainSyncedVar = true
-      FBDProcessor.setMinimalHeightOfBlock(header)
+      blockDownloadProcessor.updateMinimalHeightOfBlock(header)
       Seq.empty
     } else Seq.empty
   }
