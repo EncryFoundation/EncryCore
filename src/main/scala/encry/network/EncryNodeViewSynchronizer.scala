@@ -3,17 +3,19 @@ package encry.network
 import akka.actor.{ActorRef, ActorRefFactory, Props}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.EncryMempool
-import encry.view.state.UtxoState
-import encry.view.wallet.EncryWallet
-import scorex.core.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, Subscribe}
+import scorex.core.NodeViewHolder.ReceivableMessages.Subscribe
 import scorex.core.NodeViewHolder._
 import scorex.core.network.NetworkController.ReceivableMessages.SendToNetwork
-import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import scorex.core.network.message.Message
+import scorex.core.network.NetworkControllerSharedMessages.ReceivableMessages.DataFromPeer
+import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallySuccessfulModifier}
+import scorex.core.network.message.BasicMsgDataTypes.ModifiersData
+import scorex.core.network.message.{Message, ModifiersSpec}
 import scorex.core.network.{NodeViewSynchronizer, SendToRandom}
 import scorex.core.settings.NetworkSettings
 import scorex.core.utils.NetworkTimeProvider
@@ -40,23 +42,13 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
 
   private val toDownloadCheckInterval = 3.seconds
 
+  private val downloadListSize = networkSettings.networkChunkSize
+
   override def preStart(): Unit = {
+    val toDownloadCheckInterval = networkSettings.syncInterval
     super.preStart()
     viewHolderRef ! Subscribe(Seq(NodeViewHolder.EventType.DownloadNeeded))
     context.system.scheduler.schedule(toDownloadCheckInterval, toDownloadCheckInterval)(self ! CheckModifiersToDownload)
-    initializeToDownload()
-  }
-
-  protected def initializeToDownload(): Unit = {
-    viewHolderRef ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, MissedModifiers] { v =>
-      MissedModifiers(v.history.missedModifiersForFullChain)
-    }
-  }
-
-  protected def onMissedModifiers(): Receive = {
-    case MissedModifiers(ids) =>
-      log.info(s"Initialize toDownload with ${ids.length} ids: ${scorex.core.idsToString(ids)}")
-      ids.foreach { id => requestDownload(id._1, id._2) }
   }
 
   protected val onSemanticallySuccessfulModifier: Receive = {
@@ -67,30 +59,61 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
   }
 
   override protected def viewHolderEvents: Receive =
-    onSemanticallySuccessfulModifier orElse
+    onSyntacticallySuccessfulModifier orElse
       onDownloadRequest orElse
       onCheckModifiersToDownload orElse
-      onMissedModifiers orElse
       super.viewHolderEvents
 
   def onDownloadRequest: Receive = {
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
-      requestDownload(modifierTypeId, modifierId)
+      requestDownload(modifierTypeId, Seq(modifierId))
+  }
+
+  /**
+    * Broadcast inv on successful Header and BlockTransactions application
+    * Do not broadcast Inv messages during initial synchronization (the rest of the network should already have all
+    * this messages)
+    *
+    */
+  protected val onSyntacticallySuccessfulModifier: Receive = {
+    case SyntacticallySuccessfulModifier(mod) if (mod.isInstanceOf[EncryBlockHeader] || mod.isInstanceOf[EncryBlockPayload]) &&
+      historyReaderOpt.exists(_.isHeadersChainSynced) =>
+
+      broadcastModifierInv(mod)
   }
 
   protected val onCheckModifiersToDownload: Receive = {
     case CheckModifiersToDownload =>
-      val modifiersToDownloadNow = deliveryTracker.downloadRetry(historyReaderOpt)
-      if (modifiersToDownloadNow.nonEmpty) log.debug(s"Going to request ${modifiersToDownloadNow.size} of " +
-        s"${deliveryTracker.toDownload.size} missed modifiers")
-      modifiersToDownloadNow.foreach(i => requestDownload(i._2.tp, i._1))
+      deliveryTracker.removeOutdatedExpectingFromRandom()
+      historyReaderOpt.foreach { h =>
+        val currentQueue = deliveryTracker.expectingFromRandomQueue
+        val newIds = h.modifiersToDownload(downloadListSize - currentQueue.size, currentQueue)
+        val oldIds = deliveryTracker.idsExpectingFromRandomToRetry()
+        (newIds ++ oldIds).groupBy(_._1).foreach(ids => requestDownload(ids._1, ids._2.map(_._2)))
+      }
   }
 
-  def requestDownload(modifierTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
-    val msg = Message(requestModifierSpec, Right(modifierTypeId -> Seq(modifierId)), None)
-    // Full nodes should be here, not a random peer
+  private def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
+    modifierIds.foreach(id => deliveryTracker.expectFromRandom(modifierTypeId, id))
+    val msg = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
+    //todo: Full nodes should be here, not a random peer
     networkControllerRef ! SendToNetwork(msg, SendToRandom)
-    deliveryTracker.downloadRequested(modifierTypeId, modifierId)
+  }
+
+  override protected def modifiersFromRemote: Receive = {
+    case DataFromPeer(spec, data: ModifiersData@unchecked, remote)
+      if spec.messageCode == ModifiersSpec.messageCode =>
+      super.modifiersFromRemote(DataFromPeer(spec, data, remote))
+      //If queue is empty - check, whether there are more modifiers to download
+      historyReaderOpt foreach { h =>
+        if (!h.isHeadersChainSynced && !deliveryTracker.isExpecting) {
+          // headers chain is not synced yet, but our expecting list is empty - ask for more headers
+          sendSync(h.syncInfo)
+        } else if (h.isHeadersChainSynced && !deliveryTracker.isExpectingFromRandom) {
+          // headers chain is synced, but our full block list is empty - request more full blocks
+          self ! CheckModifiersToDownload
+        }
+      }
   }
 }
 
