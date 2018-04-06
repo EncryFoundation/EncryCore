@@ -53,7 +53,7 @@ object EncryMiningWorker {
 
   case class MineBlock(nonce: Long)
 
-  def props(ergoSettings: EncryAppSettings, viewHolderRef: ActorRef, startCandidate: PowCandidateBlock): Props = {
-    Props(new EncryMiningWorker(ergoSettings, viewHolderRef, startCandidate))
+  def props(EncryCoreSettings: EncryAppSettings, viewHolderRef: ActorRef, startCandidate: PowCandidateBlock): Props = {
+    Props(new EncryMiningWorker(EncryCoreSettings, viewHolderRef, startCandidate))
   }
 }
