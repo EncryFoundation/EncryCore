@@ -7,7 +7,6 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.{Constants, NodeSettings}
 import encry.view.history.Height
-import BlockDownloadProcessor
 import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 
@@ -51,7 +50,7 @@ trait DownloadProcessor extends ScorexLogging {
     bestBlockOpt match {
       case _ if !isHeadersChainSynced => Seq.empty
       case Some(fb) => continuation(Height @@ (fb.header.height + 1), Seq.empty)
-      case None => continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
+      case None => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
 
@@ -62,7 +61,7 @@ trait DownloadProcessor extends ScorexLogging {
     else if (!isHeadersChainSynced && isNewHeader(header)) {
       log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
       isHeadersChainSyncedVar = true
-      blockDownloadProcessor.updateMinimalHeightOfBlock(header)
+      blockDownloadProcessor.updateBestBlock(header)
       Seq.empty
     } else Seq.empty
   }
