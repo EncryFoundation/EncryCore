@@ -7,7 +7,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.{Constants, NodeSettings}
 import encry.view.history.Height
-import encry.view.history.storage.FullBlockDownloadProcessor
+import BlockDownloadProcessor
 import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 
@@ -17,7 +17,7 @@ trait DownloadProcessor extends ScorexLogging {
 
   protected val timeProvider: NetworkTimeProvider
 
-  protected[history] lazy val blockDownloadProcessor: FullBlockDownloadProcessor = FullBlockDownloadProcessor(nodeSettings)
+  protected[history] lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(nodeSettings)
 
   private var isHeadersChainSyncedVar: Boolean = false
 

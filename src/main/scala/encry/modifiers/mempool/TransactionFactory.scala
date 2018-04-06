@@ -131,5 +131,4 @@ object TransactionFactory {
 
     EncryTransaction(accPubKey, fee, timestamp, signature, unlockers, directives)
   }
-
 }
