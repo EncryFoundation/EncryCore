@@ -4,11 +4,10 @@ import akka.actor.{Actor, ActorRef}
 import encry.cli.ConsolePromptListener.StartListening
 import encry.cli.commands._
 import encry.settings.EncryAppSettings
+import org.bitbucket.inkytonik.kiama.util.JLineConsole
 import scorex.core.utils.ScorexLogging
 
 import scala.collection.mutable
-import scala.io.StdIn
-import scala.util.Try
 
 case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings) extends Actor with ScorexLogging {
 
@@ -39,22 +38,19 @@ case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryApp
 
   override def receive: Receive = {
     case StartListening =>
-      while (true) {
-        val input = StdIn.readLine(prompt)
-        if (input != null) {
-          commands.get(parseCommand(input).head) match {
-            case Some(value) =>
-              parseCommand(input).slice(1, parseCommand(input).length).foreach { command =>
-                value.get(command.split("=").head) match {
-                  case Some(cmd) =>
-                    println(cmd.execute(nodeViewHolderRef, command.split("="), settings).map(_.msg).getOrElse(""))
-                  case None =>
-                    println("Unsupported command. Type 'app -help' to get commands list")
-                }
+      Iterator.continually(JLineConsole.readLine(prompt)).takeWhile(!_.equals("quit")).foreach { input =>
+        commands.get(parseCommand(input).head) match {
+          case Some(value) =>
+            parseCommand(input).slice(1, parseCommand(input).length).foreach { command =>
+              value.get(command.split("=").head) match {
+                case Some(cmd) =>
+                  println(cmd.execute(nodeViewHolderRef, command.split("="), settings).map(_.msg).getOrElse(""))
+                case None =>
+                  println("Unsupported command. Type 'app -help' to get commands list")
               }
-            case None =>
-              println("Unsupported command. Type 'app -help' to get commands list")
-          }
+            }
+          case None =>
+            println("Unsupported command. Type 'app -help' to get commands list")
         }
       }
   }
@@ -63,7 +59,6 @@ case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryApp
     val commandsSeq = command.split(" ").toSeq
     commandsSeq
   }
-
 }
 
 object ConsolePromptListener {
