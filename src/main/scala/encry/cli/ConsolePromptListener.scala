@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef}
 import encry.cli.ConsolePromptListener.StartListening
 import encry.cli.commands._
 import encry.settings.EncryAppSettings
-import org.bitbucket.inkytonik.kiama.util.JLineConsole
+import jline.console.ConsoleReader
 import scorex.core.utils.ScorexLogging
 
 import scala.collection.mutable
@@ -38,7 +38,8 @@ case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryApp
 
   override def receive: Receive = {
     case StartListening =>
-      Iterator.continually(JLineConsole.readLine(prompt)).takeWhile(!_.equals("quit")).foreach { input =>
+      val reader = new ConsoleReader()
+      Iterator.continually(reader.readLine(prompt)).takeWhile(!_.equals("quit")).foreach { input =>
         commands.get(parseCommand(input).head) match {
           case Some(value) =>
             parseCommand(input).slice(1, parseCommand(input).length).foreach { command =>
