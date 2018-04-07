@@ -22,12 +22,11 @@ case class DefaultPaymentTransactionTemplate(accPubKey: String,
 
   import encry.modifiers.mempool.TransactionFactory._
 
-  override def origin: Try[EncryTransaction] =
-    Try {
-      val accountPubKey = PublicKey25519(PublicKey @@ Algos.decode(accPubKey).get)
-      val signature = Signature25519(Signature @@ Algos.decode(sig).get)
-      val useBxIds = useBoxes.map(id => ADKey @@ Algos.decode(id).get)
-      if (Account.validAddress(Address @@ recipient)) throw new Error("Invalid address")
-      defaultPaymentTransaction(accountPubKey, signature, fee, change, timestamp, useBxIds, Address @@ recipient, amount)
-    }
+  override def origin: Try[EncryTransaction] = Try {
+    val accountPubKey = PublicKey25519(PublicKey @@ Algos.decode(accPubKey).get)
+    val signature = Signature25519(Signature @@ Algos.decode(sig).get)
+    val useBxIds = useBoxes.map(id => ADKey @@ Algos.decode(id).get)
+    if (!Account.validAddress(Address @@ recipient)) throw new Error("Invalid address")
+    defaultPaymentTransaction(accountPubKey, signature, fee, change, timestamp, useBxIds, Address @@ recipient, amount)
+  }
 }
