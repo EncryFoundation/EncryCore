@@ -8,6 +8,7 @@ import scorex.core.utils.ScorexLogging
 
 import scala.collection.mutable
 import scala.io.StdIn
+import scala.util.Try
 
 case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings) extends Actor with ScorexLogging {
 
@@ -39,19 +40,20 @@ case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryApp
   override def receive: Receive = {
     case StartListening =>
       while (true) {
-        val input = StdIn.readLine(prompt)
-        commands.get(parseCommand(input).head) match {
-          case Some(value) =>
-            parseCommand(input).slice(1, parseCommand(input).length).foreach { command =>
-              value.get(command.split("=").head) match {
-                case Some(cmd) =>
-                  println(cmd.execute(nodeViewHolderRef, command.split("="), settings).map(_.msg).getOrElse(""))
-                case None =>
-                  println("Unsupported command. Type 'app -help' to get commands list")
+        Try(StdIn.readLine(prompt)).map { input =>
+          commands.get(parseCommand(input).head) match {
+            case Some(value) =>
+              parseCommand(input).slice(1, parseCommand(input).length).foreach { command =>
+                value.get(command.split("=").head) match {
+                  case Some(cmd) =>
+                    println(cmd.execute(nodeViewHolderRef, command.split("="), settings).map(_.msg).getOrElse(""))
+                  case None =>
+                    println("Unsupported command. Type 'app -help' to get commands list")
+                }
               }
-            }
-          case None =>
-            println("Unsupported command. Type 'app -help' to get commands list")
+            case None =>
+              println("Unsupported command. Type 'app -help' to get commands list")
+          }
         }
       }
   }
