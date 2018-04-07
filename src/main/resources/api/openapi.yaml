@@ -1,7 +1,7 @@
 openapi: "3.0.0"
 
 info:
-  version: "0.1"
+  version: "0.3.1"
   title: Encry Node API
   description: API docs for Encry Node.
   contact:
@@ -9,66 +9,49 @@ info:
     email:
     url:
   license:
-    name: CC0 1.0 Universal
+    name: GPL 3.0
     url:
 
 components:
   schemas:
     # Objects
-    AnyoneCanSpendTransactionInput:
+    SimplePaymentTransaction:
       type: object
+      description: Simple transaction with only one transfer directive inside.
       required:
-        - id
-        - nonce
-        - signature
+       - accPubKey
+       - sig
+       - fee
+       - change
+       - timestamp
+       - useBoxes
+       - recipient
+       - amount
       properties:
-        id:
-          $ref: '#/components/schemas/TransactionId'
-        nonce:
-          description: Index of a output in transaction
-          type: integer
-          format: int32
-          minimum: 0
-          example: 667
-        signature:
-          description: The parameter that should be successfully executed the script of the output of the transaction
-          type: string
-
-    AnyoneCanSpendTransactionOutput:
-      type: object
-      required:
-        - value
-        - script
-      properties:
-        value:
-          description: Amount of Encry token
-          type: number
-          minimum: 0
-          example: 14.7
-        script:
-          description: The script which should be successfully executed for the waste of this output
-          type: string
-
-    AnyoneCanSpendTransaction:
-      type: object
-      description: Transaction without any lockers and unlockers
-      required:
-        - id
-        - inputs
-        - outputs
-      properties:
-        id:
-          $ref: '#/components/schemas/TransactionId'
-        inputs:
-          description: Many transaction inputs
-          type: array
-          items:
-            $ref: '#/components/schemas/AnyoneCanSpendTransactionInput'
-        outputs:
-          description: Many transaction outputs
-          type: array
-          items:
-            $ref: '#/components/schemas/AnyoneCanSpendTransactionOutput'
+        accPubKey:
+          description: Sender public key (Base58)
+          example: "D2bXMwWN8P9nWJ9qqwZJLauAdcZHX9n6s91QQ9vK6Zu4"
+        sig:
+          description: Digital signature bytes (Base58)
+          example: "ahpXMwWN5P9nWJ7qqwZfLauAdcZHX9n6s29QQ9vKZqu9"
+        fee:
+          description: Fee amount
+          example: 1000000
+        change:
+          description: Change to be sent back to sender
+          example: 10000
+        timestamp:
+          description: Timestamp
+          example: 15879806785
+        useBoxes:
+          description: Array of ADKey's (Inputs ids)
+          example: ["ghxXMwWN5P9nWJ7qqwZfLauAdcZHX9n6s29QQ9vKZqu9", "ydbXMwWN8P9nWJ9qqwZJLauAdcZHX9n6s91QQ9vK6Zu4"]
+        recipient:
+          description: Recipient address (Base58Check(pubKey))
+          example: "QSbuKMwWN8P9nWJ9qqwZJLauAdcZHX9n6s91QQ9vK6Zu4"
+        amount:
+          description: Transafer amount
+          example: 100000
 
     FullBlock:
       description: Block with header and transactions

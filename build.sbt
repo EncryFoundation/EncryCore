@@ -3,7 +3,7 @@ import sbt._
 
 name := "EncryCore"
 
-version := "0.2.1"
+version := "0.3.1"
 
 scalaVersion := "2.12.4"
 
