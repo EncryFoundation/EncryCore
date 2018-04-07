@@ -64,6 +64,12 @@ libraryDependencies ++= Seq(
 
 fork := true
 
+fork in run := true
+
+outputStrategy := Some(StdoutOutput)
+
+connectInput in run := true
+
 val opts = Seq(
   "-server",
   // JVM memory tuning for 2g ram
