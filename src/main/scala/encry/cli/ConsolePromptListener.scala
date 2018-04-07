@@ -39,19 +39,22 @@ case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryApp
 
   override def receive: Receive = {
     case StartListening =>
-      Iterator.continually(StdIn.readLine(prompt)).takeWhile(!_.equals("quit")).foreach { input =>
-        commands.get(parseCommand(input).head) match {
-          case Some(value) =>
-            parseCommand(input).slice(1, parseCommand(input).length).foreach { command =>
-              value.get(command.split("=").head) match {
-                case Some(cmd) =>
-                  println(cmd.execute(nodeViewHolderRef, command.split("="), settings).map(_.msg).getOrElse(""))
-                case None =>
-                  println("Unsupported command. Type 'app -help' to get commands list")
+      while (true) {
+        val input = StdIn.readLine(prompt)
+        if (input != null) {
+          commands.get(parseCommand(input).head) match {
+            case Some(value) =>
+              parseCommand(input).slice(1, parseCommand(input).length).foreach { command =>
+                value.get(command.split("=").head) match {
+                  case Some(cmd) =>
+                    println(cmd.execute(nodeViewHolderRef, command.split("="), settings).map(_.msg).getOrElse(""))
+                  case None =>
+                    println("Unsupported command. Type 'app -help' to get commands list")
+                }
               }
-            }
-          case None =>
-            println("Unsupported command. Type 'app -help' to get commands list")
+            case None =>
+              println("Unsupported command. Type 'app -help' to get commands list")
+          }
         }
       }
   }
