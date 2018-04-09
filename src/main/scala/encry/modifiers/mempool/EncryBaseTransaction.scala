@@ -20,7 +20,7 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
 
   val txHash: Digest32
 
-  val dataToSign: Array[Byte] = txHash
+  lazy val dataToSign: Array[Byte] = txHash
 
   val semanticValidity: Try[Unit]
 
@@ -49,7 +49,7 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
   override def toString: String = s"<TX: id=${Algos.encode(id)} isCoinbase=$isCoinbase>"
 
   // Shadowed.
-  override val messageToSign: Array[Byte] = Array.fill(32)(1.toByte)
+  override lazy val messageToSign: Array[Byte] = Array.fill(32)(1.toByte)
 }
 
 object EncryBaseTransaction {
