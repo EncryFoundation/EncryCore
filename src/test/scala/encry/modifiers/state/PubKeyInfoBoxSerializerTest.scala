@@ -4,11 +4,11 @@ import encry.modifiers.InstanceFactory
 import encry.modifiers.state.box.PubKeyInfoBoxSerializer
 import org.scalatest.FunSuite
 
-class PubKeyInfoBoxSerializerTest extends FunSuite {
+class PubKeyInfoBoxSerializerTest extends FunSuite with InstanceFactory {
 
   test("toBytes & parseBytes") {
 
-    val bx = InstanceFactory.pubKeyInfoBox
+    val bx = pubKeyInfoBox
 
     val bxSerialized = bx.bytes
 

@@ -3,9 +3,9 @@ package encry.api.http.routes
 import encry.modifiers.InstanceFactory
 import org.scalatest.{Matchers, PropSpec}
 
-class TransactionsApiRouteSpec extends PropSpec with Matchers {
+class TransactionsApiRouteSpec extends PropSpec with Matchers with InstanceFactory {
 
-  private val tx = InstanceFactory.paymentTransactionValid
+  private val tx = paymentTransactionDynamic
 
   property("payment tx deserialization in sendTransactionR") {
 

@@ -2,13 +2,15 @@ package encry.modifiers
 
 import encry.local.TestHelper
 import encry.modifiers.mempool._
-import encry.modifiers.state.box.{AssetBox, PubKeyInfoBox}
 import encry.modifiers.state.box.proposition.{AccountProposition, OpenProposition}
+import encry.modifiers.state.box.{AssetBox, PubKeyInfoBox}
 import encry.view.history.Height
 import scorex.crypto.signatures.{PublicKey, Signature}
 import scorex.utils.Random
 
-object InstanceFactory {
+import scala.util.{Random => Scarand}
+
+trait InstanceFactory {
 
   private val genHelper = TestHelper
   private val secret = genHelper.getOrGenerateKeys(genHelper.Props.keysFilePath).head
@@ -30,6 +32,20 @@ object InstanceFactory {
       genHelper.genAssetBox(publicKey.address))
 
     TransactionFactory.defaultPaymentTransactionScratch(secret, fee, timestamp, useBoxes,
+      publicKey.address, genHelper.Props.txAmount)
+  }
+
+  def paymentTransactionDynamic: EncryTransaction = {
+    val fee = genHelper.Props.txFee
+    val useBoxes = (0 to 5).map(_ => {
+      AssetBox(
+        AccountProposition(secret.publicImage.address),
+        Scarand.nextLong(),
+        999L
+      )
+    })
+
+    TransactionFactory.defaultPaymentTransactionScratch(secret, fee, Scarand.nextLong(), useBoxes,
       publicKey.address, genHelper.Props.txAmount)
   }
 

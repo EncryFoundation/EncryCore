@@ -11,6 +11,7 @@ import io.circe.Encoder
 import scorex.core.ModifierId
 import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.Box.Amount
+import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
 import scala.util.Try
@@ -39,7 +40,7 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
   val directives: IndexedSeq[Directive]
 
   lazy val newBoxes: Traversable[EncryBaseBox] =
-     directives.flatMap(_.boxes(txHash)) ++ feeBox.map(fb => Seq(fb)).getOrElse(Seq.empty)
+    directives.flatMap(_.boxes(txHash)) ++ feeBox.map(fb => Seq(fb)).getOrElse(Seq.empty)
 
   lazy val account: Account = Account(accountPubKey.pubKeyBytes)
 

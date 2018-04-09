@@ -5,9 +5,8 @@ import encry.modifiers.state.box.Context
 import encry.view.history.Height
 import org.scalatest.{Matchers, PropSpec}
 
-class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts with StateContext {
+class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts with StateContext with InstanceFactory {
 
-  import InstanceFactory._
 
   property("Unlocking proposition with dummy contract") {
 

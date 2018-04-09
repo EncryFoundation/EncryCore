@@ -23,7 +23,7 @@ import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{PublicKey, Signature}
 import scorex.utils.Random
 
-class WalletSpec extends PropSpec with Matchers{
+class WalletSpec extends PropSpec with Matchers with InstanceFactory {
 
   property("Balance count"){
 
@@ -78,8 +78,7 @@ class WalletSpec extends PropSpec with Matchers{
       }
     }
 
-    val blockPayload = new EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs.slice(0, 4) :+
-      InstanceFactory.addPubKeyInfoTransaction)
+    val blockPayload = new EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs.slice(0, 4) :+ addPubKeyInfoTransaction)
 
     val adProofs = ADProofs(ModifierId @@ Random.randomBytes(), SerializedAdProof @@ Random.randomBytes())
 
