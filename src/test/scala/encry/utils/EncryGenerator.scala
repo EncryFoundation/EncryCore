@@ -8,7 +8,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.proposition.AccountProposition
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
+import encry.modifiers.state.box.{AmountCarryingBox, AssetBox, EncryBaseBox}
 import scorex.core.ModifierId
 import scorex.crypto.authds.{ADDigest, ADKey}
 import scorex.crypto.hash.Digest32
@@ -39,6 +39,20 @@ trait EncryGenerator {
       TransactionFactory.defaultPaymentTransactionScratch(k, Props.txFee,
         timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
     }
+  }
+
+  def genSelfSpendingTxs(qty: Int): Seq[EncryTransaction] = {
+
+    val pks = genPrivKeys(qty)
+    val timestamp = System.currentTimeMillis()
+    pks.foldLeft(Seq[EncryTransaction]()) { (seq, key) =>
+      val useBoxes =
+        if(seq.isEmpty) IndexedSeq(genAssetBox(key.publicImage.address))
+        else IndexedSeq(seq.last.newBoxes.head.asInstanceOf[AmountCarryingBox])
+      seq :+ TransactionFactory.defaultPaymentTransactionScratch(key, Props.txFee,
+        timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
+    }
+
   }
 
   def genInvalidPaymentTxs(qty: Int): Seq[EncryTransaction] = {
