@@ -71,7 +71,8 @@ object EncryBlockHeader {
   implicit val jsonEncoder: Encoder[EncryBlockHeader] = (h: EncryBlockHeader) => Map(
     "id" -> Algos.encode(h.id).asJson,
     "hash" -> Base16.encode(h.id).asJson,
-    "parentId" -> Algos.encode(h.payloadId).asJson,
+    "parentId" -> Algos.encode(h.parentId).asJson,
+    "payloadId" -> Algos.encode(h.payloadId).asJson,
     "stateRoot" -> Algos.encode(h.stateRoot).asJson,
     "txRoot" -> Algos.encode(h.transactionsRoot).asJson,
     "timestamp" -> h.timestamp.asJson,
