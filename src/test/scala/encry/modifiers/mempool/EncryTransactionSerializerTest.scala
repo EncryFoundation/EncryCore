@@ -30,17 +30,4 @@ class EncryTransactionSerializerTest extends FunSuite with InstanceFactory {
 
     assert(tx.txHash sameElements txDeserialized.get.txHash, "Id mismatch.")
   }
-
-  test("toBytes & parseBytes (AddPubKey)") {
-
-    val tx = addPubKeyInfoTransaction
-
-    val txSerialized = tx.bytes
-
-    val txDeserialized = EncryTransactionSerializer.parseBytes(txSerialized)
-
-    assert(txDeserialized.isSuccess, "Deserialization failed.")
-
-    assert(tx.txHash sameElements txDeserialized.get.txHash, "Id mismatch.")
-  }
 }

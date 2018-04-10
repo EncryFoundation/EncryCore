@@ -28,6 +28,5 @@ object Directive {
   implicit val jsonEncoder: Encoder[Directive] = {
     case td: TransferDirective => TransferDirective.jsonEncoder(td)
     case cd: CoinbaseDirective => CoinbaseDirective.jsonEncoder(cd)
-    case apk: AddPubKeyInfoDirective => AddPubKeyInfoDirective.jsonEncoder(apk)
   }
 }

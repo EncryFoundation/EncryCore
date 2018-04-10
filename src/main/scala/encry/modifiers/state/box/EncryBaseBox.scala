@@ -29,6 +29,5 @@ object EncryBaseBox {
   implicit val jsonEncoder: Encoder[EncryBaseBox] = {
     case ab: AssetBox => AssetBox.jsonEncoder(ab)
     case cb: CoinbaseBox => CoinbaseBox.jsonEncoder(cb)
-    case pkb: PubKeyInfoBox => PubKeyInfoBox.jsonEncoder(pkb)
   }
 }

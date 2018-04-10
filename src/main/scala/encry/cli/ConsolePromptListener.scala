@@ -23,10 +23,6 @@ case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryApp
     "-help" -> Help
   ))
 
-  commands.update("pki", mutable.HashMap(
-    "-addPubKeyInfo" -> AddPubKeyInfo
-  ))
-
   commands.update("wallet", mutable.HashMap(
     "-addrs" -> PrintMyAddrs,
     "-addKey" -> AddKey,

@@ -78,7 +78,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory {
       }
     }
 
-    val blockPayload = new EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs.slice(0, 4) :+ addPubKeyInfoTransaction)
+    val blockPayload = new EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs.slice(0, 4))
 
     val adProofs = ADProofs(ModifierId @@ Random.randomBytes(), SerializedAdProof @@ Random.randomBytes())
 

@@ -25,7 +25,8 @@ case class AccountInfoApiRoute(readersHolder: ActorRef,
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
   override val route: Route = pathPrefix("account") {
-    getKeyInfoByAddressR ~ getBoxesByAddressR ~ getPortfolioByAddressR
+    getBoxesByAddressR ~
+      getPortfolioByAddressR
   }
 
   override val settings: RESTApiSettings = restApiSettings
@@ -50,19 +51,11 @@ case class AccountInfoApiRoute(readersHolder: ActorRef,
     })
   }.map(_.map(_.map(_.asJson).asJson))
 
-  private def getPubKeyInfoBxsByAddress(address: Address): Future[Option[Json]] = getState.flatMap { s =>
-    getBoxIdsByAddress(address).map(_.map(ids => s.boxesByIds(ids)))
-  }.map(_.map(bxs => BoxFilter.filterPubKeyInfoBxs(bxs).map(_.asJson).asJson))
-
   def getBoxesByAddressR: Route = (accountAddress & pathPrefix("boxes") & get) { addr =>
     getBoxesByAddress(addr).okJson()
   }
 
   def getPortfolioByAddressR: Route = (accountAddress & pathPrefix("portfolio") & get) { addr =>
     getPortfolioByAddress(addr).okJson()
-  }
-
-  def getKeyInfoByAddressR: Route = (accountAddress & pathPrefix("keys") & get) { addr =>
-    getPubKeyInfoBxsByAddress(addr).okJson()
   }
 }

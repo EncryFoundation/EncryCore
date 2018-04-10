@@ -11,15 +11,12 @@ object DirectiveSerializer extends Serializer[Directive] {
       TransferDirective.TypeId +: TransferDirectiveSerializer.toBytes(td)
     case cd: CoinbaseDirective =>
       CoinbaseDirective.TypeId +: CoinbaseDirectiveSerializer.toBytes(cd)
-    case apkd: AddPubKeyInfoDirective =>
-      AddPubKeyInfoDirective.TypeId +: AddPubKeyInfoDirectiveSerializer.toBytes(apkd)
     case m => throw new Error(s"Serialization of unknown directive type: $m")
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[Directive] = Try(bytes.head).flatMap {
     case TransferDirective.`TypeId` => TransferDirectiveSerializer.parseBytes(bytes.tail)
     case CoinbaseDirective.`TypeId` => CoinbaseDirectiveSerializer.parseBytes(bytes.tail)
-    case AddPubKeyInfoDirective.`TypeId` => AddPubKeyInfoDirectiveSerializer.parseBytes(bytes.tail)
     case t => Failure(new Error(s"Got unknown typeId: $t"))
   }
 }

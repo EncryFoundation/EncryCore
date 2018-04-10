@@ -2,11 +2,9 @@ package encry.modifiers
 
 import encry.local.TestHelper
 import encry.modifiers.mempool._
+import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.proposition.{AccountProposition, OpenProposition}
-import encry.modifiers.state.box.{AssetBox, PubKeyInfoBox}
 import encry.view.history.Height
-import scorex.crypto.signatures.{PublicKey, Signature}
-import scorex.utils.Random
 
 import scala.util.{Random => Scarand}
 
@@ -61,19 +59,6 @@ trait InstanceFactory {
     TransactionFactory.coinbaseTransactionScratch(secret, timestamp, useBoxes, Height @@ 0)
   }
 
-  lazy val addPubKeyInfoTransaction: EncryTransaction = {
-    val fee = genHelper.Props.txFee
-    val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address),
-      genHelper.genAssetBox(publicKey.address), genHelper.genAssetBox(publicKey.address))
-    val pubKeyBytes = PublicKey @@ Random.randomBytes()
-    val pubKeyProofBytes = Signature @@ Random.randomBytes(64)
-    val pubKeyInfoBytes = Random.randomBytes(40)
-    val pubKeyTypeId = 99.toByte
-
-    TransactionFactory.addPubKeyInfoTransactionScratch(
-      secret, fee, timestamp, useBoxes, pubKeyBytes, pubKeyProofBytes, pubKeyInfoBytes, pubKeyTypeId)
-  }
-
   lazy val assetBox: AssetBox =
     AssetBox(
       AccountProposition(secret.publicImage.address),
@@ -86,15 +71,5 @@ trait InstanceFactory {
       OpenProposition,
       999L,
       100000L
-    )
-
-  lazy val pubKeyInfoBox: PubKeyInfoBox =
-    PubKeyInfoBox(
-      AccountProposition(secret.publicImage.address),
-      999L,
-      PublicKey @@ Random.randomBytes(),
-      Signature @@ Random.randomBytes(64),
-      Random.randomBytes(40),
-      99.toByte
     )
 }
