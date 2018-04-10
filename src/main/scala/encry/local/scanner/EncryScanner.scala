@@ -84,18 +84,22 @@ class EncryScanner(settings: EncryAppSettings,
 
   private def updateIndex(md: IndexMetadata, sr: ScanningResult): Unit = {
     val currentIndexes = sr.newIndexes ++ sr.toRemove.foldLeft(Seq[(ByteArrayWrapper, Seq[ADKey])]())((acc, id) =>
-      storage.get(keyByBoxId(id)).map(r => acc :+ ByteArrayWrapper(r) -> Seq.empty).getOrElse(acc))
+      storage.get(keyByBoxId(id)).map(r => acc :+ (ByteArrayWrapper(r) -> Seq.empty)).getOrElse(acc))
     val finalIndexes = currentIndexes.foldLeft(Seq[(ByteArrayWrapper, Seq[ADKey])]()) { case (acc, (pk, ids))  =>
-      storage.get(pk).map(r => acc :+ pk -> FixLenComplexValueCodec.parseComplexValue(r, EncryBox.BoxIdSize)
-        .map(bxIds => bxIds.filter(id => !sr.toRemove.exists(_.sameElements(id))).map(ADKey @@ _) ++ ids)
-        .getOrElse(Seq.empty)).getOrElse(acc :+ pk -> ids)
+      storage.get(pk).map(r => acc :+ (pk -> FixLenComplexValueCodec.parseComplexValue(r, EncryBox.BoxIdSize)
+        .map(_.filter(id => !sr.toRemove.exists(_.sameElements(id))).map(ADKey @@ _) ++ ids)
+        .getOrElse(Seq.empty))).getOrElse(acc :+ (pk -> ids))
     }
     val toInsert = finalIndexes.map { case (pk, ids) =>
       pk -> FixLenComplexValueCodec.toComplexValue(ids)
     } ++ sr.toInsert.map(bx => keyByBoxId(bx.id) -> ByteArrayWrapper(Algos.hash(bx.proposition.bytes)))
     val toRemove = sr.toRemove.map(ByteArrayWrapper.apply)
 
-    storage.update(ByteArrayWrapper(md.version), toRemove, toInsert)
+    storage.update(ByteArrayWrapper(md.version), toRemove, toInsert
+      .foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()) { case (acc, i) =>
+        if (toInsert.map(_._1.data).count(_ sameElements i._1.data) == 1) acc :+ i
+        else acc
+      }) // TODO: Fix key repeating properly.
   }
 }
 
