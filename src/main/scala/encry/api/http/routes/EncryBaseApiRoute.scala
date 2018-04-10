@@ -31,7 +31,7 @@ trait EncryBaseApiRoute extends ApiRoute {
 
   val paging: Directive[(Int, Int)] = parameters("offset".as[Int] ? 0, "limit".as[Int] ? 50)
 
-  val headerId: Directive1[ModifierId] = pathPrefix(Segment).flatMap { h =>
+  val modifierId: Directive1[ModifierId] = pathPrefix(Segment).flatMap { h =>
     Base58.decode(h) match {
       case Success(header) => provide(ModifierId @@ header)
       case _ => reject

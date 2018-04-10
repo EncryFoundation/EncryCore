@@ -13,8 +13,8 @@ import encry.view.history.EncryHistoryReader
 import encry.view.mempool.EncryMempoolReader
 import encry.view.state.StateMode
 import io.circe.Json
-import io.circe.syntax._
 import io.circe.generic.auto._
+import io.circe.syntax._
 import scorex.core.LocallyGeneratedModifiersMessages.ReceivableMessages.LocallyGeneratedTransaction
 import scorex.core.settings.RESTApiSettings
 import spray.json.DefaultJsonProtocol._
@@ -33,7 +33,9 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
     jsonFormat10(AddPubKeyInfoTransactionTemplate )
 
   override val route: Route = pathPrefix("transactions") {
-    getUnconfirmedTransactionsR ~ defaultTransferTransactionR ~ addPubKeyInfoTransactionR
+    getUnconfirmedTransactionsR ~
+      defaultTransferTransactionR ~
+      addPubKeyInfoTransactionR
   }
 
   override val settings: RESTApiSettings = restApiSettings

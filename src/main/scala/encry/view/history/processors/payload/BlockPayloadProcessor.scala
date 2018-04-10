@@ -18,22 +18,22 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
 
   protected val adState: Boolean
 
-  override protected def process(txs: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] = {
-    historyStorage.modifierById(txs.headerId) match {
+  override protected def process(payload: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] = {
+    historyStorage.modifierById(payload.headerId) match {
       case Some(header: EncryBlockHeader) =>
         historyStorage.modifierById(header.adProofsId) match {
           case _ if !header.isGenesis && bestBlockIdOpt.isEmpty =>
             //TODO light mode when start from different block ?
-            putToHistory(txs)
+            putToHistory(payload)
           case Some(adProof: ADProofs) =>
-            processBlock(EncryBlock(header, txs, Some(adProof)), isNewerPayload = true)
+            processBlock(EncryBlock(header, payload, Some(adProof)), isNewerPayload = true)
           case None if !adState =>
-            processBlock(EncryBlock(header, txs, None), isNewerPayload = true)
+            processBlock(EncryBlock(header, payload, None), isNewerPayload = true)
           case _ =>
-            putToHistory(txs)
+            putToHistory(payload)
         }
       case _ =>
-        throw new Error(s"Header for modifier $txs is no defined")
+        throw new Error(s"Header for modifier $payload is no defined")
     }
   }
 
@@ -52,8 +52,8 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
     }
   }
 
-  private def putToHistory(txs: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] = {
-    historyStorage.insertObjects(Seq(txs))
+  private def putToHistory(payload: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] = {
+    historyStorage.insertObjects(Seq(payload))
     ProgressInfo(None, Seq.empty, None, Seq.empty)
   }
 }
