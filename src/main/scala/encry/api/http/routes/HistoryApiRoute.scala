@@ -35,7 +35,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
 
   override val settings: RESTApiSettings = appSettings.scorexSettings.restApi
 
-  private def getHistory = (readersHolder ? GetDataFromHistory[EncryHistoryReader](r => r)).mapTo[EncryHistoryReader]
+  private def getHistory: Future[EncryHistoryReader] = (readersHolder ? GetDataFromHistory[EncryHistoryReader](r => r)).mapTo[EncryHistoryReader]
 
   private def getHeaderIdsAtHeight(h: Int): Future[Json] = getHistory.map { history =>
     history.headerIdsAtHeight(h).map(Base58.encode).asJson
