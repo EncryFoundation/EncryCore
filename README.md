@@ -2,8 +2,14 @@
 
 [![Build Status](https://travis-ci.org/oskin1/EncryCore.svg?branch=master)](https://travis-ci.org/oskin1/EncryCore)
 
-Reference implementation of the Encry protocol - distributed PKI & Payment System. 
-Detailed specification of the protocol is in progress and will be published later.
+Reference implementation of the EncryCore node. Encry is a distributed digital asset platform supporting smart contracts
+and custom asset issuing.
+
+* [Protocol specification](https://github.com/oskin1/EncryCore/blob/master/papers/design/ProtocolSpec.md) (in progress)
+
+## Related projects
+
+* [EncryScript](https://github.com/oskin1/EncryScript) - Contract-oriented scripting language designed specially for EncryCore.
 
 ## License
 
