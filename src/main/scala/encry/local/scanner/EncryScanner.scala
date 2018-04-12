@@ -8,7 +8,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.state.box.{EncryBaseBox, EncryBox}
+import encry.modifiers.state.box.{AmountCarryingBox, EncryBaseBox, EncryBox}
 import encry.settings.{Algos, Constants, EncryAppSettings}
 import encry.storage.codec.FixLenComplexValueCodec
 import io.circe.Json
@@ -72,7 +72,8 @@ class EncryScanner(settings: EncryAppSettings,
         if (!boxIdsToRemove.exists(_.sameElements(bx.id))) {
           cache.get(keyByProposition(bx.proposition)) match {
             case Some(ids) => cache.update(keyByProposition(bx.proposition), ids :+ bx.id)
-            case _ => cache.update(keyByProposition(bx.proposition), Seq(bx.id))
+            case _ =>
+              cache.update(keyByProposition(bx.proposition), Seq(bx.id))
           }
           cache -> (bxs :+ bx)
         } else {
@@ -83,23 +84,19 @@ class EncryScanner(settings: EncryAppSettings,
   }
 
   private def updateIndex(md: IndexMetadata, sr: ScanningResult): Unit = {
-    val currentIndexes = sr.newIndexes ++ sr.toRemove.foldLeft(Seq[(ByteArrayWrapper, Seq[ADKey])]())((acc, id) =>
-      storage.get(keyByBoxId(id)).map(r => acc :+ (ByteArrayWrapper(r) -> Seq.empty)).getOrElse(acc))
-    val finalIndexes = currentIndexes.foldLeft(Seq[(ByteArrayWrapper, Seq[ADKey])]()) { case (acc, (pk, ids))  =>
-      storage.get(pk).map(r => acc :+ (pk -> FixLenComplexValueCodec.parseComplexValue(r, EncryBox.BoxIdSize)
-        .map(_.filter(id => !sr.toRemove.exists(_.sameElements(id))).map(ADKey @@ _) ++ ids)
-        .getOrElse(Seq.empty))).getOrElse(acc :+ (pk -> ids))
+    val toInsert = sr.newIndexes.foldLeft(Seq[(ByteArrayWrapper,ByteArrayWrapper)]()){
+      case (seq, (key, boxids)) =>
+        seq :+ (key -> FixLenComplexValueCodec.toComplexValue(
+          boxids.foldLeft(Seq[ADKey]())(
+            (seq, key) => if(!sr.toRemove.contains(key)) seq :+ key else seq
+          ) ++ Seq(storage.get(key).getOrElse(Array.emptyByteArray))))
+    } ++ sr.toInsert.foldLeft(Seq[(ByteArrayWrapper,ByteArrayWrapper)]()){
+      case (seq, bx) =>
+        if(!sr.toRemove.contains(bx.id)) seq :+ (ByteArrayWrapper(bx.id) -> ByteArrayWrapper(bx.bytes))
+        else seq
     }
-    val toInsert = finalIndexes.map { case (pk, ids) =>
-      pk -> FixLenComplexValueCodec.toComplexValue(ids)
-    } ++ sr.toInsert.map(bx => keyByBoxId(bx.id) -> ByteArrayWrapper(Algos.hash(bx.proposition.bytes)))
-    val toRemove = sr.toRemove.map(ByteArrayWrapper.apply)
-
-    storage.update(ByteArrayWrapper(md.version), toRemove, toInsert
-      .foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()) { case (acc, i) =>
-        if (toInsert.map(_._1.data).count(_ sameElements i._1.data) == 1) acc :+ i
-        else acc
-      }) // TODO: Fix key repeating properly.
+    val toRemove = sr.toRemove.map(ByteArrayWrapper.apply) ++ sr.newIndexes.map(_._1)
+    storage.update(ByteArrayWrapper(md.version), toRemove, toInsert)
   }
 }
 

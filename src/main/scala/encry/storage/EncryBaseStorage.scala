@@ -1,5 +1,6 @@
 package encry.storage
 
+import encry.settings.Algos
 import encry.storage.codec.FixLenComplexValueCodec
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.core.utils.ScorexLogging
@@ -18,7 +19,10 @@ trait EncryBaseStorage extends AutoCloseable with ScorexLogging {
 
   def update(version: ByteArrayWrapper,
              toRemove: Seq[ByteArrayWrapper],
-             toUpdate: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit = store.update(version, toRemove, toUpdate)
+             toUpdate: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit = {
+    remove(version, toRemove)
+    insert(ByteArrayWrapper(Algos.hash(version.data)), toUpdate)
+  }
 
   def get(key: ByteArrayWrapper): Option[Array[Byte]] = store.get(key).map(_.data)
 

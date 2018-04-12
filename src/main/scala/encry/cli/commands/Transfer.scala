@@ -24,7 +24,7 @@ object Transfer extends Command {
 
   /**
     * Command "wallet -transfer=toAddress;Fee;Amount"
-    * Example "wallet -transfer=31sVyJTL5nAaxogr1TBV7Y8tCDBwAaruGMQPAp1Qv7ZvSrjDHN;10;100"
+    * Example "wallet -transfer=3jSD9fwHEHJwHq99ARqhnNhqGXeKnkJMyX4FZjHV6L3PjbCmjG;100;100"
     *
     * @param nodeViewHolderRef
     * @param args
@@ -48,6 +48,8 @@ object Transfer extends Command {
           val tx = TransactionFactory.defaultPaymentTransactionScratch(secret, fee, timestamp, boxes, recipient, amount)
 
           nodeViewHolderRef ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
+
+          println(s"tx semval: ${tx.semanticValidity}")
 
           tx
         }.toOption.map(tx => Some(Response(tx.toString))).getOrElse(Some(Response("Operation failed. Malformed data.")))
