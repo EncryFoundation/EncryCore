@@ -15,6 +15,7 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import scorex.core.LocallyGeneratedModifiersMessages.ReceivableMessages.LocallyGeneratedTransaction
 import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+import scorex.core.utils.NetworkTimeProvider
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -36,11 +37,12 @@ object Transfer extends Command {
     Await.result((nodeViewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
         Try {
+          lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.scorexSettings.ntp)
           val secret = view.vault.keyManager.keys.head
           val recipient = Address @@ args(1).split(";").head
           val fee = args(1).split(";")(1).toLong
           val amount = args(1).split(";").last.toLong
-          val timestamp = System.currentTimeMillis()  // TODO: Use NTP.
+          val timestamp = timeProvider.time()
           val boxes = view.vault.walletStorage.allBoxes.filter(_.isInstanceOf[AssetBox]).map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) {
             case (seq, box) => if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
           }.toIndexedSeq
