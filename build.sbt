@@ -59,7 +59,7 @@ libraryDependencies ++= Seq(
   "com.storm-enroute" %% "scalameter" % "0.8.+",
   "io.spray" %%  "spray-json" % "1.3.3",
   "io.monix" %% "monix" % "2.3.3",
-  "com.github.oskin1" %% "encryscript" % "0.2.12"
+  "com.github.oskin1" %% "encryscript" % "0.2.14"
 ) ++ networkDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
 
 fork := true
