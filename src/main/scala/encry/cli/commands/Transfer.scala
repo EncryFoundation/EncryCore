@@ -49,8 +49,6 @@ object Transfer extends Command {
 
           nodeViewHolderRef ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
 
-          println(s"tx semval: ${tx.semanticValidity}")
-
           tx
         }.toOption.map(tx => Some(Response(tx.toString))).getOrElse(Some(Response("Operation failed. Malformed data.")))
       }).mapTo[Option[Response]], 5.second)
