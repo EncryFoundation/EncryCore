@@ -5,7 +5,7 @@
 Reference implementation of the EncryCore node. Encry is a distributed digital asset platform supporting smart contracts
 and custom asset issuing.
 
-* [Protocol specification](https://github.com/oskin1/EncryCore/blob/master/papers/design/ProtocolSpec.md) (in progress)
+* [Protocol specification](https://github.com/oskin1/EncryCore/blob/master/docs/design/ProtocolSpec.md) (in progress)
 
 ## Related projects
 
