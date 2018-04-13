@@ -80,17 +80,17 @@ class EncryScanner(settings: EncryAppSettings,
   }
 
   private def updateIndex(md: IndexMetadata, sr: ScanningResult): Unit = {
-    val toInsert = sr.newIndexes.foldLeft(Seq[(ByteArrayWrapper,ByteArrayWrapper)]()){
-      case (seq, (key, boxids)) =>
-        seq :+ (key -> FixLenComplexValueCodec.toComplexValue(
-          boxids.foldLeft(Seq[ADKey]())(
-            (seq, key) => if(!sr.toRemove.contains(key)) seq :+ key else seq
-          ) ++ Seq(storage.get(key).getOrElse(Array.emptyByteArray))))
-    } ++ sr.toInsert.foldLeft(Seq[(ByteArrayWrapper,ByteArrayWrapper)]()){
-      case (seq, bx) =>
-        if(!sr.toRemove.contains(bx.id)) seq :+ (ByteArrayWrapper(bx.id) -> ByteArrayWrapper(bx.bytes))
-        else seq
-    }
+    val toInsert = sr.newIndexes
+      .foldLeft(Seq[(ByteArrayWrapper,ByteArrayWrapper)]()) { case (acc, (key, ids)) =>
+        acc :+ (key -> FixLenComplexValueCodec.toComplexValue(
+          ids.foldLeft(Seq[ADKey]()) { case (a, k) =>
+            if (!sr.toRemove.contains(k)) a :+ k else a
+          } ++ Seq(storage.get(key).getOrElse(Array.emptyByteArray))))
+      } ++ sr.toInsert.foldLeft(Seq[(ByteArrayWrapper,ByteArrayWrapper)]()) { case (seq, bx) =>
+          if (!sr.toRemove.contains(bx.id)) {
+            seq :+ (ByteArrayWrapper(bx.id) -> ByteArrayWrapper(bx.bytes))
+          } else seq
+      }
     val toRemove = sr.toRemove.map(ByteArrayWrapper.apply) ++ sr.newIndexes.map(_._1)
     storage.update(ByteArrayWrapper(md.version), toRemove, toInsert)
   }
