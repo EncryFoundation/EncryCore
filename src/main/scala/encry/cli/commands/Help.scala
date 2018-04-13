@@ -1,13 +1,13 @@
 package encry.cli.commands
 
 import akka.actor.ActorRef
-import encry.cli.Response
+import encry.cli.{Ast, Response}
 import encry.settings.EncryAppSettings
 
 object Help extends Command {
 
   override def execute(nodeViewHolderRef: ActorRef,
-                       args: Array[String], settings: EncryAppSettings): Option[Response] =
+                       args: List[Ast.Param], settings: EncryAppSettings): Option[Response] =
     Some(Response(
       """
         |Usage: [GROUP_NAME] [COMMAND]=[ARGUMENT_1];[ARGUMENT_2]
