@@ -5,7 +5,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proof.Signature25519
 import encry.settings.Algos
-import io.circe.{Encoder, Json}
+import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.block.Block.Timestamp
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}

@@ -7,8 +7,8 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.{Constants, NodeSettings}
 import encry.view.history.Height
-import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
+import scorex.core.{ModifierId, ModifierTypeId}
 
 trait DownloadProcessor extends ScorexLogging {
 

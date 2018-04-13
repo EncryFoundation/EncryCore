@@ -3,7 +3,7 @@ package encry.modifiers.mempool
 import encry.modifiers.state.box.EncryBox
 import encry.modifiers.state.box.proof.{Proof, ProofSerializer}
 import encry.settings.Algos
-import io.circe.{Encoder, Json}
+import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.{BytesSerializable, Serializer}
 import scorex.crypto.authds.ADKey

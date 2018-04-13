@@ -14,13 +14,12 @@ import encry.view.mempool.EncryMempool
 import encry.view.state.{DigestState, EncryState, UtxoState}
 import encry.view.wallet.EncryWallet
 import scorex.core._
-import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{FailedTransaction, SuccessfulTransaction}
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.Transaction
 import scorex.core.utils.NetworkTimeProvider
 import scorex.crypto.authds.ADDigest
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings,
                                                                        timeProvider: NetworkTimeProvider)

@@ -3,11 +3,8 @@ package encry.local
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import encry.Version
 import encry.local.EncryLocalInterface.{GetNodeInfo, NodeInfo}
-import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncryHistory
 import encry.view.state.StateMode
@@ -17,7 +14,6 @@ import scorex.core.network.Handshake
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, SemanticallySuccessfulModifier}
 import scorex.core.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
-import scorex.core.ModifierId
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._

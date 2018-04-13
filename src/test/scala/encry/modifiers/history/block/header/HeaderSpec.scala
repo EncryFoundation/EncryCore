@@ -1,11 +1,8 @@
 package encry.modifiers.history.block.header
 
-import encry.Version
 import encry.utils.EncryGenerator
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.hash.Blake2b256
-
-import scala.util.Random
 
 class HeaderSpec extends PropSpec with Matchers with EncryGenerator{
 

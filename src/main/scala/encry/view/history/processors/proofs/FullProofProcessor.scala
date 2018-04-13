@@ -7,9 +7,8 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.view.history.processors.BlockProcessor
 import scorex.core.consensus.History.ProgressInfo
-import scorex.crypto.encode.Base58
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 trait FullProofProcessor extends BaseADProofProcessor with BlockProcessor {
 

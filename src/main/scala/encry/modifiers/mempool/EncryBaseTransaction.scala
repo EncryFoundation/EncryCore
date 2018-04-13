@@ -11,7 +11,6 @@ import io.circe.Encoder
 import scorex.core.ModifierId
 import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.Box.Amount
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
 import scala.util.Try

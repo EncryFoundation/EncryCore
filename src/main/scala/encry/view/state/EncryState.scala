@@ -6,7 +6,7 @@ import akka.actor.ActorRef
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
 import encry.modifiers.state.box._
-import encry.modifiers.state.box.proposition.{HeightProposition, OpenProposition}
+import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.{Algos, Constants, EncryAppSettings, NodeSettings}
 import encry.view.history.Height
 import scorex.core.VersionTag

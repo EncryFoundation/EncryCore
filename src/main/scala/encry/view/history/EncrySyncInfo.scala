@@ -1,11 +1,11 @@
 package encry.view.history
 
 import encry.modifiers.history.block.header.EncryBlockHeader
-import scorex.core.{ModifierId, NodeViewModifier}
 import scorex.core.consensus.History.ModifierIds
 import scorex.core.consensus.SyncInfo
 import scorex.core.network.message.SyncInfoMessageSpec
 import scorex.core.serialization.Serializer
+import scorex.core.{ModifierId, NodeViewModifier}
 
 import scala.util.Try
 

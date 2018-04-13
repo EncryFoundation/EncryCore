@@ -18,7 +18,7 @@ import scorex.core.network.message.{Message, ModifiersSpec}
 import scorex.core.network.{NodeViewSynchronizer, SendToRandom}
 import scorex.core.settings.NetworkSettings
 import scorex.core.utils.NetworkTimeProvider
-import scorex.core.{ModifierId, ModifierTypeId, NodeViewHolder}
+import scorex.core.{ModifierId, ModifierTypeId}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._

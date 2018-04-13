@@ -46,6 +46,7 @@ val testingDependencies = Seq(
 )
 
 libraryDependencies ++= Seq(
+  "com.lihaoyi" %% "fastparse" % "1.0.0",
   "com.iheart" %% "ficus" % "1.4.2",
   "com.google.guava" % "guava" % "19.+",
   "org.slf4j" % "slf4j-api" % "1.7.+",

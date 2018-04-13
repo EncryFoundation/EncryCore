@@ -3,9 +3,9 @@ package encry.settings
 import java.io.File
 
 import com.typesafe.config.{Config, ConfigFactory}
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-import net.ceedubs.ficus.Ficus._
 import encry.EncryApp
+import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import scorex.core.settings.{ScorexSettings, SettingsReaders}
 import scorex.core.utils.ScorexLogging
 

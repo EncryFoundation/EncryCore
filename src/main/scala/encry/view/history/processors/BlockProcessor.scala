@@ -2,10 +2,8 @@ package encry.view.history.processors
 
 import encry.consensus.Difficulty
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
-import encry.modifiers.history.block.payload.EncryBlockPayload
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
 import scorex.core.consensus.History.ProgressInfo

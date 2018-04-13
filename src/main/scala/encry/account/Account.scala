@@ -6,7 +6,7 @@ import scorex.core.serialization.{BytesSerializable, Serializer}
 import scorex.crypto.encode.Base58
 import scorex.crypto.signatures.PublicKey
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 // Represents the owner of the Public/Private key pair.
 case class Account(address: Address) extends BytesSerializable {

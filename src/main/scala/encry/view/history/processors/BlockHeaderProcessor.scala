@@ -4,19 +4,17 @@ import com.google.common.primitives.Ints
 import encry.EncryApp
 import encry.consensus.{Difficulty, PowConsensus}
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
-import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.Constants._
 import encry.settings.{Algos, Constants, NodeSettings}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
+import scorex.core.ModifierId
 import scorex.core.consensus.History.ProgressInfo
-import scorex.core.consensus.{Invalid, ModifierSemanticValidity}
+import scorex.core.consensus.ModifierSemanticValidity
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
-import scorex.core.{ModifierId, ModifierTypeId}
 
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}

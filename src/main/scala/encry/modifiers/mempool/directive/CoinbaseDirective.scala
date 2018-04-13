@@ -6,7 +6,7 @@ import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.Constants
 import encry.view.history.Height
 import encry.view.state.UtxoState
-import io.circe.{Encoder, Json}
+import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
