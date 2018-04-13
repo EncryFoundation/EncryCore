@@ -9,7 +9,6 @@ import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.EncryMempool
-import scorex.core.NodeViewHolder.ReceivableMessages.Subscribe
 import scorex.core.NodeViewHolder._
 import scorex.core.network.NetworkController.ReceivableMessages.SendToNetwork
 import scorex.core.network.NetworkControllerSharedMessages.ReceivableMessages.DataFromPeer
@@ -32,8 +31,7 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
                                 timeProvider: NetworkTimeProvider)
   extends NodeViewSynchronizer[EncryProposition, EncryBaseTransaction,
     EncrySyncInfo, EncrySyncInfoMessageSpec.type, EncryPersistentModifier, EncryHistory,
-    EncryMempool](networkControllerRef, viewHolderRef, localInterfaceRef,
-    syncInfoSpec, networkSettings, timeProvider) {
+    EncryMempool](networkControllerRef, viewHolderRef, syncInfoSpec, networkSettings, timeProvider) {
 
   import EncryNodeViewSynchronizer._
 
@@ -47,7 +45,7 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
   override def preStart(): Unit = {
     val toDownloadCheckInterval = networkSettings.syncInterval
     super.preStart()
-    viewHolderRef ! Subscribe(Seq(NodeViewHolder.EventType.DownloadNeeded))
+    context.system.eventStream.subscribe(self, classOf[DownloadRequest])
     context.system.scheduler.schedule(toDownloadCheckInterval, toDownloadCheckInterval)(self ! CheckModifiersToDownload)
   }
 

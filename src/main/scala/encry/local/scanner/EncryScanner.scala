@@ -8,16 +8,15 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.state.box.{AmountCarryingBox, EncryBaseBox, EncryBox}
+import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.{Algos, Constants, EncryAppSettings}
 import encry.storage.codec.FixLenComplexValueCodec
 import io.circe.Json
 import io.circe.syntax._
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import scorex.core.NodeViewHolder.ReceivableMessages.Subscribe
-import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
+import scorex.core.VersionTag
+import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{ChangedState, SemanticallySuccessfulModifier}
 import scorex.core.utils.ScorexLogging
-import scorex.core.{NodeViewHolder, VersionTag}
 import scorex.crypto.authds.ADKey
 
 import scala.collection.mutable
@@ -40,11 +39,8 @@ class EncryScanner(settings: EncryAppSettings,
     .flatMap(r => EncryBlockHeaderSerializer.parseBytes(r).toOption)
 
   override def preStart(): Unit = {
-    val events = Seq(
-      NodeViewHolder.EventType.StateChanged,
-      NodeViewHolder.EventType.SuccessfulSemanticallyValidModifier
-    )
-    viewHolderRef ! Subscribe(events)
+    context.system.eventStream.subscribe(self, classOf[ChangedState[_]])
+    context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
   }
 
   override def receive: Receive = {

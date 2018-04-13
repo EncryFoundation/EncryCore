@@ -23,15 +23,15 @@ case class ContractProposition(contract: ESContract) extends EncryProposition {
 
   override def serializer: Serializer[M] = ContractPropositionSerializer
 
-  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
-    ScriptSerializer.deserialize(contract.serializedScript).map { script =>
-      val contractContext = new ContractContext(proof, ctx.transaction, CStateInfo(ctx.height, ctx.lastBlockTimestamp, ctx.stateDigest))
-      val executor = new Executor(ScopedRuntimeEnv.initialized("global", 1, Map("context" -> contractContext.asVal)))
-      executor.executeContract(script) match {
-        case Right(Return(_: Unlocked.type)) => Success()
-        case _ => throw new Error("Unlock failed.")
-      }
+  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] = Try {
+    val contractDeserialized = ScriptSerializer.deserialize(contract.serializedScript).get
+    val contractContext = new ContractContext(proof, ctx.transaction, CStateInfo(ctx.height, ctx.lastBlockTimestamp, ctx.stateDigest))
+    val executor = new Executor(ScopedRuntimeEnv.initialized("global", 1, Map("context" -> contractContext.asVal)))
+    executor.executeContract(contractDeserialized) match {
+      case Right(Return(_: Unlocked.type)) => Success()
+      case _ => throw new Error("Unlock failed.")
     }
+  }
 }
 
 object ContractProposition {
@@ -51,10 +51,10 @@ object ContractPropositionSerializer extends Serializer[ContractProposition] {
 
   // TODO: Move contract serialization logic to EncryScript library.
   override def toBytes(obj: ContractProposition): Array[Byte] = Bytes.concat(
-      obj.contract.serializedScript,
-      Ints.toByteArray(obj.contract.meta.complexityScore),
-      obj.contract.meta.scriptFingerprint
-    )
+    obj.contract.serializedScript,
+    Ints.toByteArray(obj.contract.meta.complexityScore),
+    obj.contract.meta.scriptFingerprint
+  )
 
   override def parseBytes(bytes: Array[Byte]): Try[ContractProposition] = Try {
     val complexity = Ints.fromByteArray(bytes.dropRight(8).takeRight(4))

@@ -1,6 +1,6 @@
 package encry.local
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import encry.Version
 import encry.local.EncryLocalInterface.{GetNodeInfo, NodeInfo}
 import encry.modifiers.EncryPersistentModifier
@@ -13,12 +13,11 @@ import encry.view.history.EncryHistory
 import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
-import scorex.core.NodeViewHolder.ReceivableMessages.Subscribe
 import scorex.core.network.Handshake
-import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool}
+import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, SemanticallySuccessfulModifier}
 import scorex.core.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
-import scorex.core.utils.NetworkTimeProvider
-import scorex.core.{LocalInterface, ModifierId, NodeViewHolder}
+import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
+import scorex.core.ModifierId
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -26,19 +25,16 @@ import scala.concurrent.duration._
 /**
   * Class that subscribes to NodeViewHolderEvents and collects them to provide fast response to API requests.
   */
-class EncryLocalInterface(override val viewHolderRef: ActorRef,
+class EncryLocalInterface(viewHolderRef: ActorRef,
                           peerManager: ActorRef,
                           settings: EncryAppSettings,
                           timeProvider: NetworkTimeProvider)
-  extends LocalInterface[EncryProposition, EncryBaseTransaction, EncryPersistentModifier] {
+  extends Actor with ScorexLogging{
 
   override def preStart(): Unit = {
-    val events = Seq(
-      NodeViewHolder.EventType.StateChanged,
-      NodeViewHolder.EventType.HistoryChanged,
-      NodeViewHolder.EventType.MempoolChanged
-    )
-    viewHolderRef ! Subscribe(events)
+    context.system.eventStream.subscribe(self, classOf[ChangedHistory[_]])
+    context.system.eventStream.subscribe(self, classOf[ChangedMempool[_]])
+    context.system.eventStream.subscribe(self, classOf[ChangedState[_]])
     context.system.scheduler.schedule(10.second, 10.second)(peerManager ! GetConnectedPeers)
   }
 
@@ -49,7 +45,7 @@ class EncryLocalInterface(override val viewHolderRef: ActorRef,
     timeProvider.time())
 
   override def receive: Receive = onConnectedPeers orElse getNodeInfo orElse onMempoolChanged orElse
-    onHistoryChanged orElse super.receive
+    onHistoryChanged orElse onSemanticallySuccessfulModification
 
   private def getNodeInfo: Receive = {
     case GetNodeInfo => sender ! nodeInfo
@@ -71,27 +67,11 @@ class EncryLocalInterface(override val viewHolderRef: ActorRef,
       nodeInfo = nodeInfo.copy(peersCount = peers.length)
   }
 
-  override protected def onStartingPersistentModifierApplication(pmod: EncryPersistentModifier): Unit = {}
-
-  override protected def onFailedTransaction(tx: EncryBaseTransaction): Unit = {}
-
-  override protected def onSuccessfulTransaction(tx: EncryBaseTransaction): Unit = {}
-
-  override protected def onNoBetterNeighbour(): Unit = {}
-
-  override protected def onBetterNeighbourAppeared(): Unit = {}
-
-  override protected def onSyntacticallySuccessfulModification(mod: EncryPersistentModifier): Unit = {}
-
-  override protected def onSyntacticallyFailedModification(mod: EncryPersistentModifier): Unit = {}
-
-  override protected def onSemanticallySuccessfulModification(mod: EncryPersistentModifier): Unit = {}
-
-  override protected def onSemanticallyFailedModification(mod: EncryPersistentModifier): Unit = {}
-
-  override protected def onNewSurface(newSurface: Seq[ModifierId]): Unit = {}
-
-  override protected def onRollbackFailed(): Unit = {}
+  def onSemanticallySuccessfulModification: Receive = {
+    case SemanticallySuccessfulModifier(fb: EncryBlock) =>
+      nodeInfo = nodeInfo.copy(stateRoot = Algos.encode(fb.header.stateRoot),
+        stateVersion = fb.encodedId)
+  }
 }
 
 object EncryLocalInterface {

@@ -15,7 +15,7 @@ import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.generic.auto._
 import io.circe.syntax._
-import scorex.core.LocallyGeneratedModifiersMessages.ReceivableMessages.LocallyGeneratedTransaction
+import scorex.core.NodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
 import scorex.core.settings.RESTApiSettings
 import spray.json.DefaultJsonProtocol._
 import spray.json.RootJsonFormat
