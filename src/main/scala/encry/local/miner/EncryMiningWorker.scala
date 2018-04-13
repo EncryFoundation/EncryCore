@@ -5,7 +5,7 @@ import akka.actor.{Actor, ActorRef, Props}
 import encry.consensus.{PowCandidateBlock, PowConsensus}
 import encry.local.miner.EncryMiningWorker.MineBlock
 import encry.view.state.StateMode
-import scorex.core.LocallyGeneratedModifiersMessages.ReceivableMessages.LocallyGeneratedModifier
+import scorex.core.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import scorex.core.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global

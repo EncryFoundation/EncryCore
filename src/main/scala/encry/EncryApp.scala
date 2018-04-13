@@ -63,7 +63,7 @@ class EncryApp(args: Seq[String]) extends Application {
     AccountInfoApiRoute(readersHolderRef, nodeViewHolderRef, scannerRef, settings.restApi, encrySettings.nodeSettings.stateMode)
   )
 
-  override val localInterface: ActorRef =
+  val localInterface: ActorRef =
     EncryLocalInterfaceRef(nodeViewHolderRef, peerManagerRef, encrySettings, timeProvider)
 
   override val nodeViewSynchronizer: ActorRef = actorSystem.actorOf(

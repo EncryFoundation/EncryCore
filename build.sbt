@@ -12,7 +12,7 @@ resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repos
   "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/",
   "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/")
 
-val scorexVersion = "2d039699-SNAPSHOT"
+val scorexVersion = "ebdf660f-SNAPSHOT"
 
 val circeVersion = "0.9.1"
 
@@ -59,7 +59,7 @@ libraryDependencies ++= Seq(
   "com.storm-enroute" %% "scalameter" % "0.8.+",
   "io.spray" %%  "spray-json" % "1.3.3",
   "io.monix" %% "monix" % "2.3.3",
-  "com.github.oskin1" %% "encryscript" % "0.2.12"
+  "com.github.oskin1" %% "encryscript" % "0.2.14"
 ) ++ networkDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
 
 fork := true

@@ -17,7 +17,7 @@ import io.circe.Json
 import io.circe.syntax._
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.NodeViewHolder
-import scorex.core.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, Subscribe}
+import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 import scorex.utils.Random
@@ -40,9 +40,7 @@ class EncryMiner(settings: EncryAppSettings,
   private var candidateOpt: Option[PowCandidateBlock] = None
   private var miningThreads: Seq[ActorRef] = Seq.empty
 
-  override def preStart(): Unit = {
-    viewHolderRef ! Subscribe(Seq(NodeViewHolder.EventType.SuccessfulSemanticallyValidModifier))
-  }
+  override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
 
   override def receive: Receive = {
     case SemanticallySuccessfulModifier(mod) =>
