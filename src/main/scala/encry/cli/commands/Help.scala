@@ -17,7 +17,7 @@ object Help extends Command {
         |node          shutdown         None           Shutdown the node
         |wallet        pubKeys          None           Print available public keys
         |wallet        addrs            None           Print available addresses
-        |wallet        init             w1, w2         Init storage with seed
+        |wallet        init             seed           Init storage with seed
         |wallet        init             None           Generate new storage
         |wallet        addKey           None           Add key to storage
         |wallet        balance          None           Show balance of current wallet
