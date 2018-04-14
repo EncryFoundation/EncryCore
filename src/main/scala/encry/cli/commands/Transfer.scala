@@ -23,24 +23,24 @@ import scala.util.Try
 object Transfer extends Command {
 
   /**
-    * Command "wallet -transfer=toAddress;Fee;Amount"
-    * Example "wallet -transfer=3jSD9fwHEHJwHq99ARqhnNhqGXeKnkJMyX4FZjHV6L3PjbCmjG;100;100"
+    * Command "wallet transfer -addr=<addr[String]> -fee=<fee[Num]> -amount=<amount[Num]>"
+    * Example "wallet transfer -addr='3jSD9fwHEHJwHq99ARqhnNhqGXeKnkJMyX4FZjHV6L3PjbCmjG' -fee=100 -amount=2000"
     *
     * @param nodeViewHolderRef
     * @param args
     * @return
     */
   override def execute(nodeViewHolderRef: ActorRef,
-                       args: List[Ast.Param], settings: EncryAppSettings): Option[Response] = {
+                       args: Command.Args, settings: EncryAppSettings): Option[Response] = {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
     Await.result((nodeViewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
         Try {
           lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.scorexSettings.ntp)
           val secret = view.vault.keyManager.keys.head
-          val recipient = Address @@ args.find(_.ident.ident == "addr").get.value.asInstanceOf[Ast.Str].s
-          val fee = args.find(_.ident.ident == "fee").get.value.asInstanceOf[Ast.Num].i
-          val amount = args.find(_.ident.ident == "amount").get.value.asInstanceOf[Ast.Num].i
+          val recipient = Address @@ args.requireArg[Ast.Str]("addr").s
+          val fee = args.requireArg[Ast.Num]("fee").i
+          val amount = args.requireArg[Ast.Num]("amount").i
           val timestamp = timeProvider.time()
           val boxes = view.vault.walletStorage.allBoxes.filter(_.isInstanceOf[AssetBox])
             .map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) { case (seq, box) =>

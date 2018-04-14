@@ -6,5 +6,16 @@ import encry.settings.EncryAppSettings
 
 trait Command {
 
-  def execute(nodeViewHolderRef: ActorRef, args: List[Ast.Param], settings: EncryAppSettings): Option[Response]
+  def execute(nodeViewHolderRef: ActorRef, args: Command.Args, settings: EncryAppSettings): Option[Response]
+}
+
+object Command {
+
+  case class Args(args: Map[String, Ast.Value]) {
+
+    def requireArg[VT <: Ast.Value](n: String): VT = args.get(n).map {
+      case vt: VT@unchecked => vt
+      case _ => throw new Error("Wrong argument type.")
+    }.getOrElse(throw new Error(s"Argument $n not found."))
+  }
 }

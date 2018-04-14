@@ -22,15 +22,19 @@ case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryApp
       Iterator.continually(reader.readLine(prompt)).takeWhile(!_.equals("quit")).foreach { input =>
         (InputParser.commandP ~ End).parse(input) match {
           case Parsed.Success(command, _) =>
-            println(command)
-            getCommand(command.category.ident, command.name.ident) match {
+            getCommand(command.category.name, command.ident.name) match {
               case Some(cmd) =>
-                println(cmd.execute(nodeViewHolderRef, command.params, settings).map(_.msg).getOrElse(""))
+                println(
+                  cmd.execute(
+                    nodeViewHolderRef,
+                    Command.Args(command.params.map(p => p.ident.name -> p.value ).toMap),
+                    settings
+                  ).map(_.msg).getOrElse("")
+                )
               case _ =>
                 println("Unsupported command. Type 'app help' to get commands list")
             }
-          case o =>
-            println(o)
+          case _ =>
             println("Bad input")
         }
       }
@@ -43,15 +47,15 @@ object ConsolePromptListener {
 
   def getCommand(cat: String, cmd: String): Option[Command] = cmdDictionary.get(cat).flatMap(_.get(cmd))
 
-  val nodeCmds = Map("node" -> Map(
+  private val nodeCmds = Map("node" -> Map(
     "shutdown" -> NodeShutdown
   ))
 
-  val appCmds = Map("app" -> Map(
+  private val appCmds = Map("app" -> Map(
     "help" -> Help
   ))
 
-  val walletCmds = Map("wallet" -> Map(
+  private val walletCmds = Map("wallet" -> Map(
     "addrs" -> PrintMyAddrs,
     "addKey" -> AddKey,
     "init" -> InitKeyStorage,

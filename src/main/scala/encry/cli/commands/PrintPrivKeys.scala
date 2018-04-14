@@ -18,7 +18,7 @@ import scala.concurrent.duration._
 object PrintPrivKeys extends Command {
 
   override def execute(nodeViewHolderRef: ActorRef,
-                       args: List[Ast.Param], settings: EncryAppSettings): Option[Response] = {
+                       args: Command.Args, settings: EncryAppSettings): Option[Response] = {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
     Await.result((nodeViewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>

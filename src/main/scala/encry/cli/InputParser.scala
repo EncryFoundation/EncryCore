@@ -7,6 +7,7 @@ object InputParser {
   import fastparse.all._
 
   val ws = P( " " )
+  val wss = P( " ".rep(min = 1, max = 5) )
 
   val letter: all.Parser[Unit] =        P( lowercase | uppercase )
   val lowercase: all.Parser[Unit] =     P( CharIn('a' to 'z') )
@@ -51,7 +52,8 @@ object InputParser {
 
   val flagsP: P[Seq[Ast.Flag]] = P( flagP.rep(min = 1, " ") )
 
-  val commandP: P[Ast.Command] = P( IDENT ~ ws ~ IDENT ~ ws.? ~ paramsP.? ~ ws.? ~ flagsP.? ).map { case (cat, cmd, params, flags) =>
-    Ast.Command(cat, cmd, params.getOrElse(List.empty).toList, flags.getOrElse(List.empty).toList)
-  }
+  val commandP: P[Ast.Command] = P( wss.? ~ IDENT ~ wss ~ IDENT ~ (wss ~ paramsP).? ~ (wss ~ flagsP).? )
+    .map { case (cat, cmd, params, flags) =>
+      Ast.Command(cat, cmd, params.getOrElse(List.empty).toList, flags.getOrElse(List.empty).toList)
+    }
 }

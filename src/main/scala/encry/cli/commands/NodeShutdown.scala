@@ -7,7 +7,7 @@ import encry.settings.EncryAppSettings
 object NodeShutdown extends Command {
 
   override def execute(nodeViewHolderRef: ActorRef,
-                       args: List[Ast.Param], settings: EncryAppSettings): Option[Response] = {
+                       args: Command.Args, settings: EncryAppSettings): Option[Response] = {
     EncryApp.forceStopApplication()
     None
   }
