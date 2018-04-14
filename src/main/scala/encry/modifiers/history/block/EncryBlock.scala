@@ -32,13 +32,10 @@ case class EncryBlock(override val header: EncryBlockHeader,
       }
 
     if (header.transactionsRoot != payload.digest) {
-      log.info(s"$this Invalid tx Merkle Root hash.")
-      Failure(new Error("Invalid tx Merkle Root hash"))
+      Failure(new Error("Invalid payload root hash"))
     } else if (!(validCoinbase && payload.transactions.count(_.isCoinbase) == 1)) {
-      log.info(s"$this Invalid coinbase transaction.")
-      Failure(new Error("Invalid signature"))
+      Failure(new Error("Invalid coinbase"))
     } else if (!header.validSignature) {
-      log.info(s"$this Invalid timestamp signature.")
       Failure(new Error("Invalid signature"))
     } else Success()
   }
@@ -59,7 +56,7 @@ object EncryBlock {
   implicit val jsonEncoder: Encoder[EncryBlock] = (b: EncryBlock) => Map(
     "header" -> b.header.asJson,
     "payload" -> b.payload.asJson,
-    "adPoofs" -> b.adProofsOpt.map(_.asJson).getOrElse(Map.empty[String, String].asJson)
+    "adProofs" -> b.adProofsOpt.map(_.asJson).getOrElse(Map.empty[String, String].asJson)
   ).asJson
 }
 
