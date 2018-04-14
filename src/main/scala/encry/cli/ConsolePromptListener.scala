@@ -27,7 +27,7 @@ case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryApp
                 println(
                   cmd.execute(
                     nodeViewHolderRef,
-                    Command.Args(command.params.map(p => p.ident.name -> p.value ).toMap),
+                    Command.Args(command.params.map(p => p.ident.name -> p.value).toMap),
                     settings
                   ).map(_.msg).getOrElse("")
                 )
