@@ -18,9 +18,9 @@ object Command {
       case _ => throw new Error("Wrong argument type.")
     }.getOrElse(throw new Error(s"Argument $n not found."))
 
-    def getOrElse[VT <: Ast.Value](key: String, default: => VT): VT = args.get(key) match {
-      case Some(v: VT@unchecked) => v
+    def requireArgOrElse[VT <: Ast.Value](key: String, default: => VT): VT = args.get(key).map {
+      case vt: VT@unchecked => vt
       case _ => default
-    }
+    }.getOrElse(default)
   }
 }
