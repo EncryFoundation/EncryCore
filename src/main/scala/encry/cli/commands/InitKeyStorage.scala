@@ -23,7 +23,7 @@ object InitKeyStorage extends Command {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
     nodeViewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Unit] { view =>
-        val mnemonicCode = args.args.get("seed").map(_.asInstanceOf[Ast.Str].s).getOrElse(Mnemonic.entropyToMnemonicCode(SecureRandom.getSeed(16)))
+        val mnemonicCode = args.getOrElse("seed", Ast.Str(Mnemonic.entropyToMnemonicCode(SecureRandom.getSeed(16)))).s
         println(s"Your mnemonic key is: $mnemonicCode")
         view.vault.keyManager.initStorage(Mnemonic.mnemonicCodeToBytes(mnemonicCode))
       }
