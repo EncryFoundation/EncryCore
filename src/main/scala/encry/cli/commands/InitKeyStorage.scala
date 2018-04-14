@@ -14,18 +14,22 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import scala.util.Try
 
 object InitKeyStorage extends Command {
 
   override def execute(nodeViewHolderRef: ActorRef,
-                       args: Command.Args, settings: EncryAppSettings): Option[Response] = Try {
+                       args: Command.Args, settings: EncryAppSettings): Option[Response] = {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
-    nodeViewHolderRef ?
-      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Unit] { view =>
-        val mnemonicCode = args.getOrElse("seed", Ast.Str(Mnemonic.entropyToMnemonicCode(SecureRandom.getSeed(16)))).s
-        println(s"Your mnemonic key is: $mnemonicCode")
-        view.vault.keyManager.initStorage(Mnemonic.mnemonicCodeToBytes(mnemonicCode))
-      }
-  }.map(_ => Some(Response("OK"))).getOrElse(Some(Response("Operation failed")))
+    Await.result((nodeViewHolderRef ?
+      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
+        Try {
+          val mnemonicCode = args.getOrElse("seed", Ast.Str(Mnemonic.entropyToMnemonicCode(SecureRandom.getSeed(16)))).s
+          view.vault.keyManager.initStorage(Mnemonic.mnemonicCodeToBytes(mnemonicCode))
+          mnemonicCode
+        }.toOption.map(code => Some(Response(s"Your mnemonic code is: $code"))).getOrElse(Some(Response("Operation failed. Couldn't init key storage.")))
+      }).mapTo[Option[Response]], 5.second)
+  }
 }
