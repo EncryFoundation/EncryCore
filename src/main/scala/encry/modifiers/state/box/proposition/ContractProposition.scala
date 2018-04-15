@@ -4,6 +4,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import encry.contracts.{CStateInfo, ContractContext}
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
+import encry.settings.Constants
 import encrywm.backend.env.ScopedRuntimeEnv
 import encrywm.backend.executor.Executor
 import encrywm.backend.executor.Executor.{Return, Unlocked}
@@ -26,7 +27,7 @@ case class ContractProposition(contract: ESContract) extends EncryProposition {
   override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
     ScriptSerializer.deserialize(contract.serializedScript).map { script =>
       val contractContext = new ContractContext(proof, ctx.transaction, CStateInfo(ctx.height, ctx.lastBlockTimestamp, ctx.stateDigest))
-      val executor = new Executor(ScopedRuntimeEnv.initialized("global", 1, Map("context" -> contractContext.asVal)))
+      val executor = new Executor(ScopedRuntimeEnv.initialized("G", 1, Map("context" -> contractContext.asVal)), Constants.ContractMaxFuel)
       executor.executeContract(script) match {
         case Right(Return(_: Unlocked.type)) => Success()
         case _ => throw new Error("Unlock failed.")

@@ -20,9 +20,9 @@ object TestHelper {
 
   object Props {
     lazy val keysQty = 1000
-    lazy val boxValue: Amount = 1000
-    lazy val txAmount: Amount = 900
-    lazy val txFee: Amount = 100
+    lazy val boxValue: Amount = 1000000
+    lazy val txAmount: Amount = 199000
+    lazy val txFee: Amount = 4300
     lazy val testDir = "test-data/"
     lazy val keysFilePath = s"${testDir}seeds"
     lazy val recipientAddr: Address = Address @@ "3EkkRFTepVFHqWdAqR5WQrvHkKjNJ26V35UthTMqTpGJHxnCYj"
