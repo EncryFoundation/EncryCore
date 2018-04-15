@@ -5,7 +5,7 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.settings.{Algos, NodeSettings}
+import encry.settings.{Algos, Constants, NodeSettings}
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
@@ -78,7 +78,7 @@ trait EncryHistoryReader
   /**
     * @param info other's node sync info
     * @param size max return size
-    * @return Ids of headerss, that node with info should download and apply to synchronize
+    * @return Ids of headers, that node with info should download and apply to synchronize
     */
   override def continuationIds(info: EncrySyncInfo, size: Int): Option[ModifierIds] = Try {
     if (isEmpty) {
@@ -88,7 +88,7 @@ trait EncryHistoryReader
       val startId = headerIdsAtHeight(heightFrom).head
       val startHeader = typedModifierById[EncryBlockHeader](startId).get
       val headers = headerChainBack(size, startHeader, _ => false)
-        .ensuring(_.headers.exists(_.height == 0), "Should always contain genesis header")
+        .ensuring(_.headers.exists(_.height == Constants.Chain.GenesisHeight), "Should always contain genesis header")
       headers.headers.flatMap(h => Seq((EncryBlockHeader.modifierTypeId, h.id)))
     } else {
       val ids = info.lastHeaderIds

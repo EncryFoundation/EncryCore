@@ -6,6 +6,7 @@ import scorex.core.consensus.SyncInfo
 import scorex.core.network.message.SyncInfoMessageSpec
 import scorex.core.serialization.Serializer
 import scorex.core.{ModifierId, NodeViewModifier}
+import scorex.crypto.encode.Base58
 
 import scala.util.Try
 
@@ -13,7 +14,9 @@ case class EncrySyncInfo(lastHeaderIds: Seq[ModifierId]) extends SyncInfo {
 
   override type M = EncrySyncInfo
 
-  override def startingPoints: ModifierIds = lastHeaderIds.map(b => EncryBlockHeader.modifierTypeId -> b)
+  override def startingPoints: ModifierIds = lastHeaderIds.map(id => EncryBlockHeader.modifierTypeId -> id)
+
+  println(s"SyncInfo (${lastHeaderIds.size}): " + lastHeaderIds.foreach(Base58.encode))
 
   override lazy val serializer: Serializer[M] = EncrySyncInfoSerializer
 }
@@ -32,6 +35,8 @@ object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
     require(bytes.length <= EncrySyncInfo.MaxBlockIds * NodeViewModifier.ModifierIdSize + 1)
 
     val ids = ModifierId @@ bytes.grouped(NodeViewModifier.ModifierIdSize).toSeq
+
+    println(s"Deserialized EncrySyncInfo(${ids.map(Base58.encode)})")
 
     EncrySyncInfo(ids)
   }
