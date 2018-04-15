@@ -88,7 +88,7 @@ trait DownloadProcessor extends ScorexLogging {
   private def requiredModifiersForHeader(h: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] = {
     if (!nodeSettings.verifyTransactions) {
       Seq.empty
-    } else if (nodeSettings.stateMode.isDigest) { // TODO: Should depend on requirement of ADProofs.
+    } else if (nodeSettings.stateMode.isDigest) {
       Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId))
     } else {
       Seq((EncryBlockPayload.modifierTypeId, h.payloadId))

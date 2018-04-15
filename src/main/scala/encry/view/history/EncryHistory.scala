@@ -26,7 +26,11 @@ import scala.util.Try
   * process different type of modifiers.
   *
   * HeadersProcessor: processor of block headers. It's the same for all node settings
-  * BlockTransactionsProcessor: Processor of BlockTransactions. BlockTransactions may
+  * ADProofsProcessor: processor of ADProofs. ADProofs may
+  *   1. Be downloaded from other nodes (ADState == true)
+  *   2. Be calculated by using local state (ADState == false)
+  *   3. Be ignored by history in light mode (verifyTransactions == false)
+  * BlockPayloadProcessor: Processor of BlockPayload. BlockPayload may
   *   1. Be downloaded from other peers (verifyTransactions == true)
   *   2. Be ignored by history (verifyTransactions == false)
   */
@@ -35,7 +39,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
 
   // Appends modifier to the history if it is applicable.
   override def append(modifier: EncryPersistentModifier): Try[(EncryHistory, History.ProgressInfo[EncryPersistentModifier])] = {
-    log.debug(s"Trying to append modifier ${Base58.encode(modifier.id)} of type ${modifier.modifierTypeId} to history...")
+    log.debug(s"Trying to append modifier ${Base58.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     testApplicable(modifier).map { _ =>
       modifier match {
         case header: EncryBlockHeader => (this, process(header))
@@ -50,10 +54,10 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
     * @return header, that corresponds to modifier
     */
   protected def correspondingHeader(modifier: EncryPersistentModifier): Option[EncryBlockHeader] = modifier match {
-    case h: EncryBlockHeader => Some(h)
-    case full: EncryBlock => Some(full.header)
+    case header: EncryBlockHeader => Some(header)
+    case block: EncryBlock => Some(block.header)
     case proof: ADProofs => typedModifierById[EncryBlockHeader](proof.headerId)
-    case txs: EncryBlockPayload => typedModifierById[EncryBlockHeader](txs.headerId)
+    case payload: EncryBlockPayload => typedModifierById[EncryBlockHeader](payload.headerId)
     case _ => None
   }
 
