@@ -43,8 +43,8 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
 
   lazy val account: Account = Account(accountPubKey.pubKeyBytes)
 
-  lazy val minimalFee: Amount = Constants.feeMinAmount +
-    directives.map(_.cost).sum + (Constants.txByteCost * length).toLong
+  lazy val minimalFee: Amount = Constants.FeeMinAmount +
+    directives.map(_.cost).sum + (Constants.PersistentByteCost * length)
 
   override def toString: String = s"<TX: id=${Algos.encode(id)} isCoinbase=$isCoinbase>"
 

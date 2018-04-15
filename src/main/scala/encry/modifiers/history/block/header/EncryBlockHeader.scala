@@ -46,7 +46,7 @@ case class EncryBlockHeader(override val version: Version,
   override val dataToSign: Array[Byte] =
     getMessageToSign(version, accountPubKey, parentId, adProofsRoot, stateRoot, transactionsRoot, timestamp, height, difficulty)
 
-  lazy val isGenesis: Boolean = height == Constants.Chain.genesisHeight
+  lazy val isGenesis: Boolean = height == Constants.Chain.GenesisHeight
 
   lazy val payloadId: ModifierId =
     ModifierWithDigest.computeId(EncryBlockPayload.modifierTypeId, id, transactionsRoot)
@@ -66,7 +66,7 @@ object EncryBlockHeader {
 
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (101: Byte)
 
-  lazy val GenesisParentId: ModifierId = ModifierId @@ Array.fill(Constants.digestLength)(0: Byte)
+  lazy val GenesisParentId: ModifierId = ModifierId @@ Array.fill(Constants.DigestLength)(0: Byte)
 
   implicit val jsonEncoder: Encoder[EncryBlockHeader] = (h: EncryBlockHeader) => Map(
     "id" -> Algos.encode(h.id).asJson,

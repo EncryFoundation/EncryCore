@@ -22,7 +22,7 @@ class UtxoStateSpec extends PropSpec with Matchers {
 
     val stateStore = new LSMStore(dir, keySize = 32, keepVersions = 10)
 
-    new UtxoState(EncryState.genesisStateVersion, Constants.Chain.genesisHeight, stateStore, 0L, None) {
+    new UtxoState(EncryState.genesisStateVersion, Constants.Chain.GenesisHeight, stateStore, 0L, None) {
       override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
         PersistentBatchAVLProver.create(
           p, storage, paranoidChecks = true

@@ -136,7 +136,7 @@ object EncryWallet {
     val walletDir = getWalletDir(settings)
     walletDir.mkdirs()
 
-    val walletStore = new LSMStore(walletDir, keepVersions = Constants.keepVersions)
+    val walletStore = new LSMStore(walletDir, keepVersions = Constants.DefaultKeepVersions)
 
     new EncryWallet(walletStore, keyManager = KeyManager.readOrGenerate(settings))
   }

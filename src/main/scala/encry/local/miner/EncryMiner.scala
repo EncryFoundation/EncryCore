@@ -107,7 +107,7 @@ class EncryMiner(settings: EncryAppSettings,
           .foldLeft((Seq[EncryBaseTransaction](), Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) {
             case ((validTxs, invalidTxs, bxsAcc), tx) =>
               val bxsRaw = tx.unlockers.map(u => ByteArrayWrapper(u.boxId))
-              if ((validTxs.map(_.length).sum + tx.length) <= Constants.Chain.blockMaxSize - 124) {
+              if ((validTxs.map(_.length).sum + tx.length) <= Constants.Chain.BlockMaxSize - 124) {
                 if (state.validate(tx).isSuccess && bxsRaw.forall(k => !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size) {
                   (validTxs :+ tx, invalidTxs, bxsAcc ++ bxsRaw)
                 } else {
@@ -138,7 +138,7 @@ class EncryMiner(settings: EncryAppSettings,
 
         val (adProof, adDigest) = state.proofsForTransactions(txs).get
         val difficulty = bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
-          .getOrElse(Constants.Chain.initialDifficulty)
+          .getOrElse(Constants.Chain.InitialDifficulty)
         val derivedFields = PowConsensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
         val blockSignature = minerSecret.sign(
           EncryBlockHeader.getMessageToSign(derivedFields._1, minerSecret.publicImage, derivedFields._2,

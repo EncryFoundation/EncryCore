@@ -28,7 +28,7 @@ case class CoinbaseDirective(height: Height) extends Directive {
 
   override val cost: Amount = 0
 
-  override val isValid: Boolean = height > Constants.Chain.preGenesisHeight
+  override val isValid: Boolean = height > Constants.Chain.PreGenesisHeight
 
   override def serializer: Serializer[M] = CoinbaseDirectiveSerializer
 }

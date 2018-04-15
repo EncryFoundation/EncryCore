@@ -13,17 +13,17 @@ object PowLinearController {
   private val chainParams = Constants.Chain
 
   def getDifficulty(previousHeaders: Seq[(Int, EncryBlockHeader)]): Difficulty = {
-    if (previousHeaders.size == chainParams.retargetingEpochsQty) {
+    if (previousHeaders.size == chainParams.RetargetingEpochsQty) {
       val data: Seq[(Int, Difficulty)] = previousHeaders.sliding(2).toList.map { d =>
         val start = d.head
         val end = d.last
-        require(end._1 - start._1 == chainParams.epochLength, s"Incorrect heights interval for $d")
-        val diff = Difficulty @@ (end._2.difficulty * chainParams.desiredBlockInterval.toMillis *
-          chainParams.epochLength / (end._2.timestamp - start._2.timestamp))
+        require(end._1 - start._1 == chainParams.EpochLength, s"Incorrect heights interval for $d")
+        val diff = Difficulty @@ (end._2.difficulty * chainParams.DesiredBlockInterval.toMillis *
+          chainParams.EpochLength / (end._2.timestamp - start._2.timestamp))
         (end._1, diff)
       }
       val diff = interpolate(data)
-      if (diff >= 1) diff else chainParams.initialDifficulty
+      if (diff >= 1) diff else chainParams.InitialDifficulty
     } else previousHeaders.maxBy(_._1)._2.difficulty
   }
 
@@ -42,22 +42,22 @@ object PowLinearController {
     val k: BigInt = (xySum * size - xSum * ySum) * PrecisionConstant / (x2Sum * size - xSum * xSum)
     val b: BigInt = (ySum * PrecisionConstant - k * xSum) / size / PrecisionConstant
 
-    val point = data.map(_._1).max + chainParams.epochLength
+    val point = data.map(_._1).max + chainParams.EpochLength
     Difficulty @@ (b + k * point / PrecisionConstant)
   }
 
   // Retargeting to adjust difficulty.
   def getNewTarget(oldTarget: BigInt, lastEpochsIntervalMs: FiniteDuration): BigInt =
-    oldTarget * lastEpochsIntervalMs.toMillis / (chainParams.desiredBlockInterval.toMillis *
-      chainParams.retargetingEpochsQty)
+    oldTarget * lastEpochsIntervalMs.toMillis / (chainParams.DesiredBlockInterval.toMillis *
+      chainParams.RetargetingEpochsQty)
 
   def getNewDifficulty(oldDifficulty: Difficulty, lastEpochsIntervalMs: FiniteDuration): Difficulty =
-    Difficulty @@ (chainParams.maxTarget / getNewTarget(getTarget(oldDifficulty), lastEpochsIntervalMs))
+    Difficulty @@ (chainParams.MaxTarget / getNewTarget(getTarget(oldDifficulty), lastEpochsIntervalMs))
 
   // Used to provide `getTimedelta()` with the sequence of headers of right heights.
   def getHeightsForRetargetingAt(height: Height): Seq[Height] = {
-    if ((height - 1) > chainParams.retargetingEpochsQty)
-      (0 until chainParams.retargetingEpochsQty)
+    if ((height - 1) > chainParams.RetargetingEpochsQty)
+      (0 until chainParams.RetargetingEpochsQty)
         .map(i => (height - 1) - i).reverse.map(i => Height @@ i)
     else
       (0 until height)
@@ -73,5 +73,5 @@ object PowLinearController {
   val PrecisionConstant: Int = 1000000000
 
   def getTarget(difficulty: Difficulty): BigInt =
-    chainParams.maxTarget / difficulty
+    chainParams.MaxTarget / difficulty
 }

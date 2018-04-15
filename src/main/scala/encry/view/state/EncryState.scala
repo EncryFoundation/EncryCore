@@ -62,8 +62,8 @@ object EncryState extends ScorexLogging{
   def genesisBoxes: IndexedSeq[AssetBox] = {
     lazy val genesisSeed = Long.MaxValue
     lazy val rndGen = new scala.util.Random(genesisSeed)
-    (0 until Constants.Chain.genesisBoxesQty).map(_ =>
-      AssetBox(HeightProposition(Height @@ -1), rndGen.nextLong(), Constants.Chain.genesisBoxesAmount))
+    (0 until Constants.Chain.GenesisBoxesQty).map(_ =>
+      AssetBox(HeightProposition(Height @@ -1), rndGen.nextLong(), Constants.Chain.GenesisBoxesAmount))
   }
 
   def generateGenesisUtxoState(stateDir: File,

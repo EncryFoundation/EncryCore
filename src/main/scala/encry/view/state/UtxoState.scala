@@ -148,12 +148,12 @@ class UtxoState(override val version: VersionTag,
       case Some(v) =>
         val rollbackResult = prover.rollback(ADDigest @@ v.data).map { _ =>
           val stateHeight = stateStore.get(ByteArrayWrapper(UtxoState.bestHeightKey))
-            .map(d => Ints.fromByteArray(d.data)).getOrElse(Constants.Chain.genesisHeight)
+            .map(d => Ints.fromByteArray(d.data)).getOrElse(Constants.Chain.GenesisHeight)
           new UtxoState(version, Height @@ stateHeight, stateStore, lastBlockTimestamp, nodeViewHolderRef) {
             override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] = prover
           }
         }
-        stateStore.clean(Constants.keepVersions)
+        stateStore.clean(Constants.DefaultKeepVersions)
         rollbackResult
       case None =>
         Failure(new Error(s"Unable to get root hash at version ${Algos.encoder.encode(version)}"))
@@ -215,11 +215,11 @@ object UtxoState extends ScorexLogging {
   private lazy val lastBlockTimeKey = Algos.hash("last_block_timestamp")
 
   def create(stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val stateStore = new LSMStore(stateDir, keepVersions = Constants.keepVersions)
+    val stateStore = new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions)
     val stateVersion = stateStore.get(ByteArrayWrapper(bestVersionKey))
       .map(_.data).getOrElse(EncryState.genesisStateVersion)
     val stateHeight = stateStore.get(ByteArrayWrapper(bestHeightKey))
-      .map(d => Ints.fromByteArray(d.data)).getOrElse(Constants.Chain.preGenesisHeight)
+      .map(d => Ints.fromByteArray(d.data)).getOrElse(Constants.Chain.PreGenesisHeight)
     val lastBlockTimestamp = stateStore.get(ByteArrayWrapper(lastBlockTimeKey))
       .map(d => Longs.fromByteArray(d.data)).getOrElse(0L)
     new UtxoState(VersionTag @@ stateVersion, Height @@ stateHeight, stateStore, lastBlockTimestamp, nodeViewHolderRef)
@@ -239,21 +239,21 @@ object UtxoState extends ScorexLogging {
     val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = EncryBox.BoxIdSize, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
-    val stateStore = new LSMStore(stateDir, keepVersions = Constants.keepVersions)
+    val stateStore = new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions)
 
     log.info(s"Generating UTXO State from BH with ${bh.boxes.size} boxes")
 
-    new UtxoState(EncryState.genesisStateVersion, Constants.Chain.preGenesisHeight, stateStore, 0L, nodeViewHolderRef) {
+    new UtxoState(EncryState.genesisStateVersion, Constants.Chain.PreGenesisHeight, stateStore, 0L, nodeViewHolderRef) {
       override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
         PersistentBatchAVLProver.create(
-          p, storage, metadata(EncryState.genesisStateVersion, p.digest, Constants.Chain.preGenesisHeight, 0L), paranoidChecks = true
+          p, storage, metadata(EncryState.genesisStateVersion, p.digest, Constants.Chain.PreGenesisHeight, 0L), paranoidChecks = true
         ).get.ensuring(_.digest sameElements storage.version.get)
     }
   }
 
   def supplyBoxesAt(height: Height, seed: Long): CoinbaseBox = {
     val supplyAmount: Long = TokenSupplyController.supplyAt(height)
-    CoinbaseBox(HeightProposition(Height @@ (height + Constants.Chain.coinbaseHeightLock)),
+    CoinbaseBox(HeightProposition(Height @@ (height + Constants.Chain.CoinbaseHeightLock)),
       seed * height, supplyAmount)
   }
 }

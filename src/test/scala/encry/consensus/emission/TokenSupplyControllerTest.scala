@@ -10,7 +10,7 @@ class TokenSupplyControllerTest extends PropSpec with Matchers {
 
   val epochLen = 10
 
-  val blocksPerHour: Int =  ((60 * 60).seconds / Constants.Chain.desiredBlockInterval).toInt
+  val blocksPerHour: Int =  ((60 * 60).seconds / Constants.Chain.DesiredBlockInterval).toInt
 
   val blocksPerYear: Int = blocksPerHour * 24 * 365
 
@@ -26,7 +26,7 @@ class TokenSupplyControllerTest extends PropSpec with Matchers {
 
     val firstYearSupply = epochSupply.zipWithIndex.filter(i => i._2 <= blocksPerYear).map(_._1).sum
 
-    atEndEpochSupply < Constants.Chain.initialEmissionAmount shouldBe true
+    atEndEpochSupply < Constants.Chain.InitialEmissionAmount shouldBe true
   }
 
 }

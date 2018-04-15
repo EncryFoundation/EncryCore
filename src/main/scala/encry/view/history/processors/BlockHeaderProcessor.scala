@@ -32,9 +32,9 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   protected val charsetName: String = "UTF-8"
 
   protected val BestHeaderKey: ByteArrayWrapper =
-    ByteArrayWrapper(Array.fill(digestLength)(EncryBlockHeader.modifierTypeId))
+    ByteArrayWrapper(Array.fill(DigestLength)(EncryBlockHeader.modifierTypeId))
 
-  protected val BestBlockKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(digestLength)(-1))
+  protected val BestBlockKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(-1))
 
   protected val historyStorage: HistoryStorage
 
@@ -101,8 +101,8 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
       log.info(s"Initialize header chain with genesis header ${h.encodedId}")
       (Seq(
         BestHeaderKey -> ByteArrayWrapper(h.id),
-        heightIdsKey(chainParams.genesisHeight) -> ByteArrayWrapper(h.id),
-        headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(chainParams.genesisHeight)),
+        heightIdsKey(chainParams.GenesisHeight) -> ByteArrayWrapper(h.id),
+        headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(chainParams.GenesisHeight)),
         headerScoreKey(h.id) -> ByteArrayWrapper(difficulty.toByteArray)), h)
     } else {
       val score = Difficulty @@ (scoreOf(h.parentId).get + difficulty)
@@ -239,7 +239,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   def requiredDifficultyAfter(parent: EncryBlockHeader): Difficulty = {
     val parentHeight = heightOf(parent.id).get
     if (parentHeight <= 2) {
-      chainParams.initialDifficulty
+      chainParams.InitialDifficulty
     } else {
       val requiredHeights =
         consensusAlgo.difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
@@ -263,7 +263,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
       if (header.parentId sameElements EncryBlockHeader.GenesisParentId) {
         if (bestHeaderIdOpt.nonEmpty) {
           Failure(new Error("Trying to append genesis block to non-empty history."))
-        } else if (header.height != chainParams.genesisHeight) {
+        } else if (header.height != chainParams.GenesisHeight) {
           Failure(new Error("Invalid height for genesis block header."))
         } else {
           Success()
@@ -272,7 +272,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
         Failure(new Error(s"Parental header <id: ${header.parentId}> does not exist!"))
       } else if (header.height != parentOpt.get.height + 1) {
         Failure(new Error(s"Invalid height in header <id: ${header.id}>"))
-      } else if (header.timestamp - timeProvider.time() > Constants.Chain.maxTimeDrift) {
+      } else if (header.timestamp - timeProvider.time() > Constants.Chain.MaxTimeDrift) {
         Failure(new Error(s"Invalid timestamp in header <id: ${header.id}>"))
       } else if (header.timestamp < parentOpt.get.timestamp) {
         Failure(new Error("Header timestamp is less than parental`s"))
@@ -280,7 +280,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
         Failure(new Error("Header <id: ${header.id}> difficulty too low."))
       } else if (!consensusAlgo.validator.validatePow(header.hHash, header.difficulty)) {
         Failure(new Error(s"Invalid POW in header <id: ${header.id}>"))
-      } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainParams.maxRollback)) {
+      } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainParams.MaxRollback)) {
         Failure(new Error("Header is too old to be applied."))
       } else if (!header.validSignature) {
         Failure(new Error("Block signature is invalid."))

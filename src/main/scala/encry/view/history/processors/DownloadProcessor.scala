@@ -72,6 +72,6 @@ trait DownloadProcessor extends ScorexLogging {
 
   private def isNewHeader(header: EncryBlockHeader): Boolean = {
     // TODO: Magic Number
-    timeProvider.time() - header.timestamp < Constants.Chain.desiredBlockInterval.toMillis * 3
+    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 3
   }
 }

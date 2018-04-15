@@ -126,7 +126,7 @@ object EncryScanner {
     val indexDir = getIndexDir(settings)
     indexDir.mkdirs()
 
-    val indexStore = new LSMStore(indexDir, keepVersions = Constants.keepVersions)
+    val indexStore = new LSMStore(indexDir, keepVersions = Constants.DefaultKeepVersions)
 
     new EncryScanner(settings, viewHolderRef, indexStore)
   }

@@ -43,9 +43,9 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory {
 
     lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(Option(""))
 
-    val walletStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.keepVersions)
+    val walletStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions)
 
-    val keyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.keepVersions), encrySettings.keyManagerSettings, None)
+    val keyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), encrySettings.keyManagerSettings, None)
 
     keyManager.initStorage(Random.randomBytes())
 

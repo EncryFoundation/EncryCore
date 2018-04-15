@@ -6,8 +6,8 @@ import scorex.core.transaction.box.Box.Amount
 
 object TokenSupplyController {
 
-  def supplyAt(height: Height): Amount = if (height >= Constants.Chain.deflationInterval) {
-    (scala.math.pow(Constants.Chain.deflationFactor, (height / Constants.Chain.deflationInterval).floor) *
-      Constants.Chain.initialEmissionAmount).toLong
-  } else Constants.Chain.initialEmissionAmount
+  def supplyAt(height: Height): Amount = if (height >= Constants.Chain.DeflationInterval) {
+    (scala.math.pow(Constants.Chain.DeflationFactor, (height / Constants.Chain.DeflationInterval).floor) *
+      Constants.Chain.InitialEmissionAmount).toLong
+  } else Constants.Chain.InitialEmissionAmount
 }
