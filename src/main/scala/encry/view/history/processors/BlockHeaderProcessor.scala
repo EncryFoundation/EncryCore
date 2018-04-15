@@ -231,7 +231,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   protected final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[EncryBlockHeader] = {
     headerIdsAtHeight(height).find(id => p(id)).flatMap(id => typedModifierById[EncryBlockHeader](id)) match {
       case Some(header) => Some(header)
-      case None if height > 0 => loopHeightDown(height - 1, p)
+      case None if height > Constants.Chain.GenesisHeight => loopHeightDown(height - 1, p)
       case None => None
     }
   }

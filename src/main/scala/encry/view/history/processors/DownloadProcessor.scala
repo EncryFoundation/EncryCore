@@ -10,6 +10,8 @@ import encry.view.history.Height
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 import scorex.core.{ModifierId, ModifierTypeId}
 
+import scala.annotation.tailrec
+
 trait DownloadProcessor extends ScorexLogging {
 
   protected val nodeSettings: NodeSettings
@@ -30,9 +32,16 @@ trait DownloadProcessor extends ScorexLogging {
 
   def headerIdsAtHeight(height: Int): Seq[ModifierId]
 
+  /**
+    * @return true if we decide that our chain is synced with the network.
+    */
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
 
+  /**
+    * Next number of modifiers we should download to synchronize full block chain with headers chain
+    */
   def modifiersToDownload(howMany: Int, excluding: Iterable[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
+    @tailrec
     def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] = {
       if (acc.lengthCompare(howMany) >= 0) acc
       else {
@@ -54,24 +63,40 @@ trait DownloadProcessor extends ScorexLogging {
     }
   }
 
+  /**
+    * Checks, whether it's time to download full chain and return toDownload modifiers
+    */
   protected def toDownload(header: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] = {
-    if (!nodeSettings.verifyTransactions){
+
+    if (!nodeSettings.verifyTransactions) {
+      // Regime that do not download and verify transaction
       Seq.empty
-    } else if (header.height >= blockDownloadProcessor.minimalBlockHeightVar) requiredModifiersForHeader(header)
-    else if (!isHeadersChainSynced && isNewHeader(header)) {
+    } else if (header.height >= blockDownloadProcessor.minimalBlockHeight) {
+      // Already synced and header is not too far back. Download required modifiers
+      requiredModifiersForHeader(header)
+    } else if (!isHeadersChainSynced && isNewHeader(header)) {
+      // Headers chain is synced after this header. Start downloading full blocks
       log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
       isHeadersChainSyncedVar = true
       blockDownloadProcessor.updateBestBlock(header)
       Seq.empty
-    } else Seq.empty
+    } else {
+      Seq.empty
+    }
   }
 
-  private def requiredModifiersForHeader(header: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] =
-    if (!nodeSettings.verifyTransactions) Seq.empty
-    else Seq((EncryBlockPayload.modifierTypeId, header.id), (ADProofs.modifierTypeId, header.adProofsId))
+  private def requiredModifiersForHeader(h: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] = {
+    if (!nodeSettings.verifyTransactions) {
+      Seq.empty
+    } else if (nodeSettings.stateMode.isDigest) { // TODO: Should depend on requirement of ADProofs.
+      Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId))
+    } else {
+      Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
+    }
+  }
 
   private def isNewHeader(header: EncryBlockHeader): Boolean = {
     // TODO: Magic Number
-    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 3
+    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5
   }
 }

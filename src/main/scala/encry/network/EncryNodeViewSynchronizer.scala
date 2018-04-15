@@ -68,7 +68,7 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
   }
 
   /**
-    * Broadcast inv on successful Header and BlockTransactions application
+    * Broadcast inv on successful Header and BlockPayload application
     * Do not broadcast Inv messages during initial synchronization (the rest of the network should already have all
     * this messages)
     *

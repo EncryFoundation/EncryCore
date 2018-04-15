@@ -45,15 +45,14 @@ class EncryMiner(settings: EncryAppSettings,
     case SemanticallySuccessfulModifier(mod) =>
       if (isMining) {
         mod match {
-          case f: EncryBlock if !candidateOpt.flatMap(_.parentOpt).exists(_.id sameElements f.header.id) =>
+          case block: EncryBlock if !candidateOpt.flatMap(_.parentOpt).exists(_.id sameElements block.header.id) =>
             prepareCandidate(settings, nodeId).foreach(_.foreach(c => self ! c))
           case _ =>
         }
       } else if (settings.nodeSettings.mining) {
         mod match {
-          case f: EncryBlock if f.header.timestamp >= startTime =>
+          case block: EncryBlock if block.header.timestamp >= startTime =>
             self ! StartMining
-
           case _ =>
         }
       }

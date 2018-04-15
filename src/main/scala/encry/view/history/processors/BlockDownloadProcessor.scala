@@ -1,9 +1,13 @@
 package encry.view.history.processors
 
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.settings.NodeSettings
+import encry.settings.{Constants, NodeSettings}
 
-case class BlockDownloadProcessor(nodeSettings: NodeSettings){
+/**
+  * Class that keeps and calculates minimal height for full blocks starting from which we need to download these full
+  * blocks from the network and keep them in our history.
+  */
+case class BlockDownloadProcessor(nodeSettings: NodeSettings) {
 
   private[history] var minimalBlockHeightVar: Int = Int.MaxValue
 
@@ -32,17 +36,17 @@ case class BlockDownloadProcessor(nodeSettings: NodeSettings){
       // just synced with the headers chain - determine first full block to apply
       if (nodeSettings.blocksToKeep < 0) {
         // keep all blocks in history
-        0
+        Constants.Chain.GenesisHeight
       } else if (!nodeSettings.stateMode.isDigest) {
-        ???
+        Constants.Chain.GenesisHeight         //TODO start with the height of UTXO snapshot applied. Start from genesis util this is implemented
       } else {
         // Start from config.blocksToKeep blocks back
-        Math.max(0, header.height - nodeSettings.blocksToKeep + 1)
+        Math.max(Constants.Chain.GenesisHeight, header.height - nodeSettings.blocksToKeep + 1)
       }
     } else if (nodeSettings.blocksToKeep >= 0) {
       Math.max(header.height - nodeSettings.blocksToKeep + 1, minimalBlockHeightVar)
     } else {
-      0
+      Constants.Chain.GenesisHeight
     }
   }
 }
