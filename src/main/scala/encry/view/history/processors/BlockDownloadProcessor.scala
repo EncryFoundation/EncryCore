@@ -28,6 +28,7 @@ case class BlockDownloadProcessor(nodeSettings: NodeSettings) {
     minimalBlockHeightVar
   }
 
+  // TODO: Ensure that `nodeSettings.blocksToKeep + 1` is correct.
   private def minimalBlockHeightAfter(header: EncryBlockHeader): Int = {
     if (!nodeSettings.verifyTransactions) {
       // we do not verify transactions at any height

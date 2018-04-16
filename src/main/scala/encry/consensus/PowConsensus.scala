@@ -37,7 +37,7 @@ object PowConsensus {
     if (validator.validatePow(header.hHash, candidate.difficulty)) {
       val adProofs = ADProofs(header.id, candidate.adProofBytes)
       val payload = new EncryBlockPayload(header.id, candidate.transactions)
-      Option(new EncryBlock(header, payload, Some(adProofs)))
+      Some(new EncryBlock(header, payload, Some(adProofs)))
     } else None
   }
 
