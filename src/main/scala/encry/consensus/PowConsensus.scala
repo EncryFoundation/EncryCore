@@ -6,6 +6,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
+import encry.settings.Constants
 import scorex.core.ModifierId
 import scorex.crypto.authds.SerializedAdProof
 import scorex.crypto.hash.Digest32
@@ -43,12 +44,12 @@ object PowConsensus {
 
   def getDerivedHeaderFields(parentOpt: Option[EncryBlockHeader], adProofBytes: SerializedAdProof,
                              transactions: Seq[EncryBaseTransaction]): (Byte, ModifierId, Digest32, Digest32, Int) = {
-    // TODO: Move to settings.
+    // TODO: Move to Constants.
     val version = 1.toByte
     val parentId: ModifierId = ModifierId @@ parentOpt.map(_.id).getOrElse(EncryBlockHeader.GenesisParentId)
     val adProofsRoot = ADProofs.proofDigest(adProofBytes)
     val txsRoot = EncryBlockPayload.rootHash(transactions.map(_.id))
-    val height = parentOpt.map(_.height).getOrElse(0) + 1
+    val height = parentOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1
 
     (version, parentId, adProofsRoot, txsRoot, height)
   }

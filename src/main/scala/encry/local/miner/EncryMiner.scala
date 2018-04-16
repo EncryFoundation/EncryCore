@@ -98,7 +98,7 @@ class EncryMiner(settings: EncryAppSettings,
       if ((bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) && vault.keyManager.keys.nonEmpty) Try {
 
         lazy val timestamp = timeProvider.time()
-        val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(0) + 1)
+        val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
 
         // `txsToPut` - valid, non-conflicting txs with respect to its fee amount.
         // `txsToDrop` - invalidated txs to be dropped from mempool.

@@ -53,7 +53,7 @@ object Constants {
 
     val MaxTarget = BigInt(1, Array.fill(DigestLength)((-1).toByte))
 
-    val GenesisHeight: Height = Height @@ 1
+    val GenesisHeight: Height = Height @@ 0
 
     val PreGenesisHeight: Height = Height @@ (GenesisHeight - 1)
 
