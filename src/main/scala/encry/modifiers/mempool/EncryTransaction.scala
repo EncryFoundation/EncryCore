@@ -11,7 +11,7 @@ import encry.utils.Utils
 import encrywm.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
 import encrywm.lib.Types.{ESByteVector, ESLong, ESTransaction}
-import io.circe.Encoder
+import io.circe.{Decoder, Encoder, HCursor, Json}
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
@@ -91,6 +91,25 @@ object EncryTransaction {
     "unlockers" -> tx.unlockers.map(_.asJson).asJson,
     "directives" -> tx.directives.map(_.asJson).asJson
   ).asJson
+
+  implicit val jsonDecoder: Decoder[EncryTransaction] = (c: HCursor) => for {
+    id <- c.downField("id").as[String]
+    accountPubKey <- c.downField("accountPubKey").as[String]
+    fee <- c.downField("fee").as[Long]
+    timestamp <- c.downField("timestamp").as[Long]
+    signature <- c.downField("signature").as[String]
+    unlocker <- c.downField("unlockers").as[IndexedSeq[Unlocker]]
+    directives <- c.downField("directives").as[IndexedSeq[Directive]]
+  } yield {
+    EncryTransaction(
+      PublicKey25519(PublicKey @@ Algos.decode(accountPubKey).get),
+      fee,
+      timestamp,
+      Signature25519(Signature @@ Algos.decode(signature).get),
+      unlocker,
+      directives
+    )
+  }
 
   def getHash(accountPubKey: PublicKey25519,
               fee: Amount,

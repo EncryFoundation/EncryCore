@@ -6,8 +6,8 @@ import encry.settings.Algos
 import encrywm.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
 import encrywm.lib.Types.{ESByteVector, ESInt, ESProof}
-import io.circe.Encoder
 import io.circe.syntax._
+import io.circe.{Decoder, Encoder, HCursor}
 import scorex.core.serialization.Serializer
 import scorex.crypto.signatures.{Curve25519, Signature}
 
@@ -45,8 +45,18 @@ object Signature25519 {
   lazy val SignatureSize: Int = Curve25519.SignatureLength
 
   implicit val jsonEncoder: Encoder[Signature25519] = (p: Signature25519) => Map(
+    "typeId" -> p.typeId.asJson,
     "signature" -> Algos.encode(p.signature).asJson
   ).asJson
+
+  implicit val jsonDecoder: Decoder[Signature25519] =
+    (c: HCursor) => {
+      for {
+        sig <- c.downField("signature").as[String]
+      } yield {
+        Signature25519(Signature @@ Algos.decode(sig).get)
+      }
+    }
 }
 
 object Signature25519Serializer extends Serializer[Signature25519] {

@@ -6,7 +6,7 @@ import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.Algos
 import encry.utils.Utils
-import io.circe.Encoder
+import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
@@ -44,6 +44,18 @@ object TransferDirective {
     "amount" -> d.amount.asJson,
     "idx" -> d.idx.asJson
   ).asJson
+
+  implicit val jsonDecoder: Decoder[TransferDirective] = (c: HCursor) => for {
+    address <- c.downField("address").as[String]
+    amount <- c.downField("amount").as[Long]
+    idx <- c.downField("idx").as[Int]
+  } yield {
+    TransferDirective(
+      Address @@ address,
+      amount,
+      idx
+    )
+  }
 }
 
 object TransferDirectiveSerializer extends Serializer[TransferDirective] {

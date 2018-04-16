@@ -3,7 +3,7 @@ package encry.modifiers.mempool
 import encry.modifiers.state.box.EncryBox
 import encry.modifiers.state.box.proof.{Proof, ProofSerializer}
 import encry.settings.Algos
-import io.circe.Encoder
+import io.circe.{Decoder, Encoder, HCursor, Json}
 import io.circe.syntax._
 import scorex.core.serialization.{BytesSerializable, Serializer}
 import scorex.crypto.authds.ADKey
@@ -24,6 +24,17 @@ object Unlocker {
     "boxId" -> Algos.encode(u.boxId).asJson,
     "proof" -> u.proofOpt.map(_.asJson).getOrElse("None".asJson)
   ).asJson
+
+  implicit val jsonDecoder: Decoder[Unlocker] = {
+    (c: HCursor) => {
+      for {
+        foo <- c.downField("boxId").as[String]
+        bar <- c.downField("proof").as[Option[Proof]]
+      } yield {
+        Unlocker(ADKey @@ Algos.decode(foo).get, bar)
+      }
+    }
+  }
 }
 
 object UnlockerSerializer extends Serializer[Unlocker] {
