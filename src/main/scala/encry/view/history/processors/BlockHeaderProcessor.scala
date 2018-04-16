@@ -125,7 +125,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
     */
   private def bestBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty) = {
     val prevHeight = bestHeaderHeight
-    log.info(s"New best header ${h.encodedId} with score $score. Hew height ${h.height}, old height $prevHeight")
+    log.info(s"New best header ${h.encodedId} with score: $score. New height: ${h.height}, old height: $prevHeight")
     val self: (ByteArrayWrapper, ByteArrayWrapper) =
       heightIdsKey(h.height) -> ByteArrayWrapper((Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray)
     val parentHeaderOpt: Option[EncryBlockHeader] = typedModifierById[EncryBlockHeader](h.parentId)

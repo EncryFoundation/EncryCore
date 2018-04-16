@@ -57,7 +57,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
     case header: EncryBlockHeader => Some(header)
     case block: EncryBlock => Some(block.header)
     case proof: ADProofs => typedModifierById[EncryBlockHeader](proof.headerId)
-    case payload: EncryBlockPayload => typedModifierById[EncryBlockHeader](payload.headerId)
+    case txs: EncryBlockPayload => typedModifierById[EncryBlockHeader](txs.headerId)
     case _ => None
   }
 

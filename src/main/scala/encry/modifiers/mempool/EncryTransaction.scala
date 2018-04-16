@@ -84,7 +84,7 @@ object EncryTransaction {
 
   implicit val jsonEncoder: Encoder[EncryTransaction] = (tx: EncryTransaction) => Map(
     "id" -> Algos.encode(tx.id).asJson,
-    "proposition" -> tx.account.toString.asJson,
+    "accountPubKey" -> Algos.encode(tx.accountPubKey.pubKeyBytes).asJson,
     "fee" -> tx.fee.asJson,
     "timestamp" -> tx.timestamp.asJson,
     "signature" -> Algos.encode(tx.signature.signature).asJson,

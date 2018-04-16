@@ -95,7 +95,6 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
   private def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     modifierIds.foreach(id => deliveryTracker.expectFromRandom(modifierTypeId, id))
     val msg = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
-    println("Download request: " + modifierTypeId + " % " + modifierIds.map(Base58.encode))
     //todo: Full nodes should be here, not a random peer
     networkControllerRef ! SendToNetwork(msg, SendToRandom)
   }

@@ -16,12 +16,11 @@ case class EncrySyncInfo(lastHeaderIds: Seq[ModifierId]) extends SyncInfo {
 
   override def startingPoints: ModifierIds = lastHeaderIds.map(id => EncryBlockHeader.modifierTypeId -> id)
 
-  println(s"SyncInfo (${lastHeaderIds.size}): " + lastHeaderIds.foreach(Base58.encode))
-
   override lazy val serializer: Serializer[M] = EncrySyncInfoSerializer
 }
 
 object EncrySyncInfo {
+
   val MaxBlockIds = 1000
 }
 
@@ -35,8 +34,6 @@ object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
     require(bytes.length <= EncrySyncInfo.MaxBlockIds * NodeViewModifier.ModifierIdSize + 1)
 
     val ids = ModifierId @@ bytes.grouped(NodeViewModifier.ModifierIdSize).toSeq
-
-    println(s"Deserialized EncrySyncInfo(${ids.map(Base58.encode)})")
 
     EncrySyncInfo(ids)
   }

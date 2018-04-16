@@ -56,8 +56,10 @@ class UtxoState(override val version: VersionTag,
           }
         }
       } else {
-        if (appliedModCounter > 0) persistentProver.rollback(rootHash)
-          .ensuring(persistentProver.digest.sameElements(rootHash))
+        if (appliedModCounter > 0) {
+          persistentProver.rollback(rootHash)
+            .ensuring(persistentProver.digest.sameElements(rootHash))
+        }
         throw new Error(s"Error while applying modifier $tx.")
       }
     }
@@ -109,7 +111,7 @@ class UtxoState(override val version: VersionTag,
   }
 
   def proofsForTransactions(txs: Seq[EncryBaseTransaction]): Try[(SerializedAdProof, ADDigest)] = {
-
+    val rootHash = persistentProver.digest
     def rollback(): Try[Unit] = Try(
       persistentProver.rollback(rootHash).ensuring(_.isSuccess && persistentProver.digest.sameElements(rootHash))
     ).flatten
