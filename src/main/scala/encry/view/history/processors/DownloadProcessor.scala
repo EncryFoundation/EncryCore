@@ -38,7 +38,7 @@ trait DownloadProcessor extends ScorexLogging {
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
 
   /**
-    * Next number of modifiers we should download to synchronize full block chain with headers chain
+    * Next number of modifiers we should download to synchronize block chain with headers chain
     */
   def modifiersToDownload(howMany: Int, excluding: Iterable[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
     @tailrec

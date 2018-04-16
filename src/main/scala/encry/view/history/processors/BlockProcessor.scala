@@ -37,7 +37,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
                              isNewerPayload: Boolean): ProgressInfo[EncryPersistentModifier] = {
 
     val newModRow = getModRowFromBlock(block, isNewerPayload)
-    val storageVersion = ByteArrayWrapper( if (isNewerPayload) block.payload.id else block.adProofsOpt.get.id )
+    val storageVersion = ByteArrayWrapper(if (isNewerPayload) block.payload.id else block.adProofsOpt.get.id)
     val bestFullChain = getBestFullChain(block.header)
     val bestHeaderNew = bestFullChain.last
 
@@ -51,7 +51,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
                                 newBestHeader: ModifierId,
                                 storageVersion: ByteArrayWrapper,
                                 bestBlockOpt: Option[EncryBlock]): Option[ProgressInfo[EncryPersistentModifier]] =
-    if(isValidFirstFullBlock(block.header)) updateStorage(newModRow, storageVersion, block, newBestHeader)
+    if (isValidFirstFullBlock(block.header)) updateStorage(newModRow, storageVersion, block, newBestHeader)
     else None
 
   private def processBetterChain(block: EncryBlock,
@@ -120,10 +120,8 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
 
   private def clipHistoryDataAt(heights: Seq[Int]): Try[Unit] = Try {
     val toRemove: Seq[ModifierId] = heights.flatMap(h => headerIdsAtHeight(h))
-      .flatMap { id => typedModifierById[EncryBlockHeader](id) }
-      .flatMap { h =>
-        Seq(h.adProofsId, h.payloadId)
-      }
+      .flatMap(id => typedModifierById[EncryBlockHeader](id))
+      .flatMap(h => Seq(h.adProofsId, h.payloadId))
     historyStorage.removeObjects(toRemove)
   }
 

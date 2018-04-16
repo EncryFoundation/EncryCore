@@ -84,7 +84,7 @@ trait EncryHistoryReader
     if (isEmpty) {
       info.startingPoints
     } else if (info.lastHeaderIds.isEmpty) {
-      val heightFrom = Math.min(bestHeaderHeight, size - 1)
+      val heightFrom = Math.min(bestHeaderHeight, size)
       val startId = headerIdsAtHeight(heightFrom).head
       val startHeader = typedModifierById[EncryBlockHeader](startId).get
       val headers = headerChainBack(size, startHeader, _ => false)
@@ -163,7 +163,7 @@ trait EncryHistoryReader
   def missedModifiersForFullChain: Seq[(ModifierTypeId, ModifierId)] = {
     if (nodeSettings.verifyTransactions) {
       bestHeaderOpt.toSeq
-        .flatMap(h => headerChainBack(bestHeaderHeight + 1, h, _ => false).headers)
+        .flatMap(h => headerChainBack(bestHeaderHeight, h, _ => false).headers)
         .flatMap(h => Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId)))
         .filter(id => !contains(id._2))
     } else {
@@ -185,7 +185,7 @@ trait EncryHistoryReader
         val (prevChain, newChain) = commonBlockThenSuffixes(h1, toHeader)
         (prevChain.headOption.map(_.id), newChain.tail)
       case None =>
-        (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
+        (None, headerChainBack(toHeader.height, toHeader, _ => false))
     }
   }
 
