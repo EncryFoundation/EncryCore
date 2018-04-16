@@ -68,12 +68,12 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   /**
     * @return height of best header
     */
-  def bestHeaderHeight: Int = bestHeaderIdOpt.flatMap(id => heightOf(id)).getOrElse(-1)
+  def bestHeaderHeight: Int = bestHeaderIdOpt.flatMap(id => heightOf(id)).getOrElse(Constants.Chain.PreGenesisHeight)
 
   /**
-    * @return height of best header with transacions and proofs
+    * @return height of best header with transactions and proofs
     */
-  def bestFullBlockHeight: Int = bestBlockIdOpt.flatMap(id => heightOf(id)).getOrElse(-1)
+  def bestFullBlockHeight: Int = bestBlockIdOpt.flatMap(id => heightOf(id)).getOrElse(Constants.Chain.PreGenesisHeight)
 
   /**
     * @return ProgressInfo - info required for State to be consistent with History

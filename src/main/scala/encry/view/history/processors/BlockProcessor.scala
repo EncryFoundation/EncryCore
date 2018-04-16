@@ -111,7 +111,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
     if(isNewerPayload) block.payload
     else block.adProofsOpt.getOrElse(throw new Error("Only block payload can be new when proofs are empty"))
 
-  private def getBestFullChain(header: EncryBlockHeader) =
+  private def getBestFullChain(header: EncryBlockHeader): Seq[EncryBlockHeader] =
     continuationHeaderChains(header, _ => true)
       .map(_.tail)
       .map(hc => hc.map(getBlock).takeWhile(_.isDefined).flatten.map(_.header))
