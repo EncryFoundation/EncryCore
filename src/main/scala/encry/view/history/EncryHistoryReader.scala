@@ -159,6 +159,7 @@ trait EncryHistoryReader
     }
   }
 
+  // TODO: Make sure `bestHeaderHeight + 1` is correct.
   def missedModifiersForFullChain: Seq[(ModifierTypeId, ModifierId)] = {
     if (nodeSettings.verifyTransactions) {
       bestHeaderOpt.toSeq
