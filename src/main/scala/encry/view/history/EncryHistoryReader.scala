@@ -56,21 +56,38 @@ trait EncryHistoryReader
     */
   override def openSurfaceIds(): Seq[ModifierId] = bestBlockIdOpt.orElse(bestHeaderIdOpt).toSeq
 
-  // Compares node`s `SyncInfo` with another`s.
-  override def compare(other: EncrySyncInfo): HistoryComparisonResult = {
+  /**
+    * Whether another's node syncinfo shows that another node is ahead or behind ours
+    *
+    * @param si other's node sync info
+    * @return Equal if nodes have the same history, Younger if another node is behind, Older if a new node is ahead
+    */
+  override def compare(si: EncrySyncInfo): HistoryComparisonResult = {
     bestHeaderIdOpt match {
-      case Some(id) if other.lastHeaderIds.lastOption.exists(_ sameElements id) => Equal
-      case Some(id) if other.lastHeaderIds.exists(_ sameElements id) => Older
-      case Some(_) if other.lastHeaderIds.isEmpty => Younger
+      case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) =>
+        //Our best header is the same as other node best header
+        Equal
+      case Some(id) if si.lastHeaderIds.exists(_ sameElements id) =>
+        //Our best header is in other node best chain, but not at the last position
+        Older
+      case Some(_) if si.lastHeaderIds.isEmpty =>
+        //Other history is empty, our contain some headers
+        Younger
       case Some(_) =>
-        // Compare headers chain
-        val ids = other.lastHeaderIds
-        ids.view.reverse.find(m => contains(m)) match {
-          case Some(_) => Younger
-          case None => Nonsense
+        //We are on different forks now.
+        if(si.lastHeaderIds.view.reverse.exists(m => contains(m))) {
+          //Return Younger, because we can send blocks from our fork that other node can download.
+          Younger
+        } else {
+          //We don't have any of id's from other's node sync info in history.
+          //We don't know whether we can sync with it and what blocks to send in Inv message.
+          Unknown
         }
+      case None if si.lastHeaderIds.isEmpty =>
+        //Both nodes do not keep any blocks
+        Equal
       case None =>
-        log.warn("Trying to compare with other node while our history is empty")
+        //Our history is empty, other contain some headers
         Older
     }
   }

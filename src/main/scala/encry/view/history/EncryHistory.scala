@@ -57,7 +57,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
     case header: EncryBlockHeader => Some(header)
     case block: EncryBlock => Some(block.header)
     case proof: ADProofs => typedModifierById[EncryBlockHeader](proof.headerId)
-    case txs: EncryBlockPayload => typedModifierById[EncryBlockHeader](txs.headerId)
+    case payload: EncryBlockPayload => typedModifierById[EncryBlockHeader](payload.headerId)
     case _ => None
   }
 
@@ -207,7 +207,7 @@ object EncryHistory {
           override protected val timeProvider: NetworkTimeProvider = ntp
         }
       case m =>
-        throw new Error(s"Unsupported settings combination ADState==${m._1}, verifyTransactions==${m._2}, ")
+        throw new Error(s"Unsupported settings combination ADState=:${m._1}, verifyTransactions=:${m._2}, ")
     }
     history
   }
