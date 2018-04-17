@@ -20,7 +20,7 @@ class EncryBlockPayloadSerializerTest extends FunSuite {
       TransactionFactory.coinbaseTransactionScratch(k, timestamp, useBoxes, Height @@ 1)
     }
 
-    val blockPayload = new EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), txs)
+    val blockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), txs)
 
     val blockPayloadSerialized = EncryBlockPayloadSerializer.toBytes(blockPayload)
 

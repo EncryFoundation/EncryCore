@@ -13,7 +13,7 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-class EncryBlockPayload(override val headerId: ModifierId, val txs: Seq[EncryBaseTransaction])
+case class EncryBlockPayload(override val headerId: ModifierId, txs: Seq[EncryBaseTransaction])
   extends EncryBaseBlockPayload {
 
   assert(txs.nonEmpty, "Block should contain at least 1 coinbase-like transaction")

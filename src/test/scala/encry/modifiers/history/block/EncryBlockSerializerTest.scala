@@ -45,11 +45,11 @@ class EncryBlockSerializerTest extends FunSuite {
         timestamp, useBoxes, factory.Props.recipientAddr, factory.Props.boxValue)
     }
 
-    val blockPayload = new EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), txs)
+    val blockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), txs)
 
     val adProofs = ADProofs(ModifierId @@ Random.randomBytes(), SerializedAdProof @@ Random.randomBytes())
 
-    val block = new EncryBlock(blockHeader,blockPayload,Option(adProofs))
+    val block = EncryBlock(blockHeader,blockPayload,Option(adProofs))
 
     val blockSererialized = EncryBlockSerializer.toBytes(block)
 
