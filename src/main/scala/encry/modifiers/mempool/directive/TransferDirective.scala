@@ -4,7 +4,6 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.{Account, Address}
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
-import encry.settings.Algos
 import encry.utils.Utils
 import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
@@ -17,14 +16,14 @@ import scala.util.Try
 
 case class TransferDirective(address: Address,
                              amount: Amount,
-                             override val idx: Int) extends AmountTransferingDirective {
+                             override val idx: Int) extends Directive {
 
   override type M = TransferDirective
 
   override val typeId: DTypeId = TransferDirective.TypeId
 
   override def boxes(digest: Digest32): Seq[EncryBaseBox] =
-      Seq(AssetBox(address, Utils.nonceFromDigest(Algos.hash(digest ++ Ints.toByteArray(idx))), amount))
+      Seq(AssetBox(address, Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)), amount))
 
   override val cost: Amount = 4
 

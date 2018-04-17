@@ -2,6 +2,7 @@ package encry.utils
 
 import com.google.common.primitives.Longs
 import encry.modifiers.mempool.EncryBaseTransaction.Nonce
+import encry.settings.Algos
 import encry.utils.LittleEndianBytes._
 import org.bouncycastle.crypto.Digest
 
@@ -30,5 +31,5 @@ object Utils {
     countLeadingZeroes(solution) >= target
   }
 
-  def nonceFromDigest(digest: Array[Byte]): Nonce = Longs.fromByteArray(digest.take(8))
+  def nonceFromDigest(digest: Array[Byte]): Nonce = Longs.fromByteArray(Algos.hash(digest).take(8))
 }

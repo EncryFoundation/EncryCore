@@ -17,7 +17,7 @@ import scala.util.Try
 
 case class ScriptedAssetDirective(script: ESContract,
                                   amount: Amount,
-                                  override val idx: Int) extends AmountTransferingDirective {
+                                  override val idx: Int) extends Directive {
 
   override type M = ScriptedAssetDirective
 

@@ -28,7 +28,7 @@ case class AssetIssuingBox(override val proposition: EncryProposition,
   override def serializer: Serializer[M] = AssetIssuingBoxSerializer
 }
 
-object AssetCreationBox {
+object AssetIssuingBox {
 
   val TypeId: BxTypeId = 3.toByte
 
