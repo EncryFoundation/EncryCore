@@ -114,9 +114,10 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
   private def getBestFullChain(header: EncryBlockHeader): Seq[EncryBlockHeader] =
     continuationHeaderChains(header, _ => true)
       .map(_.tail)
-      .map(hc => hc.map(getBlock).takeWhile(_.isDefined).flatten.map(_.header))
-      .map(c => header +: c)
-      .maxBy(c => c.last.difficulty.untag(Difficulty))
+      .map(_.map(getBlock).takeWhile(_.isDefined).flatten.map(_.header))
+      .map(header +: _)
+      .maxBy(_.last.height)
+      // .maxBy(c => c.last.difficulty.untag(Difficulty))
 
   private def clipHistoryDataAt(heights: Seq[Int]): Try[Unit] = Try {
     val toRemove: Seq[ModifierId] = heights.flatMap(h => headerIdsAtHeight(h))
