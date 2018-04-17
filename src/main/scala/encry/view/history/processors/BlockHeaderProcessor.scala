@@ -11,12 +11,13 @@ import encry.settings.{Algos, Constants, NodeSettings}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
-import scorex.core.ModifierId
+import scorex.core._
 import scorex.core.consensus.History.ProgressInfo
-import scorex.core.consensus.ModifierSemanticValidity
+import scorex.core.consensus.{Invalid, ModifierSemanticValidity}
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 
 import scala.annotation.tailrec
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
@@ -73,7 +74,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   /**
     * @return height of best header with transactions and proofs
     */
-  def bestFullBlockHeight: Int = bestBlockIdOpt.flatMap(id => heightOf(id)).getOrElse(Constants.Chain.PreGenesisHeight)
+  def bestBlockHeight: Int = bestBlockIdOpt.flatMap(id => heightOf(id)).getOrElse(Constants.Chain.PreGenesisHeight)
 
   /**
     * @return ProgressInfo - info required for State to be consistent with History

@@ -57,7 +57,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
     case header: EncryBlockHeader => Some(header)
     case block: EncryBlock => Some(block.header)
     case proof: ADProofs => typedModifierById[EncryBlockHeader](proof.headerId)
-    case txs: EncryBlockPayload => typedModifierById[EncryBlockHeader](txs.headerId)
+    case payload: EncryBlockPayload => typedModifierById[EncryBlockHeader](payload.headerId)
     case _ => None
   }
 
@@ -94,7 +94,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
               ProgressInfo[EncryPersistentModifier](None, Seq.empty, None, Seq.empty)
             } else {
               val invalidatedChain: Seq[EncryBlock] = bestBlockOpt.toSeq
-                .flatMap(f => headerChainBack(bestFullBlockHeight + 1, f.header, h => !invalidatedHeaders.contains(h)).headers)
+                .flatMap(f => headerChainBack(bestBlockHeight + 1, f.header, h => !invalidatedHeaders.contains(h)).headers)
                 .flatMap(h => getBlock(h))
                 .ensuring(_.lengthCompare(1) > 0, "invalidatedChain should contain at least bestFullBlock and parent")
 
@@ -207,7 +207,7 @@ object EncryHistory {
           override protected val timeProvider: NetworkTimeProvider = ntp
         }
       case m =>
-        throw new Error(s"Unsupported settings combination ADState==${m._1}, verifyTransactions==${m._2}, ")
+        throw new Error(s"Unsupported settings combination ADState=:${m._1}, verifyTransactions=:${m._2}, ")
     }
     history
   }

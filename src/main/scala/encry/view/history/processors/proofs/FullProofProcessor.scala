@@ -19,7 +19,7 @@ trait FullProofProcessor extends BaseADProofProcessor with BlockProcessor {
       case Some(header: EncryBlockHeader) =>
         historyStorage.modifierById(header.payloadId) match {
           case Some(payload: EncryBlockPayload) if adState =>
-            processBlock(EncryBlock(header, payload, Some(m)), isNewerPayload = false)
+            processBlock(EncryBlock(header, payload, Some(m)), payloadIsNew = false)
           case _ =>
             historyStorage.insertObjects(Seq(m))
             ProgressInfo(None, Seq.empty, None, Seq.empty)
