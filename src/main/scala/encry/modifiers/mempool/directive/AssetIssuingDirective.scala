@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import encry.account.Account
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.proposition.{AccountProposition, ContractProposition}
-import encry.modifiers.state.box.{AssetBox, AssetCreationBox, AssetIssuingBox, EncryBaseBox}
+import encry.modifiers.state.box.{AssetCreationBox, AssetIssuingBox, EncryBaseBox}
 import encry.utils.Utils
 import encrywm.common.{ESContract, ScriptMeta}
 import io.circe.Encoder

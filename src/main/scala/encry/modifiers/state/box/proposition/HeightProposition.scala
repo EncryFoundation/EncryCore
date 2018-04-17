@@ -3,7 +3,6 @@ package encry.modifiers.state.box.proposition
 import com.google.common.primitives.Ints
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
-import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.view.history.Height
 import io.circe.Encoder
 import io.circe.syntax._
@@ -32,7 +31,7 @@ object HeightProposition {
   ).asJson
 }
 
-object HeightPropositionSerializer extends SizedCompanionSerializer[HeightProposition] {
+object HeightPropositionSerializer extends Serializer[HeightProposition] {
 
   val Size = 4
 
