@@ -5,7 +5,6 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.api.templates.DefaultPaymentTransactionTemplate
 import encry.modifiers.mempool.EncryTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
@@ -13,21 +12,15 @@ import encry.view.history.EncryHistoryReader
 import encry.view.mempool.EncryMempoolReader
 import encry.view.state.StateMode
 import io.circe.Json
-import io.circe.generic.auto._
 import io.circe.syntax._
 import scorex.core.NodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
 import scorex.core.settings.RESTApiSettings
-import spray.json.DefaultJsonProtocol._
-import spray.json.RootJsonFormat
 
 import scala.concurrent.Future
 
 case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: ActorRef,
                                 restApiSettings: RESTApiSettings, stateMode: StateMode)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
-
-  implicit val defaultPaymentTxCodec: RootJsonFormat[DefaultPaymentTransactionTemplate] =
-    jsonFormat8(DefaultPaymentTransactionTemplate)
 
   override val route: Route = pathPrefix("transactions") {
     getUnconfirmedTransactionsR ~
@@ -44,12 +37,17 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
     _.take(limit).toSeq
   }.map(_.map(_.asJson).asJson)
 
-  def defaultTransferTransactionR: Route = (path("transfer") & post & entity(as[DefaultPaymentTransactionTemplate])) { model =>
-    model.origin.map { ptx =>
-      nodeViewActorRef ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](ptx)
-      complete(StatusCodes.OK)
-    }.getOrElse(complete(StatusCodes.BadRequest))
+  def defaultTransferTransactionR: Route = path("transfer") {
+    post {
+    entity(as[EncryTransaction]) {
+      tx => complete{
+        nodeViewActorRef ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
+        StatusCodes.OK
+        }
+      }
+    }
   }
+
 
   def getUnconfirmedTransactionsR: Route = (path("unconfirmed") & get & paging) { (offset, limit) =>
     getUnconfirmedTransactions(limit).okJson()
