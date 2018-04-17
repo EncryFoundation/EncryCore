@@ -123,7 +123,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
   private def getBestFullChain(header: EncryBlockHeader) = {
     val continuations = continuationHeaderChains(header, h => getBlock(h).nonEmpty).map(_.tail)
     val chains = continuations.map(hc => hc.map(getBlock).takeWhile(_.isDefined).flatten.map(_.header))
-    chains.map(c => header +: c).maxBy(c => scoreOf(c.last.id).get)
+    chains.map(c => header +: c).maxBy(c => scoreOf(c.last.id).get) // TODO: .get
   }
 
   // Unused
