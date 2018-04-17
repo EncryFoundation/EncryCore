@@ -11,12 +11,13 @@ import encry.settings.{Algos, Constants, NodeSettings}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
-import scorex.core.ModifierId
+import scorex.core._
 import scorex.core.consensus.History.ProgressInfo
-import scorex.core.consensus.ModifierSemanticValidity
+import scorex.core.consensus.{Invalid, ModifierSemanticValidity}
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 
 import scala.annotation.tailrec
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {

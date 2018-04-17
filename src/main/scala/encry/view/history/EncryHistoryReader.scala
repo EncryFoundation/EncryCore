@@ -170,9 +170,10 @@ trait EncryHistoryReader
   }
 
   def getBlock(header: EncryBlockHeader): Option[EncryBlock] = {
-    val aDProofs = typedModifierById[ADProofs](header.adProofsId)
-    typedModifierById[EncryBlockPayload](header.payloadId).map { txs =>
-      EncryBlock(header, txs, aDProofs)
+    (typedModifierById[EncryBlockPayload](header.payloadId), typedModifierById[ADProofs](header.adProofsId)) match {
+      case (Some(txs), Some(proofs)) => Some(EncryBlock(header, txs, Some(proofs)))
+      case (Some(txs), None) if !nodeSettings.stateMode.isDigest => Some(EncryBlock(header, txs, None))
+      case _ => None
     }
   }
 

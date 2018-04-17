@@ -26,9 +26,9 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
             //TODO light mode when start from different block ?
             putToHistory(payload)
           case Some(adProof: ADProofs) =>
-            processBlock(EncryBlock(header, payload, Some(adProof)), isNewerPayload = true)
+            processBlock(EncryBlock(header, payload, Some(adProof)), payloadIsNew = true)
           case None if !adState =>
-            processBlock(EncryBlock(header, payload, None), isNewerPayload = true)
+            processBlock(EncryBlock(header, payload, None), payloadIsNew = true)
           case _ =>
             putToHistory(payload)
         }
