@@ -8,7 +8,6 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.modifiers.mempool.EncryTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
-import encry.view.history.EncryHistoryReader
 import encry.view.mempool.EncryMempoolReader
 import encry.view.state.StateMode
 import io.circe.Json
@@ -29,8 +28,6 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
 
   override val settings: RESTApiSettings = restApiSettings
 
-  private def getHistory: Future[EncryHistoryReader] = (readersHolder ? GetReaders).mapTo[Readers].map(_.h.get)
-
   private def getMempool: Future[EncryMempoolReader] = (readersHolder ? GetReaders).mapTo[Readers].map(_.m.get)
 
   private def getUnconfirmedTransactions(limit: Int): Future[Json] = getMempool.map {
@@ -39,15 +36,14 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
 
   def defaultTransferTransactionR: Route = path("transfer") {
     post {
-    entity(as[EncryTransaction]) {
-      tx => complete{
-        nodeViewActorRef ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
-        StatusCodes.OK
+      entity(as[EncryTransaction]) {
+        tx => complete {
+          nodeViewActorRef ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
+          StatusCodes.OK
         }
       }
     }
   }
-
 
   def getUnconfirmedTransactionsR: Route = (path("unconfirmed") & get & paging) { (offset, limit) =>
     getUnconfirmedTransactions(limit).okJson()
