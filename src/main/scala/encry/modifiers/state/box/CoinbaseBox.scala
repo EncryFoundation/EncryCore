@@ -1,12 +1,13 @@
 package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs}
+import encry.modifiers.state.box.AssetCreationBox.TypeId
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.{HeightProposition, HeightPropositionSerializer}
-import encry.modifiers.state.box.serializers.SizedCompanionSerializer
 import encry.settings.Algos
 import io.circe.Encoder
 import io.circe.syntax._
+import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.ADValue
 
@@ -14,13 +15,13 @@ import scala.util.Try
 
 case class CoinbaseBox(override val proposition: HeightProposition,
                        override val nonce: Long,
-                       override val amount: Amount) extends EncryBox[HeightProposition] with AmountCarryingBox {
+                       override val amount: Amount) extends EncryBox[HeightProposition] with MonetaryBox {
 
   override type M = CoinbaseBox
 
   override val typeId: BxTypeId = CoinbaseBox.typeId
 
-  override def serializer: SizedCompanionSerializer[M] = CoinbaseBoxSerializer
+  override def serializer: Serializer[M] = CoinbaseBoxSerializer
 
   override lazy val bytes: ADValue = ADValue @@ serializer.toBytes(this)
 }
@@ -30,6 +31,7 @@ object CoinbaseBox {
   val typeId: BxTypeId = 0.toByte
 
   implicit val jsonEncoder: Encoder[CoinbaseBox] = (bx: CoinbaseBox) => Map(
+    "type" -> TypeId.asJson,
     "id" -> Algos.encode(bx.id).asJson,
     "proposition" -> bx.proposition.asJson,
     "nonce" -> bx.nonce.asJson,
@@ -37,9 +39,7 @@ object CoinbaseBox {
   ).asJson
 }
 
-object CoinbaseBoxSerializer extends SizedCompanionSerializer[CoinbaseBox] {
-
-  val Size: Int = 20
+object CoinbaseBoxSerializer extends Serializer[CoinbaseBox] {
 
   override def toBytes(obj: CoinbaseBox): Array[Byte] = {
     Bytes.concat(

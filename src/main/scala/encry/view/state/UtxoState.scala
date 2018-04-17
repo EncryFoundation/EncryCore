@@ -184,7 +184,7 @@ class UtxoState(override val version: VersionTag,
 
       def totalAmountOf(boxes: Traversable[EncryBaseBox]): Long =
         boxes.foldLeft(0L)((acc, bx) => bx match {
-          case acbx: AmountCarryingBox => acc + acbx.amount
+          case acbx: MonetaryBox => acc + acbx.amount
           case _ => acc
         })
 

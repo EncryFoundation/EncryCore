@@ -7,7 +7,7 @@ import encry.consensus.{PowCandidateBlock, PowConsensus}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryBaseTransaction, TransactionFactory}
-import encry.modifiers.state.box.{AmountCarryingBox, AssetBox}
+import encry.modifiers.state.box.{MonetaryBox, AssetBox}
 import encry.settings.{Constants, EncryAppSettings}
 import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
@@ -133,7 +133,7 @@ class EncryMiner(settings: EncryAppSettings,
 
         val minerSecret = vault.keyManager.mainKey
 
-        val openBxs: IndexedSeq[AmountCarryingBox] = txsToPut.foldLeft(IndexedSeq[AssetBox]())((buff, tx) =>
+        val openBxs: IndexedSeq[MonetaryBox] = txsToPut.foldLeft(IndexedSeq[AssetBox]())((buff, tx) =>
           buff ++ tx.newBoxes.foldLeft(IndexedSeq[AssetBox]()) { case (acc, bx) =>
             bx match {
               case ab: AssetBox if ab.isOpen => acc :+ ab

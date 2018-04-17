@@ -8,7 +8,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.proposition.AccountProposition
-import encry.modifiers.state.box.{AmountCarryingBox, AssetBox, EncryBaseBox}
+import encry.modifiers.state.box.{MonetaryBox, AssetBox, EncryBaseBox}
 import scorex.core.ModifierId
 import scorex.crypto.authds.{ADDigest, ADKey}
 import scorex.crypto.hash.Digest32
@@ -48,7 +48,7 @@ trait EncryGenerator {
     pks.foldLeft(Seq[EncryTransaction]()) { (seq, key) =>
       val useBoxes =
         if(seq.isEmpty) IndexedSeq(genAssetBox(key.publicImage.address))
-        else IndexedSeq(seq.last.newBoxes.head.asInstanceOf[AmountCarryingBox])
+        else IndexedSeq(seq.last.newBoxes.head.asInstanceOf[MonetaryBox])
       seq :+ TransactionFactory.defaultPaymentTransactionScratch(key, Props.txFee,
         timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
     }

@@ -4,24 +4,24 @@ import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.account.{Account, Address}
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.{AccountProposition, EncryProposition, PropositionSerializer}
-import encry.modifiers.state.box.serializers.SizedCompanionSerializer
+import encry.settings.Algos
 import io.circe.Encoder
 import io.circe.syntax._
+import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
-import scorex.crypto.encode.Base58
 
 import scala.util.Try
 
 case class AssetBox(override val proposition: EncryProposition,
                     override val nonce: Long,
                     override val amount: Amount)
-  extends EncryBox[EncryProposition] with AmountCarryingBox {
+  extends EncryBox[EncryProposition] with MonetaryBox {
 
   override type M = AssetBox
 
   override val typeId: BxTypeId = AssetBox.TypeId
 
-  override def serializer: SizedCompanionSerializer[M] = AssetBoxSerializer
+  override def serializer: Serializer[M] = AssetBoxSerializer
 }
 
 object AssetBox {
@@ -29,7 +29,8 @@ object AssetBox {
   val TypeId: BxTypeId = 1.toByte
 
   implicit val jsonEncoder: Encoder[AssetBox] = (bx: AssetBox) => Map(
-    "id" -> Base58.encode(bx.id).asJson,
+    "type" -> TypeId.asJson,
+    "id" -> Algos.encode(bx.id).asJson,
     "proposition" -> bx.proposition.asJson,
     "nonce" -> bx.nonce.asJson,
     "value" -> bx.amount.asJson
@@ -42,11 +43,7 @@ object AssetBox {
     AssetBox(AccountProposition(account), nonce, amount)
 }
 
-object AssetBoxSerializer extends SizedCompanionSerializer[AssetBox] {
-
-  import Account._
-
-  val Size: Int = AddressLength + 16
+object AssetBoxSerializer extends Serializer[AssetBox] {
 
   override def toBytes(obj: AssetBox): Array[Byte] = {
     val propBytes = PropositionSerializer.toBytes(obj.proposition)

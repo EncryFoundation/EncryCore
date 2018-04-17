@@ -3,7 +3,7 @@ package encry.modifiers.mempool
 import encry.account.Address
 import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.modifiers.mempool.directive.{CoinbaseDirective, TransferDirective}
-import encry.modifiers.state.box.AmountCarryingBox
+import encry.modifiers.state.box.MonetaryBox
 import encry.modifiers.state.box.proof.Signature25519
 import encry.view.history.Height
 import scorex.core.transaction.box.Box.Amount
@@ -14,7 +14,7 @@ object TransactionFactory {
   def defaultPaymentTransactionScratch(privKey: PrivateKey25519,
                                        fee: Amount,
                                        timestamp: Long,
-                                       useBoxes: IndexedSeq[AmountCarryingBox],
+                                       useBoxes: IndexedSeq[MonetaryBox],
                                        recipient: Address,
                                        amount: Amount): EncryTransaction = {
 
@@ -57,7 +57,7 @@ object TransactionFactory {
 
   def coinbaseTransactionScratch(privKey: PrivateKey25519,
                                  timestamp: Long,
-                                 useBoxes: Seq[AmountCarryingBox],
+                                 useBoxes: Seq[MonetaryBox],
                                  height: Height): EncryTransaction = {
 
     val pubKey = privKey.publicImage

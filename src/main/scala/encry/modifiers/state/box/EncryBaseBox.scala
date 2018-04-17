@@ -19,7 +19,7 @@ trait EncryBaseBox extends Box[EncryProposition] {
   override def toString: String = s"<Box type=:$typeId id=:${Algos.encode(id)}>"
 
   def isCoinbase: Boolean = this.isInstanceOf[CoinbaseBox]
-  def isAmountCarrying: Boolean = this.isInstanceOf[AmountCarryingBox]
+  def isAmountCarrying: Boolean = this.isInstanceOf[MonetaryBox]
   def isOpen: Boolean = this.proposition.isInstanceOf[OpenProposition.type]
   def isHeightLocked: Boolean = this.proposition.isInstanceOf[HeightProposition]
 }
