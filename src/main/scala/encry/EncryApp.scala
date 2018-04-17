@@ -15,15 +15,14 @@ import encry.modifiers.state.box.proposition.EncryProposition
 import encry.network.EncryNodeViewSynchronizer
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncrySyncInfoMessageSpec
-import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
+import encry.view.{EncryNodeViewHolder, EncryNodeViewHolderRef, EncryReadersHolderRef}
 import scorex.core.api.http.{ApiRoute, PeersApiRoute, UtilsApiRoute}
 import scorex.core.app.Application
 import scorex.core.network.message.MessageSpec
 import scorex.core.settings.ScorexSettings
 import scorex.core.utils.ScorexLogging
 
-import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContextExecutor}
+import scala.concurrent.ExecutionContextExecutor
 import scala.io.Source
 
 
@@ -44,9 +43,9 @@ class EncryApp(args: Seq[String]) extends Application {
 
   override protected lazy val additionalMessageSpecs: Seq[MessageSpec[_]] = Seq(EncrySyncInfoMessageSpec)
 
-  override val nodeViewHolderRef: ActorRef = EncryNodeViewHolder.createActor(actorSystem, encrySettings, timeProvider)
+  override val nodeViewHolderRef: ActorRef = EncryNodeViewHolderRef(encrySettings, timeProvider)
 
-  val readersHolderRef: ActorRef = actorSystem.actorOf(Props(classOf[EncryViewReadersHolder], nodeViewHolderRef))
+  val readersHolderRef: ActorRef = EncryReadersHolderRef(nodeViewHolderRef)
 
   val minerRef: ActorRef = EncryMinerRef(encrySettings, nodeViewHolderRef, nodeId, timeProvider)
 
@@ -66,9 +65,8 @@ class EncryApp(args: Seq[String]) extends Application {
   val localInterface: ActorRef =
     EncryLocalInterfaceRef(nodeViewHolderRef, peerManagerRef, encrySettings, timeProvider)
 
-  override val nodeViewSynchronizer: ActorRef = actorSystem.actorOf(
-    Props(new EncryNodeViewSynchronizer(
-      networkControllerRef, nodeViewHolderRef, localInterface, EncrySyncInfoMessageSpec, settings.network, timeProvider)))
+  override val nodeViewSynchronizer: ActorRef =
+    EncryNodeViewSynchronizer(networkControllerRef, nodeViewHolderRef, EncrySyncInfoMessageSpec, settings.network, timeProvider)
 
   if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) {
     minerRef ! StartMining
@@ -108,8 +106,6 @@ object EncryApp extends ScorexLogging {
     log.warn("Terminating Actors")
     actors.foreach(_ ! PoisonPill)
     log.warn("Terminating ActorSystem")
-    val termination = system.terminate()
-    Await.result(termination, 60.seconds)
-    log.warn("Application has been terminated.")
+    system.terminate()
   }
 }

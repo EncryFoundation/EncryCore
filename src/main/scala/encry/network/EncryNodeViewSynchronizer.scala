@@ -26,7 +26,6 @@ import scala.concurrent.duration._
 
 class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
                                 viewHolderRef: ActorRef,
-                                localInterfaceRef: ActorRef,
                                 syncInfoSpec: EncrySyncInfoMessageSpec.type,
                                 networkSettings: NetworkSettings,
                                 timeProvider: NetworkTimeProvider)
@@ -120,35 +119,30 @@ object EncryNodeViewSynchronizer {
 
   def props(networkControllerRef: ActorRef,
             viewHolderRef: ActorRef,
-            localInterfaceRef: ActorRef,
             syncInfoSpec: EncrySyncInfoMessageSpec.type,
             networkSettings: NetworkSettings,
             timeProvider: NetworkTimeProvider): Props =
-    Props(new EncryNodeViewSynchronizer(networkControllerRef, viewHolderRef, localInterfaceRef,
+    Props(new EncryNodeViewSynchronizer(networkControllerRef, viewHolderRef,
       syncInfoSpec, networkSettings, timeProvider))
 
   def apply(networkControllerRef: ActorRef,
             viewHolderRef: ActorRef,
-            localInterfaceRef: ActorRef,
             syncInfoSpec: EncrySyncInfoMessageSpec.type,
             networkSettings: NetworkSettings,
             timeProvider: NetworkTimeProvider)
            (implicit context: ActorRefFactory): ActorRef =
-    context.actorOf(props(networkControllerRef, viewHolderRef, localInterfaceRef,
+    context.actorOf(props(networkControllerRef, viewHolderRef,
       syncInfoSpec, networkSettings, timeProvider))
 
   def apply(networkControllerRef: ActorRef,
             viewHolderRef: ActorRef,
-            localInterfaceRef: ActorRef,
             syncInfoSpec: EncrySyncInfoMessageSpec.type,
             networkSettings: NetworkSettings,
             timeProvider: NetworkTimeProvider,
             name: String)
            (implicit context: ActorRefFactory): ActorRef =
-    context.actorOf(props(networkControllerRef, viewHolderRef, localInterfaceRef,
-      syncInfoSpec, networkSettings, timeProvider), name)
+    context.actorOf(props(networkControllerRef, viewHolderRef, syncInfoSpec,
+      networkSettings, timeProvider), name)
 
   case object CheckModifiersToDownload
-
-  case class MissedModifiers(mods: Seq[(ModifierTypeId, ModifierId)])
 }

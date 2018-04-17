@@ -20,16 +20,16 @@ import scala.util.{Failure, Success, Try}
   */
 class DigestState protected(override val version: VersionTag,
                             override val rootHash: ADDigest,
-                            val store: Store,
+                            val stateStore: Store,
                             settings: NodeSettings)
   extends EncryState[DigestState]
     with ModifierValidation[EncryPersistentModifier]
     with ScorexLogging {
 
-  store.lastVersionID
+  stateStore.lastVersionID
     .foreach(id => assert(version sameElements id.data, "`version` should always be equal to store.lastVersionID"))
 
-  override val maxRollbackDepth = 10
+  override val maxRollbackDepth: Int = stateStore.rollbackVersions().size
 
   def validate(mod: EncryPersistentModifier): Try[Unit] = mod match {
     case block: EncryBlock =>
@@ -58,8 +58,8 @@ class DigestState protected(override val version: VersionTag,
 
   private def update(newVersion: VersionTag, newRootHash: ADDigest): Try[DigestState] = Try {
     val wrappedVersion = ByteArrayWrapper(newVersion)
-    store.update(wrappedVersion, toRemove = Seq(), toUpdate = Seq(wrappedVersion -> ByteArrayWrapper(newRootHash)))
-    new DigestState(newVersion, newRootHash, store, settings)
+    stateStore.update(wrappedVersion, toRemove = Seq(), toUpdate = Seq(wrappedVersion -> ByteArrayWrapper(newRootHash)))
+    new DigestState(newVersion, newRootHash, stateStore, settings)
   }
 
   //todo: utxo snapshot could go here
@@ -80,18 +80,15 @@ class DigestState protected(override val version: VersionTag,
   override def rollbackTo(version: VersionTag): Try[DigestState] = {
     log.info(s"Rollback Digest State to version ${Algos.encoder.encode(version)}")
     val wrappedVersion = ByteArrayWrapper(version)
-    Try(store.rollback(wrappedVersion)).map { _ =>
-      store.clean(Constants.DefaultKeepVersions)
-      val rootHash = ADDigest @@ store.get(wrappedVersion).get.data
+    Try(stateStore.rollback(wrappedVersion)).map { _ =>
+      stateStore.clean(Constants.DefaultKeepVersions)
+      val rootHash = ADDigest @@ stateStore.get(wrappedVersion).get.data
       log.info(s"Rollback to version ${Algos.encoder.encode(version)} with roothash ${Algos.encoder.encode(rootHash)}")
-      new DigestState(version, rootHash, store, settings)
+      new DigestState(version, rootHash, stateStore, settings)
     }
   }
 
-  override def rollbackVersions: Iterable[VersionTag] = store.rollbackVersions().map(VersionTag @@ _.data)
-
-  def closeStorage(): Unit = store.close()
-
+  override def rollbackVersions: Iterable[VersionTag] = stateStore.rollbackVersions().map(VersionTag @@ _.data)
 }
 
 object DigestState {

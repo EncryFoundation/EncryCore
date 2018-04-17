@@ -167,6 +167,8 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
     } else {
       this -> markModifierInvalid(modifier)
     }
+
+  def closeStorage(): Unit = historyStorage.close()
 }
 
 object EncryHistory {

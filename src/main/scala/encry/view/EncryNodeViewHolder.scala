@@ -11,7 +11,7 @@ import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.{EncryHistory, EncrySyncInfo}
 import encry.view.mempool.EncryMempool
-import encry.view.state.{DigestState, EncryState, UtxoState}
+import encry.view.state.{DigestState, EncryState, StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
 import scorex.core._
 import scorex.core.serialization.Serializer
@@ -44,6 +44,12 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     super.preRestart(reason, message)
     reason.printStackTrace()
     System.exit(100)
+  }
+
+  override def postStop(): Unit = {
+    log.warn("Stopping EncryNodeViewHolder")
+    history().closeStorage
+    minimalState().closeStorage
   }
 
   /**
@@ -136,15 +142,38 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
   }.get
 }
 
-private[view] class DigestEncryNodeViewHolder(settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
+private[view] class DigestNodeViewHolder(settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
   extends EncryNodeViewHolder[DigestState](settings, timeProvider)
 
-private[view] class UtxoEncryNodeViewHolder(settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
+private[view] class UtxoNodeViewHolder(settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
   extends EncryNodeViewHolder[UtxoState](settings, timeProvider)
 
-object EncryNodeViewHolder {
-  def createActor(system: ActorSystem, settings: EncryAppSettings, timeProvider: NetworkTimeProvider): ActorRef = {
-    if (settings.nodeSettings.stateMode.isDigest) system.actorOf(Props.create(classOf[DigestEncryNodeViewHolder], settings, timeProvider))
-    else system.actorOf(Props.create(classOf[UtxoEncryNodeViewHolder], settings, timeProvider))
-  }
+/** This class guarantees to its inheritors the creation of correct instance of [[EncryNodeViewHolder]]
+  *  for the given instance of [[StateMode]]
+  */
+sealed abstract class EncryNodeViewProps[ST <: StateMode, S <: EncryState[S], N <: EncryNodeViewHolder[S]]
+(implicit ev: StateMode.Evidence[ST, S]) {
+  def apply(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, digestType:ST): Props
+}
+
+object DigestNodeViewProps extends EncryNodeViewProps[StateMode.DigestMode, DigestState, DigestNodeViewHolder] {
+  def apply(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, digestType: StateMode.DigestMode): Props =
+    Props.create(classOf[DigestNodeViewHolder], settings, timeProvider)
+}
+
+object UtxoNodeViewProps extends EncryNodeViewProps[StateMode.UtxoMode, UtxoState, UtxoNodeViewHolder]  {
+  def apply(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, digestType: StateMode.UtxoMode): Props =
+    Props.create(classOf[UtxoNodeViewHolder], settings, timeProvider)
+}
+
+object EncryNodeViewHolderRef {
+
+  def props(settings: EncryAppSettings, timeProvider: NetworkTimeProvider): Props =
+    settings.nodeSettings.stateMode match {
+      case digestType @ StateMode.Digest => DigestNodeViewProps(settings, timeProvider, digestType)
+      case utxoType @ StateMode.Utxo => UtxoNodeViewProps(settings, timeProvider, utxoType)
+    }
+
+  def apply(settings: EncryAppSettings, timeProvider: NetworkTimeProvider)(implicit system: ActorSystem): ActorRef =
+    system.actorOf(props(settings, timeProvider))
 }

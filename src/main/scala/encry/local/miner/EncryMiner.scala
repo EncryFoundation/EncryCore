@@ -1,6 +1,6 @@
 package encry.local.miner
 
-import akka.actor.{Actor, ActorRef, ActorRefFactory, Props}
+import akka.actor.{Actor, ActorRef, ActorRefFactory, PoisonPill, Props}
 import akka.pattern._
 import akka.util.Timeout
 import encry.consensus.{PowCandidateBlock, PowConsensus}
@@ -21,6 +21,8 @@ import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallyS
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 import scorex.utils.Random
 
+import scala.collection._
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -37,9 +39,17 @@ class EncryMiner(settings: EncryAppSettings,
 
   private var isMining = false
   private var candidateOpt: Option[PowCandidateBlock] = None
-  private var miningThreads: Seq[ActorRef] = Seq.empty
+  private val workers: mutable.Buffer[ActorRef] = new ArrayBuffer[ActorRef]()
 
   override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
+
+  override def postStop(): Unit = killAllWorkers()
+
+  private def killAllWorkers(): Unit = {
+    log.warn("Stopping miner's threads.")
+    workers.foreach( _ ! PoisonPill)
+    workers.clear()
+  }
 
   override def receive: Receive = {
     case SemanticallySuccessfulModifier(mod) =>
@@ -61,8 +71,9 @@ class EncryMiner(settings: EncryAppSettings,
       candidateOpt match {
         case Some(candidate) if !isMining && settings.nodeSettings.mining =>
           log.info("Starting Mining")
-          miningThreads = Seq(context.actorOf(EncryMiningWorker.props(settings, viewHolderRef, candidate)))
           isMining = true
+          workers += EncryMiningWorker(settings, viewHolderRef, candidate)(context)
+          workers.foreach(_ ! candidateOpt.get)
         case None =>
           context.system.scheduler.scheduleOnce(5.second) {
             prepareCandidate(settings, nodeId).foreach(_.foreach(c => {
@@ -75,7 +86,7 @@ class EncryMiner(settings: EncryAppSettings,
 
     case c: PowCandidateBlock =>
       candidateOpt = Some(c)
-      miningThreads.foreach(t => t ! c)
+      workers.foreach(t => t ! c)
 
     case GetMinerStatus =>
       sender ! MinerStatus(isMining, candidateOpt)

@@ -9,6 +9,7 @@ import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.{Algos, Constants, EncryAppSettings, NodeSettings}
 import encry.view.history.Height
+import io.iohk.iodb.Store
 import scorex.core.VersionTag
 import scorex.core.transaction.state.MinimalState
 import scorex.core.utils.ScorexLogging
@@ -22,7 +23,11 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 
   self: IState =>
 
-  def rootHash(): ADDigest
+  def rootHash: ADDigest
+
+  val stateStore: Store
+
+  def closeStorage(): Unit = stateStore.close()
 
   // Extracts `state changes` from the given sequence of transactions.
   def getAllStateChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {

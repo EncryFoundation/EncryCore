@@ -1,6 +1,6 @@
 package encry.local.miner
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, ActorRefFactory, Props}
 import encry.consensus.{PowCandidateBlock, PowConsensus}
 import encry.local.miner.EncryMiningWorker.MineBlock
 import encry.settings.EncryAppSettings
@@ -53,7 +53,21 @@ object EncryMiningWorker {
 
   case class MineBlock(nonce: Long)
 
-  def props(EncryCoreSettings: EncryAppSettings, viewHolderRef: ActorRef, startCandidate: PowCandidateBlock): Props = {
-    Props(new EncryMiningWorker(EncryCoreSettings, viewHolderRef, startCandidate))
-  }
+  def props(ergoSettings: EncryAppSettings,
+            viewHolderRef: ActorRef,
+            startCandidate: PowCandidateBlock): Props =
+    Props(new EncryMiningWorker(ergoSettings, viewHolderRef, startCandidate))
+
+  def apply(ergoSettings: EncryAppSettings,
+            viewHolderRef: ActorRef,
+            startCandidate: PowCandidateBlock)
+           (implicit context: ActorRefFactory): ActorRef =
+    context.actorOf(props(ergoSettings, viewHolderRef, startCandidate))
+
+  def apply(ergoSettings: EncryAppSettings,
+            viewHolderRef: ActorRef,
+            startCandidate: PowCandidateBlock,
+            name: String)
+           (implicit context: ActorRefFactory): ActorRef =
+    context.actorOf(props(ergoSettings, viewHolderRef, startCandidate), name)
 }

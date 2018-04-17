@@ -1,6 +1,6 @@
 package encry.view
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, ActorRef, ActorRefFactory, Props}
 import encry.view.EncryViewReadersHolder.{GetDataFromHistory, GetReaders, Readers}
 import encry.view.history.EncryHistoryReader
 import encry.view.mempool.EncryMempoolReader
@@ -52,4 +52,18 @@ object EncryViewReadersHolder {
   case object GetReaders
 
   case class Readers(h: Option[EncryHistoryReader], s: Option[UtxoStateReader], m: Option[EncryMempoolReader])
+}
+
+object EncryReadersHolderRef {
+
+  def props(viewHolderRef: ActorRef): Props = Props(new EncryViewReadersHolder(viewHolderRef))
+
+  def apply(viewHolderRef: ActorRef)
+           (implicit context: ActorRefFactory): ActorRef =
+    context.actorOf(props(viewHolderRef))
+
+  def apply(viewHolderRef: ActorRef,
+            name: String)
+           (implicit context: ActorRefFactory): ActorRef =
+    context.actorOf(props(viewHolderRef), name)
 }
