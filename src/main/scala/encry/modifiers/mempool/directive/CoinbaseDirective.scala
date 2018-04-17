@@ -1,12 +1,13 @@
 package encry.modifiers.mempool.directive
 
 import com.google.common.primitives.{Ints, Longs}
+import encry.account.Address
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.Constants
 import encry.view.history.Height
 import encry.view.state.UtxoState
-import io.circe.Encoder
+import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
@@ -43,6 +44,14 @@ object CoinbaseDirective {
     "height" -> d.height.toString.asJson,
     "idx" -> d.idx.asJson
   ).asJson
+
+  implicit val jsonDecoder: Decoder[CoinbaseDirective] = (c: HCursor) => for {
+    height <- c.downField("heigth").as[Int]
+  } yield {
+    CoinbaseDirective(
+      Height @@ height
+    )
+  }
 }
 
 object CoinbaseDirectiveSerializer extends Serializer[CoinbaseDirective] {

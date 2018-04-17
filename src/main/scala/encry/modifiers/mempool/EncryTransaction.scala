@@ -6,13 +6,13 @@ import encry.modifiers.mempool.directive.{CoinbaseDirective, Directive, Directiv
 import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.proposition.OpenProposition
-import encry.settings.Algos
+import encry.settings.{Algos, Constants}
 import encry.utils.Utils
 import encrywm.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
 import encrywm.lib.Types.{ESByteVector, ESLong, ESTransaction}
-import io.circe.Encoder
 import io.circe.syntax._
+import io.circe.{Decoder, Encoder, HCursor}
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.hash.Digest32
@@ -80,7 +80,7 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
 
 object EncryTransaction {
 
-  val MaxSize: Int = 350
+  val MaxSize: Int = Constants.TransactionMaxSize
 
   implicit val jsonEncoder: Encoder[EncryTransaction] = (tx: EncryTransaction) => Map(
     "id" -> Algos.encode(tx.id).asJson,
@@ -91,6 +91,26 @@ object EncryTransaction {
     "unlockers" -> tx.unlockers.map(_.asJson).asJson,
     "directives" -> tx.directives.map(_.asJson).asJson
   ).asJson
+
+  implicit val jsonDecoder: Decoder[EncryTransaction] = (c: HCursor) => {
+    for {
+      accountPubKey <- c.downField("accountPubKey").as[String]
+      fee <- c.downField("fee").as[Long]
+      timestamp <- c.downField("timestamp").as[Long]
+      signature <- c.downField("signature").as[String]
+      unlockers <- c.downField("unlockers").as[IndexedSeq[Unlocker]]
+      directives <- c.downField("directives").as[IndexedSeq[Directive]]
+    } yield {
+      EncryTransaction(
+        PublicKey25519(PublicKey @@ Algos.decode(accountPubKey).get),
+        fee,
+        timestamp,
+        Signature25519(Signature @@ Algos.decode(signature).get),
+        unlockers,
+        directives
+      )
+    }
+  }
 
   def getHash(accountPubKey: PublicKey25519,
               fee: Amount,

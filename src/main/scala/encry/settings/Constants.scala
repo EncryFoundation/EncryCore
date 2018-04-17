@@ -11,6 +11,8 @@ object Constants {
 
   val ModifierIdSize: Int = DigestLength
 
+  val TransactionMaxSize: Int = 400
+
   val DefaultKeepVersions: Int = 200  // TODO: Move to `NodeSettings`.
 
   val FeeMinAmount: Int = 100

@@ -1,34 +1,23 @@
 package encry.api.http.routes
 
 import encry.modifiers.InstanceFactory
+import encry.modifiers.mempool.EncryTransaction
 import org.scalatest.{Matchers, PropSpec}
 
 class TransactionsApiRouteSpec extends PropSpec with Matchers with InstanceFactory {
 
-  private val tx = paymentTransactionDynamic
+  private val tx = paymentTransactionValid
 
   property("payment tx deserialization in sendTransactionR") {
 
-    // TODO: Fix when json deserializer for transaction will be ready
-//    val txWrapped = PaymentTransactionModel(
-//      Algos.encode(tx.accountPubKey.pubKeyBytes),
-//      tx.fee,
-//      tx.timestamp,
-//      Algos.encode(tx.signature.signature),
-//      tx.useBoxes.map(k => Algos.encode(k)),
-//      tx.directives
-//    )
-//
-//    val txSerialized = txWrapped.asJson.noSpaces
-//
-//    val txDeserialized = decode[PaymentTransactionModel](txSerialized)
-//
-//    txDeserialized.isRight shouldBe true
-//
-//    txWrapped.proposition shouldEqual txDeserialized.right.get.proposition
-//
-//    val baseTxDeserialized = txDeserialized.right.get.toBaseObjOpt.get
-//
-//    tx.id shouldEqual baseTxDeserialized.id
+    val txSerialized = EncryTransaction.jsonEncoder(tx)
+
+    val txDeserialized = EncryTransaction.jsonDecoder.decodeJson(txSerialized)
+
+    txDeserialized.isRight shouldBe true
+
+    tx.account shouldEqual txDeserialized.map(_.account).getOrElse("None")
+
+    tx.id shouldEqual txDeserialized.map(_.id).getOrElse(Array.emptyByteArray)
   }
 }
