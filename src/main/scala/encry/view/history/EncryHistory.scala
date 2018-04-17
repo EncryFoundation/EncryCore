@@ -94,7 +94,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
               ProgressInfo[EncryPersistentModifier](None, Seq.empty, None, Seq.empty)
             } else {
               val invalidatedChain: Seq[EncryBlock] = bestBlockOpt.toSeq
-                .flatMap(f => headerChainBack(bestFullBlockHeight + 1, f.header, h => !invalidatedHeaders.contains(h)).headers)
+                .flatMap(f => headerChainBack(bestBlockHeight + 1, f.header, h => !invalidatedHeaders.contains(h)).headers)
                 .flatMap(h => getBlock(h))
                 .ensuring(_.lengthCompare(1) > 0, "invalidatedChain should contain at least bestFullBlock and parent")
 

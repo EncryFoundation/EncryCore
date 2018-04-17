@@ -22,7 +22,7 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
     historyStorage.modifierById(payload.headerId) match {
       case Some(header: EncryBlockHeader) =>
         historyStorage.modifierById(header.adProofsId) match {
-          case _ if !isValidFirstFullBlock(header) && bestBlockIdOpt.isEmpty =>
+          case _ if !isValidFirstBlock(header) && bestBlockIdOpt.isEmpty =>
             //TODO light mode when start from different block ?
             putToHistory(payload)
           case Some(adProof: ADProofs) =>
