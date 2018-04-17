@@ -77,6 +77,9 @@ case class KeyManager(store: LSMStore,
     }
   }
 
+  // TODO: Add the ability to select the key.
+  def mainKey: PrivateKey25519 = keys.last
+
   def updateKey(key: ByteArrayWrapper, newValue: Array[Byte]): Unit = {
     //delete previous value
     store.update(

@@ -120,8 +120,7 @@ class EncryMiner(settings: EncryAppSettings,
         // Remove stateful-invalid txs from mempool.
         pool.removeAsync(txsToDrop)
 
-        // TODO: Add ability to select the key.
-        val minerSecret = vault.keyManager.keys.head
+        val minerSecret = vault.keyManager.mainKey
 
         val openBxs: IndexedSeq[AmountCarryingBox] = txsToPut.foldLeft(IndexedSeq[AssetBox]())((buff, tx) =>
           buff ++ tx.newBoxes.foldLeft(IndexedSeq[AssetBox]()) { case (acc, bx) =>
