@@ -4,12 +4,14 @@ import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.proposition.ContractProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
+import encry.settings.{Algos, Constants}
 import encry.utils.Utils
 import encrywm.common.{ESContract, ScriptMeta}
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
+import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
@@ -17,7 +19,8 @@ import scala.util.Try
 
 case class ScriptedAssetDirective(script: ESContract,
                                   amount: Amount,
-                                  override val idx: Int) extends Directive {
+                                  override val idx: Int,
+                                  tokenIdOpt: Option[ADKey] = None) extends Directive {
 
   override type M = ScriptedAssetDirective
 
@@ -31,6 +34,8 @@ case class ScriptedAssetDirective(script: ESContract,
   override lazy val isValid: Boolean = amount > 0 && script.validMeta
 
   override def serializer: Serializer[M] = ScriptedAssetDirectiveSerializer
+
+  lazy val isIntrinsic: Boolean = tokenIdOpt.isEmpty
 }
 
 object ScriptedAssetDirective {
@@ -42,6 +47,7 @@ object ScriptedAssetDirective {
     "verboseType" -> "SCRIPT_LOCK".asJson,
     "script" -> Base58.encode(d.script.serializedScript).asJson,
     "amount" -> d.amount.asJson,
+    "tokenId" -> d.tokenIdOpt.map(id => Algos.encode(id)).getOrElse("null").asJson,
     "idx" -> d.idx.asJson
   ).asJson
 }
@@ -55,7 +61,8 @@ object ScriptedAssetDirectiveSerializer extends Serializer[ScriptedAssetDirectiv
       Ints.toByteArray(obj.script.meta.complexityScore),
       obj.script.meta.scriptFingerprint,
       Longs.toByteArray(obj.amount),
-      Ints.toByteArray(obj.idx)
+      Ints.toByteArray(obj.idx),
+      obj.tokenIdOpt.getOrElse(Array.empty)
     )
 
   override def parseBytes(bytes: Array[Byte]): Try[ScriptedAssetDirective] = Try {
@@ -64,7 +71,10 @@ object ScriptedAssetDirectiveSerializer extends Serializer[ScriptedAssetDirectiv
     val fingerprint = bytes.slice(scriptLen + 2 + 4, scriptLen + 2 + 4 + 8)
     val contract = ESContract(bytes.slice(2, scriptLen), ScriptMeta(complexity, fingerprint))
     val amount = Longs.fromByteArray(bytes.slice(scriptLen + 2 + 4 + 8, scriptLen + 2 + 4 + 8 + 8))
-    val idx = Ints.fromByteArray(bytes.takeRight(4))
-    ScriptedAssetDirective(contract, amount, idx)
+    val idx = Ints.fromByteArray(bytes.slice(scriptLen + 2 + 4 + 8 + 8, scriptLen + 2 + 4 + 8 + 8 + 4))
+    val tokenIdOpt = if ((bytes.length - (scriptLen + 2 + 4 + 8 + 8 + 4)) == Constants.ModifierIdSize) {
+      Some(ADKey @@ bytes.takeRight(Constants.ModifierIdSize))
+    } else None
+    ScriptedAssetDirective(contract, amount, idx, tokenIdOpt)
   }
 }

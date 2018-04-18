@@ -28,7 +28,7 @@ case class AssetIssuingDirective(script: ESContract,
 
   override def boxes(digest: Digest32): Seq[EncryBaseBox] = {
     val assetCreationBox = AssetCreationBox(AccountProposition(Account(PublicKey @@ Random.randomBytes(32))),
-      Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx) ++ Ints.toByteArray(1)))
+      Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx) ++ Ints.toByteArray(1)), amount)
     Seq(
       assetCreationBox,
       AssetIssuingBox(ContractProposition(script),

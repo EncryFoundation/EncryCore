@@ -18,9 +18,10 @@ import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import scorex.core.VersionTag
+import scorex.core.transaction.box.Box.Amount
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.avltree.batch._
-import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
+import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
 
 import scala.util.{Failure, Success, Try}
@@ -182,11 +183,22 @@ class UtxoState(override val version: VersionTag,
   override def validate(tx: EncryBaseTransaction): Try[Unit] =
     tx.semanticValidity.map { _: Unit =>
 
-      def totalAmountOf(boxes: Traversable[EncryBaseBox]): Long =
-        boxes.foldLeft(0L)((acc, bx) => bx match {
-          case acbx: MonetaryBox => acc + acbx.amount
-          case _ => acc
-        })
+      val intrinsicId = ADKey @@ Array.fill(4)(-1: Byte)
+
+      def balanceSheet(bxs: Traversable[EncryBaseBox]): Map[ADKey, Amount] = {
+        bxs.foldLeft(Map.empty[ADKey, Amount]) {
+          case (cache, bx: AssetBox) if bx.isIntrinsic =>
+            cache.get(intrinsicId).map { amount =>
+              cache.updated(intrinsicId, amount + bx.amount)
+            }.getOrElse(cache.updated(intrinsicId, bx.amount))
+          case (cache, bx: AssetBox) =>
+            val tokenId = bx.tokenIdOpt.get
+            cache.get(tokenId).map { amount =>
+              cache.updated(tokenId, amount + bx.amount)
+            }.getOrElse(cache.updated(tokenId, bx.amount))
+          case (cache, _) => cache
+        }
+      }
 
       implicit val context: Context = Context(tx, height, lastBlockTimestamp, rootHash)
 
@@ -201,10 +213,13 @@ class UtxoState(override val version: VersionTag,
           }
         }
 
-      val debit = totalAmountOf(bxs)
-      val credit = totalAmountOf(tx.newBoxes) - totalAmountOf(tx.newBoxes.filter(_.isCoinbase))
+      val validBalance = {
+        val debitB = balanceSheet(bxs)
+        val creditB = balanceSheet(tx.newBoxes)
+        creditB.forall { case (id, amount) => debitB.getOrElse(id, 0L) >= amount }
+      }
 
-      if (debit < credit) throw new Error(s"Non-positive balance in $tx")
+      if (!validBalance) throw new Error(s"Non-positive balance in $tx")
     }
 }
 

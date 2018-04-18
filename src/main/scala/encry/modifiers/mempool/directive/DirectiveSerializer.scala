@@ -11,6 +11,8 @@ object DirectiveSerializer extends Serializer[Directive] {
       TransferDirective.TypeId +: TransferDirectiveSerializer.toBytes(td)
     case cd: CoinbaseDirective =>
       CoinbaseDirective.TypeId +: CoinbaseDirectiveSerializer.toBytes(cd)
+    case aid: AssetIssuingDirective =>
+      AssetIssuingDirective.TypeId +: AssetIssuingDirectiveSerializer.toBytes(aid)
     case m => throw new Error(s"Serialization of unknown directive type: $m")
   }
 

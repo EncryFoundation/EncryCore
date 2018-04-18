@@ -67,7 +67,8 @@ class EncryScanner(settings: EncryAppSettings,
       .foldLeft(mutable.TreeMap[ByteArrayWrapper, Seq[ADKey]](), Seq[EncryBaseBox]()) { case ((cache, bxs), bx) =>
         if (!boxIdsToRemove.exists(_.sameElements(bx.id))) {
           cache.get(keyByProposition(bx.proposition)) match {
-            case Some(ids) => cache.update(keyByProposition(bx.proposition), ids :+ bx.id)
+            case Some(ids) =>
+              cache.update(keyByProposition(bx.proposition), ids :+ bx.id)
             case _ =>
               cache.update(keyByProposition(bx.proposition), Seq(bx.id))
           }
@@ -87,9 +88,9 @@ class EncryScanner(settings: EncryAppSettings,
             if (!sr.toRemove.contains(k)) a :+ k else a
           } ++ Seq(storage.get(key).getOrElse(Array.emptyByteArray))))
       } ++ sr.toInsert.foldLeft(Seq[(ByteArrayWrapper,ByteArrayWrapper)]()) { case (seq, bx) =>
-          if (!sr.toRemove.contains(bx.id)) {
-            seq :+ (ByteArrayWrapper(bx.id) -> ByteArrayWrapper(bx.bytes))
-          } else seq
+        if (!sr.toRemove.contains(bx.id)) {
+          seq :+ (ByteArrayWrapper(bx.id) -> ByteArrayWrapper(bx.bytes))
+        } else seq
       }
     val toRemove = sr.toRemove.map(ByteArrayWrapper.apply) ++ sr.newIndexes.map(_._1)
     storage.update(ByteArrayWrapper(md.version), toRemove, toInsert)
