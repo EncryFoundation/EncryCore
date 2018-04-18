@@ -29,6 +29,8 @@ object Directive {
     case td: TransferDirective => TransferDirective.jsonEncoder(td)
     case cd: CoinbaseDirective => CoinbaseDirective.jsonEncoder(cd)
     case aid: AssetIssuingDirective => AssetIssuingDirective.jsonEncoder(aid)
+    case sad: ScriptedAssetDirective => ScriptedAssetDirective.jsonEncoder(sad)
+    case _ => throw new Exception("Incorrect directive type")
   }
 
   implicit val jsonDecoder: Decoder[Directive] = {
@@ -38,6 +40,7 @@ object Directive {
           case TransferDirective.TypeId => TransferDirective.jsonDecoder(c)
           case CoinbaseDirective.TypeId => CoinbaseDirective.jsonDecoder(c)
           case AssetIssuingDirective.TypeId => AssetIssuingDirective.jsonDecoder(c)
+          case ScriptedAssetDirective.TypeId => ScriptedAssetDirective.jsonDecoder(c)
           case _ => Left(DecodingFailure("Incorrect directive typeID", c.history))
         }
         case Left(_) => Left(DecodingFailure("None typeId", c.history))

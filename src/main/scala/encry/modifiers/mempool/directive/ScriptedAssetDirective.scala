@@ -7,8 +7,8 @@ import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.{Algos, Constants}
 import encry.utils.Utils
 import encrywm.common.{ESContract, ScriptMeta}
-import io.circe.Encoder
 import io.circe.syntax._
+import io.circe.{Decoder, Encoder, HCursor}
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.ADKey
@@ -46,10 +46,33 @@ object ScriptedAssetDirective {
     "typeId" -> d.typeId.asJson,
     "verboseType" -> "SCRIPT_LOCK".asJson,
     "script" -> Base58.encode(d.script.serializedScript).asJson,
+    "complexityScore" -> d.script.meta.complexityScore.asJson,
+    "scriptFingerprint" -> Base58.encode(d.script.meta.scriptFingerprint).asJson,
     "amount" -> d.amount.asJson,
     "tokenId" -> d.tokenIdOpt.map(id => Algos.encode(id)).getOrElse("null").asJson,
     "idx" -> d.idx.asJson
   ).asJson
+
+  implicit val jsonDecoder: Decoder[ScriptedAssetDirective] = (c: HCursor) => for {
+    scriptStr <- c.downField("script").as[String]
+    complexityScore <- c.downField("complexityScore").as[Int]
+    scriptFingerprint <- c.downField("scriptFingerprint").as[String]
+    amount <- c.downField("amount").as[Long]
+    tokenIdOpt <- c.downField("tokenId").as[Option[String]]
+    idx <- c.downField("idx").as[Int]
+  } yield {
+    ScriptedAssetDirective(
+      Base58.decode(scriptStr).map(scriptDes =>
+        ESContract(
+          scriptDes,
+          ScriptMeta(complexityScore, Base58.decode(scriptFingerprint).getOrElse(Array.emptyByteArray))
+        )
+      ).getOrElse(throw new Exception("Incorrect script deserialize from json")),
+      amount,
+      idx,
+      tokenIdOpt.flatMap(id => Algos.decode(id).map(ADKey @@ _).toOption)
+    )
+  }
 }
 
 object ScriptedAssetDirectiveSerializer extends Serializer[ScriptedAssetDirective] {
