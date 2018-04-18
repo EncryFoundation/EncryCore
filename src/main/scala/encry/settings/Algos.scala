@@ -9,13 +9,14 @@ import scala.util.Try
 
 object Algos {
 
+  type HF = Blake2b256.type
+
   def encode(bytes: Array[Byte]): String = encoder.encode(bytes)
 
   def decode(str: String): Try[Array[Byte]] = encoder.decode(str)
 
-  //def blockIdDifficulty(id: Array[Byte]): BigInt = 1
+  val hash: HF = Blake2b256
 
-  val hash: Blake2b256.type = Blake2b256
   val encoder: Base58.type = Base58
 
   val initialDifficulty = 1
