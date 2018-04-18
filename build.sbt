@@ -56,7 +56,7 @@ libraryDependencies ++= Seq(
   "org.scorexfoundation" %% "scorex-core" % scorexVersion,
   "org.scorexfoundation" %% "avl-iodb" % "0.2.+",
   "org.scorexfoundation" %% "iodb" % "0.3.2",
-  "org.scorexfoundation" %% "scrypto" % "2.0.3",
+  "org.scorexfoundation" %% "scrypto" % "2.0.5",
   "com.storm-enroute" %% "scalameter" % "0.8.+",
   "io.spray" %%  "spray-json" % "1.3.3",
   "io.monix" %% "monix" % "2.3.3",

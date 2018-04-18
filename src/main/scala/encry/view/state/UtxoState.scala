@@ -186,7 +186,7 @@ class UtxoState(override val version: VersionTag,
 
       val intrinsicId = ADKey @@ Array.fill(4)(-1: Byte)
 
-      def balanceSheet(bxs: Traversable[EncryBaseBox]): Map[ADKey, Amount] = {
+      def balanceSheet(bxs: Traversable[EncryBaseBox]): Map[ADKey, Amount] =
         bxs.foldLeft(Map.empty[ADKey, Amount]) {
           case (cache, bx: AssetBox) if bx.isIntrinsic =>
             cache.get(intrinsicId).map { amount =>
@@ -199,7 +199,6 @@ class UtxoState(override val version: VersionTag,
             }.getOrElse(cache.updated(tokenId, bx.amount))
           case (cache, _) => cache
         }
-      }
 
       implicit val context: Context = Context(tx, height, lastBlockTimestamp, rootHash)
 

@@ -25,14 +25,12 @@ object Unlocker {
     "proof" -> u.proofOpt.map(_.asJson).getOrElse("None".asJson)
   ).asJson
 
-  implicit val jsonDecoder: Decoder[Unlocker] = {
-    (c: HCursor) => {
-      for {
-        foo <- c.downField("boxId").as[String]
-        bar <- c.downField("proof").as[Option[Proof]]
-      } yield {
-        Unlocker(ADKey @@ Algos.decode(foo).get, bar)
-      }
+  implicit val jsonDecoder: Decoder[Unlocker] = (c: HCursor) => {
+    for {
+      foo <- c.downField("boxId").as[String]
+      bar <- c.downField("proof").as[Option[Proof]]
+    } yield {
+      Unlocker(ADKey @@ Algos.decode(foo).get, bar)
     }
   }
 }
