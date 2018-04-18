@@ -178,6 +178,7 @@ class UtxoState(override val version: VersionTag,
     * 1. Check if box is in the state
     * 2. Parse box from the state storage
     * 3. Try to unlock the box, providing appropriate context and proof
+    *    For all asset types:
     * 4. Make sure inputs.sum >= outputs.sum
    */
   override def validate(tx: EncryBaseTransaction): Try[Unit] =
@@ -208,6 +209,7 @@ class UtxoState(override val version: VersionTag,
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
         .map(t => t.toOption -> u.proofOpt)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, proofOpt)) =>
           bxOpt match {
+            // If `proofOpt` from unlocker is `None` then `tx.signature` is used as a default proof.
             case Some(bx) if bx.proposition.unlockTry(proofOpt.getOrElse(tx.signature)).isSuccess => acc :+ bx
             case _ => throw new Error(s"Failed to spend some boxes referenced in $tx")
           }
@@ -242,7 +244,8 @@ object UtxoState extends ScorexLogging {
     new UtxoState(VersionTag @@ stateVersion, Height @@ stateHeight, stateStore, lastBlockTimestamp, nodeViewHolderRef)
   }
 
-  private def metadata(modId: VersionTag, stateRoot: ADDigest, height: Height, blockTimestamp: Long): Seq[(Array[Byte], Array[Byte])] = {
+  private def metadata(modId: VersionTag, stateRoot: ADDigest,
+                       height: Height, blockTimestamp: Long): Seq[(Array[Byte], Array[Byte])] = {
     val idStateDigestIdxElem: (Array[Byte], Array[Byte]) = modId -> stateRoot
     val stateDigestIdIdxElem = Algos.hash(stateRoot) -> modId
     val bestVersion = bestVersionKey -> modId
@@ -258,7 +261,7 @@ object UtxoState extends ScorexLogging {
 
     val stateStore = new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions)
 
-    log.info(s"Generating UTXO State from BH with ${bh.boxes.size} boxes")
+    log.info(s"Generating UTXO State with ${bh.boxes.size} boxes")
 
     new UtxoState(EncryState.genesisStateVersion, Constants.Chain.PreGenesisHeight, stateStore, 0L, nodeViewHolderRef) {
       override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
