@@ -59,8 +59,8 @@ object TestHelper {
         rndGen.nextLong(), Props.boxValue)
     }
 
-  def genAssetBox(address: Address): AssetBox =
-    AssetBox(AccountProposition(address), 9L, Props.boxValue)
+  def genAssetBox(address: Address, amount: Amount = 9L): AssetBox =
+    AssetBox(AccountProposition(address), amount, Props.boxValue)
 
   def genTxOutputs(boxes: Traversable[EncryBaseBox]): IndexedSeq[ADKey] =
     boxes.foldLeft(IndexedSeq[ADKey]()) { case(s, box) =>

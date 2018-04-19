@@ -34,10 +34,10 @@ trait WalletReader {
 
   def encryBalance: Long = walletStore.get(WalletStorage.encryBalanceKey).map(v => Longs.fromByteArray(v.data)).getOrElse(0L)
 
-  def tokenBalance: Seq[(ADKey, Long)] = FixLenComplexValueCodec.
-    parseComplexValue(walletStorage.get(WalletStorage.tokenBalanceKey).getOrElse(Array.emptyByteArray), 36).map(
-      _.foldLeft(Seq[(ADKey, Long)]()){
-        case (seq, serTok) => seq :+ (ADKey @@ serTok.slice(0, 32) -> Longs.fromByteArray(serTok.slice(32, serTok.length)))
-      }
-    ).getOrElse(Seq.empty[(ADKey, Long)])
+  def tokenBalance: Seq[(ADKey, Long)] = walletStorage.getTokensId.foldLeft(Seq[(ADKey, Long)]()){
+    case (seq, tokenId) => walletStorage.getTokenBalanceById(tokenId) match {
+      case Some(v) => seq :+ (tokenId, v)
+      case None => seq
+    }
+  }
 }

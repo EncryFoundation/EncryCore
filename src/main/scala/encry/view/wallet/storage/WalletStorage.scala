@@ -1,5 +1,6 @@
 package encry.view.wallet.storage
 
+import com.google.common.primitives.Longs
 import encry.crypto.PublicKey25519
 import encry.modifiers.mempool.{EncryTransaction, EncryTransactionSerializer}
 import encry.modifiers.state.StateModifierDeserializer
@@ -40,6 +41,12 @@ class WalletStorage(val store: Store, val publicKeys: Set[PublicKey25519])
       getBoxById(id).map(bx => acc :+ bx).getOrElse(acc)
     }
 
+  def getTokenBalanceById(id: ADKey): Option[Long] = store.get(keyByTokenId(id))
+    .map(v => Longs.fromByteArray(v.data))
+
+  def getTokensId: Seq[ADKey] =
+    readComplexValue(tokensIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
+
   def getTransactionById(id: ModifierId): Option[EncryTransaction] = Try {
     EncryTransactionSerializer.parseBytes(store.get(ByteArrayWrapper(id)).get.data).get
   }.toOption
@@ -53,11 +60,15 @@ object WalletStorage {
 
   val transactionIdsKey = ByteArrayWrapper(Algos.hash("account_transactions"))
 
-  val tokenBalanceKey = ByteArrayWrapper(Algos.hash("token"))
+  val tokensIdsKey = ByteArrayWrapper(Algos.hash("tokens_id"))
 
-  val encryBalanceKey = ByteArrayWrapper(Algos.hash("encry_balance"))
+  val tokenBalanceKey = ByteArrayWrapper(Algos.hash("token balance"))
+
+  val encryBalanceKey = ByteArrayWrapper(Algos.hash("encry balance"))
 
   def keyByBoxId(id: ADKey): ByteArrayWrapper = ByteArrayWrapper(id)
+
+  def keyByTokenId(id: ADKey): ByteArrayWrapper = ByteArrayWrapper(id)
 
   def txKeyById(id: ModifierId): ByteArrayWrapper = ByteArrayWrapper(id)
 }

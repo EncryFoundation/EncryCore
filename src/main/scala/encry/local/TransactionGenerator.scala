@@ -44,7 +44,7 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings, time
             val fee = 15L
             val amount: Long = Random.nextInt(30) + 9
             val timestamp = timeProvider.time()
-            if (v.vault.balance > 1000) {
+            if (v.vault.encryBalance > 1000) {
               // Generate valid txs if vault's balance is enough.
               val boxes = v.vault.walletStorage.allBoxes.filter(_.isInstanceOf[AssetBox])
                 .map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) {

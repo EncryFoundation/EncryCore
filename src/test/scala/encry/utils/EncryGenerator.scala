@@ -41,6 +41,17 @@ trait EncryGenerator {
     }
   }
 
+  def genValidPaymentTxsToAddr(qty: Int, address: Address): Seq[EncryTransaction] = {
+    val pks = genPrivKeys(qty)
+    val timestamp = System.currentTimeMillis()
+
+    pks.map { k =>
+      val useBoxes = IndexedSeq(genAssetBox(address))
+      TransactionFactory.defaultPaymentTransactionScratch(k, Props.txFee,
+        timestamp, useBoxes, address, Props.boxValue)
+    }
+  }
+
   def genSelfSpendingTxs(qty: Int): Seq[EncryTransaction] = {
 
     val pks = genPrivKeys(qty)
