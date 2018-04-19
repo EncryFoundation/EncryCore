@@ -186,8 +186,12 @@ class UtxoState(override val version: VersionTag,
 
       val intrinsicId = ADKey @@ Array.fill(4)(-1: Byte)
 
-      def balanceSheet(bxs: Traversable[EncryBaseBox]): Map[ADKey, Amount] =
+      def balanceSheet(bxs: Traversable[EncryBaseBox], excludeCoinbase: Boolean = true): Map[ADKey, Amount] =
         bxs.foldLeft(Map.empty[ADKey, Amount]) {
+          case (cache, bx: CoinbaseBox) if !excludeCoinbase =>
+            cache.get(intrinsicId).map { amount =>
+              cache.updated(intrinsicId, amount + bx.amount)
+            }.getOrElse(cache.updated(intrinsicId, bx.amount))
           case (cache, bx: AssetBox) if bx.isIntrinsic =>
             cache.get(intrinsicId).map { amount =>
               cache.updated(intrinsicId, amount + bx.amount)
@@ -215,7 +219,7 @@ class UtxoState(override val version: VersionTag,
         }
 
       val validBalance = {
-        val debitB = balanceSheet(bxs)
+        val debitB = balanceSheet(bxs, excludeCoinbase = false)
         val creditB = balanceSheet(tx.newBoxes)
         creditB.forall { case (id, amount) => debitB.getOrElse(id, 0L) >= amount }
       }
