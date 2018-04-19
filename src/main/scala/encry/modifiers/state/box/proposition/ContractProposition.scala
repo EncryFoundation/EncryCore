@@ -24,7 +24,6 @@ case class ContractProposition(contract: EncryContract) extends EncryProposition
 
   override def serializer: Serializer[M] = ContractPropositionSerializer
 
-  // TODO: Use `monix.Coeval` for thread-safe contract execution?
   override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
     ScriptSerializer.deserialize(contract.serializedScript).map { script =>
       val contractContext = ContractContext(proof, ctx.transaction,

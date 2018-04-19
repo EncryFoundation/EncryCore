@@ -30,22 +30,20 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
 
   private def getMempool: Future[EncryMempoolReader] = (readersHolder ? GetReaders).mapTo[Readers].map(_.m.get)
 
-  private def getUnconfirmedTransactions(limit: Int): Future[Json] = getMempool.map {
-    _.take(limit).toSeq
+  private def getUnconfirmedTransactions(limit: Int, offset: Int = 0): Future[Json] = getMempool.map {
+    _.unconfirmed.values.slice(offset, offset + limit)
   }.map(_.map(_.asJson).asJson)
 
   def defaultTransferTransactionR: Route = path("transfer") {
-    post {
-      entity(as[EncryTransaction]) {
-        tx => complete {
-          nodeViewActorRef ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
-          StatusCodes.OK
-        }
+    post(entity(as[EncryTransaction]) {
+      tx => complete {
+        nodeViewActorRef ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
+        StatusCodes.OK
       }
-    }
+    })
   }
 
   def getUnconfirmedTransactionsR: Route = (path("unconfirmed") & get & paging) { (offset, limit) =>
-    getUnconfirmedTransactions(limit).okJson()
+    getUnconfirmedTransactions(limit, offset).okJson()
   }
 }
