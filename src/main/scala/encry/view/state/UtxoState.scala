@@ -44,28 +44,14 @@ class UtxoState(override val version: VersionTag,
 
   private[state] def applyTransactions(txs: Seq[EncryBaseTransaction],
                                        expectedDigest: ADDigest): Try[Unit] = Try {
-    var appliedModCounter: Int = 0
-
-    txs.foreach { tx =>
-      // Carries out an exhaustive txs validation and then tries to apply it.
-      if (validate(tx).isSuccess) {
-        getStateChanges(tx).operations.map(ADProofs.toModification)
-          .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
-          t.flatMap { _ =>
-            appliedModCounter += 1
-            persistentProver.performOneOperation(m)
-          }
+    txs.foreach(tx => validate(tx).map { _ =>
+      getStateChanges(tx).operations.map(ADProofs.toModification)
+        .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
+        t.flatMap { _ =>
+          persistentProver.performOneOperation(m)
         }
-      } else {
-        if (appliedModCounter > 0) {
-          persistentProver.rollback(rootHash)
-            .ensuring(persistentProver.digest.sameElements(rootHash))
-        }
-        throw new Error(s"Error while applying modifier $tx.")
-      }
-    }
-
-    log.debug(s"$appliedModCounter modifications applied")
+      }.get
+    }.orElse(throw new Error(s"$tx validation failed.")))
 
     // Checks whether the outcoming result is the same as expected.
     if (!expectedDigest.sameElements(persistentProver.digest))
