@@ -80,7 +80,7 @@ class UtxoState(override val version: VersionTag,
       log.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
 
-      applyTransactions(block.payload.transactions, block.header.stateRoot).map { _: Unit =>
+      applyTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val md = metadata(VersionTag @@ block.id, block.header.stateRoot, Height @@ block.header.height, block.header.timestamp)
         val proofBytes = persistentProver.generateProofAndUpdateStorage(md)
         val proofHash = ADProofs.proofDigest(proofBytes)

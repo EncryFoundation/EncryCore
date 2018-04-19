@@ -12,7 +12,7 @@ case class CStateInfo(height: Height, lastBlockTimestamp: Long, stateDigest: ADD
 
   override val esType: ESProduct = ESState
 
-  override def asVal: ESValue = ESValue("state", ESState)(convert)
+  override def asVal: ESValue = ESValue(ESState.ident.toLowerCase, ESState)(convert)
 
   override def convert: ESObject = {
     val fields = Map(
@@ -30,7 +30,7 @@ class ContractContext(proof: Proof,
 
   override val esType: ESProduct = ESContext
 
-  override def asVal: ESValue = ESValue("context", ESContext)(convert)
+  override def asVal: ESValue = ESValue(ESContext.ident.toLowerCase, ESContext)(convert)
 
   override def convert: ESObject = {
     val fields = Map(

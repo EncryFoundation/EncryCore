@@ -19,8 +19,6 @@ object Algos {
 
   val encoder: Base58.type = Base58
 
-  val initialDifficulty = 1
-
   def merkleTreeRoot(elements: Seq[LeafData]): Digest32 =
     if (elements.isEmpty) emptyMerkleTreeRoot else MerkleTree(elements)(hash).rootHash
 
