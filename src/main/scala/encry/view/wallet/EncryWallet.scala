@@ -91,30 +91,32 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
     import WalletStorage._
 
     val bObj = newBxs.foldLeft((Map[String, Long](), 0L)){
-      case ((balanceTree, encryBalance), bx) =>
+      case ((balances, balance), bx) =>
         bx match {
           case aib: AssetBox =>
             aib.tokenIdOpt match {
-              case Some(key) => balanceTree.get(Algos.encode(key)) match {
+              case Some(key) => balances.get(Algos.encode(key)) match {
                 case Some(v) =>
-                  (balanceTree.updated(Algos.encode(key), v + aib.amount), encryBalance)
+                  (balances.updated(Algos.encode(key), v + aib.amount), balance)
                 case None =>
-                  (balanceTree.updated(Algos.encode(key), aib.amount), encryBalance)
+                  (balances.updated(Algos.encode(key), aib.amount), balance)
               }
               case None =>
-                (balanceTree, encryBalance + aib.amount)
+                (balances, balance + aib.amount)
             }
-          case _ => (balanceTree, encryBalance)
+          case _ => (balances, balance)
         }
     }
 
     val decodedTokenBalance = bObj._1.foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()){
-      case (seq, (tid, balance)) => seq :+ (ByteArrayWrapper(Algos.decode(tid).getOrElse(Random.randomBytes())) -> ByteArrayWrapper(Longs.toByteArray(balance)))
+      case (seq, (tId, balance)) =>
+        seq :+ (ByteArrayWrapper(Algos.decode(tId).getOrElse(Random.randomBytes())) -> ByteArrayWrapper(Longs.toByteArray(balance)))
     }
 
     decodedTokenBalance ++
       Seq(
-        tokensIdsKey -> ByteArrayWrapper(bObj._1.keys.foldLeft(Array[Byte]()){case (seq, key) => seq ++ Algos.decode(key).getOrElse(Array.emptyByteArray)}),
+        tokensIdsKey -> ByteArrayWrapper(bObj._1.keys.foldLeft(Array[Byte]()) { case (seq, key) =>
+          seq ++ Algos.decode(key).getOrElse(Array.emptyByteArray)}),
         encryBalanceKey -> ByteArrayWrapper(Longs.toByteArray(bObj._2))
       )
   }

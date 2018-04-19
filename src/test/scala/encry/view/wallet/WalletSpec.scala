@@ -15,7 +15,7 @@ import scorex.utils.Random
 
 class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator{
 
-  property("Balance count. Only Encry Coins"){
+  property("Balance count (intrinsic coins only)"){
 
     val blockHeader = genHeader
 
@@ -32,8 +32,8 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
     val validTxs = genValidPaymentTxsToAddr(4, keyManager.keys.head.publicImage.address)
 
     val correctBalance = validTxs.foldLeft(0L) {
-      case(sum, transaction) => sum + transaction.newBoxes.foldLeft(0L){
-        case(boxSum, bx) =>
+      case (sum, transaction) => sum + transaction.newBoxes.foldLeft(0L){
+        case (boxSum, bx) =>
           bx match {
           case ac: MonetaryBox if keyManager.keys.exists(privKey => AccountProposition(privKey.publicImage.address) == ac.proposition) =>
             boxSum + ac.amount
