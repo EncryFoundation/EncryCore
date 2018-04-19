@@ -1,15 +1,15 @@
 # EncryCore
 
-[![Build Status](https://travis-ci.org/oskin1/EncryCore.svg?branch=master)](https://travis-ci.org/oskin1/EncryCore)
+[![Build Status](https://travis-ci.org/EncryFoundation/EncryCore.svg?branch=master)](https://travis-ci.org/EncryFoundation/EncryCore)
 
 Reference implementation of the EncryCore node. Encry is a distributed digital asset platform supporting smart contracts
 and custom asset issuing.
 
-* [Protocol specification](https://github.com/oskin1/EncryCore/blob/master/docs/design/ProtocolSpec.md) (in progress)
+* [Protocol specification](https://github.com/EncryFoundation/EncryCore/blob/master/docs/design/ProtocolSpec.md) (in progress)
 
 ## Related projects
 
-* [EncryScript](https://github.com/oskin1/EncryScript) - Contract-oriented scripting language designed specially for EncryCore.
+* [EncryScript](https://github.com/EncryFoundation/EncryScript) - Contract-oriented scripting language designed specially for EncryCore.
 
 ## License
 
