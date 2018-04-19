@@ -3,6 +3,7 @@ package encry.view.wallet
 import com.google.common.primitives.Longs
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.{CoinbaseBox, EncryBaseBox}
+import encry.storage.codec.FixLenComplexValueCodec
 import encry.view.history.Height
 import encry.view.wallet.storage.WalletStorage
 import io.iohk.iodb.Store
@@ -31,5 +32,12 @@ trait WalletReader {
       walletStorage.getTransactionById(id).map(tx => acc :+ tx).getOrElse(acc)
     }
 
-  def balance: Long = walletStore.get(WalletStorage.balanceKey).map(v => Longs.fromByteArray(v.data)).getOrElse(0L)
+  def encryBalance: Long = walletStore.get(WalletStorage.encryBalanceKey).map(v => Longs.fromByteArray(v.data)).getOrElse(0L)
+
+  def tokenBalance: Seq[(ADKey, Long)] = FixLenComplexValueCodec.
+    parseComplexValue(walletStorage.get(WalletStorage.tokenBalanceKey).getOrElse(Array.emptyByteArray), 36).map(
+      _.foldLeft(Seq[(ADKey, Long)]()){
+        case (seq, serTok) => seq :+ (ADKey @@ serTok.slice(0, 32) -> Longs.fromByteArray(serTok.slice(32, serTok.length)))
+      }
+    ).getOrElse(Seq.empty[(ADKey, Long)])
 }

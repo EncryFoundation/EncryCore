@@ -53,7 +53,9 @@ object WalletStorage {
 
   val transactionIdsKey = ByteArrayWrapper(Algos.hash("account_transactions"))
 
-  val balanceKey = ByteArrayWrapper(Algos.hash("account_balance"))
+  val tokenBalanceKey = ByteArrayWrapper(Algos.hash("token"))
+
+  val encryBalanceKey = ByteArrayWrapper(Algos.hash("encry_balance"))
 
   def keyByBoxId(id: ADKey): ByteArrayWrapper = ByteArrayWrapper(id)
 
