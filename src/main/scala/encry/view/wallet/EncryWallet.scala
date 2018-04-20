@@ -7,10 +7,10 @@ import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
+import encry.modifiers.state.box.EncryBaseBox
 import encry.modifiers.state.box.proposition.{AccountProposition, EncryProposition, HeightProposition}
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.{Algos, Constants, EncryAppSettings}
-import encry.utils.BoxFilter
+import encry.utils.{BalanceCalculator, BoxFilter}
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
@@ -90,23 +90,7 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
 
     import WalletStorage._
 
-    val bObj = newBxs.foldLeft((Map[String, Long](), 0L)){
-      case ((balances, balance), bx) =>
-        bx match {
-          case aib: AssetBox =>
-            aib.tokenIdOpt match {
-              case Some(key) => balances.get(Algos.encode(key)) match {
-                case Some(v) =>
-                  (balances.updated(Algos.encode(key), v + aib.amount), balance)
-                case None =>
-                  (balances.updated(Algos.encode(key), aib.amount), balance)
-              }
-              case None =>
-                (balances, balance + aib.amount)
-            }
-          case _ => (balances, balance)
-        }
-    }
+    val bObj = BalanceCalculator.getBalances(newBxs)
 
     val decodedTokenBalance = bObj._1.foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()){
       case (seq, (tId, balance)) =>

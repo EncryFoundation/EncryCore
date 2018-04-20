@@ -4,10 +4,10 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.account.{Address, Balance, Portfolio}
+import encry.account.{Address, Portfolio}
 import encry.local.scanner.EncryScanner.{GetIndexReader, IndexReader}
 import encry.local.scanner.storage.EncryIndexReader
-import encry.utils.BoxFilter
+import encry.utils.{BalanceCalculator, BoxFilter}
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import encry.view.state.{StateMode, UtxoStateReader}
 import io.circe.Json
@@ -46,7 +46,7 @@ case class AccountInfoApiRoute(readersHolder: ActorRef,
   private def getPortfolioByAddress(address: Address): Future[Option[Json]] = getState.flatMap { s =>
     getBoxIdsByAddress(address).map(_.map { ids =>
       val bxs = s.boxesByIds(ids)
-      val balance = Balance @@ BoxFilter.filterAmountCarryingBxs(bxs).map(_.amount).sum
+      val balance = BalanceCalculator.getBalances(BoxFilter.filterAmountCarryingBxs(bxs))
       Some(Portfolio(address, balance, bxs))
     })
   }.map(_.map(_.map(_.asJson).asJson))
