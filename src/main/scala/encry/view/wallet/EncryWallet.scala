@@ -86,23 +86,18 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
     Try(walletStore.rollback(wrappedVersion)).map(_ => this)
   }
 
-  private def calculateNewBalance(newBxs: Seq[EncryBaseBox]): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
+  private def calculateNewBalance(bxs: Seq[EncryBaseBox]): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
 
     import WalletStorage._
 
-    val bObj = BalanceCalculator.balancesOf(newBxs)
+    val bObj = BalanceCalculator.balanceSheet(bxs)
 
-    val decodedTokenBalance = bObj._1.foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()){
+    val decodedTokenBalance = bObj.foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()){
       case (seq, (tId, balance)) =>
-        seq :+ (ByteArrayWrapper(Algos.decode(tId).getOrElse(Random.randomBytes())) -> ByteArrayWrapper(Longs.toByteArray(balance)))
+        seq :+ (ByteArrayWrapper(tId) -> ByteArrayWrapper(Longs.toByteArray(balance)))
     }
 
-    decodedTokenBalance ++
-      Seq(
-        tokensIdsKey -> ByteArrayWrapper(bObj._1.keys.foldLeft(Array[Byte]()) { case (seq, key) =>
-          seq ++ Algos.decode(key).getOrElse(Array.emptyByteArray)}),
-        encryBalanceKey -> ByteArrayWrapper(Longs.toByteArray(bObj._2))
-      )
+    decodedTokenBalance ++ Seq(tokensIdsKey -> ByteArrayWrapper(bObj.keys.map(_.untag(ADKey)).reduce(_ ++ _)))
   }
 
   private def updateWallet(modifierId: ModifierId,

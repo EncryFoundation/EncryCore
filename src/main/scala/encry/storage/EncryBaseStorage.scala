@@ -11,7 +11,7 @@ trait EncryBaseStorage extends AutoCloseable with ScorexLogging {
 
   def insert(version: ByteArrayWrapper,
              toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit =
-    store.update(version, Seq.empty, toInsert)
+      store.update(version, Seq.empty, toInsert)
 
   def remove(version: ByteArrayWrapper,
              toRemove: Seq[ByteArrayWrapper]): Unit =

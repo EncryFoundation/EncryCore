@@ -6,7 +6,7 @@ import scorex.crypto.authds.ADKey
 
 object BalanceCalculator {
 
-  private val intrinsicId = ADKey @@ Array.fill(4)(-1: Byte)
+  private val intrinsicId = ADKey @@ Array.fill(32)(-1: Byte)
 
   def balanceSheet(bxs: Traversable[EncryBaseBox],
                    excludeCoinbase: Boolean = true): Map[ADKey, Amount] =
