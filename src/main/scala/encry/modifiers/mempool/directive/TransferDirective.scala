@@ -26,7 +26,7 @@ case class TransferDirective(address: Address,
   override val typeId: DTypeId = TransferDirective.TypeId
 
   override def boxes(digest: Digest32): Seq[EncryBaseBox] =
-      Seq(AssetBox(address, Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)), amount, tokenIdOpt))
+    Seq(AssetBox(address, Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)), amount, tokenIdOpt))
 
   override val cost: Amount = 4
 

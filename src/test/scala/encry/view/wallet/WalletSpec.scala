@@ -1,5 +1,6 @@
 package encry.view.wallet
 
+import encry.local.TestHelper.Props
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.payload.EncryBlockPayload
@@ -50,5 +51,33 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
     wallet.scanPersistent(block)
 
     wallet.encryBalance shouldEqual correctBalance
+  }
+
+  property("Balance count (intrinsic coins + tokens)"){
+
+    val txsQty = 4
+
+    val blockHeader = genHeader
+
+    lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(Option(""))
+
+    val walletStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions)
+
+    val keyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), encrySettings.keyManagerSettings, None)
+
+    keyManager.initStorage(Random.randomBytes())
+
+    val wallet = new EncryWallet(walletStore, keyManager)
+
+    val validTxs = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.keys.head.publicImage.address)
+
+    val blockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
+
+    val block = EncryBlock(blockHeader, blockPayload, None)
+
+    wallet.scanPersistent(block)
+
+    wallet.tokenBalance.foldLeft(0L){_ + _._2} shouldEqual txsQty*Props.boxValue
+
   }
 }

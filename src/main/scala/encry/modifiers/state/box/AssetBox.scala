@@ -46,10 +46,10 @@ object AssetBox {
   ).asJson
 
   def apply(address: Address, nonce: Long, amount: Amount, tokenIdOpt: Option[ADKey]): AssetBox =
-    AssetBox(AccountProposition(address), nonce, amount)
+    AssetBox(AccountProposition(address), nonce, amount, tokenIdOpt)
 
   def apply(account: Account, nonce: Long, amount: Amount, tokenIdOpt: Option[ADKey]): AssetBox =
-    AssetBox(AccountProposition(account), nonce, amount)
+    AssetBox(AccountProposition(account), nonce, amount, tokenIdOpt)
 }
 
 object AssetBoxSerializer extends Serializer[AssetBox] {
