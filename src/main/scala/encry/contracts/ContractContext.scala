@@ -4,6 +4,7 @@ import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proof.Proof
 import encry.view.history.Height
 import encrywm.backend.env.{ESObject, ESValue}
+import encrywm.common.ScriptMeta
 import encrywm.lib.Types._
 import encrywm.lib.predef.env.ESEnvConvertable
 import scorex.crypto.authds.ADDigest
@@ -24,9 +25,10 @@ case class CStateInfo(height: Height, lastBlockTimestamp: Long, stateDigest: ADD
   }
 }
 
-class ContractContext(proof: Proof,
-                      transaction: EncryBaseTransaction,
-                      si: CStateInfo) extends ESEnvConvertable {
+case class ContractContext(proof: Proof,
+                           transaction: EncryBaseTransaction,
+                           si: CStateInfo,
+                           selfMeta: ScriptMeta) extends ESEnvConvertable {
 
   override val esType: ESProduct = ESContext
 
@@ -36,7 +38,8 @@ class ContractContext(proof: Proof,
     val fields = Map(
       "proof" -> proof.asVal,
       "transaction" -> transaction.asVal,
-      "state" -> si.asVal
+      "state" -> si.asVal,
+      "self" -> selfMeta.asVal
     )
     ESObject(ESContext.ident, fields, esType)
   }

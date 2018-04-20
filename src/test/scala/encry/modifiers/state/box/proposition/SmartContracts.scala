@@ -3,12 +3,12 @@ package encry.modifiers.state.box.proposition
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.Keys
 import encry.modifiers.state.box.AssetBox
-import encrywm.common.{ESContract, SourceProcessor}
+import encrywm.common.{EncryContract, SourceProcessor}
 import scorex.crypto.encode.Base58
 
 trait SmartContracts extends Keys {
 
-  val DummyContract: ESContract = {
+  val DummyContract: EncryContract = {
     val source =
       """
         |unlock if true
@@ -18,7 +18,7 @@ trait SmartContracts extends Keys {
   }
 
   // Height lock
-  val HLContract: ESContract = {
+  val HLContract: EncryContract = {
     val source =
       """
         |let unlockStart = 1000
@@ -30,7 +30,7 @@ trait SmartContracts extends Keys {
   }
 
   // Account lock
-  val ALContract: ESContract = {
+  val ALContract: EncryContract = {
     val source =
       s"""
         |let ownerPubKey = base58"${Base58.encode(publicKey.pubKeyBytes)}"
@@ -40,7 +40,7 @@ trait SmartContracts extends Keys {
     SourceProcessor.source2Contract(source).get
   }
 
-  val ALContract2: ESContract = {
+  val ALContract2: EncryContract = {
     val source =
       s"""
          |let ownerPubKey = base58"${Base58.encode(publicKey.pubKeyBytes)}"

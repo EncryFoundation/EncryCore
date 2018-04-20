@@ -6,7 +6,7 @@ import encry.modifiers.state.box.proposition.ContractProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.{Algos, Constants}
 import encry.utils.Utils
-import encrywm.common.{ESContract, ScriptMeta}
+import encrywm.common.{EncryContract, ScriptMeta}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import scorex.core.serialization.Serializer
@@ -17,7 +17,7 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-case class ScriptedAssetDirective(script: ESContract,
+case class ScriptedAssetDirective(script: EncryContract,
                                   amount: Amount,
                                   override val idx: Int,
                                   tokenIdOpt: Option[ADKey] = None) extends Directive {
@@ -63,7 +63,7 @@ object ScriptedAssetDirective {
   } yield {
     ScriptedAssetDirective(
       Base58.decode(scriptStr).map(scriptDes =>
-        ESContract(
+        EncryContract(
           scriptDes,
           ScriptMeta(complexityScore, Base58.decode(scriptFingerprint).getOrElse(Array.emptyByteArray))
         )
@@ -92,7 +92,7 @@ object ScriptedAssetDirectiveSerializer extends Serializer[ScriptedAssetDirectiv
     val scriptLen = Shorts.fromByteArray(bytes.take(2))
     val complexity = Ints.fromByteArray(bytes.slice(scriptLen + 2, scriptLen + 2 + 4))
     val fingerprint = bytes.slice(scriptLen + 2 + 4, scriptLen + 2 + 4 + 8)
-    val contract = ESContract(bytes.slice(2, scriptLen), ScriptMeta(complexity, fingerprint))
+    val contract = EncryContract(bytes.slice(2, scriptLen), ScriptMeta(complexity, fingerprint))
     val amount = Longs.fromByteArray(bytes.slice(scriptLen + 2 + 4 + 8, scriptLen + 2 + 4 + 8 + 8))
     val idx = Ints.fromByteArray(bytes.slice(scriptLen + 2 + 4 + 8 + 8, scriptLen + 2 + 4 + 8 + 8 + 4))
     val tokenIdOpt = if ((bytes.length - (scriptLen + 2 + 4 + 8 + 8 + 4)) == Constants.ModifierIdSize) {
