@@ -21,12 +21,7 @@ object GetBalance extends Command {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
     Await.result((nodeViewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
-        Some(Response(
-          BalanceCalculator.balanceMapToString(
-            view.vault.tokenBalance.map(key => (Algos.encode(key._1), key._2)).toMap,
-            view.vault.encryBalance
-          )
-        ))
+        ???
       }).mapTo[Option[Response]], 5.second)
   }
 }

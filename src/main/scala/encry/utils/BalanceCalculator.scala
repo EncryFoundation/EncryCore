@@ -1,40 +1,29 @@
 package encry.utils
 
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
-import encry.settings.Algos
+import encry.modifiers.state.box.{AssetBox, CoinbaseBox, EncryBaseBox}
+import scorex.core.transaction.box.Box.Amount
+import scorex.crypto.authds.ADKey
 
 object BalanceCalculator {
 
-  /**
-    * Calculate all amount in newBxs
-    * @param newBxs
-    * @return Map[String, Long] - where String is Algos.encode(tokenId), Long - amount
-    *         Long - amount of encryCoin
-    */
-  def getBalances(newBxs: Seq[EncryBaseBox]): (Map[String, Long], Long) =
-    newBxs.foldLeft((Map[String, Long](), 0L)){
-    case ((balances, balance), bx) =>
-      bx match {
-        case aib: AssetBox =>
-          aib.tokenIdOpt match {
-            case Some(key) => balances.get(Algos.encode(key)) match {
-              case Some(v) =>
-                (balances.updated(Algos.encode(key), v + aib.amount), balance)
-              case None =>
-                (balances.updated(Algos.encode(key), aib.amount), balance)
-            }
-            case None =>
-              (balances, balance + aib.amount)
-          }
-        case _ => (balances, balance)
-      }
-  }
+  private val intrinsicId = ADKey @@ Array.fill(4)(-1: Byte)
 
-  def balanceMapToString(balancesMap: Map[String, Long], encryBalance: Long): String = {
-
-    def tokenInfoStr(tokenId: String, balance: Long): String = s"TokenId: $tokenId. Balance: $balance\n"
-
-    tokenInfoStr("Encry coin", encryBalance) ++
-      balancesMap.foldLeft(""){ case (str, tokenInfo) => str.concat(tokenInfoStr(tokenInfo._1, tokenInfo._2))}
-  }
+  def balanceSheet(bxs: Traversable[EncryBaseBox],
+                   excludeCoinbase: Boolean = true): Map[ADKey, Amount] =
+    bxs.foldLeft(Map.empty[ADKey, Amount]) {
+      case (cache, bx: CoinbaseBox) if !excludeCoinbase =>
+        cache.get(intrinsicId).map { amount =>
+          cache.updated(intrinsicId, amount + bx.amount)
+        }.getOrElse(cache.updated(intrinsicId, bx.amount))
+      case (cache, bx: AssetBox) if bx.isIntrinsic =>
+        cache.get(intrinsicId).map { amount =>
+          cache.updated(intrinsicId, amount + bx.amount)
+        }.getOrElse(cache.updated(intrinsicId, bx.amount))
+      case (cache, bx: AssetBox) =>
+        val tokenId = bx.tokenIdOpt.get
+        cache.get(tokenId).map { amount =>
+          cache.updated(tokenId, amount + bx.amount)
+        }.getOrElse(cache.updated(tokenId, bx.amount))
+      case (cache, _) => cache
+    }
 }

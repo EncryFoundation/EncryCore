@@ -90,7 +90,7 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
 
     import WalletStorage._
 
-    val bObj = BalanceCalculator.getBalances(newBxs)
+    val bObj = BalanceCalculator.balancesOf(newBxs)
 
     val decodedTokenBalance = bObj._1.foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()){
       case (seq, (tId, balance)) =>
