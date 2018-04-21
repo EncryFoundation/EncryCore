@@ -41,7 +41,7 @@ case class AssetBox(override val proposition: EncryProposition,
   override def convert: ESObject = {
     val fields = Map(
       "amount" -> ESValue("amount", ESLong)(amount),
-      "tokenIdOpt" -> ESValue("tokenIdOpt", ESOption(ESByteVector))(Some(tokenIdOpt.map(_.untag(ADKey)).get))
+      "tokenIdOpt" -> ESValue("tokenIdOpt", ESOption(ESByteVector))(Some(tokenIdOpt.map(_.untag(ADKey)).getOrElse(Array.emptyByteArray)))
     )
     ESObject(Types.AssetBox.ident, fields, esType)
   }

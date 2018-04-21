@@ -2,13 +2,14 @@ package encry.modifiers
 
 import encry.local.TestHelper
 import encry.modifiers.mempool._
-import encry.modifiers.state.box.proposition.{AccountProposition, OpenProposition, SmartContracts}
+import encry.modifiers.state.Keys
+import encry.modifiers.state.box.proposition.{AccountProposition, OpenProposition}
 import encry.modifiers.state.box.{AssetBox, AssetCreationBox}
 import encry.view.history.Height
 
 import scala.util.{Random => Scarand}
 
-trait InstanceFactory extends SmartContracts {
+trait InstanceFactory extends Keys {
 
   private val genHelper = TestHelper
   private val timestamp = System.currentTimeMillis()

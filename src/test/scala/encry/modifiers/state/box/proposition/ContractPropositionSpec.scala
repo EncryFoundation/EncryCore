@@ -2,13 +2,12 @@ package encry.modifiers.state.box.proposition
 
 import encry.modifiers.InstanceFactory
 import encry.modifiers.mempool.EncryTransaction
-import encry.modifiers.state.Keys
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.MultiSig
 import encry.view.history.Height
 import org.scalatest.{Matchers, PropSpec}
 
-class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts with StateContext with InstanceFactory with Keys{
+class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts with StateContext with InstanceFactory {
 
 
   property("Unlocking proposition with dummy contract") {

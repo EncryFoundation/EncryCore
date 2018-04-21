@@ -71,10 +71,10 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
       "accountPubKey" -> ESValue("accountPubKey", ESByteVector)(accountPubKey.pubKeyBytes),
       "signature" -> ESValue("signature", ESByteVector)(signature.signature),
       "messageToSign" -> ESValue("messageToSign", ESByteVector)(txHash),
-      "timestamp" -> ESValue("timestamp", ESLong)(timestamp),
-      "outputs" -> ESValue("outputs", ESList(Types.ESBox))(newBoxes.map(_.convert).toList)
+      "outputs" -> ESValue("outputs", ESList(Types.ESBox))(newBoxes.map(_.convert).toList),
+      "timestamp" -> ESValue("timestamp", ESLong)(timestamp)
     )
-    ESObject(ESTransaction.ident, fields, esType)
+    ESObject(Types.ESTransaction.ident, fields, esType)
   }
 }
 
