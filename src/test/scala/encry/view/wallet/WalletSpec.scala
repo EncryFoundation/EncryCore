@@ -7,6 +7,7 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.state.box.MonetaryBox
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.settings.{Constants, EncryAppSettings}
+import encry.utils.BalanceCalculator.encryCoinKey
 import encry.utils.{EncryGenerator, FileHelper}
 import encry.view.wallet.keys.KeyManager
 import io.iohk.iodb.LSMStore
@@ -50,7 +51,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     wallet.scanPersistent(block)
 
-    wallet.encryBalance shouldEqual correctBalance
+    wallet.walletStorage.getTokenBalanceById(encryCoinKey).getOrElse(0L) shouldEqual correctBalance
   }
 
   property("Balance count (intrinsic coins + tokens)"){
@@ -77,7 +78,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     wallet.scanPersistent(block)
 
-    wallet.tokenBalance.foldLeft(0L){_ + _._2} shouldEqual txsQty*Props.boxValue
+    wallet.getBalances.foldLeft(0L){_ + _._2} shouldEqual txsQty*Props.boxValue
 
   }
 }

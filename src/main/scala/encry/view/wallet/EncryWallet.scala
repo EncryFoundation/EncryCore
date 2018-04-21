@@ -9,7 +9,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.EncryBaseBox
 import encry.modifiers.state.box.proposition.{AccountProposition, EncryProposition, HeightProposition}
-import encry.settings.{Algos, Constants, EncryAppSettings}
+import encry.settings.{Constants, EncryAppSettings}
 import encry.utils.{BalanceCalculator, BoxFilter}
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
@@ -92,7 +92,12 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
 
     val bObj = BalanceCalculator.balanceSheet(bxs)
 
-    val decodedTokenBalance = bObj.foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()){
+    val prevBoxes = getBalances
+
+    val newBalanceSheet = bObj.map(tokenInfo =>
+      tokenInfo._1 -> (tokenInfo._2 + prevBoxes.find(ti => ti._1 == tokenInfo._1).getOrElse((ADKey @@ Random.randomBytes(), 0L))._2))
+
+    val decodedTokenBalance = newBalanceSheet.foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()){
       case (seq, (tId, balance)) =>
         seq :+ (ByteArrayWrapper(tId) -> ByteArrayWrapper(Longs.toByteArray(balance)))
     }

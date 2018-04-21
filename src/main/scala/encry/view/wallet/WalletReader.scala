@@ -31,10 +31,8 @@ trait WalletReader {
     walletStorage.transactionIds.foldLeft(Seq[EncryBaseTransaction]()) { case (acc, id) =>
       walletStorage.getTransactionById(id).map(tx => acc :+ tx).getOrElse(acc)
     }
-
-  def encryBalance: Long = walletStore.get(WalletStorage.encryBalanceKey).map(v => Longs.fromByteArray(v.data)).getOrElse(0L)
-
-  def tokenBalance: Seq[(ADKey, Long)] = walletStorage.getTokensId.foldLeft(Seq[(ADKey, Long)]()){
+  
+  def getBalances: Seq[(ADKey, Long)] = walletStorage.getTokensId.foldLeft(Seq[(ADKey, Long)]()){
     case (seq, tokenId) => walletStorage.getTokenBalanceById(tokenId) match {
       case Some(v) => seq :+ (tokenId, v)
       case None => seq
