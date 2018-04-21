@@ -64,7 +64,7 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
 
   override val esType: Types.ESProduct = ESTransaction
 
-  override def asVal: ESValue = ESValue("transaction", ESTransaction)(convert)
+  override def asVal: ESValue = ESValue(ESTransaction.ident.toLowerCase, ESTransaction)(convert)
 
   // TODO: Add converters for boxes.
   override def convert: ESObject = {

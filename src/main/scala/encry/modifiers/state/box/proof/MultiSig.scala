@@ -1,9 +1,9 @@
 package encry.modifiers.state.box.proof
 import com.google.common.primitives.Ints
 import encry.modifiers.state.box.proof.Proof.ProofTypeId
-import encry.settings.Algos
 import encrywm.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
+import encrywm.lib.Types.ESByteVector
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import scorex.core.serialization.Serializer
@@ -14,18 +14,23 @@ case class MultiSig(proofs: Seq[Proof]) extends Proof {
 
   override val typeId: ProofTypeId = MultiSig.TypeId
 
-  override val esType: Types.ESProduct = _
+  override val esType: Types.ESProduct = Types.MultiSig
 
-  override def asVal: ESValue = ???
+  override def asVal: ESValue = ESValue(Types.MultiSig.ident.toLowerCase, Types.MultiSig)(convert)
 
-  override def convert: ESObject = ???
+  override def convert: ESObject = {
+    val fields = proofs.indices.foldLeft(Seq[(String, ESValue)]()){
+      case (seq, i) => seq :+ (i.toString -> ESValue(i.toString, ESByteVector)(proofs(i).bytes))
+    }.toMap
+    ESObject(Types.MultiSig.ident, fields, esType)
+  }
 
   override type M = MultiSig
 
-  override def serializer: Serializer[MultiSig.this.type] = ???
+  override def serializer: Serializer[MultiSig] = MultiProofSerializer
 }
 
-object MultiSig{
+object MultiSig {
 
   val TypeId: ProofTypeId = 2.toByte
 

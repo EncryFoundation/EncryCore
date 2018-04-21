@@ -27,7 +27,7 @@ case class Signature25519(signature: Signature) extends Proof {
 
   override val esType: Types.ESProduct = Types.Signature25519
 
-  override def asVal: ESValue = ESValue("proof", ESProof)(convert)
+  override def asVal: ESValue = ESValue(Types.Signature25519.ident.toLowerCase, ESProof)(convert)
 
   override def convert: ESObject = {
     val fields = Map(
