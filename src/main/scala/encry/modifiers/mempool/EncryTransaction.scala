@@ -10,7 +10,7 @@ import encry.settings.{Algos, Constants}
 import encry.utils.Utils
 import encrywm.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
-import encrywm.lib.Types.{ESByteVector, ESLong, ESTransaction}
+import encrywm.lib.Types.{ESByteVector, ESList, ESLong, ESTransaction, AssetBox => ESAssetBox}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import scorex.core.serialization.Serializer
@@ -70,9 +70,9 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
     val fields = Map(
       "accountPubKey" -> ESValue("accountPubKey", ESByteVector)(accountPubKey.pubKeyBytes),
       "signature" -> ESValue("signature", ESByteVector)(signature.signature),
-     // "outputs" -> ESValue("outputs", ESList(ESBox))(newBoxes.filter(_.isAmountCarrying).map(_.asInstanceOf[AssetBox]))
       "messageToSign" -> ESValue("messageToSign", ESByteVector)(txHash),
-      "timestamp" -> ESValue("timestamp", ESLong)(timestamp)
+      "timestamp" -> ESValue("timestamp", ESLong)(timestamp),
+      "outputs" -> ESValue("outputs", ESList(Types.ESBox))(newBoxes.map(_.convert).toList)
     )
     ESObject(ESTransaction.ident, fields, esType)
   }
