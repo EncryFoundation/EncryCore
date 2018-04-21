@@ -102,7 +102,9 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
         seq :+ (ByteArrayWrapper(tId) -> ByteArrayWrapper(Longs.toByteArray(balance)))
     }
 
-    decodedTokenBalance ++ Seq(tokensIdsKey -> ByteArrayWrapper(bObj.keys.map(_.untag(ADKey)).reduce(_ ++ _)))
+    decodedTokenBalance ++ Seq(tokensIdsKey -> ByteArrayWrapper(bObj.keys.foldLeft(Array.empty[Byte]) { case (acc, k) =>
+        acc ++ k
+    }))
   }
 
   private def updateWallet(modifierId: ModifierId,

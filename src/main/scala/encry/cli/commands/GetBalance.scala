@@ -22,7 +22,7 @@ object GetBalance extends Command {
     Await.result((nodeViewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
         Option(Response(
-          view.vault.getBalances.foldLeft("")((str, tokenInfo) => str.concat(s"token: ${Algos.encode(tokenInfo._1)}. Balance: ${tokenInfo._2}"))
+          view.vault.getBalances.foldLeft("")((str, tokenInfo) => str.concat(s"TokenID(${Algos.encode(tokenInfo._1)}) : ${tokenInfo._2}\n"))
         ))
       }).mapTo[Option[Response]], 5.second)
   }

@@ -8,7 +8,7 @@ import encry.account.{Address, Portfolio}
 import encry.local.scanner.EncryScanner.{GetIndexReader, IndexReader}
 import encry.local.scanner.storage.EncryIndexReader
 import encry.settings.Algos
-import encry.utils.{BalanceCalculator, BoxFilter}
+import encry.utils.BalanceCalculator
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import encry.view.state.{StateMode, UtxoStateReader}
 import io.circe.Json
