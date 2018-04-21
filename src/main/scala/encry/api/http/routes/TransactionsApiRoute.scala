@@ -34,7 +34,7 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
     _.unconfirmed.values.slice(offset, offset + limit)
   }.map(_.map(_.asJson).asJson)
 
-  def defaultTransferTransactionR: Route = path("transfer") {
+  def defaultTransferTransactionR: Route = path("send") {
     post(entity(as[EncryTransaction]) {
       tx => complete {
         nodeViewActorRef ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)

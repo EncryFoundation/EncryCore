@@ -2,8 +2,9 @@ package encry.cli.commands
 import akka.actor.ActorRef
 import akka.pattern._
 import akka.util.Timeout
-import encry.cli.{Ast, Response}
-import encry.settings.EncryAppSettings
+import encry.cli.Response
+import encry.settings.{Algos, EncryAppSettings}
+import encry.utils.BalanceCalculator
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
@@ -20,7 +21,9 @@ object GetBalance extends Command {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
     Await.result((nodeViewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
-        Some(Response(view.vault.balance.toString))
+        Option(Response(
+          view.vault.getBalances.foldLeft("")((str, tokenInfo) => str.concat(s"TokenID(${Algos.encode(tokenInfo._1)}) : ${tokenInfo._2}\n"))
+        ))
       }).mapTo[Option[Response]], 5.second)
   }
 }

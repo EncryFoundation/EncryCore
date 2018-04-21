@@ -10,6 +10,7 @@ import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
+import encry.utils.BalanceCalculator.encryCoinKey
 import scorex.core.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedTransaction}
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 
@@ -44,7 +45,7 @@ class TransactionGenerator(viewHolder: ActorRef, settings: TestingSettings, time
             val fee = 15L
             val amount: Long = Random.nextInt(30) + 9
             val timestamp = timeProvider.time()
-            if (v.vault.balance > 1000) {
+            if (v.vault.walletStorage.getTokenBalanceById(encryCoinKey).getOrElse(0L) > 1000) {
               // Generate valid txs if vault's balance is enough.
               val boxes = v.vault.walletStorage.allBoxes.filter(_.isInstanceOf[AssetBox])
                 .map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) {

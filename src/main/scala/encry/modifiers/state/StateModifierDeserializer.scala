@@ -9,6 +9,8 @@ object StateModifierDeserializer {
   def parseBytes(bytes: Array[Byte], typeId: Byte): Try[EncryBaseBox] = typeId match {
     case CoinbaseBox.`typeId` => CoinbaseBoxSerializer.parseBytes(bytes)
     case AssetBox.TypeId => AssetBoxSerializer.parseBytes(bytes)
+    case AssetIssuingBox.TypeId => AssetIssuingBoxSerializer.parseBytes(bytes)
+    case AssetCreationBox.TypeId => AssetCreationBoxSerializer.parseBytes(bytes)
     case t => Failure(new Error(s"Got unknown typeId: $t"))
   }
 }

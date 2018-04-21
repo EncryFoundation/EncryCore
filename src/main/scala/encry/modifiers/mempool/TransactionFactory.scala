@@ -16,7 +16,8 @@ object TransactionFactory {
                                        timestamp: Long,
                                        useBoxes: IndexedSeq[MonetaryBox],
                                        recipient: Address,
-                                       amount: Amount): EncryTransaction = {
+                                       amount: Amount,
+                                       tokenIdOpt: Option[ADKey] = None): EncryTransaction = {
 
     val pubKey = privKey.publicImage
 
@@ -25,9 +26,9 @@ object TransactionFactory {
     val change = useBoxes.map(_.amount).sum - (amount + fee)
 
     val directives = if (change > 0) {
-      IndexedSeq(TransferDirective(recipient, amount, 0), TransferDirective(pubKey.address, change, 1))
+      IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt), TransferDirective(pubKey.address, change, 1, tokenIdOpt))
     } else {
-      IndexedSeq(TransferDirective(recipient, amount, 0))
+      IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt))
     }
 
     val signature = privKey.sign(EncryTransaction.getMessageToSign(pubKey, fee, timestamp, unlockers, directives))
@@ -42,14 +43,15 @@ object TransactionFactory {
                                 timestamp: Long,
                                 useBoxesIds: IndexedSeq[ADKey],
                                 recipient: Address,
-                                amount: Amount): EncryTransaction = {
+                                amount: Amount,
+                                tokenIdOpt: Option[ADKey] = None): EncryTransaction = {
 
     val unlockers = useBoxesIds.map(id => Unlocker(id, None)).toIndexedSeq
 
     val directives = if (change > 0) {
-      IndexedSeq(TransferDirective(recipient, amount, 0), TransferDirective(accPubKey.address, change, 1))
+      IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt), TransferDirective(accPubKey.address, change, 1, tokenIdOpt))
     } else {
-      IndexedSeq(TransferDirective(recipient, amount, 0))
+      IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt))
     }
 
     EncryTransaction(accPubKey, fee, timestamp, signature, unlockers, directives)
