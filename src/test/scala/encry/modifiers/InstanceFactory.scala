@@ -2,7 +2,7 @@ package encry.modifiers
 
 import encry.local.TestHelper
 import encry.modifiers.mempool._
-import encry.modifiers.state.box.AssetBox
+import encry.modifiers.state.box.{AssetBox, AssetCreationBox}
 import encry.modifiers.state.box.proposition.{AccountProposition, OpenProposition}
 import encry.view.history.Height
 
@@ -59,14 +59,22 @@ trait InstanceFactory {
     TransactionFactory.coinbaseTransactionScratch(secret, timestamp, useBoxes, Height @@ 0)
   }
 
-  lazy val assetBox: AssetBox =
+  lazy val AssetBoxI: AssetBox =
     AssetBox(
       AccountProposition(secret.publicImage.address),
       999L,
       100000L
     )
 
-  lazy val openAssetBox: AssetBox =
+  lazy val AssetCreationBoxI: AssetCreationBox =
+    AssetCreationBox(
+      AccountProposition(secret.publicImage.address),
+      999L,
+      10000L,
+      "SYM"
+    )
+
+  lazy val OpenAssetBoxI: AssetBox =
     AssetBox(
       OpenProposition,
       999L,

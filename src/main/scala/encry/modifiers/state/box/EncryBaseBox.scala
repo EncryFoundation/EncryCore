@@ -16,8 +16,6 @@ trait EncryBaseBox extends Box[EncryProposition] {
 
   override lazy val id: ADKey = ADKey @@ Algos.hash(Longs.toByteArray(nonce)).updated(0, typeId) // 32 bytes!
 
-  override def toString: String = s"<Box type=:$typeId id=:${Algos.encode(id)}>"
-
   def isCoinbase: Boolean = this.isInstanceOf[CoinbaseBox]
   def isAmountCarrying: Boolean = this.isInstanceOf[MonetaryBox]
   def isOpen: Boolean = this.proposition.isInstanceOf[OpenProposition.type]

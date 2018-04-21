@@ -62,5 +62,7 @@ object Constants {
     val MaxRollback: Long = 600.days.toMillis / DesiredBlockInterval.toMillis
 
     val MaxTimeDrift: Long = 10 * DesiredBlockInterval.toMillis
+
+    val TokenSymbolMaxLength: Int = 10
   }
 }

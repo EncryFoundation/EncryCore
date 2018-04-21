@@ -8,7 +8,7 @@ class AssetBoxSerializerTest extends FunSuite with InstanceFactory {
 
   test("toBytes & parseBytes") {
 
-    val bx = assetBox
+    val bx = AssetBoxI
 
     val bxSerialized = bx.bytes
 
@@ -21,7 +21,7 @@ class AssetBoxSerializerTest extends FunSuite with InstanceFactory {
 
   test("toBytes & parseBytes (OpenProposition)") {
 
-    val bx = openAssetBox
+    val bx = OpenAssetBoxI
 
     val bxSerialized = bx.bytes
 
