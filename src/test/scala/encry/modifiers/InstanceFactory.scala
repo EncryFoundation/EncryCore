@@ -3,12 +3,13 @@ package encry.modifiers
 import encry.local.TestHelper
 import encry.modifiers.mempool._
 import encry.modifiers.state.box.{AssetBox, AssetCreationBox}
-import encry.modifiers.state.box.proposition.{AccountProposition, OpenProposition}
+import encry.modifiers.state.box.proposition.{AccountProposition, OpenProposition, SmartContracts}
 import encry.view.history.Height
+import encrywm.common.{EncryContract, SourceProcessor}
 
 import scala.util.{Random => Scarand}
 
-trait InstanceFactory {
+trait InstanceFactory extends SmartContracts{
 
   private val genHelper = TestHelper
   private val secret = genHelper.getOrGenerateKeys(genHelper.Props.keysFilePath).head

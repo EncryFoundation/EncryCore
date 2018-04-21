@@ -2,10 +2,11 @@ package encry.modifiers.mempool
 
 import encry.account.Address
 import encry.crypto.{PrivateKey25519, PublicKey25519}
-import encry.modifiers.mempool.directive.{CoinbaseDirective, TransferDirective}
+import encry.modifiers.mempool.directive.{AssetIssuingDirective, CoinbaseDirective, TransferDirective}
 import encry.modifiers.state.box.MonetaryBox
-import encry.modifiers.state.box.proof.Signature25519
+import encry.modifiers.state.box.proof.{MultiSig, Proof, Signature25519}
 import encry.view.history.Height
+import encrywm.common.EncryContract
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.ADKey
 
@@ -31,7 +32,26 @@ object TransactionFactory {
       IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt))
     }
 
-    val signature = privKey.sign(EncryTransaction.getMessageToSign(pubKey, fee, timestamp, unlockers, directives))
+    val signature = privKey.sign(EncryTransaction.getMessageToSign(pubKey, fee, timestamp, directives))
+
+    EncryTransaction(pubKey, fee, timestamp, signature, unlockers, directives)
+  }
+
+  def defaultPaymentTransactionWithMultiSig(privKey: Seq[PrivateKey25519],
+                                            fee: Amount,
+                                            timestamp: Long,
+                                            useBoxes: IndexedSeq[MonetaryBox],
+                                            recipient: Address,
+                                            amount: Amount,
+                                            tokenIdOpt: Option[ADKey] = None): EncryTransaction = {
+
+    val pubKey = privKey.head.publicImage
+
+    val directives = IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt))
+
+    val unlockers = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
+
+    val signature = privKey.head.sign(EncryTransaction.getMessageToSign(pubKey, fee, timestamp, directives))
 
     EncryTransaction(pubKey, fee, timestamp, signature, unlockers, directives)
   }
@@ -74,7 +94,7 @@ object TransactionFactory {
     }
 
 
-    val signature = privKey.sign(EncryTransaction.getMessageToSign(pubKey, 0, timestamp, unlockers, directives))
+    val signature = privKey.sign(EncryTransaction.getMessageToSign(pubKey, 0, timestamp, directives))
 
     EncryTransaction(pubKey, 0, timestamp, signature, unlockers, directives)
   }

@@ -2,6 +2,7 @@ package encry.crypto
 
 import encry.account.Address
 import encry.crypto.encoding.Base58Check
+import encry.settings.Algos
 import scorex.core.serialization.{BytesSerializable, Serializer}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
@@ -28,6 +29,8 @@ case class PublicKey25519(pubKeyBytes: PublicKey) extends PublicKeyWrapper {
   }
 
   override def hashCode: Int = (BigInt(pubKeyBytes) % Int.MaxValue).toInt
+
+  override def toString: String = Algos.encode(pubKeyBytes)
 }
 
 object PublicKey25519Serializer extends Serializer[PublicKey25519] {

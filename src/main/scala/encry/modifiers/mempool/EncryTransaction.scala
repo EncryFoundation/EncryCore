@@ -10,7 +10,7 @@ import encry.settings.{Algos, Constants}
 import encry.utils.Utils
 import encrywm.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
-import encrywm.lib.Types.{ESByteVector, ESLong, ESTransaction}
+import encrywm.lib.Types.{ESByteVector, ESLong, ESTransaction, ESList, ESBox}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import scorex.core.serialization.Serializer
@@ -70,6 +70,7 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
     val fields = Map(
       "accountPubKey" -> ESValue("accountPubKey", ESByteVector)(accountPubKey.pubKeyBytes),
       "signature" -> ESValue("signature", ESByteVector)(signature.signature),
+     // "outputs" -> ESValue("outputs", ESList(ESBox))(newBoxes.filter(_.isAmountCarrying).map(_.asInstanceOf[AssetBox]))
       "messageToSign" -> ESValue("messageToSign", ESByteVector)(txHash),
       "timestamp" -> ESValue("timestamp", ESLong)(timestamp)
     )
@@ -114,11 +115,9 @@ object EncryTransaction {
   def getHash(accountPubKey: PublicKey25519,
               fee: Amount,
               timestamp: Long,
-              unlockers: IndexedSeq[Unlocker],
               directives: IndexedSeq[Directive]): Digest32 = Algos.hash(
     Bytes.concat(
       accountPubKey.pubKeyBytes,
-      unlockers.map(_.bytesWithoutProof).foldLeft(Array[Byte]())(_ ++ _),
       directives.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
       Longs.toByteArray(timestamp),
       Longs.toByteArray(fee)
@@ -128,9 +127,8 @@ object EncryTransaction {
   def getMessageToSign(accountPubKey: PublicKey25519,
                        fee: Amount,
                        timestamp: Long,
-                       unlockers: IndexedSeq[Unlocker],
                        directives: IndexedSeq[Directive]): Array[Byte] =
-    getHash(accountPubKey, fee, timestamp, unlockers, directives)
+    getHash(accountPubKey, fee, timestamp, directives)
 }
 
 object EncryTransactionSerializer extends Serializer[EncryTransaction] {
