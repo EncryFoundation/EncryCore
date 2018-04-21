@@ -1,5 +1,7 @@
 package encry.settings
 
+import java.nio.charset.Charset
+
 import scorex.crypto.authds.LeafData
 import scorex.crypto.authds.merkle.MerkleTree
 import scorex.crypto.encode.Base58
@@ -18,6 +20,8 @@ object Algos {
   val hash: HF = Blake2b256
 
   val encoder: Base58.type = Base58
+
+  val charset: Charset = Charset.defaultCharset()
 
   def merkleTreeRoot(elements: Seq[LeafData]): Digest32 =
     if (elements.isEmpty) emptyMerkleTreeRoot else MerkleTree(elements)(hash).rootHash

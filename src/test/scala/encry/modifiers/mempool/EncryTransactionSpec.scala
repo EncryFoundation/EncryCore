@@ -7,6 +7,8 @@ class EncryTransactionSpec extends PropSpec with Matchers with InstanceFactory {
 
   private val txValid = paymentTransactionValid
 
+  private val txWithSC = paymentTransactionValidWithSmartContractDirectives
+
   private val txInvalid = paymentTransactionInvalid
 
   property("semanticValidity of valid tx") {
@@ -18,4 +20,12 @@ class EncryTransactionSpec extends PropSpec with Matchers with InstanceFactory {
 
     txInvalid.semanticValidity.isSuccess shouldBe false
   }
+
+  property("semantciValidity of tx with diff propositions") {
+
+    println(EncryTransaction.jsonEncoder(txWithSC))
+
+    txWithSC.semanticValidity.isSuccess shouldBe true
+  }
+
 }
