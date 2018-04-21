@@ -2,18 +2,15 @@ package encry.modifiers
 
 import encry.local.TestHelper
 import encry.modifiers.mempool._
-import encry.modifiers.state.box.{AssetBox, AssetCreationBox}
 import encry.modifiers.state.box.proposition.{AccountProposition, OpenProposition, SmartContracts}
+import encry.modifiers.state.box.{AssetBox, AssetCreationBox}
 import encry.view.history.Height
-import encrywm.common.{EncryContract, SourceProcessor}
 
 import scala.util.{Random => Scarand}
 
-trait InstanceFactory extends SmartContracts{
+trait InstanceFactory extends SmartContracts {
 
   private val genHelper = TestHelper
-  private val secret = genHelper.getOrGenerateKeys(genHelper.Props.keysFilePath).head
-  private val publicKey = secret.publicImage
   private val timestamp = System.currentTimeMillis()
 
   lazy val fakeTransaction: EncryTransaction = {

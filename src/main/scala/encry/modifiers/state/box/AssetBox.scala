@@ -7,7 +7,7 @@ import encry.modifiers.state.box.proposition.{AccountProposition, EncryPropositi
 import encry.settings.{Algos, Constants}
 import encrywm.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
-import encrywm.lib.Types.{ESByteVector, ESByteVector, ESLong, ESOption}
+import encrywm.lib.Types.{ESByteVector, ESLong, ESOption}
 import encrywm.lib.predef.env.ESEnvConvertable
 import io.circe.Encoder
 import io.circe.syntax._
@@ -42,8 +42,7 @@ case class AssetBox(override val proposition: EncryProposition,
   override def convert: ESObject = {
     val fields = Map(
       "amount" -> ESValue("amount", ESLong)(amount),
-//      "tokenIdOpt" -> ESValue("tokenIdOpt", ESOption(ESByteVector))
-//      (tokenIdOpt.map(_.untag(ADKey)).get)
+      "tokenIdOpt" -> ESValue("tokenIdOpt", ESOption(ESByteVector))(Some(tokenIdOpt.map(_.untag(ADKey)).get))
     )
     ESObject(Types.Signature25519.ident, fields, esType)
   }

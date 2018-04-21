@@ -10,7 +10,7 @@ import encry.settings.{Algos, Constants}
 import encry.utils.Utils
 import encrywm.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
-import encrywm.lib.Types.{ESByteVector, ESLong, ESTransaction, ESList, ESBox}
+import encrywm.lib.Types.{ESByteVector, ESLong, ESTransaction}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import scorex.core.serialization.Serializer
@@ -40,7 +40,7 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
   override lazy val serializer: Serializer[M] = EncryTransactionSerializer
 
   override lazy val txHash: Digest32 =
-    EncryTransaction.getHash(accountPubKey, fee, timestamp, unlockers, directives)
+    EncryTransaction.getHash(accountPubKey, fee, timestamp, directives)
 
   override lazy val isCoinbase: Boolean = directives.head.isInstanceOf[CoinbaseDirective]
 
