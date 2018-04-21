@@ -16,6 +16,8 @@ case class Unlocker(boxId: ADKey, proofOpt: Option[Proof]) extends BytesSerializ
   override type M = Unlocker
 
   override def serializer: Serializer[M] = UnlockerSerializer
+
+  lazy val bytesWithoutProof: Array[Byte] = UnlockerSerializer.toBytesWithoutProof(this)
 }
 
 object Unlocker {
@@ -36,6 +38,8 @@ object Unlocker {
 }
 
 object UnlockerSerializer extends Serializer[Unlocker] {
+
+  def toBytesWithoutProof(obj: Unlocker): Array[Byte] = obj.boxId
 
   override def toBytes(obj: Unlocker): Array[Byte] =
     obj.boxId ++ obj.proofOpt.map(ProofSerializer.toBytes).getOrElse(Array.empty)

@@ -9,7 +9,7 @@ import encry.view.history.Height
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.ADKey
 
-object TransactionFactory{
+object TransactionFactory {
 
   def defaultPaymentTransactionScratch(privKey: PrivateKey25519,
                                        fee: Amount,

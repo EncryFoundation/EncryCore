@@ -119,7 +119,7 @@ object EncryTransaction {
               directives: IndexedSeq[Directive]): Digest32 = Algos.hash(
     Bytes.concat(
       accountPubKey.pubKeyBytes,
-      unlockers.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
+      unlockers.map(_.bytesWithoutProof).foldLeft(Array[Byte]())(_ ++ _),
       directives.map(_.bytes).reduceLeft(_ ++ _),
       Longs.toByteArray(timestamp),
       Longs.toByteArray(fee)
