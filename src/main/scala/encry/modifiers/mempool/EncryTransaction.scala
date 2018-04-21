@@ -66,7 +66,6 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
 
   override def asVal: ESValue = ESValue(ESTransaction.ident.toLowerCase, ESTransaction)(convert)
 
-  // TODO: Add converters for boxes.
   override def convert: ESObject = {
     val fields = Map(
       "accountPubKey" -> ESValue("accountPubKey", ESByteVector)(accountPubKey.pubKeyBytes),

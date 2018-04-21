@@ -19,8 +19,8 @@ case class MultiSig(proofs: Seq[Proof]) extends Proof {
   override def asVal: ESValue = ESValue(Types.MultiSig.ident.toLowerCase, Types.MultiSig)(convert)
 
   override def convert: ESObject = {
-    val fields = proofs.indices.foldLeft(Seq[(String, ESValue)]()){
-      case (seq, i) => seq :+ (i.toString -> ESValue(i.toString, ESByteVector)(proofs(i).bytes))
+    val fields = proofs.indices.foldLeft(Seq[(String, ESValue)]()) { case (seq, i) =>
+      seq :+ (i.toString -> ESValue(i.toString, ESByteVector)(proofs(i).bytes))
     }.toMap
     ESObject(Types.MultiSig.ident, fields, esType)
   }
