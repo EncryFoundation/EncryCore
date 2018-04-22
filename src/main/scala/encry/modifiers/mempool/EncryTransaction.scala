@@ -40,7 +40,7 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
   override lazy val serializer: Serializer[M] = EncryTransactionSerializer
 
   override lazy val txHash: Digest32 =
-    EncryTransaction.getHash(accountPubKey, fee, timestamp, directives)
+    EncryTransaction.getHash(accountPubKey, fee, timestamp, unlockers, directives)
 
   override lazy val isCoinbase: Boolean = directives.head.isInstanceOf[CoinbaseDirective]
 
@@ -115,9 +115,11 @@ object EncryTransaction {
   def getHash(accountPubKey: PublicKey25519,
               fee: Amount,
               timestamp: Long,
+              unlockers: IndexedSeq[Unlocker],
               directives: IndexedSeq[Directive]): Digest32 = Algos.hash(
     Bytes.concat(
       accountPubKey.pubKeyBytes,
+      unlockers.map(_.bytesWithoutProof).foldLeft(Array[Byte]())(_ ++ _),
       directives.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
       Longs.toByteArray(timestamp),
       Longs.toByteArray(fee)
@@ -127,8 +129,9 @@ object EncryTransaction {
   def getMessageToSign(accountPubKey: PublicKey25519,
                        fee: Amount,
                        timestamp: Long,
+                       unlockers: IndexedSeq[Unlocker],
                        directives: IndexedSeq[Directive]): Array[Byte] =
-    getHash(accountPubKey, fee, timestamp, directives)
+    getHash(accountPubKey, fee, timestamp, unlockers, directives)
 }
 
 object EncryTransactionSerializer extends Serializer[EncryTransaction] {

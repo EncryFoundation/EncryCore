@@ -32,7 +32,7 @@ object TransactionFactory {
       IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt))
     }
 
-    val signature = privKey.sign(EncryTransaction.getMessageToSign(pubKey, fee, timestamp, directives))
+    val signature = privKey.sign(EncryTransaction.getMessageToSign(pubKey, fee, timestamp, unlockers, directives))
 
     EncryTransaction(pubKey, fee, timestamp, signature, unlockers, directives)
   }
@@ -51,7 +51,7 @@ object TransactionFactory {
 
     val unlockers = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
 
-    val signature = privKey.head.sign(EncryTransaction.getMessageToSign(pubKey, fee, timestamp, directives))
+    val signature = privKey.head.sign(EncryTransaction.getMessageToSign(pubKey, fee, timestamp, unlockers, directives))
 
     EncryTransaction(pubKey, fee, timestamp, signature, unlockers, directives)
   }
@@ -94,7 +94,7 @@ object TransactionFactory {
     }
 
 
-    val signature = privKey.sign(EncryTransaction.getMessageToSign(pubKey, 0, timestamp, directives))
+    val signature = privKey.sign(EncryTransaction.getMessageToSign(pubKey, 0, timestamp, unlockers, directives))
 
     EncryTransaction(pubKey, 0, timestamp, signature, unlockers, directives)
   }
