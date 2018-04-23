@@ -44,7 +44,6 @@ object ScriptedAssetDirective {
 
   implicit val jsonEncoder: Encoder[ScriptedAssetDirective] = (d: ScriptedAssetDirective) => Map(
     "typeId" -> d.typeId.asJson,
-    "verboseType" -> "SCRIPT_LOCK".asJson,
     "script" -> Base58.encode(d.script.serializedScript).asJson,
     "complexityScore" -> d.script.meta.complexityScore.asJson,
     "scriptFingerprint" -> Base58.encode(d.script.meta.scriptFingerprint).asJson,

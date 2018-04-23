@@ -40,7 +40,6 @@ object CoinbaseDirective {
 
   implicit val jsonEncoder: Encoder[CoinbaseDirective] = (d: CoinbaseDirective) => Map(
     "typeId" -> d.typeId.asJson,
-    "verboseType" -> "COINBASE".asJson,
     "height" -> d.height.toString.asJson,
     "idx" -> d.idx.asJson
   ).asJson

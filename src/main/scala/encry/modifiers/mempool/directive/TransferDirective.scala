@@ -43,7 +43,6 @@ object TransferDirective {
 
   implicit val jsonEncoder: Encoder[TransferDirective] = (d: TransferDirective) => Map(
     "typeId" -> d.typeId.asJson,
-    "verboseType" -> "TRANSFER".asJson,
     "address" -> d.address.toString.asJson,
     "amount" -> d.amount.asJson,
     "tokenId" -> d.tokenIdOpt.map(id => Algos.encode(id)).getOrElse("null").asJson,
