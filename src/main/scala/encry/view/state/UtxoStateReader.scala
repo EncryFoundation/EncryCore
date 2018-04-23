@@ -2,17 +2,18 @@ package encry.view.state
 
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
+import encry.settings.Algos
 import encry.view.history.Height
 import io.iohk.iodb.Store
 import scorex.core.transaction.state.StateReader
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
 import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
-import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
+import scorex.crypto.hash.Digest32
 
 trait UtxoStateReader extends StateReader with ScorexLogging {
 
-  implicit val hf: Blake2b256Unsafe = new Blake2b256Unsafe
+  implicit val hf: Algos.HF = Algos.hash
 
   val stateStore: Store
 
@@ -22,8 +23,8 @@ trait UtxoStateReader extends StateReader with ScorexLogging {
 
   protected lazy val storage = new VersionedIODBAVLStorage(stateStore, np)
 
-  protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] = {
-    val bp = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = 32, valueLengthOpt = None)
+  protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Algos.HF] = {
+    val bp = new BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
     PersistentBatchAVLProver.create(bp, storage).get
   }
 

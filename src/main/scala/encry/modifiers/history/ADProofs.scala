@@ -11,7 +11,7 @@ import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.crypto.authds.avltree.batch.{BatchAVLVerifier, Insert, Modification, Remove}
 import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
+import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Success, Try}
 
@@ -40,7 +40,7 @@ case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
              previousHash: ADDigest,
              expectedHash: ADDigest): Try[Unit] = {
 
-    def applyChanges(verifier: BatchAVLVerifier[Digest32, Blake2b256Unsafe],
+    def applyChanges(verifier: BatchAVLVerifier[Digest32, Algos.HF],
                      changes: EncryBoxStateChanges): Try[Option[ADValue]] =
       changes.operations.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, o) =>
         t.flatMap(_ => {
@@ -48,7 +48,7 @@ case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
         })
       }
 
-    val verifier = new BatchAVLVerifier[Digest32, Blake2b256Unsafe](previousHash, proofBytes, ADProofs.KL,
+    val verifier = new BatchAVLVerifier[Digest32, Algos.HF](previousHash, proofBytes, ADProofs.KL,
       None, maxNumOperations = Some(changes.operations.size))
 
     applyChanges(verifier, changes).flatMap { _ =>

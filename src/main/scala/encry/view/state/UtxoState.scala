@@ -138,7 +138,7 @@ class UtxoState(override val version: VersionTag,
           val stateHeight = stateStore.get(ByteArrayWrapper(UtxoState.bestHeightKey))
             .map(d => Ints.fromByteArray(d.data)).getOrElse(Constants.Chain.GenesisHeight)
           new UtxoState(version, Height @@ stateHeight, stateStore, lastBlockTimestamp, nodeViewHolderRef) {
-            override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] = prover
+            override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Algos.HF] = prover
           }
         }
         stateStore.clean(Constants.DefaultKeepVersions)
@@ -226,7 +226,7 @@ object UtxoState extends ScorexLogging {
   }
 
   def fromBoxHolder(bh: BoxHolder, stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val p = new BatchAVLProver[Digest32, Blake2b256Unsafe](keyLength = EncryBox.BoxIdSize, valueLengthOpt = None)
+    val p = new BatchAVLProver[Digest32, Algos.HF](keyLength = EncryBox.BoxIdSize, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
     val stateStore = new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions)
@@ -234,7 +234,7 @@ object UtxoState extends ScorexLogging {
     log.info(s"Generating UTXO State with ${bh.boxes.size} boxes")
 
     new UtxoState(EncryState.genesisStateVersion, Constants.Chain.PreGenesisHeight, stateStore, 0L, nodeViewHolderRef) {
-      override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Blake2b256Unsafe] =
+      override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Algos.HF] =
         PersistentBatchAVLProver.create(
           p, storage, metadata(EncryState.genesisStateVersion, p.digest, Constants.Chain.PreGenesisHeight, 0L), paranoidChecks = true
         ).get.ensuring(_.digest sameElements storage.version.get)
