@@ -5,7 +5,6 @@ import encry.contracts.{CStateInfo, ContractContext}
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
 import encry.settings.Constants
-import encrywm.backend.env.ScopedRuntimeEnv
 import encrywm.backend.executor.Executor
 import encrywm.backend.executor.Executor.{Return, Unlocked}
 import encrywm.common.SourceProcessor.SerializedContract
