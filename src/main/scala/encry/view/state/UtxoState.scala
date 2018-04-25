@@ -21,7 +21,7 @@ import scorex.core.VersionTag
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
-import scorex.crypto.hash.{Blake2b256Unsafe, Digest32}
+import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Success, Try}
 
@@ -97,35 +97,14 @@ class UtxoState(override val version: VersionTag,
   }
 
   def proofsForTransactions(txs: Seq[EncryBaseTransaction]): Try[(SerializedAdProof, ADDigest)] = {
+    log.debug(s"Generating proof for ${txs.length} transactions ...")
     val rootHash = persistentProver.digest
-    def rollback(): Try[Unit] = Try(
-      persistentProver.rollback(rootHash).ensuring(_.isSuccess && persistentProver.digest.sameElements(rootHash))
-    ).flatten
-
-    Try {
-      assert(txs.nonEmpty, "Got empty transaction sequence.")
-
-      if (!(persistentProver.digest.sameElements(rootHash) &&
-        storage.version.get.sameElements(rootHash) &&
-        stateStore.lastVersionID.get.data.sameElements(rootHash))) Failure(new Error("Bad state version."))
-
-      val mods = getAllStateChanges(txs).operations.map(ADProofs.toModification)
-
-      // TODO: Refactoring.
-      mods.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
-        t.flatMap(_ => {
-          val opRes = persistentProver.performOneOperation(m)
-          if (opRes.isFailure) log.warn(s"modification: $m, failure $opRes")
-          opRes
-        })
-      }.get
-      val proof = persistentProver.generateProofAndUpdateStorage()
-      val digest = persistentProver.digest
-
-      proof -> digest
-    } match {
-      case Success(result) => rollback().map(_ => result)
-      case Failure(e) => rollback().flatMap(_ => Failure(e))
+    if (txs.isEmpty) {
+      Failure(new Error("Got empty transaction sequence"))
+    } else if (!storage.version.exists(_.sameElements(rootHash))) {
+      Failure(new Error(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}"))
+    } else {
+      persistentProver.avlProver.generateProofForOperations(getAllStateChanges(txs).operations.map(ADProofs.toModification))
     }
   }
 
