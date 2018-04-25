@@ -14,12 +14,13 @@ import encry.view.mempool.EncryMempool
 import encry.view.state.{DigestState, EncryState, StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
 import scorex.core._
+import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{FailedTransaction, SuccessfulTransaction}
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.Transaction
 import scorex.core.utils.NetworkTimeProvider
 import scorex.crypto.authds.ADDigest
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings,
                                                                        timeProvider: NetworkTimeProvider)
@@ -48,8 +49,21 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
 
   override def postStop(): Unit = {
     log.warn("Stopping EncryNodeViewHolder")
-    history().closeStorage
-    minimalState().closeStorage
+    history().closeStorage()
+    minimalState().closeStorage()
+  }
+
+  override protected def txModify(tx: EncryBaseTransaction): Unit = {
+    memoryPool().put(tx) match {
+      case Success(newPool) =>
+        log.debug(s"Unconfirmed transaction $tx added to the memory pool")
+        val newVault = vault().scanOffchain(tx)
+        updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
+        context.system.eventStream.publish(SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx))
+
+      case Failure(e) =>
+        context.system.eventStream.publish(FailedTransaction[EncryProposition, EncryBaseTransaction](tx, e))
+    }
   }
 
   /**
