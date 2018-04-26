@@ -35,10 +35,10 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
   override type MP = EncryMempool
 
   override lazy val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
-    EncryBlockHeader.modifierTypeId     -> EncryBlockHeaderSerializer,
-    EncryBlockPayload.modifierTypeId    -> EncryBlockPayloadSerializer,
-    ADProofs.modifierTypeId             -> ADProofSerializer,
-    Transaction.ModifierTypeId          -> EncryTransactionSerializer
+    EncryBlockHeader.modifierTypeId  -> EncryBlockHeaderSerializer,
+    EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,
+    ADProofs.modifierTypeId          -> ADProofSerializer,
+    Transaction.ModifierTypeId       -> EncryTransactionSerializer
   )
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
