@@ -16,7 +16,8 @@ case class NodeSettings(stateMode: StateMode,
                         keepVersions: Int,
                         utxMaxAge: FiniteDuration,
                         mempoolCleanupInterval: FiniteDuration,
-                        mempoolMaxCapacity: Int)
+                        mempoolMaxCapacity: Int,
+                        useCli: Boolean)
 
 trait NodeSettingsReader {
 
@@ -32,7 +33,8 @@ trait NodeSettingsReader {
                  cfg.as[Int](s"$path.keepVersions"),
                  cfg.as[FiniteDuration](s"$path.utxMaxAge"),
                  cfg.as[FiniteDuration](s"$path.mempoolCleanupInterval"),
-                 cfg.as[Int](s"$path.mempoolMaxCapacity"))
+                 cfg.as[Int](s"$path.mempoolMaxCapacity"),
+                 cfg.as[Boolean](s"$path.useCli"))
   }
 
   def stateModeFromString(modeName: String, path: String): StateMode = {
