@@ -47,7 +47,7 @@ class EncryApp(args: Seq[String]) extends Application {
 
   val readersHolderRef: ActorRef = EncryReadersHolderRef(nodeViewHolderRef)
 
-  val minerRef: ActorRef = EncryMinerRef(encrySettings, nodeViewHolderRef, nodeId, timeProvider)
+  val minerRef: ActorRef = EncryMinerRef(encrySettings, nodeViewHolderRef, readersHolderRef, nodeId, timeProvider)
 
   val scannerRef: ActorRef = EncryScannerRef(encrySettings, nodeViewHolderRef)
 
