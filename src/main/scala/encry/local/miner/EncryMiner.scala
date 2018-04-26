@@ -53,7 +53,7 @@ class EncryMiner(settings: EncryAppSettings,
   }
 
   private def miningStatus: Receive = {
-    case MinerStatus =>
+    case GetMinerStatus =>
       sender ! MinerStatus(isMining, candidateOpt)
   }
 
