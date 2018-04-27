@@ -254,4 +254,3 @@ object EncryMinerRef {
            (implicit context: ActorRefFactory): ActorRef =
     context.actorOf(props(settings, viewHolderRef, readersHolderRef, nodeId, timeProvider), name)
 }
-

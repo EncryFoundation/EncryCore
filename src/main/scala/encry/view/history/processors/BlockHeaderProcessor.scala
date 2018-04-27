@@ -29,8 +29,6 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
   private val consensusAlgo = PowConsensus
 
-  protected val charsetName: String = "UTF-8"
-
   protected val BestHeaderKey: ByteArrayWrapper =
     ByteArrayWrapper(Array.fill(DigestLength)(EncryBlockHeader.modifierTypeId))
 
@@ -47,13 +45,13 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   private def heightIdsKey(height: Int): ByteArrayWrapper = ByteArrayWrapper(Algos.hash(Ints.toByteArray(height)))
 
   protected def headerScoreKey(id: ModifierId): ByteArrayWrapper =
-    ByteArrayWrapper(Algos.hash("score".getBytes(charsetName) ++ id))
+    ByteArrayWrapper(Algos.hash("score".getBytes(Algos.charset) ++ id))
 
   protected def headerHeightKey(id: ModifierId): ByteArrayWrapper =
-    ByteArrayWrapper(Algos.hash("height".getBytes(charsetName) ++ id))
+    ByteArrayWrapper(Algos.hash("height".getBytes(Algos.charset) ++ id))
 
   protected def validityKey(id: Array[Byte]): ByteArrayWrapper =
-    ByteArrayWrapper(Algos.hash("validity".getBytes(charsetName) ++ id))
+    ByteArrayWrapper(Algos.hash("validity".getBytes(Algos.charset) ++ id))
 
   // Defined if `scorex.core.consensus.HistoryReader`.
   def contains(id: ModifierId): Boolean
