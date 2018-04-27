@@ -54,9 +54,9 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
 
   private def applyFirstBlock(fullBlock: EncryBlock,
                                   newModRow: EncryPersistentModifier,
-                                  newBestAfterThis: EncryBlockHeader): ProgressInfo[EncryPersistentModifier] = {
+                                  newBestHeader: EncryBlockHeader): ProgressInfo[EncryPersistentModifier] = {
     logStatus(Seq(), Seq(fullBlock), fullBlock, None)
-    updateStorage(newModRow, newBestAfterThis.id)
+    updateStorage(newModRow, newBestHeader.id)
     ProgressInfo(None, Seq.empty, Some(fullBlock), Seq.empty)
   }
 
@@ -77,7 +77,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
   private def applyBetterChain(fullBlock: EncryBlock,
                                newModRow: EncryPersistentModifier,
                                prevBest: EncryBlock,
-                               newBestAfterThis: EncryBlockHeader): ProgressInfo[EncryPersistentModifier] = {
+                               newBestHeader: EncryBlockHeader): ProgressInfo[EncryPersistentModifier] = {
     val (prevChain, newChain) = commonBlockThenSuffixes(prevBest.header, fullBlock.header)
     val toRemove: Seq[EncryBlock] = prevChain.tail.headers.flatMap(getBlock)
     val toApply: Seq[EncryBlock] = newChain.tail.headers
@@ -91,11 +91,11 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
       logStatus(toRemove, toApply, fullBlock, Some(prevBest))
       val branchPoint = toRemove.headOption.map(_ => prevChain.head.id)
 
-      updateStorage(newModRow, newBestAfterThis.id)
+      updateStorage(newModRow, newBestHeader.id)
 
       if (nodeSettings.blocksToKeep >= 0) {
         val lastKept = blockDownloadProcessor.updateBestBlock(fullBlock.header)
-        val bestHeight: Int = newBestAfterThis.height
+        val bestHeight: Int = newBestHeader.height
         val diff = bestHeight - prevBest.header.height
         clipBlockDataAt(((lastKept - diff) until lastKept).filter(_ >= 0))
       }
