@@ -12,7 +12,6 @@ import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockP
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
 import encry.view.history.storage.{FileHistoryObjectsStore, HistoryStorage}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
-import scorex.core.ModifierId
 import scorex.core.consensus.History
 import scorex.core.consensus.History.ProgressInfo
 import scorex.core.utils.NetworkTimeProvider
@@ -49,6 +48,21 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
     }
   }
 
+  override def reportModifierIsValid(modifier: EncryPersistentModifier): EncryHistory = {
+    log.debug(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as valid ")
+    markModifierValid(modifier)
+    this
+  }
+
+  /**
+    * Report some modifier as valid or invalid semantically
+    */
+  override def reportModifierIsInvalid(modifier: EncryPersistentModifier,
+                                       progressInfo: ProgressInfo[EncryPersistentModifier]): (EncryHistory, ProgressInfo[EncryPersistentModifier]) = {
+    log.debug(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
+    this -> markModifierInvalid(modifier)
+  }
+
   /**
     * @param modifier
     * @return header, that corresponds to modifier
@@ -80,7 +94,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
           case (false, false) =>
             // Modifiers from best header and best full chain are not involved, no rollback and links change required.
             historyStorage.insert(validityKey(modifier.id), validityRow)
-            ProgressInfo[EncryPersistentModifier](None, Seq.empty, None, Seq.empty)
+            ProgressInfo[EncryPersistentModifier](None, Seq.empty, Seq.empty, Seq.empty)
           case _ =>
             // Modifiers from best header and best full chain are involved, links change required.
             val newBestHeader = loopHeightDown(bestHeaderHeight, id => !invalidatedHeaders.exists(_.id sameElements id))
@@ -91,7 +105,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
               // Only headers chain involved.
               historyStorage.insert(validityKey(modifier.id),
                 Seq(BestHeaderKey -> ByteArrayWrapper(newBestHeader.id)))
-              ProgressInfo[EncryPersistentModifier](None, Seq.empty, None, Seq.empty)
+              ProgressInfo[EncryPersistentModifier](None, Seq.empty, Seq.empty, Seq.empty)
             } else {
               val invalidatedChain: Seq[EncryBlock] = bestBlockOpt.toSeq
                 .flatMap(f => headerChainBack(bestBlockHeight + 1, f.header, h => !invalidatedHeaders.contains(h)).headers)
@@ -110,15 +124,14 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
                 BestHeaderKey -> ByteArrayWrapper(newBestHeader.id))
               val toInsert = validityRow ++ changedLinks
               historyStorage.insert(validityKey(modifier.id), toInsert)
-              ProgressInfo[EncryPersistentModifier](Some(branchPoint.id), invalidatedChain.tail,
-                validChain.tail.headOption, Seq.empty)
+              ProgressInfo[EncryPersistentModifier](Some(branchPoint.id), invalidatedChain.tail, validChain.tail, Seq.empty)
             }
         }
       case None =>
         // No headers become invalid. Just mark this particular modifier as invalid.
         historyStorage.insert(validityKey(modifier.id),
           Seq(validityKey(modifier.id) -> ByteArrayWrapper(Array(0.toByte))))
-        ProgressInfo[EncryPersistentModifier](None, Seq.empty, None, Seq.empty)
+        ProgressInfo[EncryPersistentModifier](None, Seq.empty, Seq.empty, Seq.empty)
     }
 
   /**
@@ -139,7 +152,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
         }
         if (bestBlockOpt.contains(block)) {
           // Applies best header to the history
-          ProgressInfo[EncryPersistentModifier](None, Seq.empty, None, Seq.empty)
+          ProgressInfo[EncryPersistentModifier](None, Seq.empty, Seq.empty, Seq.empty)
         } else {
           // Marks non-best full block as valid. Should have more blocks to apply to sync state and history.
           val bestFullHeader = bestBlockOpt.get.header
@@ -151,21 +164,12 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
             .ensuring(_.isDefined, s"Should be able to get full block for header ${chainBack.headOption}")
             .ensuring(_.get.header.parentId sameElements block.header.id,
               s"Block to appy should link to current block. Failed for ${chainBack.headOption} and ${block.header}")
-          ProgressInfo[EncryPersistentModifier](None, Seq.empty, toApply, Seq.empty)
+          ProgressInfo[EncryPersistentModifier](None, Seq.empty, toApply.toSeq, Seq.empty) // TODO: reverse `toApply`?
         }
       case _ =>
         historyStorage.insert(validityKey(modifier.id),
           Seq(validityKey(modifier.id) -> ByteArrayWrapper(Array(1.toByte))))
-        ProgressInfo[EncryPersistentModifier](None, Seq.empty, None, Seq.empty)
-    }
-
-  override def reportSemanticValidity(modifier: EncryPersistentModifier,
-                                      valid: Boolean,
-                                      unusedParam: ModifierId): (EncryHistory, ProgressInfo[EncryPersistentModifier]) =
-    if (valid) {
-      this -> markModifierValid(modifier)
-    } else {
-      this -> markModifierInvalid(modifier)
+        ProgressInfo[EncryPersistentModifier](None, Seq.empty, Seq.empty, Seq.empty)
     }
 
   def closeStorage(): Unit = historyStorage.close()

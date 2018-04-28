@@ -22,7 +22,7 @@ trait FullProofProcessor extends BaseADProofProcessor with BlockProcessor {
             processBlock(EncryBlock(header, payload, Some(m)), payloadIsNew = false)
           case _ =>
             historyStorage.insertObjects(Seq(m))
-            ProgressInfo(None, Seq.empty, None, Seq.empty)
+            ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
         }
       case _ =>
         throw new Error(s"Header for modifier $m is no defined")

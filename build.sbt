@@ -12,8 +12,6 @@ resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repos
   "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/",
   "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/")
 
-val scorexVersion = "ebdf660f-SNAPSHOT"
-
 val circeVersion = "0.9.1"
 
 val networkDependencies = Seq(
@@ -31,6 +29,7 @@ val apiDependencies = Seq(
 )
 
 val loggingDependencies = Seq(
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.+",
   "ch.qos.logback" % "logback-classic" % "1.+",
   "ch.qos.logback" % "logback-core" % "1.+"
 )
@@ -41,7 +40,6 @@ val testingDependencies = Seq(
   "org.scalactic" %% "scalactic" % "3.0.3" % "test",
   "org.scalatest" %% "scalatest" % "3.0.3" % "test",
   "org.scalacheck" %% "scalacheck" % "1.13.+" % "test",
-  "org.scorexfoundation" %% "scorex-testkit" % scorexVersion % "test",
   "net.databinder.dispatch" %% "dispatch-core" % "+" % "test"
 )
 
@@ -53,7 +51,6 @@ libraryDependencies ++= Seq(
   "org.bouncycastle" % "bcprov-jdk15on" % "1.58",
   "org.whispersystems" % "curve25519-java" % "+",
   "org.rudogma" %% "supertagged" % "1.+",
-  "org.scorexfoundation" %% "scorex-core" % scorexVersion,
   "org.scorexfoundation" %% "avl-iodb" % "0.2.13",
   "com.storm-enroute" %% "scalameter" % "0.8.+",
   "io.spray" %%  "spray-json" % "1.3.3",

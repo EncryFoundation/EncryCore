@@ -12,5 +12,5 @@ trait EmptyBlockPayloadProcessor extends BaseBlockPayloadProcessor {
     Failure(new Error("Regime that do not process BlockTransactions"))
 
   override protected def process(m: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] =
-    ProgressInfo(None, Seq(), None, Seq())
+    ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
 }

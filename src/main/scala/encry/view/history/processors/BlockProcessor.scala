@@ -12,6 +12,8 @@ import scala.util.{Failure, Success, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
 
+  import BlockProcessor._
+
   /**
     * Id of header that contains transactions and proofs
     */
@@ -31,84 +33,76 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
     */
   protected def processBlock(fullBlock: EncryBlock, payloadIsNew: Boolean): ProgressInfo[EncryPersistentModifier] = {
     val newModRow = calculateNewModRow(fullBlock, payloadIsNew)
-    val bestFullChain = getBestFullChain(fullBlock.header)
+    val bestFullChain = calculateBestFullChain(fullBlock.header)
     val newBestAfterThis = bestFullChain.last
-    processIfValidFirstBlock(fullBlock, newModRow, newBestAfterThis).
-      orElse(processIfBetterChain(fullBlock, newModRow, newBestAfterThis)).
-      getOrElse(nonBestBlock(fullBlock, newModRow))
+    processing(ToProcess(fullBlock, newModRow, newBestAfterThis, nodeSettings.blocksToKeep))
   }
+
+  private def processing: BlockProcessing =
+    processValidFirstBlock orElse
+      processBetterChain orElse
+      nonBestBlock
 
   protected def isValidFirstBlock(header: EncryBlockHeader): Boolean = {
     header.height == blockDownloadProcessor.minimalBlockHeight && bestBlockIdOpt.isEmpty
   }
 
-  private def processIfValidFirstBlock(fullBlock: EncryBlock,
-                                       newModRow: EncryPersistentModifier,
-                                       newBestHeader: EncryBlockHeader): Option[ProgressInfo[EncryPersistentModifier]] = {
-    if (isValidFirstBlock(fullBlock.header)) {
-      Some(applyFirstBlock(fullBlock, newModRow, newBestHeader))
-    } else {
-      None
-    }
+  private def processValidFirstBlock: BlockProcessing = {
+    case ToProcess(fullBlock, newModRow, newBestAfterThis, _)
+      if isValidFirstBlock(fullBlock.header) =>
+
+      logStatus(Seq(), Seq(fullBlock), fullBlock, None)
+      updateStorage(newModRow, newBestAfterThis.id)
+      ProgressInfo(None, Seq.empty, Seq(fullBlock), Seq.empty)
+
   }
 
-  private def applyFirstBlock(fullBlock: EncryBlock,
-                                  newModRow: EncryPersistentModifier,
-                                  newBestHeader: EncryBlockHeader): ProgressInfo[EncryPersistentModifier] = {
-    logStatus(Seq(), Seq(fullBlock), fullBlock, None)
-    updateStorage(newModRow, newBestHeader.id)
-    ProgressInfo(None, Seq.empty, Some(fullBlock), Seq.empty)
+  private def processBetterChain: BlockProcessing = {
+    case toProcess @ ToProcess(fullBlock, newModRow, newBestAfterThis, blocksToKeep)
+      if bestBlockOpt.nonEmpty && isBetterChain(newBestAfterThis.id) =>
+
+      val prevBest = bestBlockOpt.get
+      val (prevChain, newChain) = commonBlockThenSuffixes(prevBest.header, fullBlock.header)
+      val toRemove: Seq[EncryBlock] = prevChain.tail.headers.flatMap(getBlock)
+      val toApply: Seq[EncryBlock] = newChain.tail.headers
+        .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
+
+      if (toApply.lengthCompare(newChain.length - 1) != 0) {
+        //block have higher score but is not linkable to full chain
+        nonBestBlock(toProcess)
+      } else {
+        //application of this block leads to full chain with higher score
+        logStatus(toRemove, toApply, fullBlock, Some(prevBest))
+        val branchPoint = toRemove.headOption.map(_ => prevChain.head.id)
+
+        updateStorage(newModRow, newBestAfterThis.id)
+
+        if (blocksToKeep >= 0) {
+          val lastKept = blockDownloadProcessor.updateBestBlock(fullBlock.header)
+          val bestHeight: Int = newBestAfterThis.height
+          val diff = bestHeight - prevBest.header.height
+          clipBlockDataAt(((lastKept - diff) until lastKept).filter(_ >= 0))
+        }
+        ProgressInfo(branchPoint, toRemove, toApply, Seq.empty)
+      }
   }
 
-  private def processIfBetterChain(fullBlock: EncryBlock,
-                                   newModRow: EncryPersistentModifier,
-                                   newBestAfterThis: EncryBlockHeader): Option[ProgressInfo[EncryPersistentModifier]] = {
-    for {
-      prevBestFullBlock <- bestBlockOpt
+  private def isBetterChain(id: ModifierId): Boolean = {
+    val isBetter = for {
       bestFullBlockId <- bestBlockIdOpt
       prevBestScore <- scoreOf(bestFullBlockId)
-      score <- scoreOf(newBestAfterThis.id)
-      if score > prevBestScore
+      score <- scoreOf(id)
       //TODO currentScore == prevBestScore
-    } yield applyBetterChain(fullBlock, newModRow, prevBestFullBlock, newBestAfterThis)
+    } yield score > prevBestScore
+
+    isBetter getOrElse false
   }
 
-
-  private def applyBetterChain(fullBlock: EncryBlock,
-                               newModRow: EncryPersistentModifier,
-                               prevBest: EncryBlock,
-                               newBestHeader: EncryBlockHeader): ProgressInfo[EncryPersistentModifier] = {
-    val (prevChain, newChain) = commonBlockThenSuffixes(prevBest.header, fullBlock.header)
-    val toRemove: Seq[EncryBlock] = prevChain.tail.headers.flatMap(getBlock)
-    val toApply: Seq[EncryBlock] = newChain.tail.headers
-      .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
-
-    if (toApply.lengthCompare(newChain.length - 1) != 0) {
-      //block have higher score but is not linkable to full chain
-      nonBestBlock(fullBlock, newModRow)
-    } else {
-      //application of this block leads to full chain with higher score
-      logStatus(toRemove, toApply, fullBlock, Some(prevBest))
-      val branchPoint = toRemove.headOption.map(_ => prevChain.head.id)
-
-      updateStorage(newModRow, newBestHeader.id)
-
-      if (nodeSettings.blocksToKeep >= 0) {
-        val lastKept = blockDownloadProcessor.updateBestBlock(fullBlock.header)
-        val bestHeight: Int = newBestHeader.height
-        val diff = bestHeight - prevBest.header.height
-        clipBlockDataAt(((lastKept - diff) until lastKept).filter(_ >= 0))
-      }
-      ProgressInfo(branchPoint, toRemove, toApply.headOption, Seq.empty)
-    }
-  }
-
-  private def nonBestBlock(fullBlock: EncryBlock,
-                           newModRow: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
+  private def nonBestBlock: BlockProcessing = { case params =>
     //Orphaned block or full chain is not initialized yet
-    logStatus(Seq(), Seq(), fullBlock, None)
-    historyStorage.bulkInsert(storageVersion(newModRow), Seq.empty, Seq(newModRow))
-    ProgressInfo(None, Seq.empty, None, Seq.empty)
+    logStatus(Seq(), Seq(), params.fullBlock, None)
+    historyStorage.bulkInsert(storageVersion(params.newModRow), Seq.empty, Seq(params.newModRow))
+    ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
 
   private def calculateNewModRow(fullBlock: EncryBlock, txsAreNew: Boolean): EncryPersistentModifier = {
@@ -120,10 +114,10 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
     }
   }
 
-  private def getBestFullChain(header: EncryBlockHeader) = {
+  private def calculateBestFullChain(header: EncryBlockHeader) = {
     val continuations = continuationHeaderChains(header, h => getBlock(h).nonEmpty).map(_.tail)
     val chains = continuations.map(hc => hc.map(getBlock).takeWhile(_.isDefined).flatten.map(_.header))
-    chains.map(c => header +: c).maxBy(c => scoreOf(c.last.id).get) // TODO: .get
+    chains.map(c => header +: c).maxBy(c => scoreOf(c.last.id).get)
   }
 
   // Unused
@@ -184,4 +178,14 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
     log.info(s"Full block ${appliedBlock.encodedId} appended, " +
       s"going to apply ${toApply.length}$toRemoveStr modifiers.$newStatusStr")
   }
+}
+
+object BlockProcessor {
+
+  type BlockProcessing = PartialFunction[ToProcess, ProgressInfo[EncryPersistentModifier]]
+
+  case class ToProcess(fullBlock: EncryBlock,
+                       newModRow: EncryPersistentModifier,
+                       newBestAfterThis: EncryBlockHeader,
+                       blocksToKeep: Int)
 }

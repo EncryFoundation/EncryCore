@@ -54,6 +54,6 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
 
   private def putToHistory(payload: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] = {
     historyStorage.insertObjects(Seq(payload))
-    ProgressInfo(None, Seq.empty, None, Seq.empty)
+    ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
 }
