@@ -7,6 +7,7 @@ import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
 import scorex.core.consensus.History.ProgressInfo
 import scorex.core.utils.ScorexLogging
+import scorex.crypto.encode.Base58
 
 import scala.util.{Failure, Success, Try}
 
@@ -54,9 +55,9 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
       logStatus(Seq(), Seq(fullBlock), fullBlock, None)
       updateStorage(newModRow, newBestAfterThis.id)
       ProgressInfo(None, Seq.empty, Seq(fullBlock), Seq.empty)
-
   }
 
+  // FIXME: The problem seems to be here.
   private def processBetterChain: BlockProcessing = {
     case toProcess @ ToProcess(fullBlock, newModRow, newBestAfterThis, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestAfterThis.id) =>
@@ -116,7 +117,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
 
   private def calculateBestFullChain(header: EncryBlockHeader) = {
     val continuations = continuationHeaderChains(header, h => getBlock(h).nonEmpty).map(_.tail)
-    val chains = continuations.map(hc => hc.map(getBlock).takeWhile(_.isDefined).flatten.map(_.header))
+    val chains = continuations.map(hc => hc.map(getBlock).takeWhile(_.nonEmpty).flatten.map(_.header))
     chains.map(c => header +: c).maxBy(c => scoreOf(c.last.id).get)
   }
 
@@ -137,6 +138,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
 
   private def updateStorage(newModRow: EncryPersistentModifier,
                             bestFullHeaderId: ModifierId): Unit = {
+    println("Best full header: " + Base58.encode(bestFullHeaderId))
     val indicesToInsert = Seq(BestBlockKey -> ByteArrayWrapper(bestFullHeaderId))
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
       .ensuring(bestHeaderHeight >= bestBlockHeight, s"Headers height $bestHeaderHeight should be >= " +

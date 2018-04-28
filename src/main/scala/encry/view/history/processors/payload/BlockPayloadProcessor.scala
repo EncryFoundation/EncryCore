@@ -5,12 +5,11 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.settings.Algos
 import encry.view.history.processors.BlockProcessor
 import encry.view.history.storage.HistoryStorage
 import scorex.core.consensus.History.ProgressInfo
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcessor {
 
@@ -18,39 +17,34 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
 
   protected val adState: Boolean
 
-  override protected def process(payload: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] = {
-    historyStorage.modifierById(payload.headerId) match {
+  override protected def process(txs: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] = {
+    historyStorage.modifierById(txs.headerId) match {
       case Some(header: EncryBlockHeader) =>
         historyStorage.modifierById(header.adProofsId) match {
-          case _ if !isValidFirstBlock(header) && bestBlockIdOpt.isEmpty =>
-            //TODO light mode when start from different block ?
-            putToHistory(payload)
+          case _ if bestBlockIdOpt.isEmpty && !isValidFirstBlock(header) =>
+            println("1 - " + header.encodedId)
+            putToHistory(txs)
           case Some(adProof: ADProofs) =>
-            processBlock(EncryBlock(header, payload, Some(adProof)), payloadIsNew = true)
-          case None if !adState =>
-            processBlock(EncryBlock(header, payload, None), payloadIsNew = true)
+            println("2 - " + header.encodedId)
+            processBlock(EncryBlock(header, txs, Some(adProof)), payloadIsNew = true)
+          case None if !adState && header.height - bestBlockHeight == 1 =>
+            println("3 - " + header.encodedId)
+            println(s"Best block height:  $bestBlockHeight")
+            println(s"This header height: ${header.height}")
+            val pi = processBlock(EncryBlock(header, txs, None), payloadIsNew = true)
+            println(pi)
+            pi
           case _ =>
-            putToHistory(payload)
+            println("4 - " + header.encodedId)
+            putToHistory(txs)
         }
       case _ =>
-        throw new Error(s"Header for modifier $payload is undefined")
+        throw new Error(s"Header for modifier $txs is no defined")
     }
   }
 
-  override protected def validate(m: EncryBlockPayload): Try[Unit] = {
-    if(historyStorage.containsObject(m.id)) {
-      Failure(new Error(s"Modifier $m is already in history"))
-    } else {
-      historyStorage.modifierById(m.headerId) match {
-        case None =>
-          Failure(new Error(s"Header for modifier $m is undefined"))
-        case Some(header: EncryBlockHeader) if !(header.transactionsRoot sameElements m.digest) =>
-          Failure(new Error(s"Header transactions root ${Algos.encode(header.adProofsRoot)} differs from $m digest"))
-        case Some(_: EncryBlockHeader) =>
-          Success()
-      }
-    }
-  }
+  override protected def validate(m: EncryBlockPayload): Try[Unit] =
+    modifierValidation(m, typedModifierById[EncryBlockHeader](m.headerId))
 
   private def putToHistory(payload: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] = {
     historyStorage.insertObjects(Seq(payload))

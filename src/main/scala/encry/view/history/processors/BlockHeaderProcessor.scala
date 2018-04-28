@@ -103,6 +103,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
         headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(chainParams.GenesisHeight)),
         headerScoreKey(h.id) -> ByteArrayWrapper(difficulty.toByteArray)), h)
     } else {
+      println("Putting ")
       val score = Difficulty @@ (scoreOf(h.parentId).get + difficulty)
       val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
         if (score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty

@@ -107,7 +107,8 @@ class EncryMiner(settings: EncryAppSettings,
       procCandidateBlock(cEnv.c.get)
   }
 
-  override def receive: Receive = receiveSemanticallySuccessfulModifier orElse
+  override def receive: Receive =
+    receiveSemanticallySuccessfulModifier orElse
     receiverCandidateBlock orElse
     miningStatus orElse
     startMining orElse

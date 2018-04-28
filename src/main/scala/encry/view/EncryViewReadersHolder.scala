@@ -34,12 +34,7 @@ class EncryViewReadersHolder(viewHolderRef: ActorRef) extends Actor with ScorexL
       sender ! Readers(historyReaderOpt, stateReaderOpt, mempoolReaderOpt)
 
     case GetDataFromHistory(f) =>
-      historyReaderOpt match {
-        case Some(historyReader) =>
-          sender() ! f(historyReader)
-        case None =>
-          log.warn("Trying to get data from undefined history reader")
-      }
+      historyReaderOpt.foreach(sender ! f(_))
 
     case _ => // Do nothing.
   }
