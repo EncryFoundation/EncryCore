@@ -64,7 +64,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
   /**
     * Marks modifier and all modifiers in child chains as invalid
     *
-    * @param modifier that is invalid from State point of view
+    * @param modifier that is invalid against the State
     * @return ProgressInfo with next modifier to try to apply
     */
   private def markModifierInvalid(modifier: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] =
@@ -124,7 +124,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
   /**
     * Marks modifier as valid
     *
-    * @param modifier that is invalid from State point of view
+    * @param modifier that is valid against the State
     * @return ProgressInfo with next modifier to try to apply
     */
   private def markModifierValid(modifier: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] =

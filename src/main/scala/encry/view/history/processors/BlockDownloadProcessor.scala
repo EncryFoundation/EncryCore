@@ -28,7 +28,6 @@ case class BlockDownloadProcessor(nodeSettings: NodeSettings) {
     minimalBlockHeightVar
   }
 
-  // TODO: Ensure that `nodeSettings.blocksToKeep + 1` is correct.
   private def minimalBlockHeightAfter(header: EncryBlockHeader): Int = {
     if (!nodeSettings.verifyTransactions) {
       // we do not verify transactions at any height
@@ -39,7 +38,8 @@ case class BlockDownloadProcessor(nodeSettings: NodeSettings) {
         // keep all blocks in history
         Constants.Chain.GenesisHeight
       } else if (!nodeSettings.stateMode.isDigest) {
-        Constants.Chain.GenesisHeight         //TODO start with the height of UTXO snapshot applied. Start from genesis util this is implemented
+        // TODO: start with the height of UTXO snapshot applied. Start from genesis until this is implemented
+        Constants.Chain.GenesisHeight
       } else {
         // Start from config.blocksToKeep blocks back
         Math.max(Constants.Chain.GenesisHeight, header.height - nodeSettings.blocksToKeep + 1)
