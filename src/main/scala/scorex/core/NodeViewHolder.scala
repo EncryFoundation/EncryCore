@@ -32,14 +32,9 @@ import scala.util.{Failure, Success, Try}
 trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentNodeViewModifier]
   extends Actor with ScorexLogging {
 
-  import NodeViewHolder._
   import NodeViewHolder.ReceivableMessages._
-  import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{RequestFromLocal, ChangedHistory,
-                                                                      ChangedMempool, ChangedVault,
-                                                                      SuccessfulTransaction, FailedTransaction,
-                                                                      SyntacticallySuccessfulModifier, SyntacticallyFailedModification,
-                                                                      SemanticallySuccessfulModifier, SemanticallyFailedModification,
-                                                                      ChangedState, RollbackFailed, NewOpenSurface, StartingPersistentModifierApplication}
+  import NodeViewHolder._
+  import scorex.core.network.NodeViewSynchronizer.ReceivableMessages._
   //import scorex.core.LocallyGeneratedModifiersMessages.ReceivableMessages.{LocallyGeneratedTransaction, LocallyGeneratedModifier}
 
   type SI <: SyncInfo
@@ -248,6 +243,8 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
 
     stateToApplyTry match {
       case Success(stateToApply) =>
+        log.info(s"Rollback succeed: BranchPoint(${progressInfo.branchPoint.map(Base58.encode)})")
+        context.system.eventStream.publish(RollbackSucceed(progressInfo.branchPoint.map(VersionTag @@ _)))
 
         val u0 = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
 
@@ -274,7 +271,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
         }
       case Failure(e) =>
         log.error("Rollback failed: ", e)
-        context.system.eventStream.publish(RollbackFailed)
+        context.system.eventStream.publish(RollbackFailed(progressInfo.branchPoint.map(VersionTag @@ _)))
         //todo: what to return here? the situation is totally wrong
         ???
     }
