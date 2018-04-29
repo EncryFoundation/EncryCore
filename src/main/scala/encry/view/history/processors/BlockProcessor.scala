@@ -35,6 +35,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
   protected def processBlock(fullBlock: EncryBlock, payloadIsNew: Boolean): ProgressInfo[EncryPersistentModifier] = {
     val newModRow = calculateNewModRow(fullBlock, payloadIsNew)
     val bestFullChain = calculateBestFullChain(fullBlock.header)
+    // FIXME: This header is wrong.
     val newBestAfterThis = bestFullChain.last
     processing(ToProcess(fullBlock, newModRow, newBestAfterThis, nodeSettings.blocksToKeep))
   }
@@ -53,11 +54,10 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
       if isValidFirstBlock(fullBlock.header) =>
 
       logStatus(Seq(), Seq(fullBlock), fullBlock, None)
-      updateStorage(newModRow, newBestAfterThis.id)
+      updateStorage(newModRow, fullBlock.id)
       ProgressInfo(None, Seq.empty, Seq(fullBlock), Seq.empty)
   }
 
-  // FIXME: The problem seems to be here.
   private def processBetterChain: BlockProcessing = {
     case toProcess @ ToProcess(fullBlock, newModRow, newBestAfterThis, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestAfterThis.id) =>
@@ -76,11 +76,11 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint = toRemove.headOption.map(_ => prevChain.head.id)
 
-        updateStorage(newModRow, newBestAfterThis.id)
+        updateStorage(newModRow, toApply.last.id)
 
         if (blocksToKeep >= 0) {
           val lastKept = blockDownloadProcessor.updateBestBlock(fullBlock.header)
-          val bestHeight: Int = newBestAfterThis.height
+          val bestHeight: Int = toApply.last.header.height
           val diff = bestHeight - prevBest.header.height
           clipBlockDataAt(((lastKept - diff) until lastKept).filter(_ >= 0))
         }
@@ -138,7 +138,6 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
 
   private def updateStorage(newModRow: EncryPersistentModifier,
                             bestFullHeaderId: ModifierId): Unit = {
-    println("Best full header: " + Base58.encode(bestFullHeaderId))
     val indicesToInsert = Seq(BestBlockKey -> ByteArrayWrapper(bestFullHeaderId))
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
       .ensuring(bestHeaderHeight >= bestBlockHeight, s"Headers height $bestHeaderHeight should be >= " +

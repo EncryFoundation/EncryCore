@@ -22,20 +22,12 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
       case Some(header: EncryBlockHeader) =>
         historyStorage.modifierById(header.adProofsId) match {
           case _ if bestBlockIdOpt.isEmpty && !isValidFirstBlock(header) =>
-            println("1 - " + header.encodedId)
             putToHistory(txs)
           case Some(adProof: ADProofs) =>
-            println("2 - " + header.encodedId)
             processBlock(EncryBlock(header, txs, Some(adProof)), payloadIsNew = true)
-          case None if !adState && header.height - bestBlockHeight == 1 =>
-            println("3 - " + header.encodedId)
-            println(s"Best block height:  $bestBlockHeight")
-            println(s"This header height: ${header.height}")
-            val pi = processBlock(EncryBlock(header, txs, None), payloadIsNew = true)
-            println(pi)
-            pi
+          case None if !adState =>
+            processBlock(EncryBlock(header, txs, None), payloadIsNew = true)
           case _ =>
-            println("4 - " + header.encodedId)
             putToHistory(txs)
         }
       case _ =>
