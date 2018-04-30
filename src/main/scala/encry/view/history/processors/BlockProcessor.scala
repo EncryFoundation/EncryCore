@@ -7,7 +7,6 @@ import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
 import scorex.core.consensus.History.ProgressInfo
 import scorex.core.utils.ScorexLogging
-import scorex.crypto.encode.Base58
 
 import scala.util.{Failure, Success, Try}
 
@@ -24,7 +23,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
 
   protected def commonBlockThenSuffixes(header1: EncryBlockHeader, header2: EncryBlockHeader): (EncryHeaderChain, EncryHeaderChain)
 
-  protected[history] def continuationHeaderChains(header: EncryBlockHeader, withFilter: EncryBlockHeader => Boolean): Seq[Seq[EncryBlockHeader]]
+  protected[history] def continuationHeaderChains(header: EncryBlockHeader, filterCond: EncryBlockHeader => Boolean): Seq[Seq[EncryBlockHeader]]
 
   /** Process full block when we have one.
     *
@@ -35,9 +34,8 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
   protected def processBlock(fullBlock: EncryBlock, payloadIsNew: Boolean): ProgressInfo[EncryPersistentModifier] = {
     val newModRow = calculateNewModRow(fullBlock, payloadIsNew)
     val bestFullChain = calculateBestFullChain(fullBlock.header)
-    // FIXME: This header is wrong.
     val newBestAfterThis = bestFullChain.last
-    processing(ToProcess(fullBlock, newModRow, newBestAfterThis, nodeSettings.blocksToKeep))
+    processing(ToProcess(fullBlock, newModRow, newBestAfterThis, bestFullChain, nodeSettings.blocksToKeep))
   }
 
   private def processing: BlockProcessing =
@@ -50,20 +48,23 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
   }
 
   private def processValidFirstBlock: BlockProcessing = {
-    case ToProcess(fullBlock, newModRow, newBestAfterThis, _)
+    case ToProcess(fullBlock, newModRow, newBestHeader, newBestChain, _)
       if isValidFirstBlock(fullBlock.header) =>
 
-      logStatus(Seq(), Seq(fullBlock), fullBlock, None)
-      updateStorage(newModRow, fullBlock.id)
-      ProgressInfo(None, Seq.empty, Seq(fullBlock), Seq.empty)
+      val toApply: Seq[EncryBlock] = newBestChain
+        .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
+
+      logStatus(Seq(), toApply, fullBlock, None)
+      updateStorage(newModRow, newBestHeader.id)
+      ProgressInfo(None, Seq.empty, toApply, Seq.empty)
   }
 
   private def processBetterChain: BlockProcessing = {
-    case toProcess @ ToProcess(fullBlock, newModRow, newBestAfterThis, blocksToKeep)
+    case toProcess @ ToProcess(fullBlock, newModRow, newBestAfterThis, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestAfterThis.id) =>
 
       val prevBest = bestBlockOpt.get
-      val (prevChain, newChain) = commonBlockThenSuffixes(prevBest.header, fullBlock.header)
+      val (prevChain, newChain) = commonBlockThenSuffixes(prevBest.header, newBestAfterThis)
       val toRemove: Seq[EncryBlock] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[EncryBlock] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
@@ -76,7 +77,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint = toRemove.headOption.map(_ => prevChain.head.id)
 
-        updateStorage(newModRow, toApply.last.id)
+        updateStorage(newModRow, newBestAfterThis.id)
 
         if (blocksToKeep >= 0) {
           val lastKept = blockDownloadProcessor.updateBestBlock(fullBlock.header)
@@ -187,6 +188,7 @@ object BlockProcessor {
 
   case class ToProcess(fullBlock: EncryBlock,
                        newModRow: EncryPersistentModifier,
-                       newBestAfterThis: EncryBlockHeader,
+                       newBestHeader: EncryBlockHeader,
+                       newBestChain: Seq[EncryBlockHeader],
                        blocksToKeep: Int)
 }

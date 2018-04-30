@@ -128,7 +128,7 @@ trait EncryHistoryReader
     @tailrec
     def loop(currentHeight: Option[Int], acc: Seq[Seq[EncryBlockHeader]]): Seq[Seq[EncryBlockHeader]] = {
       val nextLevelHeaders = currentHeight.toList
-        .flatMap{ h => headerIdsAtHeight(h + 1) }
+        .flatMap { h => headerIdsAtHeight(h + 1) }
         .flatMap { id => typedModifierById[EncryBlockHeader](id) }
         .filter(filterCond)
       if (nextLevelHeaders.isEmpty) {
