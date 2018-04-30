@@ -3,7 +3,10 @@ package encry.storage
 import encry.settings.Algos
 import encry.storage.codec.FixLenComplexValueCodec
 import io.iohk.iodb.{ByteArrayWrapper, Store}
+import scorex.core.VersionTag
 import scorex.core.utils.ScorexLogging
+
+import scala.util.{Failure, Success, Try}
 
 trait EncryBaseStorage extends AutoCloseable with ScorexLogging {
 
@@ -29,6 +32,14 @@ trait EncryBaseStorage extends AutoCloseable with ScorexLogging {
   def readComplexValue(key: ByteArrayWrapper, unitLen: Int): Option[Seq[Array[Byte]]] =
     store.get(key).flatMap { v =>
       FixLenComplexValueCodec.parseComplexValue(v.data, unitLen).toOption
+    }
+
+  def rollbackTo(version: VersionTag): Try[Unit] =
+    store.get(ByteArrayWrapper(version)) match {
+      case Some(_) =>
+        Success(store.rollback(ByteArrayWrapper(version)))
+      case None =>
+        Failure(new Error(s"Unable to get root hash at version ${Algos.encoder.encode(version)}"))
     }
 
   override def close(): Unit = {

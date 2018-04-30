@@ -1,6 +1,7 @@
 package scorex.core
 
 import akka.actor.Actor
+import encry.EncryApp
 import scorex.core.consensus.History.ProgressInfo
 import scorex.core.consensus.{History, SyncInfo}
 import scorex.core.network.ConnectedPeer
@@ -234,8 +235,9 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
                                  alternativeProgressInfo: Option[ProgressInfo[PMOD]],
                                  suffix: IndexedSeq[PMOD])
 
+    val branchingPoint = VersionTag @@ progressInfo.branchPoint.get
+
     val (stateToApplyTry: Try[MS], suffixTrimmed: IndexedSeq[PMOD]) = if (progressInfo.chainSwitchingNeeded) {
-        val branchingPoint = VersionTag @@ progressInfo.branchPoint.get     //todo: .get
         if (!state.version.sameElements(branchingPoint)){
           state.rollbackTo(branchingPoint) -> trimChainSuffix(suffixApplied, branchingPoint)
         } else Success(state) -> IndexedSeq()
@@ -244,7 +246,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
     stateToApplyTry match {
       case Success(stateToApply) =>
         log.info(s"Rollback succeed: BranchPoint(${progressInfo.branchPoint.map(Base58.encode)})")
-        context.system.eventStream.publish(RollbackSucceed(progressInfo.branchPoint.map(VersionTag @@ _)))
+        context.system.eventStream.publish(RollbackSucceed(branchingPoint))
 
         val u0 = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
 
@@ -271,9 +273,9 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
         }
       case Failure(e) =>
         log.error("Rollback failed: ", e)
-        context.system.eventStream.publish(RollbackFailed(progressInfo.branchPoint.map(VersionTag @@ _)))
-        //todo: what to return here? the situation is totally wrong
-        ???
+        context.system.eventStream.publish(RollbackFailed(branchingPoint))
+        EncryApp.forceStopApplication(500)
+        // TODO: Recovery?
     }
   }
 

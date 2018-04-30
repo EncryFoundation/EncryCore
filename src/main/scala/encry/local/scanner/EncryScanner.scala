@@ -15,7 +15,7 @@ import io.circe.Json
 import io.circe.syntax._
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.VersionTag
-import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{ChangedState, SemanticallySuccessfulModifier}
+import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{ChangedState, RollbackSucceed, SemanticallySuccessfulModifier}
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
 
@@ -39,6 +39,7 @@ class EncryScanner(settings: EncryAppSettings,
     .flatMap(r => EncryBlockHeaderSerializer.parseBytes(r).toOption)
 
   override def preStart(): Unit = {
+    context.system.eventStream.subscribe(self, classOf[RollbackSucceed])
     context.system.eventStream.subscribe(self, classOf[ChangedState[_]])
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
   }
@@ -47,6 +48,9 @@ class EncryScanner(settings: EncryAppSettings,
 
     case SemanticallySuccessfulModifier(mod: EncryPersistentModifier) =>
       scanPersistent(mod)
+
+    case RollbackSucceed(branchPointOpt) =>
+      branchPointOpt.foreach(storage.rollbackTo)
 
     case GetIndexReader =>
       sender ! IndexReader(indexReader)

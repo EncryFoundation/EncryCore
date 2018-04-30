@@ -60,11 +60,11 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
   }
 
   private def processBetterChain: BlockProcessing = {
-    case toProcess @ ToProcess(fullBlock, newModRow, newBestAfterThis, _, blocksToKeep)
-      if bestBlockOpt.nonEmpty && isBetterChain(newBestAfterThis.id) =>
+    case toProcess @ ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
+      if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
 
       val prevBest = bestBlockOpt.get
-      val (prevChain, newChain) = commonBlockThenSuffixes(prevBest.header, newBestAfterThis)
+      val (prevChain, newChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
       val toRemove: Seq[EncryBlock] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[EncryBlock] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
@@ -77,7 +77,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint = toRemove.headOption.map(_ => prevChain.head.id)
 
-        updateStorage(newModRow, newBestAfterThis.id)
+        updateStorage(newModRow, newBestHeader.id)
 
         if (blocksToKeep >= 0) {
           val lastKept = blockDownloadProcessor.updateBestBlock(fullBlock.header)
