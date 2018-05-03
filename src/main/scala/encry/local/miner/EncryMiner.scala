@@ -94,10 +94,8 @@ class EncryMiner(settings: EncryAppSettings,
       */
     case SemanticallySuccessfulModifier(mod: EncryBlock) if shouldStartMine(mod) =>
       self ! StartMining
-    /**
-      * Just ignore all other modifiers.
-      */
-    case SemanticallySuccessfulModifier =>
+
+    case SemanticallySuccessfulModifier(_) => // Ignore other mods.
   }
 
   private def receiverCandidateBlock: Receive = {

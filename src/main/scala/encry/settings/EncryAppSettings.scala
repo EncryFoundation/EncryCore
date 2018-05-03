@@ -33,6 +33,11 @@ object EncryAppSettings
     val keyManagerSettings = config.as[KeyManagerSettings](s"$configPath.keyManager")
     val scorexSettings = config.as[ScorexSettings](scorexConfigPath)
 
+    if (nodeSettings.stateMode.isDigest && nodeSettings.mining) {
+      log.error("Malformed configuration file was provided! Mining is not possible with digest state. Aborting!")
+      EncryApp.forceStopApplication()
+    }
+
     EncryAppSettings(directory, testingSettings, nodeSettings, keyManagerSettings, scorexSettings)
   }
 

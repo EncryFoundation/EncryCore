@@ -246,7 +246,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
     stateToApplyTry match {
       case Success(stateToApply) =>
         log.info(s"Rollback succeed: BranchPoint(${progressInfo.branchPoint.map(Base58.encode)})")
-        context.system.eventStream.publish(RollbackSucceed(branchingPoint))
+        context.system.eventStream.publish(RollbackSucceed(Some(branchingPoint)))
 
         val u0 = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
 
@@ -273,7 +273,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
         }
       case Failure(e) =>
         log.error("Rollback failed: ", e)
-        context.system.eventStream.publish(RollbackFailed(branchingPoint))
+        context.system.eventStream.publish(RollbackFailed(Some(branchingPoint)))
         EncryApp.forceStopApplication(500)
         // TODO: Recovery?
     }
@@ -326,7 +326,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
     } else {
       log.warn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
     }
-
 
   protected def compareViews: Receive = {
     case CompareViews(peer, modifierTypeId, modifierIds) =>
@@ -407,7 +406,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
     }
 }
 
-
 object NodeViewHolder {
 
   object ReceivableMessages {
@@ -433,5 +431,4 @@ object NodeViewHolder {
   case class DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) extends NodeViewHolderEvent
 
   case class CurrentView[HIS, MS, VL, MP](history: HIS, state: MS, vault: VL, pool: MP)
-
 }
