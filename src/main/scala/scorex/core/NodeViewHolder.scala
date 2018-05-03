@@ -235,18 +235,18 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
                                  alternativeProgressInfo: Option[ProgressInfo[PMOD]],
                                  suffix: IndexedSeq[PMOD])
 
-    val branchingPoint = VersionTag @@ progressInfo.branchPoint.get
+    val branchingPointOpt = progressInfo.branchPoint.map(VersionTag @@ _)
 
     val (stateToApplyTry: Try[MS], suffixTrimmed: IndexedSeq[PMOD]) = if (progressInfo.chainSwitchingNeeded) {
-        if (!state.version.sameElements(branchingPoint)){
-          state.rollbackTo(branchingPoint) -> trimChainSuffix(suffixApplied, branchingPoint)
+        if (!state.version.sameElements(branchingPointOpt)){
+          state.rollbackTo(branchingPointOpt.get) -> trimChainSuffix(suffixApplied, branchingPointOpt.get)
         } else Success(state) -> IndexedSeq()
     } else Success(state) -> suffixApplied
 
     stateToApplyTry match {
       case Success(stateToApply) =>
         log.info(s"Rollback succeed: BranchPoint(${progressInfo.branchPoint.map(Base58.encode)})")
-        context.system.eventStream.publish(RollbackSucceed(Some(branchingPoint)))
+        context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
 
         val u0 = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
 
@@ -273,7 +273,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
         }
       case Failure(e) =>
         log.error("Rollback failed: ", e)
-        context.system.eventStream.publish(RollbackFailed(Some(branchingPoint)))
+        context.system.eventStream.publish(RollbackFailed(branchingPointOpt))
         EncryApp.forceStopApplication(500)
         // TODO: Recovery?
     }
