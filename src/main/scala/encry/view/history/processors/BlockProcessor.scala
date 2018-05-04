@@ -33,8 +33,8 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
     */
   protected def processBlock(fullBlock: EncryBlock, payloadIsNew: Boolean): ProgressInfo[EncryPersistentModifier] = {
     val newModRow = calculateNewModRow(fullBlock, payloadIsNew)
-    val bestFullChain = calculateBestFullChain(fullBlock.header)
-    val newBestAfterThis = bestFullChain.last
+    val bestFullChain = calculateBestFullChain(fullBlock)
+    val newBestAfterThis = bestFullChain.last.header
     processing(ToProcess(fullBlock, newModRow, newBestAfterThis, bestFullChain, nodeSettings.blocksToKeep))
   }
 
@@ -51,12 +51,9 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
     case ToProcess(fullBlock, newModRow, newBestHeader, newBestChain, _)
       if isValidFirstBlock(fullBlock.header) =>
 
-      val toApply: Seq[EncryBlock] = newBestChain
-        .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
-
-      logStatus(Seq(), toApply, fullBlock, None)
+      logStatus(Seq(), newBestChain, fullBlock, None)
       updateStorage(newModRow, newBestHeader.id)
-      ProgressInfo(None, Seq.empty, toApply, Seq.empty)
+      ProgressInfo(None, Seq.empty, newBestChain, Seq.empty)
   }
 
   private def processBetterChain: BlockProcessing = {
@@ -116,10 +113,10 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
     }
   }
 
-  private def calculateBestFullChain(header: EncryBlockHeader) = {
-    val continuations = continuationHeaderChains(header, h => getBlock(h).nonEmpty).map(_.tail)
-    val chains = continuations.map(hc => hc.map(getBlock).takeWhile(_.nonEmpty).flatten.map(_.header))
-    chains.map(c => header +: c).maxBy(c => scoreOf(c.last.id).get)
+  private def calculateBestFullChain(block: EncryBlock): Seq[EncryBlock] = {
+    val continuations = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
+    val chains = continuations.map(hc => hc.map(getBlock).takeWhile(_.nonEmpty).flatten)
+    chains.map(c => block +: c).maxBy(c => scoreOf(c.last.id).get)
   }
 
   // Unused
@@ -189,6 +186,6 @@ object BlockProcessor {
   case class ToProcess(fullBlock: EncryBlock,
                        newModRow: EncryPersistentModifier,
                        newBestHeader: EncryBlockHeader,
-                       newBestChain: Seq[EncryBlockHeader],
+                       newBestChain: Seq[EncryBlock],
                        blocksToKeep: Int)
 }
