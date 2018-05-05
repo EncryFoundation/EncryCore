@@ -2,7 +2,7 @@ package encry.view.history.processors
 
 import com.google.common.primitives.Ints
 import encry.EncryApp
-import encry.consensus.{Difficulty, PowConsensus}
+import encry.consensus.{Difficulty, DifficultySerializer, PowConsensus}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
@@ -267,14 +267,19 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
           Success()
         }
       } else if (parentOpt.isEmpty) {
-        Failure(new Error(s"Parental header <id: ${header.parentId}> does not exist!"))
+        Failure(new Error(s"Parental header <id: ${Algos.encode(header.parentId)}> does not exist!"))
       } else if (header.height != parentOpt.get.height + 1) {
         Failure(new Error(s"Invalid height in header <id: ${header.id}>"))
       } else if (header.timestamp - timeProvider.time() > Constants.Chain.MaxTimeDrift) {
         Failure(new Error(s"Invalid timestamp in header <id: ${header.id}>"))
       } else if (header.timestamp < parentOpt.get.timestamp) {
         Failure(new Error("Header timestamp is less than parental`s"))
-      } else if (requiredDifficultyAfter(parentOpt.get) > header.difficulty) {
+      } else if (
+        //TODO: fix big with Serializer
+        requiredDifficultyAfter(parentOpt.get) != chainParams.InitialDifficulty &&
+          Math.min(DifficultySerializer.parseBytes(DifficultySerializer.toBytes(requiredDifficultyAfter(parentOpt.get))).longValue(),
+            requiredDifficultyAfter(parentOpt.get).longValue())
+            > header.difficulty ) {
         Failure(new Error("Header <id: ${header.id}> difficulty too low."))
       } else if (!consensusAlgo.validator.validatePow(header.hHash, header.difficulty)) {
         Failure(new Error(s"Invalid POW in header <id: ${header.id}>"))
