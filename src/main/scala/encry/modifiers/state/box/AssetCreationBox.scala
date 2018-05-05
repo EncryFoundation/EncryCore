@@ -1,7 +1,5 @@
 package encry.modifiers.state.box
 
-import java.nio.charset.Charset
-
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.{EncryProposition, PropositionSerializer}

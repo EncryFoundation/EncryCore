@@ -12,7 +12,7 @@ resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repos
   "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/",
   "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/")
 
-val circeVersion = "0.9.1"
+val circeVersion = "0.9.3"
 
 val networkDependencies = Seq(
   "org.bitlet" % "weupnp" % "0.1.+",
