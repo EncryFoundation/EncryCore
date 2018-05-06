@@ -71,4 +71,12 @@ object Constants {
 
     val TokenSymbolMaxLength: Int = 10
   }
+
+  object Equihash {
+
+    val n: Int = 96
+
+    val k: Int = 5
+  }
+
 }
