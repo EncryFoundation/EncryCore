@@ -2,10 +2,11 @@ package encry.local
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import encry.Version
+import encry.consensus.NBits
 import encry.local.EncryLocalInterface.{GetNodeInfo, NodeInfo}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.settings.{Algos, EncryAppSettings}
+import encry.settings.{Algos, Constants, EncryAppSettings}
 import encry.view.history.EncryHistory
 import encry.view.state.StateMode
 import io.circe.Json
@@ -95,7 +96,7 @@ object EncryLocalInterface {
       "bestHeaderId" -> bestHeaderOpt.map(_.encodedId).getOrElse("null").asJson,
       "bestFullHeaderId" -> bestFullBlockOpt.map(_.header.encodedId).getOrElse("null").asJson,
       "previousFullHeaderId" -> bestFullBlockOpt.map(_.header.parentId).map(Algos.encode).getOrElse("null").asJson,
-      "difficulty" -> bestFullBlockOpt.map(_.header.difficulty.toString(10)).getOrElse("null").asJson,
+      "difficulty" -> bestFullBlockOpt.map(_.header.nBits.untag(NBits)).getOrElse(Constants.Chain.InitialNBits).asJson,
       "unconfirmedCount" -> unconfirmedCount.asJson,
       "stateRoot" -> stateRoot.asJson,
       "stateType" -> stateType.verboseName.asJson,

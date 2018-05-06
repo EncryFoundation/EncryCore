@@ -1,8 +1,8 @@
 package encry.view.history.processors
 
-import com.google.common.primitives.Ints
+import com.google.common.primitives.{Ints, Longs}
 import encry.EncryApp
-import encry.consensus.{Difficulty, DifficultySerializer, PowConsensus}
+import encry.consensus._
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
@@ -27,7 +27,9 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
   private val chainParams = Constants.Chain
 
-  private val consensusAlgo = PowConsensus
+  private val difficultyController = PowLinearController
+
+  val powScheme: ConsensusScheme = new EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
 
   protected val BestHeaderKey: ByteArrayWrapper =
     ByteArrayWrapper(Array.fill(DigestLength)(EncryBlockHeader.modifierTypeId))
@@ -37,6 +39,8 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   protected val historyStorage: HistoryStorage
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
+
+  def realDifficulty(h: EncryBlockHeader): Difficulty = Difficulty @@ powScheme.realDifficulty(h)
 
   protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
 
@@ -94,14 +98,14 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   }
 
   private def getHeaderInfoUpdate(h: EncryBlockHeader): (Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier) = {
-    val difficulty: Difficulty = h.difficulty
+    val difficulty: NBits = h.nBits
     if (h.isGenesis) {
       log.info(s"Initialize header chain with genesis header ${h.encodedId}")
       (Seq(
         BestHeaderKey -> ByteArrayWrapper(h.id),
         heightIdsKey(chainParams.GenesisHeight) -> ByteArrayWrapper(h.id),
         headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(chainParams.GenesisHeight)),
-        headerScoreKey(h.id) -> ByteArrayWrapper(difficulty.toByteArray)), h)
+        headerScoreKey(h.id) -> ByteArrayWrapper(Longs.toByteArray(difficulty))), h)
     } else {
       val score = Difficulty @@ (scoreOf(h.parentId).get + difficulty)
       val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
@@ -234,13 +238,13 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
     }
   }
 
-  def requiredDifficultyAfter(parent: EncryBlockHeader): Difficulty = {
+  def requiredDifficultyAfter(parent: EncryBlockHeader): NBits = {
     val parentHeight = heightOf(parent.id).get
     if (parentHeight <= 2) {
-      chainParams.InitialDifficulty
+      chainParams.InitialNBits
     } else {
       val requiredHeights =
-        consensusAlgo.difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
+        difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
           .ensuring(_.last == parentHeight, "Incorrect heights sequence!")
       val chain = headerChainBack(requiredHeights.max - requiredHeights.min + 1,
         parent, (_: EncryBlockHeader) => false)
@@ -248,7 +252,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
         .zip(chain.headers).filter(p => requiredHeights.contains(p._1))
       assert(requiredHeights.length == requiredHeaders.length,
         s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}")
-      consensusAlgo.difficultyController.getDifficulty(requiredHeaders)
+      difficultyController.getDifficulty(requiredHeaders)
     }
   }
 
@@ -274,15 +278,8 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
         Failure(new Error(s"Invalid timestamp in header <id: ${header.id}>"))
       } else if (header.timestamp < parentOpt.get.timestamp) {
         Failure(new Error("Header timestamp is less than parental`s"))
-      } else if (
-        //TODO: fix big with Serializer
-        requiredDifficultyAfter(parentOpt.get) != chainParams.InitialDifficulty &&
-          Math.min(DifficultySerializer.parseBytes(DifficultySerializer.toBytes(requiredDifficultyAfter(parentOpt.get))).longValue(),
-            requiredDifficultyAfter(parentOpt.get).longValue())
-            > header.difficulty ) {
+      } else if (realDifficulty(header) < header.requiredDifficulty) {
         Failure(new Error("Header <id: ${header.id}> difficulty too low."))
-      } else if (!consensusAlgo.validator.validatePow(header.hHash, header.difficulty)) {
-        Failure(new Error(s"Invalid POW in header <id: ${header.id}>"))
       } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainParams.MaxRollback)) {
         Failure(new Error("Header is too old to be applied."))
       } else if (!header.validSignature) {

@@ -1,7 +1,8 @@
 package encry.settings
 
-import encry.consensus.{Difficulty, DifficultySerializer}
+import encry.consensus.{Difficulty, DifficultySerializer, NBits}
 import encry.view.history.Height
+import scorex.core.block.Block.Version
 
 import scala.concurrent.duration._
 
@@ -32,7 +33,9 @@ object Constants {
 
     val InitialDifficulty: Difficulty = Difficulty @@ BigInt(1)
 
-    val InitialNBits: Long = DifficultySerializer.encodeCompactBits(InitialDifficulty)
+    val Version: Version = 0: Byte
+
+    val InitialNBits: NBits = NBits @@ DifficultySerializer.encodeCompactBits(InitialDifficulty)
 
     val ModifierIdSize: Int = hashLength
 
@@ -74,9 +77,9 @@ object Constants {
 
   object Equihash {
 
-    val n: Int = 96
+    val n: Char = 96
 
-    val k: Int = 5
+    val k: Char = 5
   }
 
 }

@@ -12,28 +12,29 @@ object PowLinearController {
 
   private val chainParams = Constants.Chain
 
-  def getDifficulty(previousHeaders: Seq[(Int, EncryBlockHeader)]): Difficulty = {
+  def getDifficulty(previousHeaders: Seq[(Int, EncryBlockHeader)]): NBits = {
     if (previousHeaders.size == chainParams.RetargetingEpochsQty) {
-      val data: Seq[(Int, Difficulty)] = previousHeaders.sliding(2).toList.map { d =>
+      val data: Seq[(Int, NBits)] = previousHeaders.sliding(2).toList.map { d =>
         val start = d.head
         val end = d.last
         require(end._1 - start._1 == chainParams.EpochLength, s"Incorrect heights interval for $d")
-        val diff = Difficulty @@ (end._2.difficulty * chainParams.DesiredBlockInterval.toMillis *
+        val diff = NBits @@ (end._2.nBits * chainParams.DesiredBlockInterval.toMillis *
           chainParams.EpochLength / (end._2.timestamp - start._2.timestamp))
         (end._1, diff)
       }
       val diff = interpolate(data)
-      if (diff >= 1) diff else chainParams.InitialDifficulty
-    } else previousHeaders.maxBy(_._1)._2.difficulty
+      println(s"diff is ${diff}")
+      if (diff >= 1) diff else chainParams.InitialNBits
+    } else previousHeaders.maxBy(_._1)._2.nBits
   }
 
   // y = a + bx
-  private[consensus] def interpolate(data: Seq[(Int, Difficulty)]): Difficulty = {
+  private[consensus] def interpolate(data: Seq[(Int, NBits)]): NBits = {
     val size = data.size
-    val xy: Iterable[BigInt] = data.map(d => d._1 * d._2)
+    val xy: Iterable[Long] = data.map(d => d._1 * d._2)
     val x: Iterable[BigInt] = data.map(d => BigInt(d._1))
     val x2: Iterable[BigInt] = data.map(d => BigInt(d._1) * d._1)
-    val y: Iterable[BigInt] = data.map(d => d._2)
+    val y: Iterable[Long] = data.map(d => d._2)
     val xySum = xy.sum
     val x2Sum = x2.sum
     val ySum = y.sum
@@ -43,7 +44,7 @@ object PowLinearController {
     val b: BigInt = (ySum * PrecisionConstant - k * xSum) / size / PrecisionConstant
 
     val point = data.map(_._1).max + chainParams.EpochLength
-    Difficulty @@ (b + k * point / PrecisionConstant)
+    NBits @@ DifficultySerializer.encodeCompactBits(b + k * point / PrecisionConstant)
   }
 
   // Retargeting to adjust difficulty.
