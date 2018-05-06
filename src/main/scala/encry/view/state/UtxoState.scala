@@ -14,6 +14,7 @@ import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.{Algos, Constants}
+import encry.utils.BalanceCalculator
 import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
@@ -148,8 +149,6 @@ class UtxoState(override val version: VersionTag,
   override def validate(tx: EncryBaseTransaction): Try[Unit] =
     tx.semanticValidity.map { _: Unit =>
 
-      import encry.utils.BalanceCalculator._
-
       implicit val context: Context = Context(tx, height, lastBlockTimestamp, rootHash)
 
       if (tx.fee < tx.minimalFee && !tx.isCoinbase) throw new Error(s"Low fee in $tx")
@@ -165,8 +164,8 @@ class UtxoState(override val version: VersionTag,
         }
 
       val validBalance = {
-        val debitB = balanceSheet(bxs, excludeCoinbase = false)
-        val creditB = balanceSheet(tx.newBoxes)
+        val debitB = BalanceCalculator.balanceSheet(bxs, excludeCoinbase = false)
+        val creditB = BalanceCalculator.balanceSheet(tx.newBoxes)
         creditB.forall { case (id, amount) => debitB.getOrElse(id, 0L) >= amount }
       }
 
