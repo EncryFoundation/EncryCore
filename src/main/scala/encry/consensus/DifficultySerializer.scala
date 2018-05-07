@@ -32,7 +32,7 @@ object DifficultySerializer {
     Array(0xFF & (value >> 24), 0xFF & (value >> 16), 0xFF & (value >> 8), 0xFF & value).map(_.toByte)
 
 
-  def decodeCompactBits(compact: Long): BigInt = {
+  def decodeCompactBits(compact: NBits): BigInt = {
     val size: Int = (compact >> 24).toInt & 0xFF
     val bytes: Array[Byte] = new Array[Byte](4 + size)
     bytes(3) = size.toByte

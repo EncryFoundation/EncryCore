@@ -240,9 +240,8 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
   def requiredDifficultyAfter(parent: EncryBlockHeader): NBits = {
     val parentHeight = heightOf(parent.id).get
-    if (parentHeight <= 2) {
-      chainParams.InitialNBits
-    } else {
+    if (parentHeight <= 2) chainParams.InitialNBits
+    else {
       val requiredHeights =
         difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
           .ensuring(_.last == parentHeight, "Incorrect heights sequence!")

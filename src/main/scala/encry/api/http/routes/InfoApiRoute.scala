@@ -3,7 +3,7 @@ package encry.api.http.routes
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.consensus.NBits
+import encry.consensus.DifficultySerializer
 import encry.local.miner.EncryMiner.{GetMinerStatus, MinerStatus}
 import encry.settings.{Algos, Constants, EncryAppSettings}
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
@@ -66,7 +66,7 @@ object InfoApiRoute {
       "bestHeaderId" -> bestHeader.map(_.encodedId).getOrElse("null").asJson,
       "bestFullHeaderId" -> bestFullBlock.map(_.header.encodedId).getOrElse("null").asJson,
       "previousFullHeaderId" -> bestFullBlock.map(_.header.parentId).map(Base58.encode).getOrElse("null").asJson,
-      "difficulty" -> bestFullBlock.map(_.header.nBits.untag(NBits)).getOrElse(Constants.Chain.InitialNBits.untag(NBits)).asJson,
+      "difficulty" -> bestFullBlock.map(block => DifficultySerializer.decodeCompactBits(block.header.nBits)).getOrElse(Constants.Chain.InitialDifficulty).asJson,
       "unconfirmedCount" -> unconfirmedCount.asJson,
       "stateType" -> stateType.asJson,
       "stateVersion" -> stateVersion.asJson,

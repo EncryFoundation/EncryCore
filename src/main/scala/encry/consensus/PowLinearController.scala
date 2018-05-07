@@ -13,12 +13,12 @@ object PowLinearController {
   private val chainParams = Constants.Chain
 
   def getDifficulty(previousHeaders: Seq[(Int, EncryBlockHeader)]): NBits = {
-    if (previousHeaders.size == chainParams.RetargetingEpochsQty) {
-      val data: Seq[(Int, NBits)] = previousHeaders.sliding(2).toList.map { d =>
+    if (previousHeaders.length == chainParams.RetargetingEpochsQty) {
+      val data: Seq[(Int, Difficulty)] = previousHeaders.sliding(2).toList.map { d =>
         val start = d.head
         val end = d.last
         require(end._1 - start._1 == chainParams.EpochLength, s"Incorrect heights interval for $d")
-        val diff = NBits @@ (end._2.nBits * chainParams.DesiredBlockInterval.toMillis *
+        val diff = Difficulty @@ (end._2.requiredDifficulty * chainParams.DesiredBlockInterval.toMillis *
           chainParams.EpochLength / (end._2.timestamp - start._2.timestamp))
         (end._1, diff)
       }
@@ -28,12 +28,12 @@ object PowLinearController {
   }
 
   // y = a + bx
-  private[consensus] def interpolate(data: Seq[(Int, NBits)]): NBits = {
+  private[consensus] def interpolate(data: Seq[(Int, Difficulty)]): NBits = {
     val size = data.size
-    val xy: Iterable[Long] = data.map(d => d._1 * d._2)
+    val xy: Iterable[BigInt] = data.map(d => d._1 * d._2)
     val x: Iterable[BigInt] = data.map(d => BigInt(d._1))
     val x2: Iterable[BigInt] = data.map(d => BigInt(d._1) * d._1)
-    val y: Iterable[Long] = data.map(d => d._2)
+    val y: Iterable[BigInt] = data.map(d => d._2)
     val xySum = xy.sum
     val x2Sum = x2.sum
     val ySum = y.sum

@@ -18,7 +18,7 @@ import scala.annotation.tailrec
 import scala.math.BigInt
 
 case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with ScorexLogging {
-  lazy val encryPerson: Array[Byte] = "EncryEquihash".getBytes("UTF-8") ++
+  lazy val encryPerson: Array[Byte] = "EncryEqui123".getBytes("UTF-8") ++
     Chars.toByteArray(n) ++
     Chars.toByteArray(k)
 
@@ -27,6 +27,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Scor
     require(finishingNonce >= startingNonce)
 
     val difficulty = DifficultySerializer.decodeCompactBits(candidateBlock.nBits)
+
 
     val (version, parentId, adProofsRoot, txsRoot, height) =
       getDerivedHeaderFields(candidateBlock.parentOpt, candidateBlock.adProofBytes, candidateBlock.transactions)
@@ -97,7 +98,9 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Scor
     }
 
 
-  override def realDifficulty(header: EncryBlockHeader): Difficulty = Difficulty @@ (Constants.Chain.MaxTarget / BigInt(1, header.powHash))
+  override def realDifficulty(header: EncryBlockHeader): Difficulty = {
+    Difficulty @@ (Constants.Chain.MaxTarget / BigInt(1, header.powHash))
+  }
 
   override def toString: String = s"EquihashPowScheme(n = ${n.toInt}, k = ${k.toInt})"
 }

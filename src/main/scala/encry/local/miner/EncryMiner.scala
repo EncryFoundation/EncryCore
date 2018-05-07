@@ -166,7 +166,6 @@ class EncryMiner(settings: EncryAppSettings,
     val (adProof, adDigest) = state.proofsForTransactions(txs).get
     val nBits: NBits = bestHeaderOpt
       .map(parent => history.requiredDifficultyAfter(parent))
-      .map(d => DifficultySerializer.encodeCompactBits(d))
       .getOrElse(Constants.Chain.InitialNBits)
     val derivedFields = consensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
     val blockSignature = minerSecret.sign(
