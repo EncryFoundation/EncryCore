@@ -27,6 +27,8 @@ object Constants {
 
   object Chain {
 
+    val consensusScheme: String = "equihash"
+
     val hashLength: Int = 32
 
     val MaxTarget: BigInt = BigInt(1, Array.fill(hashLength)((-1).toByte))
@@ -35,7 +37,7 @@ object Constants {
 
     val Version: Version = 0: Byte
 
-    val InitialNBits: NBits = NBits @@ DifficultySerializer.encodeCompactBits(InitialDifficulty)
+    val InitialNBits: NBits = DifficultySerializer.encodeCompactBits(InitialDifficulty)
 
     val ModifierIdSize: Int = hashLength
 

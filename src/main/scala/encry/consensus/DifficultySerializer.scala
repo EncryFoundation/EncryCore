@@ -25,14 +25,14 @@ object DifficultySerializer {
       } else BigInteger.ZERO
   }
 
-  private def readUint32BE(bytes: Array[Byte]): Long =
-    ((bytes(0) & 0xffl) << 24) | ((bytes(1) & 0xffl) << 16) | ((bytes(2) & 0xffl) << 8) | (bytes(3) & 0xffl)
+  def readUint32BE(bytes: Array[Byte]): NBits =
+    NBits @@ (((bytes(0) & 0xffl) << 24) | ((bytes(1) & 0xffl) << 16) | ((bytes(2) & 0xffl) << 8) | (bytes(3) & 0xffl))
 
-  private def uint32ToByteArrayBE(value: Long): Array[Byte] =
+  def uint32ToByteArrayBE(value: NBits): Array[Byte] =
     Array(0xFF & (value >> 24), 0xFF & (value >> 16), 0xFF & (value >> 8), 0xFF & value).map(_.toByte)
 
 
-  private def decodeCompactBits(compact: Long): BigInt = {
+  def decodeCompactBits(compact: Long): BigInt = {
     val size: Int = (compact >> 24).toInt & 0xFF
     val bytes: Array[Byte] = new Array[Byte](4 + size)
     bytes(3) = size.toByte
@@ -42,7 +42,7 @@ object DifficultySerializer {
     decodeMPI(bytes, hasLength = true)
   }
 
-  private def encodeCompactBits(requiredDifficulty: BigInt): Long = {
+  def encodeCompactBits(requiredDifficulty: BigInt): NBits = {
     val value = requiredDifficulty.bigInteger
     var result: Long = 0L
     var size: Int = value.toByteArray.length
@@ -60,7 +60,7 @@ object DifficultySerializer {
     result |= size << 24
     val a: Int = if (value.signum == -1) 0x00800000 else 0
     result |= a
-    result
+    NBits @@ result
   }
 
 }

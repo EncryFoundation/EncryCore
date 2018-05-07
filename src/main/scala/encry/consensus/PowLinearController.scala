@@ -23,7 +23,6 @@ object PowLinearController {
         (end._1, diff)
       }
       val diff = interpolate(data)
-      println(s"diff is ${diff}")
       if (diff >= 1) diff else chainParams.InitialNBits
     } else previousHeaders.maxBy(_._1)._2.nBits
   }
@@ -44,7 +43,7 @@ object PowLinearController {
     val b: BigInt = (ySum * PrecisionConstant - k * xSum) / size / PrecisionConstant
 
     val point = data.map(_._1).max + chainParams.EpochLength
-    NBits @@ DifficultySerializer.encodeCompactBits(b + k * point / PrecisionConstant)
+    DifficultySerializer.encodeCompactBits(b + k * point / PrecisionConstant)
   }
 
   // Retargeting to adjust difficulty.

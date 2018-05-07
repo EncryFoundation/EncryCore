@@ -1,7 +1,7 @@
 package encry.local.miner
 
 import akka.actor.{Actor, ActorRef, ActorRefFactory, Props}
-import encry.consensus.{PowCandidateBlock, PowConsensus}
+import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
 import encry.local.miner.EncryMiningWorker.MineBlock
 import encry.settings.EncryAppSettings
 import encry.view.state.StateMode
@@ -13,11 +13,12 @@ import scala.util.Random
 
 class EncryMiningWorker(settings: EncryAppSettings,
                         viewHolderRef: ActorRef,
-                        initialCandidate: PowCandidateBlock) extends Actor with ScorexLogging {
+                        initialCandidate: CandidateBlock) extends Actor with ScorexLogging {
 
-  private val consensus = PowConsensus
 
-  private var candidate: PowCandidateBlock = initialCandidate
+  private val consensus = ConsensusSchemeReaders.consensusScheme
+
+  private var candidate: CandidateBlock = initialCandidate
 
   override def preStart(): Unit = {
     log.info("Booting new mining worker")
@@ -25,7 +26,7 @@ class EncryMiningWorker(settings: EncryAppSettings,
   }
 
   override def receive: Receive = {
-    case newCandidate: PowCandidateBlock =>
+    case newCandidate: CandidateBlock =>
       candidate = newCandidate
 
     case MineBlock(nonce) =>
@@ -53,21 +54,21 @@ object EncryMiningWorker {
 
   case class MineBlock(nonce: Long)
 
-  def props(ergoSettings: EncryAppSettings,
+  def props(settings: EncryAppSettings,
             viewHolderRef: ActorRef,
-            startCandidate: PowCandidateBlock): Props =
-    Props(new EncryMiningWorker(ergoSettings, viewHolderRef, startCandidate))
+            startCandidate: CandidateBlock): Props =
+    Props(new EncryMiningWorker(settings, viewHolderRef, startCandidate))
 
-  def apply(ergoSettings: EncryAppSettings,
+  def apply(settings: EncryAppSettings,
             viewHolderRef: ActorRef,
-            startCandidate: PowCandidateBlock)
+            startCandidate: CandidateBlock)
            (implicit context: ActorRefFactory): ActorRef =
-    context.actorOf(props(ergoSettings, viewHolderRef, startCandidate))
+    context.actorOf(props(settings, viewHolderRef, startCandidate))
 
-  def apply(ergoSettings: EncryAppSettings,
+  def apply(settings: EncryAppSettings,
             viewHolderRef: ActorRef,
-            startCandidate: PowCandidateBlock,
+            startCandidate: CandidateBlock,
             name: String)
            (implicit context: ActorRefFactory): ActorRef =
-    context.actorOf(props(ergoSettings, viewHolderRef, startCandidate), name)
+    context.actorOf(props(settings, viewHolderRef, startCandidate), name)
 }

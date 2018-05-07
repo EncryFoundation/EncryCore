@@ -1,13 +1,14 @@
 package encry.modifiers.history.block
 
-import encry.consensus.Difficulty
 import encry.crypto.PublicKey25519
+import encry.crypto.equihash.EquihashSolution
 import encry.local.TestHelper
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.TransactionFactory
 import encry.modifiers.state.box.proof.Signature25519
+import encry.settings.Constants
 import org.scalatest.FunSuite
 import scorex.core.ModifierId
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
@@ -30,7 +31,8 @@ class EncryBlockSerializerTest extends FunSuite {
       99999L,
       199,
       999L,
-      Difficulty @@ BigInt(999999999999999L)
+      Constants.Chain.InitialNBits,
+      EquihashSolution(Seq(1, 2, 3))
     )
 
     val factory = TestHelper

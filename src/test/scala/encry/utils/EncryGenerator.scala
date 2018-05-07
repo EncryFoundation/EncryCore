@@ -1,7 +1,7 @@
 package encry.utils
 
 import encry.account.Address
-import encry.consensus.Difficulty
+import encry.crypto.equihash.EquihashSolution
 import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.local.TestHelper.Props
 import encry.modifiers.history.block.header.EncryBlockHeader
@@ -9,6 +9,7 @@ import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, MonetaryBox}
+import encry.settings.Constants
 import scorex.core.ModifierId
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.{ADDigest, ADKey}
@@ -106,7 +107,8 @@ trait EncryGenerator {
       rand.nextLong(),
       rand.nextInt(),
       rand.nextLong(),
-      Difficulty @@ BigInt(999999999999999L)
+      Constants.Chain.InitialNBits,
+      EquihashSolution(Seq(1, 3))
     )
   }
 }
