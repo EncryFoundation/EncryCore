@@ -52,7 +52,6 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Scor
 
     @tailrec
     def generateHeader(nonce: Long): Option[EncryBlockHeader] = {
-      log.debug("Trying nonce: " + nonce)
       val currentDigest = new Blake2bDigest(digest)
       Equihash.hashNonce(currentDigest, nonce)
       val solutions = Equihash.gbpBasic(currentDigest, n, k)

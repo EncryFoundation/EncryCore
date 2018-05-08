@@ -3,8 +3,9 @@ package encry.api.http.routes
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import encry.consensus.DifficultySerializer
 import encry.local.miner.EncryMiner.{GetMinerStatus, MinerStatus}
-import encry.settings.{Algos, EncryAppSettings}
+import encry.settings.{Algos, Constants, EncryAppSettings}
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import io.circe.Json
 import io.circe.syntax._
@@ -68,10 +69,10 @@ object InfoApiRoute {
       "name" -> nodeName.asJson,
       "headersHeight" -> bestHeader.map(_.height).getOrElse(0).asJson,
       "fullHeight" -> bestFullBlock.map(_.header.height).getOrElse(0).asJson,
-      "bestHeaderId" -> bestHeader.map(_.encodedId).asJson,
-      "bestFullHeaderId" -> bestFullBlock.map(_.header.encodedId).asJson,
-      "previousFullHeaderId" -> bestFullBlock.map(_.header.parentId).map(Base58.encode).asJson,
-      "difficulty" -> bestFullBlock.map(_.header.difficulty).getOrElse(BigInt(0)).asJson,
+      "bestHeaderId" -> bestHeader.map(_.encodedId).getOrElse("null").asJson,
+      "bestFullHeaderId" -> bestFullBlock.map(_.header.encodedId).getOrElse("null").asJson,
+      "previousFullHeaderId" -> bestFullBlock.map(_.header.parentId).map(Base58.encode).getOrElse("null").asJson,
+      "difficulty" -> bestFullBlock.map(block => DifficultySerializer.decodeCompactBits(block.header.nBits)).getOrElse(Constants.Chain.InitialDifficulty).asJson,
       "unconfirmedCount" -> unconfirmedCount.asJson,
       "stateType" -> stateType.asJson,
       "stateVersion" -> stateVersion.asJson,
