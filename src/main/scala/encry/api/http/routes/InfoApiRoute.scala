@@ -11,6 +11,7 @@ import io.circe.syntax._
 import scorex.core.network.Handshake
 import scorex.core.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import scorex.core.settings.RESTApiSettings
+import scorex.core.utils.NetworkTimeProvider
 import scorex.crypto.encode.Base58
 
 import scala.concurrent.Future
@@ -19,12 +20,16 @@ case class InfoApiRoute(readersHolder: ActorRef,
                         miner: ActorRef,
                         peerManager: ActorRef,
                         appSettings: EncryAppSettings,
-                        nodeId: Array[Byte])
+                        nodeId: Array[Byte],
+                        timeProvider: NetworkTimeProvider)
                        (implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
 
   override val settings: RESTApiSettings = appSettings.scorexSettings.restApi
 
+  private val launchTime: Long = timeProvider.time()
+
   override val route: Route = (path("info") & get) {
+    val nodeUptime = timeProvider.time() - launchTime
     val minerInfoF = getMinerInfo
     val connectedPeersF = getConnectedPeers
     val readersF: Future[Readers] = (readersHolder ? GetReaders).mapTo[Readers]
@@ -33,7 +38,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
       connectedPeers <- connectedPeersF
       readers <- readersF
     } yield {
-      InfoApiRoute.makeInfoJson(nodeId, minerInfo, connectedPeers, readers, getStateType, getNodeName)
+      InfoApiRoute.makeInfoJson(nodeId, minerInfo, connectedPeers, readers, getStateType, getNodeName, nodeUptime)
     }).okJson()
   }
 
@@ -53,7 +58,8 @@ object InfoApiRoute {
                    connectedPeersLength: Int,
                    readers: Readers,
                    stateType: String,
-                   nodeName: String): Json = {
+                   nodeName: String,
+                   nodeUptime: Long): Json = {
     val stateVersion = readers.s.map(_.version).map(Algos.encode)
     val bestHeader = readers.h.flatMap(_.bestHeaderOpt)
     val bestFullBlock = readers.h.flatMap(_.bestBlockOpt)
@@ -70,7 +76,8 @@ object InfoApiRoute {
       "stateType" -> stateType.asJson,
       "stateVersion" -> stateVersion.asJson,
       "isMining" -> minerInfo.isMining.asJson,
-      "peersCount" -> connectedPeersLength.asJson
+      "peersCount" -> connectedPeersLength.asJson,
+      "uptime" -> nodeUptime.asJson
     ).asJson
   }
 }
