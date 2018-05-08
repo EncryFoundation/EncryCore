@@ -3,7 +3,7 @@ import com.google.common.primitives.Ints
 import encry.modifiers.state.box.proof.Proof.ProofTypeId
 import encrywm.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
-import encrywm.lib.Types.ESList
+import encrywm.lib.Types.{ESInt, ESList}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import scorex.core.serialization.Serializer
@@ -22,6 +22,7 @@ case class MultiSig(proofs: Seq[Signature25519]) extends Proof {
 
   override def convert: ESObject = {
     val fields = Map(
+      "typeId" -> ESValue("typeId", ESInt)(typeId.toInt),
       "proofs" -> ESValue("proofs", ESList(Types.Signature25519))(proofs.map(_.convert).toList)
     )
     ESObject(Types.MultiSig.ident, fields, esType)

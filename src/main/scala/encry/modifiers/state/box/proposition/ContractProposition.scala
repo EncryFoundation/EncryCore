@@ -5,11 +5,14 @@ import encry.contracts.{CStateInfo, ContractContext}
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
 import encry.settings.Constants
+import encrywm.backend.env.{ESObject, ESValue}
 import encrywm.backend.executor.Executor
 import encrywm.backend.executor.Executor.{Return, Unlocked}
 import encrywm.common.SourceProcessor.SerializedContract
 import encrywm.common.{EncryContract, ScriptFingerprint, ScriptMeta, ScriptSerializer}
 import encrywm.frontend.semantics.ComplexityAnalyzer.ScriptComplexityScore
+import encrywm.lib.Types
+import encrywm.lib.Types.ESProposition
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
@@ -20,6 +23,8 @@ import scala.util.{Success, Try}
 case class ContractProposition(contract: EncryContract) extends EncryProposition {
 
   override type M = ContractProposition
+
+  override val typeId: Byte = ContractProposition.TypeId
 
   override def serializer: Serializer[M] = ContractPropositionSerializer
 
@@ -33,6 +38,12 @@ case class ContractProposition(contract: EncryContract) extends EncryProposition
         case _ => throw new Error("Unlock failed.")
       }
     }
+
+  override val esType: Types.ESProduct = ESProposition
+
+  override def asVal: ESValue = ???
+
+  override def convert: ESObject = ???
 }
 
 object ContractProposition {

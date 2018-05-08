@@ -7,7 +7,7 @@ import encry.modifiers.state.box.proposition.{AccountProposition, EncryPropositi
 import encry.settings.{Algos, Constants}
 import encrywm.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
-import encrywm.lib.Types.{ESByteVector, ESLong, ESOption}
+import encrywm.lib.Types._
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
@@ -24,7 +24,7 @@ case class AssetBox(override val proposition: EncryProposition,
                     override val nonce: Long,
                     override val amount: Amount,
                     tokenIdOpt: Option[ADKey] = None)
-  extends EncryBox[EncryProposition] with MonetaryBox{
+  extends EncryBox[EncryProposition] with MonetaryBox {
 
   override type M = AssetBox
 
@@ -40,6 +40,9 @@ case class AssetBox(override val proposition: EncryProposition,
 
   override def convert: ESObject = {
     val fields = Map(
+      "proposition" -> ESValue("proposition", ESProposition)(amount),
+      "typeId" -> ESValue("typeId", ESInt)(typeId.toInt),
+      "id" -> ESValue("id", ESByteVector)(id),
       "amount" -> ESValue("amount", ESLong)(amount),
       "tokenIdOpt" -> ESValue("tokenIdOpt", ESOption(ESByteVector))(tokenIdOpt.flatMap(bytes => Some(bytes.untag(ADKey))))
     )

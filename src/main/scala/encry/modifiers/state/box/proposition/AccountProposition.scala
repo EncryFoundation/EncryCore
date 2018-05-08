@@ -3,6 +3,9 @@ package encry.modifiers.state.box.proposition
 import encry.account.{Account, AccountSerializer, Address}
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
+import encrywm.backend.env.{ESObject, ESValue}
+import encrywm.lib.Types
+import encrywm.lib.Types._
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
@@ -15,11 +18,25 @@ case class AccountProposition(account: Account) extends EncryProposition {
 
   override type M = AccountProposition
 
+  override val typeId: Byte = AccountProposition.TypeId
+
   override def serializer: Serializer[M] = AccountPropositionSerializer
 
   override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
     if (Account(ctx.transaction.accountPubKey.pubKeyBytes) != account) Failure(new Error("Unlock failed"))
     else Success()
+
+  override val esType: Types.ESProduct = Types.AccountProposition
+
+  override def asVal: ESValue = ESValue(Types.AccountProposition.ident.toLowerCase, Types.AccountProposition)(convert)
+
+  override def convert: ESObject = {
+    val fields = Map(
+      "typeId" -> ESValue("typeId", ESInt)(typeId.toInt),
+      "accountAddress" -> ESValue("accountAddress", ESString)(account.address)
+    )
+    ESObject(Types.AccountProposition.ident, fields, esType)
+  }
 }
 
 object AccountProposition {

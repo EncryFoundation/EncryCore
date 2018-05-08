@@ -3,21 +3,37 @@ package encry.modifiers.mempool
 import encry.modifiers.state.box.EncryBox
 import encry.modifiers.state.box.proof.{Proof, ProofSerializer}
 import encry.settings.Algos
-import io.circe.{Decoder, Encoder, HCursor, Json}
+import encrywm.backend.env.{ESObject, ESValue}
+import encrywm.lib.Types
+import encrywm.lib.Types._
+import encrywm.lib.predef.env.ESEnvConvertable
 import io.circe.syntax._
+import io.circe.{Decoder, Encoder, HCursor}
 import scorex.core.serialization.{BytesSerializable, Serializer}
 import scorex.crypto.authds.ADKey
 
 import scala.util.Try
 
-// Holds the boxId/proof pair.
-case class Unlocker(boxId: ADKey, proofOpt: Option[Proof]) extends BytesSerializable {
+/** Holds the boxId/proof pair. */
+case class Unlocker(boxId: ADKey, proofOpt: Option[Proof]) extends BytesSerializable with ESEnvConvertable {
 
   override type M = Unlocker
 
   override def serializer: Serializer[M] = UnlockerSerializer
 
   lazy val bytesWithoutProof: Array[Byte] = UnlockerSerializer.toBytesWithoutProof(this)
+
+  override def asVal: ESValue = ESValue(Types.ESUnlocker.ident.toLowerCase, Types.ESUnlocker)(convert)
+
+  override val esType: Types.ESProduct = ESUnlocker
+
+  override def convert: ESObject = {
+    val fields = Map(
+      "boxId" -> ESValue("boxId", ESByteVector)(boxId),
+      "proofOpt" -> ESValue("proofOpt", ESOption(ESProof))(proofOpt.map(_.convert))
+    )
+    ESObject(Types.ESUnlocker.ident, fields, esType)
+  }
 }
 
 object Unlocker {
@@ -29,10 +45,10 @@ object Unlocker {
 
   implicit val jsonDecoder: Decoder[Unlocker] = (c: HCursor) => {
     for {
-      foo <- c.downField("boxId").as[String]
-      bar <- c.downField("proof").as[Option[Proof]]
+      boxId <- c.downField("boxId").as[String]
+      proof <- c.downField("proof").as[Option[Proof]]
     } yield {
-      Unlocker(ADKey @@ Algos.decode(foo).get, bar)
+      Unlocker(ADKey @@ Algos.decode(boxId).get, proof)
     }
   }
 }

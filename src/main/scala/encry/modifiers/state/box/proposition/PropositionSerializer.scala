@@ -8,7 +8,7 @@ object PropositionSerializer extends Serializer[EncryProposition] {
 
   override def toBytes(obj: EncryProposition): Array[Byte] = obj match {
     case op: OpenProposition.type =>
-      OpenProposition.TypeId +: OpenPropositionSerializer.toBytes(op)
+      OpenProposition.typeId +: OpenPropositionSerializer.toBytes(op)
     case ap: AccountProposition =>
       AccountProposition.TypeId +: AccountPropositionSerializer.toBytes(ap)
     case hp: HeightProposition =>
@@ -19,7 +19,7 @@ object PropositionSerializer extends Serializer[EncryProposition] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[EncryProposition] = Try(bytes.head).flatMap {
-    case OpenProposition.`TypeId` => OpenPropositionSerializer.parseBytes(bytes.tail)
+    case OpenProposition.`typeId` => OpenPropositionSerializer.parseBytes(bytes.tail)
     case AccountProposition.`TypeId` => AccountPropositionSerializer.parseBytes(bytes.tail)
     case HeightProposition.`TypeId` => HeightPropositionSerializer.parseBytes(bytes.tail)
     case ContractProposition.`TypeId` => ContractPropositionSerializer.parseBytes(bytes.tail)
