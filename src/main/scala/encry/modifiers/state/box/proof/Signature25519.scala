@@ -32,7 +32,7 @@ case class Signature25519(signature: Signature) extends Proof {
   override def convert: ESObject = {
     val fields = Map(
       "sigBytes" -> ESValue("sigBytes", ESByteVector)(signature),
-      "typeId" -> ESValue("typeId", ESInt)(typeId)
+      "typeId" -> ESValue("typeId", ESInt)(typeId.toInt)
     )
     ESObject(Types.Signature25519.ident, fields, esType)
   }

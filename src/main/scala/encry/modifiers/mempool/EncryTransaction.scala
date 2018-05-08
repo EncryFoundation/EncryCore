@@ -69,9 +69,11 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
   override def convert: ESObject = {
     val fields = Map(
       "accountPubKey" -> ESValue("accountPubKey", ESByteVector)(accountPubKey.pubKeyBytes),
+      "fee" -> ESValue("fee", ESLong)(fee),
       "signature" -> ESValue("signature", ESByteVector)(signature.signature),
       "messageToSign" -> ESValue("messageToSign", ESByteVector)(txHash),
       "outputs" -> ESValue("outputs", ESList(Types.ESBox))(newBoxes.map(_.convert).toList),
+      "unlockers" -> ESValue("unlockers", ESList(Types.ESUnlocker))(unlockers.map(_.convert).toList),
       "timestamp" -> ESValue("timestamp", ESLong)(timestamp)
     )
     ESObject(Types.ESTransaction.ident, fields, esType)
