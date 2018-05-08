@@ -11,7 +11,7 @@ import io.circe.syntax._
 import scorex.core.network.Handshake
 import scorex.core.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import scorex.core.settings.RESTApiSettings
-import scorex.core.utils.NetworkTimeProvider
+import scorex.core.utils.{NetworkTime, NetworkTimeProvider}
 import scorex.crypto.encode.Base58
 
 import scala.concurrent.Future
@@ -26,7 +26,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
 
   override val settings: RESTApiSettings = appSettings.scorexSettings.restApi
 
-  private val launchTime: Long = timeProvider.time()
+  private val launchTime: NetworkTime.Time = timeProvider.time()
 
   override val route: Route = (path("info") & get) {
     val nodeUptime = timeProvider.time() - launchTime
