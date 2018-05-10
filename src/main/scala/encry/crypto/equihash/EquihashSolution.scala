@@ -8,11 +8,12 @@ import scorex.core.serialization.{BytesSerializable, Serializer}
 import scala.util.Try
 
 case class EquihashSolution(ints: Seq[Int]) extends BytesSerializable {
-  def indexedSeq: IndexedSeq[Int] = ints.toIndexedSeq
-  def headOption: Option[Int] = ints.headOption
-  def byteLength: Int = ints.length * 4
-  def serializer: Serializer[EquihashSolution] = EquihashSolutionsSerializer
+
   type M = EquihashSolution
+
+  def indexedSeq: IndexedSeq[Int] = ints.toIndexedSeq
+
+  def serializer: Serializer[EquihashSolution] = EquihashSolutionsSerializer
 }
 
 object EquihashSolution {
@@ -26,6 +27,7 @@ object EquihashSolution {
 }
 
 object EquihashSolutionsSerializer extends Serializer[EquihashSolution] {
+
   override def toBytes(obj: EquihashSolution): Array[Byte] = {
     obj.ints.map(Ints.toByteArray).reduceLeft(_ ++ _)
   }

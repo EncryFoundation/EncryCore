@@ -7,7 +7,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.settings.Constants
+import encry.settings.{Algos, Constants}
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import scorex.core.ModifierId
 import scorex.core.utils.ScorexLogging
@@ -18,11 +18,11 @@ import scala.annotation.tailrec
 import scala.math.BigInt
 
 case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with ScorexLogging {
-  lazy val encryPerson: Array[Byte] = "EncryEqui123".getBytes("UTF-8") ++
+
+  lazy val encryPerson: Array[Byte] = "equi_seed_12".getBytes(Algos.charset) ++
     Chars.toByteArray(n) ++
     Chars.toByteArray(k)
 
-  @SuppressWarnings(Array("NullParameter"))
   override def verifyCandidate(candidateBlock: CandidateBlock, finishingNonce: Long, startingNonce: Long): Option[EncryBlock] = {
     require(finishingNonce >= startingNonce)
 
@@ -95,7 +95,6 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Scor
 
       (version, parentId, adProofsRoot, txsRoot, height)
     }
-
 
   override def realDifficulty(header: EncryBlockHeader): Difficulty = {
     Difficulty @@ (Constants.Chain.MaxTarget / BigInt(1, header.powHash))

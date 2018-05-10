@@ -1,12 +1,8 @@
 package encry.consensus
 
-import java.util.concurrent.TimeUnit.MILLISECONDS
-
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.settings.Constants
 import encry.view.history.Height
-
-import scala.concurrent.duration.FiniteDuration
 
 object PowLinearController {
 
@@ -46,14 +42,6 @@ object PowLinearController {
     DifficultySerializer.encodeCompactBits(b + k * point / PrecisionConstant)
   }
 
-  // Retargeting to adjust difficulty.
-  def getNewTarget(oldTarget: BigInt, lastEpochsIntervalMs: FiniteDuration): BigInt =
-    oldTarget * lastEpochsIntervalMs.toMillis / (chainParams.DesiredBlockInterval.toMillis *
-      chainParams.RetargetingEpochsQty)
-
-  def getNewDifficulty(oldDifficulty: Difficulty, lastEpochsIntervalMs: FiniteDuration): Difficulty =
-    Difficulty @@ (chainParams.MaxTarget / getNewTarget(getTarget(oldDifficulty), lastEpochsIntervalMs))
-
   // Used to provide `getTimedelta()` with the sequence of headers of right heights.
   def getHeightsForRetargetingAt(height: Height): Seq[Height] = {
     if ((height - 1) > chainParams.RetargetingEpochsQty)
@@ -64,14 +52,5 @@ object PowLinearController {
         .map(i => (height - 1) - i).filter(i => i > 1).reverse.map(i => Height @@ i)
   }
 
-  def getTimedelta(headers: Seq[EncryBlockHeader]): FiniteDuration = {
-    val start = headers.head.timestamp
-    val end = headers.last.timestamp
-    FiniteDuration(end - start, MILLISECONDS)
-  }
-
   val PrecisionConstant: Int = 1000000000
-
-  def getTarget(difficulty: Difficulty): BigInt =
-    chainParams.MaxTarget / difficulty
 }

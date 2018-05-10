@@ -30,33 +30,18 @@ case class EncryBlockHeader(override val version: Version,
                              override val stateRoot: ADDigest, // 32 bytes + 1 (tree height)
                              override val transactionsRoot: Digest32,
                              override val timestamp: Timestamp,
-                             override val height: Height, // TODO: @@ Height
+                             override val height: Height,
                              var nonce: Long = 0L,
                              nBits: NBits,
                              equihashSolution: EquihashSolution) extends EncryBaseBlockHeader {
-
-  lazy val powHash: Digest32 = {
-    val digest = new Blake2bDigest(256)
-    val bytes = EncryBlockHeaderSerializer.bytesWithoutPow(this)
-    digest.update(bytes, 0, bytes.length)
-    Equihash.hashNonce(digest, nonce)
-    Equihash.hashSolution(digest, equihashSolution)
-    val h = new Array[Byte](32)
-    digest.doFinal(h, 0)
-
-    val secondDigest = new Blake2bDigest(256)
-    secondDigest.update(h, 0, h.length)
-    val result = new Array[Byte](32)
-    secondDigest.doFinal(result, 0)
-
-    Digest32 @@ result
-  }
 
   import EncryBlockHeader._
 
   override type M = EncryBlockHeader
 
   override val modifierTypeId: ModifierTypeId = EncryBlockHeader.modifierTypeId
+
+  lazy val powHash: Digest32 = getPowHash(this)
 
   lazy val requiredDifficulty: Difficulty = Difficulty @@ DifficultySerializer.decodeCompactBits(nBits)
 
@@ -98,6 +83,23 @@ object EncryBlockHeader {
     "height" -> h.height.asJson,
     "nBits" -> h.nBits.untag(NBits).asJson,
   ).asJson
+
+  def getPowHash(header: EncryBlockHeader): Digest32 = {
+    val digest = new Blake2bDigest(256)
+    val bytes = EncryBlockHeaderSerializer.bytesWithoutPow(header)
+    digest.update(bytes, 0, bytes.length)
+    Equihash.hashNonce(digest, header.nonce)
+    Equihash.hashSolution(digest, header.equihashSolution)
+    val h = new Array[Byte](32)
+    digest.doFinal(h, 0)
+
+    val secondDigest = new Blake2bDigest(256)
+    secondDigest.update(h, 0, h.length)
+    val result = new Array[Byte](32)
+    secondDigest.doFinal(result, 0)
+
+    Digest32 @@ result
+  }
 
   def getMessageToSign(version: Version,
                        accountPubKey: PublicKey25519,
@@ -150,7 +152,6 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
       DifficultySerializer.uint32ToByteArrayBE(obj.nBits),
       obj.equihashSolution.bytes
     )
-
 
   override def parseBytes(bytes: Array[Byte]): Try[EncryBlockHeader] = Try {
     val version = bytes.head

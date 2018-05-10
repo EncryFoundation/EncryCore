@@ -22,10 +22,12 @@ sealed trait ConsensusSchemeReader[T <: ConsensusScheme] {
 }
 
 object EquihashPowSchemeReader extends ConsensusSchemeReader[EquihashPowScheme] {
+
   val schemeName = "equihash"
+
   def read: EquihashPowScheme = {
     val n = Constants.Equihash.n
     val k = Constants.Equihash.k
-    new EquihashPowScheme(n, k)
+    EquihashPowScheme(n, k)
   }
 }
