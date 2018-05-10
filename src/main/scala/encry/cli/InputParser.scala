@@ -6,8 +6,8 @@ object InputParser {
 
   import fastparse.all._
 
-  val ws = P( " " )
-  val wss = P( ws.rep(min = 1, max = 5) )
+  val ws: all.Parser[Unit] = P( " " )
+  val wss: all.Parser[Unit] = P( ws.rep(min = 1, max = 5) )
 
   val letter: all.Parser[Unit] =        P( lowercase | uppercase )
   val lowercase: all.Parser[Unit] =     P( CharIn('a' to 'z') )
@@ -30,7 +30,7 @@ object InputParser {
 
   val escapeseq: P0 = P( "\\" ~ AnyChar )
 
-  val number = negatable[Long](P( CharIn('0' to '9').rep(min = 1).!.map(_.toLong) ))
+  val number: core.Parser[Long, Char, String] = negatable[Long](P( CharIn('0' to '9').rep(min = 1).!.map(_.toLong) ))
 
   val IDENT: P[Ast.Identifier] = P( letter.rep ).!.map(Ast.Identifier)
   val NUMBER: P[Ast.Num] = P( intConstExpr )

@@ -26,4 +26,14 @@ object GetBalance extends Command {
         ))
       }).mapTo[Option[Response]], 5.second)
   }
+
+  override def testExecute(nodeViewHolderRef: ActorRef,
+                       args: Command.Args, settings: EncryAppSettings): Unit = {
+    nodeViewHolderRef !
+      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
+        Option(Response(
+          view.vault.getBalances.foldLeft("")((str, tokenInfo) => str.concat(s"TokenID(${Algos.encode(tokenInfo._1)}) : ${tokenInfo._2}\n"))
+        ))
+      }
+  }
 }
