@@ -1,14 +1,16 @@
 package encry.cli.commands
 
 import akka.actor.ActorRef
-import encry.cli.{Ast, Response}
+import encry.cli.Response
 import encry.settings.EncryAppSettings
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 object Help extends Command {
 
   override def execute(nodeViewHolderRef: ActorRef,
-                       args: Command.Args, settings: EncryAppSettings): Option[Response] =
-    Some(Response(
+                       args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] =
+    Future(Some(Response(
       """
         |Usage: [GROUP_NAME] [COMMAND] -[ARGUMENT_1]=[VAL_1] -[ARGUMENT_2]=[VAL_2]
         |
@@ -24,5 +26,5 @@ object Help extends Command {
         |wallet        transfer         addr, amount   Transfer `amount` to `addr`ess
         |app           help             None           Show all supported commands
       """
-        .stripMargin))
+        .stripMargin)))
 }

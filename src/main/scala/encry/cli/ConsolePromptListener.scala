@@ -13,10 +13,7 @@ import jline.console.ConsoleReader
 import scorex.core.utils.ScorexLogging
 import fastparse.all._
 import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
-
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Await
-import scala.concurrent.Future
 
 class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings)
   extends Actor with ScorexLogging {
@@ -34,13 +31,14 @@ class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSetti
           case Parsed.Success(command, _) =>
             getCommand(command.category.name, command.ident.name) match {
               case Some(cmd) =>
-                println(
                   cmd.execute(
                     nodeViewHolderRef,
                     Command.Args(command.params.map(p => p.ident.name -> p.value).toMap),
                     settings
-                  ).map(_.msg).getOrElse("")
-                )
+                  ).map(x => x match {
+                    case Some(x) => println(x.msg)
+                    case None =>
+                  })//_.map(_.msg).getOrElse(""))
               case _ =>
                 println("Unsupported command. Type 'app help' to get commands list")
             }
