@@ -11,7 +11,7 @@ import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
 import encry.settings.{Algos, Constants}
 import io.circe.Encoder
 import io.circe.syntax._
-import org.bouncycastle.crypto.digests.SHA256Digest
+import org.bouncycastle.crypto.digests.Blake2bDigest
 import scorex.core.block.Block._
 import scorex.core.serialization.Serializer
 import scorex.core.{ModifierId, ModifierTypeId}
@@ -30,13 +30,13 @@ case class EncryBlockHeader(override val version: Version,
                              override val stateRoot: ADDigest, // 32 bytes + 1 (tree height)
                              override val transactionsRoot: Digest32,
                              override val timestamp: Timestamp,
-                             override val height: Int, // TODO: @@ Height
+                             override val height: Height, // TODO: @@ Height
                              var nonce: Long = 0L,
                              nBits: NBits,
                              equihashSolution: EquihashSolution) extends EncryBaseBlockHeader {
 
   lazy val powHash: Digest32 = {
-    val digest = new SHA256Digest()
+    val digest = new Blake2bDigest(256)
     val bytes = EncryBlockHeaderSerializer.bytesWithoutPow(this)
     digest.update(bytes, 0, bytes.length)
     Equihash.hashNonce(digest, nonce)
@@ -44,7 +44,7 @@ case class EncryBlockHeader(override val version: Version,
     val h = new Array[Byte](32)
     digest.doFinal(h, 0)
 
-    val secondDigest = new SHA256Digest()
+    val secondDigest = new Blake2bDigest(256)
     secondDigest.update(h, 0, h.length)
     val result = new Array[Byte](32)
     secondDigest.doFinal(result, 0)
