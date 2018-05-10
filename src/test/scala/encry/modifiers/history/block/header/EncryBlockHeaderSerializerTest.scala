@@ -1,12 +1,12 @@
 package encry.modifiers.history.block.header
 
 import encry.utils.EncryGenerator
-import org.scalatest.FunSuite
+import org.scalatest.{Matchers, PropSpec}
 
 
-class EncryBlockHeaderSerializerTest extends FunSuite with EncryGenerator{
+class EncryBlockHeaderSerializerTest extends PropSpec with Matchers with EncryGenerator{
 
-  test("testToBytes & testParseBytes") {
+  property("testToBytes & testParseBytes") {
 
     val blockHeader = genHeader
 
@@ -14,8 +14,10 @@ class EncryBlockHeaderSerializerTest extends FunSuite with EncryGenerator{
 
     val blockHeaderDeserialized = EncryBlockHeaderSerializer.parseBytes(blockHeaderSerialized)
 
-    assert(blockHeaderDeserialized.isSuccess, "Deserialization failed.")
+    blockHeaderDeserialized.isSuccess shouldBe true
 
-    assert(blockHeader.id sameElements blockHeaderDeserialized.get.id, "HeaderId mismatch.")
+    blockHeader.id shouldEqual blockHeaderDeserialized.get.id
+
+    blockHeader.nBits shouldEqual blockHeaderDeserialized.get.nBits
   }
 }
