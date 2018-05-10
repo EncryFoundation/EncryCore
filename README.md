@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/EncryFoundation/EncryCore.svg?branch=master)](https://travis-ci.org/EncryFoundation/EncryCore)
 
-Reference implementation of the EncryCore node. Encry is a distributed digital asset platform supporting smart contracts
+Reference implementation of the EncryCore node. Encry is a distributed digital asset platform supporting smart contracts (non turing-complete)
 and custom asset issuing.
 
 * [Protocol specification](https://github.com/EncryFoundation/EncryCore/blob/master/docs/design/ProtocolSpec.md) (in progress)
@@ -10,11 +10,12 @@ and custom asset issuing.
 ## Related projects
 
 * [EncryScript](https://github.com/EncryFoundation/EncryScript) - Contract-oriented scripting language designed specially for EncryCore.
+* [EncryTypeLang](https://github.com/EncryFoundation/EncryTypeLang) - Language for arbitrary data structures description (At early development stage, currently).
 
 ## Installation
 
 #### Compiling from source
-To run the EncryCore node you need JRE 1.8 (64-bit version) and SBT to be installed. 
+To run EncryCore node you need JRE 1.8 (64-bit version) and SBT to be installed. 
 Default configuration file and templates could be found in `src/main/resources/`.
 
 MacOS and Linux:
