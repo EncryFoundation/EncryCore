@@ -11,7 +11,7 @@ import encrywm.backend.executor.Executor.{Return, Unlocked}
 import encrywm.common.SourceProcessor.SerializedContract
 import encrywm.common.{EncryContract, ScriptFingerprint, ScriptMeta, ScriptSerializer}
 import encrywm.frontend.semantics.ComplexityAnalyzer.ScriptComplexityScore
-import encrywm.lib.Types
+import encrywm.lib.{TypeSystem, Types}
 import encrywm.lib.Types.ESProposition
 import io.circe.Encoder
 import io.circe.syntax._
@@ -32,7 +32,7 @@ case class ContractProposition(contract: EncryContract) extends EncryProposition
     ScriptSerializer.deserialize(contract.serializedScript).map { script =>
       val contractContext = ContractContext(proof, ctx.transaction,
         CStateInfo(ctx.height, ctx.lastBlockTimestamp, ctx.stateDigest), contract.meta)
-      val executor = Executor(contractContext.asVal, Constants.ContractMaxFuel)
+      val executor = Executor(TypeSystem.empty, contractContext.asVal, Constants.ContractMaxFuel)
       executor.executeContract(script) match {
         case Right(Return(_: Unlocked.type)) => Success()
         case _ => throw new Error("Unlock failed.")
