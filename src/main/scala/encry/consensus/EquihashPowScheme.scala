@@ -19,7 +19,7 @@ import scala.math.BigInt
 
 case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with ScorexLogging {
 
-  lazy val encryPerson: Array[Byte] =
+  private val seed: Array[Byte] =
     "equi_seed_12".getBytes(Algos.charset) ++ Chars.toByteArray(n) ++ Chars.toByteArray(k)
 
   override def verifyCandidate(candidateBlock: CandidateBlock,
@@ -35,7 +35,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Scor
     val bytesPerWord = n / 8
     val wordsPerHash = 512 / n
 
-    val digest = new Blake2bDigest(null, bytesPerWord * wordsPerHash, null, encryPerson) // scalastyle:ignore
+    val digest = new Blake2bDigest(null, bytesPerWord * wordsPerHash, null, seed) // scalastyle:ignore
     val h = EncryBlockHeader(
       version,
       candidateBlock.accountPubKey,
@@ -48,7 +48,8 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Scor
       height,
       0L,
       candidateBlock.nBits,
-      EquihashSolution.empty)
+      EquihashSolution.empty
+    )
 
     @tailrec
     def generateHeader(nonce: Long): Option[EncryBlockHeader] = {
@@ -68,7 +69,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Scor
     val possibleHeader = generateHeader(startingNonce)
 
     possibleHeader.flatMap(header => {
-      if(verify(header)){
+      if (verify(header)) {
         val adProofs = ADProofs(header.id, candidateBlock.adProofBytes)
         val payload = EncryBlockPayload(header.id, candidateBlock.transactions)
         Some(EncryBlock(header, payload, Some(adProofs)))
@@ -80,7 +81,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Scor
     Equihash.validateSolution(
       n,
       k,
-      encryPerson,
+      seed,
       Equihash.nonceToLeBytes(header.nonce),
       header.equihashSolution.indexedSeq
     )

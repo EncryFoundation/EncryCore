@@ -72,7 +72,8 @@ object InfoApiRoute {
       "bestHeaderId" -> bestHeader.map(_.encodedId).getOrElse("null").asJson,
       "bestFullHeaderId" -> bestFullBlock.map(_.header.encodedId).getOrElse("null").asJson,
       "previousFullHeaderId" -> bestFullBlock.map(_.header.parentId).map(Base58.encode).getOrElse("null").asJson,
-      "difficulty" -> bestFullBlock.map(block => DifficultySerializer.decodeCompactBits(block.header.nBits)).getOrElse(Constants.Chain.InitialDifficulty).asJson,
+      "difficulty" -> bestFullBlock.map(block => DifficultySerializer.decodeCompactBits(block.header.nBits))
+        .getOrElse(Constants.Chain.InitialDifficulty).asJson,
       "unconfirmedCount" -> unconfirmedCount.asJson,
       "stateType" -> stateType.asJson,
       "stateVersion" -> stateVersion.asJson,
