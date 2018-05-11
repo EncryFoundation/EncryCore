@@ -71,9 +71,7 @@ class EncryApp(args: Seq[String]) extends Application {
   val cliListenerRef: ActorRef =
     actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolderRef, encrySettings))
 
-  if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) {
-    minerRef ! StartMining
-  }
+  if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) minerRef ! StartMining
 
   if (encrySettings.testingSettings.transactionGeneration) {
     val txGen =
@@ -81,9 +79,7 @@ class EncryApp(args: Seq[String]) extends Application {
     txGen ! StartGeneration
   }
 
-  if (encrySettings.nodeSettings.enableCLI) {
-    cliListenerRef ! StartListening
-  }
+  if (encrySettings.nodeSettings.enableCLI) cliListenerRef ! StartListening
 
   val allActors = Seq(
     nodeViewHolderRef,
