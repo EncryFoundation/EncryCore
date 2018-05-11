@@ -26,7 +26,7 @@ class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSetti
 
   override def receive: Receive = {
     case StartListening =>
-      Iterator.continually(reader.readLine(prompt)).takeWhile(!_.equals("quit")).foreach { input =>
+      Iterator.continually(reader.readLine(prompt)).foreach { input =>
         (InputParser.commandP ~ End).parse(input) match {
           case Parsed.Success(command, _) =>
             getCommand(command.category.name, command.ident.name) match {
@@ -36,7 +36,7 @@ class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSetti
                     Command.Args(command.params.map(p => p.ident.name -> p.value).toMap),
                     settings
                   ).map {
-                    case Some(x) => println(x.msg)
+                    case Some(x) => println(x.msg); print("$> ")
                     case None =>
                   }
               case _ => println("Unsupported command. Type 'app help' to get commands list")
