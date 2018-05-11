@@ -1,18 +1,13 @@
 package encry.cli
 
 import akka.actor.{Actor, ActorRef}
-import akka.util.Timeout
 import encry.cli.commands._
-import encry.settings.{Algos, EncryAppSettings}
-import encry.view.history.EncryHistory
-import encry.view.mempool.EncryMempool
-import encry.view.state.UtxoState
-import encry.view.wallet.EncryWallet
+import encry.settings.EncryAppSettings
+import fastparse.all._
 import fastparse.core.Parsed
 import jline.console.ConsoleReader
 import scorex.core.utils.ScorexLogging
-import fastparse.all._
-import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings)
