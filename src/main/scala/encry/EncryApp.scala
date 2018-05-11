@@ -2,7 +2,7 @@ package encry
 
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import encry.api.http.routes.{AccountInfoApiRoute, HistoryApiRoute, InfoApiRoute, TransactionsApiRoute}
-import encry.cli.ConsolePromptListener
+import encry.cli.{ConsoleActor, ConsolePromptListener}
 import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator.StartGeneration
 import encry.local.miner.EncryMiner.StartMining
@@ -23,7 +23,7 @@ import scorex.core.settings.ScorexSettings
 import scorex.core.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContextExecutor
-import scala.io.Source
+import scala.io.{Source, StdIn}
 
 
 class EncryApp(args: Seq[String]) extends Application {
@@ -62,14 +62,23 @@ class EncryApp(args: Seq[String]) extends Application {
     AccountInfoApiRoute(readersHolderRef, nodeViewHolderRef, scannerRef, settings.restApi, encrySettings.nodeSettings.stateMode)
   )
 
+  //Console
+  val consoleActor: ActorRef = actorSystem.actorOf(
+    Props(classOf[ConsoleActor], nodeViewHolderRef, minerRef, encrySettings), "consoleActor")
+  import ConsoleActor._
+  while (true) {
+    val raw: String = StdIn.readLine()
+    consoleActor ! Order(raw)
+  }
+
   val localInterface: ActorRef =
     EncryLocalInterfaceRef(nodeViewHolderRef, peerManagerRef, encrySettings, timeProvider)
 
   override val nodeViewSynchronizer: ActorRef =
     EncryNodeViewSynchronizer(networkControllerRef, nodeViewHolderRef, EncrySyncInfoMessageSpec, settings.network, timeProvider)
 
-  val cliListenerRef: ActorRef =
-    actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolderRef, encrySettings))
+  //val cliListenerRef: ActorRef =
+  //  actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolderRef, encrySettings))
 
   if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) minerRef ! StartMining
 
@@ -79,7 +88,7 @@ class EncryApp(args: Seq[String]) extends Application {
     txGen ! StartGeneration
   }
 
-  if (encrySettings.nodeSettings.enableCLI) cliListenerRef ! StartListening
+  //if (encrySettings.nodeSettings.enableCLI) cliListenerRef ! StartListening
 
   val allActors = Seq(
     nodeViewHolderRef,
@@ -87,7 +96,7 @@ class EncryApp(args: Seq[String]) extends Application {
     readersHolderRef,
     networkControllerRef,
     localInterface,
-    cliListenerRef,
+    //cliListenerRef,
     scannerRef,
     minerRef
   )

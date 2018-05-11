@@ -52,19 +52,18 @@ class EncryMiner(settings: EncryAppSettings,
       log.warn(s"Unexpected message $m")
   }
 
-  private def miningStatus: Receive = {
-    case GetMinerStatus =>
-      sender ! MinerStatus(isMining, candidateOpt)
-  }
-
-  private def startMining: Receive = {
+  private def mining: Receive = {
     case StartMining if candidateOpt.nonEmpty && !isMining && settings.nodeSettings.mining =>
       log.info("Starting mining")
       isMining = true
       miningWorkers += EncryMiningWorker(settings, viewHolderRef, candidateOpt.get)(context)
       miningWorkers.foreach(_ ! candidateOpt.get)
-    case StartMining if candidateOpt.isEmpty =>
-      produceCandidate()
+    case StartMining if candidateOpt.isEmpty => produceCandidate()
+    case StopMining =>
+      isMining = false
+      killAllWorkers()
+      log.info("Stop mining")
+    case GetMinerStatus => sender ! MinerStatus(isMining, candidateOpt)
   }
 
   private def needNewCandidate(b: EncryBlock): Boolean = {
@@ -108,8 +107,7 @@ class EncryMiner(settings: EncryAppSettings,
   override def receive: Receive =
     receiveSemanticallySuccessfulModifier orElse
     receiverCandidateBlock orElse
-    miningStatus orElse
-    startMining orElse
+    mining orElse
     unknownMessage
 
   private def procCandidateBlock(c: PowCandidateBlock): Unit = {
@@ -199,8 +197,9 @@ class EncryMiner(settings: EncryAppSettings,
 
 object EncryMiner extends ScorexLogging {
 
-
   case object StartMining
+
+  case object StopMining
 
   case object GetMinerStatus
 
