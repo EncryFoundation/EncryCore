@@ -10,20 +10,23 @@ import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
-
-import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 object GetBalance extends Command {
 
   override def execute(nodeViewHolderRef: ActorRef,
-                       args: Command.Args, settings: EncryAppSettings): Option[Response] = {
+                       args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
-    Await.result((nodeViewHolderRef ?
+    (nodeViewHolderRef ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
         Option(Response(
-          view.vault.getBalances.foldLeft("")((str, tokenInfo) => str.concat(s"TokenID(${Algos.encode(tokenInfo._1)}) : ${tokenInfo._2}\n"))
+          {
+            val r = view.vault.getBalances.foldLeft("")((str, tokenInfo) => str.concat(s"TokenID(${Algos.encode(tokenInfo._1)}) : ${tokenInfo._2}\n"))
+            if (r.length == 0) "<empty>" else r
+          }
         ))
-      }).mapTo[Option[Response]], 5.second)
+      }).mapTo[Option[Response]]
   }
 }
