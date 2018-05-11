@@ -13,6 +13,7 @@ import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import scala.concurrent.Future
 import scala.util.Try
 import scala.concurrent.ExecutionContext.Implicits.global
+
 object AddKey extends Command {
 
   override def execute(nodeViewHolderRef: ActorRef,
