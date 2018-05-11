@@ -100,8 +100,6 @@ class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts
 
     val unlockR = proposition.unlockTry(multiSigProof)
 
-    unlockR.get
-
     unlockR.isSuccess shouldBe true
   }
 }

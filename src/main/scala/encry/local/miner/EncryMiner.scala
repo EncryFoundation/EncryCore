@@ -1,7 +1,7 @@
 package encry.local.miner
 
 import akka.actor.{Actor, ActorRef, ActorRefFactory, PoisonPill, Props}
-import encry.consensus.{PowCandidateBlock, PowConsensus}
+import encry.consensus._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryBaseTransaction, TransactionFactory}
@@ -11,8 +11,8 @@ import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
-import io.circe.{Encoder, Json}
 import io.circe.syntax._
+import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
@@ -31,8 +31,10 @@ class EncryMiner(settings: EncryAppSettings,
 
   private val startTime = timeProvider.time()
 
+  private val consensus = ConsensusSchemeReaders.consensusScheme
+
   private var isMining = false
-  private var candidateOpt: Option[PowCandidateBlock] = None
+  private var candidateOpt: Option[CandidateBlock] = None
   private val miningWorkers: mutable.Buffer[ActorRef] = new ArrayBuffer[ActorRef]()
 
   override def preStart(): Unit = {
@@ -99,7 +101,7 @@ class EncryMiner(settings: EncryAppSettings,
   }
 
   private def receiverCandidateBlock: Receive = {
-    case c: PowCandidateBlock =>
+    case c: CandidateBlock =>
       procCandidateBlock(c)
     case cEnv: CandidateEnvelope if cEnv.c.nonEmpty =>
       procCandidateBlock(cEnv.c.get)
@@ -112,7 +114,7 @@ class EncryMiner(settings: EncryAppSettings,
     startMining orElse
     unknownMessage
 
-  private def procCandidateBlock(c: PowCandidateBlock): Unit = {
+  private def procCandidateBlock(c: CandidateBlock): Unit = {
     log.debug(s"Got candidate block $c")
     candidateOpt = Some(c)
     if (!isMining) self ! StartMining
@@ -123,7 +125,7 @@ class EncryMiner(settings: EncryAppSettings,
                               pool: EncryMempool,
                               state: UtxoState,
                               vault: EncryWallet,
-                              bestHeaderOpt: Option[EncryBlockHeader]): PowCandidateBlock = {
+                              bestHeaderOpt: Option[EncryBlockHeader]): CandidateBlock = {
     val timestamp = timeProvider.time()
     val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
 
@@ -162,15 +164,16 @@ class EncryMiner(settings: EncryAppSettings,
     val txs = txsToPut.sortBy(_.timestamp) :+ coinbase
 
     val (adProof, adDigest) = state.proofsForTransactions(txs).get
-    val difficulty = bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
-      .getOrElse(Constants.Chain.InitialDifficulty)
-    val derivedFields = PowConsensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
+    val nBits: NBits = bestHeaderOpt
+      .map(parent => history.requiredDifficultyAfter(parent))
+      .getOrElse(Constants.Chain.InitialNBits)
+    val derivedFields = consensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
     val blockSignature = minerSecret.sign(
       EncryBlockHeader.getMessageToSign(derivedFields._1, minerSecret.publicImage, derivedFields._2,
-        derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, difficulty))
+        derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, nBits))
 
-    val candidate = new PowCandidateBlock(minerSecret.publicImage,
-      blockSignature, bestHeaderOpt, adProof, adDigest, txs, timestamp, difficulty)
+    val candidate = new CandidateBlock(minerSecret.publicImage,
+      blockSignature, bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, nBits)
 
     log.debug(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
       s"and 1 coinbase for height $height")
@@ -204,20 +207,20 @@ object EncryMiner extends ScorexLogging {
 
   case object GetMinerStatus
 
-  case class MinerStatus(isMining: Boolean, candidateBlock: Option[PowCandidateBlock]) {
+  case class MinerStatus(isMining: Boolean, candidateBlock: Option[CandidateBlock]) {
     lazy val json: Json = Map(
       "isMining" -> isMining.asJson,
       "candidateBlock" -> candidateBlock.map(_.asJson).getOrElse("None".asJson)
     ).asJson
   }
 
-  case class CandidateEnvelope(c: Option[PowCandidateBlock])
+  case class CandidateEnvelope(c: Option[CandidateBlock])
 
   object CandidateEnvelope {
 
     val empty = CandidateEnvelope(None)
 
-    def fromCandidate(c: PowCandidateBlock): CandidateEnvelope = CandidateEnvelope(Some(c))
+    def fromCandidate(c: CandidateBlock): CandidateEnvelope = CandidateEnvelope(Some(c))
   }
 
   implicit val jsonEncoder: Encoder[MinerStatus] = (r: MinerStatus) =>

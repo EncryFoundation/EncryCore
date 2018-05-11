@@ -8,6 +8,10 @@ package object consensus {
 
   type Difficulty = Difficulty.Type
 
+  object NBits extends TaggedType[Long]
+
+  type NBits = NBits.Type
+
   object Target extends TaggedType[BigInt]
 
   type Target = Target.Type
