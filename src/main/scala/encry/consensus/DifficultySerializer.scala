@@ -62,5 +62,4 @@ object DifficultySerializer {
     result |= a
     NBits @@ result
   }
-
 }

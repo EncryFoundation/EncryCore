@@ -19,15 +19,15 @@ import scala.math.BigInt
 
 case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with ScorexLogging {
 
-  lazy val encryPerson: Array[Byte] = "equi_seed_12".getBytes(Algos.charset) ++
-    Chars.toByteArray(n) ++
-    Chars.toByteArray(k)
+  lazy val encryPerson: Array[Byte] =
+    "equi_seed_12".getBytes(Algos.charset) ++ Chars.toByteArray(n) ++ Chars.toByteArray(k)
 
-  override def verifyCandidate(candidateBlock: CandidateBlock, finishingNonce: Long, startingNonce: Long): Option[EncryBlock] = {
+  override def verifyCandidate(candidateBlock: CandidateBlock,
+                               finishingNonce: Long,
+                               startingNonce: Long): Option[EncryBlock] = {
     require(finishingNonce >= startingNonce)
 
     val difficulty = DifficultySerializer.decodeCompactBits(candidateBlock.nBits)
-
 
     val (version, parentId, adProofsRoot, txsRoot, height) =
       getDerivedHeaderFields(candidateBlock.parentOpt, candidateBlock.adProofBytes, candidateBlock.transactions)
@@ -85,7 +85,8 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Scor
       header.equihashSolution.indexedSeq
     )
 
-  override def getDerivedHeaderFields(parentOpt: Option[EncryBlockHeader], adProofBytes: SerializedAdProof,
+  override def getDerivedHeaderFields(parentOpt: Option[EncryBlockHeader],
+                                      adProofBytes: SerializedAdProof,
                                       transactions: Seq[EncryBaseTransaction]): (Byte, ModifierId, Digest32, Digest32, Int) = {
       val version = Constants.Chain.Version
       val parentId: ModifierId = parentOpt.map(_.id).getOrElse(EncryBlockHeader.GenesisParentId)
