@@ -3,12 +3,14 @@ package encry.cli
 import akka.actor.{Actor, ActorRef}
 import encry.cli.commands._
 import encry.settings.EncryAppSettings
+import fastparse.all._
 import fastparse.core.Parsed
 import jline.console.ConsoleReader
 import scorex.core.utils.ScorexLogging
-import fastparse.all._
 
-case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings)
+import scala.concurrent.ExecutionContext.Implicits.global
+
+class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings)
   extends Actor with ScorexLogging {
 
   import ConsolePromptListener._
@@ -19,23 +21,22 @@ case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryApp
 
   override def receive: Receive = {
     case StartListening =>
-      Iterator.continually(reader.readLine(prompt)).takeWhile(!_.equals("quit")).foreach { input =>
+      Iterator.continually(reader.readLine(prompt)).foreach { input =>
         (InputParser.commandP ~ End).parse(input) match {
           case Parsed.Success(command, _) =>
             getCommand(command.category.name, command.ident.name) match {
               case Some(cmd) =>
-                println(
                   cmd.execute(
                     nodeViewHolderRef,
                     Command.Args(command.params.map(p => p.ident.name -> p.value).toMap),
                     settings
-                  ).map(_.msg).getOrElse("")
-                )
-              case _ =>
-                println("Unsupported command. Type 'app help' to get commands list")
+                  ).map {
+                    case Some(x) => println(x.msg); print("$> ")
+                    case None =>
+                  }
+              case _ => println("Unsupported command. Type 'app help' to get commands list")
             }
-          case _ =>
-            println("Bad input")
+          case _ => println("Bad input")
         }
       }
   }
