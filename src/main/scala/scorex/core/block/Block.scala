@@ -35,6 +35,7 @@ object Block {
   type BlockId = ModifierId
   type Timestamp = Long
   type Version = Byte
+  type Height = Int
 
   val BlockIdLength: Int = NodeViewModifier.ModifierIdSize
 

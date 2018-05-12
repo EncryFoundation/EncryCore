@@ -7,9 +7,8 @@ import scorex.crypto.encode.Base58
 import scala.util.Try
 
 /**
-  * History of a blockchain system is some blocktree in fact
-  * (like this: http://image.slidesharecdn.com/sfbitcoindev-chepurnoy-2015-150322043044-conversion-gate01/95/proofofstake-its-improvements-san-francisco-bitcoin-devs-hackathon-12-638.jpg),
-  * where longest chain is being considered as canonical one, containing right kind of history.
+  * History of a blockchain system is some blocktree, where longest chain is
+  * being considered as canonical one, containing right kind of history.
   *
   * In cryptocurrencies of today blocktree view is usually implicit, means code supports only linear history,
   * but other options are possible.
@@ -17,7 +16,6 @@ import scala.util.Try
   * To say "longest chain" is the canonical one is simplification, usually some kind of "cumulative difficulty"
   * function has been used instead.
   */
-
 trait History[PM <: PersistentNodeViewModifier, SI <: SyncInfo, HT <: History[PM, SI, HT]] extends HistoryReader[PM, SI] {
 
   /**
