@@ -3,12 +3,11 @@ package encry.cli
 import akka.actor.{Actor, ActorRef}
 import encry.cli.commands._
 import encry.settings.EncryAppSettings
-import fastparse.all._
-import fastparse.core.Parsed
 import jline.console.ConsoleReader
 import scorex.core.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.Success
 
 class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings)
   extends Actor with ScorexLogging {
@@ -22,8 +21,8 @@ class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSetti
   override def receive: Receive = {
     case StartListening =>
       Iterator.continually(reader.readLine(prompt)).foreach { input =>
-        (InputParser.commandP ~ End).parse(input) match {
-          case Parsed.Success(command, _) =>
+        InputParser.parse(input) match {
+          case Success(command) =>
             getCommand(command.category.name, command.ident.name) match {
               case Some(cmd) =>
                   cmd.execute(
@@ -31,7 +30,9 @@ class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSetti
                     Command.Args(command.params.map(p => p.ident.name -> p.value).toMap),
                     settings
                   ).map {
-                    case Some(x) => println(x.msg); print("$> ")
+                    case Some(x) =>
+                      println(x.msg)
+                      print(prompt)
                     case None =>
                   }
               case _ => println("Unsupported command. Type 'app help' to get commands list")
