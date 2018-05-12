@@ -191,7 +191,7 @@ trait EncryHistoryReader
                        toHeader: EncryBlockHeader): (Option[ModifierId], EncryHeaderChain) = {
     fromHeaderOpt match {
       case Some(h1) =>
-        val (prevChain, newChain) = commonBlockAndSuffixes(h1, toHeader)
+        val (prevChain, newChain) = commonBlockThenSuffixes(h1, toHeader)
         (prevChain.headOption.map(_.id), newChain.tail)
       case None =>
         (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
@@ -199,13 +199,13 @@ trait EncryHistoryReader
   }
 
   /** Finds common block and sub-chains from common block to header1 and header2. */
-  protected[history] def commonBlockAndSuffixes(header1: EncryBlockHeader,
-                                                header2: EncryBlockHeader): (EncryHeaderChain, EncryHeaderChain) = {
+  protected[history] def commonBlockThenSuffixes(header1: EncryBlockHeader,
+                                                 header2: EncryBlockHeader): (EncryHeaderChain, EncryHeaderChain) = {
     assert(contains(header1) && contains(header2), "Got non-existing header(s)")
     val heightDelta = Math.max(header1.height - header2.height, 0)
 
     def loop(numberBack: Int, otherChain: EncryHeaderChain): (EncryHeaderChain, EncryHeaderChain) = {
-      val r = commonBlockAndSuffixes(otherChain, header1, numberBack + heightDelta)
+      val r = commonBlockThenSuffixes(otherChain, header1, numberBack + heightDelta)
       if (r._1.head == r._2.head) {
         r
       } else {
@@ -222,9 +222,9 @@ trait EncryHistoryReader
   }
 
   /** Finds common block and sub-chains with `otherChain`. */
-  protected[history] def commonBlockAndSuffixes(otherChain: EncryHeaderChain,
-                                                startHeader: EncryBlockHeader,
-                                                limit: Int): (EncryHeaderChain, EncryHeaderChain) = {
+  protected[history] def commonBlockThenSuffixes(otherChain: EncryHeaderChain,
+                                                 startHeader: EncryBlockHeader,
+                                                 limit: Int): (EncryHeaderChain, EncryHeaderChain) = {
     def until(h: EncryBlockHeader): Boolean = otherChain.exists(_.id sameElements h.id)
 
     val ourChain = headerChainBack(limit, startHeader, until)
