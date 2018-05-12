@@ -69,9 +69,9 @@ object InfoApiRoute {
       "name" -> nodeName.asJson,
       "headersHeight" -> bestHeader.map(_.height).getOrElse(0).asJson,
       "fullHeight" -> bestFullBlock.map(_.header.height).getOrElse(0).asJson,
-      "bestHeaderId" -> bestHeader.map(_.encodedId).getOrElse("null").asJson,
-      "bestFullHeaderId" -> bestFullBlock.map(_.header.encodedId).getOrElse("null").asJson,
-      "previousFullHeaderId" -> bestFullBlock.map(_.header.parentId).map(Base58.encode).getOrElse("null").asJson,
+      "bestHeaderId" -> bestHeader.map(_.encodedId).asJson,
+      "bestFullHeaderId" -> bestFullBlock.map(_.header.encodedId).asJson,
+      "previousFullHeaderId" -> bestFullBlock.map(_.header.parentId).map(Base58.encode).asJson,
       "difficulty" -> bestFullBlock.map(block => DifficultySerializer.decodeCompactBits(block.header.nBits))
         .getOrElse(Constants.Chain.InitialDifficulty).asJson,
       "unconfirmedCount" -> unconfirmedCount.asJson,
