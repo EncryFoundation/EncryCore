@@ -66,9 +66,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     }
   }
 
-  /**
-    * Hard-coded initial view all the honest nodes in a network are making progress from.
-    */
+  /** Hard-coded initial view all the honest nodes in a network are making progress from. */
   override protected def genesisState: (EncryHistory, MS, EncryWallet, EncryMempool) = {
     val stateDir = EncryState.getStateDir(settings)
     stateDir.mkdir()
@@ -80,7 +78,6 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
       else EncryState.generateGenesisUtxoState(stateDir, Some(self))._1
     }.asInstanceOf[MS]
 
-    //todo: ensure that history is in certain mode
     val history = EncryHistory.readOrGenerate(settings, timeProvider)
 
     val wallet = EncryWallet.readOrGenerate(settings)
@@ -94,7 +91,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     * Restore a local view during a node startup. If no any stored view found
     * (e.g. if it is a first launch of a node) None is to be returned
     */
-  override def restoreState: Option[NodeView] = if (!EncryHistory.getHistoryDir(settings).listFiles.isEmpty) {
+  override def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryDir(settings).listFiles.isEmpty) {
     val history = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet = EncryWallet.readOrGenerate(settings)
     val memPool = EncryMempool.empty(settings, timeProvider)
@@ -162,12 +159,12 @@ private[view] class DigestNodeViewHolder(settings: EncryAppSettings, timeProvide
 private[view] class UtxoNodeViewHolder(settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
   extends EncryNodeViewHolder[UtxoState](settings, timeProvider)
 
-/** This class guarantees to its inheritors the creation of correct instance of [[EncryNodeViewHolder]]
-  *  for the given instance of [[StateMode]]
+/**
+  * This class guarantees to its inheritors the creation of correct instance of [[EncryNodeViewHolder]]
+  * for the given instance of [[StateMode]].
   */
-sealed abstract class EncryNodeViewProps[ST <: StateMode, S <: EncryState[S], N <: EncryNodeViewHolder[S]]
-(implicit ev: StateMode.Evidence[ST, S]) {
-  def apply(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, digestType:ST): Props
+sealed abstract class EncryNodeViewProps[SM <: StateMode, S <: EncryState[S], N <: EncryNodeViewHolder[S]](implicit ev: StateMode.Evidence[SM, S]) {
+  def apply(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, digestMode: SM): Props
 }
 
 object DigestNodeViewProps extends EncryNodeViewProps[StateMode.DigestMode, DigestState, DigestNodeViewHolder] {
