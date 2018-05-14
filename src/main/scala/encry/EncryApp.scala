@@ -62,23 +62,14 @@ class EncryApp(args: Seq[String]) extends Application {
     AccountInfoApiRoute(readersHolderRef, nodeViewHolderRef, scannerRef, settings.restApi, encrySettings.nodeSettings.stateMode)
   )
 
-  //Console
-  val consoleActor: ActorRef = actorSystem.actorOf(
-    Props(classOf[ConsoleActor], nodeViewHolderRef, minerRef, encrySettings), "consoleActor")
-  import ConsoleActor._
-  while (true) {
-    val raw: String = StdIn.readLine()
-    consoleActor ! Order(raw)
-  }
-
   val localInterface: ActorRef =
     EncryLocalInterfaceRef(nodeViewHolderRef, peerManagerRef, encrySettings, timeProvider)
 
   override val nodeViewSynchronizer: ActorRef =
     EncryNodeViewSynchronizer(networkControllerRef, nodeViewHolderRef, EncrySyncInfoMessageSpec, settings.network, timeProvider)
 
-  //val cliListenerRef: ActorRef =
-  //  actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolderRef, encrySettings))
+  val cliListenerRef: ActorRef =
+    actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolderRef, encrySettings, minerRef))
 
   if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) minerRef ! StartMining
 
@@ -88,7 +79,7 @@ class EncryApp(args: Seq[String]) extends Application {
     txGen ! StartGeneration
   }
 
-  //if (encrySettings.nodeSettings.enableCLI) cliListenerRef ! StartListening
+  if (encrySettings.nodeSettings.enableCLI) cliListenerRef ! StartListening
 
   val allActors = Seq(
     nodeViewHolderRef,
@@ -96,7 +87,7 @@ class EncryApp(args: Seq[String]) extends Application {
     readersHolderRef,
     networkControllerRef,
     localInterface,
-    //cliListenerRef,
+    cliListenerRef,
     scannerRef,
     minerRef
   )
@@ -108,7 +99,7 @@ object EncryApp extends ScorexLogging {
 
   def main(args: Array[String]): Unit = new EncryApp(args).run()
 
-  def forceStopApplication(code: Int = 1): Nothing = sys.exit(code)
+  def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
 
   def shutdown(system: ActorSystem, actors: Seq[ActorRef]): Unit = {
     log.warn("Terminating Actors")

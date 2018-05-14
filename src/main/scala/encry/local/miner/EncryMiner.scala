@@ -48,13 +48,11 @@ class EncryMiner(settings: EncryAppSettings,
   }
 
   private def unknownMessage: Receive = {
-    case m =>
-      log.warn(s"Unexpected message $m")
+    case m => log.warn(s"Unexpected message $m")
   }
 
   private def mining: Receive = {
     case StartMining if candidateOpt.nonEmpty && !isMining && settings.nodeSettings.mining =>
-      log.info("Starting mining")
       isMining = true
       miningWorkers += EncryMiningWorker(settings, viewHolderRef, candidateOpt.get)(context)
       miningWorkers.foreach(_ ! candidateOpt.get)
@@ -62,7 +60,6 @@ class EncryMiner(settings: EncryAppSettings,
     case StopMining =>
       isMining = false
       killAllWorkers()
-      log.info("Stop mining")
     case GetMinerStatus => sender ! MinerStatus(isMining, candidateOpt)
   }
 

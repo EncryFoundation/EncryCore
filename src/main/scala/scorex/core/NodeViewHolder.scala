@@ -2,7 +2,6 @@ package scorex.core
 
 import akka.actor.Actor
 import encry.EncryApp
-import encry.local.miner.EncryMiner.StopMining
 import scorex.core.consensus.History.ProgressInfo
 import scorex.core.consensus.{History, SyncInfo}
 import scorex.core.network.ConnectedPeer
@@ -387,7 +386,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
   protected def getCurrentInfo: Receive = {
     case GetDataFromCurrentView(f) =>
       sender() ! f(CurrentView(history(), minimalState(), vault(), memoryPool()))
-    case StopMining =>
   }
 
   protected def getNodeViewChanges: Receive = {

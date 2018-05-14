@@ -30,7 +30,7 @@ object Transfer extends Command {
     * @param args
     * @return
     */
-  override def execute(nodeViewHolderRef: ActorRef,
+  override def execute(nodeViewHolderRef: ActorRef, miner: ActorRef,
                        args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
     (nodeViewHolderRef ?

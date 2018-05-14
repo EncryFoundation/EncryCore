@@ -1,16 +1,18 @@
 package encry.cli.commands
+
 import akka.actor.ActorRef
-import encry.EncryApp
 import encry.cli.Response
 import encry.settings.EncryAppSettings
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-object NodeShutdown extends Command {
+object StartMine extends Command {
+
+  import encry.local.miner.EncryMiner.StartMining
 
   override def execute(nodeViewHolderRef: ActorRef, miner: ActorRef,
                        args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
-    EncryApp.forceStopApplication()
-    Future(None)
+    miner ! StartMining
+    Future(Some(Response("Mining is started.")))
   }
 }

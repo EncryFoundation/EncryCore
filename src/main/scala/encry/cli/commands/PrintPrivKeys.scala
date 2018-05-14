@@ -17,7 +17,7 @@ import scala.concurrent.duration._
 // This cmd is unsafe.
 object PrintPrivKeys extends Command {
 
-  override def execute(nodeViewHolderRef: ActorRef,
+  override def execute(nodeViewHolderRef: ActorRef, miner: ActorRef,
                        args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
     (nodeViewHolderRef ?

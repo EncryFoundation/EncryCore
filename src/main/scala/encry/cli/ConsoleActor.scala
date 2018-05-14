@@ -21,6 +21,8 @@ object ConsoleActor {
 
   case class Order(rawCommand: String) extends Command
 
+  case object WalletBalance extends Command
+
 }
 
 class ConsoleActor(nvh: ActorRef, miner: ActorRef, settings: EncryAppSettings) extends Actor {
@@ -48,7 +50,7 @@ class ConsoleActor(nvh: ActorRef, miner: ActorRef, settings: EncryAppSettings) e
     case Order("wallet init") =>
     case Order("wallet pubKeys") =>
     case Order("wallet transfer") =>
-    case _ => println("unknown command, try")
+    case _ => println("Unsupported command. Type 'app help' to get commands list")
   }
 
   val helper: String =
