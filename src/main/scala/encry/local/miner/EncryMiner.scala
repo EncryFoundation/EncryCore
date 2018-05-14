@@ -42,7 +42,6 @@ class EncryMiner(settings: EncryAppSettings,
   override def postStop(): Unit = killAllWorkers()
 
   private def killAllWorkers(): Unit = {
-    log.warn("Stopping miner's workers.")
     miningWorkers.foreach(_ ! PoisonPill)
     miningWorkers.clear()
   }
