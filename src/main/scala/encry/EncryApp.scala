@@ -2,7 +2,7 @@ package encry
 
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import encry.api.http.routes.{AccountInfoApiRoute, HistoryApiRoute, InfoApiRoute, TransactionsApiRoute}
-import encry.cli.{ConsoleActor, ConsolePromptListener}
+import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator.StartGeneration
 import encry.local.miner.EncryMiner.StartMining
