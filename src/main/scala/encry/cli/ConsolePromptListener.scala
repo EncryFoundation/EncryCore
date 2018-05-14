@@ -18,6 +18,7 @@ class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSetti
 
   private val reader = new ConsoleReader()
 
+  // TODO: Use `PrintWriter(reader.getOutput())` for output handling.
   override def receive: Receive = {
     case StartListening =>
       Iterator.continually(reader.readLine(prompt)).foreach { input =>

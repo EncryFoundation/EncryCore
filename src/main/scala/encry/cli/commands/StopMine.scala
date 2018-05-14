@@ -13,6 +13,6 @@ object StopMine extends Command {
   override def execute(nodeViewHolderRef: ActorRef, miner: ActorRef,
                        args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     miner ! StopMining
-    Future(Some(Response("Mining is stoped.")))
+    Future(Some(Response("Mining is stopped.")))
   }
 }
