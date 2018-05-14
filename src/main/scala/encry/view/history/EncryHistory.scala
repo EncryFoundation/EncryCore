@@ -20,9 +20,9 @@ import scorex.crypto.encode.Base58
 import scala.util.Try
 
 /**
-  * History implementation. It is processing persistent modifiers generated locally or coming from network.
+  * History implementation. It is processing persistent modifiers generated locally or received from the network.
   * Depending on chosen node settings, it will process modifiers in a different way, different processors define how to
-  * process different type of modifiers.
+  * process different types of modifiers.
   *
   * HeadersProcessor: processor of block headers. It's the same for all node settings
   * ADProofsProcessor: processor of ADProofs. ADProofs may
@@ -36,7 +36,7 @@ import scala.util.Try
 trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, EncryHistory]
   with EncryHistoryReader {
 
-  // Appends modifier to the history if it is applicable.
+  /** Appends modifier to the history if it is applicable. */
   override def append(modifier: EncryPersistentModifier): Try[(EncryHistory, History.ProgressInfo[EncryPersistentModifier])] = {
     log.debug(s"Trying to append modifier ${Base58.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     testApplicable(modifier).map { _ =>
@@ -54,19 +54,14 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
     this
   }
 
-  /**
-    * Report some modifier as valid or invalid semantically
-    */
+  /** Report some modifier as valid or invalid semantically */
   override def reportModifierIsInvalid(modifier: EncryPersistentModifier,
                                        progressInfo: ProgressInfo[EncryPersistentModifier]): (EncryHistory, ProgressInfo[EncryPersistentModifier]) = {
     log.debug(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
     this -> markModifierInvalid(modifier)
   }
 
-  /**
-    * @param modifier
-    * @return header, that corresponds to modifier
-    */
+  /** @return header, that corresponds to modifier*/
   protected def correspondingHeader(modifier: EncryPersistentModifier): Option[EncryBlockHeader] = modifier match {
     case header: EncryBlockHeader => Some(header)
     case block: EncryBlock => Some(block.header)
@@ -213,7 +208,7 @@ object EncryHistory {
           override protected val timeProvider: NetworkTimeProvider = ntp
         }
       case m =>
-        throw new Error(s"Unsupported settings combination ADState=:${m._1}, verifyTransactions=:${m._2}, ")
+        throw new Error(s"Unsupported settings ADState=:${m._1}, verifyTransactions=:${m._2}, ")
     }
     history
   }

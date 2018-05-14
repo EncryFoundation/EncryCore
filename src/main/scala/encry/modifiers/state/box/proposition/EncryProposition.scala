@@ -2,7 +2,7 @@ package encry.modifiers.state.box.proposition
 
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
-import encrywm.lib.predef.env.ESEnvConvertable
+import encrywm.lang.backend.env.ESEnvConvertable
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.transaction.box.proposition.Proposition

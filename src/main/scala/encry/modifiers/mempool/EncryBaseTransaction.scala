@@ -6,7 +6,7 @@ import encry.modifiers.mempool.directive.Directive
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.{Algos, Constants}
-import encrywm.lib.predef.env.ESEnvConvertable
+import encrywm.lang.backend.env.ESEnvConvertable
 import io.circe.Encoder
 import scorex.core.ModifierId
 import scorex.core.transaction.Transaction

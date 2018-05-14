@@ -4,10 +4,9 @@ import com.google.common.primitives.Longs
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.{EncryProposition, HeightProposition, OpenProposition}
 import encry.settings.Algos
-import encrywm.backend.env.{ESObject, ESValue}
+import encrywm.lang.backend.env.{ESEnvConvertable, ESObject, ESValue}
 import encrywm.lib.Types
 import encrywm.lib.Types.{ESByteVector, ESInt, ESProposition}
-import encrywm.lib.predef.env.ESEnvConvertable
 import io.circe.Encoder
 import scorex.core.transaction.box.Box
 import scorex.crypto.authds.ADKey

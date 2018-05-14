@@ -4,9 +4,9 @@ import com.google.common.primitives.Ints
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
 import encry.view.history.Height
-import encrywm.backend.env.{ESObject, ESValue}
+import encrywm.lang.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
-import encrywm.lib.Types.ESProposition
+import encrywm.lib.Types.ESInt
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
@@ -25,11 +25,17 @@ case class HeightProposition(height: Height) extends EncryProposition {
     if (height <= ctx.height) Success()
     else Failure(new Error("Unlock failed"))
 
-  override val esType: Types.ESProduct = ESProposition
+  override val esType: Types.ESProduct = Types.HeightProposition
 
-  override def asVal: ESValue = ???
+  override def asVal: ESValue = ESValue(Types.HeightProposition.ident.toLowerCase, Types.HeightProposition)(convert)
 
-  override def convert: ESObject = ???
+  override def convert: ESObject = {
+    val fields = Map(
+      "typeId" -> ESValue("typeId", ESInt)(typeId.toInt),
+      "height" -> ESValue("height", ESInt)(height)
+    )
+    ESObject(Types.HeightProposition.ident, fields, esType)
+  }
 }
 
 object HeightProposition {

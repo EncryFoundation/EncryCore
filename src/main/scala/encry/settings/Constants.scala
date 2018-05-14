@@ -1,7 +1,8 @@
 package encry.settings
 
-import encry.consensus.Difficulty
+import encry.consensus.{Difficulty, DifficultySerializer, NBits}
 import encry.view.history.Height
+import scorex.core.block.Block.Version
 
 import scala.concurrent.duration._
 
@@ -26,6 +27,20 @@ object Constants {
 
   object Chain {
 
+    val consensusScheme: String = "equihash"
+
+    val hashLength: Int = 32
+
+    val MaxTarget: BigInt = BigInt(1, Array.fill(hashLength)((-1).toByte))
+
+    val InitialDifficulty: Difficulty = Difficulty @@ BigInt(1)
+
+    val Version: Version = 0: Byte
+
+    val InitialNBits: NBits = DifficultySerializer.encodeCompactBits(InitialDifficulty)
+
+    val ModifierIdSize: Int = hashLength
+
     val CoinbaseHeightLock = 1
 
     val GenesisBoxesQty = 100
@@ -44,16 +59,12 @@ object Constants {
     // Desired time interval between blocks
     val DesiredBlockInterval: FiniteDuration = 30.seconds
 
-    val InitialDifficulty: Difficulty = Difficulty @@ BigInt(100000)
-
     // Number of last epochs that will  be used for difficulty recalculation
     val RetargetingEpochsQty = 30
 
     val EpochLength = 1
 
     val BlockMaxSize = 10000
-
-    val MaxTarget = BigInt(1, Array.fill(DigestLength)((-1).toByte))
 
     val GenesisHeight: Height = Height @@ 0
 
@@ -65,4 +76,12 @@ object Constants {
 
     val TokenSymbolMaxLength: Int = 10
   }
+
+  object Equihash {
+
+    val n: Char = 96
+
+    val k: Char = 5
+  }
+
 }
