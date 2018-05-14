@@ -201,7 +201,8 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
     * @return at most limit header back in history starting from startHeader and when condition until is not satisfied
     *         Note now it includes one header satisfying until condition!
     */
-  protected def headerChainBack(limit: Int, startHeader: EncryBlockHeader,
+  protected def headerChainBack(limit: Int,
+                                startHeader: EncryBlockHeader,
                                 until: EncryBlockHeader => Boolean): EncryHeaderChain = {
     @tailrec
     def loop(header: EncryBlockHeader, acc: Seq[EncryBlockHeader]): Seq[EncryBlockHeader] = {

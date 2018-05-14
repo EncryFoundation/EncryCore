@@ -2,6 +2,8 @@ package encry.cli
 
 import fastparse.{all, core}
 
+import scala.util.{Failure, Success, Try}
+
 object InputParser {
 
   import fastparse.all._
@@ -56,4 +58,9 @@ object InputParser {
     .map { case (cat, cmd, params, flags) =>
       Ast.Command(cat, cmd, params.getOrElse(List.empty).toList, flags.getOrElse(List.empty).toList)
     }
+
+  def parse(source: String): Try[Ast.Command] = ( commandP ~ End ).parse(source) match {
+    case r: Parsed.Success[Ast.Command] => Success(r.value)
+    case e: Parsed.Failure => Failure(new Error(e.msg))
+  }
 }
