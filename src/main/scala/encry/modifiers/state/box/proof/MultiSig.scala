@@ -1,7 +1,7 @@
 package encry.modifiers.state.box.proof
 import com.google.common.primitives.Ints
 import encry.modifiers.state.box.proof.Proof.ProofTypeId
-import encrywm.backend.env.{ESObject, ESValue}
+import encrywm.lang.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
 import encrywm.lib.Types.{ESInt, ESList}
 import io.circe.syntax._

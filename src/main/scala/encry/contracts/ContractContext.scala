@@ -3,10 +3,9 @@ package encry.contracts
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proof.Proof
 import encry.view.history.Height
-import encrywm.backend.env.{ESObject, ESValue}
 import encrywm.common.ScriptMeta
+import encrywm.lang.backend.env.{ESEnvConvertable, ESObject, ESValue}
 import encrywm.lib.Types._
-import encrywm.lib.predef.env.ESEnvConvertable
 import scorex.crypto.authds.ADDigest
 
 case class CStateInfo(height: Height, lastBlockTimestamp: Long, stateDigest: ADDigest) extends ESEnvConvertable {

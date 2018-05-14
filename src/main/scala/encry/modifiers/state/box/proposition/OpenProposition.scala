@@ -2,9 +2,9 @@ package encry.modifiers.state.box.proposition
 
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
-import encrywm.backend.env.{ESObject, ESValue}
+import encrywm.lang.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
-import encrywm.lib.Types.ESProposition
+import encrywm.lib.Types.ESInt
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.ProofOfKnowledgeProposition
 
@@ -20,11 +20,16 @@ object OpenProposition extends ProofOfKnowledgeProposition[Nothing] with EncryPr
 
   override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] = Success()
 
-  override val esType: Types.ESProduct = ESProposition
+  override val esType: Types.ESProduct = Types.OpenProposition
 
-  override def asVal: ESValue = ???
+  override def asVal: ESValue = ESValue(Types.OpenProposition.ident.toLowerCase, Types.OpenProposition)(convert)
 
-  override def convert: ESObject = ???
+  override def convert: ESObject = {
+    val fields = Map(
+      "typeId" -> ESValue("typeId", ESInt)(typeId.toInt)
+    )
+    ESObject(Types.OpenProposition.ident, fields, esType)
+  }
 }
 
 object OpenPropositionSerializer extends Serializer[OpenProposition.type] {

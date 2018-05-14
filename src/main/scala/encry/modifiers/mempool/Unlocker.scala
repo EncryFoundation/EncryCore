@@ -3,10 +3,9 @@ package encry.modifiers.mempool
 import encry.modifiers.state.box.EncryBox
 import encry.modifiers.state.box.proof.{Proof, ProofSerializer}
 import encry.settings.Algos
-import encrywm.backend.env.{ESObject, ESValue}
+import encrywm.lang.backend.env.{ESEnvConvertable, ESObject, ESValue}
 import encrywm.lib.Types
 import encrywm.lib.Types._
-import encrywm.lib.predef.env.ESEnvConvertable
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import scorex.core.serialization.{BytesSerializable, Serializer}

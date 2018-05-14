@@ -3,7 +3,7 @@ package encry.modifiers.state.box.proposition
 import encry.account.{Account, AccountSerializer, Address}
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
-import encrywm.backend.env.{ESObject, ESValue}
+import encrywm.lang.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
 import encrywm.lib.Types._
 import io.circe.Encoder
@@ -12,8 +12,10 @@ import scorex.core.serialization.Serializer
 
 import scala.util.{Failure, Success, Try}
 
-// This type of proposition requires non-interactive proof of knowledge of
-// `PrivateKey` corresponding to `account.address`.
+/**
+  * This type of proposition requires non-interactive proof of knowledge of
+  * `PrivateKey` corresponding to some `account.address`.
+  */
 case class AccountProposition(account: Account) extends EncryProposition {
 
   override type M = AccountProposition

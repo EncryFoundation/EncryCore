@@ -3,7 +3,7 @@ package encry.modifiers.state.box.proof
 import encry.crypto.PublicKey25519
 import encry.modifiers.state.box.proof.Proof.ProofTypeId
 import encry.settings.Algos
-import encrywm.backend.env.{ESObject, ESValue}
+import encrywm.lang.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
 import encrywm.lib.Types.{ESByteVector, ESInt, ESProof}
 import io.circe.syntax._

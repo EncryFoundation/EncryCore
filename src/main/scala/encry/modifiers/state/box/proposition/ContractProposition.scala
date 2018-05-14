@@ -5,14 +5,14 @@ import encry.contracts.{CStateInfo, ContractContext}
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
 import encry.settings.Constants
-import encrywm.backend.env.{ESObject, ESValue}
-import encrywm.backend.executor.Executor
-import encrywm.backend.executor.Executor.{Return, Unlocked}
 import encrywm.common.SourceProcessor.SerializedContract
 import encrywm.common.{EncryContract, ScriptFingerprint, ScriptMeta, ScriptSerializer}
-import encrywm.frontend.semantics.ComplexityAnalyzer.ScriptComplexityScore
-import encrywm.lib.{TypeSystem, Types}
-import encrywm.lib.Types.ESProposition
+import encrywm.lang.backend.env.{ESObject, ESValue}
+import encrywm.lang.backend.executor.Executor
+import encrywm.lang.backend.executor.Executor.{Return, Unlocked}
+import encrywm.lang.frontend.semantics.ComplexityAnalyzer.ScriptComplexityScore
+import encrywm.lib.Types
+import encrywm.lib.Types.{ESByteVector, ESInt}
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
@@ -32,18 +32,24 @@ case class ContractProposition(contract: EncryContract) extends EncryProposition
     ScriptSerializer.deserialize(contract.serializedScript).map { script =>
       val contractContext = ContractContext(proof, ctx.transaction,
         CStateInfo(ctx.height, ctx.lastBlockTimestamp, ctx.stateDigest), contract.meta)
-      val executor = Executor(TypeSystem.empty, contractContext.asVal, Constants.ContractMaxFuel)
+      val executor = Executor(contractContext.asVal, Constants.ContractMaxFuel)
       executor.executeContract(script) match {
         case Right(Return(_: Unlocked.type)) => Success()
         case _ => throw new Error("Unlock failed.")
       }
     }
 
-  override val esType: Types.ESProduct = ESProposition
+  override val esType: Types.ESProduct = Types.ContractProposition
 
-  override def asVal: ESValue = ???
+  override def asVal: ESValue = ESValue(Types.ContractProposition.ident.toLowerCase, Types.ContractProposition)(convert)
 
-  override def convert: ESObject = ???
+  override def convert: ESObject = {
+    val fields = Map(
+      "typeId" -> ESValue("typeId", ESInt)(typeId.toInt),
+      "fingerprint" -> ESValue("fingerprint", ESByteVector)(contract.meta.scriptFingerprint)
+    )
+    ESObject(Types.ContractProposition.ident, fields, esType)
+  }
 }
 
 object ContractProposition {

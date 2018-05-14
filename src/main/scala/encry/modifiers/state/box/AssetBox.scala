@@ -5,7 +5,7 @@ import encry.account.{Account, Address}
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.{AccountProposition, EncryProposition, PropositionSerializer}
 import encry.settings.{Algos, Constants}
-import encrywm.backend.env.{ESObject, ESValue}
+import encrywm.lang.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
 import encrywm.lib.Types._
 import io.circe.Encoder
