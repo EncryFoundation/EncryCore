@@ -17,7 +17,6 @@ import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryNodeViewHolderRef, EncryReadersHolderRef}
 import scorex.core.api.http.{ApiRoute, PeersApiRoute, UtilsApiRoute}
-import scorex.core.app.Application
 import scorex.core.network.message.MessageSpec
 import scorex.core.settings.ScorexSettings
 import scorex.core.utils.ScorexLogging
@@ -92,8 +91,9 @@ class EncryApp(args: Seq[String]) extends Application {
     minerRef
   )
 
-  sys.addShutdownHook(EncryApp.shutdown(actorSystem, allActors))
+  //sys.addShutdownHook(EncryApp.shutdown(actorSystem, allActors))
 }
+
 
 object EncryApp extends ScorexLogging {
 
