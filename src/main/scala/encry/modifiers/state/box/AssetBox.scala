@@ -60,7 +60,7 @@ object AssetBox {
     "proposition" -> bx.proposition.asJson,
     "nonce" -> bx.nonce.asJson,
     "value" -> bx.amount.asJson,
-    "tokenId" -> bx.tokenIdOpt.map(id => Algos.encode(id)).getOrElse("null").asJson
+    "tokenId" -> bx.tokenIdOpt.map(id => Algos.encode(id)).asJson
   ).asJson
 
   def apply(address: Address, nonce: Long, amount: Amount, tokenIdOpt: Option[ADKey]): AssetBox =

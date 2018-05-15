@@ -78,7 +78,6 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     wallet.scanPersistent(block)
 
-    wallet.getBalances.foldLeft(0L){_ + _._2} shouldEqual txsQty*Props.boxValue
-
+    wallet.getBalances.foldLeft(0L){_ + _._2} shouldEqual txsQty * Props.boxValue
   }
 }

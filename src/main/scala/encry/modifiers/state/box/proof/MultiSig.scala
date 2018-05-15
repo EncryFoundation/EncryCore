@@ -40,12 +40,12 @@ object MultiSig {
   ).asJson
 
   implicit val jsonDecoder: Decoder[MultiSig] = (c: HCursor) => {
-      for {
-        proofs <- c.downField("proofs").as[Seq[Signature25519]]
-      } yield {
-        MultiSig(proofs)
-      }
+    for {
+      proofs <- c.downField("proofs").as[Seq[Signature25519]]
+    } yield {
+      MultiSig(proofs)
     }
+  }
 }
 
 object MultiProofSerializer extends Serializer[MultiSig] {
