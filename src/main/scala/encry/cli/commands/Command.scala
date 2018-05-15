@@ -7,7 +7,7 @@ import scala.concurrent.Future
 
 trait Command {
 
-  def execute(nodeViewHolderRef: ActorRef, args: Command.Args, settings: EncryAppSettings): Future[Option[Response]]
+  def execute(nodeViewHolderRef: ActorRef, miner: ActorRef, args: Command.Args, settings: EncryAppSettings): Future[Option[Response]]
 
 }
 

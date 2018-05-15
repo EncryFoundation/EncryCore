@@ -9,7 +9,7 @@ import scorex.core.utils.ScorexLogging
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Success
 
-class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings)
+class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings, miner: ActorRef)
   extends Actor with ScorexLogging {
 
   import ConsolePromptListener._
@@ -18,6 +18,7 @@ class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSetti
 
   private val reader = new ConsoleReader()
 
+  // TODO: Use `PrintWriter(reader.getOutput())` for output handling.
   override def receive: Receive = {
     case StartListening =>
       Iterator.continually(reader.readLine(prompt)).foreach { input =>
@@ -27,6 +28,7 @@ class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSetti
               case Some(cmd) =>
                   cmd.execute(
                     nodeViewHolderRef,
+                    miner,
                     Command.Args(command.params.map(p => p.ident.name -> p.value).toMap),
                     settings
                   ).map {
@@ -50,7 +52,9 @@ object ConsolePromptListener {
   def getCommand(cat: String, cmd: String): Option[Command] = cmdDictionary.get(cat).flatMap(_.get(cmd))
 
   private val nodeCmds = Map("node" -> Map(
-    "shutdown" -> NodeShutdown
+    "shutdown" -> NodeShutdown,
+    "stopMining" -> StopMine,
+    "startMining" -> StartMine,
   ))
 
   private val appCmds = Map("app" -> Map(

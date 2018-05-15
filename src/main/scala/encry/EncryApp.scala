@@ -23,7 +23,7 @@ import scorex.core.settings.ScorexSettings
 import scorex.core.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContextExecutor
-import scala.io.Source
+import scala.io.{Source, StdIn}
 
 
 class EncryApp(args: Seq[String]) extends Application {
@@ -69,7 +69,7 @@ class EncryApp(args: Seq[String]) extends Application {
     EncryNodeViewSynchronizer(networkControllerRef, nodeViewHolderRef, EncrySyncInfoMessageSpec, settings.network, timeProvider)
 
   val cliListenerRef: ActorRef =
-    actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolderRef, encrySettings))
+    actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolderRef, encrySettings, minerRef))
 
   if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) minerRef ! StartMining
 
@@ -99,7 +99,7 @@ object EncryApp extends ScorexLogging {
 
   def main(args: Array[String]): Unit = new EncryApp(args).run()
 
-  def forceStopApplication(code: Int = 1): Nothing = sys.exit(code)
+  def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
 
   def shutdown(system: ActorSystem, actors: Seq[ActorRef]): Unit = {
     log.warn("Terminating Actors")

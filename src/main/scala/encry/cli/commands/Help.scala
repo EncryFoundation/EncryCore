@@ -8,7 +8,7 @@ import scala.concurrent.Future
 
 object Help extends Command {
 
-  override def execute(nodeViewHolderRef: ActorRef,
+  override def execute(nodeViewHolderRef: ActorRef, miner: ActorRef,
                        args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] =
     Future(Some(Response(
       """
