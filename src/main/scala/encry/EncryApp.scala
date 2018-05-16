@@ -26,7 +26,6 @@ import scorex.core.network.{NetworkControllerRef, UPnP}
 import scorex.core.network.message._
 import scorex.core.settings.ScorexSettings
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
-import scorex.core.network.NetworkController.ReceivableMessages.ShutdownNetwork
 import scorex.core.network.peer.PeerManagerRef
 
 import scala.concurrent.ExecutionContextExecutor
@@ -71,9 +70,9 @@ object EncryApp extends App with ScorexLogging {
 
   lazy val additionalMessageSpecs: Seq[MessageSpec[_]] = Seq(EncrySyncInfoMessageSpec)
 
-  val peerManager: ActorRef = PeerManagerRef(settings, timeProvider)
-
   lazy val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ additionalMessageSpecs)
+
+  val peerManager: ActorRef = PeerManagerRef(settings, timeProvider)
 
   val nodeViewHolder: ActorRef = EncryNodeViewHolderRef(encrySettings, timeProvider)
 
@@ -82,24 +81,22 @@ object EncryApp extends App with ScorexLogging {
   val networkController: ActorRef = NetworkControllerRef("networkController", settings.network,
     messagesHandler, upnp, peerManager, timeProvider)
 
-  val localInterface: ActorRef =
-    EncryLocalInterfaceRef(nodeViewHolder, peerManager, encrySettings, timeProvider)
+  val localInterface: ActorRef = EncryLocalInterfaceRef(nodeViewHolder, peerManager, encrySettings, timeProvider)
 
   val nodeViewSynchronizer: ActorRef =
     EncryNodeViewSynchronizer(networkController, nodeViewHolder, EncrySyncInfoMessageSpec, settings.network, timeProvider)
 
-  val minerRef: ActorRef = EncryMinerRef(encrySettings, nodeViewHolder, readersHolder, nodeId, timeProvider)
+  val miner: ActorRef = EncryMinerRef(encrySettings, nodeViewHolder, readersHolder, nodeId, timeProvider)
 
-  val cliListener: ActorRef =
-    actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolder, encrySettings, minerRef))
+  val cliListener: ActorRef = actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolder, encrySettings, miner))
 
   val scanner: ActorRef = EncryScannerRef(encrySettings, nodeViewHolder)
 
   val apiRoutes: Seq[ApiRoute] = Seq(
     UtilsApiRoute(settings.restApi),
     PeersApiRoute(peerManager, networkController, settings.restApi),
-    InfoApiRoute(readersHolder, minerRef, peerManager, encrySettings, nodeId, timeProvider),
-    HistoryApiRoute(readersHolder, minerRef, encrySettings, nodeId, encrySettings.nodeSettings.stateMode),
+    InfoApiRoute(readersHolder, miner, peerManager, encrySettings, nodeId, timeProvider),
+    HistoryApiRoute(readersHolder, miner, encrySettings, nodeId, encrySettings.nodeSettings.stateMode),
     TransactionsApiRoute(readersHolder, nodeViewHolder, settings.restApi, encrySettings.nodeSettings.stateMode),
     AccountInfoApiRoute(readersHolder, nodeViewHolder, scanner, settings.restApi, encrySettings.nodeSettings.stateMode)
   )
@@ -107,7 +104,7 @@ object EncryApp extends App with ScorexLogging {
   val combinedRoute: Route = CompositeHttpService(actorSystem, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
   Http().bindAndHandle(combinedRoute, bindAddress.getAddress.getHostAddress, bindAddress.getPort)
 
-  if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) minerRef ! StartMining
+  if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) miner ! StartMining
 
   if (encrySettings.testingSettings.transactionGeneration) {
     val txGen =
@@ -118,19 +115,6 @@ object EncryApp extends App with ScorexLogging {
   if (encrySettings.nodeSettings.enableCLI) cliListener ! StartListening
 
   lazy val upnp = new UPnP(settings.network)
-
-  def stopAll(): Unit = synchronized {
-    log.info("Stopping network services")
-    if (settings.network.upnpEnabled) upnp.deletePort(settings.network.bindAddress.getPort)
-    networkController ! ShutdownNetwork
-
-    log.info("Stopping actors (incl. block generator)")
-    actorSystem.terminate().onComplete { _ =>
-
-      log.info("Exiting from the app...")
-      System.exit(0)
-    }
-  }
 
   def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
 }
