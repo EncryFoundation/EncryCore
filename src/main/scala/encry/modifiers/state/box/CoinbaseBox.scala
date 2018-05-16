@@ -19,7 +19,7 @@ case class CoinbaseBox(override val proposition: HeightProposition,
 
   override type M = CoinbaseBox
 
-  override val typeId: BxTypeId = CoinbaseBox.typeId
+  override val typeId: BxTypeId = CoinbaseBox.TypeId
 
   override def serializer: Serializer[M] = CoinbaseBoxSerializer
 
@@ -28,7 +28,7 @@ case class CoinbaseBox(override val proposition: HeightProposition,
 
 object CoinbaseBox {
 
-  val typeId: BxTypeId = 0.toByte
+  val TypeId: BxTypeId = 0.toByte
 
   implicit val jsonEncoder: Encoder[CoinbaseBox] = (bx: CoinbaseBox) => Map(
     "type" -> TypeId.asJson,
