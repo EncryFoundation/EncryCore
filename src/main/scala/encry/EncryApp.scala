@@ -1,5 +1,7 @@
 package encry
 
+import java.net.InetSocketAddress
+
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
@@ -39,7 +41,7 @@ object EncryApp extends App with ScorexLogging {
 
   lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(args.headOption)
 
-  implicit lazy val settings: ScorexSettings = encrySettings.scorexSettings
+  implicit val settings: ScorexSettings = encrySettings.scorexSettings
 
   implicit def exceptionHandler: ExceptionHandler = ApiErrorHandler.exceptionHandler
 
@@ -48,12 +50,10 @@ object EncryApp extends App with ScorexLogging {
   implicit val ec: ExecutionContextExecutor = actorSystem.dispatcher
 
   require(settings.network.agentName.length <= 50)
-  val bindAddress = settings.restApi.bindAddress
-  Http().bindAndHandle(combinedRoute, bindAddress.getAddress.getHostAddress, bindAddress.getPort)
+  lazy val bindAddress: InetSocketAddress = settings.restApi.bindAddress
 
-  val timeProvider = new NetworkTimeProvider(settings.ntp)
+  val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
-  lazy val combinedRoute: Route = CompositeHttpService(actorSystem, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
 
   val nodeId: Array[Byte] = Algos.hash(encrySettings.scorexSettings.network.nodeName).take(5)
 
@@ -103,6 +103,9 @@ object EncryApp extends App with ScorexLogging {
     TransactionsApiRoute(readersHolder, nodeViewHolder, settings.restApi, encrySettings.nodeSettings.stateMode),
     AccountInfoApiRoute(readersHolder, nodeViewHolder, scanner, settings.restApi, encrySettings.nodeSettings.stateMode)
   )
+
+  val combinedRoute: Route = CompositeHttpService(actorSystem, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
+  Http().bindAndHandle(combinedRoute, bindAddress.getAddress.getHostAddress, bindAddress.getPort)
 
   if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) minerRef ! StartMining
 
