@@ -21,7 +21,6 @@ import encry.network.EncryNodeViewSynchronizer
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryNodeViewHolderRef, EncryReadersHolderRef}
-import jline.console.ConsoleReader
 import scorex.core.api.http._
 import scorex.core.network.{NetworkControllerRef, UPnP}
 import scorex.core.network.message._
@@ -116,9 +115,6 @@ object EncryApp extends App with ScorexLogging {
   if (encrySettings.nodeSettings.enableCLI) cliListener ! StartListening
 
   lazy val upnp = new UPnP(settings.network)
-
-  lazy val reader = new ConsoleReader()
-  Iterator.continually(reader.readLine("$> ")).foreach { cliListener ! _ }
 
   def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
 }

@@ -4,37 +4,39 @@ import akka.actor.Actor
 import encry.cli.commands._
 import encry.settings.EncryAppSettings
 import scorex.core.utils.ScorexLogging
-import encry.EncryApp.{miner, nodeViewHolder, reader}
-
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{Success, Failure}
+import scala.util.{Failure, Success}
+import scala.io.StdIn.readLine
 
 class ConsolePromptListener(settings: EncryAppSettings) extends Actor with ScorexLogging {
 
   import ConsolePromptListener._
 
   override def receive: Receive = {
-    case input: String =>
-      InputParser.parse(input) match {
-        case Success(command) =>
-          getCommand(command.category.name, command.ident.name) match {
-            case Some(cmd) =>
-              cmd.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings)
-                .map {
-                  case Some(x) => reader.println(x.msg)
-                  case None =>
-                }
-            case None => reader.println("Unsupported command. Type 'app help' to get commands list")
-          }
-        case Failure(e) => reader.println("Bad input")
+    case StartListening =>
+      Iterator.continually(readLine(prompt)).foreach { input =>
+        InputParser.parse(input) match {
+          case Success(command) =>
+            getCommand(command.category.name, command.ident.name) match {
+              case Some(cmd) =>
+                cmd.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings)
+                  .map {
+                    case Some(x) => print(x.msg + s"\n$prompt")
+                    case None =>
+                  }
+              case None => println("Unsupported command. Type 'app help' to get commands list")
+            }
+          case Failure(e) => println("Bad input")
+        }
       }
   }
 }
 
-
 object ConsolePromptListener {
 
   case object StartListening
+
+  val prompt = "$> "
 
   def getCommand(cat: String, cmd: String): Option[Command] = cmdDictionary.get(cat).flatMap(_.get(cmd))
 
