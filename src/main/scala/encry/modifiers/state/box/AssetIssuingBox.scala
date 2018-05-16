@@ -6,7 +6,6 @@ import encry.modifiers.state.box.proposition.{EncryProposition, PropositionSeria
 import encry.settings.{Algos, Constants}
 import encrywm.lang.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
-import encrywm.lib.Types.{ESByteVector, ESInt, ESLong, ESProposition}
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
@@ -34,10 +33,10 @@ case class AssetIssuingBox(override val proposition: EncryProposition,
 
   override def convert: ESObject = {
     val fields = Map(
-      "proposition" -> ESValue("proposition", ESProposition)(proposition),
-      "typeId" -> ESValue("typeId", ESInt)(typeId.toInt),
-      "id" -> ESValue("id", ESByteVector)(id),
-      "amount" -> ESValue("amount", ESLong)(amount)
+      "proposition" -> ESValue("proposition", Types.ESProposition)(proposition.convert),
+      "typeId" -> ESValue("typeId", Types.ESInt)(typeId.toInt),
+      "id" -> ESValue("id", Types.ESByteVector)(id),
+      "amount" -> ESValue("amount", Types.ESLong)(amount)
     )
     ESObject(Types.DataBox.ident, fields, esType)
   }

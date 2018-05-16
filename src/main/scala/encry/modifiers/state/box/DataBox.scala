@@ -6,7 +6,6 @@ import encry.modifiers.state.box.proposition.{EncryProposition, PropositionSeria
 import encry.settings.Algos
 import encrywm.lang.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
-import encrywm.lib.Types._
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
@@ -29,13 +28,12 @@ case class DataBox(override val proposition: EncryProposition,
 
   override def asVal: ESValue = ESValue(Types.DataBox.ident.toLowerCase, Types.DataBox)(convert)
 
-  // TODO: Data deserialization?
   override def convert: ESObject = {
     val fields = Map(
-      "proposition" -> ESValue("proposition", ESProposition)(proposition),
-      "typeId" -> ESValue("typeId", ESInt)(typeId.toInt),
-      "id" -> ESValue("id", ESByteVector)(id),
-      "data" -> ESValue("data", ESByteVector)(data)
+      "proposition" -> ESValue("proposition", Types.ESProposition)(proposition.convert),
+      "typeId" -> ESValue("typeId", Types.ESInt)(typeId.toInt),
+      "id" -> ESValue("id", Types.ESByteVector)(id),
+      "data" -> ESValue("data", Types.ESByteVector)(data)
     )
     ESObject(Types.DataBox.ident, fields, esType)
   }
