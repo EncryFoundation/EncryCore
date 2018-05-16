@@ -50,7 +50,7 @@ class ApiClient(settings: RESTApiSettings) {
     }
   }
 }
-
+/*
 object ApiClient extends App {
   private val settingsFilename = args.headOption.getOrElse("settings.conf")
   private val settings = ScorexSettings.read(Some(settingsFilename))
@@ -61,3 +61,4 @@ object ApiClient extends App {
     println(s"[$command RESULT] " + apiClient.executeCommand(command))
   }
 }
+*/

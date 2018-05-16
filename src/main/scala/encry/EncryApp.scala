@@ -1,6 +1,11 @@
 package encry
 
-import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
+import java.net.InetSocketAddress
+
+import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import akka.stream.ActorMaterializer
 import encry.api.http.routes.{AccountInfoApiRoute, HistoryApiRoute, InfoApiRoute, TransactionsApiRoute}
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
@@ -16,95 +21,100 @@ import encry.network.EncryNodeViewSynchronizer
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryNodeViewHolderRef, EncryReadersHolderRef}
-import scorex.core.api.http.{ApiRoute, PeersApiRoute, UtilsApiRoute}
-import scorex.core.app.Application
-import scorex.core.network.message.MessageSpec
+import scorex.core.api.http._
+import scorex.core.network.{NetworkControllerRef, UPnP}
+import scorex.core.network.message._
 import scorex.core.settings.ScorexSettings
-import scorex.core.utils.ScorexLogging
+import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
+import scorex.core.network.peer.PeerManagerRef
 
 import scala.concurrent.ExecutionContextExecutor
-import scala.io.{Source, StdIn}
+import scala.io.Source
 
+object EncryApp extends App with ScorexLogging {
 
-class EncryApp(args: Seq[String]) extends Application {
-
-  override type P = EncryProposition
-  override type TX = EncryBaseTransaction
-  override type PMOD = EncryPersistentModifier
-  override type NVHT = EncryNodeViewHolder[_]
-
-  implicit val ec: ExecutionContextExecutor = actorSystem.dispatcher
+  type P = EncryProposition
+  type TX = EncryBaseTransaction
+  type PMOD = EncryPersistentModifier
+  type NVHT = EncryNodeViewHolder[_]
 
   lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(args.headOption)
 
-  override implicit lazy val settings: ScorexSettings = encrySettings.scorexSettings
+  implicit val settings: ScorexSettings = encrySettings.scorexSettings
+
+  implicit def exceptionHandler: ExceptionHandler = ApiErrorHandler.exceptionHandler
+
+  implicit val actorSystem: ActorSystem = ActorSystem(settings.network.agentName)
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
+  implicit val ec: ExecutionContextExecutor = actorSystem.dispatcher
+
+  require(settings.network.agentName.length <= 50)
+  lazy val bindAddress: InetSocketAddress = settings.restApi.bindAddress
+
+  val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
+  val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
 
   val nodeId: Array[Byte] = Algos.hash(encrySettings.scorexSettings.network.nodeName).take(5)
 
-  override protected lazy val additionalMessageSpecs: Seq[MessageSpec[_]] = Seq(EncrySyncInfoMessageSpec)
+  lazy val basicSpecs = {
+    val invSpec = new InvSpec(settings.network.maxInvObjects)
+    val requestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
+    Seq(
+      GetPeersSpec,
+      PeersSpec,
+      invSpec,
+      requestModifierSpec,
+      ModifiersSpec
+    )
+  }
 
-  override val nodeViewHolderRef: ActorRef = EncryNodeViewHolderRef(encrySettings, timeProvider)
+  lazy val additionalMessageSpecs: Seq[MessageSpec[_]] = Seq(EncrySyncInfoMessageSpec)
 
-  val readersHolderRef: ActorRef = EncryReadersHolderRef(nodeViewHolderRef)
+  lazy val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ additionalMessageSpecs)
 
-  val minerRef: ActorRef = EncryMinerRef(encrySettings, nodeViewHolderRef, readersHolderRef, nodeId, timeProvider)
+  val peerManager: ActorRef = PeerManagerRef(settings, timeProvider)
 
-  val scannerRef: ActorRef = EncryScannerRef(encrySettings, nodeViewHolderRef)
+  val nodeViewHolder: ActorRef = EncryNodeViewHolderRef(encrySettings, timeProvider)
 
-  val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
+  val readersHolder: ActorRef = EncryReadersHolderRef(nodeViewHolder)
 
-  override val apiRoutes: Seq[ApiRoute] = Seq(
+  val networkController: ActorRef = NetworkControllerRef("networkController", settings.network,
+    messagesHandler, upnp, peerManager, timeProvider)
+
+  val localInterface: ActorRef = EncryLocalInterfaceRef(nodeViewHolder, peerManager, encrySettings, timeProvider)
+
+  val nodeViewSynchronizer: ActorRef =
+    EncryNodeViewSynchronizer(networkController, nodeViewHolder, EncrySyncInfoMessageSpec, settings.network, timeProvider)
+
+  val miner: ActorRef = EncryMinerRef(encrySettings, nodeViewHolder, readersHolder, nodeId, timeProvider)
+
+  val cliListener: ActorRef = actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolder, encrySettings, miner))
+
+  val scanner: ActorRef = EncryScannerRef(encrySettings, nodeViewHolder)
+
+  val apiRoutes: Seq[ApiRoute] = Seq(
     UtilsApiRoute(settings.restApi),
-    PeersApiRoute(peerManagerRef, networkControllerRef, settings.restApi),
-    InfoApiRoute(readersHolderRef, minerRef, peerManagerRef, encrySettings, nodeId, timeProvider),
-    HistoryApiRoute(readersHolderRef, minerRef, encrySettings, nodeId, encrySettings.nodeSettings.stateMode),
-    TransactionsApiRoute(readersHolderRef, nodeViewHolderRef, settings.restApi, encrySettings.nodeSettings.stateMode),
-    AccountInfoApiRoute(readersHolderRef, nodeViewHolderRef, scannerRef, settings.restApi, encrySettings.nodeSettings.stateMode)
+    PeersApiRoute(peerManager, networkController, settings.restApi),
+    InfoApiRoute(readersHolder, miner, peerManager, encrySettings, nodeId, timeProvider),
+    HistoryApiRoute(readersHolder, miner, encrySettings, nodeId, encrySettings.nodeSettings.stateMode),
+    TransactionsApiRoute(readersHolder, nodeViewHolder, settings.restApi, encrySettings.nodeSettings.stateMode),
+    AccountInfoApiRoute(readersHolder, nodeViewHolder, scanner, settings.restApi, encrySettings.nodeSettings.stateMode)
   )
 
-  val localInterface: ActorRef =
-    EncryLocalInterfaceRef(nodeViewHolderRef, peerManagerRef, encrySettings, timeProvider)
+  val combinedRoute: Route = CompositeHttpService(actorSystem, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
+  Http().bindAndHandle(combinedRoute, bindAddress.getAddress.getHostAddress, bindAddress.getPort)
 
-  override val nodeViewSynchronizer: ActorRef =
-    EncryNodeViewSynchronizer(networkControllerRef, nodeViewHolderRef, EncrySyncInfoMessageSpec, settings.network, timeProvider)
-
-  val cliListenerRef: ActorRef =
-    actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolderRef, encrySettings, minerRef))
-
-  if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) minerRef ! StartMining
+  if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) miner ! StartMining
 
   if (encrySettings.testingSettings.transactionGeneration) {
     val txGen =
-      actorSystem.actorOf(TransactionGenerator.props(nodeViewHolderRef, encrySettings.testingSettings, timeProvider))
+      actorSystem.actorOf(TransactionGenerator.props(nodeViewHolder, encrySettings.testingSettings, timeProvider))
     txGen ! StartGeneration
   }
 
-  if (encrySettings.nodeSettings.enableCLI) cliListenerRef ! StartListening
+  if (encrySettings.nodeSettings.enableCLI) cliListener ! StartListening
 
-  val allActors = Seq(
-    nodeViewHolderRef,
-    nodeViewSynchronizer,
-    readersHolderRef,
-    networkControllerRef,
-    localInterface,
-    cliListenerRef,
-    scannerRef,
-    minerRef
-  )
-
-  sys.addShutdownHook(EncryApp.shutdown(actorSystem, allActors))
-}
-
-object EncryApp extends ScorexLogging {
-
-  def main(args: Array[String]): Unit = new EncryApp(args).run()
+  lazy val upnp = new UPnP(settings.network)
 
   def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
-
-  def shutdown(system: ActorSystem, actors: Seq[ActorRef]): Unit = {
-    log.warn("Terminating Actors")
-    actors.foreach(_ ! PoisonPill)
-    log.warn("Terminating ActorSystem")
-    system.terminate()
-  }
 }
