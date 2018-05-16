@@ -15,7 +15,7 @@ object DirectiveSerializer extends Serializer[Directive] {
       AssetIssuingDirective.TypeId +: AssetIssuingDirectiveSerializer.toBytes(aid)
     case sad: ScriptedAssetDirective =>
       ScriptedAssetDirective.TypeId +: ScriptedAssetDirectiveSerializer.toBytes(sad)
-    case dd: ScriptedAssetDirective =>
+    case dd: DataDirective =>
       DataDirective.TypeId +: DataDirectiveSerializer.toBytes(dd)
     case m => throw new Error(s"Serialization of unknown directive type: $m")
   }
