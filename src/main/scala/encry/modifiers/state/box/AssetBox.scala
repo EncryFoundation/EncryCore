@@ -40,7 +40,7 @@ case class AssetBox(override val proposition: EncryProposition,
 
   override def convert: ESObject = {
     val fields = Map(
-      "proposition" -> ESValue("proposition", ESProposition)(amount),
+      "proposition" -> ESValue("proposition", ESProposition)(proposition),
       "typeId" -> ESValue("typeId", ESInt)(typeId.toInt),
       "id" -> ESValue("id", ESByteVector)(id),
       "amount" -> ESValue("amount", ESLong)(amount),

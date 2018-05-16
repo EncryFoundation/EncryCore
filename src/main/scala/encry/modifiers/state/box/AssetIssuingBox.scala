@@ -4,6 +4,9 @@ import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.{EncryProposition, PropositionSerializer}
 import encry.settings.{Algos, Constants}
+import encrywm.lang.backend.env.{ESObject, ESValue}
+import encrywm.lib.Types
+import encrywm.lib.Types.{ESByteVector, ESInt, ESLong, ESProposition}
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
@@ -12,9 +15,7 @@ import scorex.crypto.authds.ADKey
 
 import scala.util.Try
 
-/**
-  * Holds the asset emission amount, reference to corresponding `AssetCreationBox` is required.
-  */
+/** Holds the asset emission amount, reference to corresponding `AssetCreationBox` is required. */
 case class AssetIssuingBox(override val proposition: EncryProposition,
                            override val nonce: Long,
                            override val amount: Amount,
@@ -26,6 +27,20 @@ case class AssetIssuingBox(override val proposition: EncryProposition,
   override val typeId: BxTypeId = AssetBox.TypeId
 
   override def serializer: Serializer[M] = AssetIssuingBoxSerializer
+
+  override val esType: Types.ESProduct = Types.AssetIssuingBox
+
+  override def asVal: ESValue = ESValue(Types.DataBox.ident.toLowerCase, Types.DataBox)(convert)
+
+  override def convert: ESObject = {
+    val fields = Map(
+      "proposition" -> ESValue("proposition", ESProposition)(proposition),
+      "typeId" -> ESValue("typeId", ESInt)(typeId.toInt),
+      "id" -> ESValue("id", ESByteVector)(id),
+      "amount" -> ESValue("amount", ESLong)(amount)
+    )
+    ESObject(Types.DataBox.ident, fields, esType)
+  }
 }
 
 object AssetIssuingBox {
