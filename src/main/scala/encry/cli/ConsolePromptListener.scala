@@ -5,12 +5,11 @@ import encry.cli.commands._
 import encry.settings.EncryAppSettings
 import jline.console.ConsoleReader
 import scorex.core.utils.ScorexLogging
-
+import encry.EncryApp.{nodeViewHolder, miner}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Success
 
-class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings, miner: ActorRef)
-  extends Actor with ScorexLogging {
+class ConsolePromptListener(settings: EncryAppSettings) extends Actor with ScorexLogging {
 
   import ConsolePromptListener._
 
@@ -18,7 +17,6 @@ class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSetti
 
   private val reader = new ConsoleReader()
 
-  // TODO: Use `PrintWriter(reader.getOutput())` for output handling.
   override def receive: Receive = {
     case StartListening =>
       Iterator.continually(reader.readLine(prompt)).foreach { input =>
@@ -27,7 +25,7 @@ class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSetti
             getCommand(command.category.name, command.ident.name) match {
               case Some(cmd) =>
                   cmd.execute(
-                    nodeViewHolderRef,
+                    nodeViewHolder,
                     miner,
                     Command.Args(command.params.map(p => p.ident.name -> p.value).toMap),
                     settings
