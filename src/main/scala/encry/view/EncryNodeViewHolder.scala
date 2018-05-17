@@ -1,5 +1,7 @@
 package encry.view
 
+import java.io.File
+
 import akka.actor.{ActorRef, ActorSystem, Props}
 import encry.EncryApp
 import encry.modifiers.EncryPersistentModifier
@@ -35,10 +37,10 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
   override type MP = EncryMempool
 
   override lazy val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
-    EncryBlockHeader.modifierTypeId  -> EncryBlockHeaderSerializer,
+    EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,
-    ADProofs.modifierTypeId          -> ADProofSerializer,
-    Transaction.ModifierTypeId       -> EncryTransactionSerializer
+    ADProofs.modifierTypeId -> ADProofSerializer,
+    Transaction.ModifierTypeId -> EncryTransactionSerializer
   )
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -60,7 +62,6 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
         val newVault = vault().scanOffchain(tx)
         updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
         context.system.eventStream.publish(SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx))
-
       case Failure(e) =>
         context.system.eventStream.publish(FailedTransaction[EncryProposition, EncryBaseTransaction](tx, e))
     }
@@ -68,21 +69,21 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
 
   /** Hard-coded initial view all the honest nodes in a network are making progress from. */
   override protected def genesisState: (EncryHistory, MS, EncryWallet, EncryMempool) = {
-    val stateDir = EncryState.getStateDir(settings)
+    val stateDir: File = EncryState.getStateDir(settings)
     stateDir.mkdir()
 
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
 
-    val state = {
+    val state: StateType = {
       if (settings.nodeSettings.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings.nodeSettings)
       else EncryState.generateGenesisUtxoState(stateDir, Some(self))._1
     }.asInstanceOf[MS]
 
-    val history = EncryHistory.readOrGenerate(settings, timeProvider)
+    val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
 
-    val wallet = EncryWallet.readOrGenerate(settings)
+    val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
 
-    val memPool = EncryMempool.empty(settings, timeProvider)
+    val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
 
     (history, state, wallet, memPool)
   }
@@ -92,15 +93,15 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     * (e.g. if it is a first launch of a node) None is to be returned
     */
   override def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryDir(settings).listFiles.isEmpty) {
-    val history = EncryHistory.readOrGenerate(settings, timeProvider)
-    val wallet = EncryWallet.readOrGenerate(settings)
-    val memPool = EncryMempool.empty(settings, timeProvider)
-    val state = restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[MS], history)
+    val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
+    val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
+    val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
+    val state: StateType = restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[MS], history)
     Some((history, state, wallet, memPool))
   } else None
 
   private def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): StateType = {
-    val dir = EncryState.getStateDir(settings)
+    val dir: File = EncryState.getStateDir(settings)
     dir.mkdirs()
     dir.listFiles.foreach(_.delete())
 
@@ -137,7 +138,7 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
           s"apply ${newChain.length} modifiers")
         val startState = rollbackId.map(id => state.rollbackTo(VersionTag @@ id).get)
           .getOrElse(getRecreatedState())
-        val toApply = newChain.headers.map{h =>
+        val toApply = newChain.headers.map { h =>
           history.getBlock(h) match {
             case Some(fb) => fb
             case None => throw new Error(s"Failed to get full block for header $h")
@@ -172,7 +173,7 @@ object DigestNodeViewProps extends EncryNodeViewProps[StateMode.DigestMode, Dige
     Props.create(classOf[DigestNodeViewHolder], settings, timeProvider)
 }
 
-object UtxoNodeViewProps extends EncryNodeViewProps[StateMode.UtxoMode, UtxoState, UtxoNodeViewHolder]  {
+object UtxoNodeViewProps extends EncryNodeViewProps[StateMode.UtxoMode, UtxoState, UtxoNodeViewHolder] {
   def apply(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, digestType: StateMode.UtxoMode): Props =
     Props.create(classOf[UtxoNodeViewHolder], settings, timeProvider)
 }
@@ -181,8 +182,8 @@ object EncryNodeViewHolderRef {
 
   def props(settings: EncryAppSettings, timeProvider: NetworkTimeProvider): Props =
     settings.nodeSettings.stateMode match {
-      case digestType @ StateMode.Digest => DigestNodeViewProps(settings, timeProvider, digestType)
-      case utxoType @ StateMode.Utxo => UtxoNodeViewProps(settings, timeProvider, utxoType)
+      case digestType@StateMode.Digest => DigestNodeViewProps(settings, timeProvider, digestType)
+      case utxoType@StateMode.Utxo => UtxoNodeViewProps(settings, timeProvider, utxoType)
     }
 
   def apply(settings: EncryAppSettings, timeProvider: NetworkTimeProvider)(implicit system: ActorSystem): ActorRef =
