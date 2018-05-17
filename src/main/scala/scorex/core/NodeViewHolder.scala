@@ -321,7 +321,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
 
   protected def processLocallyGeneratedModifiers: Receive = {
     case lt: LocallyGeneratedTransaction[P, TX] => txModify(lt.tx)
-
     case lm: LocallyGeneratedModifier[PMOD] =>
       log.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)

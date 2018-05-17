@@ -52,7 +52,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   override type NVCT = this.type
 }
 
-object EncryState extends ScorexLogging{
+object EncryState extends ScorexLogging {
 
   // 33 bytes in Base58 encoding.
   val afterGenesisStateDigestHex: String = "24m4FALZtHCiM2mcHjyQgvnF9kSTkJDyETvmkqiD5CW3M1"

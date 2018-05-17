@@ -241,13 +241,4 @@ object EncryMinerRef {
             timeProvider: NetworkTimeProvider)
            (implicit context: ActorRefFactory): ActorRef =
     context.actorOf(props(settings, viewHolderRef, readersHolderRef, nodeId, timeProvider))
-
-  def apply(settings: EncryAppSettings,
-            viewHolderRef: ActorRef,
-            readersHolderRef: ActorRef,
-            nodeId: Array[Byte],
-            timeProvider: NetworkTimeProvider,
-            name: String)
-           (implicit context: ActorRefFactory): ActorRef =
-    context.actorOf(props(settings, viewHolderRef, readersHolderRef, nodeId, timeProvider), name)
 }

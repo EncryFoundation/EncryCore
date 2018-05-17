@@ -67,7 +67,6 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
     }
   }
 
-  /** Hard-coded initial view all the honest nodes in a network are making progress from. */
   override protected def genesisState: (EncryHistory, MS, EncryWallet, EncryMempool) = {
     val stateDir: File = EncryState.getStateDir(settings)
     stateDir.mkdir()
