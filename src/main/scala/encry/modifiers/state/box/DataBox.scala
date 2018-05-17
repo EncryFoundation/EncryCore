@@ -3,31 +3,28 @@ package encry.modifiers.state.box
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.{EncryProposition, PropositionSerializer}
-import encry.settings.{Algos, Constants}
+import encry.settings.Algos
 import encrywm.lang.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
-import scorex.core.transaction.box.Box.Amount
-import scorex.crypto.authds.ADKey
 
 import scala.util.Try
 
-/** Holds the asset emission amount, reference to corresponding `AssetCreationBox` is required. */
-case class AssetIssuingBox(override val proposition: EncryProposition,
-                           override val nonce: Long,
-                           override val amount: Amount,
-                           creationBoxId: ADKey)
-  extends EncryBox[EncryProposition] with MonetaryBox {
+/** Stores arbitrary data in EncryTL binary format. */
+case class DataBox(override val proposition: EncryProposition,
+                   override val nonce: Long,
+                   data: Array[Byte])
+  extends EncryBox[EncryProposition] {
 
-  override type M = AssetIssuingBox
+  override type M = DataBox
 
-  override val typeId: BxTypeId = AssetBox.TypeId
+  override val typeId: BxTypeId = DataBox.TypeId
 
-  override def serializer: Serializer[M] = AssetIssuingBoxSerializer
+  override def serializer: Serializer[M] = DataBoxSerializer
 
-  override val esType: Types.ESProduct = Types.AssetIssuingBox
+  override val esType: Types.ESProduct = Types.DataBox
 
   override def asVal: ESValue = ESValue(Types.DataBox.ident.toLowerCase, Types.DataBox)(convert)
 
@@ -36,44 +33,45 @@ case class AssetIssuingBox(override val proposition: EncryProposition,
       "proposition" -> ESValue("proposition", Types.ESProposition)(proposition.convert),
       "typeId" -> ESValue("typeId", Types.ESInt)(typeId.toInt),
       "id" -> ESValue("id", Types.ESByteVector)(id),
-      "amount" -> ESValue("amount", Types.ESLong)(amount)
+      "data" -> ESValue("data", Types.ESByteVector)(data)
     )
     ESObject(Types.DataBox.ident, fields, esType)
   }
 }
 
-object AssetIssuingBox {
+object DataBox {
 
-  val TypeId: BxTypeId = 3.toByte
+  val TypeId: BxTypeId = 4.toByte
 
-  implicit val jsonEncoder: Encoder[AssetIssuingBox] = (bx: AssetIssuingBox) => Map(
+  implicit val jsonEncoder: Encoder[DataBox] = (bx: DataBox) => Map(
     "type" -> TypeId.asJson,
     "id" -> Algos.encode(bx.id).asJson,
     "proposition" -> bx.proposition.asJson,
-    "nonce" -> bx.nonce.asJson
+    "nonce" -> bx.nonce.asJson,
+    "data" -> Algos.encode(bx.data).asJson,
   ).asJson
 }
 
-object AssetIssuingBoxSerializer extends Serializer[AssetIssuingBox] {
+object DataBoxSerializer extends Serializer[DataBox] {
 
-  override def toBytes(obj: AssetIssuingBox): Array[Byte] = {
+  override def toBytes(obj: DataBox): Array[Byte] = {
     val propBytes = PropositionSerializer.toBytes(obj.proposition)
     Bytes.concat(
       Shorts.toByteArray(propBytes.length.toShort),
       propBytes,
       Longs.toByteArray(obj.nonce),
-      Longs.toByteArray(obj.amount),
-      obj.creationBoxId
+      Shorts.toByteArray(obj.data.length.toShort),
+      obj.data
     )
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[AssetIssuingBox] = Try {
+  override def parseBytes(bytes: Array[Byte]): Try[DataBox] = Try {
     val propositionLen = Shorts.fromByteArray(bytes.take(2))
     val iBytes = bytes.drop(2)
     val proposition = PropositionSerializer.parseBytes(iBytes.take(propositionLen)).get
     val nonce = Longs.fromByteArray(iBytes.slice(propositionLen, propositionLen + 8))
-    val amount = Longs.fromByteArray(iBytes.slice(propositionLen + 8, propositionLen + 8 + 8))
-    val creationId = ADKey @@ bytes.takeRight(Constants.ModifierIdSize)
-    AssetIssuingBox(proposition, nonce, amount, creationId)
+    val dataLen = Shorts.fromByteArray(iBytes.slice(propositionLen + 8, propositionLen + 8 + 2))
+    val data = iBytes.takeRight(dataLen)
+    DataBox(proposition, nonce, data)
   }
 }

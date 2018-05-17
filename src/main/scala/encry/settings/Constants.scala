@@ -25,6 +25,8 @@ object Constants {
   // Maximum number of computational `steps` contract can use.
   val ContractMaxFuel: Int = 800
 
+  val MaxDataLength: Int = 1000
+
   object Chain {
 
     val consensusScheme: String = "equihash"

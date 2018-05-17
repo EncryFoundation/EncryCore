@@ -2,11 +2,10 @@ package encry.modifiers.state.box
 
 import com.google.common.primitives.Longs
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import encry.modifiers.state.box.proposition.{EncryProposition, HeightProposition, OpenProposition}
+import encry.modifiers.state.box.proposition.{ContractProposition, EncryProposition, HeightProposition, OpenProposition}
 import encry.settings.Algos
 import encrywm.lang.backend.env.{ESEnvConvertable, ESObject, ESValue}
 import encrywm.lib.Types
-import encrywm.lib.Types.{ESByteVector, ESInt, ESProposition}
 import io.circe.Encoder
 import scorex.core.transaction.box.Box
 import scorex.crypto.authds.ADKey
@@ -23,6 +22,7 @@ trait EncryBaseBox extends Box[EncryProposition] with ESEnvConvertable {
   def isAmountCarrying: Boolean = this.isInstanceOf[MonetaryBox]
   def isOpen: Boolean = this.proposition.isInstanceOf[OpenProposition.type]
   def isHeightLocked: Boolean = this.proposition.isInstanceOf[HeightProposition]
+  def isLockedByScript: Boolean = this.proposition.isInstanceOf[ContractProposition]
 
   override val esType: Types.ESProduct = Types.ESBox
 
@@ -30,9 +30,9 @@ trait EncryBaseBox extends Box[EncryProposition] with ESEnvConvertable {
 
   override def convert: ESObject = {
     val fields = Map(
-      "proposition" -> ESValue("proposition", ESProposition)(proposition),
-      "typeId" -> ESValue("typeId", ESInt)(typeId),
-      "id" -> ESValue("id", ESByteVector)(id)
+      "proposition" -> ESValue("proposition", Types.ESProposition)(proposition.convert),
+      "typeId" -> ESValue("typeId", Types.ESInt)(typeId),
+      "id" -> ESValue("id", Types.ESByteVector)(id)
     )
     ESObject(Types.ESBox.ident, fields, esType)
   }
