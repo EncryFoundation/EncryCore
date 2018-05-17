@@ -15,11 +15,9 @@ import scorex.crypto.encode.Base58
 import encry.EncryApp
 import scorex.core
 import supertagged.@@
-
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
-
 
 /**
   * Composite local view of the node
@@ -179,38 +177,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
 
-  /**
-
-    Assume that history knows the following blocktree:
-
-           G
-          / \
-         *   G
-        /     \
-       *       G
-
-    where path with G-s is about canonical chain (G means semantically valid modifier), path with * is sidechain (* means
-    that semantic validity is unknown). New modifier is coming to the sidechain, it sends rollback to the root +
-    application of the sidechain to the state. Assume that state is finding that some modifier in the sidechain is
-    incorrect:
-
-           G
-          / \
-         G   G
-        /     \
-       B       G
-      /
-     *
-
-    In this case history should be informed about the bad modifier and it should retarget state
-
-    //todo: improve the comment below
-
-    We assume that we apply modifiers sequentially (on a single modifier coming from the network or generated locally),
-    and in case of failed application of some modifier in a progressInfo, rollback point in an alternative should be not
-    earlier than a rollback point of an initial progressInfo.
-   **/
-
   @tailrec
   private def updateState(history: HIS,
                           state: MS,
@@ -227,9 +193,9 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
     val branchingPointOpt: Option[Array[Byte] @@ core.ModifierId.Tag with core.VersionTag.Tag] = progressInfo.branchPoint.map(VersionTag @@ _)
 
     val (stateToApplyTry: Try[MS], suffixTrimmed: IndexedSeq[PMOD]) = if (progressInfo.chainSwitchingNeeded) {
-        if (!state.version.sameElements(branchingPointOpt)) {
-          state.rollbackTo(branchingPointOpt.get) -> trimChainSuffix(suffixApplied, branchingPointOpt.get)
-        } else Success(state) -> IndexedSeq()
+      if (!state.version.sameElements(branchingPointOpt)) {
+        state.rollbackTo(branchingPointOpt.get) -> trimChainSuffix(suffixApplied, branchingPointOpt.get)
+      } else Success(state) -> IndexedSeq()
     } else Success(state) -> suffixApplied
 
     stateToApplyTry match {
@@ -239,7 +205,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
 
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
 
-        val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) {case (u, modToApply) =>
+        val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
           if (u.failedMod.isEmpty) {
             u.state.applyModifier(modToApply) match {
               case Success(stateAfterApply) =>
@@ -264,7 +230,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
         log.error("Rollback failed: ", e)
         context.system.eventStream.publish(RollbackFailed(branchingPointOpt))
         EncryApp.forceStopApplication(500)
-        // TODO: Recovery?
+      // TODO: Recovery?
     }
   }
 
@@ -374,7 +340,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
   }
 
   override def receive: Receive =
-      compareViews orElse
+    compareViews orElse
       processRemoteModifiers orElse
       processLocallyGeneratedModifiers orElse
       getCurrentInfo orElse
@@ -389,14 +355,18 @@ object NodeViewHolder {
 
     // Explicit request of NodeViewChange events of certain types.
     case class GetNodeViewChanges(history: Boolean, state: Boolean, vault: Boolean, mempool: Boolean)
+
     case class GetDataFromCurrentView[HIS, MS, VL, MP, A](f: CurrentView[HIS, MS, VL, MP] => A)
 
     // Moved from NodeViewSynchronizer as this was only received here
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
+
     case class ModifiersFromRemote(source: ConnectedPeer, modifierTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
 
     case class LocallyGeneratedTransaction[P <: Proposition, TX <: Transaction[P]](tx: TX)
+
     case class LocallyGeneratedModifier[PMOD <: PersistentNodeViewModifier](pmod: PMOD)
+
   }
 
   // fixme: No actor is expecting this ModificationApplicationStarted and DownloadRequest messages
@@ -408,4 +378,5 @@ object NodeViewHolder {
   case class DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) extends NodeViewHolderEvent
 
   case class CurrentView[HIS, MS, VL, MP](history: HIS, state: MS, vault: VL, pool: MP)
+
 }
