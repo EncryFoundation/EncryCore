@@ -6,7 +6,7 @@ import encry.settings.EncryAppSettings
 import scorex.core.utils.ScorexLogging
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
-import scala.io.StdIn.readLine
+import jline.console.ConsoleReader
 
 class ConsolePromptListener(settings: EncryAppSettings) extends Actor with ScorexLogging {
 
@@ -14,7 +14,7 @@ class ConsolePromptListener(settings: EncryAppSettings) extends Actor with Score
 
   override def receive: Receive = {
     case StartListening =>
-      Iterator.continually(readLine(prompt)).foreach { input =>
+      Iterator.continually(reader.readLine(prompt)).foreach { input =>
         InputParser.parse(input) match {
           case Success(command) =>
             getCommand(command.category.name, command.ident.name) match {
@@ -37,6 +37,8 @@ object ConsolePromptListener {
   case object StartListening
 
   val prompt = "$> "
+
+  val reader = new ConsoleReader()
 
   def getCommand(cat: String, cmd: String): Option[Command] = cmdDictionary.get(cat).flatMap(_.get(cmd))
 
