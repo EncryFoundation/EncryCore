@@ -1,13 +1,12 @@
 package encry.cli.commands
 
-import akka.actor.ActorRef
 import encry.cli.{Ast, Response}
-import encry.settings.{Algos, EncryAppSettings}
+import encry.settings.EncryAppSettings
 import scala.concurrent.Future
 
 trait Command {
 
-  def execute(nodeViewHolderRef: ActorRef, miner: ActorRef, args: Command.Args, settings: EncryAppSettings): Future[Option[Response]]
+  def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]]
 
 }
 
