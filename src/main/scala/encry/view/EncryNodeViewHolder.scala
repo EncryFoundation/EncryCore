@@ -158,7 +158,7 @@ object EncryNodeViewHolder {
 
   def props(): Props =
     encrySettings.nodeSettings.stateMode match {
-      case digestType@StateMode.Digest => Props.create(classOf[EncryNodeViewHolder[DigestState]], encrySettings, timeProvider)
-      case utxoType@StateMode.Utxo => Props.create(classOf[EncryNodeViewHolder[UtxoState]], encrySettings, timeProvider)
+      case digestType@StateMode.Digest => Props(classOf[EncryNodeViewHolder[DigestState]], encrySettings, timeProvider)
+      case utxoType@StateMode.Utxo => Props(classOf[EncryNodeViewHolder[UtxoState]], encrySettings, timeProvider)
     }
 }
