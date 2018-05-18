@@ -1,6 +1,5 @@
 package encry.cli.commands
 
-import akka.actor.ActorRef
 import akka.pattern._
 import akka.util.Timeout
 import encry.account.Address
@@ -13,11 +12,10 @@ import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
+import encry.EncryApp._
 import scorex.core.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedTransaction}
 import scorex.core.utils.NetworkTimeProvider
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.concurrent.duration._
 import scala.util.Try
 
 object Transfer extends Command {
@@ -26,14 +24,12 @@ object Transfer extends Command {
     * Command "wallet transfer -addr=<addr[String]> -fee=<fee[Num]> -amount=<amount[Num]>"
     * Example "wallet transfer -addr='3jSD9fwHEHJwHq99ARqhnNhqGXeKnkJMyX4FZjHV6L3PjbCmjG' -fee=100 -amount=2000"
     *
-    * @param nodeViewHolderRef
     * @param args
     * @return
     */
-  override def execute(nodeViewHolderRef: ActorRef, miner: ActorRef,
-                       args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
+  override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
-    (nodeViewHolderRef ?
+    (nodeViewHolder ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
         Try {
           lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.scorexSettings.ntp)
@@ -49,7 +45,7 @@ object Transfer extends Command {
 
           val tx = TransactionFactory.defaultPaymentTransactionScratch(secret, fee, timestamp, boxes, recipient, amount)
 
-          nodeViewHolderRef ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
+          nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
 
           tx
         }.toOption.map(tx => Some(Response(tx.toString))).getOrElse(Some(Response("Operation failed. Malformed data.")))

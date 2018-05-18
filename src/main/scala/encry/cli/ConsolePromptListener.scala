@@ -1,45 +1,31 @@
 package encry.cli
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.Actor
 import encry.cli.commands._
 import encry.settings.EncryAppSettings
-import jline.console.ConsoleReader
 import scorex.core.utils.ScorexLogging
-
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.Success
+import scala.util.{Failure, Success}
 
-class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings, miner: ActorRef)
-  extends Actor with ScorexLogging {
+class ConsolePromptListener(settings: EncryAppSettings) extends Actor with ScorexLogging {
 
   import ConsolePromptListener._
 
-  private val prompt = "$> "
-
-  private val reader = new ConsoleReader()
-
-  // TODO: Use `PrintWriter(reader.getOutput())` for output handling.
   override def receive: Receive = {
     case StartListening =>
-      Iterator.continually(reader.readLine(prompt)).foreach { input =>
+      Iterator.continually(scala.io.StdIn.readLine(prompt)).foreach { input =>
         InputParser.parse(input) match {
           case Success(command) =>
             getCommand(command.category.name, command.ident.name) match {
               case Some(cmd) =>
-                  cmd.execute(
-                    nodeViewHolderRef,
-                    miner,
-                    Command.Args(command.params.map(p => p.ident.name -> p.value).toMap),
-                    settings
-                  ).map {
-                    case Some(x) =>
-                      println(x.msg)
-                      print(prompt)
+                cmd.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings)
+                  .map {
+                    case Some(x) => print(x.msg + s"\n$prompt")
                     case None =>
                   }
-              case _ => println("Unsupported command. Type 'app help' to get commands list")
+              case None => println("Unsupported command. Type 'app help' to get commands list")
             }
-          case _ => println("Bad input")
+          case Failure(e) => println("Bad input")
         }
       }
   }
@@ -48,6 +34,8 @@ class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSetti
 object ConsolePromptListener {
 
   case object StartListening
+
+  val prompt = "$> "
 
   def getCommand(cat: String, cmd: String): Option[Command] = cmdDictionary.get(cat).flatMap(_.get(cmd))
 

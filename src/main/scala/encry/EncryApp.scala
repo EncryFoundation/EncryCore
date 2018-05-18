@@ -74,7 +74,7 @@ object EncryApp extends App with ScorexLogging {
 
   val peerManager: ActorRef = PeerManagerRef(settings, timeProvider)
 
-  val nodeViewHolder: ActorRef = EncryNodeViewHolderRef(encrySettings, timeProvider)
+  lazy val nodeViewHolder: ActorRef = EncryNodeViewHolderRef(encrySettings, timeProvider)
 
   val readersHolder: ActorRef = EncryReadersHolderRef(nodeViewHolder)
 
@@ -86,9 +86,9 @@ object EncryApp extends App with ScorexLogging {
   val nodeViewSynchronizer: ActorRef =
     EncryNodeViewSynchronizer(networkController, nodeViewHolder, EncrySyncInfoMessageSpec, settings.network, timeProvider)
 
-  val miner: ActorRef = EncryMinerRef(encrySettings, nodeViewHolder, readersHolder, nodeId, timeProvider)
+  lazy val miner: ActorRef = EncryMinerRef(encrySettings, nodeViewHolder, readersHolder, nodeId, timeProvider)
 
-  val cliListener: ActorRef = actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolder, encrySettings, miner))
+  val cliListener: ActorRef = actorSystem.actorOf(Props(classOf[ConsolePromptListener], encrySettings))
 
   val scanner: ActorRef = EncryScannerRef(encrySettings, nodeViewHolder)
 
