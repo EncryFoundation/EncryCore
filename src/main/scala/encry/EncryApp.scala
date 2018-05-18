@@ -12,7 +12,6 @@ import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator.StartGeneration
 import encry.local.miner.EncryMiner
 import encry.local.miner.EncryMiner.StartMining
-import encry.local.miner.EncryMiner.props
 import encry.local.scanner.EncryScannerRef
 import encry.local.{EncryLocalInterfaceRef, TransactionGenerator}
 import encry.modifiers.EncryPersistentModifier

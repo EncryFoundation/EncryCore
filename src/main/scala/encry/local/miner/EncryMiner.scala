@@ -4,16 +4,16 @@ import akka.actor.{Actor, ActorRef, PoisonPill, Props}
 import encry.consensus._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{EncryBaseTransaction, TransactionFactory}
+import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, MonetaryBox}
-import encry.settings.{Constants, EncryAppSettings}
+import encry.settings.Constants
 import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import encry.EncryApp._
 import encry.crypto.PrivateKey25519
-import encry.view.history
+import encry.modifiers.state.box.proof.Signature25519
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
@@ -22,7 +22,8 @@ import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import scorex.core.utils.NetworkTime.Time
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
-import supertagged.@@
+import scorex.crypto.authds.{ADDigest, SerializedAdProof}
+import scorex.crypto.hash.Digest32
 
 import scala.collection._
 import scala.collection.mutable.ArrayBuffer
@@ -46,14 +47,9 @@ class EncryMiner(nodeId: Array[Byte], timeProvider: NetworkTimeProvider) extends
     miningWorkers.clear()
   }
 
-  def needNewCandidate(b: EncryBlock): Boolean = {
-    val parentHeaderIdOpt: Option[ModifierId] = candidateOpt.flatMap(_.parentOpt).map(_.id)
-    !parentHeaderIdOpt.exists(_.sameElements(b.header.id))
-  }
+  def needNewCandidate(b: EncryBlock): Boolean = !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
 
-  private def shouldStartMine(b: EncryBlock): Boolean = {
-    encrySettings.nodeSettings.mining && b.header.timestamp >= startTime
-  }
+  def shouldStartMine(b: EncryBlock): Boolean = encrySettings.nodeSettings.mining && b.header.timestamp >= startTime
 
   def unknownMessage: Receive = {
     case m => log.warn(s"Unexpected message $m")
@@ -71,7 +67,7 @@ class EncryMiner(nodeId: Array[Byte], timeProvider: NetworkTimeProvider) extends
     case GetMinerStatus => sender ! MinerStatus(isMining, candidateOpt)
   }
 
-  private def receiveSemanticallySuccessfulModifier: Receive = {
+  def receiveSemanticallySuccessfulModifier: Receive = {
     /**
       * Case when we are already mining by the time modifier arrives and
       * get block from node view that has header's id which isn't equals to our candidate's parent id.
@@ -91,7 +87,7 @@ class EncryMiner(nodeId: Array[Byte], timeProvider: NetworkTimeProvider) extends
     case SemanticallySuccessfulModifier(_) =>
   }
 
-  private def receiverCandidateBlock: Receive = {
+  def receiverCandidateBlock: Receive = {
     case c: CandidateBlock => procCandidateBlock(c)
     case cEnv: CandidateEnvelope if cEnv.c.nonEmpty => procCandidateBlock(cEnv.c.get)
   }
@@ -140,20 +136,22 @@ class EncryMiner(nodeId: Array[Byte], timeProvider: NetworkTimeProvider) extends
         }
       }) ++ vault.getAvailableCoinbaseBoxesAt(state.height)
 
-    val coinbase = TransactionFactory.coinbaseTransactionScratch(minerSecret, timestamp, openBxs, height)
+    val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(minerSecret, timestamp, openBxs, height)
 
-    val txs = txsToPut.sortBy(_.timestamp) :+ coinbase
+    val txs: Seq[TX] = txsToPut.sortBy(_.timestamp) :+ coinbase
 
-    val (adProof, adDigest) = state.proofsForTransactions(txs).get
-    val nBits: NBits = bestHeaderOpt
-      .map(parent => history.requiredDifficultyAfter(parent))
+    val (adProof: SerializedAdProof, adDigest: ADDigest) = state.proofsForTransactions(txs).get
+
+    val nBits: NBits = bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
       .getOrElse(Constants.Chain.InitialNBits)
-    val derivedFields = consensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
-    val blockSignature = minerSecret.sign(
+
+    val derivedFields: (Byte, ModifierId, Digest32, Digest32, Int) = consensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
+
+    val blockSignature: Signature25519 = minerSecret.sign(
       EncryBlockHeader.getMessageToSign(derivedFields._1, minerSecret.publicImage, derivedFields._2,
         derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, nBits))
 
-    val candidate = new CandidateBlock(minerSecret.publicImage,
+    val candidate: CandidateBlock = new CandidateBlock(minerSecret.publicImage,
       blockSignature, bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, nBits)
 
     log.debug(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
@@ -165,21 +163,18 @@ class EncryMiner(nodeId: Array[Byte], timeProvider: NetworkTimeProvider) extends
   def produceCandidate(): Unit =
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { v =>
       log.info("Starting candidate generation")
-      val history = v.history
-      val state = v.state
-      val pool = v.pool
-      val vault = v.vault
-      val bestHeaderOpt = history.bestBlockOpt.map(_.header)
+      val history: EncryHistory = v.history
+      val state: UtxoState = v.state
+      val pool: EncryMempool = v.pool
+      val vault: EncryWallet = v.vault
+      val bestHeaderOpt: Option[EncryBlockHeader] = history.bestBlockOpt.map(_.header)
 
       if (bestHeaderOpt.isDefined || encrySettings.nodeSettings.offlineGeneration) {
-        val candidate = createCandidate(history, pool, state, vault, bestHeaderOpt)
+        val candidate: CandidateBlock = createCandidate(history, pool, state, vault, bestHeaderOpt)
         CandidateEnvelope.fromCandidate(candidate)
-      } else {
-        CandidateEnvelope.empty
-      }
+      } else CandidateEnvelope.empty
     }
 }
-
 
 object EncryMiner extends ScorexLogging {
 
