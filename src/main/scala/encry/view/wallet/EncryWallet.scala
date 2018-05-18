@@ -154,10 +154,10 @@ object EncryWallet {
 
   def readOrGenerate(settings: EncryAppSettings): EncryWallet = {
 
-    val walletDir = getWalletDir(settings)
+    val walletDir: File = getWalletDir(settings)
     walletDir.mkdirs()
 
-    val walletStore = new LSMStore(walletDir, keepVersions = Constants.DefaultKeepVersions)
+    val walletStore: LSMStore = new LSMStore(walletDir, keepVersions = Constants.DefaultKeepVersions)
 
     new EncryWallet(walletStore, keyManager = KeyManager.readOrGenerate(settings))
   }
