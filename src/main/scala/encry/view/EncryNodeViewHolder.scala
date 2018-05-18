@@ -25,8 +25,7 @@ import scorex.crypto.authds.ADDigest
 
 import scala.util.{Failure, Success, Try}
 
-class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings,
-                                                                       timeProvider: NetworkTimeProvider)
+class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
   extends NodeViewHolder[EncryProposition, EncryBaseTransaction, EncryPersistentModifier] {
 
   override val networkChunkSize: Int = settings.scorexSettings.network.networkChunkSize
@@ -56,16 +55,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
     minimalState().closeStorage()
   }
 
-  override protected def txModify(tx: EncryBaseTransaction): Unit = {
-    memoryPool().put(tx) match {
-      case Success(newPool) =>
-        log.debug(s"Unconfirmed transaction $tx added to the memory pool")
-        val newVault = vault().scanOffchain(tx)
-        updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
-        context.system.eventStream.publish(SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx))
-      case Failure(e) =>
-        context.system.eventStream.publish(FailedTransaction[EncryProposition, EncryBaseTransaction](tx, e))
-    }
+  override protected def txModify(tx: EncryBaseTransaction): Unit = memoryPool().put(tx) match {
+    case Success(newPool) =>
+      log.debug(s"Unconfirmed transaction $tx added to the memory pool")
+      val newVault = vault().scanOffchain(tx)
+      updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
+      context.system.eventStream.publish(SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx))
+    case Failure(e) =>
+      context.system.eventStream.publish(FailedTransaction[EncryProposition, EncryBaseTransaction](tx, e))
   }
 
   override protected def genesisState: (EncryHistory, MS, EncryWallet, EncryMempool) = {
@@ -156,9 +153,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
 
 object EncryNodeViewHolder {
 
-  def props(): Props =
-    encrySettings.nodeSettings.stateMode match {
-      case digestType@StateMode.Digest => Props(classOf[EncryNodeViewHolder[DigestState]], encrySettings, timeProvider)
-      case utxoType@StateMode.Utxo => Props(classOf[EncryNodeViewHolder[UtxoState]], encrySettings, timeProvider)
-    }
+  def props(): Props = encrySettings.nodeSettings.stateMode match {
+    case digestType@StateMode.Digest => Props(classOf[EncryNodeViewHolder[DigestState]], encrySettings, timeProvider)
+    case utxoType@StateMode.Utxo => Props(classOf[EncryNodeViewHolder[UtxoState]], encrySettings, timeProvider)
+  }
 }
