@@ -10,8 +10,9 @@ import encry.api.http.routes.{AccountInfoApiRoute, HistoryApiRoute, InfoApiRoute
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator.StartGeneration
+import encry.local.miner.EncryMiner
 import encry.local.miner.EncryMiner.StartMining
-import encry.local.miner.EncryMinerRef
+import encry.local.miner.EncryMiner.props
 import encry.local.scanner.EncryScannerRef
 import encry.local.{EncryLocalInterfaceRef, TransactionGenerator}
 import encry.modifiers.EncryPersistentModifier
@@ -86,7 +87,7 @@ object EncryApp extends App with ScorexLogging {
   val nodeViewSynchronizer: ActorRef =
     EncryNodeViewSynchronizer(networkController, nodeViewHolder, EncrySyncInfoMessageSpec, settings.network, timeProvider)
 
-  lazy val miner: ActorRef = EncryMinerRef(encrySettings, nodeViewHolder, readersHolder, nodeId, timeProvider)
+  lazy val miner: ActorRef = actorSystem.actorOf(EncryMiner.props(nodeId, timeProvider))
 
   val cliListener: ActorRef = actorSystem.actorOf(Props[ConsolePromptListener], "cliListener")
 
