@@ -88,7 +88,7 @@ object EncryApp extends App with ScorexLogging {
 
   lazy val miner: ActorRef = EncryMinerRef(encrySettings, nodeViewHolder, readersHolder, nodeId, timeProvider)
 
-  val cliListener: ActorRef = actorSystem.actorOf(Props(classOf[ConsolePromptListener], encrySettings))
+  val cliListener: ActorRef = actorSystem.actorOf(Props[ConsolePromptListener], "cliListener")
 
   val scanner: ActorRef = EncryScannerRef(encrySettings, nodeViewHolder)
 
