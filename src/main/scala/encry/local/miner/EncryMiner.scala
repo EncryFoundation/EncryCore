@@ -28,7 +28,7 @@ import scorex.crypto.hash.Digest32
 import scala.collection._
 import scala.collection.mutable.ArrayBuffer
 
-class EncryMiner(nodeId: Array[Byte], timeProvider: NetworkTimeProvider) extends Actor with ScorexLogging {
+class EncryMiner extends Actor with ScorexLogging {
 
   import EncryMiner._
 
@@ -206,7 +206,7 @@ object EncryMiner extends ScorexLogging {
       "candidateBlock" -> r.candidateBlock.map(_.asJson).getOrElse("None".asJson)
     ).asJson
 
-  def props(nodeId: Array[Byte], timeProvider: NetworkTimeProvider): Props = Props(new EncryMiner(nodeId, timeProvider))
+  def props(nodeId: Array[Byte], timeProvider: NetworkTimeProvider): Props = Props(new EncryMiner())
 }
 
 
