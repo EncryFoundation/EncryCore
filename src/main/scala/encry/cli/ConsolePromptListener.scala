@@ -2,12 +2,12 @@ package encry.cli
 
 import akka.actor.Actor
 import encry.cli.commands._
-import encry.settings.EncryAppSettings
 import scorex.core.utils.ScorexLogging
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
+import encry.EncryApp.encrySettings
 
-class ConsolePromptListener(settings: EncryAppSettings) extends Actor with ScorexLogging {
+class ConsolePromptListener extends Actor with ScorexLogging {
 
   import ConsolePromptListener._
 
@@ -18,7 +18,7 @@ class ConsolePromptListener(settings: EncryAppSettings) extends Actor with Score
           case Success(command) =>
             getCommand(command.category.name, command.ident.name) match {
               case Some(cmd) =>
-                cmd.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings)
+                cmd.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), encrySettings)
                   .map {
                     case Some(x) => print(x.msg + s"\n$prompt")
                     case None =>
