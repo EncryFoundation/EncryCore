@@ -2,7 +2,7 @@ package encry.view
 
 import java.io.File
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.Props
 import encry.EncryApp
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
@@ -15,6 +15,7 @@ import encry.view.history.{EncryHistory, EncrySyncInfo}
 import encry.view.mempool.EncryMempool
 import encry.view.state.{DigestState, EncryState, StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
+import encry.EncryApp.{encrySettings, timeProvider}
 import scorex.core._
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{FailedTransaction, SuccessfulTransaction}
 import scorex.core.serialization.Serializer
@@ -24,7 +25,7 @@ import scorex.crypto.authds.ADDigest
 
 import scala.util.{Failure, Success, Try}
 
-abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings,
+class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings,
                                                                        timeProvider: NetworkTimeProvider)
   extends NodeViewHolder[EncryProposition, EncryBaseTransaction, EncryPersistentModifier] {
 
@@ -153,38 +154,11 @@ abstract class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings:
   }.get
 }
 
-private[view] class DigestNodeViewHolder(settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
-  extends EncryNodeViewHolder[DigestState](settings, timeProvider)
+object EncryNodeViewHolder {
 
-private[view] class UtxoNodeViewHolder(settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
-  extends EncryNodeViewHolder[UtxoState](settings, timeProvider)
-
-/**
-  * This class guarantees to its inheritors the creation of correct instance of [[EncryNodeViewHolder]]
-  * for the given instance of [[StateMode]].
-  */
-sealed abstract class EncryNodeViewProps[SM <: StateMode, S <: EncryState[S], N <: EncryNodeViewHolder[S]](implicit ev: StateMode.Evidence[SM, S]) {
-  def apply(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, digestMode: SM): Props
-}
-
-object DigestNodeViewProps extends EncryNodeViewProps[StateMode.DigestMode, DigestState, DigestNodeViewHolder] {
-  def apply(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, digestType: StateMode.DigestMode): Props =
-    Props.create(classOf[DigestNodeViewHolder], settings, timeProvider)
-}
-
-object UtxoNodeViewProps extends EncryNodeViewProps[StateMode.UtxoMode, UtxoState, UtxoNodeViewHolder] {
-  def apply(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, digestType: StateMode.UtxoMode): Props =
-    Props.create(classOf[UtxoNodeViewHolder], settings, timeProvider)
-}
-
-object EncryNodeViewHolderRef {
-
-  def props(settings: EncryAppSettings, timeProvider: NetworkTimeProvider): Props =
-    settings.nodeSettings.stateMode match {
-      case digestType@StateMode.Digest => DigestNodeViewProps(settings, timeProvider, digestType)
-      case utxoType@StateMode.Utxo => UtxoNodeViewProps(settings, timeProvider, utxoType)
+  def props(): Props =
+    encrySettings.nodeSettings.stateMode match {
+      case digestType@StateMode.Digest => Props.create(classOf[EncryNodeViewHolder[DigestState]], encrySettings, timeProvider)
+      case utxoType@StateMode.Utxo => Props.create(classOf[EncryNodeViewHolder[UtxoState]], encrySettings, timeProvider)
     }
-
-  def apply(settings: EncryAppSettings, timeProvider: NetworkTimeProvider)(implicit system: ActorSystem): ActorRef =
-    system.actorOf(props(settings, timeProvider))
 }

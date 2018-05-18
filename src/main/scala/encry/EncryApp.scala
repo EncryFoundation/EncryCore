@@ -20,7 +20,7 @@ import encry.modifiers.state.box.proposition.EncryProposition
 import encry.network.EncryNodeViewSynchronizer
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncrySyncInfoMessageSpec
-import encry.view.{EncryNodeViewHolder, EncryNodeViewHolderRef, EncryReadersHolderRef}
+import encry.view.{EncryNodeViewHolder, EncryReadersHolderRef}
 import scorex.core.api.http._
 import scorex.core.network.{NetworkControllerRef, UPnP}
 import scorex.core.network.message._
@@ -51,7 +51,7 @@ object EncryApp extends App with ScorexLogging {
   require(settings.network.agentName.length <= 50)
   lazy val bindAddress: InetSocketAddress = settings.restApi.bindAddress
 
-  val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
+  lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
 
   val nodeId: Array[Byte] = Algos.hash(encrySettings.scorexSettings.network.nodeName).take(5)
@@ -74,7 +74,7 @@ object EncryApp extends App with ScorexLogging {
 
   val peerManager: ActorRef = PeerManagerRef(settings, timeProvider)
 
-  lazy val nodeViewHolder: ActorRef = EncryNodeViewHolderRef(encrySettings, timeProvider)
+  lazy val nodeViewHolder: ActorRef = actorSystem.actorOf(EncryNodeViewHolder.props(), "nodeViewHolder")
 
   val readersHolder: ActorRef = EncryReadersHolderRef(nodeViewHolder)
 
