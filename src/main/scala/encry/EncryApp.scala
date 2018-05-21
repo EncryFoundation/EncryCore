@@ -86,7 +86,7 @@ object EncryApp extends App with ScorexLogging {
   val nodeViewSynchronizer: ActorRef =
     EncryNodeViewSynchronizer(networkController, nodeViewHolder, EncrySyncInfoMessageSpec, settings.network, timeProvider)
 
-  lazy val miner: ActorRef = system.actorOf(EncryMiner.props(nodeId, timeProvider), "miner")
+  lazy val miner: ActorRef = system.actorOf(Props[EncryMiner], "miner")
 
   val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
 

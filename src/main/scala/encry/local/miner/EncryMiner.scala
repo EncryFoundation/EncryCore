@@ -205,8 +205,6 @@ object EncryMiner extends ScorexLogging {
       "isMining" -> r.isMining.asJson,
       "candidateBlock" -> r.candidateBlock.map(_.asJson).getOrElse("None".asJson)
     ).asJson
-
-  def props(nodeId: Array[Byte], timeProvider: NetworkTimeProvider): Props = Props(new EncryMiner())
 }
 
 
