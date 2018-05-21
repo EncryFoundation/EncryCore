@@ -3,7 +3,6 @@ package encry.local.scanner.storage
 import encry.account.Address
 import encry.modifiers.state.box.EncryBox
 import encry.modifiers.state.box.proposition.AccountProposition
-import encry.settings.Algos
 import encry.storage.codec.FixLenComplexValueCodec
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.utils.ScorexLogging

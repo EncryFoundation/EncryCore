@@ -13,11 +13,10 @@ import encry.local.TransactionGenerator.StartGeneration
 import encry.local.miner.EncryMiner
 import encry.local.miner.EncryMiner.StartMining
 import encry.local.scanner.EncryScanner
-import encry.local.{EncryLocalInterfaceRef, TransactionGenerator}
+import encry.local.TransactionGenerator
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
-import encry.network.EncryNodeViewSynchronizer
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryReadersHolderRef}
@@ -81,11 +80,6 @@ object EncryApp extends App with ScorexLogging {
   val networkController: ActorRef = NetworkControllerRef("networkController", settings.network,
     messagesHandler, upnp, peerManager, timeProvider)
 
-  val localInterface: ActorRef = EncryLocalInterfaceRef(nodeViewHolder, peerManager, encrySettings, timeProvider)
-
-  val nodeViewSynchronizer: ActorRef =
-    EncryNodeViewSynchronizer(networkController, nodeViewHolder, EncrySyncInfoMessageSpec, settings.network, timeProvider)
-
   lazy val miner: ActorRef = system.actorOf(Props[EncryMiner], "miner")
 
   val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
@@ -107,14 +101,13 @@ object EncryApp extends App with ScorexLogging {
   if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) miner ! StartMining
 
   if (encrySettings.testingSettings.transactionGeneration) {
-    val txGen =
-      system.actorOf(TransactionGenerator.props(nodeViewHolder, encrySettings.testingSettings, timeProvider))
+    val txGen = system.actorOf(TransactionGenerator.props(nodeViewHolder, encrySettings.testingSettings, timeProvider))
     txGen ! StartGeneration
   }
 
   if (encrySettings.nodeSettings.enableCLI) cliListener ! StartListening
 
-  lazy val upnp = new UPnP(settings.network)
+  lazy val upnp: UPnP = new UPnP(settings.network)
 
   def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
 }

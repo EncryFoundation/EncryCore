@@ -67,7 +67,6 @@ class EncryScanner(indexStore: Store) extends Actor with ScorexLogging {
           }
           cache -> (bxs :+ bx)
         } else cache -> bxs
-
       }
     ScanningResult(newIndexes.toSeq, boxesToInsert, boxIdsToRemove)
   }
