@@ -12,7 +12,7 @@ import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator.StartGeneration
 import encry.local.miner.EncryMiner
 import encry.local.miner.EncryMiner.StartMining
-import encry.local.scanner.EncryScannerRef
+import encry.local.scanner.EncryScanner
 import encry.local.{EncryLocalInterfaceRef, TransactionGenerator}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
@@ -90,7 +90,7 @@ object EncryApp extends App with ScorexLogging {
 
   val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
 
-  val scanner: ActorRef = EncryScannerRef(encrySettings, nodeViewHolder)
+  val scanner: ActorRef = system.actorOf(EncryScanner.props(), "scanner")
 
   val apiRoutes: Seq[ApiRoute] = Seq(
     UtilsApiRoute(settings.restApi),
