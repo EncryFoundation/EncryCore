@@ -62,15 +62,12 @@ class EncryScanner(indexStore: Store) extends Actor with ScorexLogging {
       .foldLeft(mutable.TreeMap[ByteArrayWrapper, Seq[ADKey]](), Seq[EncryBaseBox]()) { case ((cache, bxs), bx) =>
         if (!boxIdsToRemove.exists(_.sameElements(bx.id))) {
           cache.get(keyByProposition(bx.proposition)) match {
-            case Some(ids) =>
-              cache.update(keyByProposition(bx.proposition), ids :+ bx.id)
-            case _ =>
-              cache.update(keyByProposition(bx.proposition), Seq(bx.id))
+            case Some(ids) => cache.update(keyByProposition(bx.proposition), ids :+ bx.id)
+            case None => cache.update(keyByProposition(bx.proposition), Seq(bx.id))
           }
           cache -> (bxs :+ bx)
-        } else {
-          cache -> bxs
-        }
+        } else cache -> bxs
+
       }
     ScanningResult(newIndexes.toSeq, boxesToInsert, boxIdsToRemove)
   }
