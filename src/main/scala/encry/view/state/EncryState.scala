@@ -36,8 +36,8 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
     val toBeInserted: Seq[EncryBaseBox] = txs.flatMap(_.newBoxes)
     val toBeInsertedSet: Set[ByteArrayWrapper] = toBeInserted.map(bx => ByteArrayWrapper(bx.id)).toSet
     val intersected: Set[ByteArrayWrapper] = toBeInsertedSet.intersect(toBeOpenedSet)
-    val toRemove = toBeOpened.filterNot(k => intersected.contains(ByteArrayWrapper(k))).map(Removal)
-    val toInsert = toBeInserted.filterNot(bx => intersected.contains(ByteArrayWrapper(bx.id))).map(Insertion)
+    val toRemove: Seq[Removal] = toBeOpened.filterNot(k => intersected.contains(ByteArrayWrapper(k))).map(Removal)
+    val toInsert: Seq[Insertion] = toBeInserted.filterNot(bx => intersected.contains(ByteArrayWrapper(bx.id))).map(Insertion)
     EncryBoxStateChanges(toRemove ++ toInsert)
   }
 
