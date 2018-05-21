@@ -97,7 +97,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
     Some((history, state, wallet, memPool))
   } else None
 
-  private def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): StateType = {
+  def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): StateType = {
     val dir: File = EncryState.getStateDir(settings)
     dir.mkdirs()
     dir.listFiles.foreach(_.delete())
@@ -113,7 +113,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
       .ensuring(_.rootHash sameElements digest.getOrElse(EncryState.afterGenesisStateDigest), "State root is incorrect")
   }
 
-  private def restoreConsistentState(stateIn: StateType, history: EncryHistory): StateType = Try {
+  def restoreConsistentState(stateIn: StateType, history: EncryHistory): StateType = Try {
     (stateIn.version, history.bestBlockOpt, stateIn) match {
       case (stateId, None, _) if stateId sameElements EncryState.genesisStateVersion =>
         log.debug("State and history are both empty on startup")

@@ -10,8 +10,8 @@ import encry.api.http.routes.{AccountInfoApiRoute, HistoryApiRoute, InfoApiRoute
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator.StartGeneration
+import encry.local.miner.EncryMiner
 import encry.local.miner.EncryMiner.StartMining
-import encry.local.miner.EncryMinerRef
 import encry.local.scanner.EncryScannerRef
 import encry.local.{EncryLocalInterfaceRef, TransactionGenerator}
 import encry.modifiers.EncryPersistentModifier
@@ -44,9 +44,9 @@ object EncryApp extends App with ScorexLogging {
 
   implicit def exceptionHandler: ExceptionHandler = ApiErrorHandler.exceptionHandler
 
-  implicit val actorSystem: ActorSystem = ActorSystem(settings.network.agentName)
+  implicit val system: ActorSystem = ActorSystem(settings.network.agentName)
   implicit val materializer: ActorMaterializer = ActorMaterializer()
-  implicit val ec: ExecutionContextExecutor = actorSystem.dispatcher
+  implicit val ec: ExecutionContextExecutor = system.dispatcher
 
   require(settings.network.agentName.length <= 50)
   lazy val bindAddress: InetSocketAddress = settings.restApi.bindAddress
@@ -74,7 +74,7 @@ object EncryApp extends App with ScorexLogging {
 
   val peerManager: ActorRef = PeerManagerRef(settings, timeProvider)
 
-  lazy val nodeViewHolder: ActorRef = actorSystem.actorOf(EncryNodeViewHolder.props(), "nodeViewHolder")
+  lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props(), "nodeViewHolder")
 
   val readersHolder: ActorRef = EncryReadersHolderRef(nodeViewHolder)
 
@@ -86,9 +86,9 @@ object EncryApp extends App with ScorexLogging {
   val nodeViewSynchronizer: ActorRef =
     EncryNodeViewSynchronizer(networkController, nodeViewHolder, EncrySyncInfoMessageSpec, settings.network, timeProvider)
 
-  lazy val miner: ActorRef = EncryMinerRef(encrySettings, nodeViewHolder, readersHolder, nodeId, timeProvider)
+  lazy val miner: ActorRef = system.actorOf(Props[EncryMiner], "miner")
 
-  val cliListener: ActorRef = actorSystem.actorOf(Props[ConsolePromptListener], "cliListener")
+  val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
 
   val scanner: ActorRef = EncryScannerRef(encrySettings, nodeViewHolder)
 
@@ -101,14 +101,14 @@ object EncryApp extends App with ScorexLogging {
     AccountInfoApiRoute(readersHolder, nodeViewHolder, scanner, settings.restApi, encrySettings.nodeSettings.stateMode)
   )
 
-  val combinedRoute: Route = CompositeHttpService(actorSystem, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
+  val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
   Http().bindAndHandle(combinedRoute, bindAddress.getAddress.getHostAddress, bindAddress.getPort)
 
   if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) miner ! StartMining
 
   if (encrySettings.testingSettings.transactionGeneration) {
     val txGen =
-      actorSystem.actorOf(TransactionGenerator.props(nodeViewHolder, encrySettings.testingSettings, timeProvider))
+      system.actorOf(TransactionGenerator.props(nodeViewHolder, encrySettings.testingSettings, timeProvider))
     txGen ! StartGeneration
   }
 

@@ -279,15 +279,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
       }
     } else log.warn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
 
-  protected def compareViews: Receive = {
-    case CompareViews(peer, modifierTypeId, modifierIds) =>
-      val ids: Seq[ModifierId] = modifierTypeId match {
-        case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => memoryPool().notIn(modifierIds)
-        case _ => modifierIds.filterNot(mid => history().contains(mid) || modifiersCache.contains(key(mid)))
-      }
-      sender() ! RequestFromLocal(peer, modifierTypeId, ids)
-  }
-
   protected def processRemoteModifiers: Receive = {
     case ModifiersFromRemote(remote, modifierTypeId, remoteObjects) =>
       modifierSerializers.get(modifierTypeId) foreach { companion =>
@@ -319,31 +310,28 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
       }
   }
 
-  protected def processLocallyGeneratedModifiers: Receive = {
+  protected def nonProcessRemoteModifiers: Receive = {
     case lt: LocallyGeneratedTransaction[P, TX] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[PMOD] =>
       log.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
-  }
-
-  protected def getCurrentInfo: Receive = {
     case GetDataFromCurrentView(f) => sender() ! f(CurrentView(history(), minimalState(), vault(), memoryPool()))
-  }
-
-  protected def getNodeViewChanges: Receive = {
     case GetNodeViewChanges(history, state, vault, mempool) =>
       if (history) sender() ! ChangedHistory(nodeView._1.getReader)
       if (state) sender() ! ChangedState(nodeView._2.getReader)
       if (vault) sender() ! ChangedVault()
       if (mempool) sender() ! ChangedMempool(nodeView._4.getReader)
+    case CompareViews(peer, modifierTypeId, modifierIds) =>
+      val ids: Seq[ModifierId] = modifierTypeId match {
+        case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => memoryPool().notIn(modifierIds)
+        case _ => modifierIds.filterNot(mid => history().contains(mid) || modifiersCache.contains(key(mid)))
+      }
+      sender() ! RequestFromLocal(peer, modifierTypeId, ids)
   }
 
   override def receive: Receive =
-    compareViews orElse
       processRemoteModifiers orElse
-      processLocallyGeneratedModifiers orElse
-      getCurrentInfo orElse
-      getNodeViewChanges orElse {
+      nonProcessRemoteModifiers orElse {
       case a: Any => log.error("Strange input: " + a)
     }
 }

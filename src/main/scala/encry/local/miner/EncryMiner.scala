@@ -1,61 +1,64 @@
 package encry.local.miner
 
-import akka.actor.{Actor, ActorRef, ActorRefFactory, PoisonPill, Props}
+import akka.actor.{Actor, ActorRef, PoisonPill, Props}
 import encry.consensus._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{EncryBaseTransaction, TransactionFactory}
+import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, MonetaryBox}
-import encry.settings.{Constants, EncryAppSettings}
+import encry.settings.Constants
 import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
+import encry.EncryApp._
+import encry.crypto.PrivateKey25519
+import encry.modifiers.state.box.proof.Signature25519
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
+import scorex.core.ModifierId
 import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
+import scorex.core.utils.NetworkTime.Time
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
+import scorex.crypto.authds.{ADDigest, SerializedAdProof}
+import scorex.crypto.hash.Digest32
 
 import scala.collection._
 import scala.collection.mutable.ArrayBuffer
 
-class EncryMiner(settings: EncryAppSettings,
-                 viewHolderRef: ActorRef,
-                 readersHolderRef: ActorRef,
-                 nodeId: Array[Byte],
-                 timeProvider: NetworkTimeProvider) extends Actor with ScorexLogging {
+class EncryMiner extends Actor with ScorexLogging {
 
   import EncryMiner._
 
-  private val startTime = timeProvider.time()
+  val startTime: Time = timeProvider.time()
+  val consensus: ConsensusScheme = ConsensusSchemeReaders.consensusScheme
+  var isMining = false
+  var candidateOpt: Option[CandidateBlock] = None
+  val miningWorkers: mutable.Buffer[ActorRef] = new ArrayBuffer[ActorRef]()
 
-  private val consensus = ConsensusSchemeReaders.consensusScheme
-
-  private var isMining = false
-  private var candidateOpt: Option[CandidateBlock] = None
-  private val miningWorkers: mutable.Buffer[ActorRef] = new ArrayBuffer[ActorRef]()
-
-  override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
-  }
+  override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
 
   override def postStop(): Unit = killAllWorkers()
 
-  private def killAllWorkers(): Unit = {
+  def killAllWorkers(): Unit = {
     miningWorkers.foreach(_ ! PoisonPill)
     miningWorkers.clear()
   }
 
-  private def unknownMessage: Receive = {
+  def needNewCandidate(b: EncryBlock): Boolean = !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
+
+  def shouldStartMine(b: EncryBlock): Boolean = encrySettings.nodeSettings.mining && b.header.timestamp >= startTime
+
+  def unknownMessage: Receive = {
     case m => log.warn(s"Unexpected message $m")
   }
 
-  private def mining: Receive = {
-    case StartMining if candidateOpt.nonEmpty && !isMining && settings.nodeSettings.mining =>
+  def mining: Receive = {
+    case StartMining if candidateOpt.nonEmpty && !isMining && encrySettings.nodeSettings.mining =>
       isMining = true
-      miningWorkers += EncryMiningWorker(settings, viewHolderRef, candidateOpt.get)(context)
+      miningWorkers += EncryMiningWorker(encrySettings, nodeViewHolder, candidateOpt.get)(context)
       miningWorkers.foreach(_ ! candidateOpt.get)
     case StartMining if candidateOpt.isEmpty => produceCandidate()
     case StopMining =>
@@ -64,24 +67,15 @@ class EncryMiner(settings: EncryAppSettings,
     case GetMinerStatus => sender ! MinerStatus(isMining, candidateOpt)
   }
 
-  private def needNewCandidate(b: EncryBlock): Boolean = {
-    val parentHeaderIdOpt = candidateOpt.flatMap(_.parentOpt).map(_.id)
-    !parentHeaderIdOpt.exists(_.sameElements(b.header.id))
-  }
-
-  private def shouldStartMine(b: EncryBlock): Boolean = {
-    settings.nodeSettings.mining && b.header.timestamp >= startTime
-  }
-
-  private def receiveSemanticallySuccessfulModifier: Receive = {
+  def receiveSemanticallySuccessfulModifier: Receive = {
     /**
       * Case when we are already mining by the time modifier arrives and
       * get block from node view that has header's id which isn't equals to our candidate's parent id.
       * That means that our candidate is outdated. Should produce new candidate for ourselves.
       * Stop all current threads and re-run them with newly produced candidate.
       */
-    case SemanticallySuccessfulModifier(mod: EncryBlock) if isMining && needNewCandidate(mod) =>
-      produceCandidate()
+    case SemanticallySuccessfulModifier(mod: EncryBlock) if isMining && needNewCandidate(mod) => produceCandidate()
+
     /**
       * Non obvious but case when mining is enabled, but miner doesn't started yet. Initialization case.
       * We've received block that been generated by somebody else or genesis while we doesn't start.
@@ -89,24 +83,20 @@ class EncryMiner(settings: EncryAppSettings,
       * to start mining.
       * This block could be either genesis or generated by another node.
       */
-    case SemanticallySuccessfulModifier(mod: EncryBlock) if shouldStartMine(mod) =>
-      self ! StartMining
-
-    case SemanticallySuccessfulModifier(_) => // Ignore other mods.
+    case SemanticallySuccessfulModifier(mod: EncryBlock) if shouldStartMine(mod) => self ! StartMining
+    case SemanticallySuccessfulModifier(_) =>
   }
 
-  private def receiverCandidateBlock: Receive = {
-    case c: CandidateBlock =>
-      procCandidateBlock(c)
-    case cEnv: CandidateEnvelope if cEnv.c.nonEmpty =>
-      procCandidateBlock(cEnv.c.get)
+  def receiverCandidateBlock: Receive = {
+    case c: CandidateBlock => procCandidateBlock(c)
+    case cEnv: CandidateEnvelope if cEnv.c.nonEmpty => procCandidateBlock(cEnv.c.get)
   }
 
   override def receive: Receive =
     receiveSemanticallySuccessfulModifier orElse
-    receiverCandidateBlock orElse
-    mining orElse
-    unknownMessage
+      receiverCandidateBlock orElse
+      mining orElse
+      unknownMessage
 
   private def procCandidateBlock(c: CandidateBlock): Unit = {
     log.debug(s"Got candidate block $c")
@@ -115,12 +105,9 @@ class EncryMiner(settings: EncryAppSettings,
     miningWorkers.foreach(_ ! c)
   }
 
-  private def createCandidate(history: EncryHistory,
-                              pool: EncryMempool,
-                              state: UtxoState,
-                              vault: EncryWallet,
-                              bestHeaderOpt: Option[EncryBlockHeader]): CandidateBlock = {
-    val timestamp = timeProvider.time()
+  def createCandidate(history: EncryHistory, pool: EncryMempool, state: UtxoState, vault: EncryWallet,
+                      bestHeaderOpt: Option[EncryBlockHeader]): CandidateBlock = {
+    val timestamp: Time = timeProvider.time()
     val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
 
     // `txsToPut` - valid, non-conflicting txs with respect to their fee amount.
@@ -128,22 +115,18 @@ class EncryMiner(settings: EncryAppSettings,
     val (txsToPut, txsToDrop, _) = pool.takeAll.toSeq.sortBy(_.fee).reverse
       .foldLeft((Seq[EncryBaseTransaction](), Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) {
         case ((validTxs, invalidTxs, bxsAcc), tx) =>
-          val bxsRaw = tx.unlockers.map(u => ByteArrayWrapper(u.boxId))
+          val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.unlockers.map(u => ByteArrayWrapper(u.boxId))
           if ((validTxs.map(_.length).sum + tx.length) <= Constants.Chain.BlockMaxSize - 124) {
-            if (state.validate(tx).isSuccess && bxsRaw.forall(k => !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size) {
+            if (state.validate(tx).isSuccess && bxsRaw.forall(k => !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size)
               (validTxs :+ tx, invalidTxs, bxsAcc ++ bxsRaw)
-            } else {
-              (validTxs, invalidTxs :+ tx, bxsAcc)
-            }
-          } else {
-            (validTxs, invalidTxs, bxsAcc)
-          }
+            else (validTxs, invalidTxs :+ tx, bxsAcc)
+          } else (validTxs, invalidTxs, bxsAcc)
       }
 
     // Remove stateful-invalid txs from mempool.
     pool.removeAsync(txsToDrop)
 
-    val minerSecret = vault.keyManager.mainKey
+    val minerSecret: PrivateKey25519 = vault.keyManager.mainKey
 
     val openBxs: IndexedSeq[MonetaryBox] = txsToPut.foldLeft(IndexedSeq[AssetBox]())((buff, tx) =>
       buff ++ tx.newBoxes.foldLeft(IndexedSeq[AssetBox]()) { case (acc, bx) =>
@@ -153,20 +136,22 @@ class EncryMiner(settings: EncryAppSettings,
         }
       }) ++ vault.getAvailableCoinbaseBoxesAt(state.height)
 
-    val coinbase = TransactionFactory.coinbaseTransactionScratch(minerSecret, timestamp, openBxs, height)
+    val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(minerSecret, timestamp, openBxs, height)
 
-    val txs = txsToPut.sortBy(_.timestamp) :+ coinbase
+    val txs: Seq[TX] = txsToPut.sortBy(_.timestamp) :+ coinbase
 
-    val (adProof, adDigest) = state.proofsForTransactions(txs).get
-    val nBits: NBits = bestHeaderOpt
-      .map(parent => history.requiredDifficultyAfter(parent))
+    val (adProof: SerializedAdProof, adDigest: ADDigest) = state.proofsForTransactions(txs).get
+
+    val nBits: NBits = bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
       .getOrElse(Constants.Chain.InitialNBits)
-    val derivedFields = consensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
-    val blockSignature = minerSecret.sign(
+
+    val derivedFields: (Byte, ModifierId, Digest32, Digest32, Int) = consensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
+
+    val blockSignature: Signature25519 = minerSecret.sign(
       EncryBlockHeader.getMessageToSign(derivedFields._1, minerSecret.publicImage, derivedFields._2,
         derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, nBits))
 
-    val candidate = new CandidateBlock(minerSecret.publicImage,
+    val candidate: CandidateBlock = new CandidateBlock(minerSecret.publicImage,
       blockSignature, bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, nBits)
 
     log.debug(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
@@ -176,23 +161,20 @@ class EncryMiner(settings: EncryAppSettings,
   }
 
   def produceCandidate(): Unit =
-    viewHolderRef ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { v =>
+    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { v =>
       log.info("Starting candidate generation")
-      val history = v.history
-      val state = v.state
-      val pool = v.pool
-      val vault = v.vault
-      val bestHeaderOpt = history.bestBlockOpt.map(_.header)
+      val history: EncryHistory = v.history
+      val state: UtxoState = v.state
+      val pool: EncryMempool = v.pool
+      val vault: EncryWallet = v.vault
+      val bestHeaderOpt: Option[EncryBlockHeader] = history.bestBlockOpt.map(_.header)
 
-      if (bestHeaderOpt.isDefined || settings.nodeSettings.offlineGeneration) {
-        val candidate = createCandidate(history, pool, state, vault, bestHeaderOpt)
+      if (bestHeaderOpt.isDefined || encrySettings.nodeSettings.offlineGeneration) {
+        val candidate: CandidateBlock = createCandidate(history, pool, state, vault, bestHeaderOpt)
         CandidateEnvelope.fromCandidate(candidate)
-      } else {
-        CandidateEnvelope.empty
-      }
+      } else CandidateEnvelope.empty
     }
 }
-
 
 object EncryMiner extends ScorexLogging {
 
@@ -213,7 +195,7 @@ object EncryMiner extends ScorexLogging {
 
   object CandidateEnvelope {
 
-    val empty = CandidateEnvelope(None)
+    val empty: CandidateEnvelope = CandidateEnvelope(None)
 
     def fromCandidate(c: CandidateBlock): CandidateEnvelope = CandidateEnvelope(Some(c))
   }
@@ -225,20 +207,4 @@ object EncryMiner extends ScorexLogging {
     ).asJson
 }
 
-object EncryMinerRef {
 
-  def props(settings: EncryAppSettings,
-            viewHolderRef: ActorRef,
-            readersHolderRef: ActorRef,
-            nodeId: Array[Byte],
-            timeProvider: NetworkTimeProvider): Props =
-    Props(new EncryMiner(settings, viewHolderRef, readersHolderRef, nodeId, timeProvider))
-
-  def apply(settings: EncryAppSettings,
-            viewHolderRef: ActorRef,
-            readersHolderRef: ActorRef,
-            nodeId: Array[Byte],
-            timeProvider: NetworkTimeProvider)
-           (implicit context: ActorRefFactory): ActorRef =
-    context.actorOf(props(settings, viewHolderRef, readersHolderRef, nodeId, timeProvider))
-}
