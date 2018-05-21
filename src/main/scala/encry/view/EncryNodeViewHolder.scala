@@ -10,7 +10,7 @@ import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPaylo
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer}
 import encry.modifiers.state.box.proposition.EncryProposition
-import encry.settings.{Algos, EncryAppSettings}
+import encry.settings.Algos
 import encry.view.history.{EncryHistory, EncrySyncInfo}
 import encry.view.mempool.EncryMempool
 import encry.view.state.{DigestState, EncryState, StateMode, UtxoState}
@@ -20,15 +20,14 @@ import scorex.core._
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{FailedTransaction, SuccessfulTransaction}
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.Transaction
-import scorex.core.utils.NetworkTimeProvider
 import scorex.crypto.authds.ADDigest
 
 import scala.util.{Failure, Success, Try}
 
-class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
+class EncryNodeViewHolder[StateType <: EncryState[StateType]]
   extends NodeViewHolder[EncryProposition, EncryBaseTransaction, EncryPersistentModifier] {
 
-  override val networkChunkSize: Int = settings.scorexSettings.network.networkChunkSize
+  override val networkChunkSize: Int = encrySettings.scorexSettings.network.networkChunkSize
 
   override type MS = StateType
   override type SI = EncrySyncInfo
@@ -66,21 +65,21 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
   }
 
   override protected def genesisState: (EncryHistory, MS, EncryWallet, EncryMempool) = {
-    val stateDir: File = EncryState.getStateDir(settings)
+    val stateDir: File = EncryState.getStateDir(encrySettings)
     stateDir.mkdir()
 
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
 
     val state: StateType = {
-      if (settings.nodeSettings.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings.nodeSettings)
+      if (encrySettings.nodeSettings.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, encrySettings.nodeSettings)
       else EncryState.generateGenesisUtxoState(stateDir, Some(self))._1
     }.asInstanceOf[MS]
 
-    val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
+    val history: EncryHistory = EncryHistory.readOrGenerate(encrySettings, timeProvider)
 
-    val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
+    val wallet: EncryWallet = EncryWallet.readOrGenerate(encrySettings)
 
-    val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
+    val memPool: EncryMempool = EncryMempool.empty(encrySettings, timeProvider)
 
     (history, state, wallet, memPool)
   }
@@ -89,25 +88,25 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
     * Restore a local view during a node startup. If no any stored view found
     * (e.g. if it is a first launch of a node) None is to be returned
     */
-  override def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryDir(settings).listFiles.isEmpty) {
-    val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
-    val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
-    val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
-    val state: StateType = restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[MS], history)
+  override def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryDir(encrySettings).listFiles.isEmpty) {
+    val history: EncryHistory = EncryHistory.readOrGenerate(encrySettings, timeProvider)
+    val wallet: EncryWallet = EncryWallet.readOrGenerate(encrySettings)
+    val memPool: EncryMempool = EncryMempool.empty(encrySettings, timeProvider)
+    val state: StateType = restoreConsistentState(EncryState.readOrGenerate(encrySettings, Some(self)).asInstanceOf[MS], history)
     Some((history, state, wallet, memPool))
   } else None
 
   def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): StateType = {
-    val dir: File = EncryState.getStateDir(settings)
+    val dir: File = EncryState.getStateDir(encrySettings)
     dir.mkdirs()
     dir.listFiles.foreach(_.delete())
 
     {
       (version, digest) match {
-        case (Some(_), Some(_)) if settings.nodeSettings.stateMode.isDigest =>
-          DigestState.create(version, digest, dir, settings.nodeSettings)
+        case (Some(_), Some(_)) if encrySettings.nodeSettings.stateMode.isDigest =>
+          DigestState.create(version, digest, dir, encrySettings.nodeSettings)
         case _ =>
-          EncryState.readOrGenerate(settings, Some(self))
+          EncryState.readOrGenerate(encrySettings, Some(self))
       }
     }.asInstanceOf[StateType]
       .ensuring(_.rootHash sameElements digest.getOrElse(EncryState.afterGenesisStateDigest), "State root is incorrect")
@@ -154,7 +153,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
 object EncryNodeViewHolder {
 
   def props(): Props = encrySettings.nodeSettings.stateMode match {
-    case digestType@StateMode.Digest => Props(classOf[EncryNodeViewHolder[DigestState]], encrySettings, timeProvider)
-    case utxoType@StateMode.Utxo => Props(classOf[EncryNodeViewHolder[UtxoState]], encrySettings, timeProvider)
+    case digestType@StateMode.Digest => Props(classOf[EncryNodeViewHolder[DigestState]])
+    case utxoType@StateMode.Utxo => Props(classOf[EncryNodeViewHolder[UtxoState]])
   }
 }
