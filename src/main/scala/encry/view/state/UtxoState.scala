@@ -45,7 +45,7 @@ class UtxoState(override val version: VersionTag,
   private[state] def applyTransactions(txs: Seq[EncryBaseTransaction],
                                        expectedDigest: ADDigest): Try[Unit] = Try {
     txs.foreach(tx => validate(tx).map { _ =>
-      getStateChanges(tx).operations.map(ADProofs.toModification)
+      extractStateChanges(tx).operations.map(ADProofs.toModification)
         .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
         t.flatMap { _ =>
           persistentProver.performOneOperation(m)
@@ -105,7 +105,7 @@ class UtxoState(override val version: VersionTag,
     } else if (!storage.version.exists(_.sameElements(rootHash))) {
       Failure(new Error(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}"))
     } else {
-      persistentProver.avlProver.generateProofForOperations(getAllStateChanges(txs).operations.map(ADProofs.toModification))
+      persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
     }
   }
 

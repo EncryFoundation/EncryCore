@@ -9,11 +9,11 @@ import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.{Algos, Constants, EncryAppSettings, NodeSettings}
 import encry.view.history.Height
-import io.iohk.iodb.Store
+import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.core.VersionTag
 import scorex.core.transaction.state.MinimalState
 import scorex.core.utils.ScorexLogging
-import scorex.crypto.authds.ADDigest
+import scorex.crypto.authds.{ADDigest, ADKey}
 import scorex.crypto.encode.Base58
 
 import scala.util.Try
@@ -29,16 +29,19 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 
   def closeStorage(): Unit = stateStore.close()
 
-  // Extracts `state changes` from the given sequence of transactions.
-  def getAllStateChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
-    EncryBoxStateChanges(
-      txs.flatMap { tx =>
-        tx.unlockers.map(u => Removal(u.boxId)) ++ tx.newBoxes.map(bx => Insertion(bx))
-      }
-    )
+  /** Extracts `state changes` from the given sequence of transactions. */
+  def extractStateChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
+    val toBeOpened: Seq[ADKey] = txs.flatMap(_.unlockers.map(_.boxId))
+    val toBeOpenedSet: Set[ByteArrayWrapper] = toBeOpened.map(ByteArrayWrapper.apply).toSet
+    val toBeInserted: Seq[EncryBaseBox] = txs.flatMap(_.newBoxes)
+    val toBeInsertedSet: Set[ByteArrayWrapper] = toBeInserted.map(bx => ByteArrayWrapper(bx.id)).toSet
+    val intersected: Set[ByteArrayWrapper] = toBeInsertedSet.intersect(toBeOpenedSet)
+    val toRemove = toBeOpened.filterNot(k => intersected.contains(ByteArrayWrapper(k))).map(Removal)
+    val toInsert = toBeInserted.filterNot(bx => intersected.contains(ByteArrayWrapper(bx.id))).map(Insertion)
+    EncryBoxStateChanges(toRemove ++ toInsert)
   }
 
-  def getStateChanges(tx: EncryBaseTransaction): EncryBoxStateChanges = getAllStateChanges(Seq(tx))
+  def extractStateChanges(tx: EncryBaseTransaction): EncryBoxStateChanges = extractStateChanges(Seq(tx))
 
   // ID of last applied modifier.
   override def version: VersionTag
