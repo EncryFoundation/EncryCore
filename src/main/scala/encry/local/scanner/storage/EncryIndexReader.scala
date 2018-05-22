@@ -8,7 +8,7 @@ import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
 
-class EncryIndexReader(val index: IndexStorage) extends ScorexLogging {
+case class EncryIndexReader(index: IndexStorage) extends ScorexLogging {
 
   def boxIdsByProposition(p: Proposition): Option[Seq[ADKey]] =
     index.get(IndexStorage.keyByProposition(p))

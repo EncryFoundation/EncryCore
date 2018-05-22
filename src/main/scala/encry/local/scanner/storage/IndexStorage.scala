@@ -6,7 +6,7 @@ import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.crypto.authds.ADKey
 
-class IndexStorage(val store: Store) extends EncryBaseStorage
+case class IndexStorage(store: Store) extends EncryBaseStorage
 
 object IndexStorage {
 

@@ -27,9 +27,9 @@ class EncryScanner(indexStore: Store) extends Actor with ScorexLogging {
   import EncryScanner._
   import IndexStorage._
 
-  val storage: IndexStorage = new IndexStorage(indexStore)
+  val storage: IndexStorage = IndexStorage(indexStore)
 
-  val indexReader: EncryIndexReader = new EncryIndexReader(storage)
+  val indexReader: EncryIndexReader = EncryIndexReader(storage)
 
   def version: VersionTag = storage.get(IndexStorage.IndexVersionKey).map(VersionTag @@ _).getOrElse(InitialVersion)
 
