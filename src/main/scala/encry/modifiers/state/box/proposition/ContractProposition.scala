@@ -4,6 +4,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import encry.contracts.{CStateInfo, ContractContext}
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
+import encry.modifiers.state.box.proposition.EncryProposition.UnlockFailedException
 import encry.settings.Constants
 import encrywm.common.SourceProcessor.SerializedContract
 import encrywm.common.{EncryContract, ScriptFingerprint, ScriptMeta, ScriptSerializer}
@@ -35,7 +36,7 @@ case class ContractProposition(contract: EncryContract) extends EncryProposition
       val executor = Executor(contractContext.asVal, Constants.ContractMaxFuel)
       executor.executeContract(script) match {
         case Right(Return(_: Unlocked.type)) => Success()
-        case _ => throw new Error("Unlock failed.")
+        case _ => throw UnlockFailedException
       }
     }
 

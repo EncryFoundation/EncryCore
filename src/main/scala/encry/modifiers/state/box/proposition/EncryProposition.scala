@@ -18,6 +18,8 @@ trait EncryProposition extends Proposition with ESEnvConvertable {
 
 object EncryProposition {
 
+  case object UnlockFailedException extends Exception("Unlock failed")
+
   implicit val jsonEncoder: Encoder[EncryProposition] = {
     case _: OpenProposition.type => "OpenProposition".asJson
     case ap: AccountProposition => AccountProposition.jsonEncoder(ap)

@@ -61,6 +61,6 @@ object InputParser {
 
   def parse(source: String): Try[Ast.Command] = ( commandP ~ End ).parse(source) match {
     case r: Parsed.Success[Ast.Command] => Success(r.value)
-    case e: Parsed.Failure => Failure(new Error(e.msg))
+    case e: Parsed.Failure => Failure(new Exception(e.msg))
   }
 }

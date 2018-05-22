@@ -57,6 +57,8 @@ object EncryBaseTransaction {
   type TxTypeId = Byte
   type Nonce = Long
 
+  case class TransactionValidationException(s: String) extends Exception(s)
+
   implicit val jsonEncoder: Encoder[EncryBaseTransaction] = {
     case tx: EncryTransaction => EncryTransaction.jsonEncoder(tx)
   }

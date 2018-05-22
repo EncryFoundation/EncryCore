@@ -48,7 +48,7 @@ case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
         })
       }
 
-    val verifier = new BatchAVLVerifier[Digest32, Algos.HF](previousHash, proofBytes, ADProofs.KL,
+    val verifier = new BatchAVLVerifier[Digest32, Algos.HF](previousHash, proofBytes, ADProofs.KeyLength,
       None, maxNumOperations = Some(changes.operations.size))
 
     applyChanges(verifier, changes).flatMap { _ =>
@@ -70,7 +70,7 @@ object ADProofs {
 
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (104: Byte)
 
-  val KL = 32
+  val KeyLength = 32
 
   implicit val jsonEncoder: Encoder[ADProofs] = (p: ADProofs) => Map(
     "headerId" -> Base58.encode(p.headerId).asJson,
@@ -89,7 +89,7 @@ object ADProofs {
     op match {
       case Insertion(box) => box match {
         case bx: EncryBaseBox => Insert(bx.id, ADValue @@ bx.bytes)
-        case _ => throw new Error("Got state modifier of unknown type.")
+        case _ => throw new Exception("Got state modifier of unknown type.")
       }
       case Removal(id) => Remove(id)
     }

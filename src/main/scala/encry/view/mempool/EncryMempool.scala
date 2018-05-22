@@ -39,7 +39,7 @@ class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTra
         val overflow = (size + validTxs.size) - settings.nodeSettings.mempoolMaxCapacity
         Success(putWithoutCheck(validTxs.take(validTxs.size - overflow)))
       }
-    } else Failure(new Error("Failed to put transaction into pool"))
+    } else Failure(new Exception("Failed to put transaction into pool"))
   }
 
   override def putWithoutCheck(txs: Iterable[EncryBaseTransaction]): EncryMempool = {
