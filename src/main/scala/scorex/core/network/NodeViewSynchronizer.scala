@@ -323,98 +323,127 @@ MR <: MempoolReader[TX]](networkControllerRef: ActorRef,
 }
 
 object NodeViewSynchronizer {
+
   object Events {
+
     trait NodeViewSynchronizerEvent
+
     case object NoBetterNeighbour extends NodeViewSynchronizerEvent
+
     case object BetterNeighbourAppeared extends NodeViewSynchronizerEvent
+
   }
 
   object ReceivableMessages {
+
     // getLocalSyncInfo messages
     case object SendLocalSyncInfo
+
     case class RequestFromLocal(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
+
     case class ResponseFromLocal[M <: NodeViewModifier](source: ConnectedPeer, modifierTypeId: ModifierTypeId, localObjects: Seq[M])
+
     case class CheckDelivery(source: ConnectedPeer,
                              modifierTypeId: ModifierTypeId,
                              modifierId: ModifierId)
+
     case class OtherNodeSyncingStatus[SI <: SyncInfo](remote: ConnectedPeer,
                                                       status: History.HistoryComparisonResult,
                                                       extension: Option[Seq[(ModifierTypeId, ModifierId)]])
+
     trait PeerManagerEvent
+
     case class HandshakedPeer(remote: ConnectedPeer) extends PeerManagerEvent
+
     case class DisconnectedPeer(remote: InetSocketAddress) extends PeerManagerEvent
 
     trait NodeViewHolderEvent
 
     trait NodeViewChange extends NodeViewHolderEvent
+
     case class ChangedHistory[HR <: HistoryReader[_ <: PersistentNodeViewModifier, _ <: SyncInfo]](reader: HR) extends NodeViewChange
+
     //TODO: return mempool reader
     case class ChangedMempool[MR <: MempoolReader[_ <: Transaction[_]]](mempool: MR) extends NodeViewChange
+
     //TODO: return Vault reader
     //FIXME: No actor process this message explicitly, it seems to be sent to NodeViewSynchcronizer
     case class ChangedVault() extends NodeViewChange
+
     case class ChangedState[SR <: StateReader](reader: SR) extends NodeViewChange
+
     //todo: consider sending info on the rollback
 
     case class RollbackFailed(branchPointOpt: Option[VersionTag]) extends NodeViewHolderEvent
+
     case class RollbackSucceed(branchPointOpt: Option[VersionTag]) extends NodeViewHolderEvent
+
     case class NewOpenSurface(newSurface: Seq[ModifierId]) extends NodeViewHolderEvent
+
     case class StartingPersistentModifierApplication[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends NodeViewHolderEvent
 
     //hierarchy of events regarding modifiers application outcome
     trait ModificationOutcome extends NodeViewHolderEvent
+
     case class FailedTransaction[P <: Proposition, TX <: Transaction[P]](transaction: TX, error: Throwable) extends ModificationOutcome
+
     case class SuccessfulTransaction[P <: Proposition, TX <: Transaction[P]](transaction: TX) extends ModificationOutcome
+
     case class SyntacticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable) extends ModificationOutcome
+
     case class SemanticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable) extends ModificationOutcome
+
     case class SyntacticallySuccessfulModifier[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends ModificationOutcome
+
     case class SemanticallySuccessfulModifier[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends ModificationOutcome
+
   }
+
 }
 
 object NodeViewSynchronizerRef {
   def props[P <: Proposition,
-    TX <: Transaction[P],
-    SI <: SyncInfo,
-    SIS <: SyncInfoMessageSpec[SI],
-    PMOD <: PersistentNodeViewModifier,
-    HR <: HistoryReader[PMOD, SI],
-    MR <: MempoolReader[TX]](networkControllerRef: ActorRef,
-                             viewHolderRef: ActorRef,
-                             syncInfoSpec: SIS,
-                             networkSettings: NetworkSettings,
-                             timeProvider: NetworkTimeProvider): Props =
+  TX <: Transaction[P],
+  SI <: SyncInfo,
+  SIS <: SyncInfoMessageSpec[SI],
+  PMOD <: PersistentNodeViewModifier,
+  HR <: HistoryReader[PMOD, SI],
+  MR <: MempoolReader[TX]](networkControllerRef: ActorRef,
+                           viewHolderRef: ActorRef,
+                           syncInfoSpec: SIS,
+                           networkSettings: NetworkSettings,
+                           timeProvider: NetworkTimeProvider): Props =
     Props(new NodeViewSynchronizer[P, TX, SI, SIS, PMOD, HR, MR](networkControllerRef, viewHolderRef, syncInfoSpec,
-                                                                 networkSettings, timeProvider))
+      networkSettings, timeProvider))
 
   def apply[P <: Proposition,
-    TX <: Transaction[P],
-    SI <: SyncInfo,
-    SIS <: SyncInfoMessageSpec[SI],
-    PMOD <: PersistentNodeViewModifier,
-    HR <: HistoryReader[PMOD, SI],
-    MR <: MempoolReader[TX]](networkControllerRef: ActorRef,
-                             viewHolderRef: ActorRef,
-                             syncInfoSpec: SIS,
-                             networkSettings: NetworkSettings,
-                             timeProvider: NetworkTimeProvider)
-                            (implicit system: ActorSystem): ActorRef =
+  TX <: Transaction[P],
+  SI <: SyncInfo,
+  SIS <: SyncInfoMessageSpec[SI],
+  PMOD <: PersistentNodeViewModifier,
+  HR <: HistoryReader[PMOD, SI],
+  MR <: MempoolReader[TX]](networkControllerRef: ActorRef,
+                           viewHolderRef: ActorRef,
+                           syncInfoSpec: SIS,
+                           networkSettings: NetworkSettings,
+                           timeProvider: NetworkTimeProvider)
+                          (implicit system: ActorSystem): ActorRef =
     system.actorOf(props[P, TX, SI, SIS, PMOD, HR, MR](networkControllerRef, viewHolderRef,
-                                                       syncInfoSpec, networkSettings, timeProvider))
+      syncInfoSpec, networkSettings, timeProvider))
 
   def apply[P <: Proposition,
-    TX <: Transaction[P],
-    SI <: SyncInfo,
-    SIS <: SyncInfoMessageSpec[SI],
-    PMOD <: PersistentNodeViewModifier,
-    HR <: HistoryReader[PMOD, SI],
-    MR <: MempoolReader[TX]](name: String,
-                             networkControllerRef: ActorRef,
-                             viewHolderRef: ActorRef,
-                             syncInfoSpec: SIS,
-                             networkSettings: NetworkSettings,
-                             timeProvider: NetworkTimeProvider)
-                            (implicit system: ActorSystem): ActorRef =
+  TX <: Transaction[P],
+  SI <: SyncInfo,
+  SIS <: SyncInfoMessageSpec[SI],
+  PMOD <: PersistentNodeViewModifier,
+  HR <: HistoryReader[PMOD, SI],
+  MR <: MempoolReader[TX]](name: String,
+                           networkControllerRef: ActorRef,
+                           viewHolderRef: ActorRef,
+                           syncInfoSpec: SIS,
+                           networkSettings: NetworkSettings,
+                           timeProvider: NetworkTimeProvider)
+                          (implicit system: ActorSystem): ActorRef =
     system.actorOf(props[P, TX, SI, SIS, PMOD, HR, MR](networkControllerRef, viewHolderRef,
-                                                       syncInfoSpec, networkSettings, timeProvider), name)
+      syncInfoSpec, networkSettings, timeProvider), name)
 }

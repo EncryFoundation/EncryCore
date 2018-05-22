@@ -28,8 +28,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type, net
 
   import EncryNodeViewSynchronizer._
 
-  override protected val deliveryTracker =
-    new EncryDeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self, timeProvider)
+  override protected val deliveryTracker = EncryDeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self, timeProvider)
 
   val toDownloadCheckInterval: FiniteDuration = 3.seconds
 
