@@ -1,7 +1,7 @@
 package encry.view.state
 
 import encry.modifiers.mempool.EncryTransaction
-import encry.modifiers.state.box.{EncryBoxStateChanges, Insertion, Removal}
+import encry.modifiers.state.box.{CoinbaseBox, EncryBoxStateChanges, Insertion, Removal}
 import encry.utils.EncryGenerator
 import org.scalatest.{Matchers, PropSpec}
 
@@ -21,9 +21,9 @@ class EncryStateSpec extends PropSpec with Matchers with EncryGenerator {
 
   property("EncryState.genesisBoxes() output equality") {
 
-    val g1 = EncryState.genesisBoxes
-    val g2 = EncryState.genesisBoxes
-    val g3 = EncryState.genesisBoxes
+    val g1: IndexedSeq[CoinbaseBox] = EncryState.genesisBoxes
+    val g2: IndexedSeq[CoinbaseBox] = EncryState.genesisBoxes
+    val g3: IndexedSeq[CoinbaseBox] = EncryState.genesisBoxes
 
     g1.zip(g2).zip(g3).forall { case ((e1, e2), e3) =>
       (e1.bytes sameElements e2.bytes) && (e2.bytes sameElements e3.bytes)

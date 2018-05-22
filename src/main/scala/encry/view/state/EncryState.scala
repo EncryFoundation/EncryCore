@@ -43,7 +43,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 
   def extractStateChanges(tx: EncryBaseTransaction): EncryBoxStateChanges = extractStateChanges(Seq(tx))
 
-  // ID of last applied modifier.
+  /** ID of the last applied modifier. */
   override def version: VersionTag
 
   override def applyModifier(mod: EncryPersistentModifier): Try[IState]
@@ -57,8 +57,8 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 
 object EncryState extends ScorexLogging {
 
-  // 33 bytes in Base58 encoding.
-  val afterGenesisStateDigestHex: String = "24m4FALZtHCiM2mcHjyQgvnF9kSTkJDyETvmkqiD5CW3M1"
+  /** 33 bytes in Base58 encoding. */
+  val afterGenesisStateDigestHex: String = "pKKYifNZQRoWFNBJYRHnRLDqkxHgYPCzDFG98P5ugmS47"
 
   val afterGenesisStateDigest: ADDigest = ADDigest @@ Algos.decode(afterGenesisStateDigestHex).get
 
@@ -66,12 +66,12 @@ object EncryState extends ScorexLogging {
 
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
-  // TODO: Generate CoinbaseBox'es at the genesis stage.
-  def genesisBoxes: IndexedSeq[AssetBox] = {
+  // TODO: Smooth supply.
+  def genesisBoxes: IndexedSeq[CoinbaseBox] = {
     lazy val genesisSeed = Long.MaxValue
     lazy val rndGen = new scala.util.Random(genesisSeed)
     (0 until Constants.Chain.GenesisBoxesQty).map(_ =>
-      AssetBox(HeightProposition(Height @@ -1), rndGen.nextLong(), Constants.Chain.GenesisBoxesAmount))
+      CoinbaseBox(HeightProposition(Height @@ -1), rndGen.nextLong(), Constants.Chain.GenesisBoxesAmount))
   }
 
   def generateGenesisUtxoState(stateDir: File,
@@ -80,14 +80,14 @@ object EncryState extends ScorexLogging {
 
     lazy val initialBoxes: Seq[EncryBaseBox] = genesisBoxes
 
-    val bh = BoxHolder(initialBoxes)
+    val boxHolder = BoxHolder(initialBoxes)
 
-    UtxoState.fromBoxHolder(bh, stateDir, nodeViewHolderRef).ensuring(us => {
+    UtxoState.fromBoxHolder(boxHolder, stateDir, nodeViewHolderRef).ensuring(us => {
       log.debug(s"Expected afterGenesisDigest: $afterGenesisStateDigestHex")
       log.debug(s"Actual afterGenesisDigest:   ${Base58.encode(us.rootHash)}")
-      log.info(s"Generated UTXO state with ${bh.boxes.size} boxes inside.")
+      log.info(s"Generated UTXO state with ${boxHolder.boxes.size} boxes inside.")
       us.rootHash.sameElements(afterGenesisStateDigest) && us.version.sameElements(genesisStateVersion)
-    }) -> bh
+    }) -> boxHolder
   }
 
   def generateGenesisDigestState(stateDir: File, settings: NodeSettings): DigestState = {
