@@ -93,13 +93,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type, net
       super.modifiersFromRemote(DataFromPeer(spec, data, remote))
       //If queue is empty - check, whether there are more modifiers to download
       historyReaderOpt foreach { h =>
-        if (!h.isHeadersChainSynced && !deliveryTracker.isExpecting) {
-          // headers chain is not synced yet, but our expecting list is empty - ask for more headers
-          sendSync(h.syncInfo)
-        } else if (h.isHeadersChainSynced && !deliveryTracker.isExpectingFromRandom) {
-          // headers chain is synced, but our full block list is empty - request more full blocks
-          self ! CheckModifiersToDownload
-        }
+        if (!h.isHeadersChainSynced && !deliveryTracker.isExpecting) sendSync(h.syncInfo)
+        else if (h.isHeadersChainSynced && !deliveryTracker.isExpectingFromRandom) self ! CheckModifiersToDownload
       }
   }
 }
