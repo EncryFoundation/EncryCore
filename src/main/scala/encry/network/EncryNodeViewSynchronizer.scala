@@ -66,14 +66,12 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type, net
     * this messages)
     *
     */
-  protected val onSyntacticallySuccessfulModifier: Receive = {
+  def onSyntacticallySuccessfulModifier: Receive = {
     case SyntacticallySuccessfulModifier(mod) if (mod.isInstanceOf[EncryBlockHeader] || mod.isInstanceOf[EncryBlockPayload]) &&
-      historyReaderOpt.exists(_.isHeadersChainSynced) =>
-
-      broadcastModifierInv(mod)
+      historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
   }
 
-  protected val onCheckModifiersToDownload: Receive = {
+  def onCheckModifiersToDownload: Receive = {
     case CheckModifiersToDownload =>
       deliveryTracker.removeOutdatedExpectingFromRandom()
       historyReaderOpt.foreach { h =>
@@ -84,7 +82,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type, net
       }
   }
 
-  private def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
+  def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     modifierIds.foreach(id => deliveryTracker.expectFromRandom(modifierTypeId, id))
     val msg = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
     //todo: Full nodes should be here, not a random peer
