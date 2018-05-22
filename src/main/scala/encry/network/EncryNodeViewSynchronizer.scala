@@ -19,7 +19,6 @@ import scorex.core.network.{NodeViewSynchronizer, SendToRandom}
 import scorex.core.settings.NetworkSettings
 import scorex.core.utils.NetworkTimeProvider
 import scorex.core.{ModifierId, ModifierTypeId}
-import scorex.crypto.encode.Base58
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -117,6 +116,8 @@ class EncryNodeViewSynchronizer(networkControllerRef: ActorRef,
 
 object EncryNodeViewSynchronizer {
 
+  case object CheckModifiersToDownload
+
   def props(networkControllerRef: ActorRef,
             viewHolderRef: ActorRef,
             syncInfoSpec: EncrySyncInfoMessageSpec.type,
@@ -133,16 +134,4 @@ object EncryNodeViewSynchronizer {
            (implicit context: ActorRefFactory): ActorRef =
     context.actorOf(props(networkControllerRef, viewHolderRef,
       syncInfoSpec, networkSettings, timeProvider))
-
-  def apply(networkControllerRef: ActorRef,
-            viewHolderRef: ActorRef,
-            syncInfoSpec: EncrySyncInfoMessageSpec.type,
-            networkSettings: NetworkSettings,
-            timeProvider: NetworkTimeProvider,
-            name: String)
-           (implicit context: ActorRefFactory): ActorRef =
-    context.actorOf(props(networkControllerRef, viewHolderRef, syncInfoSpec,
-      networkSettings, timeProvider), name)
-
-  case object CheckModifiersToDownload
 }

@@ -17,6 +17,7 @@ import encry.local.TransactionGenerator
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
+import encry.network.EncryNodeViewSynchronizer
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryReadersHolderRef}
@@ -79,6 +80,9 @@ object EncryApp extends App with ScorexLogging {
 
   val networkController: ActorRef = NetworkControllerRef("networkController", settings.network,
     messagesHandler, upnp, peerManager, timeProvider)
+
+  val nodeViewSynchronizer: ActorRef =
+    EncryNodeViewSynchronizer(networkController, nodeViewHolder, EncrySyncInfoMessageSpec, settings.network, timeProvider)
 
   lazy val miner: ActorRef = system.actorOf(Props[EncryMiner], "miner")
 
