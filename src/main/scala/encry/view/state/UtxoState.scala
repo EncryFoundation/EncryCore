@@ -13,15 +13,17 @@ import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.HeightProposition
+import encry.settings.Algos.HF
 import encry.settings.{Algos, Constants}
 import encry.utils.BalanceCalculator
 import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import scorex.core.VersionTag
+import scorex.core.transaction.box.Box.Amount
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.avltree.batch._
-import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
+import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Success, Try}
@@ -38,18 +40,16 @@ class UtxoState(override val version: VersionTag,
   override def maxRollbackDepth: Int = 10
 
   private def onAdProofGenerated(proof: ADProofs): Unit = {
-    if(nodeViewHolderRef.isEmpty) log.warn("Got proof while nodeViewHolderRef is empty")
+    if (nodeViewHolderRef.isEmpty) log.warn("Got proof while nodeViewHolderRef is empty")
     nodeViewHolderRef.foreach(_ ! LocallyGeneratedModifier(proof))
   }
 
   private[state] def applyTransactions(txs: Seq[EncryBaseTransaction],
                                        expectedDigest: ADDigest): Try[Unit] = Try {
     txs.foreach(tx => validate(tx).map { _ =>
-      getStateChanges(tx).operations.map(ADProofs.toModification)
+      extractStateChanges(tx).operations.map(ADProofs.toModification)
         .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
-        t.flatMap { _ =>
-          persistentProver.performOneOperation(m)
-        }
+        t.flatMap(_ => persistentProver.performOneOperation(m))
       }.get
     }.orElse(throw new Error(s"$tx validation failed.")))
 
@@ -59,7 +59,7 @@ class UtxoState(override val version: VersionTag,
         s"${Algos.encode(persistentProver.digest)} given")
   }
 
-  // State transition function `APPLY(S,TX) -> S'`.
+  /** State transition function `APPLY(S,TX) -> S'`. */
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
 
     case block: EncryBlock =>
@@ -67,9 +67,10 @@ class UtxoState(override val version: VersionTag,
         s"root hash ${Algos.encode(rootHash)} at height $height")
 
       applyTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
-        val md = metadata(VersionTag @@ block.id, block.header.stateRoot, Height @@ block.header.height, block.header.timestamp)
-        val proofBytes = persistentProver.generateProofAndUpdateStorage(md)
-        val proofHash = ADProofs.proofDigest(proofBytes)
+        val meta: Seq[(Array[Byte], Array[Byte])] =
+          metadata(VersionTag @@ block.id, block.header.stateRoot,Height @@ block.header.height, block.header.timestamp)
+        val proofBytes: SerializedAdProof = persistentProver.generateProofAndUpdateStorage(meta)
+        val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
 
         if (block.adProofsOpt.isEmpty) onAdProofGenerated(ADProofs(block.header.id, proofBytes))
         log.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with " +
@@ -99,23 +100,23 @@ class UtxoState(override val version: VersionTag,
 
   def proofsForTransactions(txs: Seq[EncryBaseTransaction]): Try[(SerializedAdProof, ADDigest)] = {
     log.debug(s"Generating proof for ${txs.length} transactions ...")
-    val rootHash = persistentProver.digest
+    val rootHash: ADDigest = persistentProver.digest
     if (txs.isEmpty) {
       Failure(new Error("Got empty transaction sequence"))
     } else if (!storage.version.exists(_.sameElements(rootHash))) {
       Failure(new Error(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}"))
     } else {
-      persistentProver.avlProver.generateProofForOperations(getAllStateChanges(txs).operations.map(ADProofs.toModification))
+      persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
     }
   }
 
   override def rollbackTo(version: VersionTag): Try[UtxoState] = {
-    val prover = persistentProver
+    val prover: PersistentBatchAVLProver[Digest32, HF] = persistentProver
     log.info(s"Rollback UtxoState to version ${Algos.encoder.encode(version)}")
     stateStore.get(ByteArrayWrapper(version)) match {
       case Some(v) =>
         val rollbackResult = prover.rollback(ADDigest @@ v.data).map { _ =>
-          val stateHeight = stateStore.get(ByteArrayWrapper(UtxoState.bestHeightKey))
+          val stateHeight: Int = stateStore.get(ByteArrayWrapper(UtxoState.bestHeightKey))
             .map(d => Ints.fromByteArray(d.data)).getOrElse(Constants.Chain.GenesisHeight)
           new UtxoState(version, Height @@ stateHeight, stateStore, lastBlockTimestamp, nodeViewHolderRef) {
             override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Algos.HF] = prover
@@ -163,9 +164,9 @@ class UtxoState(override val version: VersionTag,
           }
         }
 
-      val validBalance = {
-        val debitB = BalanceCalculator.balanceSheet(bxs, excludeCoinbase = false)
-        val creditB = BalanceCalculator.balanceSheet(tx.newBoxes)
+      val validBalance: Boolean = {
+        val debitB: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxs, excludeCoinbase = false)
+        val creditB: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(tx.newBoxes)
         creditB.forall { case (id, amount) => debitB.getOrElse(id, 0L) >= amount }
       }
 
@@ -204,10 +205,10 @@ object UtxoState extends ScorexLogging {
   }
 
   def fromBoxHolder(bh: BoxHolder, stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val p = new BatchAVLProver[Digest32, Algos.HF](keyLength = EncryBox.BoxIdSize, valueLengthOpt = None)
+    val p: BatchAVLProver[Digest32, HF] = new BatchAVLProver[Digest32, Algos.HF](keyLength = EncryBox.BoxIdSize, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
-    val stateStore = new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions)
+    val stateStore: LSMStore = new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions)
 
     log.info(s"Generating UTXO State with ${bh.boxes.size} boxes")
 

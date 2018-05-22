@@ -9,11 +9,11 @@ import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.{Algos, Constants, EncryAppSettings, NodeSettings}
 import encry.view.history.Height
-import io.iohk.iodb.Store
+import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.core.VersionTag
 import scorex.core.transaction.state.MinimalState
 import scorex.core.utils.ScorexLogging
-import scorex.crypto.authds.ADDigest
+import scorex.crypto.authds.{ADDigest, ADKey}
 import scorex.crypto.encode.Base58
 
 import scala.util.Try
@@ -29,18 +29,21 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 
   def closeStorage(): Unit = stateStore.close()
 
-  // Extracts `state changes` from the given sequence of transactions.
-  def getAllStateChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
-    EncryBoxStateChanges(
-      txs.flatMap { tx =>
-        tx.unlockers.map(u => Removal(u.boxId)) ++ tx.newBoxes.map(bx => Insertion(bx))
-      }
-    )
+  /** Extracts `state changes` from the given sequence of transactions. */
+  def extractStateChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
+    val toBeOpened: Seq[ADKey] = txs.flatMap(_.unlockers.map(_.boxId))
+    val toBeOpenedSet: Set[ByteArrayWrapper] = toBeOpened.map(ByteArrayWrapper.apply).toSet
+    val toBeInserted: Seq[EncryBaseBox] = txs.flatMap(_.newBoxes)
+    val toBeInsertedSet: Set[ByteArrayWrapper] = toBeInserted.map(bx => ByteArrayWrapper(bx.id)).toSet
+    val intersected: Set[ByteArrayWrapper] = toBeInsertedSet.intersect(toBeOpenedSet)
+    val toRemove: Seq[Removal] = toBeOpened.filterNot(k => intersected.contains(ByteArrayWrapper(k))).map(Removal)
+    val toInsert: Seq[Insertion] = toBeInserted.filterNot(bx => intersected.contains(ByteArrayWrapper(bx.id))).map(Insertion)
+    EncryBoxStateChanges(toRemove ++ toInsert)
   }
 
-  def getStateChanges(tx: EncryBaseTransaction): EncryBoxStateChanges = getAllStateChanges(Seq(tx))
+  def extractStateChanges(tx: EncryBaseTransaction): EncryBoxStateChanges = extractStateChanges(Seq(tx))
 
-  // ID of last applied modifier.
+  /** ID of the last applied modifier. */
   override def version: VersionTag
 
   override def applyModifier(mod: EncryPersistentModifier): Try[IState]
@@ -54,8 +57,8 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 
 object EncryState extends ScorexLogging {
 
-  // 33 bytes in Base58 encoding.
-  val afterGenesisStateDigestHex: String = "24m4FALZtHCiM2mcHjyQgvnF9kSTkJDyETvmkqiD5CW3M1"
+  /** 33 bytes in Base58 encoding. */
+  val afterGenesisStateDigestHex: String = "pKKYifNZQRoWFNBJYRHnRLDqkxHgYPCzDFG98P5ugmS47"
 
   val afterGenesisStateDigest: ADDigest = ADDigest @@ Algos.decode(afterGenesisStateDigestHex).get
 
@@ -63,12 +66,12 @@ object EncryState extends ScorexLogging {
 
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
-  // TODO: Generate CoinbaseBox'es at the genesis stage.
-  def genesisBoxes: IndexedSeq[AssetBox] = {
+  // TODO: Smooth supply.
+  def genesisBoxes: IndexedSeq[CoinbaseBox] = {
     lazy val genesisSeed = Long.MaxValue
     lazy val rndGen = new scala.util.Random(genesisSeed)
     (0 until Constants.Chain.GenesisBoxesQty).map(_ =>
-      AssetBox(HeightProposition(Height @@ -1), rndGen.nextLong(), Constants.Chain.GenesisBoxesAmount))
+      CoinbaseBox(HeightProposition(Height @@ -1), rndGen.nextLong(), Constants.Chain.GenesisBoxesAmount))
   }
 
   def generateGenesisUtxoState(stateDir: File,
@@ -77,14 +80,14 @@ object EncryState extends ScorexLogging {
 
     lazy val initialBoxes: Seq[EncryBaseBox] = genesisBoxes
 
-    val bh = BoxHolder(initialBoxes)
+    val boxHolder = BoxHolder(initialBoxes)
 
-    UtxoState.fromBoxHolder(bh, stateDir, nodeViewHolderRef).ensuring(us => {
+    UtxoState.fromBoxHolder(boxHolder, stateDir, nodeViewHolderRef).ensuring(us => {
       log.debug(s"Expected afterGenesisDigest: $afterGenesisStateDigestHex")
       log.debug(s"Actual afterGenesisDigest:   ${Base58.encode(us.rootHash)}")
-      log.info(s"Generated UTXO state with ${bh.boxes.size} boxes inside.")
+      log.info(s"Generated UTXO state with ${boxHolder.boxes.size} boxes inside.")
       us.rootHash.sameElements(afterGenesisStateDigest) && us.version.sameElements(genesisStateVersion)
-    }) -> bh
+    }) -> boxHolder
   }
 
   def generateGenesisDigestState(stateDir: File, settings: NodeSettings): DigestState = {

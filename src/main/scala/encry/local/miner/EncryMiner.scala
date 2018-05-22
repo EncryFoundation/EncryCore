@@ -1,19 +1,19 @@
 package encry.local.miner
 
-import akka.actor.{Actor, ActorRef, PoisonPill, Props}
+import akka.actor.{Actor, ActorRef, PoisonPill}
+import encry.EncryApp._
 import encry.consensus._
+import encry.crypto.PrivateKey25519
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransaction, TransactionFactory}
+import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.{AssetBox, MonetaryBox}
 import encry.settings.Constants
 import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
-import encry.EncryApp._
-import encry.crypto.PrivateKey25519
-import encry.modifiers.state.box.proof.Signature25519
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
@@ -21,7 +21,7 @@ import scorex.core.ModifierId
 import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import scorex.core.utils.NetworkTime.Time
-import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
+import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scorex.crypto.hash.Digest32
 
