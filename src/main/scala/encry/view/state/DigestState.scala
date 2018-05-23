@@ -115,7 +115,7 @@ object DigestState {
 
         new DigestState(version, ADDigest @@ rootHash, store, settings)
 
-      case _ => throw new Error("Unsupported argument combination.")
+      case _ => throw new Exception("Unsupported argument combination.")
     }
   }.getOrElse(EncryState.generateGenesisDigestState(dir, settings))
 }

@@ -9,7 +9,7 @@ import scala.util.{Failure, Try}
 trait EmptyBlockPayloadProcessor extends BaseBlockPayloadProcessor {
 
   override protected def validate(m: EncryBlockPayload): Try[Unit] =
-    Failure(new Error("Regime that do not process BlockTransactions"))
+    Failure(new Exception("Regime that do not process BlockTransactions"))
 
   override protected def process(m: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] =
     ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)

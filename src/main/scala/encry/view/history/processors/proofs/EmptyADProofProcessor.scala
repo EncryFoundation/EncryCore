@@ -13,5 +13,5 @@ trait EmptyADProofProcessor extends BaseADProofProcessor {
   override protected def process(m: ADProofs): ProgressInfo[EncryPersistentModifier] =
     ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
 
-  override protected def validate(m: ADProofs): Try[Unit] = Failure(new Error("Regime that do not process ADProofs"))
+  override protected def validate(m: ADProofs): Try[Unit] = Failure(new Exception("Regime that do not process ADProofs"))
 }

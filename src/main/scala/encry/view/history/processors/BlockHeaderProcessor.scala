@@ -264,31 +264,31 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
       lazy val parentOpt = typedModifierById[EncryBlockHeader](header.parentId)
       if (header.parentId sameElements EncryBlockHeader.GenesisParentId) {
         if (bestHeaderIdOpt.nonEmpty) {
-          Failure(new Error("Trying to append genesis block to non-empty history."))
+          Failure(new Exception("Trying to append genesis block to non-empty history."))
         } else if (header.height != chainParams.GenesisHeight) {
-          Failure(new Error("Invalid height for genesis block header."))
+          Failure(new Exception("Invalid height for genesis block header."))
         } else {
           Success()
         }
       } else if (parentOpt.isEmpty) {
-        Failure(new Error(s"Parental header <id: ${Algos.encode(header.parentId)}> does not exist!"))
+        Failure(new Exception(s"Parental header <id: ${Algos.encode(header.parentId)}> does not exist!"))
       } else if (header.height != parentOpt.get.height + 1) {
-        Failure(new Error(s"Invalid height in header <id: ${header.id}>"))
+        Failure(new Exception(s"Invalid height in header <id: ${header.id}>"))
       } else if (header.timestamp - timeProvider.time() > Constants.Chain.MaxTimeDrift) {
-        Failure(new Error(s"Invalid timestamp in header <id: ${header.id}>"))
+        Failure(new Exception(s"Invalid timestamp in header <id: ${header.id}>"))
       } else if (header.timestamp < parentOpt.get.timestamp) {
-        Failure(new Error("Header timestamp is less than parental`s"))
+        Failure(new Exception("Header timestamp is less than parental`s"))
       } else if (realDifficulty(header) < header.requiredDifficulty) {
-        Failure(new Error("Header <id: ${header.id}> difficulty too low."))
+        Failure(new Exception("Header <id: ${header.id}> difficulty too low."))
       } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainParams.MaxRollback)) {
-        Failure(new Error("Header is too old to be applied."))
+        Failure(new Exception("Header is too old to be applied."))
       } else if (!header.validSignature) {
-        Failure(new Error("Block signature is invalid."))
+        Failure(new Exception("Block signature is invalid."))
       } else {
         Success()
-      }.recoverWith { case err =>
-        log.warn("Validation error: ", err)
-        Failure(err)
+      }.recoverWith { case exc =>
+        log.warn("Validation error: ", exc)
+        Failure(exc)
       }
     }
   }

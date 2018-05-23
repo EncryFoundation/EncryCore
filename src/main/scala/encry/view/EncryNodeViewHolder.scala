@@ -137,7 +137,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
         val toApply = newChain.headers.map { h =>
           history.getBlock(h) match {
             case Some(fb) => fb
-            case None => throw new Error(s"Failed to get full block for header $h")
+            case None => throw new Exception(s"Failed to get full block for header $h")
           }
         }
         toApply.foldLeft(startState) { (s, m) =>

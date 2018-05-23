@@ -39,7 +39,7 @@ trait EncryBaseStorage extends AutoCloseable with ScorexLogging {
       case Some(_) =>
         Success(store.rollback(ByteArrayWrapper(version)))
       case None =>
-        Failure(new Error(s"Unable to get root hash at version ${Algos.encoder.encode(version)}"))
+        Failure(new Exception(s"Unable to get root hash at version ${Algos.encoder.encode(version)}"))
     }
 
   override def close(): Unit = {

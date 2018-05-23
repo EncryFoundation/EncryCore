@@ -88,7 +88,7 @@ class UtxoState(override val version: VersionTag,
 
         new UtxoState(VersionTag @@ block.id, Height @@ block.header.height, stateStore, lastBlockTimestamp, nodeViewHolderRef)
       }.recoverWith[UtxoState] { case e =>
-        log.warn(s"Error while applying block with header ${block.header.encodedId} to UTXOState with root" +
+        log.warn(s"Failed to apply block with header ${block.header.encodedId} to UTXOState with root" +
           s" ${Algos.encode(rootHash)}: ", e)
         Failure(e)
       }

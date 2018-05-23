@@ -32,11 +32,11 @@ case class EncryBlock(override val header: EncryBlockHeader,
       }
 
     if (header.transactionsRoot != payload.digest) {
-      Failure(new Error("Invalid payload root hash"))
+      Failure(new Exception("Invalid payload root hash"))
     } else if (!(validCoinbase && payload.transactions.count(_.isCoinbase) == 1)) {
-      Failure(new Error("Invalid coinbase"))
+      Failure(new Exception("Invalid coinbase"))
     } else if (!header.validSignature) {
-      Failure(new Error("Invalid signature"))
+      Failure(new Exception("Invalid signature"))
     } else Success()
   }
 
