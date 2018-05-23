@@ -104,6 +104,9 @@ assemblyMergeStrategy in assembly := {
   case "logback.xml" => MergeStrategy.first
   case "module-info.class" => MergeStrategy.discard
   case "META-INF/MANIFEST.MF" => MergeStrategy.discard
+  case "META-INF/*.DSA" => MergeStrategy.discard
+  case "META-INF/*.RSA" => MergeStrategy.discard
+  case "META-INF/*.SF" => MergeStrategy.discard
   case PathList("reference.conf") => MergeStrategy.concat
   case _ => MergeStrategy.first
 }
