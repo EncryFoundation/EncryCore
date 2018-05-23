@@ -8,11 +8,8 @@ import scorex.core.{ModifierId, ModifierTypeId}
 import scala.collection.mutable
 import scala.concurrent.duration._
 
-class EncryDeliveryTracker(context: ActorContext,
-                           deliveryTimeout: FiniteDuration,
-                           maxDeliveryChecks: Int,
-                           nvsRef: ActorRef,
-                           timeProvider: NetworkTimeProvider)
+case class EncryDeliveryTracker(context: ActorContext, deliveryTimeout: FiniteDuration, maxDeliveryChecks: Int,
+                                nvsRef: ActorRef, timeProvider: NetworkTimeProvider)
   extends DeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, nvsRef) {
 
   val toDownload: mutable.Map[ModifierIdAsKey, ToDownloadStatus] = mutable.Map[ModifierIdAsKey, ToDownloadStatus]()
