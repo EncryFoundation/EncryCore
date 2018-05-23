@@ -68,13 +68,18 @@ outputStrategy := Some(StdoutOutput)
 
 connectInput in run := true
 
+evictionWarningOptions in update := EvictionWarningOptions.default
+  .withWarnTransitiveEvictions(false)
+  .withWarnDirectEvictions(false)
+  .withWarnScalaVersionEviction(false)
+
+logLevel := Level.Error
+
 val opts = Seq(
   "-server",
-  // JVM memory tuning for 2g ram
   "-Xms128m",
   "-Xmx2G",
   "-XX:+ExitOnOutOfMemoryError",
-  // Java 9 support
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
 
