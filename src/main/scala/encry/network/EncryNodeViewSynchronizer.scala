@@ -34,18 +34,17 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type, net
 
   val downloadListSize: Int = networkSettings.networkChunkSize
 
+  val onSemanticallySuccessfulModifier: Receive = {
+    case SemanticallySuccessfulModifier(_: EncryBlock) =>
+    //Do nothing, other nodes will request required modifiers via ProgressInfo.toDownload
+    case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
+  }
+
   override def preStart(): Unit = {
     val toDownloadCheckInterval = networkSettings.syncInterval
     super.preStart()
     context.system.eventStream.subscribe(self, classOf[DownloadRequest])
     context.system.scheduler.schedule(toDownloadCheckInterval, toDownloadCheckInterval)(self ! CheckModifiersToDownload)
-  }
-
-  val onSemanticallySuccessfulModifier: Receive = {
-    case SemanticallySuccessfulModifier(_: EncryBlock) =>
-    //Do nothing, other nodes will request required modifiers via ProgressInfo.toDownload
-    case SemanticallySuccessfulModifier(mod) =>
-      broadcastModifierInv(mod)
   }
 
   override protected def viewHolderEvents: Receive =

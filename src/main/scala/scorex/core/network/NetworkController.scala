@@ -8,6 +8,7 @@ import akka.io.Tcp._
 import akka.io.{IO, Tcp}
 import akka.pattern.ask
 import akka.util.Timeout
+import scorex.core.network.message.Message.MessageCode
 import scorex.core.network.message.{Message, MessageHandler, MessageSpec}
 import scorex.core.settings.NetworkSettings
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
@@ -38,13 +39,28 @@ class NetworkController(settings: NetworkSettings,
 
   private implicit val system: ActorSystem = context.system
 
-  private val peerSynchronizer: ActorRef = PeerSynchronizerRef("PeerSynchronizer", self, peerManagerRef, settings)
+  val peerSynchronizer: ActorRef = PeerSynchronizerRef("PeerSynchronizer", self, peerManagerRef, settings)
 
-  private implicit val timeout: Timeout = Timeout(settings.controllerTimeout.getOrElse(5 seconds))
+  implicit val timeout: Timeout = Timeout(settings.controllerTimeout.getOrElse(5 seconds))
 
-  private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
+  val messageHandlers: mutable.Map[Seq[MessageCode], ActorRef] = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
-  private val tcpManager = IO(Tcp)
+  val tcpManager: ActorRef = IO(Tcp)
+
+  lazy val localAddress: InetSocketAddress = settings.bindAddress
+
+  //an address to send to peers
+  lazy val externalSocketAddress: Option[InetSocketAddress] = {
+    settings.declaredAddress orElse {
+      if (settings.upnpEnabled) {
+        upnp.externalAddress.map(a => new InetSocketAddress(a, settings.bindAddress.getPort))
+      } else None
+    }
+  }
+
+  lazy val connTimeout = Some(settings.connectionTimeout)
+
+  private val outgoing = mutable.Set[InetSocketAddress]()
 
   //check own declared address for validity
   if (!settings.localOnly) {
@@ -66,26 +82,12 @@ class NetworkController(settings: NetworkSettings,
     }
   }
 
-  lazy val localAddress = settings.bindAddress
-
-  //an address to send to peers
-  lazy val externalSocketAddress: Option[InetSocketAddress] = {
-    settings.declaredAddress orElse {
-      if (settings.upnpEnabled) {
-        upnp.externalAddress.map(a => new InetSocketAddress(a, settings.bindAddress.getPort))
-      } else None
-    }
-  }
-
   log.info(s"Declared address: $externalSocketAddress")
-
-
-  lazy val connTimeout = Some(settings.connectionTimeout)
 
   //bind to listen incoming connections
   tcpManager ! Bind(self, localAddress, options = KeepAlive(true) :: Nil, pullMode = false)
 
-  private def bindingLogic: Receive = {
+  def bindingLogic: Receive = {
     case Bound(_) =>
       log.info("Successfully bound to the port " + settings.bindAddress.getPort)
       context.system.scheduler.schedule(600.millis, 5.seconds)(peerManagerRef ! CheckPeers)
@@ -121,8 +123,6 @@ class NetworkController(settings: NetworkSettings,
         .map(_.asInstanceOf[Seq[ConnectedPeer]])
         .foreach(_.foreach(_.handlerRef ! message))
   }
-
-  private val outgoing = mutable.Set[InetSocketAddress]()
 
   def peerLogic: Receive = {
     case ConnectTo(remote) =>

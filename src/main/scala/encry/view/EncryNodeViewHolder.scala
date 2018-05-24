@@ -27,13 +27,13 @@ import scala.util.{Failure, Success, Try}
 class EncryNodeViewHolder[StateType <: EncryState[StateType]]
   extends NodeViewHolder[EncryProposition, EncryBaseTransaction, EncryPersistentModifier] {
 
-  override val networkChunkSize: Int = encrySettings.scorexSettings.network.networkChunkSize
-
   override type MS = StateType
   override type SI = EncrySyncInfo
   override type HIS = EncryHistory
   override type VL = EncryWallet
   override type MP = EncryMempool
+
+  override val networkChunkSize: Int = encrySettings.scorexSettings.network.networkChunkSize
 
   override lazy val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,

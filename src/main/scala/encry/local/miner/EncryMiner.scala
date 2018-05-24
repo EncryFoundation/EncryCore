@@ -98,7 +98,7 @@ class EncryMiner extends Actor with ScorexLogging {
       mining orElse
       unknownMessage
 
-  private def procCandidateBlock(c: CandidateBlock): Unit = {
+  def procCandidateBlock(c: CandidateBlock): Unit = {
     log.debug(s"Got candidate block $c")
     candidateOpt = Some(c)
     if (!isMining) self ! StartMining
