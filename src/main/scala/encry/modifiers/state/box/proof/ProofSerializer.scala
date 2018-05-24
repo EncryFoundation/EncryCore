@@ -11,7 +11,7 @@ object ProofSerializer extends Serializer[Proof] {
       Signature25519.TypeId +: Signature25519Serializer.toBytes(sig)
     case multiProof: MultiSig =>
       MultiSig.TypeId +: MultiProofSerializer.toBytes(multiProof)
-    case m => throw new Error(s"Serialization for unknown modifier: $m")
+    case m => throw new Exception(s"Serialization for unknown modifier: $m")
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[Proof] = Try(bytes.head).flatMap {
@@ -20,6 +20,6 @@ object ProofSerializer extends Serializer[Proof] {
     case MultiSig.`TypeId` =>
       MultiProofSerializer.parseBytes(bytes.tail)
     case m =>
-      Failure(new Error(s"Deserialization for unknown type byte: $m"))
+      Failure(new Exception(s"Deserialization for unknown type byte: $m"))
   }
 }

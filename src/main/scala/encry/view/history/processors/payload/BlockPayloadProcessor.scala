@@ -31,7 +31,7 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
             putToHistory(txs)
         }
       case _ =>
-        throw new Error(s"Header for modifier $txs is no defined")
+        throw new Exception(s"Header for modifier $txs is no defined")
     }
   }
 

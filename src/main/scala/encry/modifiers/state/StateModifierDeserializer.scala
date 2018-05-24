@@ -12,6 +12,6 @@ object StateModifierDeserializer {
     case AssetIssuingBox.`TypeId` => AssetIssuingBoxSerializer.parseBytes(bytes)
     case AssetCreationBox.`TypeId` => AssetCreationBoxSerializer.parseBytes(bytes)
     case DataBox.`TypeId` => DataBoxSerializer.parseBytes(bytes)
-    case t => Failure(new Error(s"Got unknown typeId: $t"))
+    case t => Failure(new Exception(s"Got unknown typeId: $t"))
   }
 }

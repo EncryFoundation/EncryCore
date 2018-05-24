@@ -147,16 +147,16 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
   protected def modifierValidation(m: EncryPersistentModifier,
                                    headerOpt: Option[EncryBlockHeader]): Try[Unit] = {
     if (historyStorage.containsObject(m.id)) {
-      Failure(new Error(s"Modifier $m is already in history"))
+      Failure(new Exception(s"Modifier $m is already in history"))
     } else {
       val minimalHeight = blockDownloadProcessor.minimalBlockHeight
       headerOpt match {
         case None =>
-          Failure(new Error(s"Header for modifier $m is undefined"))
+          Failure(new Exception(s"Header for modifier $m is undefined"))
         case Some(header: EncryBlockHeader) if header.height < minimalHeight =>
-          Failure(new Error(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight"))
+          Failure(new Exception(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight"))
         case Some(header: EncryBlockHeader) if !header.isRelated(m) =>
-          Failure(new Error(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}"))
+          Failure(new Exception(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}"))
         case Some(_) =>
           Success()
       }

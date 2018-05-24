@@ -3,6 +3,7 @@ package encry.modifiers.state.box.proposition
 import encry.account.{Account, AccountSerializer, Address}
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
+import encry.modifiers.state.box.proposition.EncryProposition.UnlockFailedException
 import encrywm.lang.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
 import encrywm.lib.Types._
@@ -25,7 +26,7 @@ case class AccountProposition(account: Account) extends EncryProposition {
   override def serializer: Serializer[M] = AccountPropositionSerializer
 
   override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
-    if (Account(ctx.transaction.accountPubKey.pubKeyBytes) != account) Failure(new Error("Unlock failed"))
+    if (Account(ctx.transaction.accountPubKey.pubKeyBytes) != account) Failure(UnlockFailedException)
     else Success()
 
   override val esType: Types.ESProduct = Types.AccountProposition

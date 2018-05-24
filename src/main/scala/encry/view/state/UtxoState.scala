@@ -10,6 +10,7 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.EncryBaseTransaction
+import encry.modifiers.mempool.EncryBaseTransaction.TransactionValidationException
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.HeightProposition
@@ -51,11 +52,11 @@ class UtxoState(override val version: VersionTag,
         .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
         t.flatMap(_ => persistentProver.performOneOperation(m))
       }.get
-    }.orElse(throw new Error(s"$tx validation failed.")))
+    }.orElse(throw TransactionValidationException(s"$tx validation failed.")))
 
     // Checks whether the outcoming result is the same as expected.
     if (!expectedDigest.sameElements(persistentProver.digest))
-      throw new Error(s"Digest after txs application is wrong. ${Algos.encode(expectedDigest)} expected, " +
+      throw new Exception(s"Digest after txs application is wrong. ${Algos.encode(expectedDigest)} expected, " +
         s"${Algos.encode(persistentProver.digest)} given")
   }
 
@@ -77,17 +78,17 @@ class UtxoState(override val version: VersionTag,
           s"root hash ${Algos.encode(rootHash)}")
 
         if (!stateStore.get(ByteArrayWrapper(block.id)).exists(_.data sameElements block.header.stateRoot))
-          throw new Error("Storage kept roothash is not equal to the declared one.")
+          throw new Exception("Storage kept roothash is not equal to the declared one.")
         else if (!stateStore.rollbackVersions().exists(_.data sameElements block.header.stateRoot))
-          throw new Error("Unable to apply modification properly.")
+          throw new Exception("Unable to apply modification properly.")
         else if (!(block.header.adProofsRoot sameElements proofHash))
-          throw new Error("Calculated proofHash is not equal to the declared one.")
+          throw new Exception("Calculated proofHash is not equal to the declared one.")
         else if (!(block.header.stateRoot sameElements persistentProver.digest))
-          throw new Error("Calculated stateRoot is not equal to the declared one.")
+          throw new Exception("Calculated stateRoot is not equal to the declared one.")
 
         new UtxoState(VersionTag @@ block.id, Height @@ block.header.height, stateStore, lastBlockTimestamp, nodeViewHolderRef)
       }.recoverWith[UtxoState] { case e =>
-        log.warn(s"Error while applying block with header ${block.header.encodedId} to UTXOState with root" +
+        log.warn(s"Failed to apply block with header ${block.header.encodedId} to UTXOState with root" +
           s" ${Algos.encode(rootHash)}: ", e)
         Failure(e)
       }
@@ -95,16 +96,16 @@ class UtxoState(override val version: VersionTag,
     case header: EncryBlockHeader =>
       Success(new UtxoState(VersionTag @@ header.id, height, stateStore, lastBlockTimestamp, nodeViewHolderRef))
 
-    case _ => Failure(new Error("Got Modifier of unknown type."))
+    case _ => Failure(new Exception("Got Modifier of unknown type."))
   }
 
   def proofsForTransactions(txs: Seq[EncryBaseTransaction]): Try[(SerializedAdProof, ADDigest)] = {
     log.debug(s"Generating proof for ${txs.length} transactions ...")
     val rootHash: ADDigest = persistentProver.digest
     if (txs.isEmpty) {
-      Failure(new Error("Got empty transaction sequence"))
+      Failure(new Exception("Got empty transaction sequence"))
     } else if (!storage.version.exists(_.sameElements(rootHash))) {
-      Failure(new Error(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}"))
+      Failure(new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}"))
     } else {
       persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
     }
@@ -152,7 +153,7 @@ class UtxoState(override val version: VersionTag,
 
       implicit val context: Context = Context(tx, height, lastBlockTimestamp, rootHash)
 
-      if (tx.fee < tx.minimalFee && !tx.isCoinbase) throw new Error(s"Low fee in $tx")
+      if (tx.fee < tx.minimalFee && !tx.isCoinbase) throw TransactionValidationException(s"Low fee in $tx")
 
       val bxs = tx.unlockers.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
@@ -160,7 +161,7 @@ class UtxoState(override val version: VersionTag,
           bxOpt match {
             // If `proofOpt` from unlocker is `None` then `tx.signature` is used as a default proof.
             case Some(bx) if bx.proposition.unlockTry(proofOpt.getOrElse(tx.signature)).isSuccess => acc :+ bx
-            case _ => throw new Error(s"Failed to spend some boxes referenced in $tx")
+            case _ => throw TransactionValidationException(s"Failed to spend some boxes referenced in $tx")
           }
         }
 
@@ -170,7 +171,7 @@ class UtxoState(override val version: VersionTag,
         creditB.forall { case (id, amount) => debitB.getOrElse(id, 0L) >= amount }
       }
 
-      if (!validBalance) throw new Error(s"Non-positive balance in $tx")
+      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
     }
 }
 

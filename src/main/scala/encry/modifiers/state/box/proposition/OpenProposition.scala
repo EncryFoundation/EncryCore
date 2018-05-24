@@ -41,6 +41,6 @@ object OpenPropositionSerializer extends Serializer[OpenProposition.type] {
 
   override def parseBytes(bytes: Array[Byte]): Try[OpenProposition.type] = bytes match {
     case b if b sameElements ByteValue => Success(OpenProposition)
-    case l => Failure(new Error(s"Incorrect proposition ${l.headOption}"))
+    case l => Failure(new Exception(s"Incorrect proposition ${l.headOption}"))
   }
 }

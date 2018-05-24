@@ -25,7 +25,7 @@ class ConsolePromptListener extends Actor with ScorexLogging {
                   }
               case None => println("Unsupported command. Type 'app help' to get commands list")
             }
-          case Failure(e) => println("Bad input")
+          case Failure(_) => println("Bad input")
         }
       }
   }

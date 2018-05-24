@@ -17,7 +17,7 @@ object HistoryModifierSerializer extends Serializer[EncryPersistentModifier] {
     case m: EncryBlockPayload =>
       EncryBlockPayload.modifierTypeId +: EncryBlockPayloadSerializer.toBytes(m)
     case m =>
-      throw new Error(s"Serialization for unknown modifier: $m")
+      throw new Exception(s"Serialization for unknown modifier: $m")
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[EncryPersistentModifier] =
@@ -29,6 +29,6 @@ object HistoryModifierSerializer extends Serializer[EncryPersistentModifier] {
       case EncryBlockPayload.`modifierTypeId` =>
         EncryBlockPayloadSerializer.parseBytes(bytes.tail)
       case m =>
-        Failure(new Error(s"Deserialization for unknown type byte: $m"))
+        Failure(new Exception(s"Deserialization for unknown type byte: $m"))
     }
 }

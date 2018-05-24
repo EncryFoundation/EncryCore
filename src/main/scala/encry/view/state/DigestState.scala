@@ -35,7 +35,7 @@ class DigestState protected(override val version: VersionTag,
     case block: EncryBlock =>
       Try {
         if (!ADProofs.proofDigest(block.adProofsOpt.get.proofBytes).sameElements(block.header.adProofsRoot))
-          Failure(new Error(s"Got invalid Proof for block: $block"))
+          Failure(new Exception(s"Got invalid Proof for block: $block"))
 
         val txs = block.payload.transactions
         val declaredHash = block.header.stateRoot
@@ -43,7 +43,7 @@ class DigestState protected(override val version: VersionTag,
         txs.foldLeft(Success(): Try[Unit]) { case (status, tx) =>
           status.flatMap(_ => tx.semanticValidity)
         }.flatMap(_ => block.adProofsOpt.map(_.verify(extractStateChanges(txs), rootHash, declaredHash))
-          .getOrElse(Failure(new Error("Proofs are empty"))))
+          .getOrElse(Failure(new Exception("Proofs are empty"))))
       }.flatten match {
         case s: Success[_] =>
           log.info(s"Valid modifier applied to DigestState: ${block.encodedId}")
@@ -53,7 +53,7 @@ class DigestState protected(override val version: VersionTag,
           Failure(e)
       }
     case mod: Any =>
-      Failure(new Error(s"Unhandled modifier: $mod"))
+      Failure(new Exception(s"Unhandled modifier: $mod"))
   }
 
   private def update(newVersion: VersionTag, newRootHash: ADDigest): Try[DigestState] = Try {
@@ -74,7 +74,7 @@ class DigestState protected(override val version: VersionTag,
 
     case a: Any =>
       log.info(s"Unhandled modifier: $a")
-      Failure(new Error(s"Unhandled modifier: $mod"))
+      Failure(new Exception(s"Unhandled modifier: $mod"))
   }
 
   override def rollbackTo(version: VersionTag): Try[DigestState] = {
@@ -115,7 +115,7 @@ object DigestState {
 
         new DigestState(version, ADDigest @@ rootHash, store, settings)
 
-      case _ => throw new Error("Unsupported argument combination.")
+      case _ => throw new Exception("Unsupported argument combination.")
     }
   }.getOrElse(EncryState.generateGenesisDigestState(dir, settings))
 }

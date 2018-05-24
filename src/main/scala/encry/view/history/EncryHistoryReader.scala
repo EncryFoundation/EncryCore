@@ -119,17 +119,17 @@ trait EncryHistoryReader
                                                   filterCond: EncryBlockHeader => Boolean): Seq[Seq[EncryBlockHeader]] = {
     @tailrec
     def loop(currentHeight: Option[Int], acc: Seq[Seq[EncryBlockHeader]]): Seq[Seq[EncryBlockHeader]] = {
-      val nextLevelHeaders = currentHeight.toList
+      val nextLevelHeaders: Seq[EncryBlockHeader] = currentHeight.toList
         .flatMap { h => headerIdsAtHeight(h + 1) }
         .flatMap { id => typedModifierById[EncryBlockHeader](id) }
         .filter(filterCond)
       if (nextLevelHeaders.isEmpty) {
         acc.map(chain => chain.reverse)
       } else {
-        val updatedChains = nextLevelHeaders.flatMap { h =>
+        val updatedChains: Seq[Seq[EncryBlockHeader]] = nextLevelHeaders.flatMap { h =>
           acc.find(chain => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(c => h +: c)
         }
-        val nonUpdatedChains = acc.filter(chain => !nextLevelHeaders.exists(_.parentId sameElements chain.head.id))
+        val nonUpdatedChains: Seq[Seq[EncryBlockHeader]] = acc.filter(chain => !nextLevelHeaders.exists(_.parentId sameElements chain.head.id))
         loop(currentHeight.map(_ + 1), updatedChains ++ nonUpdatedChains)
       }
     }
@@ -142,7 +142,7 @@ trait EncryHistoryReader
       case header: EncryBlockHeader => validate(header)
       case payload: EncryBlockPayload => validate(payload)
       case adProofs: ADProofs => validate(adProofs)
-      case mod: Any => Failure(new Error(s"Modifier $mod is of incorrect type."))
+      case mod: Any => Failure(new Exception(s"Modifier $mod is of incorrect type."))
     }
   }
 
@@ -202,19 +202,15 @@ trait EncryHistoryReader
   protected[history] def commonBlockThenSuffixes(header1: EncryBlockHeader,
                                                  header2: EncryBlockHeader): (EncryHeaderChain, EncryHeaderChain) = {
     assert(contains(header1) && contains(header2), "Got non-existing header(s)")
-    val heightDelta = Math.max(header1.height - header2.height, 0)
+    val heightDelta: Int = Math.max(header1.height - header2.height, 0)
 
     def loop(numberBack: Int, otherChain: EncryHeaderChain): (EncryHeaderChain, EncryHeaderChain) = {
-      val r = commonBlockThenSuffixes(otherChain, header1, numberBack + heightDelta)
-      if (r._1.head == r._2.head) {
-        r
-      } else {
-        val biggerOther = headerChainBack(numberBack, otherChain.head, _ => false) ++ otherChain.tail
-        if (!otherChain.head.isGenesis) {
-          loop(biggerOther.size, biggerOther)
-        } else {
-          throw new Error(s"Common point not found for headers $header1 and $header2")
-        }
+      val chains: (EncryHeaderChain, EncryHeaderChain) = commonBlockThenSuffixes(otherChain, header1, numberBack + heightDelta)
+      if (chains._1.head == chains._2.head) chains
+      else {
+        val biggerOther: EncryHeaderChain = headerChainBack(numberBack, otherChain.head, _ => false) ++ otherChain.tail
+        if (!otherChain.head.isGenesis) loop(biggerOther.size, biggerOther)
+        else throw new Exception(s"Common point not found for headers $header1 and $header2")
       }
     }
 
@@ -227,10 +223,10 @@ trait EncryHistoryReader
                                                  limit: Int): (EncryHeaderChain, EncryHeaderChain) = {
     def until(h: EncryBlockHeader): Boolean = otherChain.exists(_.id sameElements h.id)
 
-    val ourChain = headerChainBack(limit, startHeader, until)
-    val commonBlock = ourChain.head
-    val commonBlockAndSuffixes = otherChain.takeAfter(commonBlock)
-    (ourChain, commonBlockAndSuffixes)
+    val currentChain: EncryHeaderChain = headerChainBack(limit, startHeader, until)
+    val commonBlock: EncryBlockHeader = currentChain.head
+    val commonBlockAndSuffixes: EncryHeaderChain = otherChain.takeAfter(commonBlock)
+    (currentChain, commonBlockAndSuffixes)
   }
 
   override def syncInfo: EncrySyncInfo = if (isEmpty) {

@@ -3,6 +3,7 @@ package encry.modifiers.state.box.proposition
 import com.google.common.primitives.Ints
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
+import encry.modifiers.state.box.proposition.EncryProposition.UnlockFailedException
 import encry.view.history.Height
 import encrywm.lang.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
@@ -23,7 +24,7 @@ case class HeightProposition(height: Height) extends EncryProposition {
 
   override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
     if (height <= ctx.height) Success()
-    else Failure(new Error("Unlock failed"))
+    else Failure(UnlockFailedException)
 
   override val esType: Types.ESProduct = Types.HeightProposition
 

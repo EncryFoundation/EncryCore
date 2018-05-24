@@ -16,8 +16,8 @@ object Command {
 
     def requireArg[VT <: Ast.Value](n: String): VT = args.get(n).map {
       case vt: VT@unchecked => vt
-      case _ => throw new Error("Wrong argument type.")
-    }.getOrElse(throw new Error(s"Argument $n not found."))
+      case _ => throw new Exception("Wrong argument type.")
+    }.getOrElse(throw new Exception(s"Argument $n not found."))
 
     def requireArgOrElse[VT <: Ast.Value](key: String, default: => VT): VT = args.get(key).map {
       case vt: VT@unchecked => vt

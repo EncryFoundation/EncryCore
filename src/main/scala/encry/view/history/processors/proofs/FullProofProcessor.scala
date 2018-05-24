@@ -25,7 +25,7 @@ trait FullProofProcessor extends BaseADProofProcessor with BlockProcessor {
             ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
         }
       case _ =>
-        throw new Error(s"Header for modifier $m is no defined")
+        throw new Exception(s"Header for modifier $m is no defined")
     }
   }
 

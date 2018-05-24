@@ -17,7 +17,7 @@ object DirectiveSerializer extends Serializer[Directive] {
       ScriptedAssetDirective.TypeId +: ScriptedAssetDirectiveSerializer.toBytes(sad)
     case dd: DataDirective =>
       DataDirective.TypeId +: DataDirectiveSerializer.toBytes(dd)
-    case m => throw new Error(s"Serialization of unknown directive type: $m")
+    case m => throw new Exception(s"Serialization of unknown directive type: $m")
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[Directive] = Try(bytes.head).flatMap {
@@ -26,6 +26,6 @@ object DirectiveSerializer extends Serializer[Directive] {
     case AssetIssuingDirective.`TypeId` => AssetIssuingDirectiveSerializer.parseBytes(bytes.tail)
     case ScriptedAssetDirective.`TypeId` => ScriptedAssetDirectiveSerializer.parseBytes(bytes.tail)
     case DataDirective.`TypeId` => DataDirectiveSerializer.parseBytes(bytes.tail)
-    case t => Failure(new Error(s"Got unknown typeId: $t"))
+    case t => Failure(new Exception(s"Got unknown typeId: $t"))
   }
 }
