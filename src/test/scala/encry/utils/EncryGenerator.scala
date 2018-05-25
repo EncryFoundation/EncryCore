@@ -44,23 +44,21 @@ trait EncryGenerator {
 
   def genValidPaymentTxs(qty: Int): Seq[EncryTransaction] = {
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
-    val timestamp = System.currentTimeMillis()
 
     keys.map { k =>
       val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genAssetBox(k.publicImage.address))
       TransactionFactory.defaultPaymentTransactionScratch(k, Props.txFee,
-        timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
+        scala.util.Random.nextLong(), useBoxes, Props.recipientAddr, Props.boxValue)
     }
   }
 
   def genValidPaymentTxsToAddr(qty: Int, address: Address): Seq[EncryTransaction] = {
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
-    val timestamp = System.currentTimeMillis()
 
     keys.map { k =>
       val useBoxes = IndexedSeq(genAssetBox(address))
       TransactionFactory.defaultPaymentTransactionScratch(k, Props.txFee,
-        timestamp, useBoxes, address, Props.boxValue)
+        scala.util.Random.nextLong(), useBoxes, address, Props.boxValue)
     }
   }
 

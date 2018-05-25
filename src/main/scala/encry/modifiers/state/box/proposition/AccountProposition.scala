@@ -1,8 +1,9 @@
 package encry.modifiers.state.box.proposition
 
 import encry.account.{Account, AccountSerializer, Address}
+import encry.crypto.PublicKey25519
 import encry.modifiers.state.box.Context
-import encry.modifiers.state.box.proof.Proof
+import encry.modifiers.state.box.proof.{Proof, Signature25519}
 import encry.modifiers.state.box.proposition.EncryProposition.UnlockFailedException
 import encrywm.lang.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
@@ -11,12 +12,13 @@ import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 /**
   * This type of proposition requires non-interactive proof of knowledge of
   * `PrivateKey` corresponding to some `account.address`.
   */
+// TODO: This type of proposition should be replaced with ContractProposition in the future.
 case class AccountProposition(account: Account) extends EncryProposition {
 
   override type M = AccountProposition
@@ -25,9 +27,12 @@ case class AccountProposition(account: Account) extends EncryProposition {
 
   override def serializer: Serializer[M] = AccountPropositionSerializer
 
-  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
-    if (Account(ctx.transaction.accountPubKey.pubKeyBytes) != account) Failure(UnlockFailedException)
-    else Success()
+  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] = Try {
+    proof match {
+      case sig: Signature25519 if sig.isValid(PublicKey25519(account.pubKey), ctx.transaction.messageToSign) =>
+      case _ => UnlockFailedException
+    }
+  }
 
   override val esType: Types.ESProduct = Types.AccountProposition
 

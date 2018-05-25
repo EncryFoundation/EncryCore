@@ -1,11 +1,10 @@
 package encry.modifiers.mempool
 
-import com.google.common.primitives.{Bytes, Ints, Longs}
-import encry.crypto.PublicKey25519
+import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.mempool.EncryBaseTransaction.TransactionValidationException
 import encry.modifiers.mempool.directive.{CoinbaseDirective, Directive, DirectiveSerializer}
 import encry.modifiers.state.box.AssetBox
-import encry.modifiers.state.box.proof.Signature25519
+import encry.modifiers.state.box.proof.{Proof, ProofSerializer}
 import encry.modifiers.state.box.proposition.OpenProposition
 import encry.settings.{Algos, Constants}
 import encry.utils.Utils
@@ -14,20 +13,18 @@ import encrywm.lib.Types
 import encrywm.lib.Types.{ESByteVector, ESList, ESLong, ESTransaction}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
-import scorex.core.serialization.Serializer
+import scorex.core.serialization.{SerializationException, Serializer}
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.hash.Digest32
-import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.{Failure, Success, Try}
 
 /** Transaction is an atomic state modifier. */
-case class EncryTransaction(override val accountPubKey: PublicKey25519,
-                            override val fee: Amount,
+case class EncryTransaction(override val fee: Amount,
                             override val timestamp: Long,
-                            override val signature: Signature25519,
                             override val unlockers: IndexedSeq[Unlocker],
-                            override val directives: IndexedSeq[Directive]) extends EncryBaseTransaction {
+                            override val directives: IndexedSeq[Directive],
+                            override val defaultProofOpt: Option[Proof]) extends EncryBaseTransaction {
 
   override type M = EncryTransaction
 
@@ -42,7 +39,7 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
   override lazy val serializer: Serializer[M] = EncryTransactionSerializer
 
   override lazy val txHash: Digest32 =
-    EncryTransaction.getHash(accountPubKey, fee, timestamp, unlockers, directives)
+    EncryTransaction.getHash(fee, timestamp, unlockers, directives)
 
   override lazy val isCoinbase: Boolean = directives.head.isInstanceOf[CoinbaseDirective]
 
@@ -53,8 +50,6 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
           Failure(TransactionValidationException("Invalid size"))
         } else if (fee < 0) {
           Failure(TransactionValidationException("Negative fee"))
-        } else if (!validSignature) {
-          Failure(TransactionValidationException("Invalid signature"))
         } else if (!directives.forall(_.isValid)) {
           Failure(TransactionValidationException("Bad outputs"))
         } else Success()
@@ -66,9 +61,7 @@ case class EncryTransaction(override val accountPubKey: PublicKey25519,
 
   override def convert: ESObject = {
     val fields = Map(
-      "accountPubKey" -> ESValue("accountPubKey", ESByteVector)(accountPubKey.pubKeyBytes),
       "fee" -> ESValue("fee", ESLong)(fee),
-      "signature" -> ESValue("signature", ESByteVector)(signature.signature),
       "messageToSign" -> ESValue("messageToSign", ESByteVector)(txHash),
       "outputs" -> ESValue("outputs", ESList(Types.ESBox))(newBoxes.map(_.convert).toList),
       "unlockers" -> ESValue("unlockers", ESList(Types.ESUnlocker))(unlockers.map(_.convert).toList),
@@ -84,41 +77,36 @@ object EncryTransaction {
 
   implicit val jsonEncoder: Encoder[EncryTransaction] = (tx: EncryTransaction) => Map(
     "id" -> Algos.encode(tx.id).asJson,
-    "accountPubKey" -> Algos.encode(tx.accountPubKey.pubKeyBytes).asJson,
     "fee" -> tx.fee.asJson,
     "timestamp" -> tx.timestamp.asJson,
-    "signature" -> Algos.encode(tx.signature.signature).asJson,
     "unlockers" -> tx.unlockers.map(_.asJson).asJson,
-    "directives" -> tx.directives.map(_.asJson).asJson
+    "directives" -> tx.directives.map(_.asJson).asJson,
+    "defaultProofOpt" -> tx.defaultProofOpt.map(_.asJson).asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[EncryTransaction] = (c: HCursor) => {
     for {
-      accountPubKey <- c.downField("accountPubKey").as[String]
       fee <- c.downField("fee").as[Long]
       timestamp <- c.downField("timestamp").as[Long]
-      signature <- c.downField("signature").as[String]
       unlockers <- c.downField("unlockers").as[IndexedSeq[Unlocker]]
       directives <- c.downField("directives").as[IndexedSeq[Directive]]
+      defaultProofOpt <- c.downField("defaultProofOpt").as[Option[Proof]]
     } yield {
       EncryTransaction(
-        PublicKey25519(PublicKey @@ Algos.decode(accountPubKey).get),
         fee,
         timestamp,
-        Signature25519(Signature @@ Algos.decode(signature).get),
         unlockers,
-        directives
+        directives,
+        defaultProofOpt
       )
     }
   }
 
-  def getHash(accountPubKey: PublicKey25519,
-              fee: Amount,
+  def getHash(fee: Amount,
               timestamp: Long,
               unlockers: IndexedSeq[Unlocker],
               directives: IndexedSeq[Directive]): Digest32 = Algos.hash(
     Bytes.concat(
-      accountPubKey.pubKeyBytes,
       unlockers.map(_.bytesWithoutProof).foldLeft(Array[Byte]())(_ ++ _),
       directives.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
       Longs.toByteArray(timestamp),
@@ -126,53 +114,57 @@ object EncryTransaction {
     )
   )
 
-  def getMessageToSign(accountPubKey: PublicKey25519,
-                       fee: Amount,
+  def getMessageToSign(fee: Amount,
                        timestamp: Long,
                        unlockers: IndexedSeq[Unlocker],
                        directives: IndexedSeq[Directive]): Array[Byte] =
-    getHash(accountPubKey, fee, timestamp, unlockers, directives)
+    getHash(fee, timestamp, unlockers, directives)
 }
 
 object EncryTransactionSerializer extends Serializer[EncryTransaction] {
 
   override def toBytes(obj: EncryTransaction): Array[Byte] = {
     Bytes.concat(
-      obj.accountPubKey.pubKeyBytes,
       Longs.toByteArray(obj.fee),
       Longs.toByteArray(obj.timestamp),
-      obj.signature.signature,
-      Ints.toByteArray(obj.unlockers.size),
-      Ints.toByteArray(obj.directives.size),
-      obj.unlockers.map(u => Ints.toByteArray(u.bytes.length) ++ u.bytes).foldLeft(Array[Byte]())(_ ++ _),
+      Shorts.toByteArray(obj.unlockers.size.toShort),
+      Shorts.toByteArray(obj.directives.size.toShort),
+      obj.unlockers.map(u => Shorts.toByteArray(u.bytes.length.toShort) ++ u.bytes).foldLeft(Array[Byte]())(_ ++ _),
       obj.directives.map { d =>
         val bytes: Array[Byte] = DirectiveSerializer.toBytes(d)
-        Ints.toByteArray(bytes.length) ++ bytes
-      }.reduceLeft(_ ++ _)
+        Shorts.toByteArray(bytes.length.toShort) ++ bytes
+      }.reduceLeft(_ ++ _),
+      obj.defaultProofOpt.map(p => ProofSerializer.toBytes(p)).getOrElse(Array.empty)
     )
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[EncryTransaction] = Try {
 
-    val accPubKey: PublicKey25519 = PublicKey25519(PublicKey @@ bytes.slice(0, 32))
-    val fee: Amount = Longs.fromByteArray(bytes.slice(32, 40))
-    val timestamp: Amount = Longs.fromByteArray(bytes.slice(40, 48))
-    val signature: Signature25519 = Signature25519(Signature @@ bytes.slice(48, 112))
-    val unlockersQty: Int = Ints.fromByteArray(bytes.slice(112, 116))
-    val directivesQty: Int = Ints.fromByteArray(bytes.slice(116, 120))
-    val leftBytes1: Array[Byte] = bytes.drop(120)
-    val (unlockers: IndexedSeq[Unlocker], unlockersLen: Int) = (0 until unlockersQty).foldLeft(IndexedSeq[Unlocker](), 0) { case ((acc, shift), _) =>
-      val len: Int = Ints.fromByteArray(leftBytes1.slice(shift, shift + 4))
-      UnlockerSerializer.parseBytes(leftBytes1.slice(shift + 4, shift + 4 + len)).map(u => (acc :+ u, shift + 4 + len))
-        .getOrElse(throw new Exception("Serialization failed."))
-    }
+    val fee: Amount = Longs.fromByteArray(bytes.take(8))
+    val timestamp: Amount = Longs.fromByteArray(bytes.slice(8, 16))
+    val unlockersQty: Int = Shorts.fromByteArray(bytes.slice(16, 18))
+    val directivesQty: Int = Shorts.fromByteArray(bytes.slice(18, 20))
+    val leftBytes1: Array[Byte] = bytes.drop(20)
+    val (unlockers: IndexedSeq[Unlocker], unlockersLen: Int) = (0 until unlockersQty)
+      .foldLeft(IndexedSeq[Unlocker](), 0) { case ((acc, shift), _) =>
+        val len: Int = Shorts.fromByteArray(leftBytes1.slice(shift, shift + 2))
+        UnlockerSerializer.parseBytes(leftBytes1.slice(shift + 2, shift + 2 + len))
+          .map(u => (acc :+ u, shift + 2 + len))
+          .getOrElse(throw SerializationException)
+      }
     val leftBytes2: Array[Byte] = leftBytes1.drop(unlockersLen)
-    val directives: IndexedSeq[Directive] = (0 until directivesQty).foldLeft(IndexedSeq[Directive](), 0) { case ((acc, shift), _) =>
-      val len: Int = Ints.fromByteArray(leftBytes2.slice(shift, shift + 4))
-      DirectiveSerializer.parseBytes(leftBytes2.slice(shift + 4, shift + 4 + len)).map(d => (acc :+ d, shift + 4 + len))
-        .getOrElse(throw new Exception("Serialization failed."))
-    }._1
+    val (directives: IndexedSeq[Directive], directivesLen: Int) = (0 until directivesQty)
+      .foldLeft(IndexedSeq[Directive](), 0) { case ((acc, shift), _) =>
+        val len: Int = Shorts.fromByteArray(leftBytes2.slice(shift, shift + 2))
+        DirectiveSerializer.parseBytes(leftBytes2.slice(shift + 2, shift + 2 + len))
+          .map(d => (acc :+ d, shift + 2 + len))
+          .getOrElse(throw SerializationException)
+      }
+    val proofOpt: Option[Proof] = if (leftBytes2.length - directivesLen == 0) None else {
+      ProofSerializer.parseBytes(leftBytes2.drop(directivesLen)).map(Some(_))
+        .getOrElse(throw SerializationException)
+    }
 
-    EncryTransaction(accPubKey, fee, timestamp, signature, unlockers, directives)
+    EncryTransaction(fee, timestamp, unlockers, directives, proofOpt)
   }
 }

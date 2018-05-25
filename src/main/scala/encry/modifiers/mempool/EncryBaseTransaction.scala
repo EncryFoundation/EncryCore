@@ -1,8 +1,7 @@
 package encry.modifiers.mempool
 
-import encry.account.Account
-import encry.modifiers.Signable25519
 import encry.modifiers.mempool.directive.Directive
+import encry.modifiers.state.box.proof.Proof
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.{Algos, Constants}
@@ -16,7 +15,7 @@ import scorex.crypto.hash.Digest32
 import scala.util.Try
 
 trait EncryBaseTransaction extends Transaction[EncryProposition]
-  with Signable25519 with ModifierWithSizeLimit with ESEnvConvertable {
+  with ModifierWithSizeLimit with ESEnvConvertable {
 
   val txHash: Digest32
 
@@ -38,10 +37,10 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
 
   val directives: IndexedSeq[Directive]
 
+  val defaultProofOpt: Option[Proof]
+
   lazy val newBoxes: Traversable[EncryBaseBox] =
     directives.flatMap(_.boxes(txHash)) ++ feeBox.map(fb => Seq(fb)).getOrElse(Seq.empty)
-
-  lazy val account: Account = Account(accountPubKey.pubKeyBytes)
 
   lazy val minimalFee: Amount = Constants.FeeMinAmount +
     directives.map(_.cost).sum + (Constants.PersistentByteCost * length)

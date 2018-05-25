@@ -1,5 +1,6 @@
 package encry.view.mempool
 
+import encry.modifiers.mempool.EncryTransaction
 import encry.settings.EncryAppSettings
 import encry.utils.EncryGenerator
 import org.scalatest.{Matchers, PropSpec}
@@ -13,11 +14,11 @@ class EncryMempoolSpec extends PropSpec with Matchers with EncryGenerator {
 
   property("Mempool.put(txs) should not allow overflow.") {
 
-    val mempool = EncryMempool.empty(encrySettings, timeProvider)
+    val mempool: EncryMempool = EncryMempool.empty(encrySettings, timeProvider)
 
-    val maxCapacity = encrySettings.nodeSettings.mempoolMaxCapacity
+    val maxCapacity: Int = encrySettings.nodeSettings.mempoolMaxCapacity
 
-    val txs = genValidPaymentTxs(maxCapacity + 12)
+    val txs: Seq[EncryTransaction] = genValidPaymentTxs(maxCapacity + 12)
 
     mempool.put(txs)
 
@@ -26,11 +27,11 @@ class EncryMempoolSpec extends PropSpec with Matchers with EncryGenerator {
 
   property("Mempool should not accept invalid transactions.") {
 
-    val mempool = EncryMempool.empty(encrySettings, timeProvider)
+    val mempool: EncryMempool = EncryMempool.empty(encrySettings, timeProvider)
 
-    val validTxs = genValidPaymentTxs(60)
+    val validTxs: Seq[EncryTransaction] = genValidPaymentTxs(60)
 
-    val invalidTxs = genInvalidPaymentTxs(100)
+    val invalidTxs: Seq[EncryTransaction] = genInvalidPaymentTxs(100)
 
     mempool.put(validTxs ++ invalidTxs)
 

@@ -8,7 +8,7 @@ import scorex.crypto.signatures.PublicKey
 
 import scala.util.Try
 
-// Represents the owner of the Public/Private key pair.
+/** Represents the owner of the Public/Private key pair. */
 case class Account(address: Address) extends BytesSerializable {
 
   override type M = Account
@@ -16,6 +16,9 @@ case class Account(address: Address) extends BytesSerializable {
   lazy val isValid: Boolean = Base58Check.decode(address).map(bytes =>
     if (bytes.length != PublicKey25519.Length) throw new Exception("Invalid address")
   ).isSuccess
+
+  lazy val pubKey: PublicKey = Account.pubKeyFromAddress(address)
+    .getOrElse(throw new Exception("Invalid address"))
 
   override def serializer: Serializer[M] = AccountSerializer
 
@@ -39,6 +42,8 @@ object Account {
   val AddressLength: Int = 1 + PublicKey25519.Length + Base58Check.ChecksumLength
 
   def apply(publicKey: PublicKey): Account = Account(Address @@ Base58Check.encode(publicKey))
+
+  def pubKeyFromAddress(address: Address): Try[PublicKey] = Base58Check.decode(address).map(PublicKey @@ _)
 
   def decodeAddress(address: Address): Array[Byte] = Base58.decode(address).get
 

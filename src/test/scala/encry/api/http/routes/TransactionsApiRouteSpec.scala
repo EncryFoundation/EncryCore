@@ -16,8 +16,6 @@ class TransactionsApiRouteSpec extends PropSpec with Matchers with InstanceFacto
 
     txDeserialized.isRight shouldBe true
 
-    tx.account shouldEqual txDeserialized.map(_.account).getOrElse("None")
-
     tx.id shouldEqual txDeserialized.map(_.id).getOrElse(Array.emptyByteArray)
   }
 }

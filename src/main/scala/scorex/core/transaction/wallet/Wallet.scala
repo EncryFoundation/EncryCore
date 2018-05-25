@@ -83,13 +83,6 @@ object WalletTransaction {
   }
 }
 
-
-/**
-  * Abstract interface for a wallet
-  *
-  * @tparam P
-  * @tparam TX
-  */
 trait Wallet[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentNodeViewModifier, W <: Wallet[P, TX, PMOD, W]]
   extends Vault[P, TX, PMOD, W] {
   self: W =>
