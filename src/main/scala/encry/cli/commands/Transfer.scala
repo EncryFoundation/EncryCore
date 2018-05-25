@@ -39,7 +39,7 @@ object Transfer extends Command {
           val fee: Long = args.requireArg[Ast.Num]("fee").i
           val amount: Long = args.requireArg[Ast.Num]("amount").i
           val timestamp: Time = timeProvider.time()
-          val boxes: immutable.IndexedSeq[AssetBox] = view.vault.walletStorage.allBoxes.filter(_.isInstanceOf[AssetBox])
+          val boxes: IndexedSeq[AssetBox] = view.vault.walletStorage.allBoxes.filter(_.isInstanceOf[AssetBox])
             .map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) { case (seq, box) =>
             if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
           }.toIndexedSeq
