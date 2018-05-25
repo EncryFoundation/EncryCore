@@ -31,7 +31,8 @@ class EncryScanner(indexStore: Store) extends Actor with ScorexLogging {
 
   val indexReader: EncryIndexReader = EncryIndexReader(storage)
 
-  def version: VersionTag = storage.get(IndexStorage.IndexVersionKey).map(VersionTag @@ _).getOrElse(InitialVersion)
+  def version: VersionTag = storage.get(IndexStorage.IndexVersionKey).map(VersionTag @@ _)
+    .getOrElse(VersionTag @@ Algos.hash("initial_version"))
 
   def lastScannedHeaderOpt: Option[EncryBlockHeader] = storage.get(IndexStorage.LastScannedBlockKey)
     .flatMap(r => EncryBlockHeaderSerializer.parseBytes(r).toOption)
@@ -107,8 +108,6 @@ object EncryScanner {
       "lastScannedHeader" -> lastScannedHeader.map(_.asJson).getOrElse("None".asJson)
     ).asJson
   }
-
-  val InitialVersion: VersionTag = VersionTag @@ Algos.hash("initial_version")
 
   def getIndexDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/index")
 

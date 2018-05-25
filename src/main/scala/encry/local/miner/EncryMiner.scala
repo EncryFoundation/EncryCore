@@ -1,6 +1,6 @@
 package encry.local.miner
 
-import akka.actor.{Actor, ActorRef, PoisonPill}
+import akka.actor.{Actor, ActorRef, PoisonPill, SupervisorStrategy}
 import encry.EncryApp._
 import encry.consensus._
 import encry.crypto.PrivateKey25519
@@ -41,6 +41,8 @@ class EncryMiner extends Actor with ScorexLogging {
   override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
 
   override def postStop(): Unit = killAllWorkers()
+
+  override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
 
   def killAllWorkers(): Unit = {
     miningWorkers.foreach(_ ! PoisonPill)
@@ -98,7 +100,7 @@ class EncryMiner extends Actor with ScorexLogging {
       mining orElse
       unknownMessage
 
-  private def procCandidateBlock(c: CandidateBlock): Unit = {
+  def procCandidateBlock(c: CandidateBlock): Unit = {
     log.debug(s"Got candidate block $c")
     candidateOpt = Some(c)
     if (!isMining) self ! StartMining

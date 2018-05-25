@@ -29,6 +29,8 @@ class PeerManager(settings: ScorexSettings, timeProvider: NetworkTimeProvider) e
 
   private lazy val peerDatabase = new PeerDatabaseImpl(Some(settings.dataDir + "/peers.dat"))
 
+  private var lastIdUsed = 0
+
   if (peerDatabase.isEmpty()) {
     settings.network.knownPeers.foreach { address =>
       if (!isSelf(address, None)) {
@@ -64,7 +66,7 @@ class PeerManager(settings: ScorexSettings, timeProvider: NetworkTimeProvider) e
       sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
   }
 
-  private def apiInterface: Receive = {
+  def apiInterface: Receive = {
     case GetConnectedPeers =>
       sender() ! (connectedPeers.values.map(_.handshake).toSeq: Seq[Handshake])
 
@@ -85,7 +87,7 @@ class PeerManager(settings: ScorexSettings, timeProvider: NetworkTimeProvider) e
   /**
     * Given a peer's address and declared address, returns `true` iff the peer is the same is this node.
     */
-  private def isSelf(address: InetSocketAddress, declaredAddress: Option[InetSocketAddress]): Boolean = {
+  def isSelf(address: InetSocketAddress, declaredAddress: Option[InetSocketAddress]): Boolean = {
     // TODO: should the peer really be considered the same as self iff one of the following conditions hold?? Check carefully.
     settings.network.bindAddress == address ||
       settings.network.declaredAddress.exists(da => declaredAddress.contains(da)) ||
@@ -93,11 +95,9 @@ class PeerManager(settings: ScorexSettings, timeProvider: NetworkTimeProvider) e
       settings.network.declaredAddress.contains(address)
   }
 
-  private var lastIdUsed = 0
+  def peerCycle: Receive = connecting orElse handshaked orElse disconnected
 
-  private def peerCycle: Receive = connecting orElse handshaked orElse disconnected
-
-  private def connecting: Receive = {
+  def connecting: Receive = {
     case DoConnecting(remote, direction) =>
       if (peerDatabase.isBlacklisted(remote)) {
         log.info(s"Got incoming connection from blacklisted $remote")
@@ -119,8 +119,7 @@ class PeerManager(settings: ScorexSettings, timeProvider: NetworkTimeProvider) e
       }
   }
 
-
-  private def handshaked: Receive = {
+  def handshaked: Receive = {
     case Handshaked(peer) =>
       //todo: filter by an id introduced by the PeerManager
       if (peerDatabase.isBlacklisted(peer.socketAddress)) {
@@ -141,7 +140,7 @@ class PeerManager(settings: ScorexSettings, timeProvider: NetworkTimeProvider) e
       }
   }
 
-  private def disconnected: Receive = {
+  def disconnected: Receive = {
     case Disconnected(remote) =>
       connectedPeers -= remote
       connectingPeers -= remote
