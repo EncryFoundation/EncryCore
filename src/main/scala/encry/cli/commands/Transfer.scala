@@ -18,7 +18,6 @@ import scorex.core.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, Lo
 import scorex.core.utils.NetworkTime.Time
 import scorex.core.utils.NetworkTimeProvider
 
-import scala.collection.immutable
 import scala.concurrent.Future
 import scala.util.Try
 
