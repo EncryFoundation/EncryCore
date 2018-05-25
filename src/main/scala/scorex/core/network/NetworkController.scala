@@ -12,7 +12,7 @@ import scorex.core.network.message.Message.MessageCode
 import scorex.core.network.message.{Message, MessageHandler, MessageSpec}
 import scorex.core.settings.NetworkSettings
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
-
+import encry.EncryApp._
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -21,10 +21,7 @@ import scala.language.existentials
 import scala.util.{Failure, Success, Try}
 import scala.language.postfixOps
 
-/**
-  * Control all network interaction
-  * must be singleton
-  */
+
 class NetworkController(settings: NetworkSettings,
                         messageHandler: MessageHandler,
                         upnp: UPnP,
@@ -86,6 +83,8 @@ class NetworkController(settings: NetworkSettings,
 
   //bind to listen incoming connections
   tcpManager ! Bind(self, localAddress, options = KeepAlive(true) :: Nil, pullMode = false)
+
+  override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
 
   def bindingLogic: Receive = {
     case Bound(_) =>

@@ -2,7 +2,8 @@ package encry
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.SupervisorStrategy.Escalate
+import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.stream.ActorMaterializer
@@ -30,6 +31,7 @@ import scorex.core.network.peer.PeerManagerRef
 
 import scala.concurrent.ExecutionContextExecutor
 import scala.io.Source
+import scala.concurrent.duration._
 
 object EncryApp extends App with ScorexLogging {
 
@@ -101,6 +103,14 @@ object EncryApp extends App with ScorexLogging {
   val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
   Http().bindAndHandle(combinedRoute, bindAddress.getAddress.getHostAddress, bindAddress.getPort)
 
+  lazy val upnp: UPnP = new UPnP(settings.network)
+
+  def commonSupervisorStrategy: OneForOneStrategy = OneForOneStrategy(
+    maxNrOfRetries = 5,
+    withinTimeRange = 60 seconds) {
+    case _ => Escalate
+  }
+
   if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) miner ! StartMining
 
   if (encrySettings.testingSettings.transactionGeneration) {
@@ -109,8 +119,6 @@ object EncryApp extends App with ScorexLogging {
   }
 
   if (encrySettings.nodeSettings.enableCLI) cliListener ! StartListening
-
-  lazy val upnp: UPnP = new UPnP(settings.network)
 
   def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
 }
