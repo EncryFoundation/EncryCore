@@ -158,9 +158,10 @@ class UtxoState(override val version: VersionTag,
       val bxs = tx.unlockers.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
         .map(t => t.toOption -> u.proofOpt)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, proofOpt)) =>
-          bxOpt match {
-            // If `proofOpt` from unlocker is `None` then `tx.signature` is used as a default proof.
-            case Some(bx) if bx.proposition.unlockTry(proofOpt.getOrElse(tx.signature)).isSuccess => acc :+ bx
+        (bxOpt, proofOpt, tx.defaultProofOpt) match {
+            // If `proofOpt` from unlocker is `None` then `defaultProofOpt` is used.
+            case (Some(bx), Some(proof), _) if bx.proposition.unlockTry(proof).isSuccess => acc :+ bx
+            case (Some(bx), _, Some(defaultProof)) if bx.proposition.unlockTry(defaultProof).isSuccess => acc :+ bx
             case _ => throw TransactionValidationException(s"Failed to spend some boxes referenced in $tx")
           }
         }

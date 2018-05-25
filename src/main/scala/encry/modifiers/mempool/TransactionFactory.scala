@@ -32,9 +32,9 @@ object TransactionFactory {
       IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt))
     }
 
-    val signature = privKey.sign(EncryTransaction.getMessageToSign(pubKey, fee, timestamp, unlockers, directives))
+    val signature = privKey.sign(EncryTransaction.getMessageToSign(fee, timestamp, unlockers, directives))
 
-    EncryTransaction(pubKey, fee, timestamp, signature, unlockers, directives)
+    EncryTransaction(fee, timestamp, unlockers, directives, Some(signature))
   }
 
   def defaultPaymentTransactionWithMultiSig(privKey: Seq[PrivateKey25519],
@@ -51,9 +51,9 @@ object TransactionFactory {
 
     val unlockers = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
 
-    val signature = privKey.head.sign(EncryTransaction.getMessageToSign(pubKey, fee, timestamp, unlockers, directives))
+    val signature = privKey.head.sign(EncryTransaction.getMessageToSign(fee, timestamp, unlockers, directives))
 
-    EncryTransaction(pubKey, fee, timestamp, signature, unlockers, directives)
+    EncryTransaction(fee, timestamp, unlockers, directives, Some(signature))
   }
 
   def defaultPaymentTransaction(accPubKey: PublicKey25519,
@@ -74,7 +74,7 @@ object TransactionFactory {
       IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt))
     }
 
-    EncryTransaction(accPubKey, fee, timestamp, signature, unlockers, directives)
+    EncryTransaction(fee, timestamp, unlockers, directives, Some(signature))
   }
 
   def coinbaseTransactionScratch(privKey: PrivateKey25519,
@@ -93,9 +93,8 @@ object TransactionFactory {
       IndexedSeq(CoinbaseDirective(height))
     }
 
+    val signature = privKey.sign(EncryTransaction.getMessageToSign(0, timestamp, unlockers, directives))
 
-    val signature = privKey.sign(EncryTransaction.getMessageToSign(pubKey, 0, timestamp, unlockers, directives))
-
-    EncryTransaction(pubKey, 0, timestamp, signature, unlockers, directives)
+    EncryTransaction(0, timestamp, unlockers, directives, Some(signature))
   }
 }

@@ -3,13 +3,14 @@ package encry.view.wallet
 import java.io.File
 
 import com.google.common.primitives.Longs
+import encry.account.Account
 import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.EncryBaseBox
 import encry.modifiers.state.box.proposition.{AccountProposition, EncryProposition, HeightProposition}
-import encry.settings.{Constants, EncryAppSettings}
+import encry.settings.{Algos, Constants, EncryAppSettings}
 import encry.utils.{BalanceCalculator, BoxFilter}
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
@@ -40,6 +41,8 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
 
   val walletStorage: WalletStorage = new WalletStorage(walletStore, publicKeys)
 
+  val propositions: Set[AccountProposition] = publicKeys.map(pk => AccountProposition(Account(pk.pubKeyBytes)))
+
   override def scanOffchain(tx: EncryBaseTransaction): EncryWallet = this
 
   override def scanOffchain(txs: Seq[EncryBaseTransaction]): EncryWallet = this
@@ -68,7 +71,18 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
                     sBxs2 -> sOpenBxs2
                   }
                 }
-            if (newBxsL.nonEmpty || publicKeys.exists(_.pubKeyBytes.sameElements(tx.accountPubKey.pubKeyBytes))) {
+              val isRelatedTransaction: Boolean = {
+                val walletPropositionsSet = propositions.map(p => ByteArrayWrapper(Algos.hash(p.bytes)))
+                val txPropositionsSet = tx.unlockers.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc, u) =>
+                  u.proofOpt match {
+                    case Some(proof) => acc :+ ByteArrayWrapper(Algos.hash(proof.bytes))
+                    case _ => acc
+                  }
+                }.toSet
+                walletPropositionsSet.intersect(txPropositionsSet).nonEmpty ||
+                  tx.defaultProofOpt.exists(pr => walletPropositionsSet.exists(_.data sameElements Algos.hash(pr.bytes)))
+              }
+            if (newBxsL.nonEmpty || isRelatedTransaction) {
               (nTxs :+ tx, nBxs ++ newBxsL, nOpenBxs ++ newOpenBxsL, sBxs ++ spendBxsIdsL, sOpenBxs ++ spentOpenBxsIdsL)
             } else {
               (nTxs, nBxs, nOpenBxs ++ newOpenBxsL, sBxs, sOpenBxs ++ spentOpenBxsIdsL)
@@ -77,7 +91,7 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
         updateWallet(modifier.id, newTxs, newBxs, newOpenBxs, spentBxsIds, spentOpenBxsIds)
         this
       case _ =>
-          this
+        this
     }
   }
 

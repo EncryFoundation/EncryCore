@@ -32,18 +32,7 @@ trait SmartContracts extends Keys {
     SourceProcessor.source2Contract(source).get
   }
 
-  // Account lock
   val ALContract: EncryContract = {
-    val source =
-      s"""
-         |let ownerPubKey = base58"${Base58.encode(publicKey.pubKeyBytes)}"
-         |unlock if checkSig(context.transaction.signature, context.transaction.messageToSign, ownerPubKey)
-      """.stripMargin
-
-    SourceProcessor.source2Contract(source).get
-  }
-
-  val ALContract2: EncryContract = {
     val source =
       s"""
          |let ownerPubKey = base58"${Base58.encode(publicKey.pubKeyBytes)}"

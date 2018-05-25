@@ -15,7 +15,7 @@ class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts
     implicit val defaultCtx: Context = Context(fakeTransaction, height, lastBlockTimestamp, stateDigest)
 
     val proposition = ContractProposition(DummyContract)
-    val fakeProof = fakeTransaction.signature
+    val fakeProof = fakeTransaction.defaultProofOpt.get
 
     val unlockR = proposition.unlockTry(fakeProof)
 
@@ -27,7 +27,7 @@ class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts
     implicit val ctx: Context = Context(fakeTransaction, Height @@ 1269, lastBlockTimestamp, stateDigest)
 
     val proposition = ContractProposition(HLContract)
-    val fakeProof = fakeTransaction.signature
+    val fakeProof = fakeTransaction.defaultProofOpt.get
 
     val unlockR = proposition.unlockTry(fakeProof)
 
@@ -39,7 +39,7 @@ class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts
     implicit val ctx: Context = Context(fakeTransaction, Height @@ 561, lastBlockTimestamp, stateDigest)
 
     val proposition = ContractProposition(HLContract)
-    val fakeProof = fakeTransaction.signature
+    val fakeProof = fakeTransaction.defaultProofOpt.get
 
     val unlockR = proposition.unlockTry(fakeProof)
 
@@ -51,7 +51,7 @@ class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts
     implicit val ctx: Context = Context(TransactionForContract, Height @@ 561, lastBlockTimestamp, stateDigest)
 
     val proposition = ContractProposition(ALContract)
-    val proof = TransactionForContract.signature
+    val proof = TransactionForContract.defaultProofOpt.get
 
     val unlockR = proposition.unlockTry(proof)
 
@@ -63,19 +63,19 @@ class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts
     implicit val ctx: Context = Context(TransactionForContract, Height @@ 561, lastBlockTimestamp, stateDigest)
 
     val proposition = ContractProposition(ALContract)
-    val proof = fakeTransaction.signature
+    val proof = fakeTransaction.defaultProofOpt.get
 
     val unlockR = proposition.unlockTry(proof)
 
-    unlockR.isSuccess shouldBe true
+    unlockR.isSuccess shouldBe false
   }
 
   property("Unlocking proposition with AccountLock contract (Should unlock, complex contract)") {
 
     implicit val ctx: Context = Context(TransactionForContract, Height @@ 561, lastBlockTimestamp, stateDigest)
 
-    val proposition = ContractProposition(ALContract2)
-    val proof = TransactionForContract.signature
+    val proposition = ContractProposition(ALContract)
+    val proof = TransactionForContract.defaultProofOpt.get
 
     val unlockR = proposition.unlockTry(proof)
 
@@ -95,7 +95,7 @@ class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts
     val proposition = ContractProposition(multiSigContract(pubKeys.head, pubKeys(1), pubKeys.last))
 
     val multiSigProof = MultiSig(
-      privKeys.map(_.sign(EncryTransaction.getMessageToSign(tx.accountPubKey, tx.fee, tx.timestamp, tx.unlockers, tx.directives)))
+      privKeys.map(_.sign(EncryTransaction.getMessageToSign(tx.fee, tx.timestamp, tx.unlockers, tx.directives)))
     )
 
     val unlockR = proposition.unlockTry(multiSigProof)
