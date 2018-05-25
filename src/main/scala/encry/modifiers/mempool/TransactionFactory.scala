@@ -2,13 +2,14 @@ package encry.modifiers.mempool
 
 import encry.account.Address
 import encry.crypto.{PrivateKey25519, PublicKey25519}
-import encry.modifiers.mempool.directive.{AssetIssuingDirective, CoinbaseDirective, TransferDirective}
+import encry.modifiers.mempool.directive.{CoinbaseDirective, Directive, TransferDirective}
 import encry.modifiers.state.box.MonetaryBox
-import encry.modifiers.state.box.proof.{MultiSig, Proof, Signature25519}
+import encry.modifiers.state.box.proof.Signature25519
 import encry.view.history.Height
-import encrywm.common.EncryContract
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.ADKey
+
+import scala.collection.immutable
 
 object TransactionFactory {
 
@@ -20,19 +21,19 @@ object TransactionFactory {
                                        amount: Amount,
                                        tokenIdOpt: Option[ADKey] = None): EncryTransaction = {
 
-    val pubKey = privKey.publicImage
+    val pubKey: PublicKey25519 = privKey.publicImage
 
-    val unlockers = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
+    val unlockers: IndexedSeq[Unlocker] = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
 
-    val change = useBoxes.map(_.amount).sum - (amount + fee)
+    val change: Amount = useBoxes.map(_.amount).sum - (amount + fee)
 
-    val directives = if (change > 0) {
+    val directives: IndexedSeq[TransferDirective] = if (change > 0) {
       IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt), TransferDirective(pubKey.address, change, 1, tokenIdOpt))
     } else {
       IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt))
     }
 
-    val signature = privKey.sign(EncryTransaction.getMessageToSign(fee, timestamp, unlockers, directives))
+    val signature: Signature25519 = privKey.sign(EncryTransaction.getMessageToSign(fee, timestamp, unlockers, directives))
 
     EncryTransaction(fee, timestamp, unlockers, directives, Some(signature))
   }
@@ -45,13 +46,11 @@ object TransactionFactory {
                                             amount: Amount,
                                             tokenIdOpt: Option[ADKey] = None): EncryTransaction = {
 
-    val pubKey = privKey.head.publicImage
+    val directives: IndexedSeq[TransferDirective] = IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt))
 
-    val directives = IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt))
+    val unlockers: IndexedSeq[Unlocker] = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
 
-    val unlockers = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
-
-    val signature = privKey.head.sign(EncryTransaction.getMessageToSign(fee, timestamp, unlockers, directives))
+    val signature: Signature25519 = privKey.head.sign(EncryTransaction.getMessageToSign(fee, timestamp, unlockers, directives))
 
     EncryTransaction(fee, timestamp, unlockers, directives, Some(signature))
   }
@@ -66,9 +65,9 @@ object TransactionFactory {
                                 amount: Amount,
                                 tokenIdOpt: Option[ADKey] = None): EncryTransaction = {
 
-    val unlockers = useBoxesIds.map(id => Unlocker(id, None)).toIndexedSeq
+    val unlockers: immutable.IndexedSeq[Unlocker] = useBoxesIds.map(id => Unlocker(id, None)).toIndexedSeq
 
-    val directives = if (change > 0) {
+    val directives: IndexedSeq[TransferDirective] = if (change > 0) {
       IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt), TransferDirective(accPubKey.address, change, 1, tokenIdOpt))
     } else {
       IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt))
@@ -82,18 +81,18 @@ object TransactionFactory {
                                  useBoxes: Seq[MonetaryBox],
                                  height: Height): EncryTransaction = {
 
-    val pubKey = privKey.publicImage
+    val pubKey: PublicKey25519 = privKey.publicImage
 
-    val unlockers = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
+    val unlockers: IndexedSeq[Unlocker] = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
 
-    val directives = if (useBoxes.nonEmpty) {
+    val directives: IndexedSeq[Directive with Product] = if (useBoxes.nonEmpty) {
       IndexedSeq(CoinbaseDirective(height),
         TransferDirective(pubKey.address, useBoxes.map(_.amount).sum, 1))
     } else {
       IndexedSeq(CoinbaseDirective(height))
     }
 
-    val signature = privKey.sign(EncryTransaction.getMessageToSign(0, timestamp, unlockers, directives))
+    val signature: Signature25519 = privKey.sign(EncryTransaction.getMessageToSign(0, timestamp, unlockers, directives))
 
     EncryTransaction(0, timestamp, unlockers, directives, Some(signature))
   }

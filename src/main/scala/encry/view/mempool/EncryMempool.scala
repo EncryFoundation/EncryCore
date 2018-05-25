@@ -1,10 +1,10 @@
 package encry.view.mempool
 
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.settings.EncryAppSettings
+import encry.settings.{Algos, EncryAppSettings}
 import encry.view.mempool.EncryMempool._
 import monix.eval.Task
-import monix.execution.Scheduler
+import monix.execution.{CancelableFuture, Scheduler}
 import scorex.core.ModifierId
 import scorex.core.transaction.MemoryPool
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
@@ -18,11 +18,11 @@ class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTra
 
   private implicit val cleanupScheduler: Scheduler = Scheduler.singleThread("mempool-cleanup-thread")
 
-  private val removeExpired = Task {
+  private val removeExpired: Task[EncryMempool] = Task {
     filter(tx => (timeProvider.time() - tx.timestamp) > settings.nodeSettings.utxMaxAge.toMillis)
   }.delayExecution(settings.nodeSettings.mempoolCleanupInterval)
 
-  private val cleanup = removeExpired.runAsync
+  private val cleanup: CancelableFuture[EncryMempool] = removeExpired.runAsync
 
   override def close(): Unit = cleanup.cancel()
 
@@ -31,12 +31,12 @@ class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTra
   override def put(tx: EncryBaseTransaction): Try[EncryMempool] = put(Seq(tx))
 
   override def put(txs: Iterable[EncryBaseTransaction]): Try[EncryMempool] = {
-    val validTxs = txs.filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
+    val validTxs: Iterable[EncryBaseTransaction] = txs.filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
     if (validTxs.nonEmpty) {
       if ((size + validTxs.size) <= settings.nodeSettings.mempoolMaxCapacity) {
         Success(putWithoutCheck(validTxs))
       } else {
-        val overflow = (size + validTxs.size) - settings.nodeSettings.mempoolMaxCapacity
+        val overflow: Int = (size + validTxs.size) - settings.nodeSettings.mempoolMaxCapacity
         Success(putWithoutCheck(validTxs.take(validTxs.size - overflow)))
       }
     } else Failure(new Exception("Failed to put transaction into pool"))

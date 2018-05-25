@@ -51,8 +51,6 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     wallet.scanPersistent(block)
 
-    println(wallet.walletStorage.getTokenBalanceById(intrinsicTokenId))
-
     wallet.walletStorage.getTokenBalanceById(intrinsicTokenId).getOrElse(0L) shouldEqual correctBalance
   }
 

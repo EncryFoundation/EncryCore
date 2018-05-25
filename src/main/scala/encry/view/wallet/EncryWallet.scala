@@ -72,8 +72,8 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
                   }
                 }
               val isRelatedTransaction: Boolean = {
-                val walletPropositionsSet = propositions.map(p => ByteArrayWrapper(Algos.hash(p.bytes)))
-                val txPropositionsSet = tx.unlockers.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc, u) =>
+                val walletPropositionsSet: Set[ByteArrayWrapper] = propositions.map(p => ByteArrayWrapper(Algos.hash(p.bytes)))
+                val txPropositionsSet: Set[ByteArrayWrapper] = tx.unlockers.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc, u) =>
                   u.proofOpt match {
                     case Some(proof) => acc :+ ByteArrayWrapper(Algos.hash(proof.bytes))
                     case _ => acc
@@ -82,11 +82,11 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
                 walletPropositionsSet.intersect(txPropositionsSet).nonEmpty ||
                   tx.defaultProofOpt.exists(pr => walletPropositionsSet.exists(_.data sameElements Algos.hash(pr.bytes)))
               }
-            if (newBxsL.nonEmpty || isRelatedTransaction) {
-              (nTxs :+ tx, nBxs ++ newBxsL, nOpenBxs ++ newOpenBxsL, sBxs ++ spendBxsIdsL, sOpenBxs ++ spentOpenBxsIdsL)
-            } else {
-              (nTxs, nBxs, nOpenBxs ++ newOpenBxsL, sBxs, sOpenBxs ++ spentOpenBxsIdsL)
-            }
+              if (newBxsL.nonEmpty || isRelatedTransaction) {
+                (nTxs :+ tx, nBxs ++ newBxsL, nOpenBxs ++ newOpenBxsL, sBxs ++ spendBxsIdsL, sOpenBxs ++ spentOpenBxsIdsL)
+              } else {
+                (nTxs, nBxs, nOpenBxs ++ newOpenBxsL, sBxs, sOpenBxs ++ spentOpenBxsIdsL)
+              }
           }
         updateWallet(modifier.id, newTxs, newBxs, newOpenBxs, spentBxsIds, spentOpenBxsIds)
         this

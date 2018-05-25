@@ -1,7 +1,6 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import encry.crypto.PublicKey25519
 import encry.modifiers.mempool.EncryBaseTransaction.TransactionValidationException
 import encry.modifiers.mempool.directive.{CoinbaseDirective, Directive, DirectiveSerializer}
 import encry.modifiers.state.box.AssetBox
