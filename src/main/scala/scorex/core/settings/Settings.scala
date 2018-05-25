@@ -78,9 +78,8 @@ object ScorexSettings extends ScorexLogging with SettingsReaders {
         }
         ConfigFactory
           .defaultOverrides()
-          .withFallback(cfg) // user-supplied config
+          .withFallback(cfg)
           .withFallback(ConfigFactory.defaultApplication())
-          .withFallback(ConfigFactory.defaultReference()) // "src/main/resources/reference.conf"
           .resolve()
     }
 
