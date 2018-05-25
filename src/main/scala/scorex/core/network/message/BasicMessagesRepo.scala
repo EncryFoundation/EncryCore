@@ -120,8 +120,7 @@ object GetPeersSpec extends MessageSpec[Unit] {
 
   override val messageName: String = "GetPeers message"
 
-  override def parseBytes(bytes: Array[Byte]): Try[Unit] =
-    Try(require(bytes.isEmpty, "Non-empty data for GetPeers"))
+  override def parseBytes(bytes: Array[Byte]): Try[Unit] = Try(require(bytes.isEmpty, "Non-empty data for GetPeers"))
 
   override def toBytes(data: Unit): Array[Byte] = Array()
 }
