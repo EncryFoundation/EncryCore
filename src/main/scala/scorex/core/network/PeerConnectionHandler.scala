@@ -19,7 +19,9 @@ import scala.util.{Failure, Random, Success}
 
 
 sealed trait ConnectionType
+
 case object Incoming extends ConnectionType
+
 case object Outgoing extends ConnectionType
 
 
@@ -75,8 +77,7 @@ class PeerConnectionHandler(val settings: NetworkSettings,
 
   private var chunksBuffer: ByteString = CompactByteString()
 
-
-  private def handshake: Receive =
+  def receive: Receive =
     startInteraction orElse
       receivedData orElse
       handshakeTimeout orElse
@@ -180,7 +181,7 @@ class PeerConnectionHandler(val settings: NetworkSettings,
       chunksBuffer = t._2
 
       t._1.find { packet =>
-        messagesHandler.parseBytes(packet.toByteBuffer, Some(selfPeer.get)) match {   //todo: .get
+        messagesHandler.parseBytes(packet.toByteBuffer, Some(selfPeer.get)) match { //todo: .get
           case Success(message) =>
             log.info("Received message " + message.spec + " from " + remote)
             networkControllerRef ! message
@@ -196,9 +197,9 @@ class PeerConnectionHandler(val settings: NetworkSettings,
       connection ! ResumeReading
   }
 
-  private def reportStrangeInput: Receive= {
-      case nonsense: Any =>
-        log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
+  private def reportStrangeInput: Receive = {
+    case nonsense: Any =>
+      log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
   }
 
   def workingCycle: Receive =
@@ -215,29 +216,17 @@ class PeerConnectionHandler(val settings: NetworkSettings,
     connection ! ResumeReading
   }
 
-  override def receive: Receive = handshake
-
   override def postStop(): Unit = log.info(s"Peer handler to $remote destroyed")
 }
 
 object PeerConnectionHandler {
 
-
-  // todo: use the "become" approach to handle state more elegantly
   sealed trait CommunicationState
+
   case object AwaitingHandshake extends CommunicationState
+
   case object WorkingCycle extends CommunicationState
 
-  object ReceivableMessages {
-    private[PeerConnectionHandler] object HandshakeDone
-    case object StartInteraction
-    case object HandshakeTimeout
-    case object CloseConnection
-    case object Blacklist
-  }
-}
-
-object PeerConnectionHandlerRef {
   def props(settings: NetworkSettings,
             networkControllerRef: ActorRef,
             peerManagerRef: ActorRef,
@@ -248,32 +237,20 @@ object PeerConnectionHandlerRef {
             remote: InetSocketAddress,
             timeProvider: NetworkTimeProvider): Props =
     Props(new PeerConnectionHandler(settings, networkControllerRef, peerManagerRef, messagesHandler,
-                                    connection, direction, ownSocketAddress, remote, timeProvider))
+      connection, direction, ownSocketAddress, remote, timeProvider))
 
-  def apply(settings: NetworkSettings,
-            networkControllerRef: ActorRef,
-            peerManagerRef: ActorRef,
-            messagesHandler: MessageHandler,
-            connection: ActorRef,
-            direction: ConnectionType,
-            ownSocketAddress: Option[InetSocketAddress],
-            remote: InetSocketAddress,
-            timeProvider: NetworkTimeProvider)
-           (implicit system: ActorSystem): ActorRef =
-    system.actorOf(props(settings, networkControllerRef, peerManagerRef, messagesHandler,
-                         connection, direction, ownSocketAddress, remote, timeProvider))
+  object ReceivableMessages {
 
-  def apply(name: String,
-            settings: NetworkSettings,
-            networkControllerRef: ActorRef,
-            peerManagerRef: ActorRef,
-            messagesHandler: MessageHandler,
-            connection: ActorRef,
-            direction: ConnectionType,
-            ownSocketAddress: Option[InetSocketAddress],
-            remote: InetSocketAddress,
-            timeProvider: NetworkTimeProvider)
-           (implicit system: ActorSystem): ActorRef =
-    system.actorOf(props(settings, networkControllerRef, peerManagerRef, messagesHandler,
-                         connection, direction, ownSocketAddress, remote, timeProvider), name)
+    private[PeerConnectionHandler] object HandshakeDone
+
+    case object StartInteraction
+
+    case object HandshakeTimeout
+
+    case object CloseConnection
+
+    case object Blacklist
+
+  }
+
 }
