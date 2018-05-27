@@ -7,18 +7,6 @@ import org.scalatest.{Matchers, PropSpec}
 
 class EncryStateSpec extends PropSpec with Matchers with EncryGenerator {
 
-  property("extractStateChanges() should support instant output spending") {
-
-    val spendingTxs: Seq[EncryTransaction] = genChainSpendingTxs(1000)
-
-    val state: UtxoState = genUtxoState
-
-    val stateOperations: EncryBoxStateChanges = state.extractStateChanges(spendingTxs)
-
-    stateOperations.operations.count(_.isInstanceOf[Removal]) == 1 shouldBe true    // Box to be spent by the first generated transaction.
-    stateOperations.operations.count(_.isInstanceOf[Insertion]) == 2 shouldBe true  // 2 Boxes created by the last transaction.
-  }
-
   property("EncryState.genesisBoxes() output equality") {
 
     val g1: IndexedSeq[CoinbaseBox] = EncryState.genesisBoxes
