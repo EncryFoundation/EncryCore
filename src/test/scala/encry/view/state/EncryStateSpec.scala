@@ -1,7 +1,6 @@
 package encry.view.state
 
-import encry.modifiers.mempool.EncryTransaction
-import encry.modifiers.state.box.{CoinbaseBox, EncryBoxStateChanges, Insertion, Removal}
+import encry.modifiers.state.box.CoinbaseBox
 import encry.utils.EncryGenerator
 import org.scalatest.{Matchers, PropSpec}
 
