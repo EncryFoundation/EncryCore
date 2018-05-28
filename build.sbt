@@ -40,7 +40,8 @@ val loggingDependencies = Seq(
 val testingDependencies = Seq(
   "com.typesafe.akka" %% "akka-testkit" % "2.4.+" % "test",
   "com.typesafe.akka" %% "akka-http-testkit" % akkaVersion % "test",
-  "org.scalatest" %% "scalatest" % "3.0.3" % "test"
+  "org.scalatest" %% "scalatest" % "3.0.3" % "test",
+  "org.scalacheck" %% "scalacheck" % "1.13.+" % "test"
 )
 
 libraryDependencies ++= Seq(

@@ -4,7 +4,6 @@ import io.iohk.iodb.Store
 import scorex.crypto.authds.{ADKey, Balance}
 import scorex.crypto.hash.{CryptographicHash, Digest}
 
-
 class ProxyInternalProverNode[D <: Digest](protected var pk: ADKey,
                                            val lkey: ADKey,
                                            val rkey: ADKey,
@@ -12,7 +11,7 @@ class ProxyInternalProverNode[D <: Digest](protected var pk: ADKey,
                                           (implicit val phf: CryptographicHash[D],
                                            store: Store,
                                            nodeParameters: NodeParameters)
-  extends InternalProverNode(k = pk, l = null, r = null, b = pb)(phf) {
+  extends InternalProverNode(k = pk, l = null, r = null, b = pb)(phf) { //scalastyle:ignore
 
   override def left: ProverNodes[D] = {
     if (l == null) l = VersionedIODBAVLStorage.fetch[D](lkey)
@@ -24,5 +23,3 @@ class ProxyInternalProverNode[D <: Digest](protected var pk: ADKey,
     r
   }
 }
-
-
