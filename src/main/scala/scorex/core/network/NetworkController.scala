@@ -43,25 +43,20 @@ class NetworkController extends Actor with ScorexLogging {
   lazy val localAddress: InetSocketAddress = netSettings.bindAddress
 
   //an address to send to peers
-  lazy val externalSocketAddress: Option[InetSocketAddress] = {
-    netSettings.declaredAddress orElse {
-      if (netSettings.upnpEnabled) upnp.externalAddress.map(a => new InetSocketAddress(a, netSettings.bindAddress.getPort))
-      else None
-    }
+  lazy val externalSocketAddress: Option[InetSocketAddress] = netSettings.declaredAddress orElse {
+    if (netSettings.upnpEnabled) upnp.externalAddress.map(a => new InetSocketAddress(a, netSettings.bindAddress.getPort))
+    else None
   }
 
   //check own declared address for validity
-  if (!netSettings.localOnly) {
-    netSettings.declaredAddress.foreach { myAddress =>
-      Try {
-        val myHost: String = new URI("http://" + myAddress).getHost
-        val myAddrs: Array[InetAddress] = InetAddress.getAllByName(myHost)
-        NetworkInterface.getNetworkInterfaces.asScala.exists { intf =>
-          intf.getInterfaceAddresses.asScala.exists { intfAddr => myAddrs.contains(intfAddr.getAddress) }
-        } || (netSettings.upnpEnabled && myAddrs.contains(upnp.externalAddress.getOrElse(None)))
-      } recover { case t: Throwable =>
-        log.error("Declared address validation failed: ", t)
-      }
+  if (!netSettings.localOnly) netSettings.declaredAddress.foreach { myAddress =>
+    Try {
+      val myHost: String = new URI("http://" + myAddress).getHost
+      val myAddrs: Array[InetAddress] = InetAddress.getAllByName(myHost)
+      NetworkInterface.getNetworkInterfaces.asScala.exists { intf =>
+        intf.getInterfaceAddresses.asScala.exists { intfAddr => myAddrs.contains(intfAddr.getAddress) }
+      } || (netSettings.upnpEnabled && myAddrs.contains(upnp.externalAddress.getOrElse(None)))
+    } recover { case t: Throwable => log.error("Declared address validation failed: ", t)
     }
   }
 
@@ -80,7 +75,6 @@ class NetworkController extends Actor with ScorexLogging {
   }
 
   def businessLogic: Receive = {
-    //a message coming in from another peer
     case Message(spec, Left(msgBytes), Some(remote)) =>
       val msgId: MessageCode = spec.messageCode
       spec.parseBytes(msgBytes) match {
