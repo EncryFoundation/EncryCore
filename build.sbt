@@ -45,6 +45,7 @@ val testingDependencies = Seq(
 )
 
 libraryDependencies ++= Seq(
+  "javax.xml.bind" % "jaxb-api" % "2.+",
   "com.lihaoyi" %% "fastparse" % "1.0.0",
   "com.iheart" %% "ficus" % "1.4.2",
   "com.google.guava" % "guava" % "19.+",
