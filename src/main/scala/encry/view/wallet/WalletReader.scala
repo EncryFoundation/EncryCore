@@ -32,7 +32,7 @@ trait WalletReader {
       walletStorage.getTransactionById(id).map(tx => acc :+ tx).getOrElse(acc)
     }
   
-  def getBalances: Seq[(ADKey, Long)] = walletStorage.getTokensId.foldLeft(Seq[(ADKey, Long)]()){
+  def getBalances: Seq[(ADKey, Long)] = walletStorage.getTokensId.foldLeft(Seq[(ADKey, Long)]()) {
     case (seq, tokenId) => walletStorage.getTokenBalanceById(tokenId) match {
       case Some(v) => seq :+ (tokenId, v)
       case None => seq

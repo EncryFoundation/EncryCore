@@ -48,7 +48,7 @@ object Transfer extends Command {
 
           nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
 
-          tx
+          tx.minimalFee
         }.toOption.map(tx => Some(Response(tx.toString))).getOrElse(Some(Response("Operation failed. Malformed data.")))
       }).mapTo[Option[Response]]
   }
