@@ -1,7 +1,7 @@
 package encry.view.mempool
 
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.settings.{Algos, EncryAppSettings}
+import encry.settings.EncryAppSettings
 import encry.view.mempool.EncryMempool._
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}

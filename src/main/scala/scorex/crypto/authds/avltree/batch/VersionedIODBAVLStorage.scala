@@ -92,7 +92,6 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
   }
 }
 
-
 object VersionedIODBAVLStorage {
 
   val InternalNodePrefix: Byte = 0.toByte

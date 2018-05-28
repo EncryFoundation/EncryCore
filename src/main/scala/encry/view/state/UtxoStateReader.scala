@@ -3,6 +3,7 @@ package encry.view.state
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
 import encry.settings.Algos
+import encry.settings.Algos.HF
 import encry.view.history.Height
 import io.iohk.iodb.Store
 import scorex.core.transaction.state.StateReader
@@ -19,12 +20,12 @@ trait UtxoStateReader extends StateReader with ScorexLogging {
 
   val height: Height
 
-  private lazy val np = NodeParameters(keySize = EncryBox.BoxIdSize, valueSize = None, labelSize = 32)
+  private lazy val np: NodeParameters = NodeParameters(keySize = EncryBox.BoxIdSize, valueSize = None, labelSize = 32)
 
-  protected lazy val storage = new VersionedIODBAVLStorage(stateStore, np)
+  protected lazy val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(stateStore, np)
 
   protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Algos.HF] = {
-    val bp = new BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
+    val bp: BatchAVLProver[Digest32, HF] = new BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
     PersistentBatchAVLProver.create(bp, storage).get
   }
 
@@ -40,6 +41,5 @@ trait UtxoStateReader extends StateReader with ScorexLogging {
       case _ => None
     }
 
-  def getRandomBox: Option[EncryBaseBox] =
-    persistentProver.avlProver.randomWalk().map(_._1).flatMap(boxById)
+  def getRandomBox: Option[EncryBaseBox] = persistentProver.avlProver.randomWalk().map(_._1).flatMap(boxById)
 }

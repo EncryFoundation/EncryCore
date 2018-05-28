@@ -16,7 +16,7 @@ import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base58
 
-import scala.util.Try
+import scala.util.{Random, Try}
 
 trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   extends MinimalState[EncryPersistentModifier, IState] with ScorexLogging {
@@ -65,8 +65,8 @@ object EncryState extends ScorexLogging {
 
   // TODO: Smooth supply.
   def genesisBoxes: IndexedSeq[CoinbaseBox] = {
-    lazy val genesisSeed = Long.MaxValue
-    lazy val rndGen = new scala.util.Random(genesisSeed)
+    lazy val genesisSeed: Long = Long.MaxValue
+    lazy val rndGen: Random = new scala.util.Random(genesisSeed)
     (0 until Constants.Chain.GenesisBoxesQty).map(_ =>
       CoinbaseBox(HeightProposition(Height @@ -1), rndGen.nextLong(), Constants.Chain.GenesisBoxesAmount))
   }
@@ -77,7 +77,7 @@ object EncryState extends ScorexLogging {
 
     lazy val initialBoxes: Seq[EncryBaseBox] = genesisBoxes
 
-    val boxHolder = BoxHolder(initialBoxes)
+    val boxHolder: BoxHolder = BoxHolder(initialBoxes)
 
     UtxoState.fromBoxHolder(boxHolder, stateDir, nodeViewHolderRef).ensuring(us => {
       log.debug(s"Expected afterGenesisDigest: $afterGenesisStateDigestHex")
@@ -93,7 +93,7 @@ object EncryState extends ScorexLogging {
 
   def readOrGenerate(settings: EncryAppSettings,
                      nodeViewHolderRef: Option[ActorRef]): EncryState[_] = {
-    val stateDir = getStateDir(settings)
+    val stateDir: File = getStateDir(settings)
     stateDir.mkdirs()
 
     settings.nodeSettings.stateMode match {
