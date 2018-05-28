@@ -25,8 +25,6 @@ class PeerManager extends Actor with ScorexLogging {
 
   val peerDatabase: PeerDatabase = PeerDatabase(Some(settings.dataDir + "/peers.dat"))
 
-  var lastIdUsed: Int = 0
-
   if (peerDatabase.isEmpty) settings.network.knownPeers.foreach { address =>
     if (!isSelf(address, None)) peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), None))
   }
@@ -78,7 +76,6 @@ class PeerManager extends Actor with ScorexLogging {
             connectingPeers += remote
           }
           sender() ! StartInteraction
-          lastIdUsed += 1
         }
       }
     case Handshaked(peer) =>
