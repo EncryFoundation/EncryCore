@@ -61,7 +61,6 @@ class NetworkController extends Actor with ScorexLogging {
 
   log.info(s"Declared address: $externalSocketAddress")
 
-  //bind to listen incoming connections
   tcpManager ! Bind(self, networkSettings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
 
   override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
@@ -70,11 +69,9 @@ class NetworkController extends Actor with ScorexLogging {
     case Bound(_) =>
       log.info("Successfully bound to the port " + networkSettings.bindAddress.getPort)
       context.system.scheduler.schedule(600.millis, 5.seconds)(peerManager ! CheckPeers)
-
     case CommandFailed(_: Bind) =>
       log.error("Network port " + networkSettings.bindAddress.getPort + " already in use!")
       context stop self
-    //TODO catch?
   }
 
   def businessLogic: Receive = {
