@@ -42,7 +42,7 @@ object EncryApp extends App with ScorexLogging {
 
   lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(args.headOption)
 
-  implicit val settings: ScorexSettings = encrySettings.scorexSettings
+  implicit lazy val settings: ScorexSettings = encrySettings.scorexSettings
 
   implicit def exceptionHandler: ExceptionHandler = ApiErrorHandler.exceptionHandler
 
@@ -80,7 +80,7 @@ object EncryApp extends App with ScorexLogging {
 
   val readersHolder: ActorRef = EncryReadersHolderRef(nodeViewHolder)
 
-  lazy val networkController: ActorRef = system.actorOf(NetworkController.props(settings.network), "networkController")
+  lazy val networkController: ActorRef = system.actorOf(Props[NetworkController], "networkController")
 
   val nodeViewSynchronizer: ActorRef =
     system.actorOf(EncryNodeViewSynchronizer.props(EncrySyncInfoMessageSpec, settings.network), "nodeViewSynchronizer")

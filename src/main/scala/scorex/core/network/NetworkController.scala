@@ -22,16 +22,18 @@ import scala.util.{Failure, Success, Try}
 import scala.language.postfixOps
 
 
-class NetworkController(settings: NetworkSettings) extends Actor with ScorexLogging {
+class NetworkController extends Actor with ScorexLogging {
 
   import NetworkController.ReceivableMessages._
   import NetworkControllerSharedMessages.ReceivableMessages.DataFromPeer
   import scorex.core.network.peer.PeerManager.ReceivableMessages.{CheckPeers, FilterPeers, Disconnected}
   import PeerConnectionHandler.ReceivableMessages.CloseConnection
 
-  val peerSynchronizer: ActorRef = PeerSynchronizerRef("PeerSynchronizer", self, peerManager, settings)
+  val networkSettings: NetworkSettings = settings.network
 
-  implicit val timeout: Timeout = Timeout(settings.controllerTimeout.getOrElse(5 seconds))
+  val peerSynchronizer: ActorRef = PeerSynchronizerRef("PeerSynchronizer", self, peerManager, networkSettings)
+
+  implicit val timeout: Timeout = Timeout(networkSettings.controllerTimeout.getOrElse(5 seconds))
 
   val messageHandlers: mutable.Map[Seq[MessageCode], ActorRef] = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
@@ -39,25 +41,18 @@ class NetworkController(settings: NetworkSettings) extends Actor with ScorexLogg
 
   val tcpManager: ActorRef = IO(Tcp)
 
-  lazy val externalSocketAddress: Option[InetSocketAddress] = settings.declaredAddress orElse {
-      if (settings.upnpEnabled) upnp.externalAddress.map(a => new InetSocketAddress(a, settings.bindAddress.getPort))
-      else None
-    }
+  lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse {
+    if (networkSettings.upnpEnabled) upnp.externalAddress.map(a => new InetSocketAddress(a, networkSettings.bindAddress.getPort))
+    else None
+  }
 
-  //check own declared address for validity
-  if (!settings.localOnly) {
-    settings.declaredAddress.foreach { myAddress =>
+  if (!networkSettings.localOnly) {
+    networkSettings.declaredAddress.foreach { myAddress =>
       Try {
-        val uri = new URI("http://" + myAddress)
-        val myHost = uri.getHost
-        val myAddrs = InetAddress.getAllByName(myHost)
-
+        val myAddrs: Array[InetAddress] = InetAddress.getAllByName(new URI("http://" + myAddress).getHost)
         NetworkInterface.getNetworkInterfaces.asScala.exists { intf =>
-          intf.getInterfaceAddresses.asScala.exists { intfAddr =>
-            val extAddr = intfAddr.getAddress
-            myAddrs.contains(extAddr)
-          }
-        } || (settings.upnpEnabled && myAddrs.exists(_ == upnp.externalAddress))
+          intf.getInterfaceAddresses.asScala.exists { intfAddr => myAddrs.contains(intfAddr.getAddress) }
+        } || (networkSettings.upnpEnabled && myAddrs.exists(_ == upnp.externalAddress))
       } recover { case t: Throwable =>
         log.error("Declared address validation failed: ", t)
       }
@@ -67,41 +62,32 @@ class NetworkController(settings: NetworkSettings) extends Actor with ScorexLogg
   log.info(s"Declared address: $externalSocketAddress")
 
   //bind to listen incoming connections
-  tcpManager ! Bind(self, settings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
+  tcpManager ! Bind(self, networkSettings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
 
   override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
 
   def bindingLogic: Receive = {
     case Bound(_) =>
-      log.info("Successfully bound to the port " + settings.bindAddress.getPort)
+      log.info("Successfully bound to the port " + networkSettings.bindAddress.getPort)
       context.system.scheduler.schedule(600.millis, 5.seconds)(peerManager ! CheckPeers)
 
     case CommandFailed(_: Bind) =>
-      log.error("Network port " + settings.bindAddress.getPort + " already in use!")
+      log.error("Network port " + networkSettings.bindAddress.getPort + " already in use!")
       context stop self
     //TODO catch?
   }
 
   def businessLogic: Receive = {
-    //a message coming in from another peer
     case Message(spec, Left(msgBytes), Some(remote)) =>
-      val msgId = spec.messageCode
-
+      val msgId: MessageCode = spec.messageCode
       spec.parseBytes(msgBytes) match {
         case Success(content) =>
           messageHandlers.find(_._1.contains(msgId)).map(_._2) match {
-            case Some(handler) =>
-              handler ! DataFromPeer(spec, content, remote)
-
-            case None =>
-              log.error("No handlers found for message: " + msgId)
-            //todo: ban a peer
+            case Some(handler) => handler ! DataFromPeer(spec, content, remote)
+            case None => log.error("No handlers found for message: " + msgId)
           }
-        case Failure(e) =>
-          log.error("Failed to deserialize data: ", e)
-        //todo: ban peer
+        case Failure(e) => log.error("Failed to deserialize data: ", e)
       }
-
     case SendToNetwork(message, sendingStrategy) =>
       (peerManager ? FilterPeers(sendingStrategy))
         .map(_.asInstanceOf[Seq[ConnectedPeer]])
@@ -115,41 +101,38 @@ class NetworkController(settings: NetworkSettings) extends Actor with ScorexLogg
       tcpManager ! Connect(remote,
         localAddress = externalSocketAddress,
         options = KeepAlive(true) :: Nil,
-        timeout = Some(settings.connectionTimeout),
-        pullMode = true) //todo: check pullMode flag
-
+        timeout = Some(networkSettings.connectionTimeout),
+        pullMode = true)
     case DisconnectFrom(peer) =>
       log.info(s"Disconnected from ${peer.socketAddress}")
       peer.handlerRef ! CloseConnection
       peerManager ! Disconnected(peer.socketAddress)
-
     case Blacklist(peer) =>
       peer.handlerRef ! PeerConnectionHandler.ReceivableMessages.Blacklist
-      // todo: the following message might become unnecessary if we refactor PeerManager to automatically
-      // todo: remove peer from `connectedPeers` on receiving `AddToBlackList` message.
       peerManager ! Disconnected(peer.socketAddress)
-
     case Connected(remote, local) =>
       val direction: ConnectionType = if (outgoing.contains(remote)) Outgoing else Incoming
-      val logMsg = direction match {
+      val logMsg: String = direction match {
         case Incoming => s"New incoming connection from $remote established (bound to local $local)"
         case Outgoing => s"New outgoing connection to $remote established (bound to local $local)"
       }
       log.info(logMsg)
-      val connection = sender()
-      val handlerProps: Props = PeerConnectionHandlerRef.props(settings, self, peerManager,
-        messagesHandler, connection, direction, externalSocketAddress, remote, timeProvider)
-      context.actorOf(handlerProps) // launch connection handler
+      val handlerProps: Props = PeerConnectionHandlerRef.props(networkSettings, self, peerManager,
+        messagesHandler, sender(), direction, externalSocketAddress, remote, timeProvider)
+      context.actorOf(handlerProps)
       outgoing -= remote
-
     case CommandFailed(c: Connect) =>
       outgoing -= c.remoteAddress
       log.info("Failed to connect to : " + c.remoteAddress)
       peerManager ! Disconnected(c.remoteAddress)
   }
 
-  //calls from API / application
-  def interfaceCalls: Receive = {
+  override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse {
+    case RegisterMessagesHandler(specs, handler) =>
+      log.info(s"Registering handlers for ${specs.map(s => s.messageCode -> s.messageName)}")
+      messageHandlers += specs.map(_.messageCode) -> handler
+    case CommandFailed(cmd: Tcp.Command) => log.info("Failed to execute command : " + cmd)
+    case nonsense: Any => log.warn(s"NetworkController: got something strange $nonsense")
     case ShutdownNetwork =>
       log.info("Going to shutdown all connections & unbind port")
       (peerManager ? FilterPeers(Broadcast))
@@ -157,18 +140,6 @@ class NetworkController(settings: NetworkSettings) extends Actor with ScorexLogg
         .foreach(_.foreach(_.handlerRef ! CloseConnection))
       self ! Unbind
       context stop self
-  }
-
-  override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse interfaceCalls orElse {
-    case RegisterMessagesHandler(specs, handler) =>
-      log.info(s"Registering handlers for ${specs.map(s => s.messageCode -> s.messageName)}")
-      messageHandlers += specs.map(_.messageCode) -> handler
-
-    case CommandFailed(cmd: Tcp.Command) =>
-      log.info("Failed to execute command : " + cmd)
-
-    case nonsense: Any =>
-      log.warn(s"NetworkController: got something strange $nonsense")
   }
 }
 
@@ -190,5 +161,4 @@ object NetworkController {
 
   }
 
-  def props(settings: NetworkSettings): Props = Props(new NetworkController(settings))
 }
