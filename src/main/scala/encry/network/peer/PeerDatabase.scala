@@ -5,22 +5,40 @@ import java.net.InetSocketAddress
 import scorex.core.network.ConnectionType
 import scorex.core.utils.NetworkTime
 
-case class PeerInfo(lastSeen: Long, nodeName: Option[String] = None, connectionType: Option[ConnectionType] = None)
+import scala.collection.mutable
 
-trait PeerDatabase {
+//todo: persistence
+case class PeerDatabase(filename: Option[String])  {
 
-  def isEmpty():Boolean
+  private val whitelistPersistence = mutable.Map[InetSocketAddress, PeerInfo]()
 
-  def addOrUpdateKnownPeer(peer: InetSocketAddress, peerInfo: PeerInfo): Unit
+  private val blacklist = mutable.Map[String, NetworkTime.Time]()
 
-  def knownPeers(): Map[InetSocketAddress, PeerInfo]
+  def addOrUpdateKnownPeer(address: InetSocketAddress, peerInfo: PeerInfo): Unit = {
+    val updatedPeerInfo: PeerInfo = whitelistPersistence.get(address).fold(peerInfo) { dbPeerInfo =>
+      val nodeNameOpt: Option[String] = peerInfo.nodeName orElse dbPeerInfo.nodeName
+      val connTypeOpt: Option[ConnectionType] = peerInfo.connectionType orElse  dbPeerInfo.connectionType
+      PeerInfo(peerInfo.lastSeen, nodeNameOpt, connTypeOpt)
+    }
+    whitelistPersistence.put(address, updatedPeerInfo)
+  }
 
-  def blacklistPeer(peer: InetSocketAddress, time: NetworkTime.Time): Unit
+  def blacklistPeer(address: InetSocketAddress, time: NetworkTime.Time): Unit = {
+    whitelistPersistence.remove(address)
+    if (!isBlacklisted(address)) blacklist += address.getHostName -> time
+  }
 
-  def blacklistedPeers(): Seq[String]
+  def isBlacklisted(address: InetSocketAddress): Boolean =
+    blacklist.synchronized(blacklist.contains(address.getHostName))
 
-  def isBlacklisted(address: InetSocketAddress): Boolean
+  def knownPeers(): Map[InetSocketAddress, PeerInfo] =
+    whitelistPersistence.keys.flatMap(k => whitelistPersistence.get(k).map(v => k -> v)).toMap
 
-  def remove(address: InetSocketAddress): Boolean
+  def blacklistedPeers(): Seq[String] = blacklist.keys.toSeq
+
+  def isEmpty: Boolean = whitelistPersistence.isEmpty
+
+  def remove(address: InetSocketAddress): Boolean = whitelistPersistence.remove(address).nonEmpty
 }
 
+case class PeerInfo(lastSeen: Long, nodeName: Option[String] = None, connectionType: Option[ConnectionType] = None)

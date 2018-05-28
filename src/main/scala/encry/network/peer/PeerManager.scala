@@ -26,7 +26,7 @@ class PeerManager extends Actor with ScorexLogging {
   //peers before handshake
   val connectingPeers: mutable.Set[InetSocketAddress] = mutable.Set[InetSocketAddress]()
 
-  val peerDatabase: PeerDatabaseImpl = PeerDatabaseImpl(Some(settings.dataDir + "/peers.dat"))
+  val peerDatabase: PeerDatabase = PeerDatabase(Some(settings.dataDir + "/peers.dat"))
 
   var lastIdUsed: Int = 0
 
