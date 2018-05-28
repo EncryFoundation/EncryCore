@@ -82,10 +82,9 @@ class PeerManager extends Actor with ScorexLogging {
         }
       }
     case Handshaked(peer) =>
-      if (peerDatabase.isBlacklisted(peer.socketAddress)) {
+      if (peerDatabase.isBlacklisted(peer.socketAddress))
         log.info(s"Got handshake from blacklisted ${peer.socketAddress}")
-      } else {
-        //drop connection to self if occurred
+       else {
         if (peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress))
           peer.handlerRef ! CloseConnection
         else {
@@ -122,7 +121,6 @@ object PeerManager {
 
     case class AddToBlacklist(remote: InetSocketAddress)
 
-    // peerListOperations messages
     case class AddOrUpdatePeer(address: InetSocketAddress, peerName: Option[String], direction: Option[ConnectionType])
 
     case object KnownPeers
@@ -133,14 +131,12 @@ object PeerManager {
 
     case class FilterPeers(sendingStrategy: SendingStrategy)
 
-    // apiInterface messages
     case object GetConnectedPeers
 
     case object GetAllPeers
 
     case object GetBlacklistedPeers
 
-    // peerCycle messages
     case class DoConnecting(remote: InetSocketAddress, direction: ConnectionType)
 
     case class Handshaked(peer: ConnectedPeer)
