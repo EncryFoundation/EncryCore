@@ -11,7 +11,7 @@ import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec
 import encry.view.mempool.EncryMempool
 import encry.EncryApp._
 import scorex.core.NodeViewHolder._
-import scorex.core.network.NetworkController.ReceivableMessages.SendToNetwork
+import encry.network.NetworkController.ReceivableMessages.SendToNetwork
 import scorex.core.network.NetworkControllerSharedMessages.ReceivableMessages.DataFromPeer
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallySuccessfulModifier}
 import scorex.core.network.message.BasicMsgDataTypes.ModifiersData

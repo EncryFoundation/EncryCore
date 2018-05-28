@@ -1,4 +1,4 @@
-package scorex.core.network
+package encry.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
 
@@ -8,26 +8,26 @@ import akka.io.Tcp._
 import akka.io.{IO, Tcp}
 import akka.pattern.ask
 import akka.util.Timeout
+import encry.EncryApp._
+import scorex.core.network._
 import scorex.core.network.message.Message.MessageCode
 import scorex.core.network.message.{Message, MessageSpec}
 import scorex.core.settings.NetworkSettings
 import scorex.core.utils.ScorexLogging
-import encry.EncryApp._
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.language.existentials
+import scala.language.{existentials, postfixOps}
 import scala.util.{Failure, Success, Try}
-import scala.language.postfixOps
 
 
 class NetworkController extends Actor with ScorexLogging {
 
   import NetworkController.ReceivableMessages._
   import NetworkControllerSharedMessages.ReceivableMessages.DataFromPeer
-  import scorex.core.network.peer.PeerManager.ReceivableMessages.{CheckPeers, FilterPeers, Disconnected}
   import PeerConnectionHandler.ReceivableMessages.CloseConnection
+  import scorex.core.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 
   val networkSettings: NetworkSettings = settings.network
 
