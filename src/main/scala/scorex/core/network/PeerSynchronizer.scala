@@ -18,7 +18,7 @@ import scala.language.postfixOps
 class PeerSynchronizer(val networkControllerRef: ActorRef, peerManager: ActorRef, settings: NetworkSettings) extends Actor with ScorexLogging {
 
   import scorex.core.network.NetworkControllerSharedMessages.ReceivableMessages.DataFromPeer
-  import scorex.core.network.peer.PeerManager.ReceivableMessages.{RandomPeers, AddOrUpdatePeer}
+  import encry.network.peer.PeerManager.ReceivableMessages.{RandomPeers, AddOrUpdatePeer}
   import scorex.core.network.NetworkController.ReceivableMessages.{SendToNetwork, RegisterMessagesHandler}
 
 

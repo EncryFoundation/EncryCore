@@ -31,7 +31,7 @@ class NetworkController(settings: NetworkSettings,
 
   import NetworkController.ReceivableMessages._
   import NetworkControllerSharedMessages.ReceivableMessages.DataFromPeer
-  import scorex.core.network.peer.PeerManager.ReceivableMessages.{CheckPeers, FilterPeers, Disconnected}
+  import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, FilterPeers, Disconnected}
   import PeerConnectionHandler.ReceivableMessages.CloseConnection
 
   private implicit val system: ActorSystem = context.system

@@ -1,4 +1,4 @@
-package scorex.core.network.peer
+package encry.network.peer
 
 import java.net.InetSocketAddress
 
