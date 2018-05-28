@@ -30,8 +30,7 @@ object StateMode {
 
   val values: Seq[StateMode] = Seq(Utxo, Digest)
 
-  /** This class allows to check the correspondence between concrete instances of [[StateMode]] and [[EncryState]]
-    */
+  /** This class allows to check the correspondence between concrete instances of [[StateMode]] and [[EncryState]] */
   sealed trait Evidence[ST <: StateMode, S <: EncryState[S]]
 
   implicit object UtxoEvidence extends Evidence[UtxoMode, UtxoState]

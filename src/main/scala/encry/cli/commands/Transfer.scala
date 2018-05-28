@@ -25,8 +25,9 @@ object Transfer extends Command {
 
   /**
     * Command "wallet transfer -addr=<addr[String]> -fee=<fee[Num]> -amount=<amount[Num]>"
-    * Example "wallet transfer -addr='3jSD9fwHEHJwHq99ARqhnNhqGXeKnkJMyX4FZjHV6L3PjbCmjG' -fee=100 -amount=2000"
+    * Example "wallet transfer -addr='3jSD9fwHEHJwHq99ARqhnNhqGXeKnkJMyX4FZjHV6L3PjbCmjG' -fee=10000 -amount=2000"
     */
+  // TODO: Notify `Vault` of spent boxes.
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
     (nodeViewHolder ?

@@ -6,6 +6,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.mempool.EncryBaseTransaction
 import encry.settings.{Algos, Constants, NodeSettings}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.VersionTag
@@ -15,9 +16,7 @@ import scorex.crypto.authds.ADDigest
 
 import scala.util.{Failure, Success, Try}
 
-/**
-  * Minimal state variant which is storing only digest of UTXO authenticated as a dynamic dictionary.
-  */
+/** Minimal state variant which is storing only digest of UTXO authenticated as a dynamic dictionary. */
 class DigestState protected(override val version: VersionTag,
                             override val rootHash: ADDigest,
                             val stateStore: Store,
@@ -37,8 +36,8 @@ class DigestState protected(override val version: VersionTag,
         if (!ADProofs.proofDigest(block.adProofsOpt.get.proofBytes).sameElements(block.header.adProofsRoot))
           Failure(new Exception(s"Got invalid Proof for block: $block"))
 
-        val txs = block.payload.transactions
-        val declaredHash = block.header.stateRoot
+        val txs: Seq[EncryBaseTransaction] = block.payload.transactions
+        val declaredHash: ADDigest = block.header.stateRoot
 
         txs.foldLeft(Success(): Try[Unit]) { case (status, tx) =>
           status.flatMap(_ => tx.semanticValidity)
@@ -57,7 +56,7 @@ class DigestState protected(override val version: VersionTag,
   }
 
   private def update(newVersion: VersionTag, newRootHash: ADDigest): Try[DigestState] = Try {
-    val wrappedVersion = ByteArrayWrapper(newVersion)
+    val wrappedVersion: ByteArrayWrapper = ByteArrayWrapper(newVersion)
     stateStore.update(wrappedVersion, toRemove = Seq(), toUpdate = Seq(wrappedVersion -> ByteArrayWrapper(newRootHash)))
     new DigestState(newVersion, newRootHash, stateStore, settings)
   }
@@ -79,10 +78,10 @@ class DigestState protected(override val version: VersionTag,
 
   override def rollbackTo(version: VersionTag): Try[DigestState] = {
     log.info(s"Rollback Digest State to version ${Algos.encoder.encode(version)}")
-    val wrappedVersion = ByteArrayWrapper(version)
+    val wrappedVersion: ByteArrayWrapper = ByteArrayWrapper(version)
     Try(stateStore.rollback(wrappedVersion)).map { _ =>
       stateStore.clean(Constants.DefaultKeepVersions)
-      val rootHash = ADDigest @@ stateStore.get(wrappedVersion).get.data
+      val rootHash: ADDigest = ADDigest @@ stateStore.get(wrappedVersion).get.data
       log.info(s"Rollback to version ${Algos.encoder.encode(version)} with roothash ${Algos.encoder.encode(rootHash)}")
       new DigestState(version, rootHash, stateStore, settings)
     }
@@ -105,13 +104,13 @@ object DigestState {
         if (store.lastVersionID.isDefined && store.lastVersionID.forall(_.data sameElements version)) {
           new DigestState(version, rootHash, store, settings)
         } else {
-          val inVersion = VersionTag @@ store.lastVersionID.map(_.data).getOrElse(version)
+          val inVersion: VersionTag = VersionTag @@ store.lastVersionID.map(_.data).getOrElse(version)
           new DigestState(inVersion, rootHash, store, settings).update(version, rootHash).get //sync store
         }.ensuring(store.lastVersionID.get.data.sameElements(version))
 
       case (None, None) =>
-        val version = VersionTag @@ store.lastVersionID.get.data
-        val rootHash = store.get(ByteArrayWrapper(version)).get.data
+        val version: VersionTag = VersionTag @@ store.lastVersionID.get.data
+        val rootHash: Array[Byte] = store.get(ByteArrayWrapper(version)).get.data
 
         new DigestState(version, ADDigest @@ rootHash, store, settings)
 

@@ -45,7 +45,7 @@ object CoinbaseDirective {
   ).asJson
 
   implicit val jsonDecoder: Decoder[CoinbaseDirective] = (c: HCursor) => for {
-    height <- c.downField("heigth").as[Int]
+    height <- c.downField("height").as[Int]
   } yield {
     CoinbaseDirective(
       Height @@ height
