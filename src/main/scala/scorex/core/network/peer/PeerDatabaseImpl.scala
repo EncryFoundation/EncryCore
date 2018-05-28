@@ -8,7 +8,7 @@ import scala.collection.mutable
 
 
 //todo: persistence
-class PeerDatabaseImpl(filename: Option[String]) extends PeerDatabase {
+case class PeerDatabaseImpl(filename: Option[String]) extends PeerDatabase {
 
   private val whitelistPersistence = mutable.Map[InetSocketAddress, PeerInfo]()
 
@@ -32,9 +32,8 @@ class PeerDatabaseImpl(filename: Option[String]) extends PeerDatabase {
     blacklist.synchronized(blacklist.contains(address.getHostName))
   }
 
-  override def knownPeers(): Map[InetSocketAddress, PeerInfo] = {
+  override def knownPeers(): Map[InetSocketAddress, PeerInfo] =
     whitelistPersistence.keys.flatMap(k => whitelistPersistence.get(k).map(v => k -> v)).toMap
-  }
 
   override def blacklistedPeers(): Seq[String] = blacklist.keys.toSeq
 

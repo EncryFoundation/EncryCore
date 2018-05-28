@@ -27,7 +27,7 @@ import scorex.core.network.{NetworkControllerRef, UPnP}
 import scorex.core.network.message._
 import scorex.core.settings.ScorexSettings
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
-import scorex.core.network.peer.PeerManagerRef
+import scorex.core.network.peer.PeerManager
 
 import scala.concurrent.ExecutionContextExecutor
 import scala.io.Source
@@ -42,7 +42,7 @@ object EncryApp extends App with ScorexLogging {
 
   lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(args.headOption)
 
-  implicit val settings: ScorexSettings = encrySettings.scorexSettings
+  implicit lazy val settings: ScorexSettings = encrySettings.scorexSettings
 
   implicit def exceptionHandler: ExceptionHandler = ApiErrorHandler.exceptionHandler
 
@@ -74,7 +74,7 @@ object EncryApp extends App with ScorexLogging {
 
   lazy val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ additionalMessageSpecs)
 
-  val peerManager: ActorRef = PeerManagerRef(settings, timeProvider)
+  val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
 
   lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props(), "nodeViewHolder")
 

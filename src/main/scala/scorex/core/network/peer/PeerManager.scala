@@ -2,11 +2,10 @@ package scorex.core.network.peer
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.Actor
 import scorex.core.network._
-import scorex.core.settings.ScorexSettings
-import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
-
+import scorex.core.utils.ScorexLogging
+import encry.EncryApp._
 import scala.collection.mutable
 import scala.util.Random
 
@@ -14,7 +13,7 @@ import scala.util.Random
   * Peer manager takes care of peers connected and in process, and also chooses a random peer to connect
   * Must be singleton
   */
-class PeerManager(settings: ScorexSettings, timeProvider: NetworkTimeProvider) extends Actor with ScorexLogging {
+class PeerManager extends Actor with ScorexLogging {
 
   import PeerManager.ReceivableMessages._
   import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
@@ -22,78 +21,51 @@ class PeerManager(settings: ScorexSettings, timeProvider: NetworkTimeProvider) e
   import scorex.core.network.PeerConnectionHandler.ReceivableMessages.{StartInteraction, CloseConnection}
 
   //peers after successful handshake
-  private val connectedPeers = mutable.Map[InetSocketAddress, ConnectedPeer]()
+  val connectedPeers: mutable.Map[InetSocketAddress, ConnectedPeer] = mutable.Map[InetSocketAddress, ConnectedPeer]()
 
   //peers before handshake
-  private val connectingPeers = mutable.Set[InetSocketAddress]()
+  val connectingPeers: mutable.Set[InetSocketAddress] = mutable.Set[InetSocketAddress]()
 
-  private lazy val peerDatabase = new PeerDatabaseImpl(Some(settings.dataDir + "/peers.dat"))
+  val peerDatabase: PeerDatabaseImpl = PeerDatabaseImpl(Some(settings.dataDir + "/peers.dat"))
 
-  private var lastIdUsed = 0
+  var lastIdUsed: Int = 0
 
-  if (peerDatabase.isEmpty()) {
-    settings.network.knownPeers.foreach { address =>
-      if (!isSelf(address, None)) {
-        val defaultPeerInfo = PeerInfo(timeProvider.time(), None)
-        peerDatabase.addOrUpdateKnownPeer(address, defaultPeerInfo)
-      }
-    }
+  if (peerDatabase.isEmpty()) settings.network.knownPeers.foreach { address =>
+    if (!isSelf(address, None)) peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), None))
   }
 
-  private def randomPeer(): Option[InetSocketAddress] = {
-    val peers = peerDatabase.knownPeers().keys.toSeq
+  def randomPeer(): Option[InetSocketAddress] = {
+    val peers: Seq[InetSocketAddress] = peerDatabase.knownPeers().keys.toSeq
     if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
     else None
   }
 
-  private def peerListOperations: Receive = {
+  def peerListOperations: Receive = {
+
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
-      if (!isSelf(address, None)) {
-        val peerInfo = PeerInfo(timeProvider.time(), peerNameOpt, connTypeOpt)
-        peerDatabase.addOrUpdateKnownPeer(address, peerInfo)
-      }
-
-    case KnownPeers =>
-      sender() ! peerDatabase.knownPeers().keys.toSeq
-
-    case RandomPeer =>
-      sender() ! randomPeer()
-
-    case RandomPeers(howMany: Int) =>
-      sender() ! Random.shuffle(peerDatabase.knownPeers().keys.toSeq).take(howMany)
-
-    case FilterPeers(sendingStrategy: SendingStrategy) =>
-      sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
+      if (!isSelf(address, None)) peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), peerNameOpt, connTypeOpt))
+    case KnownPeers => sender() ! peerDatabase.knownPeers().keys.toSeq
+    case RandomPeer => sender() ! randomPeer()
+    case RandomPeers(howMany: Int) => sender() ! Random.shuffle(peerDatabase.knownPeers().keys.toSeq).take(howMany)
+    case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
   }
 
   def apiInterface: Receive = {
-    case GetConnectedPeers =>
-      sender() ! (connectedPeers.values.map(_.handshake).toSeq: Seq[Handshake])
 
-    case GetAllPeers =>
-      sender() ! peerDatabase.knownPeers()
-
-    case GetBlacklistedPeers =>
-      sender() ! peerDatabase.blacklistedPeers()
-
-//    case Subscribe(listener, events) =>
-//      events.foreach { evt =>
-//        val current = subscribers.getOrElse(evt, Seq())
-//        subscribers.put(evt, current :+ listener)
-//      }
+    case GetConnectedPeers => sender() ! (connectedPeers.values.map(_.handshake).toSeq: Seq[Handshake])
+    case GetAllPeers => sender() ! peerDatabase.knownPeers()
+    case GetBlacklistedPeers => sender() ! peerDatabase.blacklistedPeers()
   }
-
 
   /**
     * Given a peer's address and declared address, returns `true` iff the peer is the same is this node.
     */
-  def isSelf(address: InetSocketAddress, declaredAddress: Option[InetSocketAddress]): Boolean = {
-    // TODO: should the peer really be considered the same as self iff one of the following conditions hold?? Check carefully.
+  def isSelf(address: InetSocketAddress, declaredAddress: Option[InetSocketAddress]): Boolean =
+  // TODO: should the peer really be considered the same as self iff one of the following conditions hold?? Check carefully.
     settings.network.bindAddress == address ||
       settings.network.declaredAddress.exists(da => declaredAddress.contains(da)) ||
       declaredAddress.contains(settings.network.bindAddress) ||
       settings.network.declaredAddress.contains(address)
-  }
 
   def peerCycle: Receive = connecting orElse handshaked orElse disconnected
 
@@ -126,14 +98,11 @@ class PeerManager(settings: ScorexSettings, timeProvider: NetworkTimeProvider) e
         log.info(s"Got handshake from blacklisted ${peer.socketAddress}")
       } else {
         //drop connection to self if occurred
-        if (peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress)) {
+        if (peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress))
           peer.handlerRef ! CloseConnection
-        } else {
-          if (peer.publicPeer) {
-            self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
-          } else {
-            peerDatabase.remove(peer.socketAddress)
-          }
+        else {
+          if (peer.publicPeer) self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
+          else peerDatabase.remove(peer.socketAddress)
           connectedPeers += peer.socketAddress -> peer
           context.system.eventStream.publish(HandshakedPeer(peer))
         }
@@ -162,42 +131,43 @@ class PeerManager(settings: ScorexSettings, timeProvider: NetworkTimeProvider) e
     case AddToBlacklist(peer) =>
       log.info(s"Blacklist peer $peer")
       peerDatabase.blacklistPeer(peer, timeProvider.time())
-      // todo: shouldn't peer be removed from `connectedPeers` when it is blacklisted?
+    // todo: shouldn't peer be removed from `connectedPeers` when it is blacklisted?
   }: Receive) orElse peerListOperations orElse apiInterface orElse peerCycle
 }
 
 object PeerManager {
 
   object ReceivableMessages {
+
     case object CheckPeers
+
     case class AddToBlacklist(remote: InetSocketAddress)
 
     // peerListOperations messages
     case class AddOrUpdatePeer(address: InetSocketAddress, peerName: Option[String], direction: Option[ConnectionType])
+
     case object KnownPeers
+
     case object RandomPeer
+
     case class RandomPeers(hawMany: Int)
+
     case class FilterPeers(sendingStrategy: SendingStrategy)
 
     // apiInterface messages
     case object GetConnectedPeers
+
     case object GetAllPeers
+
     case object GetBlacklistedPeers
 
     // peerCycle messages
     case class DoConnecting(remote: InetSocketAddress, direction: ConnectionType)
+
     case class Handshaked(peer: ConnectedPeer)
+
     case class Disconnected(remote: InetSocketAddress)
+
   }
-}
 
-object PeerManagerRef {
-  def props(settings: ScorexSettings, timeProvider: NetworkTimeProvider): Props =
-    Props(new PeerManager(settings, timeProvider))
-
-  def apply(settings: ScorexSettings, timeProvider: NetworkTimeProvider)
-           (implicit system: ActorSystem): ActorRef = system.actorOf(props(settings, timeProvider))
-
-  def apply(name: String, settings: ScorexSettings, timeProvider: NetworkTimeProvider)
-           (implicit system: ActorSystem): ActorRef = system.actorOf(props(settings, timeProvider), name)
 }
