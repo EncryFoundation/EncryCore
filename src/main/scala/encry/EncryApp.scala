@@ -21,7 +21,7 @@ import encry.modifiers.state.box.proposition.EncryProposition
 import encry.network.{EncryNodeViewSynchronizer, NetworkController}
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncrySyncInfoMessageSpec
-import encry.view.{EncryNodeViewHolder, EncryReadersHolderRef}
+import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import scorex.core.api.http._
 import scorex.core.network.UPnP
 import scorex.core.network.message._
@@ -78,7 +78,7 @@ object EncryApp extends App with ScorexLogging {
 
   lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props(), "nodeViewHolder")
 
-  val readersHolder: ActorRef = EncryReadersHolderRef(nodeViewHolder)
+  val readersHolder: ActorRef = system.actorOf(Props[EncryViewReadersHolder], "readersHolder")
 
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController], "networkController")
 
