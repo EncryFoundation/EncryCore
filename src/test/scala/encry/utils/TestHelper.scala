@@ -1,4 +1,4 @@
-package encry.local
+package encry.utils
 
 import java.io.{File, FileWriter}
 

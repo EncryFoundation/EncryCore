@@ -2,7 +2,7 @@ package encry.modifiers.state
 
 import encry.account.Account
 import encry.crypto.{PrivateKey25519, PublicKey25519}
-import encry.local.TestHelper
+import encry.utils.TestHelper
 
 trait Keys {
 

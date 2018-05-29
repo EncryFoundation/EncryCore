@@ -1,6 +1,6 @@
 package encry.view.wallet
 
-import encry.local.TestHelper.Props
+import encry.utils.TestHelper.Props
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.payload.EncryBlockPayload
