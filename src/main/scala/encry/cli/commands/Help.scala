@@ -15,6 +15,8 @@ object Help extends Command {
         |Group name    Command          Argument       Meaning
         |--------------------------------------------------------------------------------
         |node          shutdown         None           Shutdown the node
+        |node          stopMining       None           Node stops mining
+        |node          startMining      None           Node starts mining
         |wallet        pubKeys          None           Print available public keys
         |wallet        addrs            None           Print available addresses
         |wallet        init             seed           Init storage with seed

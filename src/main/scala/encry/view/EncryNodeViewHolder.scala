@@ -64,7 +64,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
       context.system.eventStream.publish(FailedTransaction[EncryProposition, EncryBaseTransaction](tx, e))
   }
 
-  override protected def genesisState: (EncryHistory, MS, EncryWallet, EncryMempool) = {
+  override protected def genesisState: (EncryHistory, StateType, EncryWallet, EncryMempool) = {
     val stateDir: File = EncryState.getStateDir(encrySettings)
     stateDir.mkdir()
 
@@ -73,7 +73,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
     val state: StateType = {
       if (encrySettings.nodeSettings.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, encrySettings.nodeSettings)
       else EncryState.generateGenesisUtxoState(stateDir, Some(self))._1
-    }.asInstanceOf[MS]
+    }.asInstanceOf[StateType]
 
     val history: EncryHistory = EncryHistory.readOrGenerate(encrySettings, timeProvider)
 
@@ -92,7 +92,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
     val history: EncryHistory = EncryHistory.readOrGenerate(encrySettings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(encrySettings)
     val memPool: EncryMempool = EncryMempool.empty(encrySettings, timeProvider)
-    val state: StateType = restoreConsistentState(EncryState.readOrGenerate(encrySettings, Some(self)).asInstanceOf[MS], history)
+    val state: StateType = restoreConsistentState(EncryState.readOrGenerate(encrySettings, Some(self)).asInstanceOf[StateType], history)
     Some((history, state, wallet, memPool))
   } else None
 
