@@ -24,20 +24,13 @@ class EncryViewReadersHolder extends Actor with ScorexLogging {
   override def receive: Receive = {
     case ChangedHistory(reader: EncryHistoryReader@unchecked) if reader.isInstanceOf[EncryHistoryReader] =>
       historyReaderOpt = Some(reader)
-
     case ChangedState(reader: UtxoStateReader@unchecked) if reader.isInstanceOf[UtxoStateReader] =>
       stateReaderOpt = Some(reader)
-
     case ChangedMempool(reader: EncryMempoolReader@unchecked) if reader.isInstanceOf[EncryMempoolReader] =>
       mempoolReaderOpt = Some(reader)
-
-    case GetReaders =>
-      sender ! Readers(historyReaderOpt, stateReaderOpt, mempoolReaderOpt)
-
-    case GetDataFromHistory(f) =>
-      historyReaderOpt.foreach(sender ! f(_))
-
-    case _ => // Do nothing.
+    case GetReaders => sender ! Readers(historyReaderOpt, stateReaderOpt, mempoolReaderOpt)
+    case GetDataFromHistory(f) => historyReaderOpt.foreach(sender ! f(_))
+    case _ =>
   }
 }
 
@@ -48,4 +41,5 @@ object EncryViewReadersHolder {
   case object GetReaders
 
   case class Readers(h: Option[EncryHistoryReader], s: Option[UtxoStateReader], m: Option[EncryMempoolReader])
+
 }
