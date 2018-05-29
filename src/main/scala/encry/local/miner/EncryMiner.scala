@@ -153,7 +153,7 @@ class EncryMiner extends Actor with ScorexLogging {
       EncryBlockHeader.getMessageToSign(derivedFields._1, minerSecret.publicImage, derivedFields._2,
         derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, nBits))
 
-    val candidate: CandidateBlock = new CandidateBlock(minerSecret.publicImage,
+    val candidate: CandidateBlock = CandidateBlock(minerSecret.publicImage,
       blockSignature, bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, nBits)
 
     log.debug(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +

@@ -8,13 +8,15 @@ import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.state.box.EncryBaseBox
+import encry.modifiers.state.box.{CoinbaseBox, EncryBaseBox}
 import encry.modifiers.state.box.proposition.{AccountProposition, EncryProposition, HeightProposition}
 import encry.settings.{Algos, Constants, EncryAppSettings}
 import encry.utils.{BalanceCalculator, BoxFilter}
+import encry.view.history.Height
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
+import scorex.core.transaction.box.Box.Amount
 import scorex.core.transaction.wallet.Vault
 import scorex.core.utils.ScorexLogging
 import scorex.core.{ModifierId, VersionTag}
@@ -24,14 +26,12 @@ import scorex.utils.Random
 import scala.util.Try
 
 class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
-  extends Wallet
-    with Vault[EncryProposition, EncryBaseTransaction, EncryPersistentModifier, EncryWallet]
+  extends Vault[EncryProposition, EncryBaseTransaction, EncryPersistentModifier, EncryWallet]
     with ScorexLogging {
 
-  //override type NVCT = this.type
+  val propositions: Set[AccountProposition] = publicKeys.map(pk => AccountProposition(Account(pk.pubKeyBytes)))
 
-  def secretByPublicImage(publicImage: PublicKey25519): Option[PrivateKey25519] =
-    keyManager.keys.find(k => k.publicImage.address == publicImage.address)
+  val walletStorage: WalletStorage = new WalletStorage(walletStore, publicKeys)
 
   def secrets: Set[PrivateKey25519] = keyManager.keys.toSet
 
@@ -39,9 +39,6 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
     case (set, key) => set :+ PublicKey25519(key.publicKeyBytes)
   }.toSet
 
-  val walletStorage: WalletStorage = new WalletStorage(walletStore, publicKeys)
-
-  val propositions: Set[AccountProposition] = publicKeys.map(pk => AccountProposition(Account(pk.pubKeyBytes)))
 
   override def scanOffchain(tx: EncryBaseTransaction): EncryWallet = this
 
@@ -95,29 +92,26 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
     }
   }
 
-  override def rollback(to: VersionTag): Try[EncryWallet] = {
-    val wrappedVersion = ByteArrayWrapper(to)
-    Try(walletStore.rollback(wrappedVersion)).map(_ => this)
-  }
+  override def rollback(to: VersionTag): Try[EncryWallet] = Try(walletStore.rollback(ByteArrayWrapper(to))).map(_ => this)
 
   private def calculateNewBalance(bxs: Seq[EncryBaseBox]): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
 
     import WalletStorage._
 
-    val bObj = BalanceCalculator.balanceSheet(bxs)
+    val bObj: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxs)
 
-    val prevBoxes = getBalances
+    val prevBoxes: Seq[(ADKey, Amount)] = getBalances
 
-    val newBalanceSheet = bObj.map(tokenInfo =>
-      tokenInfo._1 -> (tokenInfo._2 + prevBoxes.find(ti => ti._1 == tokenInfo._1).getOrElse((ADKey @@ Random.randomBytes(), 0L))._2))
+    val newBalanceSheet: Map[ADKey, Amount] = bObj.map(tokenInfo => tokenInfo._1 -> (tokenInfo._2 + prevBoxes
+      .find(ti => ti._1 == tokenInfo._1).getOrElse((ADKey @@ Random.randomBytes(), 0L))._2))
 
-    val decodedTokenBalance = newBalanceSheet.foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()) {
-      case (seq, (tId, balance)) =>
-        seq :+ (ByteArrayWrapper(tId) -> ByteArrayWrapper(Longs.toByteArray(balance)))
-    }
+    val decodedTokenBalance: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
+      newBalanceSheet.foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()) {
+        case (seq, (tId, balance)) => seq :+ (ByteArrayWrapper(tId) -> ByteArrayWrapper(Longs.toByteArray(balance)))
+      }
 
-    decodedTokenBalance ++ Seq(tokensIdsKey -> ByteArrayWrapper(bObj.keys.foldLeft(Array.empty[Byte]) { case (acc, k) =>
-      acc ++ k
+    decodedTokenBalance ++ Seq(tokensIdsKey -> ByteArrayWrapper(bObj.keys.foldLeft(Array.empty[Byte]) {
+      case (acc, k) => acc ++ k
     }))
   }
 
@@ -146,7 +140,8 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
     val openBxIdsPacked: ByteArrayWrapper = walletStorage.packBoxIds(openBxsIdsCurrent.filter(id =>
       !spentOpenBxsIds.exists(_ sameElements id)) ++ openBxsToInsert.map(_.id))
 
-    val newBalance = calculateNewBalance(BoxFilter.filterAmountCarryingBxs(availableBoxes.filter(bx =>
+    val newBalance: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
+      calculateNewBalance(BoxFilter.filterAmountCarryingBxs(availableBoxes.filter(bx =>
       !spentBxsIds.exists(_ sameElements bx.id))) ++ BoxFilter.filterAmountCarryingBxs(bxsToInsert))
 
     val toRemoveSummary = (spentBxsIds ++ spentOpenBxsIds).map(keyByBoxId)
@@ -157,6 +152,23 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
         newTxs.map(tx => txKeyById(tx.id) -> ByteArrayWrapper(tx.bytes))
 
     walletStorage.update(ByteArrayWrapper(modifierId), toRemoveSummary, toInsertSummary)
+  }
+
+  def availableBoxes: Seq[EncryBaseBox] = walletStorage.allBoxes
+
+  def getAvailableCoinbaseBoxesAt(h: Height): Seq[CoinbaseBox] =
+    walletStorage.openBoxIds.foldLeft(Seq[CoinbaseBox]()) { case (acc, id) =>
+      walletStorage.getBoxById(id).map {
+        case bx: CoinbaseBox if bx.proposition.height <= h => acc :+ bx
+        case _ => acc
+      }.getOrElse(acc)
+    }
+
+  def getBalances: Seq[(ADKey, Long)] = walletStorage.getTokensId.foldLeft(Seq[(ADKey, Long)]()) {
+    case (seq, tokenId) => walletStorage.getTokenBalanceById(tokenId) match {
+      case Some(v) => seq :+ (tokenId, v)
+      case None => seq
+    }
   }
 }
 
