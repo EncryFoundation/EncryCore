@@ -1,19 +1,20 @@
 package encry.view
 
-import akka.actor.{Actor, ActorRef, ActorRefFactory, Props}
+import akka.actor.Actor
 import encry.view.EncryViewReadersHolder.{GetDataFromHistory, GetReaders, Readers}
 import encry.view.history.EncryHistoryReader
 import encry.view.mempool.EncryMempoolReader
 import encry.view.state.UtxoStateReader
+import encry.EncryApp._
 import scorex.core.NodeViewHolder.ReceivableMessages.GetNodeViewChanges
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, NodeViewChange}
 import scorex.core.utils.ScorexLogging
 
-class EncryViewReadersHolder(viewHolderRef: ActorRef) extends Actor with ScorexLogging {
+class EncryViewReadersHolder extends Actor with ScorexLogging {
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
-    viewHolderRef ! GetNodeViewChanges(history = true, state = true, vault = true, mempool = true)
+    nodeViewHolder ! GetNodeViewChanges(history = true, state = true, vault = true, mempool = true)
   }
 
   var historyReaderOpt: Option[EncryHistoryReader] = None
@@ -47,18 +48,4 @@ object EncryViewReadersHolder {
   case object GetReaders
 
   case class Readers(h: Option[EncryHistoryReader], s: Option[UtxoStateReader], m: Option[EncryMempoolReader])
-}
-
-object EncryReadersHolderRef {
-
-  def props(viewHolderRef: ActorRef): Props = Props(new EncryViewReadersHolder(viewHolderRef))
-
-  def apply(viewHolderRef: ActorRef)
-           (implicit context: ActorRefFactory): ActorRef =
-    context.actorOf(props(viewHolderRef))
-
-  def apply(viewHolderRef: ActorRef,
-            name: String)
-           (implicit context: ActorRefFactory): ActorRef =
-    context.actorOf(props(viewHolderRef), name)
 }
