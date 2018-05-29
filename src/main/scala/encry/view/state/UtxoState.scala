@@ -24,7 +24,7 @@ import scorex.core.VersionTag
 import scorex.core.transaction.box.Box.Amount
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.avltree.batch._
-import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
+import scorex.crypto.authds._
 import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Success, Try}
@@ -192,8 +192,10 @@ object UtxoState extends ScorexLogging {
     new UtxoState(VersionTag @@ stateVersion, Height @@ stateHeight, stateStore, lastBlockTimestamp, nodeViewHolderRef)
   }
 
-  private def metadata(modId: VersionTag, stateRoot: ADDigest,
-                       height: Height, blockTimestamp: Long): Seq[(Array[Byte], Array[Byte])] = {
+  private def metadata(modId: VersionTag,
+                       stateRoot: ADDigest,
+                       height: Height,
+                       blockTimestamp: Long): Seq[(Array[Byte], Array[Byte])] = {
     val idStateDigestIdxElem: (Array[Byte], Array[Byte]) = modId -> stateRoot
     val stateDigestIdIdxElem: (Digest32, VersionTag) = Algos.hash(stateRoot) -> modId
     val bestVersion: (Digest32, VersionTag) = bestVersionKey -> modId
