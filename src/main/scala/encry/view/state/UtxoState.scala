@@ -69,7 +69,7 @@ class UtxoState(override val version: VersionTag,
 
       applyTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] =
-          metadata(VersionTag @@ block.id, block.header.stateRoot,Height @@ block.header.height, block.header.timestamp)
+          metadata(VersionTag @@ block.id, block.header.stateRoot, Height @@ block.header.height, block.header.timestamp)
         val proofBytes: SerializedAdProof = persistentProver.generateProofAndUpdateStorage(meta)
         val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
 
@@ -102,13 +102,9 @@ class UtxoState(override val version: VersionTag,
   def proofsForTransactions(txs: Seq[EncryBaseTransaction]): Try[(SerializedAdProof, ADDigest)] = {
     log.debug(s"Generating proof for ${txs.length} transactions ...")
     val rootHash: ADDigest = persistentProver.digest
-    if (txs.isEmpty) {
-      Failure(new Exception("Got empty transaction sequence"))
-    } else if (!storage.version.exists(_.sameElements(rootHash))) {
-      Failure(new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}"))
-    } else {
-      persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
-    }
+    if (txs.isEmpty) Failure(new Exception("Got empty transaction sequence"))
+    else if (!storage.version.exists(_.sameElements(rootHash))) Failure(new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}"))
+    else persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
   }
 
   override def rollbackTo(version: VersionTag): Try[UtxoState] = {
@@ -141,13 +137,13 @@ class UtxoState(override val version: VersionTag,
     *
     * Transaction validation algorithm:
     * 0. Check semantic validity of transaction
-    *    For each box referenced in transaction:
+    * For each box referenced in transaction:
     * 1. Check if box is in the state
     * 2. Parse box from the state storage
     * 3. Try to unlock the box, providing appropriate context and proof
-    *    For all asset types:
+    * For all asset types:
     * 4. Make sure inputs.sum >= outputs.sum
-   */
+    */
   override def validate(tx: EncryBaseTransaction): Try[Unit] =
     tx.semanticValidity.map { _: Unit =>
 
@@ -159,12 +155,12 @@ class UtxoState(override val version: VersionTag,
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
         .map(t => t.toOption -> u.proofOpt)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, proofOpt)) =>
         (bxOpt, proofOpt, tx.defaultProofOpt) match {
-            // If `proofOpt` from unlocker is `None` then `defaultProofOpt` is used.
-            case (Some(bx), Some(proof), _) if bx.proposition.unlockTry(proof).isSuccess => acc :+ bx
-            case (Some(bx), _, Some(defaultProof)) if bx.proposition.unlockTry(defaultProof).isSuccess => acc :+ bx
-            case _ => throw TransactionValidationException(s"Failed to spend some boxes referenced in $tx")
-          }
+          // If `proofOpt` from unlocker is `None` then `defaultProofOpt` is used.
+          case (Some(bx), Some(proof), _) if bx.proposition.unlockTry(proof).isSuccess => acc :+ bx
+          case (Some(bx), _, Some(defaultProof)) if bx.proposition.unlockTry(defaultProof).isSuccess => acc :+ bx
+          case _ => throw TransactionValidationException(s"Failed to spend some boxes referenced in $tx")
         }
+      }
 
       val validBalance: Boolean = {
         val debitB: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxs, excludeCoinbase = false)

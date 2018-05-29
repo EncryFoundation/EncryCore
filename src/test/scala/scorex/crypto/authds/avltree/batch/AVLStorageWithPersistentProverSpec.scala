@@ -8,7 +8,7 @@ import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.utils.Random
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Try}
 
 class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
 
@@ -29,13 +29,9 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
 
   def getProof(mods: Seq[Modification]): Try[(SerializedAdProof, ADDigest)] = {
     val rootHash: ADDigest = persistentProver.digest
-    if (mods.isEmpty) {
-      Failure(new Exception("Got empty modification sequence"))
-    } else if (!storage.version.exists(_.sameElements(rootHash))) {
-      Failure(new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}"))
-    } else {
-      persistentProver.avlProver.generateProofForOperations(mods)
-    }
+    if (mods.isEmpty) Failure(new Exception("Got empty modification sequence"))
+    else if (!storage.version.exists(_.sameElements(rootHash))) Failure(new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}"))
+    else persistentProver.avlProver.generateProofForOperations(mods)
   }
 
   def applyModifications(mods: Seq[Modification]): Unit =
