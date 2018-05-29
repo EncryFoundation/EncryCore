@@ -10,7 +10,7 @@ import io.circe.generic.semiauto._
 import io.circe.syntax._
 import scorex.core.api.http.PeersApiRoute.{BlacklistedPeers, PeerInfoResponse}
 import scorex.core.network.Handshake
-import scorex.core.network.peer.PeerInfo
+import encry.network.peer.PeerInfo
 import scorex.core.settings.RESTApiSettings
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -20,7 +20,7 @@ case class PeersApiRoute(peerManager: ActorRef,
                          override val settings: RESTApiSettings)(implicit val context: ActorRefFactory)
   extends ApiRoute {
 
-  import scorex.core.network.peer.PeerManager.ReceivableMessages.{GetAllPeers, GetConnectedPeers, GetBlacklistedPeers}
+  import encry.network.peer.PeerManager.ReceivableMessages.{GetAllPeers, GetConnectedPeers, GetBlacklistedPeers}
   import encry.network.NetworkController.ReceivableMessages.ConnectTo
 
   override lazy val route: Route = pathPrefix("peers") { allPeers ~ connectedPeers ~ blacklistedPeers ~ connect }
