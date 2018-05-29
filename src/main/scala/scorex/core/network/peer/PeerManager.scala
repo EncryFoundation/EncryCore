@@ -18,7 +18,7 @@ class PeerManager(settings: ScorexSettings, timeProvider: NetworkTimeProvider) e
 
   import PeerManager.ReceivableMessages._
   import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
-  import scorex.core.network.NetworkController.ReceivableMessages.ConnectTo
+  import encry.network.NetworkController.ReceivableMessages.ConnectTo
   import scorex.core.network.PeerConnectionHandler.ReceivableMessages.{StartInteraction, CloseConnection}
 
   //peers after successful handshake
