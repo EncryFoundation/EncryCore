@@ -116,7 +116,7 @@ class UtxoState(override val version: VersionTag,
     log.info(s"Rollback UtxoState to version ${Algos.encoder.encode(version)}")
     stateStore.get(ByteArrayWrapper(version)) match {
       case Some(v) =>
-        val rollbackResult = prover.rollback(ADDigest @@ v.data).map { _ =>
+        val rollbackResult: Try[UtxoState] = prover.rollback(ADDigest @@ v.data).map { _ =>
           val stateHeight: Int = stateStore.get(ByteArrayWrapper(UtxoState.bestHeightKey))
             .map(d => Ints.fromByteArray(d.data)).getOrElse(Constants.Chain.GenesisHeight)
           new UtxoState(version, Height @@ stateHeight, stateStore, lastBlockTimestamp, nodeViewHolderRef) {
@@ -155,7 +155,7 @@ class UtxoState(override val version: VersionTag,
 
       if (tx.fee < tx.minimalFee && !tx.isCoinbase) throw TransactionValidationException(s"Low fee in $tx")
 
-      val bxs = tx.unlockers.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
+      val bxs: IndexedSeq[EncryBaseBox] = tx.unlockers.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
         .map(t => t.toOption -> u.proofOpt)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, proofOpt)) =>
         (bxOpt, proofOpt, tx.defaultProofOpt) match {
@@ -178,19 +178,19 @@ class UtxoState(override val version: VersionTag,
 
 object UtxoState extends ScorexLogging {
 
-  private lazy val bestVersionKey = Algos.hash("best_state_version")
+  private val bestVersionKey: Digest32 = Algos.hash("best_state_version")
 
-  private lazy val bestHeightKey = Algos.hash("state_height")
+  private val bestHeightKey: Digest32 = Algos.hash("state_height")
 
-  private lazy val lastBlockTimeKey = Algos.hash("last_block_timestamp")
+  private val lastBlockTimeKey: Digest32 = Algos.hash("last_block_timestamp")
 
   def create(stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val stateStore = new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions)
-    val stateVersion = stateStore.get(ByteArrayWrapper(bestVersionKey))
+    val stateStore: LSMStore = new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions)
+    val stateVersion: Array[Byte] = stateStore.get(ByteArrayWrapper(bestVersionKey))
       .map(_.data).getOrElse(EncryState.genesisStateVersion)
-    val stateHeight = stateStore.get(ByteArrayWrapper(bestHeightKey))
+    val stateHeight: Int = stateStore.get(ByteArrayWrapper(bestHeightKey))
       .map(d => Ints.fromByteArray(d.data)).getOrElse(Constants.Chain.PreGenesisHeight)
-    val lastBlockTimestamp = stateStore.get(ByteArrayWrapper(lastBlockTimeKey))
+    val lastBlockTimestamp: Amount = stateStore.get(ByteArrayWrapper(lastBlockTimeKey))
       .map(d => Longs.fromByteArray(d.data)).getOrElse(0L)
     new UtxoState(VersionTag @@ stateVersion, Height @@ stateHeight, stateStore, lastBlockTimestamp, nodeViewHolderRef)
   }
@@ -198,10 +198,10 @@ object UtxoState extends ScorexLogging {
   private def metadata(modId: VersionTag, stateRoot: ADDigest,
                        height: Height, blockTimestamp: Long): Seq[(Array[Byte], Array[Byte])] = {
     val idStateDigestIdxElem: (Array[Byte], Array[Byte]) = modId -> stateRoot
-    val stateDigestIdIdxElem = Algos.hash(stateRoot) -> modId
-    val bestVersion = bestVersionKey -> modId
-    val stateHeight = bestHeightKey -> Ints.toByteArray(height)
-    val lastBlockTimestamp = lastBlockTimeKey -> Longs.toByteArray(blockTimestamp)
+    val stateDigestIdIdxElem: (Digest32, VersionTag) = Algos.hash(stateRoot) -> modId
+    val bestVersion: (Digest32, VersionTag) = bestVersionKey -> modId
+    val stateHeight: (Digest32, Array[Byte]) = bestHeightKey -> Ints.toByteArray(height)
+    val lastBlockTimestamp: (Digest32, Array[Byte]) = lastBlockTimeKey -> Longs.toByteArray(blockTimestamp)
 
     Seq(idStateDigestIdxElem, stateDigestIdIdxElem, bestVersion, stateHeight, lastBlockTimestamp)
   }
@@ -222,6 +222,7 @@ object UtxoState extends ScorexLogging {
     }
   }
 
+  /** Controls token supply for particular `height` */
   def supplyBoxesAt(height: Height, seed: Long): CoinbaseBox = {
     val supplyAmount: Long = TokenSupplyController.supplyAt(height)
     CoinbaseBox(HeightProposition(Height @@ (height + Constants.Chain.CoinbaseHeightLock)),

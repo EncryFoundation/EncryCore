@@ -18,12 +18,12 @@ import encry.local.TransactionGenerator
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
-import encry.network.EncryNodeViewSynchronizer.props
+import encry.network.{EncryNodeViewSynchronizer, NetworkController}
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryReadersHolderRef}
 import scorex.core.api.http._
-import scorex.core.network.{NetworkControllerRef, UPnP}
+import scorex.core.network.UPnP
 import scorex.core.network.message._
 import scorex.core.settings.ScorexSettings
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
@@ -80,10 +80,10 @@ object EncryApp extends App with ScorexLogging {
 
   val readersHolder: ActorRef = EncryReadersHolderRef(nodeViewHolder)
 
-  lazy val networkController: ActorRef = NetworkControllerRef("networkController", settings.network,
-    messagesHandler, upnp, peerManager, timeProvider)
+  lazy val networkController: ActorRef = system.actorOf(Props[NetworkController], "networkController")
 
-  val nodeViewSynchronizer: ActorRef = system.actorOf(props(EncrySyncInfoMessageSpec, settings.network), "nodeViewSynchronizer")
+  val nodeViewSynchronizer: ActorRef =
+    system.actorOf(EncryNodeViewSynchronizer.props(EncrySyncInfoMessageSpec, settings.network), "nodeViewSynchronizer")
 
   lazy val miner: ActorRef = system.actorOf(Props[EncryMiner], "miner")
 

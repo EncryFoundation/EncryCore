@@ -21,7 +21,7 @@ case class PeersApiRoute(peerManager: ActorRef,
   extends ApiRoute {
 
   import encry.network.peer.PeerManager.ReceivableMessages.{GetAllPeers, GetConnectedPeers, GetBlacklistedPeers}
-  import scorex.core.network.NetworkController.ReceivableMessages.ConnectTo
+  import encry.network.NetworkController.ReceivableMessages.ConnectTo
 
   override lazy val route: Route = pathPrefix("peers") { allPeers ~ connectedPeers ~ blacklistedPeers ~ connect }
 

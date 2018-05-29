@@ -40,10 +40,12 @@ val loggingDependencies = Seq(
 val testingDependencies = Seq(
   "com.typesafe.akka" %% "akka-testkit" % "2.4.+" % "test",
   "com.typesafe.akka" %% "akka-http-testkit" % akkaVersion % "test",
-  "org.scalatest" %% "scalatest" % "3.0.3" % "test"
+  "org.scalatest" %% "scalatest" % "3.0.3" % "test",
+  "org.scalacheck" %% "scalacheck" % "1.13.+" % "test"
 )
 
 libraryDependencies ++= Seq(
+  "javax.xml.bind" % "jaxb-api" % "2.+",
   "com.lihaoyi" %% "fastparse" % "1.0.0",
   "com.iheart" %% "ficus" % "1.4.2",
   "com.google.guava" % "guava" % "19.+",
@@ -51,8 +53,8 @@ libraryDependencies ++= Seq(
   "org.bouncycastle" % "bcprov-jdk15on" % "1.58",
   "org.whispersystems" % "curve25519-java" % "+",
   "org.rudogma" %% "supertagged" % "1.+",
-  "org.scorexfoundation" %% "avl-iodb" % "0.2.13",
   "org.scorexfoundation" %% "scrypto" % "2.1.1",
+  "org.scorexfoundation" %% "iodb" % "0.3.2",
   "com.storm-enroute" %% "scalameter" % "0.8.+",
   "io.spray" %%  "spray-json" % "1.3.3",
   "io.monix" %% "monix" % "2.3.3",
