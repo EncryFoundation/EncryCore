@@ -25,7 +25,7 @@ import scorex.utils.Random
 
 import scala.util.Try
 
-class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
+case class EncryWallet(walletStore: Store, keyManager: KeyManager)
   extends Vault[EncryProposition, EncryBaseTransaction, EncryPersistentModifier, EncryWallet]
     with ScorexLogging {
 
@@ -163,9 +163,7 @@ object EncryWallet {
 
     val walletDir: File = getWalletDir(settings)
     walletDir.mkdirs()
-
     val walletStore: LSMStore = new LSMStore(walletDir, keepVersions = Constants.DefaultKeepVersions)
-
-    new EncryWallet(walletStore, keyManager = KeyManager.readOrGenerate(settings))
+    EncryWallet(walletStore, keyManager = KeyManager.readOrGenerate(settings))
   }
 }

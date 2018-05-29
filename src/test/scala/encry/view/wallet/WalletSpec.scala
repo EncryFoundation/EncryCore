@@ -29,7 +29,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     keyManager.initStorage(Random.randomBytes())
 
-    val wallet = new EncryWallet(walletStore, keyManager)
+    val wallet = EncryWallet(walletStore, keyManager)
 
     val validTxs = genValidPaymentTxsToAddr(4, keyManager.keys.head.publicImage.address)
 
@@ -68,7 +68,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     keyManager.initStorage(Random.randomBytes())
 
-    val wallet = new EncryWallet(walletStore, keyManager)
+    val wallet = EncryWallet(walletStore, keyManager)
 
     val validTxs = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.keys.head.publicImage.address)
 
