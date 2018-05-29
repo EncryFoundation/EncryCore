@@ -27,6 +27,8 @@ class TransactionGenerator extends Actor with ScorexLogging {
   var limit: Int = encrySettings.testingSettings.epochLimit
   var walletDataOpt: Option[WalletData] = None
 
+  val noLimitMode: Boolean = encrySettings.testingSettings.epochLimit < 0
+
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[ChangedVault])
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
@@ -43,32 +45,31 @@ class TransactionGenerator extends Actor with ScorexLogging {
       log.info("Starting transaction generation")
       isActive = true
       context.system.scheduler.scheduleOnce(500.millis)(self ! FetchWalletData)
-      context.system.scheduler.scheduleOnce(1500.millis)(self ! GenerateTransactions)
+      context.system.scheduler.scheduleOnce(1500.millis)(self ! GenerateTransaction)
 
     case StopGeneration =>
       log.info("Stopping transaction generation")
       isActive = false
 
-    case GenerateTransactions if isActive =>
+    case GenerateTransaction if isActive =>
       walletDataOpt match {
         // Generate new transaction if wallet contains enough coins and transaction limit is not exhausted.
-        case Some(walletData) if walletData.boxes.map(_.amount).sum >= (amountD + minimalFeeD) && limit > 0 =>
+        case Some(walletData) if walletData.boxes.map(_.amount).sum >= (amountD + minimalFeeD) && (limit > 0 || noLimitMode) =>
           val tx: EncryTransaction = createTransaction(walletData)
           val leftBoxes: Seq[AssetBox] = walletData.boxes.filterNot(bx => tx.unlockers.map(_.boxId).contains(bx.id))
           walletDataOpt = Some(walletData.copy(boxes = leftBoxes))
           limit -= 1
           nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
-          self ! GenerateTransactions
+          self ! GenerateTransaction
         // Retry in 5 sec otherwise
         case _ =>
-          context.system.scheduler.scheduleOnce(5000.millis)(self ! GenerateTransactions)
+          context.system.scheduler.scheduleOnce(5000.millis)(self ! GenerateTransaction)
       }
   }
 
   def handleWalletData: Receive = {
     case FetchWalletData => fetchWalletData()
-    case wd: WalletData =>
-      walletDataOpt = Some(wd)
+    case wd: WalletData => walletDataOpt = Some(wd)
   }
 
   def handleExternalEvents: Receive = {
@@ -109,7 +110,7 @@ object TransactionGenerator {
 
   case object StartGeneration
 
-  case object GenerateTransactions
+  case object GenerateTransaction
 
   case object StopGeneration
 }
