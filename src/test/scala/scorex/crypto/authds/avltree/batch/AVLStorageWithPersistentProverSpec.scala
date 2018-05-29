@@ -30,7 +30,8 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
   def getProof(mods: Seq[Modification]): Try[(SerializedAdProof, ADDigest)] = {
     val rootHash: ADDigest = persistentProver.digest
     if (mods.isEmpty) Failure(new Exception("Got empty modification sequence"))
-    else if (!storage.version.exists(_.sameElements(rootHash))) Failure(new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}"))
+    else if (!storage.version.exists(_.sameElements(rootHash)))
+      Failure(new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}"))
     else persistentProver.avlProver.generateProofForOperations(mods)
   }
 

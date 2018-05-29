@@ -103,7 +103,8 @@ class UtxoState(override val version: VersionTag,
     log.debug(s"Generating proof for ${txs.length} transactions ...")
     val rootHash: ADDigest = persistentProver.digest
     if (txs.isEmpty) Failure(new Exception("Got empty transaction sequence"))
-    else if (!storage.version.exists(_.sameElements(rootHash))) Failure(new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}"))
+    else if (!storage.version.exists(_.sameElements(rootHash)))
+      Failure(new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}"))
     else persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
   }
 
