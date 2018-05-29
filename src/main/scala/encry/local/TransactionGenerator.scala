@@ -101,8 +101,8 @@ class TransactionGenerator extends Actor with ScorexLogging {
 
 object TransactionGenerator {
 
-  val minimalFeeD = 10000
-  val amountD = 100
+  val minimalFeeD: Int = 10000
+  val amountD: Int = 100
 
   case class WalletData(secret: PrivateKey25519, boxes: Seq[AssetBox])
 
