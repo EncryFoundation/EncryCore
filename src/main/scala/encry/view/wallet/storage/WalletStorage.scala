@@ -13,7 +13,7 @@ import scorex.crypto.authds.ADKey
 
 import scala.util.Try
 
-class WalletStorage(val store: Store, val publicKeys: Set[PublicKey25519]) extends EncryBaseStorage {
+case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends EncryBaseStorage {
 
   import WalletStorage._
 

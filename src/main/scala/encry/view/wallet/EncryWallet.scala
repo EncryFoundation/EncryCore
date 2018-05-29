@@ -31,7 +31,7 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
 
   val propositions: Set[AccountProposition] = publicKeys.map(pk => AccountProposition(Account(pk.pubKeyBytes)))
 
-  val walletStorage: WalletStorage = new WalletStorage(walletStore, publicKeys)
+  val walletStorage: WalletStorage = WalletStorage(walletStore, publicKeys)
 
   def secrets: Set[PrivateKey25519] = keyManager.keys.toSet
 
@@ -95,21 +95,15 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
   override def rollback(to: VersionTag): Try[EncryWallet] = Try(walletStore.rollback(ByteArrayWrapper(to))).map(_ => this)
 
   private def calculateNewBalance(bxs: Seq[EncryBaseBox]): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
-
     import WalletStorage._
-
     val bObj: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxs)
-
     val prevBoxes: Seq[(ADKey, Amount)] = getBalances
-
     val newBalanceSheet: Map[ADKey, Amount] = bObj.map(tokenInfo => tokenInfo._1 -> (tokenInfo._2 + prevBoxes
       .find(ti => ti._1 == tokenInfo._1).getOrElse((ADKey @@ Random.randomBytes(), 0L))._2))
-
     val decodedTokenBalance: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
       newBalanceSheet.foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()) {
         case (seq, (tId, balance)) => seq :+ (ByteArrayWrapper(tId) -> ByteArrayWrapper(Longs.toByteArray(balance)))
       }
-
     decodedTokenBalance ++ Seq(tokensIdsKey -> ByteArrayWrapper(bObj.keys.foldLeft(Array.empty[Byte]) {
       case (acc, k) => acc ++ k
     }))
@@ -121,31 +115,22 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
                            newOpenBxs: Seq[EncryBaseBox],
                            spentBxsIds: Seq[ADKey],
                            spentOpenBxsIds: Seq[ADKey]): Unit = {
-
     import WalletStorage._
-
     val bxsIdsCurrent: Seq[ADKey] = walletStorage.boxIds
     val openBxsIdsCurrent: Seq[ADKey] = walletStorage.openBoxIds
-
     val txIdsToInsertRaw = ByteArrayWrapper(walletStorage.get(transactionIdsKey).getOrElse(Array[Byte]()) ++
       newTxs.map(_.id).foldLeft(Array[Byte]())(_ ++ _))
-
     val bxsToInsert: Seq[EncryBaseBox] = newBxs.filter(bx => !spentBxsIds.exists(_.sameElements(bx.id)))
-
     val openBxsToInsert: Seq[EncryBaseBox] = newOpenBxs.filter(bx => !spentOpenBxsIds.exists(_.sameElements(bx.id)))
-
     val bxIdsPacked: ByteArrayWrapper = walletStorage.packBoxIds(bxsIdsCurrent.filter(id =>
       !spentBxsIds.exists(_ sameElements id)) ++ bxsToInsert.map(_.id))
-
     val openBxIdsPacked: ByteArrayWrapper = walletStorage.packBoxIds(openBxsIdsCurrent.filter(id =>
       !spentOpenBxsIds.exists(_ sameElements id)) ++ openBxsToInsert.map(_.id))
-
     val newBalance: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-      calculateNewBalance(BoxFilter.filterAmountCarryingBxs(availableBoxes.filter(bx =>
+      calculateNewBalance(BoxFilter.filterAmountCarryingBxs(walletStorage.allBoxes.filter(bx =>
       !spentBxsIds.exists(_ sameElements bx.id))) ++ BoxFilter.filterAmountCarryingBxs(bxsToInsert))
-
-    val toRemoveSummary = (spentBxsIds ++ spentOpenBxsIds).map(keyByBoxId)
-    val toInsertSummary =
+    val toRemoveSummary: Seq[ByteArrayWrapper] = (spentBxsIds ++ spentOpenBxsIds).map(keyByBoxId)
+    val toInsertSummary: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
       Seq(transactionIdsKey -> txIdsToInsertRaw, boxIdsKey -> bxIdsPacked,
         openBoxesIdsKey -> openBxIdsPacked) ++ newBalance ++
         (bxsToInsert ++ openBxsToInsert).map(bx => keyByBoxId(bx.id) -> ByteArrayWrapper(bx.bytes)) ++
@@ -153,8 +138,6 @@ class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
 
     walletStorage.update(ByteArrayWrapper(modifierId), toRemoveSummary, toInsertSummary)
   }
-
-  def availableBoxes: Seq[EncryBaseBox] = walletStorage.allBoxes
 
   def getAvailableCoinbaseBoxesAt(h: Height): Seq[CoinbaseBox] =
     walletStorage.openBoxIds.foldLeft(Seq[CoinbaseBox]()) { case (acc, id) =>

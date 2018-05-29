@@ -44,8 +44,6 @@ object EncryApp extends App with ScorexLogging {
 
   implicit lazy val settings: ScorexSettings = encrySettings.scorexSettings
 
-  implicit def exceptionHandler: ExceptionHandler = ApiErrorHandler.exceptionHandler
-
   implicit val system: ActorSystem = ActorSystem(settings.network.agentName)
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
