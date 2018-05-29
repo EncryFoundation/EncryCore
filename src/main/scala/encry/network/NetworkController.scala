@@ -27,7 +27,7 @@ class NetworkController extends Actor with ScorexLogging {
   import NetworkController.ReceivableMessages._
   import NetworkControllerSharedMessages.ReceivableMessages.DataFromPeer
   import PeerConnectionHandler.ReceivableMessages.CloseConnection
-  import scorex.core.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
+  import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 
   val networkSettings: NetworkSettings = settings.network
 
