@@ -1,9 +1,7 @@
 package encry.view.wallet
 
-import com.google.common.primitives.Longs
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.{CoinbaseBox, EncryBaseBox}
-import encry.storage.codec.FixLenComplexValueCodec
 import encry.view.history.Height
 import encry.view.wallet.storage.WalletStorage
 import io.iohk.iodb.Store

@@ -1,5 +1,6 @@
 package scorex.crypto.authds.avltree.batch
 
+import encry.settings.Algos
 import io.iohk.iodb.{LSMStore, Store}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.authds.avltree.batch.benchmark.IODBBenchmark.getRandomTempDir
@@ -26,31 +27,14 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
       new BatchAVLProver[Digest32, HF](
         keyLength = 32, valueLengthOpt = None), storage).get
 
-  def genProof(mods: Seq[Modification], rollBackTo: ADDigest): Try[(SerializedAdProof, ADDigest)] = {
-
-    def rollback(): Try[Unit] = Try(
-      persistentProver.rollback(rollBackTo).ensuring(_.isSuccess && persistentProver.digest.sameElements(rollBackTo))
-    ).flatten
-
-    Try {
-      if (!(persistentProver.digest.sameElements(rollBackTo) &&
-        storage.version.get.sameElements(rollBackTo) &&
-        stateStore.lastVersionID.get.data.sameElements(rollBackTo))) Failure(new Error("Bad state version."))
-
-      mods.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
-        t.flatMap(_ => {
-          val opRes = persistentProver.performOneOperation(m)
-          opRes
-        })
-      }.get
-
-      val proof = persistentProver.generateProofAndUpdateStorage()
-      val digest = persistentProver.digest
-
-      proof -> digest
-    } match {
-      case Success(result) => rollback().map(_ => result)
-      case Failure(e) => rollback().flatMap(_ => Failure(e))
+  def getProof(mods: Seq[Modification]): Try[(SerializedAdProof, ADDigest)] = {
+    val rootHash: ADDigest = persistentProver.digest
+    if (mods.isEmpty) {
+      Failure(new Exception("Got empty modification sequence"))
+    } else if (!storage.version.exists(_.sameElements(rootHash))) {
+      Failure(new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}"))
+    } else {
+      persistentProver.avlProver.generateProofForOperations(mods)
     }
   }
 
@@ -86,7 +70,7 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
 
     lazy val afterGenesisDigest = persistentProver.digest
 
-    val proof = genProof(mods128, afterGenesisDigest)
+    val proof = getProof(mods128)
 
     // Applying mods with greater values.
     applyModifications(mods128)
