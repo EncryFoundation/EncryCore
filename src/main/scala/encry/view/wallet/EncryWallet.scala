@@ -24,18 +24,18 @@ import scorex.utils.Random
 import scala.util.Try
 
 class EncryWallet(val walletStore: Store, val keyManager: KeyManager)
-  extends EncryBaseWallet
+  extends Wallet
     with Vault[EncryProposition, EncryBaseTransaction, EncryPersistentModifier, EncryWallet]
     with ScorexLogging {
 
-  override type NVCT = this.type
+  //override type NVCT = this.type
 
-  override def secretByPublicImage(publicImage: PublicKey25519): Option[PrivateKey25519] =
+  def secretByPublicImage(publicImage: PublicKey25519): Option[PrivateKey25519] =
     keyManager.keys.find(k => k.publicImage.address == publicImage.address)
 
-  override def secrets: Set[PrivateKey25519] = keyManager.keys.toSet
+  def secrets: Set[PrivateKey25519] = keyManager.keys.toSet
 
-  override def publicKeys: Set[PublicKey25519] = secrets.foldLeft(Seq[PublicKey25519]()) {
+  def publicKeys: Set[PublicKey25519] = secrets.foldLeft(Seq[PublicKey25519]()) {
     case (set, key) => set :+ PublicKey25519(key.publicKeyBytes)
   }.toSet
 
