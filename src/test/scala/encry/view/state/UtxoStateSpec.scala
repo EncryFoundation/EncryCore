@@ -62,7 +62,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val transactions: Seq[EncryTransaction] = regularTransactions.sortBy(_.timestamp) :+ coinbase
 
-    val (_: SerializedAdProof, adDigest: ADDigest) = state.proofsForTransactions(transactions).get
+    val (_: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(transactions).get
 
     state.applyTransactions(transactions, adDigest).isSuccess shouldBe true
   }

@@ -99,13 +99,16 @@ class UtxoState(override val version: VersionTag,
     case _ => Failure(new Exception("Got Modifier of unknown type."))
   }
 
-  def proofsForTransactions(txs: Seq[EncryBaseTransaction]): Try[(SerializedAdProof, ADDigest)] = {
+  def generateProofs(txs: Seq[EncryBaseTransaction]): Try[(SerializedAdProof, ADDigest)] = Try {
     log.debug(s"Generating proof for ${txs.length} transactions ...")
     val rootHash: ADDigest = persistentProver.digest
-    if (txs.isEmpty) Failure(new Exception("Got empty transaction sequence"))
+    if (txs.isEmpty) throw new Exception("Got empty transaction sequence")
     else if (!storage.version.exists(_.sameElements(rootHash)))
-      Failure(new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}"))
-    else persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
+      throw new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}")
+    persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
+  }.flatten.recoverWith[(SerializedAdProof, ADDigest)] { case e =>
+    log.warn(s"Failed to generate ADProof", e)
+    Failure(e)
   }
 
   override def rollbackTo(version: VersionTag): Try[UtxoState] = {
