@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import io.circe.syntax._
-import scorex.core.NodeViewHolder.CurrentView
+import encry.view.NodeViewHolder.CurrentView
 import scorex.core.consensus.History
 import scorex.core.network.ConnectedPeer
 import scorex.core.serialization.SerializerRegistry
@@ -26,7 +26,7 @@ case class NodeViewApiRoute[P <: Proposition, TX <: Transaction[P]]
 (override val settings: RESTApiSettings, nodeViewHolderRef: ActorRef)
 (implicit val context: ActorRefFactory, val serializerReg: SerializerRegistry) extends ApiRoute {
 
-  import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+  import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 
   override val route = (pathPrefix("nodeView") & withCors) {
     openSurface ~ persistentModifierById ~ pool

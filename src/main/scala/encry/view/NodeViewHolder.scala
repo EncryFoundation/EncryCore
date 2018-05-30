@@ -1,6 +1,9 @@
-package scorex.core
+package encry.view
 
 import akka.actor.Actor
+import encry.EncryApp
+import scorex.core
+import scorex.core._
 import scorex.core.consensus.History.ProgressInfo
 import scorex.core.consensus.{History, SyncInfo}
 import scorex.core.network.ConnectedPeer
@@ -12,9 +15,8 @@ import scorex.core.transaction.state.{MinimalState, TransactionValidation}
 import scorex.core.transaction.wallet.Vault
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.encode.Base58
-import encry.EncryApp
-import scorex.core
 import supertagged.@@
+
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}

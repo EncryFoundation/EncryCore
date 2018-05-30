@@ -11,7 +11,7 @@ import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import encry.utils.BalanceCalculator.intrinsicTokenId
-import scorex.core.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedTransaction}
+import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedTransaction}
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 
 import scala.concurrent.ExecutionContext.Implicits.global

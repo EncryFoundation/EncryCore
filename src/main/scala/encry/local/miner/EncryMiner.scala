@@ -18,7 +18,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
-import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import scorex.core.utils.NetworkTime.Time
 import scorex.core.utils.ScorexLogging
