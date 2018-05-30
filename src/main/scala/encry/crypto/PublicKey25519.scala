@@ -4,13 +4,11 @@ import encry.account.Address
 import encry.crypto.encoding.Base58Check
 import encry.settings.Algos
 import scorex.core.serialization.{BytesSerializable, Serializer}
-import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
+import scorex.crypto.signatures.{Curve25519, PublicKey}
 
 import scala.util.Try
 
-trait PublicKeyWrapper extends BytesSerializable
-
-case class PublicKey25519(pubKeyBytes: PublicKey) extends PublicKeyWrapper {
+case class PublicKey25519(pubKeyBytes: PublicKey) extends BytesSerializable {
 
   require(pubKeyBytes.length == Curve25519.KeyLength,
     s"Incorrect pubKey length, ${Curve25519.KeyLength} expected, ${pubKeyBytes.length} given")
@@ -18,8 +16,6 @@ case class PublicKey25519(pubKeyBytes: PublicKey) extends PublicKeyWrapper {
   override type M = PublicKey25519
 
   lazy val address: Address = Address @@ Base58Check.encode(pubKeyBytes)
-
-  def verify(message: Array[Byte], signature: Signature): Boolean = Curve25519.verify(signature, message, pubKeyBytes)
 
   override def serializer: Serializer[M] = PublicKey25519Serializer
 
