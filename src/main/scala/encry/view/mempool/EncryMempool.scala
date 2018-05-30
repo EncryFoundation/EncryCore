@@ -1,8 +1,9 @@
 package encry.view.mempool
 
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.settings.EncryAppSettings
 import encry.view.mempool.EncryMempool._
+import encry.EncryApp._
+import encry.settings.EncryAppSettings
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
 import scorex.core.ModifierId
@@ -12,31 +13,32 @@ import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}
 
-class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTransaction],
-                                    settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
+class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTransaction])
   extends MemoryPool[EncryBaseTransaction, EncryMempool] with EncryMempoolReader with AutoCloseable with ScorexLogging {
+
+  val encryAppSettings: EncryAppSettings = encrySettings
 
   private implicit val cleanupScheduler: Scheduler = Scheduler.singleThread("mempool-cleanup-thread")
 
   private val removeExpired: Task[EncryMempool] = Task {
-    filter(tx => (timeProvider.time() - tx.timestamp) > settings.nodeSettings.utxMaxAge.toMillis)
-  }.delayExecution(settings.nodeSettings.mempoolCleanupInterval)
+    filter(tx => (timeProvider.time() - tx.timestamp) > encryAppSettings.nodeSettings.utxMaxAge.toMillis)
+  }.delayExecution(encryAppSettings.nodeSettings.mempoolCleanupInterval)
 
   private val cleanup: CancelableFuture[EncryMempool] = removeExpired.runAsync
 
   override def close(): Unit = cleanup.cancel()
 
-  override type NVCT = EncryMempool
+  //override type NVCT = EncryMempool
 
   override def put(tx: EncryBaseTransaction): Try[EncryMempool] = put(Seq(tx))
 
   override def put(txs: Iterable[EncryBaseTransaction]): Try[EncryMempool] = {
     val validTxs: Iterable[EncryBaseTransaction] = txs.filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
     if (validTxs.nonEmpty) {
-      if ((size + validTxs.size) <= settings.nodeSettings.mempoolMaxCapacity) {
+      if ((size + validTxs.size) <= encryAppSettings.nodeSettings.mempoolMaxCapacity) {
         Success(putWithoutCheck(validTxs))
       } else {
-        val overflow: Int = (size + validTxs.size) - settings.nodeSettings.mempoolMaxCapacity
+        val overflow: Int = (size + validTxs.size) - encryAppSettings.nodeSettings.mempoolMaxCapacity
         Success(putWithoutCheck(validTxs.take(validTxs.size - overflow)))
       }
     } else Failure(new Exception("Failed to put transaction into pool"))
@@ -77,6 +79,5 @@ object EncryMempool {
 
   type MemPoolResponse = Seq[EncryBaseTransaction]
 
-  def empty(settings: EncryAppSettings, timeProvider: NetworkTimeProvider): EncryMempool =
-    new EncryMempool(TrieMap.empty, settings, timeProvider)
+  def empty(): EncryMempool = new EncryMempool(TrieMap.empty)
 }
