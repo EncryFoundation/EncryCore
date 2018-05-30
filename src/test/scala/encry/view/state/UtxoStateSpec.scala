@@ -9,6 +9,7 @@ import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.settings.{Algos, Constants}
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
+import encry.view.history.Height
 import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
@@ -16,6 +17,8 @@ import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
+
+import scala.collection.IndexedSeq
 
 class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
@@ -38,18 +41,26 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
     val (privKey: PrivateKey, pubKey: PublicKey) = Curve25519.createKeyPair(Random.randomBytes())
     val secret: PrivateKey25519 = PrivateKey25519(privKey, pubKey)
 
-    val initialBoxes: Seq[AssetBox] = genValidAssetBoxes(secret, amount = 100000, qty = 1001)
+    val initialBoxes: Seq[AssetBox] = genValidAssetBoxes(secret, amount = 100000, qty = 50)
 
     val bh: BoxHolder = BoxHolder(initialBoxes)
 
     val state: UtxoState = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None)
 
-    val transactions: Seq[EncryTransaction] = initialBoxes.map { bx =>
+    val regularTransactions: Seq[EncryTransaction] = initialBoxes.map { bx =>
       TransactionFactory.defaultPaymentTransactionScratch(
-        secret, 10000, System.currentTimeMillis(), IndexedSeq(bx), randomAddress, 5000)
+        secret, 10000, timestamp, IndexedSeq(bx), randomAddress, 5000)
     }
 
-    assert(transactions.forall(tx => state.validate(tx).isSuccess))
+    val openBoxes: IndexedSeq[AssetBox] = regularTransactions.foldLeft(IndexedSeq[AssetBox]())((buff, tx) =>
+      buff ++ tx.newBoxes.foldLeft(IndexedSeq[AssetBox]()) {
+        case (acc, bx: AssetBox) if bx.isOpen => acc :+ bx
+        case (acc, _) => acc
+      })
+
+    val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(secret, timestamp, openBoxes, Height @@ 14)
+
+    val transactions: Seq[EncryTransaction] = regularTransactions.sortBy(_.timestamp) :+ coinbase
 
     val (_: SerializedAdProof, adDigest: ADDigest) = state.proofsForTransactions(transactions).get
 

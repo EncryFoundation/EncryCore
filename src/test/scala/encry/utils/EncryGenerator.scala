@@ -25,6 +25,8 @@ import scorex.utils.Random
 
 trait EncryGenerator {
 
+  def timestamp: Long = System.currentTimeMillis()
+
   def randomAddress: Address = Account(PublicKey @@ Random.randomBytes()).address
 
   def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None): AssetBox =
