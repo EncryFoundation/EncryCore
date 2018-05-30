@@ -140,7 +140,8 @@ class EncryMiner extends Actor with ScorexLogging {
 
     val txs: Seq[TX] = txsToPut.sortBy(_.timestamp) :+ coinbase
 
-    val (adProof: SerializedAdProof, adDigest: ADDigest) = state.proofsForTransactions(txs).get
+    val (adProof: SerializedAdProof, adDigest: ADDigest) = state.proofsForTransactions(txs)
+      .getOrElse(throw new Exception("ADProof generation failed"))
 
     val nBits: NBits = bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
       .getOrElse(Constants.Chain.InitialNBits)
