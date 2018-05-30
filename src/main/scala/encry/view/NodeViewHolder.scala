@@ -44,25 +44,12 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
   type MS <: MinimalState[PMOD, MS]
   type VL <: Vault[P, TX, PMOD, VL]
   type MP <: MemoryPool[TX, MP]
-
-
   type NodeView = (HIS, MS, VL, MP)
-
   type MapKey = scala.collection.mutable.WrappedArray.ofByte
 
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
-
-  /**
-    * Serializers for modifiers, to be provided by a concrete instantiation
-    */
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]]
-
   val networkChunkSize: Int
-
-  /**
-    * Cache for modifiers. If modifiers are coming out-of-order, they are to be stored in this cache.
-    */
-  //todo: make configurable limited size
   val modifiersCache: mutable.Map[MapKey, PMOD] = mutable.Map[MapKey, PMOD]()
 
   /**
