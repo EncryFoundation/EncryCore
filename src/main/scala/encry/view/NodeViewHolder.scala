@@ -47,13 +47,23 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
 
 
   type NodeView = (HIS, MS, VL, MP)
+
+  type MapKey = scala.collection.mutable.WrappedArray.ofByte
+
+  var nodeView: NodeView = restoreState().getOrElse(genesisState)
+
   /**
-    * The main data structure a node software is taking care about, a node view consists
-    * of four elements to be updated atomically: history (log of persistent modifiers),
-    * state (result of log's modifiers application to pre-historical(genesis) state,
-    * user-specific information stored in vault (it could be e.g. a wallet), and a memory pool.
+    * Serializers for modifiers, to be provided by a concrete instantiation
     */
-  private var nodeView: NodeView = restoreState().getOrElse(genesisState)
+  val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]]
+
+  val networkChunkSize: Int
+
+  /**
+    * Cache for modifiers. If modifiers are coming out-of-order, they are to be stored in this cache.
+    */
+  //todo: make configurable limited size
+  val modifiersCache: mutable.Map[MapKey, PMOD] = mutable.Map[MapKey, PMOD]()
 
   /**
     * Restore a local view during a node startup. If no any stored view found
@@ -64,39 +74,19 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
   /**
     * Hard-coded initial view all the honest nodes in a network are making progress from.
     */
-  protected def genesisState: NodeView
+  def genesisState: NodeView
 
+  def history(): HIS = nodeView._1
 
-  protected def history(): HIS = nodeView._1
+  def minimalState(): MS = nodeView._2
 
-  protected def minimalState(): MS = nodeView._2
+  def vault(): VL = nodeView._3
 
-  protected def vault(): VL = nodeView._3
+  def memoryPool(): MP = nodeView._4
 
-  protected def memoryPool(): MP = nodeView._4
+  def key(id: ModifierId): MapKey = new mutable.WrappedArray.ofByte(id)
 
-  /**
-    * Serializers for modifiers, to be provided by a concrete instantiation
-    */
-  val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]]
-
-  //todo: write desc
-  /**
-    *
-    */
-  val networkChunkSize: Int
-
-  protected type MapKey = scala.collection.mutable.WrappedArray.ofByte
-
-  protected def key(id: ModifierId): MapKey = new mutable.WrappedArray.ofByte(id)
-
-  /**
-    * Cache for modifiers. If modifiers are coming out-of-order, they are to be stored in this cache.
-    */
-  //todo: make configurable limited size
-  private val modifiersCache: mutable.Map[MapKey, PMOD] = mutable.Map[MapKey, PMOD]()
-
-  protected def txModify(tx: TX): Unit = {
+  def txModify(tx: TX): Unit = {
     //todo: async validation?
     val errorOpt: Option[Throwable] = minimalState() match {
       case txValidator: TransactionValidation[P, TX] =>
@@ -106,7 +96,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
         }
       case _ => None
     }
-
     errorOpt match {
       case None =>
         memoryPool().put(tx) match {
@@ -129,38 +118,31 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
     * @param updatedVault
     * @param updatedMempool
     */
-  protected def updateNodeView(updatedHistory: Option[HIS] = None,
-                               updatedState: Option[MS] = None,
-                               updatedVault: Option[VL] = None,
-                               updatedMempool: Option[MP] = None): Unit = {
+  def updateNodeView(updatedHistory: Option[HIS] = None,
+                     updatedState: Option[MS] = None,
+                     updatedVault: Option[VL] = None,
+                     updatedMempool: Option[MP] = None): Unit = {
     val newNodeView: (HIS, MS, VL, MP) = (updatedHistory.getOrElse(history()),
       updatedState.getOrElse(minimalState()),
       updatedVault.getOrElse(vault()),
       updatedMempool.getOrElse(memoryPool()))
-
     if (updatedHistory.nonEmpty) context.system.eventStream.publish(ChangedHistory(newNodeView._1.getReader))
-
     if (updatedState.nonEmpty) context.system.eventStream.publish(ChangedState(newNodeView._2.getReader))
-
     if (updatedVault.nonEmpty) context.system.eventStream.publish(ChangedVault())
-
     if (updatedMempool.nonEmpty) context.system.eventStream.publish(ChangedMempool(newNodeView._4.getReader))
-
     nodeView = newNodeView
   }
 
-  protected def extractTransactions(mod: PMOD): Seq[TX] = mod match {
+  def extractTransactions(mod: PMOD): Seq[TX] = mod match {
     case tcm: TransactionsCarryingPersistentNodeViewModifier[P, TX] => tcm.transactions
     case _ => Seq()
   }
 
   //todo: this method causes delays in a block processing as it removes transactions from mempool and checks
   //todo: validity of remaining transactions in a synchronous way. Do this job async!
-  protected def updateMemPool(blocksRemoved: Seq[PMOD], blocksApplied: Seq[PMOD], memPool: MP, state: MS): MP = {
+  def updateMemPool(blocksRemoved: Seq[PMOD], blocksApplied: Seq[PMOD], memPool: MP, state: MS): MP = {
     val rolledBackTxs: Seq[TX] = blocksRemoved.flatMap(extractTransactions)
-
     val appliedTxs: Seq[TX] = blocksApplied.flatMap(extractTransactions)
-
     memPool.putWithoutCheck(rolledBackTxs).filter { tx =>
       !appliedTxs.exists(t => t.id sameElements tx.id) && {
         state match {
@@ -171,10 +153,10 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
     }
   }
 
-  private def requestDownloads(pi: ProgressInfo[PMOD]): Unit =
+  def requestDownloads(pi: ProgressInfo[PMOD]): Unit =
     pi.toDownload.foreach { case (tid, id) => context.system.eventStream.publish(DownloadRequest(tid, id)) }
 
-  private def trimChainSuffix(suffix: IndexedSeq[PMOD], rollbackPoint: ModifierId): IndexedSeq[PMOD] = {
+  def trimChainSuffix(suffix: IndexedSeq[PMOD], rollbackPoint: ModifierId): IndexedSeq[PMOD] = {
     val idx: Int = suffix.indexWhere(_.id.sameElements(rollbackPoint))
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
@@ -184,46 +166,40 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
                           state: MS,
                           progressInfo: ProgressInfo[PMOD],
                           suffixApplied: IndexedSeq[PMOD]): (HIS, Try[MS], Seq[PMOD]) = {
-    requestDownloads(progressInfo)
-
     case class UpdateInformation(history: HIS,
                                  state: MS,
                                  failedMod: Option[PMOD],
                                  alternativeProgressInfo: Option[ProgressInfo[PMOD]],
                                  suffix: IndexedSeq[PMOD])
 
+    requestDownloads(progressInfo)
     val branchingPointOpt: Option[Array[Byte] @@ core.ModifierId.Tag with core.VersionTag.Tag] = progressInfo.branchPoint.map(VersionTag @@ _)
-
     val (stateToApplyTry: Try[MS], suffixTrimmed: IndexedSeq[PMOD]) = if (progressInfo.chainSwitchingNeeded) {
-      if (!state.version.sameElements(branchingPointOpt)) {
+      if (!state.version.sameElements(branchingPointOpt))
         state.rollbackTo(branchingPointOpt.get) -> trimChainSuffix(suffixApplied, branchingPointOpt.get)
-      } else Success(state) -> IndexedSeq()
+      else Success(state) -> IndexedSeq()
     } else Success(state) -> suffixApplied
 
     stateToApplyTry match {
       case Success(stateToApply) =>
         log.info(s"Rollback succeed: BranchPoint(${progressInfo.branchPoint.map(Base58.encode)})")
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
-
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
-
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
-          if (u.failedMod.isEmpty) {
-            u.state.applyModifier(modToApply) match {
-              case Success(stateAfterApply) =>
-                val newHis: HIS = history.reportModifierIsValid(modToApply)
-                context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
-                //updateState(newHis, stateAfterApply, newProgressInfo, suffixTrimmed :+ modToApply)
-                UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
-              case Failure(e) =>
-                val (newHis: HIS, newProgressInfo: ProgressInfo[PMOD]) = history.reportModifierIsInvalid(modToApply, progressInfo)
-                context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
-                //updateState(newHis, stateToApply, newProgressInfo, suffixTrimmed)
-                UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
-            }
-          } else u
+          if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
+            case Success(stateAfterApply) =>
+              val newHis: HIS = history.reportModifierIsValid(modToApply)
+              context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
+              //updateState(newHis, stateAfterApply, newProgressInfo, suffixTrimmed :+ modToApply)
+              UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
+            case Failure(e) =>
+              val (newHis: HIS, newProgressInfo: ProgressInfo[PMOD]) = history.reportModifierIsInvalid(modToApply, progressInfo)
+              context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
+              //updateState(newHis, stateToApply, newProgressInfo, suffixTrimmed)
+              UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
+          }
+          else u
         }
-
         uf.failedMod match {
           case Some(mod) => updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
           case None => (uf.history, Success(uf.state), uf.suffix)
@@ -232,68 +208,20 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
         log.error("Rollback failed: ", e)
         context.system.eventStream.publish(RollbackFailed(branchingPointOpt))
         EncryApp.forceStopApplication(500)
-      // TODO: Recovery?
     }
   }
 
-  //todo: update state in async way?
-  protected def pmodModify(pmod: PMOD): Unit =
-    if (!history().contains(pmod.id)) {
-      context.system.eventStream.publish(StartingPersistentModifierApplication(pmod))
-
-      log.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
-
-      history().append(pmod) match {
-        case Success((historyBeforeStUpdate, progressInfo)) =>
-          log.debug(s"Going to apply modifications to the state: $progressInfo")
-          context.system.eventStream.publish(SyntacticallySuccessfulModifier(pmod))
-          context.system.eventStream.publish(NewOpenSurface(historyBeforeStUpdate.openSurfaceIds()))
-
-          if (progressInfo.toApply.nonEmpty) {
-            val (newHistory: HIS, newStateTry: Try[MS], blocksApplied: Seq[PMOD]) =
-              updateState(historyBeforeStUpdate, minimalState(), progressInfo, IndexedSeq())
-
-            newStateTry match {
-              case Success(newMinState) =>
-                val newMemPool: MP = updateMemPool(progressInfo.toRemove, blocksApplied, memoryPool(), newMinState)
-
-                //we consider that vault always able to perform a rollback needed
-                val newVault: VL = if (progressInfo.chainSwitchingNeeded) {
-                  vault().rollback(VersionTag @@ progressInfo.branchPoint.get).get
-                } else vault()
-                blocksApplied.foreach(newVault.scanPersistent)
-
-                log.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
-                updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
-
-              case Failure(e) =>
-                log.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
-                updateNodeView(updatedHistory = Some(newHistory))
-                context.system.eventStream.publish(SemanticallyFailedModification(pmod, e))
-            }
-          } else {
-            requestDownloads(progressInfo)
-            updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
-          }
-        case Failure(e) =>
-          log.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to history", e)
-          context.system.eventStream.publish(SyntacticallyFailedModification(pmod, e))
-      }
-    } else log.warn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
-
-  protected def processRemoteModifiers: Receive = {
+  override def receive: Receive = {
     case ModifiersFromRemote(remote, modifierTypeId, remoteObjects) =>
       modifierSerializers.get(modifierTypeId) foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: TX@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: PMOD@unchecked =>
-            if (history().contains(pmod) || modifiersCache.contains(key(pmod.id))) {
+            if (history().contains(pmod) || modifiersCache.contains(key(pmod.id)))
               log.warn(s"Received modifier ${pmod.encodedId} that is already in history")
-            } else modifiersCache.put(key(pmod.id), pmod)
+            else modifiersCache.put(key(pmod.id), pmod)
         }
-
         log.debug(s"Cache before(${modifiersCache.size}): ${modifiersCache.keySet.map(_.array).map(Base58.encode).mkString(",")}")
-
         var t: Option[PMOD] = None
         do {
           t = {
@@ -310,9 +238,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
 
         log.debug(s"Cache after(${modifiersCache.size}): ${modifiersCache.keySet.map(_.array).map(Base58.encode).mkString(",")}")
       }
-  }
-
-  protected def nonProcessRemoteModifiers: Receive = {
     case lt: LocallyGeneratedTransaction[P, TX] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[PMOD] =>
       log.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
@@ -329,13 +254,45 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
         case _ => modifierIds.filterNot(mid => history().contains(mid) || modifiersCache.contains(key(mid)))
       }
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
+    case a: Any => log.error("Strange input: " + a)
   }
 
-  override def receive: Receive =
-      processRemoteModifiers orElse
-      nonProcessRemoteModifiers orElse {
-      case a: Any => log.error("Strange input: " + a)
+  //todo: update state in async way?
+  def pmodModify(pmod: PMOD): Unit = if (!history().contains(pmod.id)) {
+    context.system.eventStream.publish(StartingPersistentModifierApplication(pmod))
+    log.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
+    history().append(pmod) match {
+      case Success((historyBeforeStUpdate, progressInfo)) =>
+        log.debug(s"Going to apply modifications to the state: $progressInfo")
+        context.system.eventStream.publish(SyntacticallySuccessfulModifier(pmod))
+        context.system.eventStream.publish(NewOpenSurface(historyBeforeStUpdate.openSurfaceIds()))
+        if (progressInfo.toApply.nonEmpty) {
+          val (newHistory: HIS, newStateTry: Try[MS], blocksApplied: Seq[PMOD]) =
+            updateState(historyBeforeStUpdate, minimalState(), progressInfo, IndexedSeq())
+          newStateTry match {
+            case Success(newMinState) =>
+              val newMemPool: MP = updateMemPool(progressInfo.toRemove, blocksApplied, memoryPool(), newMinState)
+              //we consider that vault always able to perform a rollback needed
+              val newVault: VL = if (progressInfo.chainSwitchingNeeded)
+                vault().rollback(VersionTag @@ progressInfo.branchPoint.get).get
+              else vault()
+              blocksApplied.foreach(newVault.scanPersistent)
+              log.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
+              updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
+            case Failure(e) =>
+              log.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
+              updateNodeView(updatedHistory = Some(newHistory))
+              context.system.eventStream.publish(SemanticallyFailedModification(pmod, e))
+          }
+        } else {
+          requestDownloads(progressInfo)
+          updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
+        }
+      case Failure(e) =>
+        log.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to history", e)
+        context.system.eventStream.publish(SyntacticallyFailedModification(pmod, e))
     }
+  } else log.warn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
 }
 
 object NodeViewHolder {
@@ -357,12 +314,6 @@ object NodeViewHolder {
     case class LocallyGeneratedModifier[PMOD <: PersistentNodeViewModifier](pmod: PMOD)
 
   }
-
-  // fixme: No actor is expecting this ModificationApplicationStarted and DownloadRequest messages
-  // fixme: Even more, ModificationApplicationStarted seems not to be sent at all
-  // fixme: should we delete these messages?
-  case class ModificationApplicationStarted[PMOD <: PersistentNodeViewModifier](modifier: PMOD)
-    extends NodeViewHolderEvent
 
   case class DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) extends NodeViewHolderEvent
 

@@ -54,7 +54,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
     minimalState().closeStorage()
   }
 
-  override protected def txModify(tx: EncryBaseTransaction): Unit = memoryPool().put(tx) match {
+  override def txModify(tx: EncryBaseTransaction): Unit = memoryPool().put(tx) match {
     case Success(newPool) =>
       log.debug(s"Unconfirmed transaction $tx added to the memory pool")
       val newVault = vault().scanOffchain(tx)
@@ -64,7 +64,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
       context.system.eventStream.publish(FailedTransaction[EncryProposition, EncryBaseTransaction](tx, e))
   }
 
-  override protected def genesisState: (EncryHistory, StateType, EncryWallet, EncryMempool) = {
+  override def genesisState: (EncryHistory, StateType, EncryWallet, EncryMempool) = {
     val stateDir: File = EncryState.getStateDir(encrySettings)
     stateDir.mkdir()
 
