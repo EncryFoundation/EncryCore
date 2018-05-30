@@ -39,7 +39,6 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
     case (set, key) => set :+ PublicKey25519(key.publicKeyBytes)
   }.toSet
 
-
   override def scanOffchain(tx: EncryBaseTransaction): EncryWallet = this
 
   override def scanOffchain(txs: Seq[EncryBaseTransaction]): EncryWallet = this
@@ -160,7 +159,6 @@ object EncryWallet {
   def getWalletDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/wallet")
 
   def readOrGenerate(settings: EncryAppSettings): EncryWallet = {
-
     val walletDir: File = getWalletDir(settings)
     walletDir.mkdirs()
     val walletStore: LSMStore = new LSMStore(walletDir, keepVersions = Constants.DefaultKeepVersions)
