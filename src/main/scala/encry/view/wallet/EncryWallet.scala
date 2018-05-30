@@ -4,7 +4,7 @@ import java.io.File
 
 import com.google.common.primitives.Longs
 import encry.account.Account
-import encry.crypto.{PrivateKey25519, PublicKey25519}
+import encry.crypto.PublicKey25519
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
@@ -33,9 +33,7 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
 
   val walletStorage: WalletStorage = WalletStorage(walletStore, publicKeys)
 
-  def secrets: Set[PrivateKey25519] = keyManager.keys.toSet
-
-  def publicKeys: Set[PublicKey25519] = secrets.foldLeft(Seq[PublicKey25519]()) {
+  def publicKeys: Set[PublicKey25519] = keyManager.keys.foldLeft(Seq[PublicKey25519]()) {
     case (set, key) => set :+ PublicKey25519(key.publicKeyBytes)
   }.toSet
 

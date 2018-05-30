@@ -14,7 +14,7 @@ class EncryMempoolSpec extends PropSpec with Matchers with EncryGenerator {
 
   property("Mempool.put(txs) should not allow overflow.") {
 
-    val mempool: EncryMempool = EncryMempool.empty()
+    val mempool: EncryMempool = EncryMempool.empty(encrySettings, timeProvider)
 
     val maxCapacity: Int = encrySettings.nodeSettings.mempoolMaxCapacity
 
@@ -27,7 +27,7 @@ class EncryMempoolSpec extends PropSpec with Matchers with EncryGenerator {
 
   property("Mempool should not accept invalid transactions.") {
 
-    val mempool: EncryMempool = EncryMempool.empty()
+    val mempool: EncryMempool = EncryMempool.empty(encrySettings, timeProvider)
 
     val validTxs: Seq[EncryTransaction] = genValidPaymentTxs(60)
 

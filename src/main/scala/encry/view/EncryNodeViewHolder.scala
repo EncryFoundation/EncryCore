@@ -74,7 +74,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
     }.asInstanceOf[StateType]
     val history: EncryHistory = EncryHistory.readOrGenerate(encrySettings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(encrySettings)
-    val memPool: EncryMempool = EncryMempool.empty()
+    val memPool: EncryMempool = EncryMempool.empty(encrySettings, timeProvider)
     (history, state, wallet, memPool)
   }
 
@@ -85,7 +85,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
   override def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryDir(encrySettings).listFiles.isEmpty) {
     val history: EncryHistory = EncryHistory.readOrGenerate(encrySettings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(encrySettings)
-    val memPool: EncryMempool = EncryMempool.empty()
+    val memPool: EncryMempool = EncryMempool.empty(encrySettings, timeProvider)
     val state: StateType = restoreConsistentState(EncryState.readOrGenerate(encrySettings, Some(self)).asInstanceOf[StateType], history)
     Some((history, state, wallet, memPool))
   } else None
