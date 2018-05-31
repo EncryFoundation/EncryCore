@@ -45,19 +45,32 @@ class UtxoState(override val version: VersionTag,
     nodeViewHolderRef.foreach(_ ! LocallyGeneratedModifier(proof))
   }
 
-  private[state] def applyTransactions(txs: Seq[EncryBaseTransaction],
-                                       expectedDigest: ADDigest): Try[Unit] = Try {
-    txs.foreach(tx => validate(tx).map { _ =>
-      extractStateChanges(tx).operations.map(ADProofs.toModification)
-        .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
-        t.flatMap(_ => persistentProver.performOneOperation(m))
-      }.get
-    }.orElse(throw TransactionValidationException(s"$tx validation failed.")))
+  def applyBlockTransactions(blockTransactions: Seq[EncryBaseTransaction],
+                             expectedDigest: ADDigest): Try[Unit] = {
+    def applyTry(txs: Seq[EncryBaseTransaction], allowedOutputDelta: Amount = 0L): Try[Unit] =
+      txs.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, tx) =>
+        t.flatMap { _ =>
+          validate(tx, allowedOutputDelta).flatMap(_ => extractStateChanges(tx).operations.map(ADProofs.toModification)
+            .foldLeft[Try[Option[ADValue]]](Success(None)) { case (tIn, m) =>
+            tIn.flatMap(_ => persistentProver.performOneOperation(m))
+          })
+        }
+      }.map(_ => Unit)
 
-    // Checks whether the outcoming result is the same as expected.
-    if (!expectedDigest.sameElements(persistentProver.digest))
-      throw new Exception(s"Digest after txs application is wrong. ${Algos.encode(expectedDigest)} expected, " +
-        s"${Algos.encode(persistentProver.digest)} given")
+    val coinbase: EncryBaseTransaction = blockTransactions.last
+    val regularTransactions: Seq[EncryBaseTransaction] = blockTransactions.dropRight(1)
+
+    val totalFees: Amount = regularTransactions.map(_.fee).sum
+
+    val regularApplyTry: Try[Unit] = applyTry(regularTransactions)
+    val coinbaseApplyTry: Try[Unit] = applyTry(Seq(coinbase), totalFees)
+
+    regularApplyTry.flatMap(_ => coinbaseApplyTry).map { _ =>
+      // Checks whether the outcoming result is the same as expected.
+      if (!expectedDigest.sameElements(persistentProver.digest))
+        throw new Exception(s"Digest after txs application is wrong. ${Algos.encode(expectedDigest)} expected, " +
+          s"${Algos.encode(persistentProver.digest)} given")
+    }
   }
 
   /** State transition function `APPLY(S,TX) -> S'`. */
@@ -67,7 +80,7 @@ class UtxoState(override val version: VersionTag,
       log.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
 
-      applyTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
+      applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] =
           metadata(VersionTag @@ block.id, block.header.stateRoot, Height @@ block.header.height, block.header.timestamp)
         val proofBytes: SerializedAdProof = persistentProver.generateProofAndUpdateStorage(meta)
@@ -148,7 +161,7 @@ class UtxoState(override val version: VersionTag,
     * For all asset types:
     * 4. Make sure inputs.sum >= outputs.sum
     */
-  override def validate(tx: EncryBaseTransaction): Try[Unit] =
+  override def validate(tx: EncryBaseTransaction, allowedOutputDelta: Amount = 0L): Try[Unit] =
     tx.semanticValidity.map { _: Unit =>
 
       implicit val context: Context = Context(tx, height, lastBlockTimestamp, rootHash)
@@ -168,7 +181,11 @@ class UtxoState(override val version: VersionTag,
 
       val validBalance: Boolean = {
         val debitB: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxs, excludeCoinbase = false)
-        val creditB: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(tx.newBoxes)
+        val creditB: Map[ADKey, Amount] = {
+          val balanceSheet: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(tx.newBoxes)
+          val intrinsicBalance: Amount = balanceSheet.getOrElse(BalanceCalculator.intrinsicTokenId, 0L)
+          balanceSheet.updated(BalanceCalculator.intrinsicTokenId, intrinsicBalance + tx.fee)
+        }
         creditB.forall { case (id, amount) => debitB.getOrElse(id, 0L) >= amount }
       }
 

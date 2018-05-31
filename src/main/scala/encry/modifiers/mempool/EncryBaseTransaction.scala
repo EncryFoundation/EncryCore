@@ -31,8 +31,6 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
 
   val isCoinbase: Boolean
 
-  val feeBox: Option[AssetBox]
-
   val unlockers: IndexedSeq[Unlocker]
 
   val directives: IndexedSeq[Directive]
@@ -40,7 +38,7 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
   val defaultProofOpt: Option[Proof]
 
   lazy val newBoxes: Traversable[EncryBaseBox] =
-    directives.flatMap(_.boxes(txHash)) ++ feeBox.map(fb => Seq(fb)).getOrElse(Seq.empty)
+    directives.flatMap(_.boxes(txHash))
 
   lazy val minimalFee: Amount = Constants.FeeMinAmount +
     directives.map(_.cost).sum + (Constants.PersistentByteCost * length)
