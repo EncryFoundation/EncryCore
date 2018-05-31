@@ -2,10 +2,9 @@ package encry.modifiers.mempool
 
 import encry.account.Address
 import encry.crypto.{PrivateKey25519, PublicKey25519}
-import encry.modifiers.mempool.directive.{CoinbaseDirective, Directive, TransferDirective}
+import encry.modifiers.mempool.directive.{Directive, TransferDirective}
 import encry.modifiers.state.box.MonetaryBox
 import encry.modifiers.state.box.proof.Signature25519
-import encry.view.history.Height
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.ADKey
 
