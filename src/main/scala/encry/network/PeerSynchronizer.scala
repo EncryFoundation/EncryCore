@@ -23,15 +23,11 @@ class PeerSynchronizer extends Actor with ScorexLogging {
   import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
   import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 
-  val networkSettings: NetworkSettings = settings.network
-
-  implicit val timeout: Timeout = Timeout(networkSettings.syncTimeout.getOrElse(5 seconds))
-
-  val messageSpecs: Seq[MessageSpec[_]] = Seq(GetPeersSpec, PeersSpec)
+  implicit val timeout: Timeout = Timeout(settings.network.syncTimeout.getOrElse(5 seconds))
 
   override def preStart: Unit = {
     super.preStart()
-    networkController ! RegisterMessagesHandler(messageSpecs, self)
+    networkController ! RegisterMessagesHandler(Seq(GetPeersSpec, PeersSpec), self)
     val msg = Message[Unit](GetPeersSpec, Right(Unit), None)
     val stn = SendToNetwork(msg, SendToRandom)
     context.system.scheduler.schedule(2.seconds, 10.seconds)(networkController ! stn)
