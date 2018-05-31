@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.SupervisorStrategy.Escalate
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import encry.api.http.routes.{AccountInfoApiRoute, HistoryApiRoute, InfoApiRoute, TransactionsApiRoute}
 import encry.cli.ConsolePromptListener
@@ -18,7 +18,7 @@ import encry.local.TransactionGenerator
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
-import encry.network.{EncryNodeViewSynchronizer, NetworkController}
+import encry.network.{EncryNodeViewSynchronizer, NetworkController, PeerSynchronizer}
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
@@ -72,13 +72,15 @@ object EncryApp extends App with ScorexLogging {
 
   lazy val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ additionalMessageSpecs)
 
-  val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
-
   lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props(), "nodeViewHolder")
 
   val readersHolder: ActorRef = system.actorOf(Props[EncryViewReadersHolder], "readersHolder")
 
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController], "networkController")
+
+  val peerSynchronizer: ActorRef = system.actorOf(Props[PeerSynchronizer], "peerSynchronizer")
+
+  lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
 
   val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
