@@ -1,15 +1,16 @@
-package scorex.core.network
+package encry.network
 
 import java.net.InetSocketAddress
 
 import akka.actor.Actor
 import akka.pattern.ask
 import akka.util.Timeout
+import encry.EncryApp.{networkController, peerManager, settings}
 import scorex.core.network.message.{GetPeersSpec, Message, MessageSpec, PeersSpec}
+import scorex.core.network.{SendToPeers, SendToRandom}
 import scorex.core.settings.NetworkSettings
 import scorex.core.utils.ScorexLogging
 import shapeless.syntax.typeable._
-import encry.EncryApp.{networkController, peerManager, settings}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -18,9 +19,9 @@ import scala.language.postfixOps
 
 class PeerSynchronizer extends Actor with ScorexLogging {
 
+  import encry.network.NetworkController.ReceivableMessages.{RegisterMessagesHandler, SendToNetwork}
+  import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
   import scorex.core.network.NetworkControllerSharedMessages.ReceivableMessages.DataFromPeer
-  import encry.network.peer.PeerManager.ReceivableMessages.{RandomPeers, AddOrUpdatePeer}
-  import encry.network.NetworkController.ReceivableMessages.{SendToNetwork, RegisterMessagesHandler}
 
   val networkSettings: NetworkSettings = settings.network
 
