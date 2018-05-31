@@ -19,7 +19,7 @@ import encry.settings.{Algos, Constants}
 import encry.utils.BalanceCalculator
 import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import scorex.core.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
+import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import scorex.core.VersionTag
 import scorex.core.transaction.box.Box.Amount
 import scorex.core.utils.ScorexLogging

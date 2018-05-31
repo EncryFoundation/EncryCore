@@ -5,7 +5,7 @@ import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
 import encry.local.miner.EncryMiningWorker.MineBlock
 import encry.settings.EncryAppSettings
 import encry.view.state.StateMode
-import scorex.core.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
+import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import scorex.core.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global

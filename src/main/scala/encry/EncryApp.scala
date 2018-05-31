@@ -44,8 +44,6 @@ object EncryApp extends App with ScorexLogging {
 
   implicit lazy val settings: ScorexSettings = encrySettings.scorexSettings
 
-  implicit def exceptionHandler: ExceptionHandler = ApiErrorHandler.exceptionHandler
-
   implicit val system: ActorSystem = ActorSystem(settings.network.agentName)
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
@@ -83,7 +81,7 @@ object EncryApp extends App with ScorexLogging {
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController], "networkController")
 
   val nodeViewSynchronizer: ActorRef =
-    system.actorOf(EncryNodeViewSynchronizer.props(EncrySyncInfoMessageSpec, settings.network), "nodeViewSynchronizer")
+    system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
 
   lazy val miner: ActorRef = system.actorOf(Props[EncryMiner], "miner")
 

@@ -1,6 +1,5 @@
 package encry.network
 
-import akka.actor.Props
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
@@ -10,7 +9,7 @@ import encry.modifiers.state.box.proposition.EncryProposition
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.EncryMempool
 import encry.EncryApp._
-import scorex.core.NodeViewHolder._
+import encry.view.NodeViewHolder._
 import encry.network.NetworkController.ReceivableMessages.SendToNetwork
 import scorex.core.network.NetworkControllerSharedMessages.ReceivableMessages.DataFromPeer
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallySuccessfulModifier}
@@ -21,14 +20,16 @@ import scorex.core.settings.NetworkSettings
 import scorex.core.{ModifierId, ModifierTypeId}
 import scala.concurrent.duration._
 
-class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type, networkSettings: NetworkSettings)
+class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type)
   extends NodeViewSynchronizer[EncryProposition, EncryBaseTransaction,
     EncrySyncInfo, EncrySyncInfoMessageSpec.type, EncryPersistentModifier, EncryHistory,
-    EncryMempool](networkController, nodeViewHolder, syncInfoSpec, networkSettings, timeProvider) {
+    EncryMempool](networkController, nodeViewHolder, syncInfoSpec, settings.network, timeProvider) {
 
   import EncryNodeViewSynchronizer._
 
   override protected val deliveryTracker = EncryDeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self, timeProvider)
+
+  val networkSettings: NetworkSettings = settings.network
 
   val toDownloadCheckInterval: FiniteDuration = 3.seconds
 
@@ -101,8 +102,5 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type, net
 object EncryNodeViewSynchronizer {
 
   case object CheckModifiersToDownload
-
-  def props(syncInfoSpec: EncrySyncInfoMessageSpec.type, networkSettings: NetworkSettings): Props =
-    Props(new EncryNodeViewSynchronizer(syncInfoSpec, networkSettings))
 
 }

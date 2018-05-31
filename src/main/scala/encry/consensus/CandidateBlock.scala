@@ -10,15 +10,15 @@ import io.circe.syntax._
 import scorex.core.block.Block.{Timestamp, Version}
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 
-class CandidateBlock(val accountPubKey: PublicKey25519,
-                     val signature: Signature25519,
-                     val parentOpt: Option[EncryBlockHeader],
-                     val adProofBytes: SerializedAdProof,
-                     val stateRoot: ADDigest,
-                     val version: Version,
-                     val transactions: Seq[EncryBaseTransaction],
-                     val timestamp: Timestamp,
-                     val nBits: NBits) {
+case class CandidateBlock(accountPubKey: PublicKey25519,
+                          signature: Signature25519,
+                          parentOpt: Option[EncryBlockHeader],
+                          adProofBytes: SerializedAdProof,
+                          stateRoot: ADDigest,
+                          version: Version,
+                          transactions: Seq[EncryBaseTransaction],
+                          timestamp: Timestamp,
+                          nBits: NBits) {
 
   override def toString: String = s"<CandidateBlock timestamp=$timestamp txQty=${transactions.size} " +
     s"parentId=${parentOpt.map(_.encodedId).getOrElse("None")}>"

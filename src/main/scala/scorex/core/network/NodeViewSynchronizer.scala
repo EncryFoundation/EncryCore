@@ -45,7 +45,7 @@ MR <: MempoolReader[TX]](networkControllerRef: ActorRef,
   import History._
 
   import NodeViewSynchronizer.ReceivableMessages._
-  import scorex.core.NodeViewHolder.ReceivableMessages.{GetNodeViewChanges, CompareViews, ModifiersFromRemote}
+  import encry.view.NodeViewHolder.ReceivableMessages.{GetNodeViewChanges, CompareViews, ModifiersFromRemote}
   import encry.network.NetworkController.ReceivableMessages.{SendToNetwork, RegisterMessagesHandler}
   import scorex.core.network.NetworkControllerSharedMessages.ReceivableMessages.DataFromPeer
 

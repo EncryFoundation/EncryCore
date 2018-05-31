@@ -35,7 +35,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
 
   override val networkChunkSize: Int = encrySettings.scorexSettings.network.networkChunkSize
 
-  override lazy val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
+  override val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,
     ADProofs.modifierTypeId -> ADProofSerializer,
@@ -54,7 +54,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
     minimalState().closeStorage()
   }
 
-  override protected def txModify(tx: EncryBaseTransaction): Unit = memoryPool().put(tx) match {
+  override def txModify(tx: EncryBaseTransaction): Unit = memoryPool().put(tx) match {
     case Success(newPool) =>
       log.debug(s"Unconfirmed transaction $tx added to the memory pool")
       val newVault = vault().scanOffchain(tx)
@@ -64,23 +64,17 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
       context.system.eventStream.publish(FailedTransaction[EncryProposition, EncryBaseTransaction](tx, e))
   }
 
-  override protected def genesisState: (EncryHistory, MS, EncryWallet, EncryMempool) = {
+  override def genesisState: (EncryHistory, StateType, EncryWallet, EncryMempool) = {
     val stateDir: File = EncryState.getStateDir(encrySettings)
     stateDir.mkdir()
-
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
-
     val state: StateType = {
       if (encrySettings.nodeSettings.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, encrySettings.nodeSettings)
       else EncryState.generateGenesisUtxoState(stateDir, Some(self))._1
-    }.asInstanceOf[MS]
-
+    }.asInstanceOf[StateType]
     val history: EncryHistory = EncryHistory.readOrGenerate(encrySettings, timeProvider)
-
     val wallet: EncryWallet = EncryWallet.readOrGenerate(encrySettings)
-
     val memPool: EncryMempool = EncryMempool.empty(encrySettings, timeProvider)
-
     (history, state, wallet, memPool)
   }
 
@@ -92,7 +86,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
     val history: EncryHistory = EncryHistory.readOrGenerate(encrySettings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(encrySettings)
     val memPool: EncryMempool = EncryMempool.empty(encrySettings, timeProvider)
-    val state: StateType = restoreConsistentState(EncryState.readOrGenerate(encrySettings, Some(self)).asInstanceOf[MS], history)
+    val state: StateType = restoreConsistentState(EncryState.readOrGenerate(encrySettings, Some(self)).asInstanceOf[StateType], history)
     Some((history, state, wallet, memPool))
   } else None
 
@@ -105,8 +99,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
       (version, digest) match {
         case (Some(_), Some(_)) if encrySettings.nodeSettings.stateMode.isDigest =>
           DigestState.create(version, digest, dir, encrySettings.nodeSettings)
-        case _ =>
-          EncryState.readOrGenerate(encrySettings, Some(self))
+        case _ => EncryState.readOrGenerate(encrySettings, Some(self))
       }
     }.asInstanceOf[StateType]
       .ensuring(_.rootHash sameElements digest.getOrElse(EncryState.afterGenesisStateDigest), "State root is incorrect")
@@ -124,7 +117,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
         log.debug("State and history are inconsistent. History is empty on startup, rollback state to genesis.")
         getRecreatedState()
       case (_, Some(bestBlock), _: DigestState) =>
-        // Update state.digest.
         log.debug(s"State and history are inconsistent. Going to switch state to version ${bestBlock.encodedId}")
         getRecreatedState(Some(VersionTag @@ bestBlock.id), Some(bestBlock.header.stateRoot))
       case (stateId, Some(historyBestBlock), state: StateType@unchecked) =>
@@ -140,9 +132,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
             case None => throw new Exception(s"Failed to get full block for header $h")
           }
         }
-        toApply.foldLeft(startState) { (s, m) =>
-          s.applyModifier(m).get
-        }
+        toApply.foldLeft(startState) { (s, m) => s.applyModifier(m).get }
     }
   }.recoverWith { case e =>
     log.error("Failed to recover state.", e)
