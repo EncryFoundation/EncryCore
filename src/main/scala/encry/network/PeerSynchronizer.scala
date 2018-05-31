@@ -8,7 +8,6 @@ import akka.util.Timeout
 import encry.EncryApp.{networkController, peerManager, settings}
 import scorex.core.network.message.{GetPeersSpec, Message, MessageSpec, PeersSpec}
 import scorex.core.network.{SendToPeers, SendToRandom}
-import scorex.core.settings.NetworkSettings
 import scorex.core.utils.ScorexLogging
 import shapeless.syntax.typeable._
 
@@ -28,9 +27,8 @@ class PeerSynchronizer extends Actor with ScorexLogging {
   override def preStart: Unit = {
     super.preStart()
     networkController ! RegisterMessagesHandler(Seq(GetPeersSpec, PeersSpec), self)
-    val msg = Message[Unit](GetPeersSpec, Right(Unit), None)
-    val stn = SendToNetwork(msg, SendToRandom)
-    context.system.scheduler.schedule(2.seconds, 10.seconds)(networkController ! stn)
+    val msg: Message[Unit] = Message[Unit](GetPeersSpec, Right(Unit), None)
+    context.system.scheduler.schedule(2.seconds, 10.seconds)(networkController ! SendToNetwork(msg, SendToRandom))
   }
 
   override def receive: Receive = {
