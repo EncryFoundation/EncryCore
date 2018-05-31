@@ -12,7 +12,11 @@ object Constants {
 
   val ModifierIdSize: Int = DigestLength
 
-  val TransactionMaxSize: Int = 400
+  // Maximum block size in bytes
+  val BlockMaxSize = 1000000
+
+  // Maximum transaction size in bytes
+  val TransactionMaxSize: Int = BlockMaxSize / 4
 
   val DefaultKeepVersions: Int = 200  // TODO: Move to `NodeSettings`.
 
@@ -66,13 +70,12 @@ object Constants {
 
     val EpochLength = 1
 
-    val BlockMaxSize = 10000
-
     val GenesisHeight: Height = Height @@ 0
 
     val PreGenesisHeight: Height = Height @@ (GenesisHeight - 1)
 
-    val MaxRollback: Long = 600.days.toMillis / DesiredBlockInterval.toMillis
+    // Maximum number of epochs blockchain state can be rolled back
+    val MaxRollbackDepth: Int = (10.days.toMillis / DesiredBlockInterval.toMillis).toInt
 
     val MaxTimeDrift: Long = 10 * DesiredBlockInterval.toMillis
 

@@ -117,6 +117,19 @@ object EncryTransaction {
                        unlockers: IndexedSeq[Unlocker],
                        directives: IndexedSeq[Directive]): Array[Byte] =
     getHash(fee, timestamp, unlockers, directives)
+
+  def estimateMinimalFee(unlockers: IndexedSeq[Unlocker],
+                         directives: IndexedSeq[Directive],
+                         defaultProofOpt: Option[Proof]): Amount = {
+      val length: Int =
+        unlockers.map(_.bytes.length).sum +
+        directives.map(_.bytes.length).sum +
+        (unlockers.size * 2) +
+        (directives.size * 2) +
+        defaultProofOpt.map(_.bytes.length).getOrElse(0) +
+        20
+      Constants.FeeMinAmount + directives.map(_.cost).sum + (Constants.PersistentByteCost * length)
+    }
 }
 
 object EncryTransactionSerializer extends Serializer[EncryTransaction] {
