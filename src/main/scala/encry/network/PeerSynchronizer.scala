@@ -21,7 +21,7 @@ class PeerSynchronizer extends Actor with ScorexLogging {
 
   import encry.network.NetworkController.ReceivableMessages.{RegisterMessagesHandler, SendToNetwork}
   import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
-  import scorex.core.network.NetworkControllerSharedMessages.ReceivableMessages.DataFromPeer
+  import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 
   val networkSettings: NetworkSettings = settings.network
 
@@ -46,10 +46,8 @@ class PeerSynchronizer extends Actor with ScorexLogging {
       (peerManager ? RandomPeers(3))
         .mapTo[Seq[InetSocketAddress]]
         .foreach { peers =>
-          val msg = Message(PeersSpec, Right(peers), None)
-          networkController ! SendToNetwork(msg, SendToPeers(Seq(remote)))
+          networkController ! SendToNetwork(Message(PeersSpec, Right(peers), None), SendToPeers(Seq(remote)))
         }
-
     case nonsense: Any => log.warn(s"PeerSynchronizer: got something strange $nonsense")
   }
 }
