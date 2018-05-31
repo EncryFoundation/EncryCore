@@ -23,7 +23,7 @@ import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import scorex.core.api.http._
-import scorex.core.network.UPnP
+import scorex.core.network.{PeerSynchronizer, UPnP}
 import scorex.core.network.message._
 import scorex.core.settings.ScorexSettings
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
@@ -72,13 +72,15 @@ object EncryApp extends App with ScorexLogging {
 
   lazy val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ additionalMessageSpecs)
 
-  val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
+  lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
 
   lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props(), "nodeViewHolder")
 
   val readersHolder: ActorRef = system.actorOf(Props[EncryViewReadersHolder], "readersHolder")
 
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController], "networkController")
+
+  val peerSynchronizer: ActorRef = system.actorOf(Props[PeerSynchronizer], "peerSynchronizer")
 
   val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")

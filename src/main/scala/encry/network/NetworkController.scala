@@ -31,8 +31,6 @@ class NetworkController extends Actor with ScorexLogging {
 
   val networkSettings: NetworkSettings = settings.network
 
-  val peerSynchronizer: ActorRef = PeerSynchronizerRef("PeerSynchronizer", self, peerManager, networkSettings)
-
   implicit val timeout: Timeout = Timeout(networkSettings.controllerTimeout.getOrElse(5 seconds))
 
   val messageHandlers: mutable.Map[Seq[MessageCode], ActorRef] = mutable.Map[Seq[Message.MessageCode], ActorRef]()
