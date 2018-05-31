@@ -41,7 +41,7 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
   lazy val minimalFee: Amount = Constants.FeeMinAmount +
     directives.map(_.cost).sum + (Constants.PersistentByteCost * length)
 
-  override def toString: String = s"<TX: id=${Algos.encode(id)}>"
+  override def toString: String = s"EncryTransaction(id=${Algos.encode(id)}, fee=$fee, inputs=${unlockers.map(u => Algos.encode(u.boxId))})"
 
   // Shadowed.
   override lazy val messageToSign: Array[Byte] = Array.fill(32)(1.toByte)
