@@ -38,7 +38,7 @@ class UtxoState(override val version: VersionTag,
 
   import UtxoState.metadata
 
-  override def maxRollbackDepth: Int = 10
+  override def maxRollbackDepth: Int = Constants.Chain.MaxRollbackDepth
 
   private def onAdProofGenerated(proof: ADProofs): Unit = {
     if (nodeViewHolderRef.isEmpty) log.warn("Got proof while nodeViewHolderRef is empty")
