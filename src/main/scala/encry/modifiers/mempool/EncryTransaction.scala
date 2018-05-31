@@ -2,12 +2,9 @@ package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.mempool.EncryBaseTransaction.TransactionValidationException
-import encry.modifiers.mempool.directive.{CoinbaseDirective, Directive, DirectiveSerializer}
-import encry.modifiers.state.box.AssetBox
+import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
 import encry.modifiers.state.box.proof.{Proof, ProofSerializer}
-import encry.modifiers.state.box.proposition.OpenProposition
 import encry.settings.{Algos, Constants}
-import encry.utils.Utils
 import encrywm.lang.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
 import encrywm.lib.Types.{ESByteVector, ESList, ESLong, ESTransaction}
@@ -37,18 +34,13 @@ case class EncryTransaction(override val fee: Amount,
   override lazy val txHash: Digest32 =
     EncryTransaction.getHash(fee, timestamp, unlockers, directives)
 
-  override lazy val isCoinbase: Boolean = directives.head.isInstanceOf[CoinbaseDirective]
-
   override lazy val semanticValidity: Try[Unit] =
     Try(directives.map(_.idx).foldLeft(-1)((a, b) => if (b > a) b else throw TransactionValidationException("Invalid order")))
       .flatMap { _ =>
-        if (!validSize) {
-          Failure(TransactionValidationException("Invalid size"))
-        } else if (fee < 0) {
-          Failure(TransactionValidationException("Negative fee"))
-        } else if (!directives.forall(_.isValid)) {
-          Failure(TransactionValidationException("Bad outputs"))
-        } else Success()
+        if (!validSize) Failure(TransactionValidationException("Invalid size"))
+        else if (fee < 0) Failure(TransactionValidationException("Negative fee"))
+        else if (!directives.forall(_.isValid)) Failure(TransactionValidationException("Bad outputs"))
+        else Success()
       }
 
   override val esType: Types.ESProduct = ESTransaction

@@ -17,7 +17,7 @@ import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base16
 
-import scala.util.{Random, Try}
+import scala.util.Try
 
 trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   extends MinimalState[EncryPersistentModifier, IState] with ScorexLogging {
@@ -62,19 +62,11 @@ object EncryState extends ScorexLogging {
 
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
-  def totalSupplyBoxes: Seq[AssetBox] = {
-    lazy val genesisSeed: Long = Long.MaxValue
-    lazy val rndGen: Random = new scala.util.Random(genesisSeed)
-    (0 until Constants.Chain.EmissionEpochLength).map { i =>
-      AssetBox(HeightProposition(Height @@ i), rndGen.nextLong(), EncrySupplyController.supplyAt(Height @@ i))
-    }
-  }
-
   def generateGenesisUtxoState(stateDir: File,
                                nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
     log.info("Generating genesis UTXO state.")
 
-    val initialBoxes: Seq[EncryBaseBox] = totalSupplyBoxes
+    val initialBoxes: Seq[EncryBaseBox] = EncrySupplyController.totalSupplyBoxes
 
     val boxHolder: BoxHolder = BoxHolder(initialBoxes)
 

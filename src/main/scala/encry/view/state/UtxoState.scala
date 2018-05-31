@@ -178,13 +178,18 @@ class UtxoState(override val version: VersionTag,
       }
 
       val validBalance: Boolean = {
-        val debitB: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxs, excludeCoinbase = false)
+        val debitB: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxs)
         val creditB: Map[ADKey, Amount] = {
           val balanceSheet: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(tx.newBoxes)
-          val intrinsicBalance: Amount = balanceSheet.getOrElse(BalanceCalculator.intrinsicTokenId, 0L)
-          balanceSheet.updated(BalanceCalculator.intrinsicTokenId, intrinsicBalance + tx.fee)
+          val intrinsicBalance: Amount = balanceSheet.getOrElse(Constants.IntrinsicTokenId, 0L)
+          balanceSheet.updated(Constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
         }
-        creditB.forall { case (id, amount) => debitB.getOrElse(id, 0L) >= amount }
+        creditB.forall {
+          case (id, amount) if id sameElements Constants.IntrinsicTokenId =>
+            debitB.getOrElse(id, 0L) + allowedOutputDelta >= amount
+          case (id, amount) =>
+            debitB.getOrElse(id, 0L) >= amount
+        }
       }
 
       if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
@@ -237,12 +242,5 @@ object UtxoState extends ScorexLogging {
           p, storage, metadata(EncryState.genesisStateVersion, p.digest, Constants.Chain.PreGenesisHeight, 0L), paranoidChecks = true
         ).get.ensuring(_.digest sameElements storage.version.get)
     }
-  }
-
-  /** Controls token supply for particular `height` */
-  def supplyBoxesAt(height: Height, seed: Long): CoinbaseBox = {
-    val supplyAmount: Long = EncrySupplyController.supplyAt(height)
-    CoinbaseBox(HeightProposition(Height @@ (height + Constants.Chain.CoinbaseHeightLock)),
-      seed * height, supplyAmount)
   }
 }

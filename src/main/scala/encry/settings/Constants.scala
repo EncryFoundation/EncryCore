@@ -3,6 +3,7 @@ package encry.settings
 import encry.consensus.{Difficulty, DifficultySerializer, NBits}
 import encry.view.history.Height
 import scorex.core.block.Block.Version
+import scorex.crypto.authds.ADKey
 
 import scala.concurrent.duration._
 
@@ -31,7 +32,9 @@ object Constants {
 
   val MaxDataLength: Int = 1000
 
-  val AfterGenesisStateDigestHex: String = "bc1001fd6c0ffe38079ae7b88c2e49ce10bae63248d1317e99ff040d272b1b1d10"
+  val AfterGenesisStateDigestHex: String = "1d9c70e78c228c52927bc0b1b2abae43c33447cc61bd418d2584e9249594122810"
+
+  val IntrinsicTokenId: ADKey = ADKey @@ Algos.hash("intrinsic_token")
 
   object Chain {
 

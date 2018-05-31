@@ -9,11 +9,11 @@ import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.settings.{Algos, Constants}
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
-import encry.view.history.Height
 import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
-import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
+import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.avltree.batch._
+import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
@@ -50,13 +50,9 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
         secret, 10000, timestamp, IndexedSeq(bx), randomAddress, 5000)
     }
 
-    val openBoxes: IndexedSeq[AssetBox] = regularTransactions.foldLeft(IndexedSeq[AssetBox]())((buff, tx) =>
-      buff ++ tx.newBoxes.foldLeft(IndexedSeq[AssetBox]()) {
-        case (acc, bx: AssetBox) if bx.isOpen => acc :+ bx
-        case (acc, _) => acc
-      })
+    val fees: Amount = regularTransactions.map(_.fee).sum
 
-    val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(secret, timestamp, openBoxes, Height @@ 14)
+    val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(secret, timestamp, Seq.empty, fees)
 
     val transactions: Seq[EncryTransaction] = regularTransactions.sortBy(_.timestamp) :+ coinbase
 

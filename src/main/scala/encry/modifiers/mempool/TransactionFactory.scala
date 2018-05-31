@@ -79,18 +79,13 @@ object TransactionFactory {
   def coinbaseTransactionScratch(privKey: PrivateKey25519,
                                  timestamp: Long,
                                  useBoxes: Seq[MonetaryBox],
-                                 height: Height): EncryTransaction = {
+                                 fees: Amount): EncryTransaction = {
 
     val pubKey: PublicKey25519 = privKey.publicImage
 
     val unlockers: IndexedSeq[Unlocker] = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
 
-    val directives: IndexedSeq[Directive with Product] = if (useBoxes.nonEmpty) {
-      IndexedSeq(CoinbaseDirective(height),
-        TransferDirective(pubKey.address, useBoxes.map(_.amount).sum, 1))
-    } else {
-      IndexedSeq(CoinbaseDirective(height))
-    }
+    val directives: IndexedSeq[Directive with Product] = IndexedSeq(TransferDirective(pubKey.address, useBoxes.map(_.amount).sum + fees, 0))
 
     val signature: Signature25519 = privKey.sign(EncryTransaction.getMessageToSign(0, timestamp, unlockers, directives))
 

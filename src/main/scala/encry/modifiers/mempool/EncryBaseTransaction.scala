@@ -29,8 +29,6 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
 
   val timestamp: Long
 
-  val isCoinbase: Boolean
-
   val unlockers: IndexedSeq[Unlocker]
 
   val directives: IndexedSeq[Directive]
@@ -43,7 +41,7 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
   lazy val minimalFee: Amount = Constants.FeeMinAmount +
     directives.map(_.cost).sum + (Constants.PersistentByteCost * length)
 
-  override def toString: String = s"<TX: id=${Algos.encode(id)} isCoinbase=$isCoinbase>"
+  override def toString: String = s"<TX: id=${Algos.encode(id)}>"
 
   // Shadowed.
   override lazy val messageToSign: Array[Byte] = Array.fill(32)(1.toByte)

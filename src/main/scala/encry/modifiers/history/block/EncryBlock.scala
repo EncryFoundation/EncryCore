@@ -6,7 +6,6 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderS
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.mempool.directive.CoinbaseDirective
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
@@ -25,19 +24,9 @@ case class EncryBlock(override val header: EncryBlockHeader,
   override def transactions: Seq[EncryBaseTransaction] = payload.transactions
 
   override def semanticValidity: Try[Unit] = {
-
-    def validCoinbase: Boolean = payload.transactions.last.directives.head match {
-        case cd: CoinbaseDirective if cd.height == header.height => true
-        case _ => false
-      }
-
-    if (header.transactionsRoot != payload.digest) {
-      Failure(new Exception("Invalid payload root hash"))
-    } else if (!(validCoinbase && payload.transactions.count(_.isCoinbase) == 1)) {
-      Failure(new Exception("Invalid coinbase"))
-    } else if (!header.validSignature) {
-      Failure(new Exception("Invalid signature"))
-    } else Success()
+    if (header.transactionsRoot != payload.digest) Failure(new Exception("Invalid payload root hash"))
+    else if (!header.validSignature) Failure(new Exception("Invalid signature"))
+    else Success()
   }
 
   override def parentId: ModifierId = header.parentId

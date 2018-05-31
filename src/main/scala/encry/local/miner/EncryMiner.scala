@@ -3,13 +3,15 @@ package encry.local.miner
 import akka.actor.{Actor, ActorRef, PoisonPill, SupervisorStrategy}
 import encry.EncryApp._
 import encry.consensus._
+import encry.consensus.emission.EncrySupplyController
 import encry.crypto.PrivateKey25519
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransaction, TransactionFactory}
+import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.proof.Signature25519
-import encry.modifiers.state.box.{AssetBox, MonetaryBox}
 import encry.settings.Constants
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
@@ -18,8 +20,8 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
-import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
+import scorex.core.transaction.box.Box.Amount
 import scorex.core.utils.NetworkTime.Time
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
@@ -130,13 +132,12 @@ class EncryMiner extends Actor with ScorexLogging {
 
     val minerSecret: PrivateKey25519 = vault.keyManager.mainKey
 
-    val openBxs: IndexedSeq[MonetaryBox] = txsToPut.foldLeft(IndexedSeq[AssetBox]())((buff, tx) =>
-      buff ++ tx.newBoxes.foldLeft(IndexedSeq[AssetBox]()) {
-        case (acc, bx: AssetBox) if bx.isOpen => acc :+ bx
-        case (acc, _) => acc
-      }) ++ vault.getAvailableCoinbaseBoxesAt(state.height)
+    val feesTotal: Amount = txsToPut.map(_.fee).sum
 
-    val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(minerSecret, timestamp, openBxs, height)
+    val supplyBox: AssetBox = EncrySupplyController.supplyBoxAt(state.height)
+
+    val coinbase: EncryTransaction = TransactionFactory
+      .coinbaseTransactionScratch(minerSecret, timestamp, Seq(supplyBox), feesTotal)
 
     val txs: Seq[TX] = txsToPut.sortBy(_.timestamp) :+ coinbase
 

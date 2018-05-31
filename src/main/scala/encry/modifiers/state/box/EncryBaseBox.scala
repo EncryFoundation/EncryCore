@@ -18,7 +18,6 @@ trait EncryBaseBox extends Box[EncryProposition] with ESEnvConvertable {
 
   override lazy val id: ADKey = ADKey @@ Algos.hash(Longs.toByteArray(nonce)).updated(0, typeId) // 32 bytes!
 
-  def isCoinbase: Boolean = this.isInstanceOf[CoinbaseBox]
   def isAmountCarrying: Boolean = this.isInstanceOf[MonetaryBox]
   def isOpen: Boolean = this.proposition.isInstanceOf[OpenProposition.type]
   def isHeightLocked: Boolean = this.proposition.isInstanceOf[HeightProposition]
@@ -42,6 +41,8 @@ object EncryBaseBox {
 
   implicit val jsonEncoder: Encoder[EncryBaseBox] = {
     case ab: AssetBox => AssetBox.jsonEncoder(ab)
-    case cb: CoinbaseBox => CoinbaseBox.jsonEncoder(cb)
+    case db: DataBox => DataBox.jsonEncoder(db)
+    case acb: AssetCreationBox => AssetCreationBox.jsonEncoder(acb)
+    case aib: AssetIssuingBox => AssetIssuingBox.jsonEncoder(aib)
   }
 }
