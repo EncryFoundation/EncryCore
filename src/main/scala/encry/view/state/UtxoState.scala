@@ -4,7 +4,7 @@ import java.io.File
 
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
-import encry.consensus.emission.TokenSupplyController
+import encry.consensus.emission.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -166,8 +166,6 @@ class UtxoState(override val version: VersionTag,
 
       implicit val context: Context = Context(tx, height, lastBlockTimestamp, rootHash)
 
-      if (tx.fee < tx.minimalFee && !tx.isCoinbase) throw TransactionValidationException(s"Low fee in $tx")
-
       val bxs: IndexedSeq[EncryBaseBox] = tx.unlockers.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
         .map(t => t.toOption -> u.proofOpt)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, proofOpt)) =>
@@ -243,7 +241,7 @@ object UtxoState extends ScorexLogging {
 
   /** Controls token supply for particular `height` */
   def supplyBoxesAt(height: Height, seed: Long): CoinbaseBox = {
-    val supplyAmount: Long = TokenSupplyController.supplyAt(height)
+    val supplyAmount: Long = EncrySupplyController.supplyAt(height)
     CoinbaseBox(HeightProposition(Height @@ (height + Constants.Chain.CoinbaseHeightLock)),
       seed * height, supplyAmount)
   }

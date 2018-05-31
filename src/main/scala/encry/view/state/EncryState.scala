@@ -3,18 +3,19 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
+import encry.consensus.emission.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
 import encry.modifiers.state.box._
 import encry.modifiers.state.box.proposition.HeightProposition
-import encry.settings.{Algos, Constants, EncryAppSettings, NodeSettings}
+import encry.settings.{Constants, EncryAppSettings, NodeSettings}
 import encry.view.history.Height
 import io.iohk.iodb.Store
 import scorex.core.VersionTag
 import scorex.core.transaction.state.MinimalState
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADDigest
-import scorex.crypto.encode.Base58
+import scorex.crypto.encode.Base16
 
 import scala.util.{Random, Try}
 
@@ -54,34 +55,32 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 
 object EncryState extends ScorexLogging {
 
-  /** 33 bytes in Base58 encoding. */
-  val afterGenesisStateDigestHex: String = "pKKYifNZQRoWFNBJYRHnRLDqkxHgYPCzDFG98P5ugmS47"
+  val afterGenesisStateDigest: ADDigest = ADDigest @@ Base16.decode(Constants.AfterGenesisStateDigestHex)
+    .getOrElse(throw new Error("Failed to decode genesis state diegst"))
 
-  val afterGenesisStateDigest: ADDigest = ADDigest @@ Algos.decode(afterGenesisStateDigestHex).get
-
-  lazy val genesisStateVersion: VersionTag = VersionTag @@ Algos.hash(afterGenesisStateDigest.tail)
+  val genesisStateVersion: VersionTag = VersionTag @@ Array.fill(32)(9: Byte)
 
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
-  // TODO: Smooth supply.
-  def genesisBoxes: IndexedSeq[CoinbaseBox] = {
+  def totalSupplyBoxes: Seq[AssetBox] = {
     lazy val genesisSeed: Long = Long.MaxValue
     lazy val rndGen: Random = new scala.util.Random(genesisSeed)
-    (0 until Constants.Chain.GenesisBoxesQty).map(_ =>
-      CoinbaseBox(HeightProposition(Height @@ -1), rndGen.nextLong(), Constants.Chain.GenesisBoxesAmount))
+    (0 until Constants.Chain.EmissionEpochLength).map { i =>
+      AssetBox(HeightProposition(Height @@ i), rndGen.nextLong(), EncrySupplyController.supplyAt(Height @@ i))
+    }
   }
 
   def generateGenesisUtxoState(stateDir: File,
                                nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
     log.info("Generating genesis UTXO state.")
 
-    lazy val initialBoxes: Seq[EncryBaseBox] = genesisBoxes
+    val initialBoxes: Seq[EncryBaseBox] = totalSupplyBoxes
 
     val boxHolder: BoxHolder = BoxHolder(initialBoxes)
 
     UtxoState.fromBoxHolder(boxHolder, stateDir, nodeViewHolderRef).ensuring(us => {
-      log.debug(s"Expected afterGenesisDigest: $afterGenesisStateDigestHex")
-      log.debug(s"Actual afterGenesisDigest:   ${Base58.encode(us.rootHash)}")
+      log.debug(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
+      log.debug(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
       log.info(s"Generated UTXO state with ${boxHolder.boxes.size} boxes inside.")
       us.rootHash.sameElements(afterGenesisStateDigest) && us.version.sameElements(genesisStateVersion)
     }) -> boxHolder

@@ -31,13 +31,15 @@ object Constants {
 
   val MaxDataLength: Int = 1000
 
+  val AfterGenesisStateDigestHex: String = "bc1001fd6c0ffe38079ae7b88c2e49ce10bae63248d1317e99ff040d272b1b1d10"
+
   object Chain {
 
-    val consensusScheme: String = "equihash"
+    val ConsensusScheme: String = "equihash"
 
-    val hashLength: Int = 32
+    val HashLength: Int = 32
 
-    val MaxTarget: BigInt = BigInt(1, Array.fill(hashLength)((-1).toByte))
+    val MaxTarget: BigInt = BigInt(1, Array.fill(HashLength)((-1).toByte))
 
     val InitialDifficulty: Difficulty = Difficulty @@ BigInt(1)
 
@@ -45,11 +47,9 @@ object Constants {
 
     val InitialNBits: NBits = DifficultySerializer.encodeCompactBits(InitialDifficulty)
 
-    val ModifierIdSize: Int = hashLength
+    val ModifierIdSize: Int = HashLength
 
     val CoinbaseHeightLock = 1
-
-    val GenesisBoxesQty = 100
 
     val GenesisBoxesAmount = 1L
 
@@ -61,6 +61,8 @@ object Constants {
     val DeflationInterval = 100
 
     val DeflationFactor = 0.9998
+
+    val EmissionEpochLength = 10000
 
     // Desired time interval between blocks
     val DesiredBlockInterval: FiniteDuration = 30.seconds
