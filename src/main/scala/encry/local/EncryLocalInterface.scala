@@ -13,7 +13,7 @@ import io.circe.Json
 import io.circe.syntax._
 import scorex.core.network.Handshake
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, SemanticallySuccessfulModifier}
-import scorex.core.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
+import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 
 import scala.concurrent.ExecutionContext.Implicits.global
