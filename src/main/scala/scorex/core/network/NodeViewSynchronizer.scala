@@ -46,8 +46,7 @@ MR <: MempoolReader[TX]](networkControllerRef: ActorRef,
 
   import NodeViewSynchronizer.ReceivableMessages._
   import encry.view.NodeViewHolder.ReceivableMessages.{GetNodeViewChanges, CompareViews, ModifiersFromRemote}
-  import encry.network.NetworkController.ReceivableMessages.{SendToNetwork, RegisterMessagesHandler}
-  import scorex.core.network.NetworkControllerSharedMessages.ReceivableMessages.DataFromPeer
+  import encry.network.NetworkController.ReceivableMessages.{SendToNetwork, RegisterMessagesHandler, DataFromPeer}
 
   protected val deliveryTimeout: FiniteDuration = networkSettings.deliveryTimeout
   protected val maxDeliveryChecks: Int = networkSettings.maxDeliveryChecks

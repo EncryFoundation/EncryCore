@@ -25,7 +25,7 @@ import scala.util.{Failure, Success, Try}
 class NetworkController extends Actor with ScorexLogging {
 
   import NetworkController.ReceivableMessages._
-  import NetworkControllerSharedMessages.ReceivableMessages.DataFromPeer
+  import NetworkController.ReceivableMessages.DataFromPeer
   import PeerConnectionHandler.ReceivableMessages.CloseConnection
   import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 
@@ -141,6 +141,11 @@ class NetworkController extends Actor with ScorexLogging {
 object NetworkController {
 
   object ReceivableMessages {
+
+    import scorex.core.network.message.MessageSpec
+    import scala.reflect.runtime.universe.TypeTag
+
+    case class DataFromPeer[DT: TypeTag](spec: MessageSpec[DT], data: DT, source: ConnectedPeer)
 
     case class RegisterMessagesHandler(specs: Seq[MessageSpec[_]], handler: ActorRef)
 
