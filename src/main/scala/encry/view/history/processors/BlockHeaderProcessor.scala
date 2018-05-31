@@ -280,7 +280,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
         Failure(new Exception("Header timestamp is less than parental`s"))
       } else if (realDifficulty(header) < header.requiredDifficulty) {
         Failure(new Exception("Header <id: ${header.id}> difficulty too low."))
-      } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainParams.MaxRollback)) {
+      } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainParams.MaxRollbackDepth)) {
         Failure(new Exception("Header is too old to be applied."))
       } else if (!header.validSignature) {
         Failure(new Exception("Block signature is invalid."))

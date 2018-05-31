@@ -112,8 +112,8 @@ object EncryApp extends App with ScorexLogging {
   if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) miner ! StartMining
 
   if (encrySettings.testingSettings.transactionGeneration) {
-    val txGen = system.actorOf(TransactionGenerator.props(nodeViewHolder, encrySettings.testingSettings, timeProvider))
-    txGen ! StartGeneration
+    val transactionGenerator: ActorRef = system.actorOf(Props[TransactionGenerator], "tx-generator")
+    transactionGenerator ! StartGeneration
   }
 
   if (encrySettings.nodeSettings.enableCLI) cliListener ! StartListening

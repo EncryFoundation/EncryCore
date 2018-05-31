@@ -4,17 +4,23 @@ import java.io.File
 
 import akka.actor.ActorRef
 import encry.account.Address
-import encry.local.TestHelper
-import encry.modifiers.mempool.TransactionFactory
+import encry.crypto.PrivateKey25519
+import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
+import encry.modifiers.state.box.AssetBox
 import encry.settings.{Algos, Constants}
-import encry.utils.FileHelper
+import encry.utils.{EncryGenerator, FileHelper, TestHelper}
+import encry.view.history.Height
 import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
-import scorex.crypto.authds.ADValue
+import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.hash.Digest32
+import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
+import scorex.utils.Random
 
-class UtxoStateSpec extends PropSpec with Matchers {
+import scala.collection.IndexedSeq
+
+class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
   def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
     val p = new BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
@@ -28,6 +34,37 @@ class UtxoStateSpec extends PropSpec with Matchers {
           p, storage, paranoidChecks = true
         ).get
     }
+  }
+
+  property("Proofs for transaction") {
+
+    val (privKey: PrivateKey, pubKey: PublicKey) = Curve25519.createKeyPair(Random.randomBytes())
+    val secret: PrivateKey25519 = PrivateKey25519(privKey, pubKey)
+
+    val initialBoxes: Seq[AssetBox] = genValidAssetBoxes(secret, amount = 100000, qty = 50)
+
+    val bh: BoxHolder = BoxHolder(initialBoxes)
+
+    val state: UtxoState = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None)
+
+    val regularTransactions: Seq[EncryTransaction] = initialBoxes.map { bx =>
+      TransactionFactory.defaultPaymentTransactionScratch(
+        secret, 10000, timestamp, IndexedSeq(bx), randomAddress, 5000)
+    }
+
+    val openBoxes: IndexedSeq[AssetBox] = regularTransactions.foldLeft(IndexedSeq[AssetBox]())((buff, tx) =>
+      buff ++ tx.newBoxes.foldLeft(IndexedSeq[AssetBox]()) {
+        case (acc, bx: AssetBox) if bx.isOpen => acc :+ bx
+        case (acc, _) => acc
+      })
+
+    val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(secret, timestamp, openBoxes, Height @@ 14)
+
+    val transactions: Seq[EncryTransaction] = regularTransactions.sortBy(_.timestamp) :+ coinbase
+
+    val (_: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(transactions).get
+
+    state.applyTransactions(transactions, adDigest).isSuccess shouldBe true
   }
 
   property("FilterValid(txs) should return only valid txs (against current state).") {

@@ -118,7 +118,7 @@ class EncryMiner extends Actor with ScorexLogging {
       .foldLeft((Seq[EncryBaseTransaction](), Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) {
         case ((validTxs, invalidTxs, bxsAcc), tx) =>
           val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.unlockers.map(u => ByteArrayWrapper(u.boxId))
-          if ((validTxs.map(_.length).sum + tx.length) <= Constants.Chain.BlockMaxSize - 124) {
+          if ((validTxs.map(_.length).sum + tx.length) <= Constants.BlockMaxSize - 124) {
             if (state.validate(tx).isSuccess && bxsRaw.forall(k => !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size)
               (validTxs :+ tx, invalidTxs, bxsAcc ++ bxsRaw)
             else (validTxs, invalidTxs :+ tx, bxsAcc)
@@ -131,18 +131,17 @@ class EncryMiner extends Actor with ScorexLogging {
     val minerSecret: PrivateKey25519 = vault.keyManager.mainKey
 
     val openBxs: IndexedSeq[MonetaryBox] = txsToPut.foldLeft(IndexedSeq[AssetBox]())((buff, tx) =>
-      buff ++ tx.newBoxes.foldLeft(IndexedSeq[AssetBox]()) { case (acc, bx) =>
-        bx match {
-          case ab: AssetBox if ab.isOpen => acc :+ ab
-          case _ => acc
-        }
+      buff ++ tx.newBoxes.foldLeft(IndexedSeq[AssetBox]()) {
+        case (acc, bx: AssetBox) if bx.isOpen => acc :+ bx
+        case (acc, _) => acc
       }) ++ vault.getAvailableCoinbaseBoxesAt(state.height)
 
     val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(minerSecret, timestamp, openBxs, height)
 
     val txs: Seq[TX] = txsToPut.sortBy(_.timestamp) :+ coinbase
 
-    val (adProof: SerializedAdProof, adDigest: ADDigest) = state.proofsForTransactions(txs).get
+    val (adProof: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(txs)
+      .getOrElse(throw new Exception("ADProof generation failed"))
 
     val nBits: NBits = bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
       .getOrElse(Constants.Chain.InitialNBits)
