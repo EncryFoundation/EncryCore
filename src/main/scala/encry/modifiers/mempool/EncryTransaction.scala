@@ -30,7 +30,7 @@ case class EncryTransaction(override val fee: Amount,
 
   override lazy val length: Int = this.bytes.length
 
-  override val maxSize: Int = EncryTransaction.MaxSize
+  override val maxSize: Int = Constants.TransactionMaxSize
 
   override val feeBox: Option[AssetBox] =
     if (fee > 0) Some(AssetBox(OpenProposition, Utils.nonceFromDigest(Algos.hash(txHash)), fee))
@@ -73,8 +73,6 @@ case class EncryTransaction(override val fee: Amount,
 
 object EncryTransaction {
 
-  val MaxSize: Int = Constants.TransactionMaxSize
-
   implicit val jsonEncoder: Encoder[EncryTransaction] = (tx: EncryTransaction) => Map(
     "id" -> Algos.encode(tx.id).asJson,
     "fee" -> tx.fee.asJson,
@@ -105,8 +103,8 @@ object EncryTransaction {
   def getHash(fee: Amount,
               timestamp: Long,
               unlockers: IndexedSeq[Unlocker],
-              directives: IndexedSeq[Directive]): Digest32 = Algos.hash(
-    Bytes.concat(
+              directives: IndexedSeq[Directive]): Digest32 =
+    Algos.hash(Bytes.concat(
       unlockers.map(_.bytesWithoutProof).foldLeft(Array[Byte]())(_ ++ _),
       directives.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
       Longs.toByteArray(timestamp),
