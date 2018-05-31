@@ -10,7 +10,7 @@ import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import io.circe.Json
 import io.circe.syntax._
 import scorex.core.network.Handshake
-import scorex.core.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
+import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import scorex.core.settings.RESTApiSettings
 import scorex.core.utils.{NetworkTime, NetworkTimeProvider}
 import scorex.crypto.encode.Base58

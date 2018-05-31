@@ -18,7 +18,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
-import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import scorex.core.utils.NetworkTime.Time
 import scorex.core.utils.ScorexLogging
@@ -152,7 +152,7 @@ class EncryMiner extends Actor with ScorexLogging {
       EncryBlockHeader.getMessageToSign(derivedFields._1, minerSecret.publicImage, derivedFields._2,
         derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, nBits))
 
-    val candidate: CandidateBlock = new CandidateBlock(minerSecret.publicImage,
+    val candidate: CandidateBlock = CandidateBlock(minerSecret.publicImage,
       blockSignature, bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, nBits)
 
     log.debug(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +

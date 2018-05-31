@@ -13,31 +13,24 @@ import scorex.crypto.authds.ADKey
 
 import scala.util.Try
 
-class WalletStorage(val store: Store, val publicKeys: Set[PublicKey25519])
-  extends EncryBaseStorage {
+case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends EncryBaseStorage {
 
   import WalletStorage._
 
-  def packBoxIds(ids: Seq[ADKey]): ByteArrayWrapper =
-    ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
+  def packBoxIds(ids: Seq[ADKey]): ByteArrayWrapper = ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
 
-  def packTransactionIds(ids: Seq[ModifierId]): ByteArrayWrapper =
-    ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
+  def packTransactionIds(ids: Seq[ModifierId]): ByteArrayWrapper = ByteArrayWrapper(ids.foldLeft(Array[Byte]())(_ ++ _))
 
-  def boxIds: Seq[ADKey] =
-    readComplexValue(boxIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
+  def boxIds: Seq[ADKey] = readComplexValue(boxIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
 
-  def openBoxIds: Seq[ADKey] =
-    readComplexValue(openBoxesIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
+  def openBoxIds: Seq[ADKey] = readComplexValue(openBoxesIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
 
-  def transactionIds: Seq[ModifierId] =
-    readComplexValue(transactionIdsKey, 32).map(ModifierId @@ _).getOrElse(Seq())
+  def transactionIds: Seq[ModifierId] = readComplexValue(transactionIdsKey, 32).map(ModifierId @@ _).getOrElse(Seq())
 
   def getBoxById(id: ADKey): Option[EncryBaseBox] = store.get(keyByBoxId(id))
     .flatMap(d => StateModifierDeserializer.parseBytes(d.data, id.head).toOption)
 
-  def allBoxes: Seq[EncryBaseBox] =
-    boxIds.foldLeft(Seq[EncryBaseBox]()) { case (acc, id) =>
+  def allBoxes: Seq[EncryBaseBox] = boxIds.foldLeft(Seq[EncryBaseBox]()) { case (acc, id) =>
       getBoxById(id).map(bx => acc :+ bx).getOrElse(acc)
     }
 
@@ -61,10 +54,6 @@ object WalletStorage {
   val transactionIdsKey = ByteArrayWrapper(Algos.hash("account_transactions"))
 
   val tokensIdsKey = ByteArrayWrapper(Algos.hash("tokens_id"))
-
-  val tokenBalanceKey = ByteArrayWrapper(Algos.hash("token balance"))
-
-  val encryBalanceKey = ByteArrayWrapper(Algos.hash("encry balance"))
 
   def keyByBoxId(id: ADKey): ByteArrayWrapper = ByteArrayWrapper(id)
 

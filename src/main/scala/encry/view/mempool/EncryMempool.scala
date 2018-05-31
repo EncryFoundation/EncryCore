@@ -1,8 +1,8 @@
 package encry.view.mempool
 
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.settings.EncryAppSettings
 import encry.view.mempool.EncryMempool._
+import encry.settings.EncryAppSettings
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
 import scorex.core.ModifierId
@@ -12,8 +12,8 @@ import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}
 
-class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTransaction],
-                                    settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
+class EncryMempool(val unconfirmed: TrieMap[TxKey, EncryBaseTransaction],
+                   settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
   extends MemoryPool[EncryBaseTransaction, EncryMempool] with EncryMempoolReader with AutoCloseable with ScorexLogging {
 
   private implicit val cleanupScheduler: Scheduler = Scheduler.singleThread("mempool-cleanup-thread")
@@ -25,8 +25,6 @@ class EncryMempool private[mempool](val unconfirmed: TrieMap[TxKey, EncryBaseTra
   private val cleanup: CancelableFuture[EncryMempool] = removeExpired.runAsync
 
   override def close(): Unit = cleanup.cancel()
-
-  override type NVCT = EncryMempool
 
   override def put(tx: EncryBaseTransaction): Try[EncryMempool] = put(Seq(tx))
 

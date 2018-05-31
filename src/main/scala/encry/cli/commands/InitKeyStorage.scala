@@ -12,7 +12,7 @@ import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import encry.EncryApp._
-import scorex.core.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import scala.concurrent.Future
 import scala.util.Try
 
