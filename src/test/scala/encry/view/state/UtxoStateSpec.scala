@@ -46,12 +46,12 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val transactions: Seq[EncryTransaction] = initialBoxes.map { bx =>
       TransactionFactory.defaultPaymentTransactionScratch(
-        secret, 10000, System.currentTimeMillis(), IndexedSeq(bx), randomAddress, 5000)
+        secret, 10000, timestamp, IndexedSeq(bx), randomAddress, 5000)
     }
 
     assert(transactions.forall(tx => state.validate(tx).isSuccess))
 
-    val (_: SerializedAdProof, adDigest: ADDigest) = state.proofsForTransactions(transactions).get
+    val (_: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(transactions).get
 
     state.applyTransactions(transactions, adDigest).isSuccess shouldBe true
   }
@@ -68,7 +68,6 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
     val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath)
 
     val fee = factory.Props.txFee
-    val timestamp = 1234567L
 
     val validTxs = keys.zip(bxs).map { case (k, bx) =>
       val useBoxes = IndexedSeq(bx)
