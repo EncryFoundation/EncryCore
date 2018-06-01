@@ -50,10 +50,12 @@ class UtxoState(override val version: VersionTag,
     def applyTry(txs: Seq[EncryBaseTransaction], allowedOutputDelta: Amount = 0L): Try[Unit] =
       txs.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, tx) =>
         t.flatMap { _ =>
-          validate(tx, allowedOutputDelta).flatMap(_ => extractStateChanges(tx).operations.map(ADProofs.toModification)
-            .foldLeft[Try[Option[ADValue]]](Success(None)) { case (tIn, m) =>
-            tIn.flatMap(_ => persistentProver.performOneOperation(m))
-          })
+          validate(tx, allowedOutputDelta).flatMap { _ =>
+            extractStateChanges(tx).operations.map(ADProofs.toModification)
+              .foldLeft[Try[Option[ADValue]]](Success(None)) { case (tIn, m) =>
+                tIn.flatMap(_ => persistentProver.performOneOperation(m))
+            }
+          }
         }
       }.map(_ => Unit)
 

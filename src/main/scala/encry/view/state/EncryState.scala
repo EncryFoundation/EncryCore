@@ -7,9 +7,7 @@ import encry.consensus.emission.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
 import encry.modifiers.state.box._
-import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
-import encry.view.history.Height
 import io.iohk.iodb.Store
 import scorex.core.VersionTag
 import scorex.core.transaction.state.MinimalState
@@ -56,7 +54,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 object EncryState extends ScorexLogging {
 
   val afterGenesisStateDigest: ADDigest = ADDigest @@ Base16.decode(Constants.AfterGenesisStateDigestHex)
-    .getOrElse(throw new Error("Failed to decode genesis state diegst"))
+    .getOrElse(throw new Error("Failed to decode genesis state digest"))
 
   val genesisStateVersion: VersionTag = VersionTag @@ Array.fill(32)(9: Byte)
 
@@ -64,11 +62,9 @@ object EncryState extends ScorexLogging {
 
   def generateGenesisUtxoState(stateDir: File,
                                nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
-    log.info("Generating genesis UTXO state.")
 
-    val initialBoxes: Seq[EncryBaseBox] = EncrySupplyController.totalSupplyBoxes
-
-    val boxHolder: BoxHolder = BoxHolder(initialBoxes)
+    val genesisSupplyBoxes: Seq[EncryBaseBox] = EncrySupplyController.totalSupplyBoxes
+    val boxHolder: BoxHolder = BoxHolder(genesisSupplyBoxes)
 
     UtxoState.fromBoxHolder(boxHolder, stateDir, nodeViewHolderRef).ensuring(us => {
       log.debug(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
@@ -78,9 +74,8 @@ object EncryState extends ScorexLogging {
     }) -> boxHolder
   }
 
-  def generateGenesisDigestState(stateDir: File, settings: NodeSettings): DigestState = {
+  def generateGenesisDigestState(stateDir: File, settings: NodeSettings): DigestState =
     DigestState.create(Some(genesisStateVersion), Some(afterGenesisStateDigest), stateDir, settings)
-  }
 
   def readOrGenerate(settings: EncryAppSettings,
                      nodeViewHolderRef: Option[ActorRef]): EncryState[_] = {
