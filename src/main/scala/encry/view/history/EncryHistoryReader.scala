@@ -139,7 +139,10 @@ trait EncryHistoryReader
 
   protected def testApplicable(modifier: EncryPersistentModifier): Try[Unit] = {
     modifier match {
-      case header: EncryBlockHeader => validate(header)
+      case header: EncryBlockHeader => validate(header).recover {
+        case e: Exception => log.info(e.toString)
+          Failure(e)
+      }
       case payload: EncryBlockPayload => validate(payload)
       case adProofs: ADProofs => validate(adProofs)
       case mod: Any => Failure(new Exception(s"Modifier $mod is of incorrect type."))
