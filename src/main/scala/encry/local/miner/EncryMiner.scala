@@ -1,6 +1,6 @@
 package encry.local.miner
 
-import akka.actor.{Actor, ActorRef, PoisonPill, SupervisorStrategy}
+import akka.actor.{Actor, ActorRef, PoisonPill, Props, SupervisorStrategy}
 import encry.EncryApp._
 import encry.consensus._
 import encry.crypto.PrivateKey25519
@@ -60,7 +60,7 @@ class EncryMiner extends Actor with ScorexLogging {
   def mining: Receive = {
     case StartMining if candidateOpt.nonEmpty && !isMining && encrySettings.nodeSettings.mining =>
       isMining = true
-      miningWorkers += EncryMiningWorker(encrySettings, nodeViewHolder, candidateOpt.get)(context)
+      miningWorkers += context.actorOf(Props(classOf[EncryMiningWorker], candidateOpt.get), "worker1")
       miningWorkers.foreach(_ ! candidateOpt.get)
     case StartMining if candidateOpt.isEmpty => produceCandidate()
     case StopMining =>
