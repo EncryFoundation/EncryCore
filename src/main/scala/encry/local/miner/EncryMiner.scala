@@ -58,13 +58,16 @@ class EncryMiner extends Actor with ScorexLogging {
   }
 
   def mining: Receive = {
-    case StartMining if candidateOpt.nonEmpty =>
-      isMining = true
-      val numberOfWorkers = encrySettings.nodeSettings.numberOfMiningWorkers
-      miningWorkers = for (i <- 0 to numberOfWorkers) yield context.actorOf(
-        Props(classOf[EncryMiningWorker], candidateOpt.get, i, numberOfWorkers), s"worker$i")
-      miningWorkers.foreach(_ ! candidateOpt.get)
-    case StartMining if candidateOpt.isEmpty => produceCandidate()
+    case StartMining =>
+      candidateOpt match {
+        case Some(candidateBlock) =>
+          isMining = true
+          val numberOfWorkers: Int = encrySettings.nodeSettings.numberOfMiningWorkers
+          miningWorkers = for (i <- 0 to numberOfWorkers) yield context.actorOf(
+            Props(classOf[EncryMiningWorker], candidateBlock, i, numberOfWorkers), s"worker$i")
+          miningWorkers.foreach(_ ! candidateBlock)
+        case None => produceCandidate()
+      }
     case StopMining =>
       isMining = false
       killAllWorkers()
