@@ -1,6 +1,6 @@
 package encry.local.miner
 
-import akka.actor.{Actor, ActorRef, PoisonPill, Props, SupervisorStrategy}
+import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy}
 import encry.EncryApp._
 import encry.consensus._
 import encry.crypto.PrivateKey25519
@@ -108,7 +108,6 @@ class EncryMiner extends Actor with ScorexLogging {
   }
 
   def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool],
-                       //history: EncryHistory, pool: EncryMempool, state: UtxoState, vault: EncryWallet,
                       bestHeaderOpt: Option[EncryBlockHeader]): CandidateBlock = {
     val timestamp: Time = timeProvider.time()
     val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)

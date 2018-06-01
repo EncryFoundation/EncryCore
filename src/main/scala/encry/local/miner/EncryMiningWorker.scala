@@ -23,8 +23,8 @@ class EncryMiningWorker(initialCandidate: CandidateBlock) extends Actor with Sco
     case MineBlock(nonce) => ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, nonce) match {
       case Some(block) =>
         log.info(s"New block found: $block")
-        nodeViewHolder ! LocallyGeneratedModifier(block.header)
         nodeViewHolder ! LocallyGeneratedModifier(block.payload)
+        nodeViewHolder ! LocallyGeneratedModifier(block.header)
         if (encrySettings.nodeSettings.stateMode == StateMode.Digest)
           block.adProofsOpt.foreach { adp => nodeViewHolder ! LocallyGeneratedModifier(adp) }
         context.system.scheduler.scheduleOnce(encrySettings.nodeSettings.miningDelay) { self ! MineBlock(0) }
