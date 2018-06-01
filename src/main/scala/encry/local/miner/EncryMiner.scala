@@ -27,7 +27,6 @@ import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scorex.crypto.hash.Digest32
 
 import scala.collection._
-import scala.collection.mutable.ArrayBuffer
 
 class EncryMiner extends Actor with ScorexLogging {
 
@@ -37,7 +36,7 @@ class EncryMiner extends Actor with ScorexLogging {
   val consensus: ConsensusScheme = ConsensusSchemeReaders.consensusScheme
   var isMining = false
   var candidateOpt: Option[CandidateBlock] = None
-  val miningWorkers: mutable.Buffer[ActorRef] = new ArrayBuffer[ActorRef]()
+  var miningWorkers: Seq[ActorRef] = Seq.empty[ActorRef]
 
   override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
 
@@ -47,7 +46,7 @@ class EncryMiner extends Actor with ScorexLogging {
 
   def killAllWorkers(): Unit = {
     miningWorkers.foreach(worker => context.stop(worker))
-    miningWorkers.clear()
+    miningWorkers = Seq.empty[ActorRef]
   }
 
   def needNewCandidate(b: EncryBlock): Boolean = !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
@@ -61,7 +60,7 @@ class EncryMiner extends Actor with ScorexLogging {
   def mining: Receive = {
     case StartMining if candidateOpt.nonEmpty =>
       isMining = true
-      miningWorkers += context.actorOf(Props(classOf[EncryMiningWorker], candidateOpt.get), "worker1")
+      miningWorkers = miningWorkers :+ context.actorOf(Props(classOf[EncryMiningWorker], candidateOpt.get), "worker1")
       miningWorkers.foreach(_ ! candidateOpt.get)
     case StartMining if candidateOpt.isEmpty => produceCandidate()
     case StopMining =>
