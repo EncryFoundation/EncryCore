@@ -11,6 +11,7 @@ case class NodeSettings(stateMode: StateMode,
                         verifyTransactions: Boolean,
                         blocksToKeep: Int,
                         mining: Boolean,
+                        numberOfMiningWorkers: Int,
                         miningDelay: FiniteDuration,
                         offlineGeneration: Boolean,
                         keepVersions: Int,
@@ -25,16 +26,17 @@ trait NodeSettingsReader {
     val stateModeKey = s"$path.stateMode"
     val stateMode = stateModeFromString(cfg.as[String](stateModeKey), stateModeKey)
     NodeSettings(stateMode,
-                 cfg.as[Boolean](s"$path.verifyTransactions"),
-                 cfg.as[Int](s"$path.blocksToKeep"),
-                 cfg.as[Boolean](s"$path.mining"),
-                 cfg.as[FiniteDuration](s"$path.miningDelay"),
-                 cfg.as[Boolean](s"$path.offlineGeneration"),
-                 cfg.as[Int](s"$path.keepVersions"),
-                 cfg.as[FiniteDuration](s"$path.utxMaxAge"),
-                 cfg.as[FiniteDuration](s"$path.mempoolCleanupInterval"),
-                 cfg.as[Int](s"$path.mempoolMaxCapacity"),
-                 cfg.as[Boolean](s"$path.useCli"))
+      cfg.as[Boolean](s"$path.verifyTransactions"),
+      cfg.as[Int](s"$path.blocksToKeep"),
+      cfg.as[Boolean](s"$path.mining"),
+      cfg.as[Int](s"$path.numberOfMiningWorkers"),
+      cfg.as[FiniteDuration](s"$path.miningDelay"),
+      cfg.as[Boolean](s"$path.offlineGeneration"),
+      cfg.as[Int](s"$path.keepVersions"),
+      cfg.as[FiniteDuration](s"$path.utxMaxAge"),
+      cfg.as[FiniteDuration](s"$path.mempoolCleanupInterval"),
+      cfg.as[Int](s"$path.mempoolMaxCapacity"),
+      cfg.as[Boolean](s"$path.useCli"))
   }
 
   def stateModeFromString(modeName: String, path: String): StateMode = {
