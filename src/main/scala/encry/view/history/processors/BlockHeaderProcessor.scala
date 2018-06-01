@@ -150,8 +150,31 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   }
 
   protected def validate(header: EncryBlockHeader): Try[Unit] = {
-    val validator = new BlockHeaderValidator
-    validator.validate(header)
+    lazy val parentOpt = typedModifierById[EncryBlockHeader](header.parentId)
+    if (header.parentId sameElements EncryBlockHeader.GenesisParentId) {
+      if (bestHeaderIdOpt.nonEmpty) Failure(new Exception("Trying to append genesis block to non-empty history."))
+      else if (header.height != chainParams.GenesisHeight) Failure(new Exception("Invalid height for genesis block header."))
+      else Success()
+    } else if (parentOpt.isEmpty) {
+      Failure(new Exception(s"Parental header <id: ${Algos.encode(header.parentId)}> does not exist!"))
+    } else if (header.height != parentOpt.get.height + 1) {
+      Failure(new Exception(s"Invalid height in header <id: ${header.id}>"))
+    } else if (header.timestamp - timeProvider.time() > Constants.Chain.MaxTimeDrift) {
+      Failure(new Exception(s"Invalid timestamp in header <id: ${header.id}>"))
+    } else if (header.timestamp < parentOpt.get.timestamp) {
+      Failure(new Exception("Header timestamp is less than parental`s"))
+    } else if (realDifficulty(header) < header.requiredDifficulty) {
+      Failure(new Exception("Header <id: ${header.id}> difficulty too low."))
+    } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainParams.MaxRollbackDepth)) {
+      Failure(new Exception("Header is too old to be applied."))
+    } else if (!header.validSignature) {
+      Failure(new Exception("Block signature is invalid."))
+    } else {
+      Success()
+    }.recoverWith { case exc =>
+      log.warn("Validation error: ", exc)
+      Failure(exc)
+    }
   }
 
   protected def reportInvalid(header: EncryBlockHeader): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
@@ -226,8 +249,9 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
   /**
     * Find first header with the best height <= $height which id satisfies condition $p
+    *
     * @param height - start height
-    * @param p - condition to satisfy
+    * @param p      - condition to satisfy
     * @return found header
     */
   @tailrec
@@ -253,43 +277,6 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
       assert(requiredHeights.length == requiredHeaders.length,
         s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}")
       difficultyController.getDifficulty(requiredHeaders)
-    }
-  }
-
-  class BlockHeaderValidator {
-
-    type ValidationResult = Try[Unit]
-
-    def validate(header: EncryBlockHeader): ValidationResult = {
-      lazy val parentOpt = typedModifierById[EncryBlockHeader](header.parentId)
-      if (header.parentId sameElements EncryBlockHeader.GenesisParentId) {
-        if (bestHeaderIdOpt.nonEmpty) {
-          Failure(new Exception("Trying to append genesis block to non-empty history."))
-        } else if (header.height != chainParams.GenesisHeight) {
-          Failure(new Exception("Invalid height for genesis block header."))
-        } else {
-          Success()
-        }
-      } else if (parentOpt.isEmpty) {
-        Failure(new Exception(s"Parental header <id: ${Algos.encode(header.parentId)}> does not exist!"))
-      } else if (header.height != parentOpt.get.height + 1) {
-        Failure(new Exception(s"Invalid height in header <id: ${header.id}>"))
-      } else if (header.timestamp - timeProvider.time() > Constants.Chain.MaxTimeDrift) {
-        Failure(new Exception(s"Invalid timestamp in header <id: ${header.id}>"))
-      } else if (header.timestamp < parentOpt.get.timestamp) {
-        Failure(new Exception("Header timestamp is less than parental`s"))
-      } else if (realDifficulty(header) < header.requiredDifficulty) {
-        Failure(new Exception("Header <id: ${header.id}> difficulty too low."))
-      } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainParams.MaxRollbackDepth)) {
-        Failure(new Exception("Header is too old to be applied."))
-      } else if (!header.validSignature) {
-        Failure(new Exception("Block signature is invalid."))
-      } else {
-        Success()
-      }.recoverWith { case exc =>
-        log.warn("Validation error: ", exc)
-        Failure(exc)
-      }
     }
   }
 }

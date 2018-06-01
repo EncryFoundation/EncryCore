@@ -1,17 +1,16 @@
 package encry.local.miner
 
-import akka.actor.{Actor, ActorRef, PoisonPill, SupervisorStrategy}
+import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy}
 import encry.EncryApp._
 import encry.consensus._
-import encry.consensus.emission.EncrySupplyController
 import encry.crypto.PrivateKey25519
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransaction, TransactionFactory}
-import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.proof.Signature25519
+import encry.modifiers.state.box.{AssetBox, MonetaryBox}
 import encry.settings.Constants
-import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+import encry.view.NodeViewHolder.CurrentView
 import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
@@ -20,15 +19,14 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
+import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import scorex.core.transaction.box.Box.Amount
 import scorex.core.utils.NetworkTime.Time
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scorex.crypto.hash.Digest32
 
 import scala.collection._
-import scala.collection.mutable.ArrayBuffer
 
 class EncryMiner extends Actor with ScorexLogging {
 
@@ -38,7 +36,7 @@ class EncryMiner extends Actor with ScorexLogging {
   val consensus: ConsensusScheme = ConsensusSchemeReaders.consensusScheme
   var isMining = false
   var candidateOpt: Option[CandidateBlock] = None
-  val miningWorkers: mutable.Buffer[ActorRef] = new ArrayBuffer[ActorRef]()
+  var miningWorkers: Seq[ActorRef] = Seq.empty[ActorRef]
 
   override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
 
@@ -47,8 +45,8 @@ class EncryMiner extends Actor with ScorexLogging {
   override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
 
   def killAllWorkers(): Unit = {
-    miningWorkers.foreach(_ ! PoisonPill)
-    miningWorkers.clear()
+    miningWorkers.foreach(worker => context.stop(worker))
+    miningWorkers = Seq.empty[ActorRef]
   }
 
   def needNewCandidate(b: EncryBlock): Boolean = !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
@@ -60,11 +58,16 @@ class EncryMiner extends Actor with ScorexLogging {
   }
 
   def mining: Receive = {
-    case StartMining if candidateOpt.nonEmpty && !isMining && encrySettings.nodeSettings.mining =>
-      isMining = true
-      miningWorkers += EncryMiningWorker(encrySettings, nodeViewHolder, candidateOpt.get)(context)
-      miningWorkers.foreach(_ ! candidateOpt.get)
-    case StartMining if candidateOpt.isEmpty => produceCandidate()
+    case StartMining =>
+      candidateOpt match {
+        case Some(candidateBlock) =>
+          isMining = true
+          val numberOfWorkers: Int = encrySettings.nodeSettings.numberOfMiningWorkers
+          miningWorkers = for (i <- 0 to numberOfWorkers) yield context.actorOf(
+            Props(classOf[EncryMiningWorker], candidateBlock, i, numberOfWorkers), s"worker$i")
+          miningWorkers.foreach(_ ! candidateBlock)
+        case None => produceCandidate()
+      }
     case StopMining =>
       isMining = false
       killAllWorkers()
@@ -109,42 +112,43 @@ class EncryMiner extends Actor with ScorexLogging {
     miningWorkers.foreach(_ ! c)
   }
 
-  def createCandidate(history: EncryHistory, pool: EncryMempool, state: UtxoState, vault: EncryWallet,
+  def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool],
                       bestHeaderOpt: Option[EncryBlockHeader]): CandidateBlock = {
     val timestamp: Time = timeProvider.time()
     val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
 
     // `txsToPut` - valid, non-conflicting txs with respect to their fee amount.
     // `txsToDrop` - invalidated txs to be dropped from mempool.
-    val (txsToPut, txsToDrop, _) = pool.takeAll.toSeq.sortBy(_.fee).reverse
+    val (txsToPut, txsToDrop, _) = view.pool.takeAll.toSeq.sortBy(_.fee).reverse
       .foldLeft((Seq[EncryBaseTransaction](), Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) {
         case ((validTxs, invalidTxs, bxsAcc), tx) =>
           val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.unlockers.map(u => ByteArrayWrapper(u.boxId))
           if ((validTxs.map(_.length).sum + tx.length) <= Constants.BlockMaxSize - 124) {
-            if (state.validate(tx).isSuccess && bxsRaw.forall(k => !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size)
+            if (view.state.validate(tx).isSuccess && bxsRaw.forall(k => !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size)
               (validTxs :+ tx, invalidTxs, bxsAcc ++ bxsRaw)
             else (validTxs, invalidTxs :+ tx, bxsAcc)
           } else (validTxs, invalidTxs, bxsAcc)
       }
 
     // Remove stateful-invalid txs from mempool.
-    pool.removeAsync(txsToDrop)
+    view.pool.removeAsync(txsToDrop)
 
-    val minerSecret: PrivateKey25519 = vault.keyManager.mainKey
+    val minerSecret: PrivateKey25519 = view.vault.keyManager.mainKey
 
-    val feesTotal: Amount = txsToPut.map(_.fee).sum
+    val openBxs: IndexedSeq[MonetaryBox] = txsToPut.foldLeft(IndexedSeq[AssetBox]())((buff, tx) =>
+      buff ++ tx.newBoxes.foldLeft(IndexedSeq[AssetBox]()) {
+        case (acc, bx: AssetBox) if bx.isOpen => acc :+ bx
+        case (acc, _) => acc
+      }) ++ view.vault.getAvailableCoinbaseBoxesAt(view.state.height)
 
-    val supplyBox: AssetBox = EncrySupplyController.supplyBoxAt(state.height)
-
-    val coinbase: EncryTransaction = TransactionFactory
-      .coinbaseTransactionScratch(minerSecret, timestamp, Seq(supplyBox), feesTotal)
+    val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(minerSecret, timestamp, openBxs, height)
 
     val txs: Seq[TX] = txsToPut.sortBy(_.timestamp) :+ coinbase
 
-    val (adProof: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(txs)
+    val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
       .getOrElse(throw new Exception("ADProof generation failed"))
 
-    val nBits: NBits = bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
+    val nBits: NBits = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
       .getOrElse(Constants.Chain.InitialNBits)
 
     val derivedFields: (Byte, ModifierId, Digest32, Digest32, Int) = consensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
@@ -163,18 +167,12 @@ class EncryMiner extends Actor with ScorexLogging {
   }
 
   def produceCandidate(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { v =>
+    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
       log.info("Starting candidate generation")
-      val history: EncryHistory = v.history
-      val state: UtxoState = v.state
-      val pool: EncryMempool = v.pool
-      val vault: EncryWallet = v.vault
-      val bestHeaderOpt: Option[EncryBlockHeader] = history.bestBlockOpt.map(_.header)
-
-      if (bestHeaderOpt.isDefined || encrySettings.nodeSettings.offlineGeneration) {
-        val candidate: CandidateBlock = createCandidate(history, pool, state, vault, bestHeaderOpt)
-        CandidateEnvelope.fromCandidate(candidate)
-      } else CandidateEnvelope.empty
+      val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
+      if (bestHeaderOpt.isDefined || encrySettings.nodeSettings.offlineGeneration)
+        CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
+      else CandidateEnvelope.empty
     }
 }
 
