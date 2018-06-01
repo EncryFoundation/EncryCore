@@ -10,6 +10,7 @@ import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransaction, Transact
 import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.{AssetBox, MonetaryBox}
 import encry.settings.Constants
+import encry.view.NodeViewHolder.CurrentView
 import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
@@ -45,7 +46,7 @@ class EncryMiner extends Actor with ScorexLogging {
   override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
 
   def killAllWorkers(): Unit = {
-    miningWorkers.foreach(_ ! PoisonPill)
+    miningWorkers.foreach(worker => context.stop(worker))
     miningWorkers.clear()
   }
 
@@ -58,7 +59,7 @@ class EncryMiner extends Actor with ScorexLogging {
   }
 
   def mining: Receive = {
-    case StartMining if candidateOpt.nonEmpty && !isMining && encrySettings.nodeSettings.mining =>
+    case StartMining if candidateOpt.nonEmpty =>
       isMining = true
       miningWorkers += context.actorOf(Props(classOf[EncryMiningWorker], candidateOpt.get), "worker1")
       miningWorkers.foreach(_ ! candidateOpt.get)
@@ -107,43 +108,44 @@ class EncryMiner extends Actor with ScorexLogging {
     miningWorkers.foreach(_ ! c)
   }
 
-  def createCandidate(history: EncryHistory, pool: EncryMempool, state: UtxoState, vault: EncryWallet,
+  def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool],
+                       //history: EncryHistory, pool: EncryMempool, state: UtxoState, vault: EncryWallet,
                       bestHeaderOpt: Option[EncryBlockHeader]): CandidateBlock = {
     val timestamp: Time = timeProvider.time()
     val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
 
     // `txsToPut` - valid, non-conflicting txs with respect to their fee amount.
     // `txsToDrop` - invalidated txs to be dropped from mempool.
-    val (txsToPut, txsToDrop, _) = pool.takeAll.toSeq.sortBy(_.fee).reverse
+    val (txsToPut, txsToDrop, _) = view.pool.takeAll.toSeq.sortBy(_.fee).reverse
       .foldLeft((Seq[EncryBaseTransaction](), Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) {
         case ((validTxs, invalidTxs, bxsAcc), tx) =>
           val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.unlockers.map(u => ByteArrayWrapper(u.boxId))
           if ((validTxs.map(_.length).sum + tx.length) <= Constants.BlockMaxSize - 124) {
-            if (state.validate(tx).isSuccess && bxsRaw.forall(k => !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size)
+            if (view.state.validate(tx).isSuccess && bxsRaw.forall(k => !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size)
               (validTxs :+ tx, invalidTxs, bxsAcc ++ bxsRaw)
             else (validTxs, invalidTxs :+ tx, bxsAcc)
           } else (validTxs, invalidTxs, bxsAcc)
       }
 
     // Remove stateful-invalid txs from mempool.
-    pool.removeAsync(txsToDrop)
+    view.pool.removeAsync(txsToDrop)
 
-    val minerSecret: PrivateKey25519 = vault.keyManager.mainKey
+    val minerSecret: PrivateKey25519 = view.vault.keyManager.mainKey
 
     val openBxs: IndexedSeq[MonetaryBox] = txsToPut.foldLeft(IndexedSeq[AssetBox]())((buff, tx) =>
       buff ++ tx.newBoxes.foldLeft(IndexedSeq[AssetBox]()) {
         case (acc, bx: AssetBox) if bx.isOpen => acc :+ bx
         case (acc, _) => acc
-      }) ++ vault.getAvailableCoinbaseBoxesAt(state.height)
+      }) ++ view.vault.getAvailableCoinbaseBoxesAt(view.state.height)
 
     val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(minerSecret, timestamp, openBxs, height)
 
     val txs: Seq[TX] = txsToPut.sortBy(_.timestamp) :+ coinbase
 
-    val (adProof: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(txs)
+    val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
       .getOrElse(throw new Exception("ADProof generation failed"))
 
-    val nBits: NBits = bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
+    val nBits: NBits = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
       .getOrElse(Constants.Chain.InitialNBits)
 
     val derivedFields: (Byte, ModifierId, Digest32, Digest32, Int) = consensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
@@ -162,18 +164,12 @@ class EncryMiner extends Actor with ScorexLogging {
   }
 
   def produceCandidate(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { v =>
+    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
       log.info("Starting candidate generation")
-      val history: EncryHistory = v.history
-      val state: UtxoState = v.state
-      val pool: EncryMempool = v.pool
-      val vault: EncryWallet = v.vault
-      val bestHeaderOpt: Option[EncryBlockHeader] = history.bestBlockOpt.map(_.header)
-
-      if (bestHeaderOpt.isDefined || encrySettings.nodeSettings.offlineGeneration) {
-        val candidate: CandidateBlock = createCandidate(history, pool, state, vault, bestHeaderOpt)
-        CandidateEnvelope.fromCandidate(candidate)
-      } else CandidateEnvelope.empty
+      val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
+      if (bestHeaderOpt.isDefined || encrySettings.nodeSettings.offlineGeneration)
+        CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
+      else CandidateEnvelope.empty
     }
 }
 

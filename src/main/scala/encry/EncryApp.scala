@@ -42,7 +42,7 @@ object EncryApp extends App with ScorexLogging {
 
   lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(args.headOption)
 
-  implicit lazy val settings: ScorexSettings = encrySettings.scorexSettings
+  lazy val settings: ScorexSettings = encrySettings.scorexSettings
 
   implicit val system: ActorSystem = ActorSystem(settings.network.agentName)
   implicit val materializer: ActorMaterializer = ActorMaterializer()
