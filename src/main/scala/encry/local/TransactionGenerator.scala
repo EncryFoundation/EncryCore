@@ -24,10 +24,10 @@ class TransactionGenerator extends Actor with ScorexLogging {
   import TransactionGenerator._
 
   var isActive: Boolean = false
-  var limit: Int = encrySettings.testing.limitPerEpoch
+  var limit: Int = settings.testing.limitPerEpoch
   var walletDataOpt: Option[WalletData] = None
 
-  val noLimitMode: Boolean = encrySettings.testing.limitPerEpoch < 0
+  val noLimitMode: Boolean = settings.testing.limitPerEpoch < 0
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[ChangedVault])
@@ -76,7 +76,7 @@ class TransactionGenerator extends Actor with ScorexLogging {
     // Reset transaction limit counter and fetch latest wallet data
     case SemanticallySuccessfulModifier(_: EncryBlock) =>
       self ! FetchWalletData
-      limit = encrySettings.testing.limitPerEpoch
+      limit = settings.testing.limitPerEpoch
   }
 
   def fetchWalletData(): Unit =
@@ -95,7 +95,7 @@ class TransactionGenerator extends Actor with ScorexLogging {
       if (boxesAcc.map(_.amount).sum < (amountD + minimalFeeD)) boxesAcc :+ box else boxesAcc
     }.toIndexedSeq
     TransactionFactory.defaultPaymentTransactionScratch(wd.secret, minimalFeeD, timestamp, boxes,
-      Address @@ encrySettings.testing.defaultRecipientAddress, amountD)
+      Address @@ settings.testing.defaultRecipientAddress, amountD)
   }
 }
 

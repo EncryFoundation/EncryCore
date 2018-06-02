@@ -15,17 +15,17 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.core.ModifierId
 import scorex.utils.Random
 
-class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator{
+class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator {
+
+  lazy val settings: EncryAppSettings = EncryAppSettings.read(None)
 
   property("Balance count (intrinsic coins only)"){
 
     val blockHeader = genHeader
 
-    lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(Option(""))
-
     val walletStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions)
 
-    val keyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), encrySettings.keyManagerSettings, None)
+    val keyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), settings.keyManager, None)
 
     keyManager.initStorage(Random.randomBytes())
 
@@ -60,11 +60,9 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val blockHeader = genHeader
 
-    lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(Option(""))
-
     val walletStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions)
 
-    val keyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), encrySettings.keyManagerSettings, None)
+    val keyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), settings.keyManager, None)
 
     keyManager.initStorage(Random.randomBytes())
 

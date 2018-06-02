@@ -23,13 +23,13 @@ import scala.concurrent.duration._
 class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type)
   extends NodeViewSynchronizer[EncryProposition, EncryBaseTransaction,
     EncrySyncInfo, EncrySyncInfoMessageSpec.type, EncryPersistentModifier, EncryHistory,
-    EncryMempool](networkController, nodeViewHolder, syncInfoSpec, encrySettings.network, timeProvider) {
+    EncryMempool](networkController, nodeViewHolder, syncInfoSpec, settings.network, timeProvider) {
 
   import EncryNodeViewSynchronizer._
 
   override protected val deliveryTracker = EncryDeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self, timeProvider)
 
-  val networkSettings: NetworkSettings = encrySettings.network
+  val networkSettings: NetworkSettings = settings.network
 
   val toDownloadCheckInterval: FiniteDuration = 3.seconds
 

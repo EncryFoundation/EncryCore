@@ -39,23 +39,23 @@ object EncryApp extends App with ScorexLogging {
   type PMOD = EncryPersistentModifier
   type NVHT = EncryNodeViewHolder[_]
 
-  lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(args.headOption)
+  lazy val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
 
-  implicit val system: ActorSystem = ActorSystem(encrySettings.network.agentName)
+  implicit val system: ActorSystem = ActorSystem(settings.network.agentName)
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
 
-  require(encrySettings.network.agentName.length <= 50)
-  lazy val bindAddress: InetSocketAddress = encrySettings.restApi.bindAddress
+  require(settings.network.agentName.length <= 50)
+  lazy val bindAddress: InetSocketAddress = settings.restApi.bindAddress
 
-  lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(encrySettings.ntp)
+  lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
 
-  val nodeId: Array[Byte] = Algos.hash(encrySettings.network.nodeName).take(5)
+  val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName).take(5)
 
   lazy val basicSpecs = {
-    val invSpec = new InvSpec(encrySettings.network.maxInvObjects)
-    val requestModifierSpec = new RequestModifierSpec(encrySettings.network.maxInvObjects)
+    val invSpec = new InvSpec(settings.network.maxInvObjects)
+    val requestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
     Seq(
       GetPeersSpec,
       PeersSpec,
@@ -89,18 +89,18 @@ object EncryApp extends App with ScorexLogging {
   val scanner: ActorRef = system.actorOf(EncryScanner.props(), "scanner")
 
   val apiRoutes: Seq[ApiRoute] = Seq(
-    UtilsApiRoute(encrySettings.restApi),
-    PeersApiRoute(peerManager, networkController, encrySettings.restApi),
-    InfoApiRoute(readersHolder, miner, peerManager, encrySettings, nodeId, timeProvider),
-    HistoryApiRoute(readersHolder, miner, encrySettings, nodeId, encrySettings.node.stateMode),
-    TransactionsApiRoute(readersHolder, nodeViewHolder, encrySettings.restApi, encrySettings.node.stateMode),
-    AccountInfoApiRoute(readersHolder, nodeViewHolder, scanner, encrySettings.restApi, encrySettings.node.stateMode)
+    UtilsApiRoute(settings.restApi),
+    PeersApiRoute(peerManager, networkController, settings.restApi),
+    InfoApiRoute(readersHolder, miner, peerManager, settings, nodeId, timeProvider),
+    HistoryApiRoute(readersHolder, miner, settings, nodeId, settings.node.stateMode),
+    TransactionsApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
+    AccountInfoApiRoute(readersHolder, nodeViewHolder, scanner, settings.restApi, settings.node.stateMode)
   )
 
-  val combinedRoute: Route = CompositeHttpService(system, apiRoutes, encrySettings.restApi, swaggerConfig).compositeRoute
+  val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
   Http().bindAndHandle(combinedRoute, bindAddress.getAddress.getHostAddress, bindAddress.getPort)
 
-  lazy val upnp: UPnP = new UPnP(encrySettings.network)
+  lazy val upnp: UPnP = new UPnP(settings.network)
 
   def commonSupervisorStrategy: OneForOneStrategy = OneForOneStrategy(
     maxNrOfRetries = 5,
@@ -108,14 +108,14 @@ object EncryApp extends App with ScorexLogging {
     case _ => Escalate
   }
 
-  if (encrySettings.node.mining && encrySettings.node.offlineGeneration) miner ! StartMining
+  if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
 
-  if (encrySettings.testing.transactionGeneration) {
+  if (settings.testing.transactionGeneration) {
     val transactionGenerator: ActorRef = system.actorOf(Props[TransactionGenerator], "tx-generator")
     transactionGenerator ! StartGeneration
   }
 
-  if (encrySettings.node.enableCLI) cliListener ! StartListening
+  if (settings.node.enableCLI) cliListener ! StartListening
 
   def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
 }

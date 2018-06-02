@@ -29,7 +29,7 @@ class NetworkController extends Actor with ScorexLogging {
   import PeerConnectionHandler.ReceivableMessages.CloseConnection
   import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 
-  val networkSettings: NetworkSettings = encrySettings.network
+  val networkSettings: NetworkSettings = settings.network
 
   implicit val timeout: Timeout = Timeout(networkSettings.controllerTimeout.getOrElse(5 seconds))
 

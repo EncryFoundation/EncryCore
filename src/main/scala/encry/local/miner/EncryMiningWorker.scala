@@ -16,7 +16,7 @@ class EncryMiningWorker(initialCandidate: CandidateBlock, myNumber: Int, numberO
 
   override def preStart(): Unit = {
     log.info("Starting new mining worker: " + self.path)
-    context.system.scheduler.scheduleOnce(encrySettings.node.miningDelay) {
+    context.system.scheduler.scheduleOnce(settings.node.miningDelay) {
       self ! MineBlock(Long.MaxValue / numberOfWorkers * myNumber)
     }
   }
@@ -28,9 +28,9 @@ class EncryMiningWorker(initialCandidate: CandidateBlock, myNumber: Int, numberO
         log.info(s"New block is found: $block on worker $self.")
         nodeViewHolder ! LocallyGeneratedModifier(block.header)
         nodeViewHolder ! LocallyGeneratedModifier(block.payload)
-        if (encrySettings.node.stateMode == StateMode.Digest)
+        if (settings.node.stateMode == StateMode.Digest)
           block.adProofsOpt.foreach { adp => nodeViewHolder ! LocallyGeneratedModifier(adp) }
-        context.system.scheduler.scheduleOnce(encrySettings.node.miningDelay) {
+        context.system.scheduler.scheduleOnce(settings.node.miningDelay) {
           self ! MineBlock(Long.MaxValue / numberOfWorkers * myNumber)
         }
       case None => self ! MineBlock(nonce + 1)

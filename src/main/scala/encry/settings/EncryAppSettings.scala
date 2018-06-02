@@ -22,7 +22,7 @@ case class EncryAppSettings(directory: String,
                             ntp: NetworkTimeProviderSettings)
 
 object EncryAppSettings
-  extends ScorexLogging with NodeSettingsReader {
+  extends ScorexLogging with SettingsReaders with NodeSettingsReader {
 
   val configPath: String = "encry"
 
@@ -32,15 +32,34 @@ object EncryAppSettings
 
   def fromConfig(config: Config): EncryAppSettings = {
 
-    implicit val byteStrReader: ValueReader[ByteStr] = (cfg, path) => ByteStr.decodeBase58(cfg.getString(path)).get
-    implicit val fileReader: ValueReader[File] = (cfg, path) => new File(cfg.getString(path))
-    implicit val byteValueReader: ValueReader[Byte] = (cfg, path) => cfg.getInt(path).toByte
-    implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = { (config: Config, path: String) =>
-      val split = config.getString(path).split(":")
-      new InetSocketAddress(split(0), split(1).toInt)
+    val directory = config.as[String](s"$configPath.directory")
+    val nodeSettings = config.as[NodeSettings](s"$configPath.node")
+    val testingSettings = config.as[TestingSettings](s"$configPath.testing")
+    val keyManagerSettings = config.as[KeyManagerSettings](s"$configPath.keyManager")
+    val networkSettings = config.as[NetworkSettings](s"$configPath.network")
+    val restApiSettings = config.as[RESTApiSettings](s"$configPath.restApi")
+    val walletSettings = config.as[WalletSettings](s"$configPath.wallet")
+    val ntpSettings = config.as[NetworkTimeProviderSettings](s"$configPath.ntp")
+    val dataDir = new File(config.as[String](s"$configPath.dataDir"))
+    val logDir = new File(config.as[String](s"$configPath.logDir"))
+
+    if (nodeSettings.stateMode.isDigest && nodeSettings.mining) {
+      log.error("Malformed configuration file was provided! Mining is not possible with digest state. Aborting!")
+      EncryApp.forceStopApplication()
     }
 
-    config.as[EncryAppSettings](configPath)
+    EncryAppSettings(
+      directory,
+      testingSettings,
+      nodeSettings,
+      keyManagerSettings,
+      dataDir,
+      logDir,
+      networkSettings,
+      restApiSettings,
+      walletSettings,
+      ntpSettings
+    )
   }
 
   private def readConfigFromPath(userConfigPath: Option[String]): Config = {
