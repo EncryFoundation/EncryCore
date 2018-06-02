@@ -35,10 +35,10 @@ class EncryLocalInterface(viewHolderRef: ActorRef,
     context.system.scheduler.schedule(10.second, 10.second)(peerManager ! GetConnectedPeers)
   }
 
-  private val votes = Algos.encode(Algos.hash(settings.scorexSettings.network.nodeName).take(5))
+  private val votes = Algos.encode(Algos.hash(settings.network.nodeName).take(5))
 
-  var nodeInfo = NodeInfo(settings.scorexSettings.network.nodeName, Version.VersionString, 0, 0, "null",
-    settings.nodeSettings.stateMode, "null", isMining = settings.nodeSettings.mining, votes, None, None,
+  var nodeInfo = NodeInfo(settings.network.nodeName, Version.VersionString, 0, 0, "null",
+    settings.node.stateMode, "null", isMining = settings.node.mining, votes, None, None,
     timeProvider.time())
 
   override def receive: Receive = onConnectedPeers orElse getNodeInfo orElse onMempoolChanged orElse

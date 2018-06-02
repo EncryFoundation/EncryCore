@@ -23,9 +23,9 @@ class PeerManager extends Actor with ScorexLogging {
   //peers before handshake
   val connectingPeers: mutable.Set[InetSocketAddress] = mutable.Set[InetSocketAddress]()
 
-  val peerDatabase: PeerDatabase = PeerDatabase(Some(settings.dataDir + "/peers.dat"))
+  val peerDatabase: PeerDatabase = PeerDatabase(Some(encrySettings.dataDir + "/peers.dat"))
 
-  if (peerDatabase.isEmpty) settings.network.knownPeers.foreach { address =>
+  if (peerDatabase.isEmpty) encrySettings.network.knownPeers.foreach { address =>
     if (!isSelf(address, None)) peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), None))
   }
 
@@ -39,10 +39,10 @@ class PeerManager extends Actor with ScorexLogging {
     * Given a peer's address and declared address, returns `true` iff the peer is the same is this node.
     */
   def isSelf(address: InetSocketAddress, declaredAddress: Option[InetSocketAddress]): Boolean =
-    settings.network.bindAddress == address ||
-      settings.network.declaredAddress.exists(da => declaredAddress.contains(da)) ||
-      declaredAddress.contains(settings.network.bindAddress) ||
-      settings.network.declaredAddress.contains(address)
+    encrySettings.network.bindAddress == address ||
+      encrySettings.network.declaredAddress.exists(da => declaredAddress.contains(da)) ||
+      declaredAddress.contains(encrySettings.network.bindAddress) ||
+      encrySettings.network.declaredAddress.contains(address)
 
   override def receive: Receive = peerListOperations orElse apiInterface orElse connectOps
 
@@ -96,7 +96,7 @@ class PeerManager extends Actor with ScorexLogging {
       connectingPeers -= remote
       context.system.eventStream.publish(DisconnectedPeer(remote))
     case CheckPeers =>
-      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
+      if (connectedPeers.size + connectingPeers.size < encrySettings.network.maxConnections) {
         randomPeer().foreach { address =>
           if (!connectedPeers.exists(_._1 == address) &&
             !connectingPeers.exists(_.getHostName == address.getHostName)) {

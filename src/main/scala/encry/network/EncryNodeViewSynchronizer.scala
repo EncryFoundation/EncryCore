@@ -16,20 +16,20 @@ import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{Semantically
 import scorex.core.network.message.BasicMsgDataTypes.ModifiersData
 import scorex.core.network.message.{Message, ModifiersSpec}
 import scorex.core.network.{NodeViewSynchronizer, SendToRandom}
-import scorex.core.settings.NetworkSettings
+import encry.settings.NetworkSettings
 import scorex.core.{ModifierId, ModifierTypeId}
 import scala.concurrent.duration._
 
 class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type)
   extends NodeViewSynchronizer[EncryProposition, EncryBaseTransaction,
     EncrySyncInfo, EncrySyncInfoMessageSpec.type, EncryPersistentModifier, EncryHistory,
-    EncryMempool](networkController, nodeViewHolder, syncInfoSpec, settings.network, timeProvider) {
+    EncryMempool](networkController, nodeViewHolder, syncInfoSpec, encrySettings.network, timeProvider) {
 
   import EncryNodeViewSynchronizer._
 
   override protected val deliveryTracker = EncryDeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self, timeProvider)
 
-  val networkSettings: NetworkSettings = settings.network
+  val networkSettings: NetworkSettings = encrySettings.network
 
   val toDownloadCheckInterval: FiniteDuration = 3.seconds
 

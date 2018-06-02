@@ -186,7 +186,7 @@ object EncryHistory {
     val objectsStore = new FileHistoryObjectsStore(historyDir.getAbsolutePath)
     val storage = new HistoryStorage(db, objectsStore)
 
-    val ns = settings.nodeSettings
+    val ns = settings.node
 
     val history: EncryHistory = (ns.stateMode.isDigest, ns.verifyTransactions) match {
       case (true, true) =>

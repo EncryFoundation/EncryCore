@@ -10,7 +10,7 @@ import com.google.common.primitives.Ints
 import scorex.core.app.Version
 import scorex.core.network.PeerConnectionHandler.{AwaitingHandshake, WorkingCycle}
 import scorex.core.network.message.MessageHandler
-import scorex.core.settings.NetworkSettings
+import encry.settings.NetworkSettings
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 
 import scala.concurrent.ExecutionContext.Implicits.global

@@ -19,7 +19,7 @@ import scala.util.Try
 object InitKeyStorage extends Command {
 
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
-    implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
+    implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (nodeViewHolder ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
         Try {

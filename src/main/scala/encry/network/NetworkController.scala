@@ -12,7 +12,7 @@ import encry.EncryApp._
 import scorex.core.network._
 import scorex.core.network.message.Message.MessageCode
 import scorex.core.network.message.{Message, MessageSpec}
-import scorex.core.settings.NetworkSettings
+import encry.settings.NetworkSettings
 import scorex.core.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
@@ -29,7 +29,7 @@ class NetworkController extends Actor with ScorexLogging {
   import PeerConnectionHandler.ReceivableMessages.CloseConnection
   import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 
-  val networkSettings: NetworkSettings = settings.network
+  val networkSettings: NetworkSettings = encrySettings.network
 
   implicit val timeout: Timeout = Timeout(networkSettings.controllerTimeout.getOrElse(5 seconds))
 

@@ -2,9 +2,9 @@ package scorex.core.api.client
 
 import java.net.{HttpURLConnection, URL}
 
-import scorex.core.settings.{RESTApiSettings, ScorexSettings}
+import encry.settings.RESTApiSettings
 
-import scala.io.{Source, StdIn}
+import scala.io.Source
 import scala.util.{Failure, Success, Try}
 
 

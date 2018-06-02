@@ -256,11 +256,11 @@ object KeyManager extends ScorexLogging {
 
     val keysStore = new LSMStore(dir, keepVersions = 0)
 
-    val keyManager = KeyManager(keysStore, settings.keyManagerSettings, password)
+    val keyManager = KeyManager(keysStore, settings.keyManager, password)
 
     if (keyManager.keys.isEmpty) {
       keyManager.initStorage(seed)
-      if (settings.keyManagerSettings.encryption && !keyManager.isLocked) {
+      if (settings.keyManager.encryption && !keyManager.isLocked) {
         keyManager.lock()
       }
     }

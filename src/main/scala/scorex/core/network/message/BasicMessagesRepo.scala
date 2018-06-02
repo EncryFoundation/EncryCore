@@ -8,7 +8,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import scorex.core.{ModifierId, ModifierTypeId, NodeViewModifier}
 import scorex.core.consensus.SyncInfo
 import scorex.core.network.message.Message.{MessageCode, _}
-import scorex.core.settings.NetworkSettings
+import encry.settings.NetworkSettings
 
 import scala.util.Try
 

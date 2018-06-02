@@ -33,7 +33,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
   override type VL = EncryWallet
   override type MP = EncryMempool
 
-  override val networkChunkSize: Int = encrySettings.scorexSettings.network.networkChunkSize
+  override val networkChunkSize: Int = encrySettings.network.networkChunkSize
 
   override val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
@@ -69,7 +69,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
     stateDir.mkdir()
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
     val state: StateType = {
-      if (encrySettings.nodeSettings.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, encrySettings.nodeSettings)
+      if (encrySettings.node.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, encrySettings.node)
       else EncryState.generateGenesisUtxoState(stateDir, Some(self))._1
     }.asInstanceOf[StateType]
     val history: EncryHistory = EncryHistory.readOrGenerate(encrySettings, timeProvider)
@@ -97,8 +97,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
 
     {
       (version, digest) match {
-        case (Some(_), Some(_)) if encrySettings.nodeSettings.stateMode.isDigest =>
-          DigestState.create(version, digest, dir, encrySettings.nodeSettings)
+        case (Some(_), Some(_)) if encrySettings.node.stateMode.isDigest =>
+          DigestState.create(version, digest, dir, encrySettings.node)
         case _ => EncryState.readOrGenerate(encrySettings, Some(self))
       }
     }.asInstanceOf[StateType]
@@ -142,7 +142,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
 
 object EncryNodeViewHolder {
 
-  def props(): Props = encrySettings.nodeSettings.stateMode match {
+  def props(): Props = encrySettings.node.stateMode match {
     case digestType@StateMode.Digest => Props(classOf[EncryNodeViewHolder[DigestState]])
     case utxoType@StateMode.Utxo => Props(classOf[EncryNodeViewHolder[UtxoState]])
   }

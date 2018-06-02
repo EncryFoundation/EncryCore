@@ -25,7 +25,6 @@ import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import scorex.core.api.http._
 import scorex.core.network.UPnP
 import scorex.core.network.message._
-import scorex.core.settings.ScorexSettings
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 import encry.network.peer.PeerManager
 
@@ -42,23 +41,21 @@ object EncryApp extends App with ScorexLogging {
 
   lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(args.headOption)
 
-  lazy val settings: ScorexSettings = encrySettings.scorexSettings
-
-  implicit val system: ActorSystem = ActorSystem(settings.network.agentName)
+  implicit val system: ActorSystem = ActorSystem(encrySettings.network.agentName)
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
 
-  require(settings.network.agentName.length <= 50)
-  lazy val bindAddress: InetSocketAddress = settings.restApi.bindAddress
+  require(encrySettings.network.agentName.length <= 50)
+  lazy val bindAddress: InetSocketAddress = encrySettings.restApi.bindAddress
 
-  lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
+  lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(encrySettings.ntp)
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
 
-  val nodeId: Array[Byte] = Algos.hash(encrySettings.scorexSettings.network.nodeName).take(5)
+  val nodeId: Array[Byte] = Algos.hash(encrySettings.network.nodeName).take(5)
 
   lazy val basicSpecs = {
-    val invSpec = new InvSpec(settings.network.maxInvObjects)
-    val requestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
+    val invSpec = new InvSpec(encrySettings.network.maxInvObjects)
+    val requestModifierSpec = new RequestModifierSpec(encrySettings.network.maxInvObjects)
     Seq(
       GetPeersSpec,
       PeersSpec,
@@ -92,18 +89,18 @@ object EncryApp extends App with ScorexLogging {
   val scanner: ActorRef = system.actorOf(EncryScanner.props(), "scanner")
 
   val apiRoutes: Seq[ApiRoute] = Seq(
-    UtilsApiRoute(settings.restApi),
-    PeersApiRoute(peerManager, networkController, settings.restApi),
+    UtilsApiRoute(encrySettings.restApi),
+    PeersApiRoute(peerManager, networkController, encrySettings.restApi),
     InfoApiRoute(readersHolder, miner, peerManager, encrySettings, nodeId, timeProvider),
-    HistoryApiRoute(readersHolder, miner, encrySettings, nodeId, encrySettings.nodeSettings.stateMode),
-    TransactionsApiRoute(readersHolder, nodeViewHolder, settings.restApi, encrySettings.nodeSettings.stateMode),
-    AccountInfoApiRoute(readersHolder, nodeViewHolder, scanner, settings.restApi, encrySettings.nodeSettings.stateMode)
+    HistoryApiRoute(readersHolder, miner, encrySettings, nodeId, encrySettings.node.stateMode),
+    TransactionsApiRoute(readersHolder, nodeViewHolder, encrySettings.restApi, encrySettings.node.stateMode),
+    AccountInfoApiRoute(readersHolder, nodeViewHolder, scanner, encrySettings.restApi, encrySettings.node.stateMode)
   )
 
-  val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
+  val combinedRoute: Route = CompositeHttpService(system, apiRoutes, encrySettings.restApi, swaggerConfig).compositeRoute
   Http().bindAndHandle(combinedRoute, bindAddress.getAddress.getHostAddress, bindAddress.getPort)
 
-  lazy val upnp: UPnP = new UPnP(settings.network)
+  lazy val upnp: UPnP = new UPnP(encrySettings.network)
 
   def commonSupervisorStrategy: OneForOneStrategy = OneForOneStrategy(
     maxNrOfRetries = 5,
@@ -111,14 +108,14 @@ object EncryApp extends App with ScorexLogging {
     case _ => Escalate
   }
 
-  if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) miner ! StartMining
+  if (encrySettings.node.mining && encrySettings.node.offlineGeneration) miner ! StartMining
 
-  if (encrySettings.testingSettings.transactionGeneration) {
+  if (encrySettings.testing.transactionGeneration) {
     val transactionGenerator: ActorRef = system.actorOf(Props[TransactionGenerator], "tx-generator")
     transactionGenerator ! StartGeneration
   }
 
-  if (encrySettings.nodeSettings.enableCLI) cliListener ! StartListening
+  if (encrySettings.node.enableCLI) cliListener ! StartListening
 
   def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
 }
