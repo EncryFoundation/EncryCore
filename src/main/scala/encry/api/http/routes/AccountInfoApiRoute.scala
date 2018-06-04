@@ -13,7 +13,7 @@ import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import encry.view.state.{StateMode, UtxoStateReader}
 import io.circe.Json
 import io.circe.syntax._
-import scorex.core.settings.RESTApiSettings
+import encry.settings.RESTApiSettings
 import scorex.crypto.authds.ADKey
 
 import scala.concurrent.Future

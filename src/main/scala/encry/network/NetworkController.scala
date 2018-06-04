@@ -12,7 +12,7 @@ import encry.EncryApp._
 import scorex.core.network._
 import scorex.core.network.message.Message.MessageCode
 import scorex.core.network.message.{Message, MessageSpec}
-import scorex.core.settings.NetworkSettings
+import encry.settings.NetworkSettings
 import scorex.core.utils.ScorexLogging
 
 import scala.collection.JavaConverters._

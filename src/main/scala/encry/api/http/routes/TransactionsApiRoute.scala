@@ -13,7 +13,7 @@ import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
 import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
-import scorex.core.settings.RESTApiSettings
+import encry.settings.RESTApiSettings
 
 import scala.concurrent.Future
 

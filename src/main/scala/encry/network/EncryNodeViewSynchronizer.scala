@@ -16,7 +16,7 @@ import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{Semantically
 import scorex.core.network.message.BasicMsgDataTypes.ModifiersData
 import scorex.core.network.message.{Message, ModifiersSpec}
 import scorex.core.network.{NodeViewSynchronizer, SendToRandom}
-import scorex.core.settings.NetworkSettings
+import encry.settings.NetworkSettings
 import scorex.core.{ModifierId, ModifierTypeId}
 import scala.concurrent.duration._
 

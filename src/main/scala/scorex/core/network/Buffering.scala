@@ -3,7 +3,7 @@ package scorex.core.network
 import java.nio.ByteOrder
 
 import akka.util.ByteString
-import scorex.core.settings.NetworkSettings
+import encry.settings.NetworkSettings
 
 import scala.annotation.tailrec
 

@@ -5,8 +5,8 @@ import java.net.InetSocketAddress
 import akka.actor.Actor
 import akka.pattern.ask
 import akka.util.Timeout
-import encry.EncryApp.{networkController, peerManager, settings}
-import scorex.core.network.message.{GetPeersSpec, Message, MessageSpec, PeersSpec}
+import encry.EncryApp.{settings, networkController, peerManager}
+import scorex.core.network.message.{GetPeersSpec, Message, PeersSpec}
 import scorex.core.network.{SendToPeers, SendToRandom}
 import scorex.core.utils.ScorexLogging
 import shapeless.syntax.typeable._

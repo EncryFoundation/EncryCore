@@ -11,7 +11,7 @@ import io.circe.syntax._
 import scorex.core.api.http.PeersApiRoute.{BlacklistedPeers, PeerInfoResponse}
 import scorex.core.network.Handshake
 import encry.network.peer.PeerInfo
-import scorex.core.settings.RESTApiSettings
+import encry.settings.RESTApiSettings
 
 import scala.concurrent.ExecutionContext.Implicits.global
 

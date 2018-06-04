@@ -8,15 +8,15 @@ import scorex.core.utils.NetworkTimeProvider
 
 class EncryMempoolSpec extends PropSpec with Matchers with EncryGenerator {
 
-  lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(Option(""))
+  lazy val settings: EncryAppSettings = EncryAppSettings.read(None)
 
-  lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(encrySettings.scorexSettings.ntp)
+  lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
   property("Mempool.put(txs) should not allow overflow.") {
 
-    val mempool: EncryMempool = EncryMempool.empty(encrySettings, timeProvider)
+    val mempool: EncryMempool = EncryMempool.empty(settings, timeProvider)
 
-    val maxCapacity: Int = encrySettings.nodeSettings.mempoolMaxCapacity
+    val maxCapacity: Int = settings.node.mempoolMaxCapacity
 
     val txs: Seq[EncryTransaction] = genValidPaymentTxs(maxCapacity + 12)
 
@@ -27,7 +27,7 @@ class EncryMempoolSpec extends PropSpec with Matchers with EncryGenerator {
 
   property("Mempool should not accept invalid transactions.") {
 
-    val mempool: EncryMempool = EncryMempool.empty(encrySettings, timeProvider)
+    val mempool: EncryMempool = EncryMempool.empty(settings, timeProvider)
 
     val validTxs: Seq[EncryTransaction] = genValidPaymentTxs(60)
 

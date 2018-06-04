@@ -19,8 +19,8 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, EncryBaseTransaction],
   private implicit val cleanupScheduler: Scheduler = Scheduler.singleThread("mempool-cleanup-thread")
 
   private val removeExpired: Task[EncryMempool] = Task {
-    filter(tx => (timeProvider.time() - tx.timestamp) > settings.nodeSettings.utxMaxAge.toMillis)
-  }.delayExecution(settings.nodeSettings.mempoolCleanupInterval)
+    filter(tx => (timeProvider.time() - tx.timestamp) > settings.node.utxMaxAge.toMillis)
+  }.delayExecution(settings.node.mempoolCleanupInterval)
 
   private val cleanup: CancelableFuture[EncryMempool] = removeExpired.runAsync
 
@@ -31,10 +31,10 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, EncryBaseTransaction],
   override def put(txs: Iterable[EncryBaseTransaction]): Try[EncryMempool] = {
     val validTxs: Iterable[EncryBaseTransaction] = txs.filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
     if (validTxs.nonEmpty) {
-      if ((size + validTxs.size) <= settings.nodeSettings.mempoolMaxCapacity) {
+      if ((size + validTxs.size) <= settings.node.mempoolMaxCapacity) {
         Success(putWithoutCheck(validTxs))
       } else {
-        val overflow: Int = (size + validTxs.size) - settings.nodeSettings.mempoolMaxCapacity
+        val overflow: Int = (size + validTxs.size) - settings.node.mempoolMaxCapacity
         Success(putWithoutCheck(validTxs.take(validTxs.size - overflow)))
       }
     } else Failure(new Exception("Failed to put transaction into pool"))
