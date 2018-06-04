@@ -29,7 +29,7 @@ case class ContractProposition(contract: EncryContract) extends EncryProposition
 
   override def serializer: Serializer[M] = ContractPropositionSerializer
 
-  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
+  override def unlockTry(proof: Proof, ctx: Context): Try[Unit] =
     ScriptSerializer.deserialize(contract.serializedScript).map { script =>
       val contractContext = ContractContext(proof, ctx.transaction,
         CStateInfo(ctx.height, ctx.lastBlockTimestamp, ctx.stateDigest), contract.meta)

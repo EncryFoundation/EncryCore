@@ -34,7 +34,7 @@ class UtxoState(override val version: VersionTag,
                 override val stateStore: Store,
                 val lastBlockTimestamp: Long,
                 nodeViewHolderRef: Option[ActorRef])
-  extends EncryState[UtxoState] with UtxoStateReader with TransactionValidator {
+  extends EncryState[UtxoState] with UtxoStateReader {
 
   import UtxoState.metadata
 
@@ -60,7 +60,7 @@ class UtxoState(override val version: VersionTag,
       }.map(_ => Unit)
 
     val coinbase: EncryBaseTransaction = blockTransactions.last
-    val regularTransactions: Seq[EncryBaseTransaction] = blockTransactions.dropRight(1)
+    val regularTransactions: Seq[EncryBaseTransaction] = blockTransactions.init
 
     val totalFees: Amount = regularTransactions.map(_.fee).sum
 
@@ -163,18 +163,18 @@ class UtxoState(override val version: VersionTag,
     * For all asset types:
     * 4. Make sure inputs.sum >= outputs.sum
     */
-  override def validate(tx: EncryBaseTransaction, allowedOutputDelta: Amount = 0L): Try[Unit] =
+  def validate(tx: EncryBaseTransaction, allowedOutputDelta: Amount = 0L): Try[Unit] =
     tx.semanticValidity.map { _: Unit =>
 
-      implicit val context: Context = Context(tx, height, lastBlockTimestamp, rootHash)
+      val context: Context = Context(tx, height, lastBlockTimestamp, rootHash)
 
       val bxs: IndexedSeq[EncryBaseBox] = tx.unlockers.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
         .map(t => t.toOption -> u.proofOpt)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, proofOpt)) =>
         (bxOpt, proofOpt, tx.defaultProofOpt) match {
           // If `proofOpt` from unlocker is `None` then `defaultProofOpt` is used.
-          case (Some(bx), Some(proof), _) if bx.proposition.unlockTry(proof).isSuccess => acc :+ bx
-          case (Some(bx), _, Some(defaultProof)) if bx.proposition.unlockTry(defaultProof).isSuccess => acc :+ bx
+          case (Some(bx), Some(proof), _) if bx.proposition.unlockTry(proof, context).isSuccess => acc :+ bx
+          case (Some(bx), _, Some(defaultProof)) if bx.proposition.unlockTry(defaultProof, context).isSuccess => acc :+ bx
           case _ => throw TransactionValidationException(s"Failed to spend some boxes referenced in $tx")
         }
       }
@@ -196,6 +196,10 @@ class UtxoState(override val version: VersionTag,
 
       if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
     }
+
+  def isValid(tx: EncryBaseTransaction, allowedOutputDelta: Amount = 0L): Boolean = validate(tx, allowedOutputDelta).isSuccess
+
+  def filterValid(txs: Seq[EncryBaseTransaction]): Seq[EncryBaseTransaction] = txs.filter(tx => isValid(tx))
 }
 
 object UtxoState extends ScorexLogging {
