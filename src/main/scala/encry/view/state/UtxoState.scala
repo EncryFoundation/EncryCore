@@ -4,7 +4,6 @@ import java.io.File
 
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
-import encry.consensus.emission.TokenSupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -13,18 +12,17 @@ import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.mempool.EncryBaseTransaction.TransactionValidationException
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
-import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.Algos.HF
 import encry.settings.{Algos, Constants}
 import encry.utils.BalanceCalculator
+import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import scorex.core.VersionTag
 import scorex.core.transaction.box.Box.Amount
 import scorex.core.utils.ScorexLogging
-import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds._
+import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Success, Try}
@@ -34,7 +32,7 @@ class UtxoState(override val version: VersionTag,
                 override val stateStore: Store,
                 val lastBlockTimestamp: Long,
                 nodeViewHolderRef: Option[ActorRef])
-  extends EncryState[UtxoState] with UtxoStateReader with TransactionValidator {
+  extends EncryState[UtxoState] with UtxoStateReader {
 
   import UtxoState.metadata
 
@@ -45,19 +43,34 @@ class UtxoState(override val version: VersionTag,
     nodeViewHolderRef.foreach(_ ! LocallyGeneratedModifier(proof))
   }
 
-  private[state] def applyTransactions(txs: Seq[EncryBaseTransaction],
-                                       expectedDigest: ADDigest): Try[Unit] = Try {
-    txs.foreach(tx => validate(tx).map { _ =>
-      extractStateChanges(tx).operations.map(ADProofs.toModification)
-        .foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
-        t.flatMap(_ => persistentProver.performOneOperation(m))
-      }.get
-    }.orElse(throw TransactionValidationException(s"$tx validation failed.")))
+  def applyBlockTransactions(blockTransactions: Seq[EncryBaseTransaction],
+                             expectedDigest: ADDigest): Try[Unit] = {
+    def applyTry(txs: Seq[EncryBaseTransaction], allowedOutputDelta: Amount = 0L): Try[Unit] =
+      txs.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, tx) =>
+        t.flatMap { _ =>
+          validate(tx, allowedOutputDelta).flatMap { _ =>
+            extractStateChanges(tx).operations.map(ADProofs.toModification)
+              .foldLeft[Try[Option[ADValue]]](Success(None)) { case (tIn, m) =>
+                tIn.flatMap(_ => persistentProver.performOneOperation(m))
+            }
+          }
+        }
+      }.map(_ => Unit)
 
-    // Checks whether the outcoming result is the same as expected.
-    if (!expectedDigest.sameElements(persistentProver.digest))
-      throw new Exception(s"Digest after txs application is wrong. ${Algos.encode(expectedDigest)} expected, " +
-        s"${Algos.encode(persistentProver.digest)} given")
+    val coinbase: EncryBaseTransaction = blockTransactions.last
+    val regularTransactions: Seq[EncryBaseTransaction] = blockTransactions.init
+
+    val totalFees: Amount = regularTransactions.map(_.fee).sum
+
+    val regularApplyTry: Try[Unit] = applyTry(regularTransactions)
+    val coinbaseApplyTry: Try[Unit] = applyTry(Seq(coinbase), totalFees)
+
+    regularApplyTry.flatMap(_ => coinbaseApplyTry).map { _ =>
+      // Checks whether the outcoming result is the same as expected.
+      if (!expectedDigest.sameElements(persistentProver.digest))
+        throw new Exception(s"Digest after txs application is wrong. ${Algos.encode(expectedDigest)} expected, " +
+          s"${Algos.encode(persistentProver.digest)} given")
+    }
   }
 
   /** State transition function `APPLY(S,TX) -> S'`. */
@@ -67,7 +80,7 @@ class UtxoState(override val version: VersionTag,
       log.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
 
-      applyTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
+      applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] =
           metadata(VersionTag @@ block.id, block.header.stateRoot, Height @@ block.header.height, block.header.timestamp)
         val proofBytes: SerializedAdProof = persistentProver.generateProofAndUpdateStorage(meta)
@@ -148,32 +161,41 @@ class UtxoState(override val version: VersionTag,
     * For all asset types:
     * 4. Make sure inputs.sum >= outputs.sum
     */
-  override def validate(tx: EncryBaseTransaction): Try[Unit] =
+  def validate(tx: EncryBaseTransaction, allowedOutputDelta: Amount = 0L): Try[Unit] =
     tx.semanticValidity.map { _: Unit =>
 
-      implicit val context: Context = Context(tx, height, lastBlockTimestamp, rootHash)
-
-      if (tx.fee < tx.minimalFee && !tx.isCoinbase) throw TransactionValidationException(s"Low fee in $tx")
+      val context: Context = Context(tx, height, lastBlockTimestamp, rootHash)
 
       val bxs: IndexedSeq[EncryBaseBox] = tx.unlockers.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
         .map(t => t.toOption -> u.proofOpt)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, proofOpt)) =>
         (bxOpt, proofOpt, tx.defaultProofOpt) match {
           // If `proofOpt` from unlocker is `None` then `defaultProofOpt` is used.
-          case (Some(bx), Some(proof), _) if bx.proposition.unlockTry(proof).isSuccess => acc :+ bx
-          case (Some(bx), _, Some(defaultProof)) if bx.proposition.unlockTry(defaultProof).isSuccess => acc :+ bx
+          case (Some(bx), Some(proof), _) if bx.proposition.unlockTry(proof, context).isSuccess => acc :+ bx
+          case (Some(bx), _, Some(defaultProof)) if bx.proposition.unlockTry(defaultProof, context).isSuccess => acc :+ bx
           case _ => throw TransactionValidationException(s"Failed to spend some boxes referenced in $tx")
         }
       }
 
       val validBalance: Boolean = {
-        val debitB: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxs, excludeCoinbase = false)
-        val creditB: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(tx.newBoxes)
-        creditB.forall { case (id, amount) => debitB.getOrElse(id, 0L) >= amount }
+        val debitB: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxs)
+        val creditB: Map[ADKey, Amount] = {
+          val balanceSheet: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(tx.newBoxes)
+          val intrinsicBalance: Amount = balanceSheet.getOrElse(Constants.IntrinsicTokenId, 0L)
+          balanceSheet.updated(Constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
+        }
+        creditB.forall { case (tokenId, amount) =>
+          if (tokenId sameElements Constants.IntrinsicTokenId) debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
+          else debitB.getOrElse(tokenId, 0L) >= amount
+        }
       }
 
       if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
     }
+
+  def isValid(tx: EncryBaseTransaction, allowedOutputDelta: Amount = 0L): Boolean = validate(tx, allowedOutputDelta).isSuccess
+
+  def filterValid(txs: Seq[EncryBaseTransaction]): Seq[EncryBaseTransaction] = txs.filter(tx => isValid(tx))
 }
 
 object UtxoState extends ScorexLogging {
@@ -222,12 +244,5 @@ object UtxoState extends ScorexLogging {
           p, storage, metadata(EncryState.genesisStateVersion, p.digest, Constants.Chain.PreGenesisHeight, 0L), paranoidChecks = true
         ).get.ensuring(_.digest sameElements storage.version.get)
     }
-  }
-
-  /** Controls token supply for particular `height` */
-  def supplyBoxesAt(height: Height, seed: Long): CoinbaseBox = {
-    val supplyAmount: Long = TokenSupplyController.supplyAt(height)
-    CoinbaseBox(HeightProposition(Height @@ (height + Constants.Chain.CoinbaseHeightLock)),
-      seed * height, supplyAmount)
   }
 }

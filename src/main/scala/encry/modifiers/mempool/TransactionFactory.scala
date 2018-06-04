@@ -2,10 +2,9 @@ package encry.modifiers.mempool
 
 import encry.account.Address
 import encry.crypto.{PrivateKey25519, PublicKey25519}
-import encry.modifiers.mempool.directive.{CoinbaseDirective, Directive, TransferDirective}
+import encry.modifiers.mempool.directive.{Directive, TransferDirective}
 import encry.modifiers.state.box.MonetaryBox
 import encry.modifiers.state.box.proof.Signature25519
-import encry.view.history.Height
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.ADKey
 
@@ -79,18 +78,13 @@ object TransactionFactory {
   def coinbaseTransactionScratch(privKey: PrivateKey25519,
                                  timestamp: Long,
                                  useBoxes: Seq[MonetaryBox],
-                                 height: Height): EncryTransaction = {
+                                 fees: Amount): EncryTransaction = {
 
     val pubKey: PublicKey25519 = privKey.publicImage
 
     val unlockers: IndexedSeq[Unlocker] = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
 
-    val directives: IndexedSeq[Directive with Product] = if (useBoxes.nonEmpty) {
-      IndexedSeq(CoinbaseDirective(height),
-        TransferDirective(pubKey.address, useBoxes.map(_.amount).sum, 1))
-    } else {
-      IndexedSeq(CoinbaseDirective(height))
-    }
+    val directives: IndexedSeq[Directive with Product] = IndexedSeq(TransferDirective(pubKey.address, useBoxes.map(_.amount).sum + fees, 0))
 
     val signature: Signature25519 = privKey.sign(EncryTransaction.getMessageToSign(0, timestamp, unlockers, directives))
 

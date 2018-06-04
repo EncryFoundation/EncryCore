@@ -27,7 +27,7 @@ case class AccountProposition(account: Account) extends EncryProposition {
 
   override def serializer: Serializer[M] = AccountPropositionSerializer
 
-  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] = Try {
+  override def unlockTry(proof: Proof, ctx: Context): Try[Unit] = Try {
     proof match {
       case sig: Signature25519 if sig.isValid(PublicKey25519(account.pubKey), ctx.transaction.messageToSign) =>
       case _ => UnlockFailedException

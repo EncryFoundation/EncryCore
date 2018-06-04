@@ -13,7 +13,7 @@ trait EncryProposition extends Proposition with ESEnvConvertable {
 
   val typeId: Byte
 
-  def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit]
+  def unlockTry(proof: Proof, ctx: Context): Try[Unit]
 }
 
 object EncryProposition {

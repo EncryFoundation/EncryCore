@@ -6,7 +6,7 @@ import org.scalatest.{Matchers, PropSpec}
 
 import scala.concurrent.duration._
 
-class TokenSupplyControllerTest extends PropSpec with Matchers {
+class EncrySupplyControllerTest extends PropSpec with Matchers {
 
   val epochLen = 10
 
@@ -16,7 +16,7 @@ class TokenSupplyControllerTest extends PropSpec with Matchers {
 
   property("testSupplyAt") {
 
-    val epochSupply = (0 until blocksPerYear * epochLen).map(h => TokenSupplyController.supplyAt(Height @@ h))
+    val epochSupply = (0 until blocksPerYear * epochLen).map(h => EncrySupplyController.supplyAt(Height @@ h))
 
     val atEndEpochSupply = epochSupply.last
 
