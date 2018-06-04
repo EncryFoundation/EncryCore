@@ -4,7 +4,6 @@ import java.io.File
 
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
-import encry.consensus.emission.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -13,18 +12,17 @@ import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.mempool.EncryBaseTransaction.TransactionValidationException
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
-import encry.modifiers.state.box.proposition.HeightProposition
 import encry.settings.Algos.HF
 import encry.settings.{Algos, Constants}
 import encry.utils.BalanceCalculator
+import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import scorex.core.VersionTag
 import scorex.core.transaction.box.Box.Amount
 import scorex.core.utils.ScorexLogging
-import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds._
+import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Success, Try}
