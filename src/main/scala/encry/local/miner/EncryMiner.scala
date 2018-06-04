@@ -36,7 +36,7 @@ class EncryMiner extends Actor with ScorexLogging {
 
   val startTime: Time = timeProvider.time()
   val consensus: ConsensusScheme = ConsensusSchemeReaders.consensusScheme
-  var isMining = false
+  var isMining: Boolean = false
   var candidateOpt: Option[CandidateBlock] = None
   var miningWorkers: Seq[ActorRef] = Seq.empty[ActorRef]
 
@@ -60,7 +60,7 @@ class EncryMiner extends Actor with ScorexLogging {
   }
 
   def mining: Receive = {
-    case StartMining =>
+    case StartMining if !isMining =>
       candidateOpt match {
         case Some(candidateBlock) =>
           isMining = true
@@ -70,10 +70,11 @@ class EncryMiner extends Actor with ScorexLogging {
           miningWorkers.foreach(_ ! candidateBlock)
         case None => produceCandidate()
       }
-    case StopMining =>
+    case StopMining if isMining =>
       isMining = false
       killAllWorkers()
     case GetMinerStatus => sender ! MinerStatus(isMining, candidateOpt)
+    case _ =>
   }
 
   def receiveSemanticallySuccessfulModifier: Receive = {
