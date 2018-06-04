@@ -8,11 +8,10 @@ import encry.crypto.PublicKey25519
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.state.box.{CoinbaseBox, EncryBaseBox}
+import encry.modifiers.state.box.EncryBaseBox
 import encry.modifiers.state.box.proposition.{AccountProposition, EncryProposition, HeightProposition}
 import encry.settings.{Algos, Constants, EncryAppSettings}
 import encry.utils.{BalanceCalculator, BoxFilter}
-import encry.view.history.Height
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
@@ -135,14 +134,6 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
 
     walletStorage.update(ByteArrayWrapper(modifierId), toRemoveSummary, toInsertSummary)
   }
-
-  def getAvailableCoinbaseBoxesAt(h: Height): Seq[CoinbaseBox] =
-    walletStorage.openBoxIds.foldLeft(Seq[CoinbaseBox]()) { case (acc, id) =>
-      walletStorage.getBoxById(id).map {
-        case bx: CoinbaseBox if bx.proposition.height <= h => acc :+ bx
-        case _ => acc
-      }.getOrElse(acc)
-    }
 
   def getBalances: Seq[(ADKey, Long)] = walletStorage.getTokensId.foldLeft(Seq[(ADKey, Long)]()) {
     case (seq, tokenId) => walletStorage.getTokenBalanceById(tokenId) match {
