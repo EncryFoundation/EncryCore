@@ -3,7 +3,9 @@ package encry.view.wallet
 import encry.utils.TestHelper.Props
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.mempool.EncryTransaction
 import encry.modifiers.state.box.MonetaryBox
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.settings.{Constants, EncryAppSettings}
@@ -21,7 +23,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
   property("Balance count (intrinsic coins only)"){
 
-    val blockHeader = genHeader
+    val blockHeader: EncryBlockHeader = genHeader
 
     val walletStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions)
 
@@ -31,9 +33,9 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val wallet = EncryWallet(walletStore, keyManager)
 
-    val validTxs = genValidPaymentTxsToAddr(4, keyManager.keys.head.publicImage.address)
+    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddr(4, keyManager.keys.head.publicImage.address)
 
-    val correctBalance = validTxs.foldLeft(0L) {
+    val correctBalance: Long = validTxs.foldLeft(0L) {
       case (sum, transaction) => sum + transaction.newBoxes.foldLeft(0L){
         case (boxSum, bx) =>
           bx match {
@@ -56,9 +58,9 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
   property("Balance count (intrinsic coins + tokens)"){
 
-    val txsQty = 4
+    val txsQty: Int = 4
 
-    val blockHeader = genHeader
+    val blockHeader: EncryBlockHeader = genHeader
 
     val walletStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions)
 
@@ -68,7 +70,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val wallet = EncryWallet(walletStore, keyManager)
 
-    val validTxs = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.keys.head.publicImage.address)
+    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.keys.head.publicImage.address)
 
     val blockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
 

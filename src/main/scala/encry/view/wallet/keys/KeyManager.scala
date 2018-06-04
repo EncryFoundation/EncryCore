@@ -10,8 +10,8 @@ import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import javax.crypto._
 import javax.crypto.spec.{IvParameterSpec, PBEKeySpec, SecretKeySpec}
 import scorex.core.utils.ScorexLogging
-import scorex.crypto.hash.{Blake2b512, Digest32}
-import scorex.crypto.signatures.Curve25519
+import scorex.crypto.hash.{Blake2b512, Digest32, Digest64}
+import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
 
 import scala.language.postfixOps
@@ -35,9 +35,9 @@ case class KeyManager(store: LSMStore,
     */
   //TODO: add generateFrom mnemonic key
   def deriveKeysFromSeed(seed: Array[Byte]): (PrivateKey25519, Array[Byte]) = {
-    val seedHashBytes = Blake2b512.hash(seed)
-    val hashSeq = seedHashBytes.sliding(32).toSeq
-    val pair = Curve25519.createKeyPair(hashSeq.head)
+    val seedHashBytes: Digest64 = Blake2b512.hash(seed)
+    val hashSeq: Seq[Array[Byte]] = seedHashBytes.sliding(32).toSeq
+    val pair: (PrivateKey, PublicKey) = Curve25519.createKeyPair(hashSeq.head)
     PrivateKey25519(pair._1, pair._2) -> hashSeq(1)
   }
 
@@ -47,9 +47,9 @@ case class KeyManager(store: LSMStore,
     * @return Key pair based on previous key and chain code
     */
   def deriveNextKey(prevKey: (PrivateKey25519, Array[Byte])): (PrivateKey25519, Array[Byte]) = {
-    val prevKeyHash = Blake2b512.hash(prevKey._1.publicKeyBytes ++ prevKey._2)
-    val hashSeq = prevKeyHash.sliding(32).toSeq
-    val pair = Curve25519.createKeyPair(hashSeq.head)
+    val prevKeyHash: Digest64 = Blake2b512.hash(prevKey._1.publicKeyBytes ++ prevKey._2)
+    val hashSeq: Seq[Array[Byte]] = prevKeyHash.sliding(32).toSeq
+    val pair: (PrivateKey, PublicKey) = Curve25519.createKeyPair(hashSeq.head)
     PrivateKey25519(pair._1, pair._2) -> hashSeq(1)
   }
 
@@ -58,7 +58,7 @@ case class KeyManager(store: LSMStore,
     * @param keysSeq
     */
   def keysHash(keysSeq: Seq[PrivateKey25519]): Digest32 = Algos.hash(keysSeq.foldLeft(Array[Byte]()) {
-    case(currentHash,key) => currentHash ++ Algos.hash(key.publicKeyBytes)
+    case (currentHash,key) => currentHash ++ Algos.hash(key.publicKeyBytes)
   })
 
   /**
@@ -67,7 +67,7 @@ case class KeyManager(store: LSMStore,
     */
   private def getKeysWithChainCode: Seq[(PrivateKey25519, Array[Byte])] = {
 
-    val keysQty =
+    val keysQty: Int =
       store.get(new ByteArrayWrapper(Algos.hash("count"))).map(d => Ints.fromByteArray(d.data)).getOrElse(0)
 
     (0 until keysQty).foldLeft(Seq[(PrivateKey25519, Array[Byte])]()) {
@@ -103,7 +103,7 @@ case class KeyManager(store: LSMStore,
       }
     }else{
       unlock()
-      val keys = getKeysWithChainCode.foldLeft(Seq[PrivateKey25519]()) {
+      val keys: Seq[PrivateKey25519] = getKeysWithChainCode.foldLeft(Seq[PrivateKey25519]()) {
         case (seq, elem) => seq :+ elem._1
       }
       lock()
@@ -113,7 +113,7 @@ case class KeyManager(store: LSMStore,
   }
 
   def createNewKey(): Unit = {
-    val newKeysQty = store.get(KeyManager.countKey).map(d => Ints.fromByteArray(d.data)).getOrElse(0) + 1
+    val newKeysQty: Int = store.get(KeyManager.countKey).map( d => Ints.fromByteArray(d.data)).getOrElse(0) + 1
     updateKey(KeyManager.countKey, Ints.toByteArray(newKeysQty))
   }
 
@@ -139,8 +139,8 @@ case class KeyManager(store: LSMStore,
   }
 
   def generateSalt: Array[Byte] = {
-    val random = new SecureRandom()
-    val bytes = new Array[Byte](256/8)
+    val random: SecureRandom = new SecureRandom()
+    val bytes: Array[Byte] = new Array[Byte](256/8)
     random.nextBytes(bytes)
     bytes
   }
@@ -152,7 +152,7 @@ case class KeyManager(store: LSMStore,
     */
   def encryptAES(key: Array[Byte]): (Array[Byte], Array[Byte], Array[Byte]) = {
 
-    val seed = store.get(KeyManager.seedKey).map(_.data).getOrElse(Array[Byte]())
+    val seed: Array[Byte] = store.get(KeyManager.seedKey).map(_.data).getOrElse(Array[Byte]())
 
     val saltBytes: Array[Byte] = generateSalt
 
@@ -182,19 +182,18 @@ case class KeyManager(store: LSMStore,
   def decryptAES(key: Array[Byte]): Array[Byte] = {
 
 
-    val saltBytes = store.get(KeyManager.saltKey).map(_.data).getOrElse(Array[Byte]())
-    val ivBytes = store.get(KeyManager.ivKey).map(_.data).getOrElse(Array[Byte]())
-    val encryptedTextBytes = store.get(KeyManager.seedKey).map(_.data).getOrElse(Array[Byte]())
+    val saltBytes: Array[Byte] = store.get(KeyManager.saltKey).map(_.data).getOrElse(Array[Byte]())
+    val ivBytes: Array[Byte] = store.get(KeyManager.ivKey).map(_.data).getOrElse(Array[Byte]())
+    val encryptedTextBytes: Array[Byte] = store.get(KeyManager.seedKey).map(_.data).getOrElse(Array[Byte]())
 
     // Derive the key
-    val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+    val factory: SecretKeyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
     val spec = new PBEKeySpec(key.map(_.asInstanceOf[Char]), saltBytes, 1000, 128)
 
-    val secretKey = factory.generateSecret(spec)
+    val secretKey: SecretKey = factory.generateSecret(spec)
     val secret = new SecretKeySpec(secretKey.getEncoded, "AES")
 
-    // Decrypt the message
-    val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+    val cipher: Cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
     cipher.init(Cipher.DECRYPT_MODE, secret, new IvParameterSpec(ivBytes))
 
 
@@ -258,12 +257,9 @@ object KeyManager extends ScorexLogging {
 
     val keyManager = KeyManager(keysStore, settings.keyManager, password)
 
-    if (keyManager.keys.isEmpty) {
-      keyManager.initStorage(seed)
-      if (settings.keyManager.encryption && !keyManager.isLocked) {
-        keyManager.lock()
-      }
-    }
+    if (keyManager.keys.isEmpty) keyManager.initStorage(seed)
+      if (settings.keyManager.encryption && !keyManager.isLocked) keyManager.lock()
+
 
     keyManager
   }

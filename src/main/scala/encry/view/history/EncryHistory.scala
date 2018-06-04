@@ -186,24 +186,22 @@ object EncryHistory {
     val objectsStore = new FileHistoryObjectsStore(historyDir.getAbsolutePath)
     val storage = new HistoryStorage(db, objectsStore)
 
-    val ns = settings.node
-
-    val history: EncryHistory = (ns.stateMode.isDigest, ns.verifyTransactions) match {
+    val history: EncryHistory = (settings.node.stateMode.isDigest, settings.node.verifyTransactions) match {
       case (true, true) =>
         new EncryHistory with ADStateProofProcessor with BlockPayloadProcessor {
-          override protected val nodeSettings: NodeSettings = ns
+          override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
         }
       case (false, true) =>
         new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
-          override protected val nodeSettings: NodeSettings = ns
+          override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
         }
       case (true, false) =>
         new EncryHistory with ADStateProofProcessor with EmptyBlockPayloadProcessor {
-          override protected val nodeSettings: NodeSettings = ns
+          override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
         }

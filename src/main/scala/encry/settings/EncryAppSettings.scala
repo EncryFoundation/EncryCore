@@ -32,34 +32,14 @@ object EncryAppSettings
 
   def fromConfig(config: Config): EncryAppSettings = {
 
-    val directory = config.as[String](s"$configPath.directory")
-    val nodeSettings = config.as[NodeSettings](s"$configPath.node")
-    val testingSettings = config.as[TestingSettings](s"$configPath.testing")
-    val keyManagerSettings = config.as[KeyManagerSettings](s"$configPath.keyManager")
-    val networkSettings = config.as[NetworkSettings](s"$configPath.network")
-    val restApiSettings = config.as[RESTApiSettings](s"$configPath.restApi")
-    val walletSettings = config.as[WalletSettings](s"$configPath.wallet")
-    val ntpSettings = config.as[NetworkTimeProviderSettings](s"$configPath.ntp")
-    val dataDir = new File(config.as[String](s"$configPath.dataDir"))
-    val logDir = new File(config.as[String](s"$configPath.logDir"))
+    val settings = config.as[EncryAppSettings](s"$configPath")
 
-    if (nodeSettings.stateMode.isDigest && nodeSettings.mining) {
+    if (settings.node.stateMode.isDigest && settings.node.mining) {
       log.error("Malformed configuration file was provided! Mining is not possible with digest state. Aborting!")
       EncryApp.forceStopApplication()
     }
 
-    EncryAppSettings(
-      directory,
-      testingSettings,
-      nodeSettings,
-      keyManagerSettings,
-      dataDir,
-      logDir,
-      networkSettings,
-      restApiSettings,
-      walletSettings,
-      ntpSettings
-    )
+    settings
   }
 
   private def readConfigFromPath(userConfigPath: Option[String]): Config = {
