@@ -22,7 +22,7 @@ case class HeightProposition(height: Height) extends EncryProposition {
 
   override def serializer: Serializer[M] = HeightPropositionSerializer
 
-  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] =
+  override def unlockTry(proof: Proof, ctx: Context): Try[Unit] =
     if (height <= ctx.height) Success()
     else Failure(UnlockFailedException)
 

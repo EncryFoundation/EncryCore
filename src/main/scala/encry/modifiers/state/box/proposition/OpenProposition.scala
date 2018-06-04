@@ -18,7 +18,7 @@ object OpenProposition extends ProofOfKnowledgeProposition[Nothing] with EncryPr
 
   override lazy val serializer: Serializer[OpenProposition.type] = OpenPropositionSerializer
 
-  override def unlockTry(proof: Proof)(implicit ctx: Context): Try[Unit] = Success()
+  override def unlockTry(proof: Proof, ctx: Context): Try[Unit] = Success()
 
   override val esType: Types.ESProduct = Types.OpenProposition
 

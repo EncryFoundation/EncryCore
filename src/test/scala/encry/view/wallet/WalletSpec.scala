@@ -7,7 +7,6 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.state.box.MonetaryBox
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.settings.{Constants, EncryAppSettings}
-import encry.utils.BalanceCalculator.intrinsicTokenId
 import encry.utils.{EncryGenerator, FileHelper}
 import encry.view.wallet.keys.KeyManager
 import io.iohk.iodb.LSMStore
@@ -34,7 +33,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
     val validTxs = genValidPaymentTxsToAddr(4, keyManager.keys.head.publicImage.address)
 
     val correctBalance = validTxs.foldLeft(0L) {
-      case (sum, transaction) => sum + transaction.newBoxes.foldLeft(0L){
+      case (sum, transaction) => sum + transaction.newBoxes.foldLeft(0L) {
         case (boxSum, bx) =>
           bx match {
           case ac: MonetaryBox if keyManager.keys.exists(privKey => AccountProposition(privKey.publicImage.address) == ac.proposition) =>
@@ -51,7 +50,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     wallet.scanPersistent(block)
 
-    wallet.walletStorage.getTokenBalanceById(intrinsicTokenId).getOrElse(0L) shouldEqual correctBalance
+    wallet.walletStorage.getTokenBalanceById(Constants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance
   }
 
   property("Balance count (intrinsic coins + tokens)"){

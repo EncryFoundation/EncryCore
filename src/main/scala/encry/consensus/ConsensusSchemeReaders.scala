@@ -9,7 +9,7 @@ object ConsensusSchemeReaders {
   )
 
   val consensusScheme: ConsensusScheme = {
-    val schemeName = Constants.Chain.consensusScheme
+    val schemeName = Constants.Chain.ConsensusScheme
     readers.find(_.schemeName == schemeName)
       .getOrElse(EquihashPowSchemeReader)
       .read

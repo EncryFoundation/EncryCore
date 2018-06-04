@@ -11,8 +11,9 @@ import encry.settings.{Algos, Constants}
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
 import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
-import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
+import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.avltree.batch._
+import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
@@ -38,22 +39,26 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
     val (privKey: PrivateKey, pubKey: PublicKey) = Curve25519.createKeyPair(Random.randomBytes())
     val secret: PrivateKey25519 = PrivateKey25519(privKey, pubKey)
 
-    val initialBoxes: Seq[AssetBox] = genValidAssetBoxes(secret, amount = 100000, qty = 1000)
+    val initialBoxes: Seq[AssetBox] = genValidAssetBoxes(secret, amount = 100000, qty = 50)
 
     val bh: BoxHolder = BoxHolder(initialBoxes)
 
     val state: UtxoState = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None)
 
-    val transactions: Seq[EncryTransaction] = initialBoxes.map { bx =>
+    val regularTransactions: Seq[EncryTransaction] = initialBoxes.map { bx =>
       TransactionFactory.defaultPaymentTransactionScratch(
         secret, 10000, timestamp, IndexedSeq(bx), randomAddress, 5000)
     }
 
-    assert(transactions.forall(tx => state.validate(tx).isSuccess))
+    val fees: Amount = regularTransactions.map(_.fee).sum
+
+    val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(secret, timestamp, Seq.empty, fees)
+
+    val transactions: Seq[EncryTransaction] = regularTransactions.sortBy(_.timestamp) :+ coinbase
 
     val (_: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(transactions).get
 
-    state.applyTransactions(transactions, adDigest).isSuccess shouldBe true
+    state.applyBlockTransactions(transactions, adDigest).isSuccess shouldBe true
   }
 
   property("FilterValid(txs) should return only valid txs (against current state).") {

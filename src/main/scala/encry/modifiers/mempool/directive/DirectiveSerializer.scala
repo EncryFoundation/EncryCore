@@ -7,8 +7,6 @@ import scala.util.{Failure, Try}
 object DirectiveSerializer extends Serializer[Directive] {
 
   override def toBytes(obj: Directive): Array[Byte] = obj match {
-    case cd: CoinbaseDirective =>
-      CoinbaseDirective.TypeId +: CoinbaseDirectiveSerializer.toBytes(cd)
     case td: TransferDirective =>
       TransferDirective.TypeId +: TransferDirectiveSerializer.toBytes(td)
     case aid: AssetIssuingDirective =>
@@ -21,7 +19,6 @@ object DirectiveSerializer extends Serializer[Directive] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[Directive] = Try(bytes.head).flatMap {
-    case CoinbaseDirective.`TypeId` => CoinbaseDirectiveSerializer.parseBytes(bytes.tail)
     case TransferDirective.`TypeId` => TransferDirectiveSerializer.parseBytes(bytes.tail)
     case AssetIssuingDirective.`TypeId` => AssetIssuingDirectiveSerializer.parseBytes(bytes.tail)
     case ScriptedAssetDirective.`TypeId` => ScriptedAssetDirectiveSerializer.parseBytes(bytes.tail)
