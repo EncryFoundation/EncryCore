@@ -184,11 +184,9 @@ class UtxoState(override val version: VersionTag,
           val intrinsicBalance: Amount = balanceSheet.getOrElse(Constants.IntrinsicTokenId, 0L)
           balanceSheet.updated(Constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
         }
-        creditB.forall {
-          case (id, amount) if id sameElements Constants.IntrinsicTokenId =>
-            debitB.getOrElse(id, 0L) + allowedOutputDelta >= amount
-          case (id, amount) =>
-            debitB.getOrElse(id, 0L) >= amount
+        creditB.forall { case (tokenId, amount) =>
+          if (tokenId sameElements Constants.IntrinsicTokenId) debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
+          else debitB.getOrElse(tokenId, 0L) >= amount
         }
       }
 
