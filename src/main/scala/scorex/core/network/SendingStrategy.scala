@@ -1,6 +1,6 @@
 package scorex.core.network
 
-import encry.network.ConnectedPeer
+import encry.network.PeerConnectionHandler.ConnectedPeer
 
 import scala.util.Random
 

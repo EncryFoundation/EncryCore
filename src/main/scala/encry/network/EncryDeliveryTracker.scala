@@ -4,13 +4,15 @@ import akka.actor.{ActorContext, ActorRef}
 import scorex.core.network.DeliveryTracker
 import scorex.core.utils.NetworkTimeProvider
 import scorex.core.{ModifierId, ModifierTypeId}
-
+import PeerConnectionHandler._
 import scala.collection.mutable
 import scala.concurrent.duration._
 
 case class EncryDeliveryTracker(context: ActorContext, deliveryTimeout: FiniteDuration, maxDeliveryChecks: Int,
                                 nvsRef: ActorRef, timeProvider: NetworkTimeProvider)
   extends DeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, nvsRef) {
+
+  case class ToDownloadStatus(tp: ModifierTypeId, firstViewed: Long, lastTry: Long)
 
   val toDownload: mutable.Map[ModifierIdAsKey, ToDownloadStatus] = mutable.Map[ModifierIdAsKey, ToDownloadStatus]()
 

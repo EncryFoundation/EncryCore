@@ -16,8 +16,8 @@ import scorex.core.network.message.{Message, MessageHandler}
 import scorex.core.settings.NetworkSettings
 import scorex.core.utils.ScorexLogging
 import NetworkController.ReceivableMessages._
-import NetworkController.ReceivableMessages.DataFromPeer
 import PeerConnectionHandler.ReceivableMessages.CloseConnection
+import PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 
 import scala.collection.JavaConverters._

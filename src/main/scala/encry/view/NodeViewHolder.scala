@@ -2,7 +2,7 @@ package encry.view
 
 import akka.actor.Actor
 import encry.EncryApp
-import encry.network.ConnectedPeer
+import encry.network.PeerConnectionHandler._
 import scorex.core
 import scorex.core._
 import scorex.core.consensus.History.ProgressInfo

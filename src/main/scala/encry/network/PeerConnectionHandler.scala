@@ -16,33 +16,10 @@ import scorex.core.network._
 import scorex.core.network.message.MessageHandler
 import scorex.core.settings.NetworkSettings
 import scorex.core.utils.ScorexLogging
-
+import PeerConnectionHandler._
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
-
-sealed trait ConnectionType
-
-case object Incoming extends ConnectionType
-
-case object Outgoing extends ConnectionType
-
-case class ConnectedPeer(socketAddress: InetSocketAddress,
-                         handlerRef: ActorRef,
-                         direction: ConnectionType,
-                         handshake: Handshake) {
-
-  import shapeless.syntax.typeable._
-
-  def publicPeer: Boolean = handshake.declaredAddress.contains(socketAddress)
-
-  override def hashCode(): Int = socketAddress.hashCode()
-
-  override def equals(obj: Any): Boolean =
-    obj.cast[ConnectedPeer].exists(p => p.socketAddress == this.socketAddress && p.direction == this.direction)
-
-  override def toString: String = s"ConnectedPeer($socketAddress)"
-}
 
 class PeerConnectionHandler(messagesHandler: MessageHandler,
                             connection: ActorRef,
@@ -201,7 +178,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   def getPacket(data: ByteString): (List[ByteString], ByteString) = {
 
-    val headerSize = 4
+    val headerSize: Int = 4
 
     @tailrec
     def multiPacket(packets: List[ByteString], current: ByteString): (List[ByteString], ByteString) = {
@@ -224,6 +201,30 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 }
 
 object PeerConnectionHandler {
+
+  sealed trait ConnectionType
+
+  case object Incoming extends ConnectionType
+
+  case object Outgoing extends ConnectionType
+
+  case class ConnectedPeer(socketAddress: InetSocketAddress,
+                           handlerRef: ActorRef,
+                           direction: ConnectionType,
+                           handshake: Handshake) {
+
+    import shapeless.syntax.typeable._
+
+    def publicPeer: Boolean = handshake.declaredAddress.contains(socketAddress)
+
+    override def hashCode(): Int = socketAddress.hashCode()
+
+    override def equals(obj: Any): Boolean =
+      obj.cast[ConnectedPeer].exists(p => p.socketAddress == this.socketAddress && p.direction == this.direction)
+
+    override def toString: String = s"ConnectedPeer($socketAddress)"
+  }
+
 
   sealed trait CommunicationState
 

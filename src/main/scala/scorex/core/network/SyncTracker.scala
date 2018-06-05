@@ -3,10 +3,9 @@ package scorex.core.network
 import java.net.InetSocketAddress
 
 import akka.actor.{ActorContext, ActorRef, Cancellable}
-import encry.network.ConnectedPeer
+import encry.network.PeerConnectionHandler._
 import scorex.core.network.NodeViewSynchronizer.Events.{BetterNeighbourAppeared, NoBetterNeighbour}
 import scorex.core.consensus.History
-import scorex.core.consensus.History.HistoryComparisonResult
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
 import scorex.core.settings.NetworkSettings
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
