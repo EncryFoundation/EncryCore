@@ -12,7 +12,6 @@ import encry.EncryApp
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle}
 import encry.EncryApp._
 import scorex.core.app.Version
-import scorex.core.network._
 import encry.network.message.MessageHandler
 import encry.settings.NetworkSettings
 import scorex.core.utils.ScorexLogging

@@ -7,7 +7,6 @@ import encry.network.PeerConnectionHandler._
 import encry.network.message.BasicMsgDataTypes._
 import encry.network.message.{InvSpec, RequestModifierSpec, _}
 import scorex.core.consensus.{History, HistoryReader, SyncInfo}
-import scorex.core.network._
 import encry.settings.NetworkSettings
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.StateReader

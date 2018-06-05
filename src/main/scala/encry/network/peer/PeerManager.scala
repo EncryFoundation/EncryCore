@@ -3,7 +3,6 @@ package encry.network.peer
 import java.net.InetSocketAddress
 
 import akka.actor.Actor
-import scorex.core.network._
 import scorex.core.utils.ScorexLogging
 import encry.EncryApp._
 import PeerManager.ReceivableMessages._
