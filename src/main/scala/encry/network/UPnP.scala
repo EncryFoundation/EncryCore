@@ -40,7 +40,7 @@ class UPnP(settings: NetworkSettings) extends ScorexLogging {
   if (settings.upnpEnabled) addPort(settings.bindAddress.getPort)
 
   def addPort(port: Int): Try[Unit] = Try {
-    if (gateway.get.addPortMapping(port, port, localAddress.get.getHostAddress, "TCP", "Scorex"))
+    if (gateway.get.addPortMapping(port, port, localAddress.get.getHostAddress, "TCP", "EncryCore"))
       log.debug("Mapped port [" + externalAddress.get.getHostAddress + "]:" + port)
     else log.debug("Unable to map port " + port)
   }.recover { case t: Throwable => log.error("Unable to map port " + port + ": " + t.toString) }
