@@ -9,7 +9,7 @@ import io.circe.syntax._
 import encry.view.NodeViewHolder.CurrentView
 import scorex.core.consensus.History
 import scorex.core.serialization.SerializerRegistry
-import scorex.core.settings.RESTApiSettings
+import encry.settings.RESTApiSettings
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.MinimalState
 import scorex.core.transaction.wallet.Vault

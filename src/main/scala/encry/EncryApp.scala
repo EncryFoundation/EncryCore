@@ -40,9 +40,7 @@ object EncryApp extends App with ScorexLogging {
   type PMOD = EncryPersistentModifier
   type NVHT = EncryNodeViewHolder[_]
 
-  lazy val encrySettings: EncryAppSettings = EncryAppSettings.read(args.headOption)
-
-  lazy val settings: ScorexSettings = encrySettings.scorexSettings
+  lazy val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
 
   implicit val system: ActorSystem = ActorSystem(settings.network.agentName)
   implicit val materializer: ActorMaterializer = ActorMaterializer()
@@ -54,7 +52,7 @@ object EncryApp extends App with ScorexLogging {
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
 
-  val nodeId: Array[Byte] = Algos.hash(encrySettings.scorexSettings.network.nodeName).take(5)
+  val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName).take(5)
 
   lazy val basicSpecs = {
     val invSpec = new InvSpec(settings.network.maxInvObjects)
@@ -88,10 +86,10 @@ object EncryApp extends App with ScorexLogging {
   val apiRoutes: Seq[ApiRoute] = Seq(
     UtilsApiRoute(settings.restApi),
     PeersApiRoute(peerManager, networkController, settings.restApi),
-    InfoApiRoute(readersHolder, miner, peerManager, encrySettings, nodeId, timeProvider),
-    HistoryApiRoute(readersHolder, miner, encrySettings, nodeId, encrySettings.nodeSettings.stateMode),
-    TransactionsApiRoute(readersHolder, nodeViewHolder, settings.restApi, encrySettings.nodeSettings.stateMode),
-    AccountInfoApiRoute(readersHolder, nodeViewHolder, scanner, settings.restApi, encrySettings.nodeSettings.stateMode)
+    InfoApiRoute(readersHolder, miner, peerManager, settings, nodeId, timeProvider),
+    HistoryApiRoute(readersHolder, miner, settings, nodeId, settings.node.stateMode),
+    TransactionsApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
+    AccountInfoApiRoute(readersHolder, nodeViewHolder, scanner, settings.restApi, settings.node.stateMode)
   )
 
   val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
@@ -105,12 +103,14 @@ object EncryApp extends App with ScorexLogging {
     case _ => Escalate
   }
 
-  if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) miner ! StartMining
+  if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
 
-  if (encrySettings.testingSettings.transactionGeneration)
-    system.actorOf(Props[TransactionGenerator], "tx-generator") ! StartGeneration
+  if (settings.testing.transactionGeneration) {
+    val transactionGenerator: ActorRef = system.actorOf(Props[TransactionGenerator], "tx-generator")
+    transactionGenerator ! StartGeneration
+  }
 
-  if (encrySettings.nodeSettings.enableCLI) cliListener ! StartListening
+  if (settings.node.enableCLI) cliListener ! StartListening
 
   def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
 }

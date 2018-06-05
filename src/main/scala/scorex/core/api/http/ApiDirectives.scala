@@ -2,7 +2,7 @@ package scorex.core.api.http
 
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.{AuthorizationFailedRejection, Directive0, Directives}
-import scorex.core.settings.RESTApiSettings
+import encry.settings.RESTApiSettings
 import scorex.crypto.hash.{Blake2b256, Digest}
 
 trait ApiDirectives extends Directives {

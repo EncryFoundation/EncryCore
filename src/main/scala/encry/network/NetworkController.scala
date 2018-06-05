@@ -13,7 +13,7 @@ import encry.view.history.EncrySyncInfoMessageSpec
 import scorex.core.network._
 import encry.network.message.Message.MessageCode
 import encry.network.message.{Message, MessageHandler}
-import scorex.core.settings.NetworkSettings
+import encry.settings.NetworkSettings
 import scorex.core.utils.ScorexLogging
 import NetworkController.ReceivableMessages._
 import PeerConnectionHandler.ReceivableMessages.CloseConnection

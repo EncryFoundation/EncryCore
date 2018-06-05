@@ -36,7 +36,7 @@ class EncryMiner extends Actor with ScorexLogging {
 
   val startTime: Time = timeProvider.time()
   val consensus: ConsensusScheme = ConsensusSchemeReaders.consensusScheme
-  var isMining = false
+  var isMining: Boolean = false
   var candidateOpt: Option[CandidateBlock] = None
   var miningWorkers: Seq[ActorRef] = Seq.empty[ActorRef]
 
@@ -53,27 +53,28 @@ class EncryMiner extends Actor with ScorexLogging {
 
   def needNewCandidate(b: EncryBlock): Boolean = !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
 
-  def shouldStartMine(b: EncryBlock): Boolean = encrySettings.nodeSettings.mining && b.header.timestamp >= startTime
+  def shouldStartMine(b: EncryBlock): Boolean = settings.node.mining && b.header.timestamp >= startTime
 
   def unknownMessage: Receive = {
     case m => log.warn(s"Unexpected message $m")
   }
 
   def mining: Receive = {
-    case StartMining =>
+    case StartMining if !isMining =>
       candidateOpt match {
         case Some(candidateBlock) =>
           isMining = true
-          val numberOfWorkers: Int = encrySettings.nodeSettings.numberOfMiningWorkers
+          val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
           miningWorkers = for (i <- 0 to numberOfWorkers) yield context.actorOf(
             Props(classOf[EncryMiningWorker], candidateBlock, i, numberOfWorkers), s"worker$i")
           miningWorkers.foreach(_ ! candidateBlock)
         case None => produceCandidate()
       }
-    case StopMining =>
+    case StopMining if isMining =>
       isMining = false
       killAllWorkers()
     case GetMinerStatus => sender ! MinerStatus(isMining, candidateOpt)
+    case _ =>
   }
 
   def receiveSemanticallySuccessfulModifier: Receive = {
@@ -171,7 +172,7 @@ class EncryMiner extends Actor with ScorexLogging {
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
       log.info("Starting candidate generation")
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
-      if (bestHeaderOpt.isDefined || encrySettings.nodeSettings.offlineGeneration)
+      if (bestHeaderOpt.isDefined || settings.node.offlineGeneration)
         CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
       else CandidateEnvelope.empty
     }

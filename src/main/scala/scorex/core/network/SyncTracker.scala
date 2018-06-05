@@ -7,7 +7,7 @@ import encry.network.PeerConnectionHandler._
 import encry.network.NodeViewSynchronizer.Events.{BetterNeighbourAppeared, NoBetterNeighbour}
 import scorex.core.consensus.History
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
-import scorex.core.settings.NetworkSettings
+import encry.settings.NetworkSettings
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 
 import scala.collection.mutable

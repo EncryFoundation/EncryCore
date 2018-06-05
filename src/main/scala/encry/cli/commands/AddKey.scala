@@ -16,7 +16,7 @@ import scala.util.Try
 object AddKey extends Command {
 
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = Try {
-    implicit val timeout: Timeout = Timeout(settings.scorexSettings.restApi.timeout)
+    implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     nodeViewHolder ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Unit] { view =>
         view.vault.keyManager.createNewKey()

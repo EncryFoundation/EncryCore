@@ -4,7 +4,7 @@ import java.security.SecureRandom
 
 import akka.actor.ActorRefFactory
 import akka.http.scaladsl.server.Route
-import scorex.core.settings.RESTApiSettings
+import encry.settings.RESTApiSettings
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Blake2b256
 

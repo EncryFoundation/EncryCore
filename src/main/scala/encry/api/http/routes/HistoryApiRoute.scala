@@ -13,7 +13,7 @@ import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
 import scorex.core.ModifierId
-import scorex.core.settings.RESTApiSettings
+import encry.settings.RESTApiSettings
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.encode.Base58
 
@@ -33,7 +33,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
     candidateBlockR
   }
 
-  override val settings: RESTApiSettings = appSettings.scorexSettings.restApi
+  override val settings: RESTApiSettings = appSettings.restApi
 
   private def getHistory: Future[EncryHistoryReader] = (readersHolder ? GetDataFromHistory[EncryHistoryReader](r => r)).mapTo[EncryHistoryReader]
 

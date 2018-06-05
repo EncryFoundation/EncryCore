@@ -112,7 +112,7 @@ object EncryScanner {
   def getIndexDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/index")
 
   def props(): Props = {
-    val indexDir: File = getIndexDir(encrySettings)
+    val indexDir: File = getIndexDir(settings)
     indexDir.mkdirs()
     val indexStore: LSMStore = new LSMStore(indexDir, keepVersions = Constants.DefaultKeepVersions)
     Props(classOf[EncryScanner], indexStore)

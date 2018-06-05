@@ -4,7 +4,7 @@ import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import scorex.core.api.http.ApiRoute
-import scorex.core.settings.RESTApiSettings
+import encry.settings.RESTApiSettings
 
 class SwaggerConfigRoute(swaggerConf: String, override val settings: RESTApiSettings)(implicit val context: ActorRefFactory)
   extends ApiRoute {

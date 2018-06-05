@@ -11,7 +11,7 @@ import io.circe.Json
 import io.circe.syntax._
 import scorex.core.network.Handshake
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
-import scorex.core.settings.RESTApiSettings
+import encry.settings.RESTApiSettings
 import scorex.core.utils.{NetworkTime, NetworkTimeProvider}
 import scorex.crypto.encode.Base58
 
@@ -25,7 +25,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
                         timeProvider: NetworkTimeProvider)
                        (implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
 
-  override val settings: RESTApiSettings = appSettings.scorexSettings.restApi
+  override val settings: RESTApiSettings = appSettings.restApi
 
   private val launchTime: NetworkTime.Time = timeProvider.time()
 
@@ -45,9 +45,9 @@ case class InfoApiRoute(readersHolder: ActorRef,
 
   private def getConnectedPeers: Future[Int] = (peerManager ? GetConnectedPeers).mapTo[Seq[Handshake]].map(_.size)
 
-  private def getStateType: String = appSettings.nodeSettings.stateMode.verboseName
+  private def getStateType: String = appSettings.node.stateMode.verboseName
 
-  private def getNodeName: String = appSettings.scorexSettings.network.nodeName
+  private def getNodeName: String = appSettings.network.nodeName
 
   private def getMinerInfo: Future[MinerStatus] = (miner ? GetMinerStatus).mapTo[MinerStatus]
 }

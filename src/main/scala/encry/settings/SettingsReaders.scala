@@ -1,4 +1,4 @@
-package scorex.core.settings
+package encry.settings
 
 import java.io.File
 import java.net.InetSocketAddress
