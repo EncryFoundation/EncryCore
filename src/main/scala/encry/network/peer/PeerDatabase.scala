@@ -2,7 +2,7 @@ package encry.network.peer
 
 import java.net.InetSocketAddress
 
-import scorex.core.network.ConnectionType
+import encry.network.ConnectionType
 import scorex.core.utils.NetworkTime
 
 import scala.collection.mutable

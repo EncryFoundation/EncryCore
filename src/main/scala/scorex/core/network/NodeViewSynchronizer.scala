@@ -4,6 +4,7 @@ package scorex.core.network
 import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import encry.network.ConnectedPeer
 import scorex.core.consensus.{History, HistoryReader, SyncInfo}
 import scorex.core.network.message.{InvSpec, RequestModifierSpec, _}
 import scorex.core.transaction.box.proposition.Proposition

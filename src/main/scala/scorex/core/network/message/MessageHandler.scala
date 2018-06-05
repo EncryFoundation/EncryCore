@@ -2,7 +2,7 @@ package scorex.core.network.message
 
 import java.nio.ByteBuffer
 
-import scorex.core.network.ConnectedPeer
+import encry.network.ConnectedPeer
 import scorex.crypto.hash.Blake2b256
 
 import scala.language.existentials

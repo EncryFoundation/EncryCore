@@ -1,4 +1,4 @@
-package scorex.core.network
+package encry.network
 
 import java.net.InetSocketAddress
 
@@ -7,8 +7,9 @@ import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
+import encry.network.PeerConnectionHandler.{AwaitingHandshake, WorkingCycle}
 import scorex.core.app.Version
-import scorex.core.network.PeerConnectionHandler.{AwaitingHandshake, WorkingCycle}
+import scorex.core.network._
 import scorex.core.network.message.MessageHandler
 import scorex.core.settings.NetworkSettings
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
@@ -55,7 +56,7 @@ class PeerConnectionHandler(val settings: NetworkSettings,
                             timeProvider: NetworkTimeProvider) extends Actor with Buffering with ScorexLogging {
 
   import PeerConnectionHandler.ReceivableMessages._
-  import encry.network.peer.PeerManager.ReceivableMessages.{AddToBlacklist, Handshaked, Disconnected, DoConnecting}
+  import encry.network.peer.PeerManager.ReceivableMessages.{AddToBlacklist, Disconnected, DoConnecting, Handshaked}
 
   context watch connection
 

@@ -1,5 +1,7 @@
 package scorex.core.network
 
+import encry.network.ConnectedPeer
+
 import scala.util.Random
 
 trait SendingStrategy {

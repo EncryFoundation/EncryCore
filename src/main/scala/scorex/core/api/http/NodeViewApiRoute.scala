@@ -4,10 +4,10 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import encry.network.ConnectedPeer
 import io.circe.syntax._
 import encry.view.NodeViewHolder.CurrentView
 import scorex.core.consensus.History
-import scorex.core.network.ConnectedPeer
 import scorex.core.serialization.SerializerRegistry
 import scorex.core.settings.RESTApiSettings
 import scorex.core.transaction.box.proposition.Proposition

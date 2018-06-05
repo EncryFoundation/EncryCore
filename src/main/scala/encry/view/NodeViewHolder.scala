@@ -2,11 +2,11 @@ package encry.view
 
 import akka.actor.Actor
 import encry.EncryApp
+import encry.network.ConnectedPeer
 import scorex.core
 import scorex.core._
 import scorex.core.consensus.History.ProgressInfo
 import scorex.core.consensus.{History, SyncInfo}
-import scorex.core.network.ConnectedPeer
 import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.NodeViewHolderEvent
 import scorex.core.serialization.Serializer
 import scorex.core.transaction._
