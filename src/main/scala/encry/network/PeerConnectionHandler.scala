@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.InetSocketAddress
+import java.nio.ByteOrder
 
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import akka.io.Tcp
@@ -16,6 +17,7 @@ import scorex.core.network.message.MessageHandler
 import scorex.core.settings.NetworkSettings
 import scorex.core.utils.ScorexLogging
 
+import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
 
@@ -46,14 +48,14 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
                             connection: ActorRef,
                             direction: ConnectionType,
                             ownSocketAddress: Option[InetSocketAddress],
-                            remote: InetSocketAddress) extends Actor with Buffering with ScorexLogging {
+                            remote: InetSocketAddress) extends Actor with ScorexLogging {
 
   import PeerConnectionHandler.ReceivableMessages._
   import encry.network.peer.PeerManager.ReceivableMessages.{AddToBlacklist, Disconnected, DoConnecting, Handshaked}
 
   context watch connection
 
-  override val settings: NetworkSettings = EncryApp.settings.network
+  val settings: NetworkSettings = EncryApp.settings.network
   var receivedHandshake: Option[Handshake] = None
   var selfPeer: Option[ConnectedPeer] = None
   var handshakeSent = false
@@ -186,11 +188,43 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   }
 
   override def postStop(): Unit = log.info(s"Peer handler to $remote destroyed")
+
+  /**
+    * Extracts complete packets of the specified length, preserving remainder
+    * data. If there is no complete packet, then we return an empty list. If
+    * there are multiple packets available, all packets are extracted, Any remaining data
+    * is returned to the caller for later submission
+    *
+    * @param data A list of the packets extracted from the raw data in order of receipt
+    * @return A list of ByteStrings containing extracted packets as well as any remaining buffer data not consumed
+    */
+
+  def getPacket(data: ByteString): (List[ByteString], ByteString) = {
+
+    val headerSize = 4
+
+    @tailrec
+    def multiPacket(packets: List[ByteString], current: ByteString): (List[ByteString], ByteString) = {
+      if (current.length < headerSize) (packets.reverse, current)
+      else {
+        val len: Int = current.iterator.getInt(ByteOrder.BIG_ENDIAN)
+        if (len > settings.maxPacketLen || len < 0) throw new Exception(s"Invalid packet length: $len")
+        if (current.length < len + headerSize) (packets.reverse, current)
+        else {
+          val rem: ByteString = current drop headerSize // Pop off header
+          val (front: ByteString, back: ByteString) = rem.splitAt(len) // Front contains a completed packet, back contains the remaining data
+          // Pull of the packet and recurse to see if there is another packet available
+          multiPacket(front :: packets, back)
+        }
+      }
+    }
+
+    multiPacket(List[ByteString](), data)
+  }
 }
 
 object PeerConnectionHandler {
 
-  // todo: use the "become" approach to handle state more elegantly
   sealed trait CommunicationState
 
   case object AwaitingHandshake extends CommunicationState
@@ -199,7 +233,7 @@ object PeerConnectionHandler {
 
   object ReceivableMessages {
 
-    private[PeerConnectionHandler] object HandshakeDone
+    case object HandshakeDone
 
     case object StartInteraction
 
@@ -211,10 +245,7 @@ object PeerConnectionHandler {
 
   }
 
-  def props(messagesHandler: MessageHandler,
-            connection: ActorRef,
-            direction: ConnectionType,
-            ownSocketAddress: Option[InetSocketAddress],
-            remote: InetSocketAddress): Props =
+  def props(messagesHandler: MessageHandler, connection: ActorRef, direction: ConnectionType,
+            ownSocketAddress: Option[InetSocketAddress], remote: InetSocketAddress): Props =
     Props(new PeerConnectionHandler(messagesHandler, connection, direction, ownSocketAddress, remote))
 }
