@@ -23,8 +23,6 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
 
   def boxIds: Seq[ADKey] = readComplexValue(boxIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
 
-  def openBoxIds: Seq[ADKey] = readComplexValue(openBoxesIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
-
   def transactionIds: Seq[ModifierId] = readComplexValue(transactionIdsKey, 32).map(ModifierId @@ _).getOrElse(Seq())
 
   def getBoxById(id: ADKey): Option[EncryBaseBox] = store.get(keyByBoxId(id))
@@ -48,8 +46,6 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
 object WalletStorage {
 
   val boxIdsKey = ByteArrayWrapper(Algos.hash("account_boxes"))
-
-  val openBoxesIdsKey = ByteArrayWrapper(Algos.hash("open_boxes"))
 
   val transactionIdsKey = ByteArrayWrapper(Algos.hash("account_transactions"))
 
