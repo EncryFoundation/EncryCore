@@ -18,12 +18,11 @@ import encry.local.TransactionGenerator
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
-import encry.network.{EncryNodeViewSynchronizer, NetworkController}
+import encry.network.{EncryNodeViewSynchronizer, NetworkController, UPnP}
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import scorex.core.api.http._
-import scorex.core.network.UPnP
 import encry.network.message._
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 import encry.network.peer.PeerManager

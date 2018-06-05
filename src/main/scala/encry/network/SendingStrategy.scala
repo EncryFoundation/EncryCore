@@ -1,4 +1,4 @@
-package scorex.core.network
+package encry.network
 
 import encry.network.PeerConnectionHandler.ConnectedPeer
 
@@ -9,19 +9,13 @@ trait SendingStrategy {
 }
 
 object SendToRandom extends SendingStrategy {
-  override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] = peers.nonEmpty match {
-    case true => Seq(peers(Random.nextInt(peers.length)))
-    case false => Seq()
-  }
+  override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] =
+    if (peers.nonEmpty) Seq(peers(Random.nextInt(peers.length)))
+    else Seq()
 }
 
 case object Broadcast extends SendingStrategy {
   override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] = peers
-}
-
-case class BroadcastExceptOf(exceptOf: Seq[ConnectedPeer]) extends SendingStrategy {
-  override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] =
-    peers.filterNot(exceptOf.contains)
 }
 
 case class SendToPeer(chosenPeer: ConnectedPeer) extends SendingStrategy {
@@ -30,9 +24,4 @@ case class SendToPeer(chosenPeer: ConnectedPeer) extends SendingStrategy {
 
 case class SendToPeers(chosenPeers: Seq[ConnectedPeer]) extends SendingStrategy {
   override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] = chosenPeers
-}
-
-case class SendToRandomFromChosen(chosenPeers: Seq[ConnectedPeer]) extends SendingStrategy {
-  override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] =
-    Seq(chosenPeers(Random.nextInt(chosenPeers.length)))
 }

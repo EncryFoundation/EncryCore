@@ -10,7 +10,6 @@ import akka.pattern.ask
 import akka.util.Timeout
 import encry.EncryApp._
 import encry.view.history.EncrySyncInfoMessageSpec
-import scorex.core.network._
 import encry.network.message.Message.MessageCode
 import encry.network.message.{Message, MessageHandler}
 import encry.settings.NetworkSettings
