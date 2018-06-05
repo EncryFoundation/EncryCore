@@ -13,7 +13,7 @@ import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationStat
 import encry.EncryApp._
 import scorex.core.app.Version
 import scorex.core.network._
-import scorex.core.network.message.MessageHandler
+import encry.network.message.MessageHandler
 import scorex.core.settings.NetworkSettings
 import scorex.core.utils.ScorexLogging
 import PeerConnectionHandler._

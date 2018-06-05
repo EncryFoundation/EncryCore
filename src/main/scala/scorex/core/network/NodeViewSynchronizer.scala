@@ -6,12 +6,12 @@ import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import encry.network.PeerConnectionHandler._
 import scorex.core.consensus.{History, HistoryReader, SyncInfo}
-import scorex.core.network.message.{InvSpec, RequestModifierSpec, _}
+import encry.network.message.{InvSpec, RequestModifierSpec, _}
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.{MempoolReader, Transaction}
 import scorex.core.utils.NetworkTimeProvider
 import scorex.core.{PersistentNodeViewModifier, _}
-import scorex.core.network.message.BasicMsgDataTypes._
+import encry.network.message.BasicMsgDataTypes._
 import scorex.core.settings.NetworkSettings
 import scorex.core.transaction.state.StateReader
 import scorex.core.utils.ScorexLogging

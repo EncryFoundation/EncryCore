@@ -18,13 +18,13 @@ import encry.local.TransactionGenerator
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
-import encry.network.{EncryNodeViewSynchronizer, NetworkController, PeerSynchronizer}
+import encry.network.{EncryNodeViewSynchronizer, NetworkController}
 import encry.settings.{Algos, EncryAppSettings}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import scorex.core.api.http._
 import scorex.core.network.UPnP
-import scorex.core.network.message._
+import encry.network.message._
 import scorex.core.settings.ScorexSettings
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 import encry.network.peer.PeerManager
@@ -107,10 +107,8 @@ object EncryApp extends App with ScorexLogging {
 
   if (encrySettings.nodeSettings.mining && encrySettings.nodeSettings.offlineGeneration) miner ! StartMining
 
-  if (encrySettings.testingSettings.transactionGeneration) {
-    val transactionGenerator: ActorRef = system.actorOf(Props[TransactionGenerator], "tx-generator")
-    transactionGenerator ! StartGeneration
-  }
+  if (encrySettings.testingSettings.transactionGeneration)
+    system.actorOf(Props[TransactionGenerator], "tx-generator") ! StartGeneration
 
   if (encrySettings.nodeSettings.enableCLI) cliListener ! StartListening
 

@@ -11,8 +11,8 @@ import akka.util.Timeout
 import encry.EncryApp._
 import encry.view.history.EncrySyncInfoMessageSpec
 import scorex.core.network._
-import scorex.core.network.message.Message.MessageCode
-import scorex.core.network.message.{Message, MessageHandler}
+import encry.network.message.Message.MessageCode
+import encry.network.message.{Message, MessageHandler}
 import scorex.core.settings.NetworkSettings
 import scorex.core.utils.ScorexLogging
 import NetworkController.ReceivableMessages._
@@ -144,7 +144,7 @@ object NetworkController {
 
   object ReceivableMessages {
 
-    import scorex.core.network.message.MessageSpec
+    import encry.network.message.MessageSpec
     import scala.reflect.runtime.universe.TypeTag
 
     case class DataFromPeer[DT: TypeTag](spec: MessageSpec[DT], data: DT, source: ConnectedPeer)
