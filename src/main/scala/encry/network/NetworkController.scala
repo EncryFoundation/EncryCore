@@ -116,9 +116,7 @@ class NetworkController extends Actor with ScorexLogging {
         case Outgoing => s"New outgoing connection to $remote established (bound to local $local)"
       }
       log.info(logMsg)
-      val handlerProps: Props = PeerConnectionHandlerRef.props(networkSettings, self, peerManager,
-        messagesHandler, sender(), direction, externalSocketAddress, remote, timeProvider)
-      context.actorOf(handlerProps)
+      context.actorOf(PeerConnectionHandler.props(messagesHandler, sender(), direction, externalSocketAddress, remote))
       outgoing -= remote
     case CommandFailed(c: Connect) =>
       outgoing -= c.remoteAddress
