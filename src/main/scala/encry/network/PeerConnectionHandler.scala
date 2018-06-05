@@ -14,7 +14,7 @@ import encry.EncryApp._
 import scorex.core.app.Version
 import scorex.core.network._
 import encry.network.message.MessageHandler
-import scorex.core.settings.NetworkSettings
+import encry.settings.NetworkSettings
 import scorex.core.utils.ScorexLogging
 import PeerConnectionHandler._
 import scala.annotation.tailrec

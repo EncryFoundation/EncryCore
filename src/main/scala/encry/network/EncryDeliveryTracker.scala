@@ -1,10 +1,10 @@
 package encry.network
 
 import akka.actor.{ActorContext, ActorRef}
-import scorex.core.network.DeliveryTracker
 import scorex.core.utils.NetworkTimeProvider
 import scorex.core.{ModifierId, ModifierTypeId}
 import PeerConnectionHandler._
+
 import scala.collection.mutable
 import scala.concurrent.duration._
 

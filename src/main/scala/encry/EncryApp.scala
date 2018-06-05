@@ -25,7 +25,6 @@ import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import scorex.core.api.http._
 import scorex.core.network.UPnP
 import encry.network.message._
-import scorex.core.settings.ScorexSettings
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 import encry.network.peer.PeerManager
 

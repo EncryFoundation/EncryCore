@@ -6,12 +6,12 @@ import encry.consensus.NBits
 import encry.local.EncryLocalInterface.{GetNodeInfo, NodeInfo}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.network.Handshake
 import encry.settings.{Algos, Constants, EncryAppSettings}
 import encry.view.history.EncryHistory
 import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
-import scorex.core.network.Handshake
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, SemanticallySuccessfulModifier}
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}

@@ -7,6 +7,7 @@ import scorex.core.network._
 import scorex.core.utils.ScorexLogging
 import encry.EncryApp._
 import PeerManager.ReceivableMessages._
+import encry.network.Handshake
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler._

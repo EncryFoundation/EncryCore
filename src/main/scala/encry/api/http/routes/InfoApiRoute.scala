@@ -5,11 +5,11 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.consensus.DifficultySerializer
 import encry.local.miner.EncryMiner.{GetMinerStatus, MinerStatus}
+import encry.network.Handshake
 import encry.settings.{Algos, Constants, EncryAppSettings}
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import io.circe.Json
 import io.circe.syntax._
-import scorex.core.network.Handshake
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import encry.settings.RESTApiSettings
 import scorex.core.utils.{NetworkTime, NetworkTimeProvider}
