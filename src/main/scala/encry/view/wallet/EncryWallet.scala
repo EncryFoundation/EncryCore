@@ -25,8 +25,7 @@ import scorex.utils.Random
 import scala.util.Try
 
 case class EncryWallet(walletStore: Store, keyManager: KeyManager)
-  extends Vault[EncryProposition, EncryBaseTransaction, EncryPersistentModifier, EncryWallet]
-    with ScorexLogging {
+  extends Vault[EncryProposition, EncryBaseTransaction, EncryPersistentModifier, EncryWallet] with ScorexLogging {
 
   val propositions: Set[AccountProposition] = publicKeys.map(pk => AccountProposition(Account(pk.pubKeyBytes)))
 
@@ -40,8 +39,8 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
 
   override def scanOffchain(txs: Seq[EncryBaseTransaction]): EncryWallet = this
 
-  override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = {
-    modifier match {
+  override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = modifier match {
+
       case block: EncryBlock =>
         val (
           newTxs: Seq[EncryBaseTransaction],
@@ -73,15 +72,14 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
                 walletPropositionsSet.intersect(txPropositionsSet).nonEmpty ||
                   tx.defaultProofOpt.exists(pr => walletPropositionsSet.exists(_.data sameElements Algos.hash(pr.bytes)))
               }
-              if (newBxsL.nonEmpty || isRelatedTransaction)
-                (nTxs :+ tx, nBxs ++ newBxsL, sBxs ++ spendBxsIdsL)
+              if (newBxsL.nonEmpty || isRelatedTransaction) (nTxs :+ tx, nBxs ++ newBxsL, sBxs ++ spendBxsIdsL)
               else (nTxs, nBxs, sBxs)
           }
         updateWallet(modifier.id, newTxs, newBxs, spentBxsIds)
         this
+
       case _ => this
     }
-  }
 
   override def rollback(to: VersionTag): Try[EncryWallet] = Try(walletStore.rollback(ByteArrayWrapper(to))).map(_ => this)
 
