@@ -2,20 +2,20 @@ package encry.network.peer
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Actor, ActorRef}
-import scorex.core.network._
+import akka.actor.Actor
 import scorex.core.utils.ScorexLogging
 import encry.EncryApp._
+import PeerManager.ReceivableMessages._
+import encry.network.{Handshake, SendingStrategy}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
+import encry.network.NetworkController.ReceivableMessages.ConnectTo
+import encry.network.PeerConnectionHandler._
+import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
 
 import scala.collection.mutable
 import scala.util.Random
 
 class PeerManager extends Actor with ScorexLogging {
-
-  import PeerManager.ReceivableMessages._
-  import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
-  import encry.network.NetworkController.ReceivableMessages.ConnectTo
-  import scorex.core.network.PeerConnectionHandler.ReceivableMessages.{StartInteraction, CloseConnection}
 
   //peers after successful handshake
   val connectedPeers: mutable.Map[InetSocketAddress, ConnectedPeer] = mutable.Map[InetSocketAddress, ConnectedPeer]()

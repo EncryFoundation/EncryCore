@@ -1,6 +1,6 @@
 package scorex
 
-import scorex.core.network.message.BasicMsgDataTypes.InvData
+import encry.network.message.BasicMsgDataTypes.InvData
 import scorex.crypto.encode.Base58
 import supertagged.TaggedType
 

@@ -5,11 +5,11 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import encry.network.Handshake
 import io.circe.Encoder
 import io.circe.generic.semiauto._
 import io.circe.syntax._
 import scorex.core.api.http.PeersApiRoute.{BlacklistedPeers, PeerInfoResponse}
-import scorex.core.network.Handshake
 import encry.network.peer.PeerInfo
 import encry.settings.RESTApiSettings
 
