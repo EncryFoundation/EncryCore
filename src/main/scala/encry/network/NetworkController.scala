@@ -9,11 +9,16 @@ import akka.io.{IO, Tcp}
 import akka.pattern.ask
 import akka.util.Timeout
 import encry.EncryApp._
+import encry.view.history.EncrySyncInfoMessageSpec
 import scorex.core.network._
 import scorex.core.network.message.Message.MessageCode
-import scorex.core.network.message.{Message, MessageSpec}
+import scorex.core.network.message.{Message, MessageHandler}
 import scorex.core.settings.NetworkSettings
 import scorex.core.utils.ScorexLogging
+import NetworkController.ReceivableMessages._
+import NetworkController.ReceivableMessages.DataFromPeer
+import PeerConnectionHandler.ReceivableMessages.CloseConnection
+import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -24,20 +29,19 @@ import scala.util.{Failure, Success, Try}
 
 class NetworkController extends Actor with ScorexLogging {
 
-  import NetworkController.ReceivableMessages._
-  import NetworkController.ReceivableMessages.DataFromPeer
-  import PeerConnectionHandler.ReceivableMessages.CloseConnection
-  import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
-
   val networkSettings: NetworkSettings = settings.network
 
+  val peerSynchronizer: ActorRef = context.actorOf(Props[PeerSynchronizer], "peerSynchronizer")
+
+  val tcpManager: ActorRef = IO(Tcp)
+
   implicit val timeout: Timeout = Timeout(networkSettings.controllerTimeout.getOrElse(5 seconds))
+
+  val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
 
   val messageHandlers: mutable.Map[Seq[MessageCode], ActorRef] = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
   val outgoing: mutable.Set[InetSocketAddress] = mutable.Set[InetSocketAddress]()
-
-  val tcpManager: ActorRef = IO(Tcp)
 
   lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse {
     if (networkSettings.upnpEnabled) upnp.externalAddress.map(a => new InetSocketAddress(a, networkSettings.bindAddress.getPort))

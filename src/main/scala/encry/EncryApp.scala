@@ -68,17 +68,11 @@ object EncryApp extends App with ScorexLogging {
     )
   }
 
-  lazy val additionalMessageSpecs: Seq[MessageSpec[_]] = Seq(EncrySyncInfoMessageSpec)
-
-  lazy val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ additionalMessageSpecs)
-
   lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props(), "nodeViewHolder")
 
   val readersHolder: ActorRef = system.actorOf(Props[EncryViewReadersHolder], "readersHolder")
 
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController], "networkController")
-
-  val peerSynchronizer: ActorRef = system.actorOf(Props[PeerSynchronizer], "peerSynchronizer")
 
   lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
 
