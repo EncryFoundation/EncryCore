@@ -1,4 +1,4 @@
-package scorex.core.network
+package encry.network
 
 import java.nio.ByteOrder
 
@@ -6,10 +6,6 @@ import akka.util.ByteString
 import scorex.core.settings.NetworkSettings
 
 import scala.annotation.tailrec
-
-/**
-  * Taken from https://stackoverflow.com/questions/30665811/scala-tcp-packet-frame-using-akka
-  */
 
 trait Buffering {
 
