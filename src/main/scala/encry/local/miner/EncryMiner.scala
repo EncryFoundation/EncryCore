@@ -21,7 +21,7 @@ import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
 import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
-import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
+import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import scorex.core.transaction.box.Box.Amount
 import scorex.core.utils.NetworkTime.Time
 import scorex.core.utils.ScorexLogging

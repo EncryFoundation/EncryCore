@@ -7,7 +7,7 @@ import scorex.core
 import scorex.core._
 import scorex.core.consensus.History.ProgressInfo
 import scorex.core.consensus.{History, SyncInfo}
-import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.NodeViewHolderEvent
+import encry.network.NodeViewSynchronizer.ReceivableMessages.NodeViewHolderEvent
 import scorex.core.serialization.Serializer
 import scorex.core.transaction._
 import scorex.core.transaction.box.proposition.Proposition
@@ -37,7 +37,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
 
   import NodeViewHolder.ReceivableMessages._
   import NodeViewHolder._
-  import scorex.core.network.NodeViewSynchronizer.ReceivableMessages._
+  import encry.network.NodeViewSynchronizer.ReceivableMessages._
 
   type SI <: SyncInfo
   type HIS <: History[PMOD, SI, HIS]

@@ -12,10 +12,10 @@ import encry.EncryApp._
 import encry.view.NodeViewHolder._
 import encry.network.NetworkController.ReceivableMessages.SendToNetwork
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallySuccessfulModifier}
+import NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallySuccessfulModifier}
 import encry.network.message.BasicMsgDataTypes.ModifiersData
 import encry.network.message.{Message, ModifiersSpec}
-import scorex.core.network.{NodeViewSynchronizer, SendToRandom}
+import scorex.core.network.SendToRandom
 import scorex.core.settings.NetworkSettings
 import scorex.core.{ModifierId, ModifierTypeId}
 import scala.concurrent.duration._

@@ -12,7 +12,7 @@ import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
 import scorex.core.network.Handshake
-import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, SemanticallySuccessfulModifier}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, SemanticallySuccessfulModifier}
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 
