@@ -1,4 +1,4 @@
-package scorex.core.network.message
+package encry.network.message
 
 import scorex.core.serialization.Serializer
 

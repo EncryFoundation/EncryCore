@@ -1,4 +1,4 @@
-package scorex.core.network.message
+package encry.network.message
 
 
 import java.net.{InetAddress, InetSocketAddress}
@@ -7,8 +7,7 @@ import java.util
 import com.google.common.primitives.{Bytes, Ints}
 import scorex.core.{ModifierId, ModifierTypeId, NodeViewModifier}
 import scorex.core.consensus.SyncInfo
-import scorex.core.network.message.Message.{MessageCode, _}
-import encry.settings.NetworkSettings
+import encry.network.message.Message.{MessageCode, _}
 
 import scala.util.Try
 
@@ -18,7 +17,7 @@ object BasicMsgDataTypes {
   type ModifiersData = (ModifierTypeId, Map[ModifierId, Array[Byte]])
 }
 
-import scorex.core.network.message.BasicMsgDataTypes._
+import encry.network.message.BasicMsgDataTypes._
 
 class SyncInfoMessageSpec[SI <: SyncInfo](deserializer: Array[Byte] => Try[SI]) extends MessageSpec[SI] {
 

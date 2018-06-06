@@ -17,7 +17,7 @@ import encry.view.state.{DigestState, EncryState, StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
 import encry.EncryApp.{settings, timeProvider}
 import scorex.core._
-import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{FailedTransaction, SuccessfulTransaction}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{FailedTransaction, SuccessfulTransaction}
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.Transaction
 import scorex.crypto.authds.ADDigest

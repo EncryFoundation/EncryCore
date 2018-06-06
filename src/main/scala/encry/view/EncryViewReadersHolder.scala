@@ -7,7 +7,7 @@ import encry.view.mempool.EncryMempoolReader
 import encry.view.state.UtxoStateReader
 import encry.EncryApp._
 import encry.view.NodeViewHolder.ReceivableMessages.GetNodeViewChanges
-import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, NodeViewChange}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, NodeViewChange}
 import scorex.core.utils.ScorexLogging
 
 class EncryViewReadersHolder extends Actor with ScorexLogging {
