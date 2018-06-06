@@ -5,15 +5,14 @@ import java.math.BigInteger
 import encry.utils.LittleEndianBytes._
 import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests.Blake2bDigest
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.mutable.ArrayBuffer
 
 object Equihash {
 
-  def nonceToLeBytes(nonce: BigInt): Array[Byte] = {
+  def nonceToLeBytes(nonce: BigInt): Array[Byte] =
     (for (i <- 0 to 7) yield leIntToByteArray((nonce >> 32 * i).intValue())).reduce(_ ++ _)
-  }
 
   def hashNonce[T <: Digest](digest: T, nonce: BigInt): T = {
     val arr = nonceToLeBytes(nonce)
@@ -22,7 +21,7 @@ object Equihash {
   }
 
   def hashSolution[T <: Digest](digest: T, solution: EquihashSolution): T = {
-    solution.ints map { hashXi(digest, _) }
+    solution.ints.map(hashXi(digest, _))
     digest
   }
 
@@ -39,57 +38,45 @@ object Equihash {
     case (res, _) => res
   }
 
-  def hasCollision(ha: Array[Byte], hb: Array[Byte], i: Int, lenght: Int): Boolean = {
+  def hasCollision(ha: Array[Byte], hb: Array[Byte], i: Int, lenght: Int): Boolean =
     ((i - 1) * lenght / 8 until i * lenght / 8).forall(j => ha(j) == hb(j))
-  }
 
   def distinctIndices(a: Seq[Int], b: Seq[Int]): Boolean = !a.exists(v => b.contains(v))
 
-  def xor(ha: Array[Byte], hb: Array[Byte]): Array[Byte] = {
+  def xor(ha: Array[Byte], hb: Array[Byte]): Array[Byte] =
     for {(a, b) <- ha.zip(hb)} yield (a ^ b).toByte
-  }
 
-  private val log = LoggerFactory.getLogger(getClass)
-  private val wordSize = 32
-  private val wordMask = BigInteger.ONE.shiftLeft(wordSize).subtract(BigInteger.ONE)
-  private val byteMask = BigInteger.valueOf(0xFF)
+  private val log: Logger = LoggerFactory.getLogger(getClass)
+  private val wordSize: Int = 32
+  private val wordMask: BigInteger = BigInteger.ONE.shiftLeft(wordSize).subtract(BigInteger.ONE)
+  private val byteMask: BigInteger = BigInteger.valueOf(0xFF)
 
   def expandArray(inp: Array[Byte], outLen: Int, bitLen: Int, bytePad: Int = 0): Array[Byte] = {
+
     assert(bitLen >= 8 && wordSize >= 7 + bitLen)
 
-    val outWidth = (bitLen + 7) / 8 + bytePad
+    val outWidth: Int = (bitLen + 7) / 8 + bytePad
+
     assert(outLen == 8 * outWidth * inp.length / bitLen)
-    val out = new Array[Byte](outLen)
 
-    val bitLenMask = BigInteger.valueOf((1 << bitLen) - 1)
+    inp.indices.foldLeft(0, 0, BigInteger.ZERO, new Array[Byte](outLen)) {
 
-    // The acc_bits least - significant bits of acc_value represent a bit sequence in big-endian order.
-    var accBits = 0
-    var accValue = BigInteger.ZERO
-
-    var j = 0
-    for (i <- inp.indices) {
-      accValue = accValue.shiftLeft(8).and(wordMask).or(BigInteger.valueOf((inp(i) & 0xFF).toLong))
-      accBits += 8
-
-      // When we have bit_len or more bits in the accumulator, write the next output element.
-      if (accBits >= bitLen) {
-        accBits -= bitLen
-        for (x <- bytePad until outWidth)
-          out.update(j + x, {
-            // Big-endian
-            val a = accValue.shiftRight(accBits + (8 * (outWidth - x - 1)))
-            val b =
-            // Apply bitLenMask across byte boundaries
-              bitLenMask.shiftRight(8 * (outWidth - x - 1)).and(byteMask)
-            val v = a.and(b)
-            v.byteValue()
-          })
-        j += outWidth
-      }
-    }
-
-    out
+      case ((j, accBits, accValue, out), i) =>
+        val newAcc: BigInteger = accValue.shiftLeft(8).and(wordMask).or(BigInteger.valueOf((inp(i) & 0xFF).toLong))
+        val possibleAccBits: Int = accBits + 8
+        val (newJ: Int, newAccBits: Int) = if (possibleAccBits >= bitLen) {
+          val correctAccBits: Int = possibleAccBits - bitLen
+          (bytePad until outWidth).foreach(x =>
+            out.update(j + x,
+              accValue.shiftRight( accBits + (8 * (outWidth - x - 1)) )
+                .add(BigInteger.valueOf((1 << bitLen) - 1).shiftRight(8 * (outWidth - x - 1)).and(byteMask))
+                .byteValue()
+            )
+          )
+          (j + outWidth, correctAccBits)
+        } else (j, possibleAccBits)
+        (newJ, newAccBits, newAcc, out)
+    }._4
   }
 
   def compressArray(inp: Array[Byte], outLen: Int, bitLen: Int, bytePad: Int = 0): Array[Byte] = {
@@ -97,35 +84,26 @@ object Equihash {
 
     val inWidth = (bitLen + 7) / 8 + bytePad
     assert(outLen == bitLen * inp.length / (8 * inWidth))
-    val out = new Array[Byte](outLen)
 
-    val bitLenMask = BigInteger.valueOf((1 << bitLen) - 1)
+    (0 until outLen).foldLeft(0, 0, BigInteger.ZERO, new Array[Byte](outLen)) {
 
-    // The acc_bits least-significant bits of acc_value represent a bit sequence in big-endian order.
-    var accBits = 0
-    var accValue = BigInteger.ZERO
+      case ((j, accBits, accValue, out), i) =>
+        val (newJ, newAccBits, newAccValue) = if (accBits < 8) {
+          val possibleAccValue: BigInteger =
+            (bytePad until inWidth).foldLeft(accValue.shiftLeft(bitLen).and(wordMask).or(BigInteger.valueOf(inp(j).toLong))) {
+              case (newAccVal, x) =>
+                val b = BigInteger.valueOf(inp(j + x)).and(BigInteger.valueOf((1 << bitLen) - 1).shiftRight(8 * (inWidth - x - 1))
+                  .and(BigInteger.valueOf(0xFF)))
+                  .shiftLeft(8 * (inWidth - x - 1))
+                newAccVal.or(b)
+            }
+          (j + inWidth, accBits + bitLen, possibleAccValue)
+        } else (j, accBits, accValue)
 
-    var j = 0
-    for (i <- 0 until outLen) {
-      // When we have fewer than 8 bits left in the accumulator, read the next input element.
-      if (accBits < 8) {
-        accValue = accValue.shiftLeft(bitLen).and(wordMask).or(BigInteger.valueOf(inp(j).toLong))
-        for (x <- bytePad until inWidth) {
-          // Apply bit_len_mask across byte boundaries
-          val b = BigInteger.valueOf(inp(j + x)).and(bitLenMask.shiftRight(8 * (inWidth - x - 1))
-            .and(BigInteger.valueOf(0xFF)))
-            .shiftLeft(8 * (inWidth - x - 1))
-          accValue = accValue.or(b) //Big - endian
-        }
-        j += inWidth
-        accBits += bitLen
-      }
+        out(i) = accValue.shiftRight(accBits).and(BigInteger.valueOf(0xFF)).byteValue()
 
-      accBits -= 8
-      out(i) = accValue.shiftRight(accBits).and(BigInteger.valueOf(0xFF)).byteValue()
-    }
-
-    out
+        (newJ, newAccBits - 8, newAccValue, out)
+    }._4
   }
 
   // Implementation of Basic Wagner's algorithm for the GBP
@@ -136,7 +114,7 @@ object Equihash {
     log.trace("Generating first list")
     //  1) Generate first list
     val tmpHash = new Array[Byte](digest.getDigestSize)
-    var X = for {i <- (0 until Math.pow(2, collisionLength + 1).toInt).toVector} yield {
+    val X: Seq[(Array[Byte], Seq[Int])] = for {i <- (0 until Math.pow(2, collisionLength + 1).toInt).toVector} yield {
       val r = i % indicesPerHashOutput
       if (r == 0) {
         //  X_i = H(I||V||x_i)
@@ -148,88 +126,75 @@ object Equihash {
       val expanded = expandArray(d, hashLength, collisionLength)
       expanded -> Seq(i)
     }
-
+    
     //  3) Repeat step 2 until 2n/(k+1) bits remain
-    for (i <- 1 until k) {
-      log.trace(s"Round $i")
 
-      //  2a) Sort the list
-      log.trace("- Sorting list")
-      X = X.sortBy(_._1.toIterable)
+    val xOn3step = (1 until k).foldLeft(X) {
 
-      log.trace("- Finding collisions")
-      var Xc = Vector.empty[(Array[Byte], Seq[Int])]
-      while (X.nonEmpty) {
-        //  2b) Find next set of unordered pairs with collisions on first n/(k+1) bits
-        val XSize = X.size
-        val j = (1 until XSize).find(j => !hasCollision(X.last._1, X(XSize - 1 - j)._1, i, collisionLength)).getOrElse(XSize)
+      case (x, i) =>
+        log.trace(s"Round $i")
+        //  2a) Sort the list
+        log.trace("- Finding collisions")
 
-        //  2c) Store tuples (X_i ^ X_j, (i, j)) on the table
-        for {
-          l <- 0 until j - 1
-          m <- l + 1 until j
-        } {
-          val X1l = X(XSize - 1 - l)
-          val X1m = X(XSize - 1 - m)
-          //  Check that there are no duplicate indices in tuples i and j
-          if (distinctIndices(X1l._2, X1m._2)) {
-            val concat = if (X1l._2(0) < X1m._2(0)) {
-              X1l._2 ++ X1m._2
-            } else {
-              X1m._2 ++ X1l._2
+        x.indices.foldLeft(Vector[(Array[Byte], Seq[Int])](), x.sortBy(_._1.toIterable)) {
+
+          case ((xC, xForRound), _) =>
+
+            val xSize = xForRound.length
+            val j = (1 until xSize).find(j => !hasCollision(x.last._1, x(xSize - 1 - j)._1, i, collisionLength)).getOrElse(xSize)
+            val newXc = (0 until j - 1).foldLeft(Vector[(Array[Byte], Seq[Int])]()) {
+
+              case (xCforRound, l) =>
+                val m = l + 1
+                val X1l = x(xSize - 1 - l)
+                val X1m = x(xSize - 1 - m)
+                //  Check that there are no duplicate indices in tuples i and j
+                if (distinctIndices(X1l._2, X1m._2)) {
+                  val concat = if (X1l._2.head < X1m._2.head) {
+                    X1l._2 ++ X1m._2
+                  } else {
+                    X1m._2 ++ X1l._2
+                  }
+                  xCforRound :+ (xor(X1l._1, X1m._1) -> concat)
+                } else xCforRound
             }
-            Xc = Xc :+ (xor(X1l._1, X1m._1) -> concat)
-          }
-        }
-
-        //  2d) Drop this set
-        X = X.dropRight(j)
-      }
-      //  2e) Replace previous list with new list
-      X = Xc
+            (newXc, xForRound.dropRight(1))
+        }._1
     }
 
     //  k+1) Find a collision on last 2n(k+1) bits
     log.trace("Final round:")
     log.trace("- Sorting list")
 
-    X = X.sortBy(_._1.toIterable)
+    val xOn4Step = xOn3step.sortBy(_._1.toIterable)
 
     log.trace("- Finding collisions")
 
-    var solns = Vector.empty[EquihashSolution]
+    xOn4Step.indices.foldLeft(xOn4Step, Seq[EquihashSolution]()) {
 
-    while (X.nonEmpty) {
-      val XSize = X.length
+      case ((x, solutions), _) =>
+        
+        val xSize: Int = x.length
+        val j: Int = (1 until xSize).find( j => !(hasCollision(x.last._1, x(xSize - 1 - j)._1, k, collisionLength) &&
+          hasCollision(x.last._1, x(xSize - 1 - j)._1, k + 1, collisionLength))).getOrElse(xSize)
+        
+        val newSolutions = (0 until j - 1).foldLeft(Seq[EquihashSolution]()) {
 
-      // to?
-      val j = (1 until XSize).find(j => !(hasCollision(X.last._1, X(XSize - 1 - j)._1, k, collisionLength) &&
-        hasCollision(X.last._1, X(XSize - 1 - j)._1, k + 1, collisionLength))).getOrElse(XSize)
-
-      for {
-        l <- 0 until j - 1
-        m <- l + 1 until j
-      } {
-        val res = xor(X(XSize - 1 - l)._1, X(XSize - 1 - m)._1)
-        if (countLeadingZeroes(res) == 8 * hashLength && distinctIndices(X(XSize - 1 - l)._2, X(XSize - 1 - m)._2)) {
-          //        if DEBUG and VERBOSE:
-          //          print 'Found solution:'
-          //        print '- %s %s' % (print_hash(X[-1-l][0]), X[-1-l][1])
-          //        print '- %s %s' % (print_hash(X[-1-m][0]), X[-1-m][1])
-          val p = if (X(XSize - 1 - l)._2(0) < X(XSize - 1 - m)._2(0)) {
-            X(XSize - 1 - l)._2 ++ X(XSize - 1 - m)._2
-          } else {
-            X(XSize - 1 - m)._2 ++ X(XSize - 1 - l)._2
-          }
-          solns = solns :+ EquihashSolution(p)
+          case (solutionsSeq, l) =>
+            val m = l + 1
+            val res = xor(x(xSize - 1 - l)._1, x(xSize - 1 - m)._1)
+            if (countLeadingZeroes(res) == 8 * hashLength && distinctIndices(x(xSize - 1 - l)._2, x(xSize - 1 - m)._2)) {
+              val p = if (x( xSize - 1 - l )._2.head < x( xSize - 1 - m )._2.head) {
+                x(xSize - 1 - l)._2 ++ x(xSize - 1 - m)._2
+              } else {
+                x(xSize - 1 - m)._2 ++ x(xSize - 1 - l)._2
+              }
+              solutionsSeq :+ EquihashSolution(p)
+            } else solutionsSeq
         }
-      }
-
-      // 2d) Drop this set
-      X = X.dropRight(j)
-    }
-
-    solns
+        
+        (x.dropRight(1), solutions ++ newSolutions)
+    }._2
   }
 
   /**
@@ -242,16 +207,17 @@ object Equihash {
     */
   // https://github.com/str4d/zcash-pow/blob/master/test-pow.py
   def generateWord(n: Char, digestWithoutIdx: Blake2bDigest, idx: Int): BigInteger = {
-    val bytesPerWord = n / 8
-    val wordsPerHash = 512 / n
 
-    val hidx = idx / wordsPerHash
-    val hrem = idx % wordsPerHash
+    val bytesPerWord: Int = n / 8
+    val wordsPerHash: Int = 512 / n
 
-    val idxdata = leIntToByteArray(hidx)
-    val ctx1 = new Blake2bDigest(digestWithoutIdx)
+    val hidx: Int = idx / wordsPerHash
+    val hrem: Int = idx % wordsPerHash
+
+    val idxdata: Array[Byte] = leIntToByteArray(hidx)
+    val ctx1: Blake2bDigest = new Blake2bDigest(digestWithoutIdx)
     ctx1.update(idxdata, 0, idxdata.length)
-    val digest = new Array[Byte](ctx1.getDigestSize)
+    val digest: Array[Byte] = new Array[Byte](ctx1.getDigestSize)
     ctx1.doFinal(digest, 0)
 
     (hrem * bytesPerWord until hrem * bytesPerWord + bytesPerWord).foldLeft(BigInteger.ZERO) {
@@ -281,9 +247,8 @@ object Equihash {
     assert(solutionIndices.size == solutionLen)
 
     // Check for duplicate indices.
-    if (solutionIndices.toSet.size != solutionIndices.size) {
-      false
-    } else {
+    if (solutionIndices.toSet.size != solutionIndices.size) false
+    else {
       // Generate hash words.
       val bytesPerWord = n / 8
       val wordsPerHash = 512 / n
