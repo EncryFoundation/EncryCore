@@ -16,7 +16,7 @@ import io.circe.Json
 import io.circe.syntax._
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.VersionTag
-import scorex.core.network.NodeViewSynchronizer.ReceivableMessages.{ChangedState, RollbackSucceed, SemanticallySuccessfulModifier}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedState, RollbackSucceed, SemanticallySuccessfulModifier}
 import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
 

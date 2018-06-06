@@ -1,7 +1,7 @@
-package scorex.core.network.message
+package encry.network.message
 
 import com.google.common.primitives.{Bytes, Ints}
-import scorex.core.network.ConnectedPeer
+import encry.network.PeerConnectionHandler._
 import scorex.core.serialization.{BytesSerializable, Serializer}
 import scorex.crypto.hash.Blake2b256
 
