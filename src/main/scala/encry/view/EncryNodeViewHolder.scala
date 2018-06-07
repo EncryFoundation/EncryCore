@@ -33,8 +33,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
   override type VL = EncryWallet
   override type MP = EncryMempool
 
-  override val networkChunkSize: Int = settings.network.networkChunkSize
-
   override val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,
@@ -77,6 +75,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
     val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
     (history, state, wallet, memPool)
   }
+
+  override def receive: Receive = super.receive
 
   /**
     * Restore a local view during a node startup. If no any stored view found

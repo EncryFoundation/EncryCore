@@ -49,7 +49,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
 
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]]
-  val networkChunkSize: Int
   val modifiersCache: mutable.Map[MapKey, PMOD] = mutable.Map[MapKey, PMOD]()
 
   /**
@@ -58,9 +57,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
     */
   def restoreState(): Option[NodeView]
 
-  /**
-    * Hard-coded initial view all the honest nodes in a network are making progress from.
-    */
   def genesisState: NodeView
 
   def history(): HIS = nodeView._1
@@ -142,7 +138,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
   def requestDownloads(pi: ProgressInfo[PMOD]): Unit =
     pi.toDownload.foreach { case (tid, id) => context.system.eventStream.publish(DownloadRequest(tid, id)) }
 
-  def trimChainSuffix(suffix: IndexedSeq[PMOD], rollbackPoint: ModifierId): IndexedSeq[PMOD] = {
+  def trimChainSuffix(suffix: IndexedSeq[PMOD], rollbackPoint: VersionTag): IndexedSeq[PMOD] = {
     val idx: Int = suffix.indexWhere(_.id.sameElements(rollbackPoint))
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
@@ -159,7 +155,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
                                  suffix: IndexedSeq[PMOD])
 
     requestDownloads(progressInfo)
-    val branchingPointOpt: Option[Array[Byte] @@ core.ModifierId.Tag with core.VersionTag.Tag] = progressInfo.branchPoint.map(VersionTag @@ _)
+    val branchingPointOpt: Option[Array[Byte] @@ core.VersionTag.Tag] = progressInfo.branchPoint.map(VersionTag @@ _)
     val (stateToApplyTry: Try[MS], suffixTrimmed: IndexedSeq[PMOD]) = if (progressInfo.chainSwitchingNeeded) {
       if (!state.version.sameElements(branchingPointOpt))
         state.rollbackTo(branchingPointOpt.get) -> trimChainSuffix(suffixApplied, branchingPointOpt.get)
@@ -176,12 +172,10 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
             case Success(stateAfterApply) =>
               val newHis: HIS = history.reportModifierIsValid(modToApply)
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
-              //updateState(newHis, stateAfterApply, newProgressInfo, suffixTrimmed :+ modToApply)
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Failure(e) =>
               val (newHis: HIS, newProgressInfo: ProgressInfo[PMOD]) = history.reportModifierIsInvalid(modToApply, progressInfo)
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
-              //updateState(newHis, stateToApply, newProgressInfo, suffixTrimmed)
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           }
           else u
@@ -257,7 +251,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
           newStateTry match {
             case Success(newMinState) =>
               val newMemPool: MP = updateMemPool(progressInfo.toRemove, blocksApplied, memoryPool(), newMinState)
-              //we consider that vault always able to perform a rollback needed
               val newVault: VL = if (progressInfo.chainSwitchingNeeded)
                 vault().rollback(VersionTag @@ progressInfo.branchPoint.get).get
               else vault()
