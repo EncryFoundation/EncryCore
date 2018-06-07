@@ -74,7 +74,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
   def key(id: ModifierId): MapKey = new mutable.WrappedArray.ofByte(id)
 
   def txModify(tx: TX): Unit = {
-    //todo: async validation?
     val errorOpt: Option[Throwable] = minimalState() match {
       case txValidator: TransactionValidation[P, TX] =>
         txValidator.validate(tx) match {
@@ -244,7 +243,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
     case a: Any => log.error("Strange input: " + a)
   }
 
-  //todo: update state in async way?
   def pmodModify(pmod: PMOD): Unit = if (!history().contains(pmod.id)) {
     context.system.eventStream.publish(StartingPersistentModifierApplication(pmod))
     log.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
