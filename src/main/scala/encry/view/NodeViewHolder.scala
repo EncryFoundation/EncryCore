@@ -2,12 +2,12 @@ package encry.view
 
 import akka.actor.Actor
 import encry.EncryApp
+import encry.network.NodeViewSynchronizer.ReceivableMessages.NodeViewHolderEvent
 import encry.network.PeerConnectionHandler._
 import scorex.core
 import scorex.core._
 import scorex.core.consensus.History.ProgressInfo
 import scorex.core.consensus.{History, SyncInfo}
-import encry.network.NodeViewSynchronizer.ReceivableMessages.NodeViewHolderEvent
 import scorex.core.serialization.Serializer
 import scorex.core.transaction._
 import scorex.core.transaction.box.proposition.Proposition
