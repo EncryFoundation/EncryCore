@@ -17,7 +17,7 @@ import encry.view.state.{DigestState, EncryState, StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
 import encry.EncryApp.{settings, timeProvider}
 import scorex.core._
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{FailedTransaction, SuccessfulTransaction}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.SuccessfulTransaction
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.Transaction
 import scorex.crypto.authds.ADDigest
@@ -59,7 +59,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]]
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
       context.system.eventStream.publish(SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx))
     case Failure(e) =>
-      context.system.eventStream.publish(FailedTransaction[EncryProposition, EncryBaseTransaction](tx, e))
   }
 
   override def genesisState: (EncryHistory, StateType, EncryWallet, EncryMempool) = {

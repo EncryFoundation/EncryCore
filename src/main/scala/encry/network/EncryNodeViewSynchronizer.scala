@@ -15,9 +15,9 @@ import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallySuccessfulModifier}
 import encry.network.message.BasicMsgDataTypes.ModifiersData
 import encry.network.message.{Message, ModifiersSpec}
-import encry.settings.NetworkSettings
 import scorex.core.{ModifierId, ModifierTypeId}
-import scala.concurrent.duration._
+
+import scala.concurrent.duration.FiniteDuration
 
 class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type)
   extends NodeViewSynchronizer[EncryProposition, EncryBaseTransaction,
@@ -26,13 +26,9 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type)
 
   import EncryNodeViewSynchronizer._
 
-  override protected val deliveryTracker = EncryDeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self, timeProvider)
+  override val deliveryTracker: EncryDeliveryTracker = EncryDeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self, timeProvider)
 
-  val networkSettings: NetworkSettings = settings.network
-
-  val toDownloadCheckInterval: FiniteDuration = 3.seconds
-
-  val downloadListSize: Int = networkSettings.networkChunkSize
+  val downloadListSize: Int = settings.network.networkChunkSize
 
   val onSemanticallySuccessfulModifier: Receive = {
     case SemanticallySuccessfulModifier(_: EncryBlock) =>
@@ -41,9 +37,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type)
   }
 
   override def preStart(): Unit = {
-    val toDownloadCheckInterval = networkSettings.syncInterval
     super.preStart()
-    context.system.scheduler.schedule(toDownloadCheckInterval, toDownloadCheckInterval)(self ! CheckModifiersToDownload)
+    context.system.scheduler.schedule(settings.network.syncInterval, settings.network.syncInterval)(self ! CheckModifiersToDownload)
   }
 
   override protected def viewHolderEvents: Receive =
@@ -86,7 +81,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type)
     networkController ! SendToNetwork(msg, SendToRandom)
   }
 
-  override protected def modifiersFromRemote: Receive = {
+  override def modifiersFromRemote: Receive = {
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       super.modifiersFromRemote(DataFromPeer(spec, data, remote))
       //If queue is empty - check, whether there are more modifiers to download

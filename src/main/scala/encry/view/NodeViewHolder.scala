@@ -87,9 +87,9 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
             val newVault: VL = vault().scanOffchain(tx)
             updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
             context.system.eventStream.publish(SuccessfulTransaction[P, TX](tx))
-          case Failure(e) => context.system.eventStream.publish(FailedTransaction[P, TX](tx, e))
+          case Failure(e) =>
         }
-      case Some(e) => context.system.eventStream.publish(FailedTransaction[P, TX](tx, e))
+      case Some(e) =>
     }
   }
 

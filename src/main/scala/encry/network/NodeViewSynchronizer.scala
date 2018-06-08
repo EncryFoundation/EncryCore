@@ -46,60 +46,45 @@ MR <: MempoolReader[TX]](networkControllerRef: ActorRef,
   import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
   import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
 
-  protected val deliveryTimeout: FiniteDuration = networkSettings.deliveryTimeout
-  protected val maxDeliveryChecks: Int = networkSettings.maxDeliveryChecks
-  protected val invSpec = new InvSpec(networkSettings.maxInvObjects)
-  protected val requestModifierSpec = new RequestModifierSpec(networkSettings.maxInvObjects)
+  val deliveryTimeout: FiniteDuration = networkSettings.deliveryTimeout
+  val maxDeliveryChecks: Int = networkSettings.maxDeliveryChecks
+  val invSpec = new InvSpec(networkSettings.maxInvObjects)
+  val requestModifierSpec = new RequestModifierSpec(networkSettings.maxInvObjects)
 
-  protected val deliveryTracker = new DeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self)
-  protected val statusTracker = new SyncTracker(self, context, networkSettings, timeProvider)
+  val deliveryTracker = new DeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self)
+  val statusTracker = new SyncTracker(self, context, networkSettings, timeProvider)
 
-  protected var historyReaderOpt: Option[HR] = None
-  protected var mempoolReaderOpt: Option[MR] = None
+  var historyReaderOpt: Option[HR] = None
+  var mempoolReaderOpt: Option[MR] = None
 
-  private def readersOpt: Option[(HR, MR)] = historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp)))
+  def readersOpt: Option[(HR, MR)] = historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp)))
 
-  protected def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit = {
+  def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit = {
     val msg = Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None)
     networkControllerRef ! SendToNetwork(msg, Broadcast)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
-  protected def viewHolderEvents: Receive = {
-    case SuccessfulTransaction(tx) =>
-      broadcastModifierInv(tx)
-
-    case FailedTransaction(tx, throwable) =>
-    //todo: penalize source peer?
-
+  def viewHolderEvents: Receive = {
+    case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
     case SyntacticallySuccessfulModifier(mod) =>
-    case SyntacticallyFailedModification(mod, throwable) =>
-    //todo: penalize source peer?
-
-    case SemanticallySuccessfulModifier(mod) =>
-      broadcastModifierInv(mod)
-
-    case SemanticallyFailedModification(mod, throwable) =>
-    //todo: penalize source peer?
-
+    case SyntacticallyFailedModification(mod, throwable) => //todo: penalize source peer?
+    case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
+    case SemanticallyFailedModification(mod, throwable) => //todo: penalize source peer?
     case ChangedHistory(reader: HR@unchecked) if reader.isInstanceOf[HR] =>
       //TODO isInstanceOf, type erasure
       historyReaderOpt = Some(reader)
-
     case ChangedMempool(reader: MR@unchecked) if reader.isInstanceOf[MR] =>
       //TODO isInstanceOf, type erasure
       mempoolReaderOpt = Some(reader)
   }
 
-  protected def peerManagerEvents: Receive = {
-    case HandshakedPeer(remote) =>
-      statusTracker.updateStatus(remote, Unknown)
-
-    case DisconnectedPeer(remote) =>
-      statusTracker.clearStatus(remote)
+  def peerManagerEvents: Receive = {
+    case HandshakedPeer(remote) => statusTracker.updateStatus(remote, Unknown)
+    case DisconnectedPeer(remote) => statusTracker.clearStatus(remote)
   }
 
-  protected def getLocalSyncInfo: Receive = {
+  def getLocalSyncInfo: Receive = {
     case SendLocalSyncInfo =>
       //todo: why this condition?
       if (statusTracker.elapsedTimeSinceLastSync() < (networkSettings.syncInterval.toMillis / 2)) {
@@ -110,14 +95,14 @@ MR <: MempoolReader[TX]](networkControllerRef: ActorRef,
       }
   }
 
-  protected def sendSync(syncInfo: SI): Unit = {
+  def sendSync(syncInfo: SI): Unit = {
     val peers = statusTracker.peersToSyncWith()
     if (peers.nonEmpty)
       networkControllerRef ! SendToNetwork(Message(syncInfoSpec, Right(syncInfo), None), SendToPeers(peers))
   }
 
   //sync info is coming from another node
-  protected def processSync: Receive = {
+  def processSync: Receive = {
     case DataFromPeer(spec, syncInfo: SI@unchecked, remote)
       if spec.messageCode == syncInfoSpec.messageCode =>
 
@@ -153,7 +138,7 @@ MR <: MempoolReader[TX]](networkControllerRef: ActorRef,
   }
 
   //view holder is telling other node status
-  protected def processSyncStatus: Receive = {
+  def processSyncStatus: Receive = {
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       statusTracker.updateStatus(remote, status)
 
@@ -171,7 +156,7 @@ MR <: MempoolReader[TX]](networkControllerRef: ActorRef,
   }
 
   //object ids coming from other node
-  protected def processInv: Receive = {
+  def processInv: Receive = {
     case DataFromPeer(spec, invData: InvData@unchecked, remote)
       if spec.messageCode == InvSpec.MessageCode =>
 
@@ -180,7 +165,7 @@ MR <: MempoolReader[TX]](networkControllerRef: ActorRef,
   }
 
   //other node asking for objects by their ids
-  protected def modifiersReq: Receive = {
+  def modifiersReq: Receive = {
     case DataFromPeer(spec, invData: InvData@unchecked, remote)
       if spec.messageCode == RequestModifierSpec.MessageCode =>
 
@@ -201,38 +186,30 @@ MR <: MempoolReader[TX]](networkControllerRef: ActorRef,
   /**
     * Logic to process modifiers got from another peer
     */
-  protected def modifiersFromRemote: Receive = {
-    case DataFromPeer(spec, data: ModifiersData@unchecked, remote)
-      if spec.messageCode == ModifiersSpec.messageCode =>
-
-      val typeId = data._1
-      val modifiers = data._2
-
+  def modifiersFromRemote: Receive = {
+    case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
+      val typeId: ModifierTypeId = data._1
+      val modifiers: Map[ModifierId, Array[Byte]] = data._2
       log.info(s"Got modifiers of type $typeId from remote connected peer: $remote")
       log.trace(s"Received modifier ids ${data._2.keySet.map(Base58.encode).mkString(",")}")
-
       for ((id, _) <- modifiers) deliveryTracker.receive(typeId, id, remote)
-
-      val (spam, fm) = modifiers partition { case (id, _) => deliveryTracker.isSpam(id) }
-
+      val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
+        modifiers partition { case (id, _) => deliveryTracker.isSpam(id) }
       if (spam.nonEmpty) {
         log.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
           s": ${spam.keys.map(Base58.encode)}")
-        penalizeSpammingPeer(remote)
-        val mids = spam.keys.toSeq
+        val mids: Seq[ModifierId] = spam.keys.toSeq
         deliveryTracker.deleteSpam(mids)
       }
-
       if (fm.nonEmpty) {
-        val mods = fm.values.toSeq
+        val mods: Seq[Array[Byte]] = fm.values.toSeq
         viewHolderRef ! ModifiersFromRemote(remote, typeId, mods)
       }
   }
 
   //local node sending object ids to remote
-  protected def requestFromLocal: Receive = {
+  def requestFromLocal: Receive = {
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
-
       if (modifierIds.nonEmpty) {
         val msg = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
         peer.handlerRef ! msg
@@ -240,40 +217,19 @@ MR <: MempoolReader[TX]](networkControllerRef: ActorRef,
       deliveryTracker.expect(peer, modifierTypeId, modifierIds)
   }
 
-  // todo: make DeliveryTracker an independent actor and move checkDelivery there?
-
   //scheduler asking node view synchronizer to check whether requested messages have been delivered
   @SuppressWarnings(Array("org.wartremover.warts.JavaSerializable"))
-  protected def checkDelivery: Receive = {
+  def checkDelivery: Receive = {
     case CheckDelivery(peer, modifierTypeId, modifierId) =>
-
-      if (deliveryTracker.peerWhoDelivered(modifierId).contains(peer)) {
-        deliveryTracker.delete(modifierId)
-      }
+      if (deliveryTracker.peerWhoDelivered(modifierId).contains(peer)) deliveryTracker.delete(modifierId)
       else {
         log.info(s"Peer $peer has not delivered asked modifier ${Base58.encode(modifierId)} on time")
-        penalizeNonDeliveringPeer(peer)
         deliveryTracker.reexpect(peer, modifierTypeId, modifierId)
       }
   }
 
-  protected def penalizeNonDeliveringPeer(peer: ConnectedPeer): Unit = {
-    //todo: do something less harsh than blacklisting?
-    //todo: proposal: add a new field to PeerInfo to count how many times
-    //todo: the peer has been penalized for not delivering. In PeerManager,
-    //todo: add something similar to FilterPeers to return only peers that
-    //todo: have not been penalized too many times.
-
-    // networkControllerRef ! Blacklist(peer)
-  }
-
-  protected def penalizeSpammingPeer(peer: ConnectedPeer): Unit = {
-    //todo: consider something less harsh than blacklisting, see comment for previous function
-    // networkControllerRef ! Blacklist(peer)
-  }
-
   //local node sending out objects requested to remote
-  protected def responseFromLocal: Receive = {
+  def responseFromLocal: Receive = {
     case ResponseFromLocal(peer, _, modifiers: Seq[NodeViewModifier]) =>
       if (modifiers.nonEmpty) {
         @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
@@ -288,9 +244,7 @@ MR <: MempoolReader[TX]](networkControllerRef: ActorRef,
     //register as a handler for synchronization-specific types of messages
     val messageSpecs: Seq[MessageSpec[_]] = Seq(invSpec, requestModifierSpec, ModifiersSpec, syncInfoSpec)
     networkControllerRef ! RegisterMessagesHandler(messageSpecs, self)
-
     //register as a listener for peers got connected (handshaked) or disconnected
-    context.system.eventStream.subscribe(self, classOf[HandshakedPeer])
     context.system.eventStream.subscribe(self, classOf[DisconnectedPeer])
     // todo: replace the two lines above by a single line with classOf[PeerManagementEvent]
 

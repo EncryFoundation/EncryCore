@@ -26,11 +26,7 @@ class PeerManager extends Actor with ScorexLogging {
   val peerDatabase: PeerDatabase = PeerDatabase(Some(settings.dataDir + "/peers.dat"))
 
   if (peerDatabase.isEmpty) settings.network.knownPeers.foreach { address =>
-    if (!isSelf(address, None)) {
-      println("notself---------------- " + address)
-      peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), None))
-    }
-    else println("self --------------------------- " + address)
+    if (!isSelf(address, None)) peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), None))
   }
 
   def randomPeer(): Option[InetSocketAddress] = {
@@ -92,7 +88,7 @@ class PeerManager extends Actor with ScorexLogging {
           if (peer.publicPeer) self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
           else peerDatabase.remove(peer.socketAddress)
           connectedPeers += peer.socketAddress -> peer
-          context.system.eventStream.publish(HandshakedPeer(peer))
+          nodeViewSynchronizer ! HandshakedPeer(peer)
         }
       }
     case Disconnected(remote) =>
