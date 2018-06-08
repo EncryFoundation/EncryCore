@@ -26,7 +26,11 @@ class PeerManager extends Actor with ScorexLogging {
   val peerDatabase: PeerDatabase = PeerDatabase(Some(settings.dataDir + "/peers.dat"))
 
   if (peerDatabase.isEmpty) settings.network.knownPeers.foreach { address =>
-    if (!isSelf(address, None)) peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), None))
+    if (!isSelf(address, None)) {
+      println("notself---------------- " + address)
+      peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), None))
+    }
+    else println("self --------------------------- " + address)
   }
 
   def randomPeer(): Option[InetSocketAddress] = {
