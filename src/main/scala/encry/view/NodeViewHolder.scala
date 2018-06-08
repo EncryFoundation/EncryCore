@@ -215,7 +215,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
           }
           t.foreach(pmodModify)
         } while (t.isDefined)
-
         log.debug(s"Cache after(${modifiersCache.size}): ${modifiersCache.keySet.map(_.array).map(Base58.encode).mkString(",")}")
       }
     case lt: LocallyGeneratedTransaction[P, TX] => txModify(lt.tx)

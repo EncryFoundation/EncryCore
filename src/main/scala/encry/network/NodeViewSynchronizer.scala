@@ -2,7 +2,7 @@ package encry.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.Actor
 import encry.EncryApp._
 import encry.network.PeerConnectionHandler._
 import encry.network.message.BasicMsgDataTypes._
@@ -28,13 +28,14 @@ import scala.language.postfixOps
   */
 class NodeViewSynchronizer[P <: Proposition, TX <: Transaction[P], SI <: SyncInfo,
 SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: HistoryReader[PMOD, SI], MR <: MempoolReader[TX]]
-(syncInfoSpec: SIS, networkSettings: NetworkSettings,
- timeProvider: NetworkTimeProvider) extends Actor with ScorexLogging {
+(syncInfoSpec: SIS) extends Actor with ScorexLogging {
 
   import History._
   import NodeViewSynchronizer.ReceivableMessages._
   import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
   import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
+
+  val networkSettings: NetworkSettings = settings.network
 
   val deliveryTimeout: FiniteDuration = networkSettings.deliveryTimeout
   val maxDeliveryChecks: Int = networkSettings.maxDeliveryChecks
@@ -269,7 +270,6 @@ object NodeViewSynchronizer {
 
   object ReceivableMessages {
 
-    // getLocalSyncInfo messages
     case object SendLocalSyncInfo
 
     case class RequestFromLocal(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])

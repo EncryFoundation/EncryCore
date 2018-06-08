@@ -17,10 +17,9 @@ import encry.network.message.BasicMsgDataTypes.ModifiersData
 import encry.network.message.{Message, ModifiersSpec}
 import scorex.core.{ModifierId, ModifierTypeId}
 
-class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type)
-  extends NodeViewSynchronizer[EncryProposition, EncryBaseTransaction,
-    EncrySyncInfo, EncrySyncInfoMessageSpec.type, EncryPersistentModifier, EncryHistory,
-    EncryMempool](syncInfoSpec, settings.network, timeProvider) {
+class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends
+  NodeViewSynchronizer[EncryProposition, EncryBaseTransaction, EncrySyncInfo, EncrySyncInfoMessageSpec.type,
+    EncryPersistentModifier, EncryHistory, EncryMempool](syncInfoSpec) {
 
   import EncryNodeViewSynchronizer._
 
