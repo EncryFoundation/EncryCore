@@ -17,12 +17,10 @@ import encry.network.message.BasicMsgDataTypes.ModifiersData
 import encry.network.message.{Message, ModifiersSpec}
 import scorex.core.{ModifierId, ModifierTypeId}
 
-import scala.concurrent.duration.FiniteDuration
-
 class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type)
   extends NodeViewSynchronizer[EncryProposition, EncryBaseTransaction,
     EncrySyncInfo, EncrySyncInfoMessageSpec.type, EncryPersistentModifier, EncryHistory,
-    EncryMempool](networkController, nodeViewHolder, syncInfoSpec, settings.network, timeProvider) {
+    EncryMempool](syncInfoSpec, settings.network, timeProvider) {
 
   import EncryNodeViewSynchronizer._
 
@@ -31,8 +29,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type)
   val downloadListSize: Int = settings.network.networkChunkSize
 
   val onSemanticallySuccessfulModifier: Receive = {
-    case SemanticallySuccessfulModifier(_: EncryBlock) =>
-    //Do nothing, other nodes will request required modifiers via ProgressInfo.toDownload
+    case SemanticallySuccessfulModifier(_: EncryBlock) => //Do nothing, other nodes will request required modifiers via ProgressInfo.toDownload
     case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
   }
 
@@ -41,7 +38,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type)
     context.system.scheduler.schedule(settings.network.syncInterval, settings.network.syncInterval)(self ! CheckModifiersToDownload)
   }
 
-  override protected def viewHolderEvents: Receive =
+  override def viewHolderEvents: Receive =
     onSyntacticallySuccessfulModifier orElse
       onDownloadRequest orElse
       onCheckModifiersToDownload orElse

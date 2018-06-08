@@ -111,7 +111,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
       updatedMempool.getOrElse(memoryPool()))
     if (updatedHistory.nonEmpty) context.system.eventStream.publish(ChangedHistory(newNodeView._1.getReader))
     if (updatedState.nonEmpty) context.system.eventStream.publish(ChangedState(newNodeView._2.getReader))
-    if (updatedVault.nonEmpty) context.system.eventStream.publish(ChangedVault())
     if (updatedMempool.nonEmpty) context.system.eventStream.publish(ChangedMempool(newNodeView._4.getReader))
     nodeView = newNodeView
   }
@@ -227,7 +226,6 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
     case GetNodeViewChanges(history, state, vault, mempool) =>
       if (history) sender() ! ChangedHistory(nodeView._1.getReader)
       if (state) sender() ! ChangedState(nodeView._2.getReader)
-      if (vault) sender() ! ChangedVault()
       if (mempool) sender() ! ChangedMempool(nodeView._4.getReader)
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] = modifierTypeId match {

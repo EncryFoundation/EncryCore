@@ -13,7 +13,7 @@ import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedTransaction}
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedVault, SemanticallySuccessfulModifier}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import scorex.core.utils.NetworkTime.Time
 import scorex.core.utils.ScorexLogging
 
@@ -30,7 +30,6 @@ class TransactionGenerator extends Actor with ScorexLogging {
   val noLimitMode: Boolean = settings.testing.limitPerEpoch < 0
 
   override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[ChangedVault])
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
   }
 
