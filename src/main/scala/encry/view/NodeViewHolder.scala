@@ -2,6 +2,7 @@ package encry.view
 
 import akka.actor.Actor
 import encry.EncryApp
+import encry.EncryApp._
 import encry.network.PeerConnectionHandler._
 import scorex.core
 import scorex.core._
@@ -136,7 +137,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
   }
 
   def requestDownloads(pi: ProgressInfo[PMOD]): Unit =
-    pi.toDownload.foreach { case (tid, id) => context.system.eventStream.publish(DownloadRequest(tid, id)) }
+    pi.toDownload.foreach { case (tid, id) => networkController ! DownloadRequest(tid, id) }
 
   def trimChainSuffix(suffix: IndexedSeq[PMOD], rollbackPoint: VersionTag): IndexedSeq[PMOD] = {
     val idx: Int = suffix.indexWhere(_.id.sameElements(rollbackPoint))

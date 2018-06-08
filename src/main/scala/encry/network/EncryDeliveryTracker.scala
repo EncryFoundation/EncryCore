@@ -4,6 +4,7 @@ import akka.actor.{ActorContext, ActorRef}
 import scorex.core.utils.NetworkTimeProvider
 import scorex.core.{ModifierId, ModifierTypeId}
 import PeerConnectionHandler._
+import scorex.core.utils.NetworkTime.Time
 
 import scala.collection.mutable
 import scala.concurrent.duration._
@@ -36,8 +37,8 @@ case class EncryDeliveryTracker(context: ActorContext, deliveryTimeout: FiniteDu
     * Process download request of modifier of type modifierTypeId with id modifierId
     */
   def expectFromRandom(modifierTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
-    val downloadRequestTime = timeProvider.time()
-    val newValue = expectingFromRandom.get(key(modifierId))
+    val downloadRequestTime: Time = timeProvider.time()
+    val newValue: ToDownloadStatus = expectingFromRandom.get(key(modifierId))
       .map(_.copy(lastTry = downloadRequestTime))
       .getOrElse(ToDownloadStatus(modifierTypeId, downloadRequestTime, downloadRequestTime))
     expectingFromRandom.put(key(modifierId), newValue)

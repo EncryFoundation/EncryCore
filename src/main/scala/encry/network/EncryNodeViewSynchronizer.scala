@@ -43,7 +43,6 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type)
   override def preStart(): Unit = {
     val toDownloadCheckInterval = networkSettings.syncInterval
     super.preStart()
-    context.system.eventStream.subscribe(self, classOf[DownloadRequest])
     context.system.scheduler.schedule(toDownloadCheckInterval, toDownloadCheckInterval)(self ! CheckModifiersToDownload)
   }
 
@@ -82,7 +81,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type)
 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     modifierIds.foreach(id => deliveryTracker.expectFromRandom(modifierTypeId, id))
-    val msg = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
+    val msg: Message[(ModifierTypeId, Seq[ModifierId])] = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
     //todo: Full nodes should be here, not a random peer
     networkController ! SendToNetwork(msg, SendToRandom)
   }
