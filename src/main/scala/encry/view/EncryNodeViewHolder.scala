@@ -244,7 +244,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   def txModify(tx: EncryBaseTransaction): Unit = nodeView.mempool.put(tx) match {
     case Success(newPool) =>
       log.debug(s"Unconfirmed transaction $tx added to the memory pool")
-      val newVault = nodeView.wallet.scanOffchain(tx)
+      val newVault: VL = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
       context.system.eventStream.publish(SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx))
     case Failure(e) =>

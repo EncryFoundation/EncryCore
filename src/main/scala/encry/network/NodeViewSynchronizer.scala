@@ -194,7 +194,8 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
   def requestFromLocal: Receive = {
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       if (modifierIds.nonEmpty) {
-        val msg = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
+        val msg: Message[(ModifierTypeId, Seq[ModifierId])] =
+          Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
         peer.handlerRef ! msg
       }
       deliveryTracker.expect(peer, modifierTypeId, modifierIds)
