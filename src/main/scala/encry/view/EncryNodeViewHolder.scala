@@ -24,11 +24,9 @@ import scorex.crypto.authds.ADDigest
 
 import scala.util.{Failure, Success, Try}
 
-class EncryNodeViewHolder[StateType <: EncryState[StateType]]
-  extends NodeViewHolder[EncryProposition, EncryBaseTransaction, EncryPersistentModifier] {
+class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends NodeViewHolder {
 
   override type MS = StateType
-  override type SI = EncrySyncInfo
   override type HIS = EncryHistory
   override type VL = EncryWallet
   override type MP = EncryMempool

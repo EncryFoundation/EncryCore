@@ -3,12 +3,16 @@ package encry.view
 import akka.actor.Actor
 import encry.EncryApp
 import encry.EncryApp._
+import encry.modifiers.EncryPersistentModifier
+import encry.modifiers.mempool.EncryBaseTransaction
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.network.PeerConnectionHandler._
 import scorex.core
 import scorex.core._
 import scorex.core.consensus.History.ProgressInfo
 import scorex.core.consensus.{History, SyncInfo}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.NodeViewHolderEvent
+import encry.view.history.EncrySyncInfo
 import scorex.core.serialization.Serializer
 import scorex.core.transaction._
 import scorex.core.transaction.box.proposition.Proposition
@@ -29,28 +33,23 @@ import scala.util.{Failure, Success, Try}
   * The instances are read-only for external world.
   * Updates of the composite view(the instances are to be performed atomically.
   *
-  * @tparam P
-  * @tparam TX
-  * @tparam PMOD
   */
-trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentNodeViewModifier]
-  extends Actor with ScorexLogging {
+trait NodeViewHolder extends Actor with ScorexLogging {
 
   import NodeViewHolder.ReceivableMessages._
   import NodeViewHolder._
   import encry.network.NodeViewSynchronizer.ReceivableMessages._
 
-  type SI <: SyncInfo
-  type HIS <: History[PMOD, SI, HIS]
-  type MS <: MinimalState[PMOD, MS]
-  type VL <: Vault[P, TX, PMOD, VL]
-  type MP <: MemoryPool[TX, MP]
+  type HIS <: History[EncryPersistentModifier, EncrySyncInfo, HIS]
+  type MS <: MinimalState[EncryPersistentModifier, MS]
+  type VL <: Vault[EncryProposition, EncryBaseTransaction, EncryPersistentModifier, VL]
+  type MP <: MemoryPool[EncryBaseTransaction, MP]
   type NodeView = (HIS, MS, VL, MP)
-  type MapKey = scala.collection.mutable.WrappedArray.ofByte
 
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]]
-  val modifiersCache: mutable.Map[MapKey, PMOD] = mutable.Map[MapKey, PMOD]()
+  val modifiersCache: mutable.Map[scala.collection.mutable.WrappedArray.ofByte, EncryPersistentModifier] =
+    mutable.Map[scala.collection.mutable.WrappedArray.ofByte, EncryPersistentModifier]()
 
   /**
     * Restore a local view during a node startup. If no any stored view found
@@ -68,11 +67,11 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
 
   def memoryPool(): MP = nodeView._4
 
-  def key(id: ModifierId): MapKey = new mutable.WrappedArray.ofByte(id)
+  def key(id: ModifierId): scala.collection.mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
-  def txModify(tx: TX): Unit = {
+  def txModify(tx: EncryBaseTransaction): Unit = {
     val errorOpt: Option[Throwable] = minimalState() match {
-      case txValidator: TransactionValidation[P, TX] =>
+      case txValidator: TransactionValidation[P, EncryBaseTransaction] =>
         txValidator.validate(tx) match {
           case Success(_) => None
           case Failure(e) => Some(e)
@@ -86,7 +85,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
             log.debug(s"Unconfirmed transaction $tx added to the memory pool")
             val newVault: VL = vault().scanOffchain(tx)
             updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
-            context.system.eventStream.publish(SuccessfulTransaction[P, TX](tx))
+            context.system.eventStream.publish(SuccessfulTransaction[P, EncryBaseTransaction](tx))
           case Failure(e) =>
         }
       case Some(e) =>
@@ -115,30 +114,30 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
     nodeView = newNodeView
   }
 
-  def extractTransactions(mod: PMOD): Seq[TX] = mod match {
-    case tcm: TransactionsCarryingPersistentNodeViewModifier[P, TX] => tcm.transactions
+  def extractTransactions(mod: EncryPersistentModifier): Seq[EncryBaseTransaction] = mod match {
+    case tcm: TransactionsCarryingPersistentNodeViewModifier[P, EncryBaseTransaction] => tcm.transactions
     case _ => Seq()
   }
 
   //todo: this method causes delays in a block processing as it removes transactions from mempool and checks
   //todo: validity of remaining transactions in a synchronous way. Do this job async!
-  def updateMemPool(blocksRemoved: Seq[PMOD], blocksApplied: Seq[PMOD], memPool: MP, state: MS): MP = {
-    val rolledBackTxs: Seq[TX] = blocksRemoved.flatMap(extractTransactions)
-    val appliedTxs: Seq[TX] = blocksApplied.flatMap(extractTransactions)
+  def updateMemPool(blocksRemoved: Seq[EncryPersistentModifier], blocksApplied: Seq[EncryPersistentModifier], memPool: MP, state: MS): MP = {
+    val rolledBackTxs: Seq[EncryBaseTransaction] = blocksRemoved.flatMap(extractTransactions)
+    val appliedTxs: Seq[EncryBaseTransaction] = blocksApplied.flatMap(extractTransactions)
     memPool.putWithoutCheck(rolledBackTxs).filter { tx =>
       !appliedTxs.exists(t => t.id sameElements tx.id) && {
         state match {
-          case v: TransactionValidation[P, TX] => v.validate(tx).isSuccess
+          case v: TransactionValidation[P, EncryBaseTransaction] => v.validate(tx).isSuccess
           case _ => true
         }
       }
     }
   }
 
-  def requestDownloads(pi: ProgressInfo[PMOD]): Unit =
+  def requestDownloads(pi: ProgressInfo[EncryPersistentModifier]): Unit =
     pi.toDownload.foreach { case (tid, id) => networkController ! DownloadRequest(tid, id) }
 
-  def trimChainSuffix(suffix: IndexedSeq[PMOD], rollbackPoint: VersionTag): IndexedSeq[PMOD] = {
+  def trimChainSuffix(suffix: IndexedSeq[EncryPersistentModifier], rollbackPoint: VersionTag): IndexedSeq[EncryPersistentModifier] = {
     val idx: Int = suffix.indexWhere(_.id.sameElements(rollbackPoint))
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
@@ -146,17 +145,17 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
   @tailrec
   private def updateState(history: HIS,
                           state: MS,
-                          progressInfo: ProgressInfo[PMOD],
-                          suffixApplied: IndexedSeq[PMOD]): (HIS, Try[MS], Seq[PMOD]) = {
+                          progressInfo: ProgressInfo[EncryPersistentModifier],
+                          suffixApplied: IndexedSeq[EncryPersistentModifier]): (HIS, Try[MS], Seq[EncryPersistentModifier]) = {
     case class UpdateInformation(history: HIS,
                                  state: MS,
-                                 failedMod: Option[PMOD],
-                                 alternativeProgressInfo: Option[ProgressInfo[PMOD]],
-                                 suffix: IndexedSeq[PMOD])
+                                 failedMod: Option[EncryPersistentModifier],
+                                 alternativeProgressInfo: Option[ProgressInfo[EncryPersistentModifier]],
+                                 suffix: IndexedSeq[EncryPersistentModifier])
 
     requestDownloads(progressInfo)
     val branchingPointOpt: Option[Array[Byte] @@ core.VersionTag.Tag] = progressInfo.branchPoint.map(VersionTag @@ _)
-    val (stateToApplyTry: Try[MS], suffixTrimmed: IndexedSeq[PMOD]) = if (progressInfo.chainSwitchingNeeded) {
+    val (stateToApplyTry: Try[MS], suffixTrimmed: IndexedSeq[EncryPersistentModifier]) = if (progressInfo.chainSwitchingNeeded) {
       if (!state.version.sameElements(branchingPointOpt))
         state.rollbackTo(branchingPointOpt.get) -> trimChainSuffix(suffixApplied, branchingPointOpt.get)
       else Success(state) -> IndexedSeq()
@@ -174,7 +173,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Failure(e) =>
-              val (newHis: HIS, newProgressInfo: ProgressInfo[PMOD]) = history.reportModifierIsInvalid(modToApply, progressInfo)
+              val (newHis: HIS, newProgressInfo: ProgressInfo[EncryPersistentModifier]) = history.reportModifierIsInvalid(modToApply, progressInfo)
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           }
@@ -195,14 +194,14 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
     case ModifiersFromRemote(remote, modifierTypeId, remoteObjects) =>
       modifierSerializers.get(modifierTypeId) foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
-          case tx: TX@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
-          case pmod: PMOD@unchecked =>
+          case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
+          case pmod: EncryPersistentModifier@unchecked =>
             if (history().contains(pmod) || modifiersCache.contains(key(pmod.id)))
               log.warn(s"Received modifier ${pmod.encodedId} that is already in history")
             else modifiersCache.put(key(pmod.id), pmod)
         }
         log.debug(s"Cache before(${modifiersCache.size}): ${modifiersCache.keySet.map(_.array).map(Base58.encode).mkString(",")}")
-        var t: Option[PMOD] = None
+        var t: Option[EncryPersistentModifier] = None
         do {
           t = {
             modifiersCache.find { case (_, pmod) =>
@@ -217,8 +216,8 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
         } while (t.isDefined)
         log.debug(s"Cache after(${modifiersCache.size}): ${modifiersCache.keySet.map(_.array).map(Base58.encode).mkString(",")}")
       }
-    case lt: LocallyGeneratedTransaction[P, TX] => txModify(lt.tx)
-    case lm: LocallyGeneratedModifier[PMOD] =>
+    case lt: LocallyGeneratedTransaction[P, EncryBaseTransaction] => txModify(lt.tx)
+    case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       log.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
     case GetDataFromCurrentView(f) => sender() ! f(CurrentView(history(), minimalState(), vault(), memoryPool()))
@@ -235,7 +234,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
     case a: Any => log.error("Strange input: " + a)
   }
 
-  def pmodModify(pmod: PMOD): Unit = if (!history().contains(pmod.id)) {
+  def pmodModify(pmod: EncryPersistentModifier): Unit = if (!history().contains(pmod.id)) {
     context.system.eventStream.publish(StartingPersistentModifierApplication(pmod))
     log.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
     history().append(pmod) match {
@@ -244,7 +243,7 @@ trait NodeViewHolder[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentN
         context.system.eventStream.publish(SyntacticallySuccessfulModifier(pmod))
         context.system.eventStream.publish(NewOpenSurface(historyBeforeStUpdate.openSurfaceIds()))
         if (progressInfo.toApply.nonEmpty) {
-          val (newHistory: HIS, newStateTry: Try[MS], blocksApplied: Seq[PMOD]) =
+          val (newHistory: HIS, newStateTry: Try[MS], blocksApplied: Seq[EncryPersistentModifier]) =
             updateState(historyBeforeStUpdate, minimalState(), progressInfo, IndexedSeq())
           newStateTry match {
             case Success(newMinState) =>
@@ -285,9 +284,9 @@ object NodeViewHolder {
 
     case class ModifiersFromRemote(source: ConnectedPeer, modifierTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
 
-    case class LocallyGeneratedTransaction[P <: Proposition, TX <: Transaction[P]](tx: TX)
+    case class LocallyGeneratedTransaction[P <: Proposition, EncryBaseTransaction <: Transaction[P]](tx: EncryBaseTransaction)
 
-    case class LocallyGeneratedModifier[PMOD <: PersistentNodeViewModifier](pmod: PMOD)
+    case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentNodeViewModifier](pmod: EncryPersistentModifier)
 
   }
 

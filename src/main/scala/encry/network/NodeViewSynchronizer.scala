@@ -12,14 +12,14 @@ import encry.settings.NetworkSettings
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.StateReader
 import scorex.core.transaction.{MempoolReader, Transaction}
-import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
+import scorex.core.utils.ScorexLogging
 import scorex.core.{PersistentNodeViewModifier, _}
 import scorex.crypto.encode.Base58
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
 /**
-  * A component which is synchronizing local node view (locked inside NodeViewHolder) with the p2p network.
+  * A component which synchronizes local node view with p2p network.
   *
   * @param syncInfoSpec         SyncInfo specification
   * @tparam P   proposition
