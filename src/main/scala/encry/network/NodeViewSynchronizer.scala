@@ -42,8 +42,8 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
   val invSpec = new InvSpec(networkSettings.maxInvObjects)
   val requestModifierSpec = new RequestModifierSpec(networkSettings.maxInvObjects)
 
-  val deliveryTracker = new DeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self)
-  val statusTracker = SyncTracker(self, context, networkSettings, timeProvider)
+  val deliveryTracker: DeliveryTracker = new DeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self)
+  val statusTracker: SyncTracker = SyncTracker(self, context, networkSettings, timeProvider)
 
   var historyReaderOpt: Option[HR] = None
   var mempoolReaderOpt: Option[MR] = None
