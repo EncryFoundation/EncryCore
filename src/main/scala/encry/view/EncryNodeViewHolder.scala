@@ -41,7 +41,6 @@ import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with ScorexLogging {
 
-  //type NodeView = (HIS, MS, VL, MP)
   type HIS = EncryHistory
   type MS = StateType
   type VL = EncryWallet
@@ -58,14 +57,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     ADProofs.modifierTypeId -> ADProofSerializer,
     Transaction.ModifierTypeId -> EncryTransactionSerializer
   )
-
-  //def history(): HIS = nodeView._1
-
-  //def minimalState(): MS = nodeView._2
-
-  //def vault(): VL = nodeView._3
-
-  //def memoryPool(): MP = nodeView._4
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     super.preRestart(reason, message)
@@ -273,10 +264,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     NodeView(history, state, wallet, memPool)
   }
 
-  /**
-    * Restore a local view during a node startup. If no any stored view found
-    * (e.g. if it is a first launch of a node) None is to be returned
-    */
   def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryDir(settings).listFiles.isEmpty) {
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
