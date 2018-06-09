@@ -4,7 +4,6 @@ package encry.stats
 import java.util
 
 import akka.actor.Actor
-import com.typesafe.config.{Config, ConfigFactory}
 import encry.EncryApp.settings
 import encry.consensus.DifficultySerializer
 import encry.modifiers.history.block.EncryBlock
@@ -14,10 +13,8 @@ import scorex.core.utils.ScorexLogging
 
 class StatsSender extends Actor with ScorexLogging {
 
-  val influxDBConfig: Config = ConfigFactory.load("influxDB")
-
   val influxDB: InfluxDB =
-    InfluxDBFactory.connect(influxDBConfig.getString("urlDB"), influxDBConfig.getString("loginDB"), influxDBConfig.getString("passwordDB") )
+    InfluxDBFactory.connect(settings.influxDB.url, settings.influxDB.login, settings.influxDB.password )
 
   influxDB.setRetentionPolicy("autogen")
 
