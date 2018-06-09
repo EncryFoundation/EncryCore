@@ -33,7 +33,7 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
   import History._
   import NodeViewSynchronizer.ReceivableMessages._
   import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
-  import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
+  import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
 
   val networkSettings: NetworkSettings = settings.network
 

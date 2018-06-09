@@ -9,12 +9,12 @@ import encry.modifiers.state.box.proposition.EncryProposition
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.EncryMempool
 import encry.EncryApp._
-import encry.view.NodeViewHolder._
 import encry.network.NetworkController.ReceivableMessages.SendToNetwork
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallySuccessfulModifier}
 import encry.network.message.BasicMsgDataTypes.ModifiersData
 import encry.network.message.{Message, ModifiersSpec}
+import encry.view.EncryNodeViewHolder.DownloadRequest
 import scorex.core.{ModifierId, ModifierTypeId}
 
 class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends

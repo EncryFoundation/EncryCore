@@ -15,7 +15,7 @@ import encry.modifiers.state.box._
 import encry.settings.Algos.HF
 import encry.settings.{Algos, Constants}
 import encry.utils.BalanceCalculator
-import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
+import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.VersionTag

@@ -11,7 +11,7 @@ import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransaction, Transact
 import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.{AssetBox, MonetaryBox}
 import encry.settings.Constants
-import encry.view.NodeViewHolder.CurrentView
+import encry.view.EncryNodeViewHolder.CurrentView
 import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
@@ -20,7 +20,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
-import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import scorex.core.transaction.box.Box.Amount
 import scorex.core.utils.NetworkTime.Time
