@@ -45,7 +45,9 @@ object EncryAppSettings extends ScorexLogging with SettingsReaders with NodeSett
     maybeConfigFile match {
       case None =>
         log.warn("No configuration file was provided. Starting with default settings!")
-        ConfigFactory.load()
+        ConfigFactory.load("local")
+          .withFallback(ConfigFactory.defaultApplication())
+          .resolve()
       case Some(file) =>
         val cfg = ConfigFactory.parseFile(file)
         if (!cfg.hasPath("encry")) {
