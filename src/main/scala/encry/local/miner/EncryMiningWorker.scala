@@ -3,7 +3,7 @@ package encry.local.miner
 import akka.actor.Actor
 import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
 import encry.view.state.StateMode
-import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
+import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.EncryApp._
 import scorex.core.utils.ScorexLogging
 

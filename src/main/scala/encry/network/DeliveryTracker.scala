@@ -22,7 +22,6 @@ class DeliveryTracker(context: ActorContext,
                       nvsRef: ActorRef) extends ScorexLogging {
 
   protected type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
-
   protected def key(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
   // todo: Do we need to keep track of ModifierTypeIds? Maybe we could ignore them?

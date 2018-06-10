@@ -73,7 +73,7 @@ object EncryApp extends App with ScorexLogging {
 
   lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
 
-  val nodeViewSynchronizer: ActorRef =
+  lazy val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
 
   lazy val miner: ActorRef = system.actorOf(Props[EncryMiner], "miner")
@@ -82,7 +82,7 @@ object EncryApp extends App with ScorexLogging {
 
   val scanner: ActorRef = system.actorOf(EncryScanner.props(), "scanner")
 
-  val statsSender: ActorRef = system.actorOf(Props[StatsSender], "statsSender")
+  //val statsSender: ActorRef = system.actorOf(Props[StatsSender], "statsSender")
 
   val apiRoutes: Seq[ApiRoute] = Seq(
     UtilsApiRoute(settings.restApi),

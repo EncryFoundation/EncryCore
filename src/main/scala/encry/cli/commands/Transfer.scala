@@ -14,7 +14,7 @@ import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
-import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedTransaction}
+import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import scorex.core.utils.NetworkTime.Time
 import scorex.core.utils.NetworkTimeProvider
 
