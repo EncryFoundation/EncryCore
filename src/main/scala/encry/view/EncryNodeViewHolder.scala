@@ -153,7 +153,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   def requestDownloads(pi: ProgressInfo[EncryPersistentModifier]): Unit =
     pi.toDownload.foreach { case (tid, id) => networkController ! DownloadRequest(tid, id) }
 
-  def trimChainSuffix(suffix: IndexedSeq[EncryPersistentModifier], rollbackPoint: VersionTag): IndexedSeq[EncryPersistentModifier] = {
+  def trimChainSuffix(suffix: IndexedSeq[EncryPersistentModifier], rollbackPoint: ModifierId): IndexedSeq[EncryPersistentModifier] = {
     val idx: Int = suffix.indexWhere(_.id.sameElements(rollbackPoint))
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
@@ -170,7 +170,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                                  suffix: IndexedSeq[EncryPersistentModifier])
 
     requestDownloads(progressInfo)
-    val branchingPointOpt: Option[Array[Byte] @@ core.VersionTag.Tag] = progressInfo.branchPoint.map(VersionTag @@ _)
+    val branchingPointOpt: Option[Array[Byte] @@ core.ModifierId.Tag with core.VersionTag.Tag] = progressInfo.branchPoint.map(VersionTag @@ _)
     val (stateToApplyTry: Try[MS], suffixTrimmed: IndexedSeq[EncryPersistentModifier]) = if (progressInfo.chainSwitchingNeeded) {
       if (!state.version.sameElements(branchingPointOpt))
         state.rollbackTo(branchingPointOpt.get) -> trimChainSuffix(suffixApplied, branchingPointOpt.get)
