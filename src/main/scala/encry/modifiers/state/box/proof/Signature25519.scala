@@ -3,11 +3,10 @@ package encry.modifiers.state.box.proof
 import encry.crypto.PublicKey25519
 import encry.modifiers.state.box.proof.Proof.ProofTypeId
 import encry.settings.Algos
-import encrywm.lang.backend.env.{ESObject, ESValue}
-import encrywm.lib.Types
-import encrywm.lib.Types.{ESByteVector, ESInt, ESProof}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
+import org.encryfoundation.prismlang.core.Types
+import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import scorex.core.serialization.Serializer
 import scorex.crypto.signatures.{Curve25519, Signature}
 
@@ -25,16 +24,16 @@ case class Signature25519(signature: Signature) extends Proof {
 
   override def serializer: Serializer[Signature25519] = Signature25519Serializer
 
-  override val esType: Types.ESProduct = Types.Signature25519
+  override val esType: Types.Product = Types.Signature25519
 
-  override def asVal: ESValue = ESValue(Types.Signature25519.ident.toLowerCase, ESProof)(convert)
+  override def asVal: PValue = PValue(Types.EncryProof)(convert)
 
-  override def convert: ESObject = {
-    val fields = Map(
-      "sigBytes" -> ESValue("sigBytes", ESByteVector)(signature),
-      "typeId" -> ESValue("typeId", ESInt)(typeId.toInt)
+  override def convert: PObject = {
+    val fields: Map[String, PValue] = Map(
+      "sigBytes" -> PValue(Types.PCollection.ofByte)(signature),
+      "typeId" -> PValue(Types.PInt)(typeId.toInt)
     )
-    ESObject(Types.Signature25519.ident, fields, esType)
+    PObject(fields, esType)
   }
 }
 

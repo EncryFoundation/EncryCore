@@ -1,11 +1,11 @@
 package encry.modifiers.state.box.proof
 
 import encry.modifiers.state.box.proof.Proof.ProofTypeId
-import encrywm.lang.backend.env.ESEnvConvertable
 import io.circe.{Decoder, DecodingFailure, Encoder, HCursor}
+import org.encryfoundation.prismlang.core.PConvertible
 import scorex.core.serialization.BytesSerializable
 
-trait Proof extends ESEnvConvertable with BytesSerializable {
+trait Proof extends PConvertible with BytesSerializable {
 
   val typeId: ProofTypeId
 }

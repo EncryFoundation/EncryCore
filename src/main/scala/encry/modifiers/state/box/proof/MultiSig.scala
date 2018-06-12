@@ -1,9 +1,8 @@
 package encry.modifiers.state.box.proof
 import com.google.common.primitives.Ints
 import encry.modifiers.state.box.proof.Proof.ProofTypeId
-import encrywm.lang.backend.env.{ESObject, ESValue}
-import encrywm.lib.Types
-import encrywm.lib.Types.{ESInt, ESList}
+import org.encryfoundation.prismlang.core.Types
+import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import scorex.core.serialization.Serializer
@@ -16,16 +15,16 @@ case class MultiSig(proofs: Seq[Signature25519]) extends Proof {
 
   override val typeId: ProofTypeId = MultiSig.TypeId
 
-  override val esType: Types.ESProduct = Types.MultiSig
+  override val esType: Types.Product = Types.MultiSig
 
-  override def asVal: ESValue = ESValue(Types.MultiSig.ident.toLowerCase, Types.MultiSig)(convert)
+  override def asVal: PValue = PValue(Types.MultiSig)(convert)
 
-  override def convert: ESObject = {
+  override def convert: PObject = {
     val fields = Map(
-      "typeId" -> ESValue("typeId", ESInt)(typeId.toInt),
-      "proofs" -> ESValue("proofs", ESList(Types.Signature25519))(proofs.map(_.convert).toList)
+      "typeId" -> PValue(Types.PInt)(typeId.toInt),
+      "proofs" -> PValue(Types.PCollection(Types.Signature25519))(proofs.map(_.convert).toList)
     )
-    ESObject(Types.MultiSig.ident, fields, esType)
+    PObject(fields, esType)
   }
 
   override def serializer: Serializer[MultiSig] = MultiProofSerializer
