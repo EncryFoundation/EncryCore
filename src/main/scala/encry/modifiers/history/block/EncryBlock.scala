@@ -54,7 +54,7 @@ object EncryBlockSerializer extends Serializer[EncryBlock] {
   override def toBytes(obj: EncryBlock): Array[Byte] = {
     val headerBytes = obj.header.serializer.toBytes(obj.header)
     val payloadBytes = obj.payload.serializer.toBytes(obj.payload)
-    val aDProofsBytes = obj.adProofsOpt.get.serializer.toBytes(obj.adProofsOpt.get)
+    val aDProofsBytes = obj.adProofsOpt.map(_.serializer.toBytes(obj.adProofsOpt.get)).getOrElse(Array.emptyByteArray)
     Bytes.concat(
       Ints.toByteArray(headerBytes.length),
       headerBytes,
