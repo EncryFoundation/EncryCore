@@ -179,7 +179,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
     val headerSize: Int = 4
 
     @tailrec
-    def multiPacket(packets: List[ByteString], current: ByteString): (List[ByteString], ByteString) = {
+    def multiPacket(packets: List[ByteString], current: ByteString): (List[ByteString], ByteString) =
       if (current.length < headerSize) (packets.reverse, current)
       else {
         val len: Int = current.iterator.getInt(ByteOrder.BIG_ENDIAN)
@@ -192,8 +192,6 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
           multiPacket(front :: packets, back)
         }
       }
-    }
-
     multiPacket(List[ByteString](), data)
   }
 }
