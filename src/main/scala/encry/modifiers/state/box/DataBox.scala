@@ -2,7 +2,7 @@ package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import encry.modifiers.state.box.proposition.{EncryProposition, PropositionSerializer}
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.Algos
 import encrywm.lang.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types
