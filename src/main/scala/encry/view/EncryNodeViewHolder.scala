@@ -83,8 +83,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
         log.debug(s"Cache before(${modifiersCache.size}): ${modifiersCache.keySet.map(_.array).map(Base58.encode).mkString(",")}")
 
-        def found: Option[(WrappedArray.ofByte, PMOD)] = modifiersCache.find(x => nodeView.history.applicable(x._2))
-        Iterator.continually(found).takeWhile(_.isDefined).flatten.foreach{ case (k,v) =>
+        def found: Option[(mutable.WrappedArray.ofByte, PMOD)] = modifiersCache.find(x => nodeView.history.applicable(x._2))
+        Iterator.continually(found).takeWhile(_.isDefined).flatten.foreach { case (k,v) =>
             modifiersCache.remove(k)
             pmodModify(v)
         }
