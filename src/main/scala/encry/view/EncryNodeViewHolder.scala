@@ -81,19 +81,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             else modifiersCache.put(key(pmod.id), pmod)
         }
         log.debug(s"Cache before(${modifiersCache.size}): ${modifiersCache.keySet.map(_.array).map(Base58.encode).mkString(",")}")
-        var t: Option[EncryPersistentModifier] = None
-        do {
-          t = {
-            modifiersCache.find { case (_, pmod) =>
-              nodeView.history.applicable(pmod)
-            }.map { t =>
-              val res = t._2
-              modifiersCache.remove(t._1)
-              res
-            }
-          }
-          t.foreach(pmodModify)
-        } while (t.isDefined)
+        val ts = modifiersCache.filter(t => nodeView.history.applicable(t._2))
+        ts.values.foreach(pmodModify)
+        ts.keys.foreach(modifiersCache.remove)
         log.debug(s"Cache after(${modifiersCache.size}): ${modifiersCache.keySet.map(_.array).map(Base58.encode).mkString(",")}")
       }
     case lt: LocallyGeneratedTransaction[P, EncryBaseTransaction] => txModify(lt.tx)

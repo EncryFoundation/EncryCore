@@ -144,7 +144,7 @@ trait EncryHistoryReader
       case adProofs: ADProofs => validate(adProofs)
       case mod: Any => Failure(new Exception(s"Modifier $mod is of incorrect type."))
     }
-  }.recover {
+  }.recoverWith {
     case e: Exception => log.info(e.toString)
       Failure(e)
   }
