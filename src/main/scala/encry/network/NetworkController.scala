@@ -105,9 +105,6 @@ class NetworkController extends Actor with ScorexLogging {
       log.info(s"Disconnected from ${peer.socketAddress}")
       peer.handlerRef ! CloseConnection
       peerManager ! Disconnected(peer.socketAddress)
-    case Blacklist(peer) =>
-      peer.handlerRef ! PeerConnectionHandler.ReceivableMessages.Blacklist
-      peerManager ! Disconnected(peer.socketAddress)
     case Connected(remote, local) =>
       val direction: ConnectionType = if (outgoing.contains(remote)) Outgoing else Incoming
       val logMsg: String = direction match {
@@ -157,8 +154,6 @@ object NetworkController {
     case class ConnectTo(address: InetSocketAddress)
 
     case class DisconnectFrom(peer: ConnectedPeer)
-
-    case class Blacklist(peer: ConnectedPeer)
 
   }
 
