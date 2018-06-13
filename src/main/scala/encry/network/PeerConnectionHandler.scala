@@ -109,9 +109,8 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   def workingCycleLocalInterface: Receive = {
     case msg: message.Message[_] =>
       def sendOutMessage(): Unit = {
-        val bytes: Array[Byte] = msg.bytes
         log.info("Send message " + msg.spec + " to " + remote)
-        connection ! Write(ByteString(Ints.toByteArray(bytes.length) ++ bytes))
+        connection ! Write(ByteString(Ints.toByteArray(msg.bytes.length) ++ msg.bytes))
       }
       //simulating network delays
       settings.addedMaxDelay match {
