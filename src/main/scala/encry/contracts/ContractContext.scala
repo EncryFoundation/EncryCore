@@ -35,7 +35,6 @@ case class ContractContext(proof: Proof,
 
   override def convert: ESObject = {
     val fields = Map(
-      "proof" -> proof.asVal,
       "transaction" -> transaction.asVal,
       "state" -> si.asVal,
       "self" -> selfMeta.asVal
