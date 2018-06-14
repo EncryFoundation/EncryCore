@@ -1,5 +1,6 @@
-package scorex.core.consensus
+package encry.consensus
 
+import scorex.core.consensus.History
 import scorex.core.serialization.BytesSerializable
 
 /**

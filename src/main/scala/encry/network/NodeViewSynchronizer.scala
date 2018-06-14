@@ -4,10 +4,11 @@ import java.net.InetSocketAddress
 
 import akka.actor.Actor
 import encry.EncryApp._
+import encry.consensus.SyncInfo
 import encry.network.PeerConnectionHandler._
 import encry.network.message.BasicMsgDataTypes._
 import encry.network.message.{InvSpec, RequestModifierSpec, _}
-import scorex.core.consensus.{History, HistoryReader, SyncInfo}
+import scorex.core.consensus.{History, HistoryReader}
 import encry.settings.NetworkSettings
 import encry.utils.ScorexLogging
 import scorex.core.transaction.box.proposition.Proposition

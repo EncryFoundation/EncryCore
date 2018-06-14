@@ -1,5 +1,6 @@
 package scorex.core.consensus
 
+import encry.consensus.SyncInfo
 import scorex.core._
 
 

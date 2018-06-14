@@ -1,5 +1,6 @@
 package scorex.core.consensus
 
+import encry.consensus.SyncInfo
 import scorex.core._
 import scorex.core.consensus.History.ProgressInfo
 import scorex.crypto.encode.Base58

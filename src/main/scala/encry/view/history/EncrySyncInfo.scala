@@ -1,8 +1,8 @@
 package encry.view.history
 
+import encry.consensus.SyncInfo
 import encry.modifiers.history.block.header.EncryBlockHeader
 import scorex.core.consensus.History.ModifierIds
-import scorex.core.consensus.SyncInfo
 import encry.network.message.SyncInfoMessageSpec
 import scorex.core.serialization.Serializer
 import scorex.core.{ModifierId, NodeViewModifier}

@@ -5,8 +5,8 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
+import encry.consensus.SyncInfo
 import scorex.core.{ModifierId, ModifierTypeId, NodeViewModifier}
-import scorex.core.consensus.SyncInfo
 import encry.network.message.Message.{MessageCode, _}
 import scorex.core
 import supertagged.@@
