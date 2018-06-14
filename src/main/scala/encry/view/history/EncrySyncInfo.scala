@@ -6,7 +6,6 @@ import scorex.core.consensus.SyncInfo
 import encry.network.message.SyncInfoMessageSpec
 import scorex.core.serialization.Serializer
 import scorex.core.{ModifierId, NodeViewModifier}
-import scorex.crypto.encode.Base58
 
 import scala.util.Try
 
@@ -26,8 +25,21 @@ object EncrySyncInfo {
 
 object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
 
-  override def toBytes(obj: EncrySyncInfo): Array[Byte] = {
-    scorex.core.utils.concatFixLengthBytes(obj.lastHeaderIds)
+  override def toBytes(obj: EncrySyncInfo): Array[Byte] = concatFixLengthBytes(obj.lastHeaderIds)
+
+  def concatFixLengthBytes(seq: Traversable[Array[Byte]]): Array[Byte] = seq.headOption match {
+    case None       => Array[Byte]()
+    case Some(head) => concatFixLengthBytes(seq, head.length)
+  }
+
+  def concatFixLengthBytes(seq: Traversable[Array[Byte]], length: Int): Array[Byte] = {
+    val result: Array[Byte] = new Array[Byte](seq.toSeq.length * length)
+    var index = 0
+    seq.foreach { s =>
+      Array.copy(s, 0, result, index, length)
+      index += length
+    }
+    result
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[EncrySyncInfo] = Try {
