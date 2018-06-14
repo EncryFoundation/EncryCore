@@ -65,11 +65,11 @@ class DigestState protected(override val version: VersionTag,
   override def applyModifier(mod: EncryPersistentModifier): Try[DigestState] = mod match {
     case block: EncryBlock if settings.verifyTransactions =>
       log.info(s"Got new full block with id ${block.encodedId} with root ${Algos.encoder.encode(block.header.stateRoot)}")
-      this.validate(block).flatMap(_ => update(VersionTag @@ block.header.id, block.header.stateRoot))
+      this.validate(block).flatMap(_ => update(VersionTag !@@ block.header.id, block.header.stateRoot))
 
     case header: EncryBlockHeader if !settings.verifyTransactions =>
       log.info(s"Got new Header ${header.encodedId} with root ${Algos.encoder.encode(header.stateRoot)}")
-      update(VersionTag @@ header.id, header.stateRoot)
+      update(VersionTag !@@ header.id, header.stateRoot)
 
     case a: Any =>
       log.info(s"Unhandled modifier: $a")

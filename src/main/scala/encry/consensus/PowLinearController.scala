@@ -10,8 +10,12 @@ object PowLinearController {
 
   private val chainParams = Constants.Chain
 
-  def getDifficulty(previousHeaders: Seq[(Int, EncryBlockHeader)]): NBits = {
-    if (previousHeaders.length == chainParams.RetargetingEpochsQty) {
+  val PrecisionConstant: Int = 1000000000
+
+  def getDifficulty(previousHeaders: Seq[(Int, EncryBlockHeader)]): NBits =
+    if (previousHeaders.lengthCompare(1) == 0 || previousHeaders.head._2.timestamp >= previousHeaders.last._2.timestamp)
+      previousHeaders.head._2.nBits
+    else {
       val data: Seq[(Int, Difficulty)] = previousHeaders.sliding(2).toList.map { d =>
         val start: (Int, EncryBlockHeader) = d.head
         val end: (Int, EncryBlockHeader) = d.last
@@ -22,11 +26,17 @@ object PowLinearController {
       }
       val diff: Difficulty = interpolate(data)
       if (diff >= chainParams.InitialDifficulty) DifficultySerializer.encodeCompactBits(diff) else chainParams.InitialNBits
-    } else previousHeaders.head._2.nBits
-  }
+    }
+
+  /** Used to provide `getDifficulty()` with the sequence of headers of correct heights. */
+  def getHeightsForRetargetingAt(height: Height): Seq[Height] = {
+    if ((height - 1) % chainParams.EpochLength == 0 && height > chainParams.EpochLength * chainParams.RetargetingEpochsQty)
+      (0 to chainParams.RetargetingEpochsQty).reverse.map(i => (height - 1) - i * chainParams.EpochLength)
+    else Seq(height - 1)
+  }.map(i => Height @@ i)
 
   // y = a + bx
-  private[consensus] def interpolate(data: Seq[(Int, Difficulty)]): Difficulty = {
+  private def interpolate(data: Seq[(Int, Difficulty)]): Difficulty = {
     val size: Int = data.size
     val xy: Iterable[BigInt] = data.map(d => d._1 * d._2)
     val x: Iterable[BigInt] = data.map(d => BigInt(d._1))
@@ -43,16 +53,4 @@ object PowLinearController {
     val point: Int = data.map(_._1).max + chainParams.EpochLength
     Difficulty @@ (b + k * point / PrecisionConstant)
   }
-
-  // Used to provide `getTimedelta()` with the sequence of headers of right heights.
-  def getHeightsForRetargetingAt(height: Height): Seq[Height] = {
-    if ((height - 1) > chainParams.RetargetingEpochsQty)
-      (0 until chainParams.RetargetingEpochsQty)
-        .map(i => (height - 1) - i).reverse.map(i => Height @@ i)
-    else
-      (0 until height)
-        .map(i => (height - 1) - i).filter(i => i > 1).reverse.map(i => Height @@ i)
-  }
-
-  val PrecisionConstant: Int = 1000000000
 }
