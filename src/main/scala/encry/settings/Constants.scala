@@ -34,7 +34,7 @@ object Constants {
 
   val AfterGenesisStateDigestHex: String = "1d9c70e78c228c52927bc0b1b2abae43c33447cc61bd418d2584e9249594122810"
 
-  val IntrinsicTokenId: ADKey = ADKey @@ Algos.hash("intrinsic_token")
+  val IntrinsicTokenId: ADKey = ADKey !@@ Algos.hash("intrinsic_token")
 
   object Chain {
 

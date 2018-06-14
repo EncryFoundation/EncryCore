@@ -4,6 +4,7 @@ import java.io.File
 
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
+import encry.contracts.EncryStateView
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -164,15 +165,17 @@ class UtxoState(override val version: VersionTag,
   def validate(tx: EncryBaseTransaction, allowedOutputDelta: Amount = 0L): Try[Unit] =
     tx.semanticValidity.map { _: Unit =>
 
-      val context: Context = Context(tx, height, lastBlockTimestamp, rootHash)
+      val context: Context = Context(tx, EncryStateView(height, lastBlockTimestamp, rootHash))
 
       val bxs: IndexedSeq[EncryBaseBox] = tx.unlockers.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
-        .map(t => t.toOption -> u.proofOpt)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, proofOpt)) =>
-        (bxOpt, proofOpt, tx.defaultProofOpt) match {
-          // If `proofOpt` from unlocker is `None` then `defaultProofOpt` is used.
-          case (Some(bx), Some(proof), _) if bx.proposition.unlockTry(proof, context).isSuccess => acc :+ bx
-          case (Some(bx), _, Some(defaultProof)) if bx.proposition.unlockTry(defaultProof, context).isSuccess => acc :+ bx
+        .map(_.toOption -> u)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, unlocker)) =>
+        (bxOpt, tx.defaultProofOpt) match {
+          // If no `proofs` provided, then `defaultProof` is used.
+          case (Some(bx), _) if unlocker.proofs.nonEmpty || unlocker.namedProofs.nonEmpty =>
+            if (bx.proposition.canUnlock(context, unlocker.proofs, unlocker.namedProofs)) acc :+ bx else acc
+          case (Some(bx), Some(defaultProof)) =>
+            if (bx.proposition.canUnlock(context, unlocker.proofs :+ defaultProof, unlocker.namedProofs)) acc :+ bx else acc
           case _ => throw TransactionValidationException(s"Failed to spend some boxes referenced in $tx")
         }
       }

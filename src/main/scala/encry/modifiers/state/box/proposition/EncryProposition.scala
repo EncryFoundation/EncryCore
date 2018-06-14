@@ -8,7 +8,8 @@ import io.circe.Encoder
 import io.circe.syntax._
 import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer}
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
-import org.encryfoundation.prismlang.core.{Ast, PConvertible, Types}
+import org.encryfoundation.prismlang.core.{Ast, PConvertible, TypeSystem, Types}
+import org.encryfoundation.prismlang.evaluator.{Evaluator, ScopedRuntimeEnvironment}
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.crypto.encode.Base58
@@ -26,9 +27,21 @@ case class EncryProposition(contract: CompiledContract) extends Proposition with
 
   override def asVal: PValue = PValue(esType)(convert)
 
-  override def convert: PObject = ???
+  override def convert: PObject = PObject(Map("fingerprint" -> PValue(Types.PCollection.ofByte)(contractHash)), esType)
 
-  def unlockTry(proof: Proof, ctx: Context): Try[Unit] = ???
+  def canUnlock(ctx: Context, proofs: Seq[Proof], namedProofs: Seq[(String, Proof)]): Boolean = {
+    val env: List[(String, Types.Product, PObject)] = if (contract.args.isEmpty) List.empty else {
+      List(("*", ctx.transaction.esType, ctx.transaction.convert), ("*", ctx.state.esType, ctx.state.convert)) ++
+        proofs.map(proof => ("*", proof.esType, proof.convert)) ++
+        namedProofs.map { case (name, proof) => (name, proof.esType, proof.convert) }
+    }
+    val args: List[(String, PObject)] = contract.args.map { case (name, tpe) =>
+      env.find(_._1 == name).orElse(env.find(_._2 == tpe)).map(elt => elt._1 -> elt._3)
+        .getOrElse(throw new Exception("Not enough arguments for contact"))
+    }
+    val evaluator: Evaluator = Evaluator(ScopedRuntimeEnvironment.initialized(1, args.toMap), TypeSystem.default)
+    evaluator.eval[Boolean](contract.script)
+  }
 
   lazy val contractHash: Digest32 = Algos.hash(contract.bytes)
 }
@@ -74,5 +87,5 @@ object EncryPropositionSerializer extends Serializer[EncryProposition] {
   override def toBytes(obj: EncryProposition): Array[Byte] = obj.contract.bytes
 
   override def parseBytes(bytes: Array[Byte]): Try[EncryProposition] = CompiledContractSerializer.parseBytes(bytes)
-    .map { contract => EncryProposition(contract) }
+    .map(EncryProposition.apply)
 }

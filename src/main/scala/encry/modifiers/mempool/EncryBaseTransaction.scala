@@ -1,12 +1,12 @@
 package encry.modifiers.mempool
 
 import encry.modifiers.mempool.directive.Directive
+import encry.modifiers.state.box.EncryBaseBox
 import encry.modifiers.state.box.proof.Proof
 import encry.modifiers.state.box.proposition.EncryProposition
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.{Algos, Constants}
-import encrywm.lang.backend.env.ESEnvConvertable
 import io.circe.Encoder
+import org.encryfoundation.prismlang.core.PConvertible
 import scorex.core.ModifierId
 import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.Box.Amount
@@ -15,7 +15,7 @@ import scorex.crypto.hash.Digest32
 import scala.util.Try
 
 trait EncryBaseTransaction extends Transaction[EncryProposition]
-  with ModifierWithSizeLimit with ESEnvConvertable {
+  with ModifierWithSizeLimit with PConvertible {
 
   val txHash: Digest32
 
@@ -23,7 +23,7 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
 
   val semanticValidity: Try[Unit]
 
-  override lazy val id: ModifierId = ModifierId @@ txHash
+  override lazy val id: ModifierId = ModifierId !@@ txHash
 
   val fee: Long
 

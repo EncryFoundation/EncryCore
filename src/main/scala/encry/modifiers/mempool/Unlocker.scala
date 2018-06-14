@@ -1,53 +1,42 @@
 package encry.modifiers.mempool
 
-import encry.modifiers.state.box.EncryBox
+import com.google.common.primitives.Shorts
 import encry.modifiers.state.box.proof.{Proof, ProofSerializer}
-import encry.settings.Algos
-import encrywm.lang.backend.env.{ESEnvConvertable, ESObject, ESValue}
-import encrywm.lib.Types
-import encrywm.lib.Types._
+import encry.settings.{Algos, Constants}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
-import scorex.core.serialization.{BytesSerializable, Serializer}
+import scorex.core.serialization.{BytesSerializable, SerializationException, Serializer}
 import scorex.crypto.authds.ADKey
 
 import scala.util.Try
 
 /** Holds the boxId/proof pair. */
-case class Unlocker(boxId: ADKey, proofOpt: Option[Proof]) extends BytesSerializable with ESEnvConvertable {
+case class Unlocker(boxId: ADKey,
+                    proofs: List[Proof],
+                    namedProofs: List[(String, Proof)] = List.empty) extends BytesSerializable {
 
   override type M = Unlocker
 
   override def serializer: Serializer[M] = UnlockerSerializer
 
   lazy val bytesWithoutProof: Array[Byte] = UnlockerSerializer.toBytesWithoutProof(this)
-
-  override def asVal: ESValue = ESValue(Types.ESUnlocker.ident.toLowerCase, Types.ESUnlocker)(convert)
-
-  override val esType: Types.ESProduct = ESUnlocker
-
-  override def convert: ESObject = {
-    val fields = Map(
-      "boxId" -> ESValue("boxId", ESByteVector)(boxId),
-      "proofOpt" -> ESValue("proofOpt", ESOption(ESProof))(proofOpt.map(_.convert))
-    )
-    ESObject(Types.ESUnlocker.ident, fields, esType)
-  }
 }
 
 object Unlocker {
 
   implicit val jsonEncoder: Encoder[Unlocker] = (u: Unlocker) => Map(
     "boxId" -> Algos.encode(u.boxId).asJson,
-    "proof" -> u.proofOpt.map(_.asJson).getOrElse("None".asJson)
+    "proofs" -> u.proofs.map(_.asJson),
+    "namedProofs" -> u.namedProofs.map(_.asJson)
   ).asJson
 
   implicit val jsonDecoder: Decoder[Unlocker] = (c: HCursor) => {
     for {
       boxId <- c.downField("boxId").as[String]
-      proof <- c.downField("proof").as[Option[Proof]]
+      proofs <- c.downField("proof").as[List[Proof]]
+      namedProofs <- c.downField("namedProofs").as[List[(String, Proof)]]
     } yield {
-      Unlocker(ADKey @@ Algos.decode(boxId).get, proof)
+      Unlocker(ADKey @@ Algos.decode(boxId).get, proofs, namedProofs)
     }
   }
 }
@@ -56,13 +45,38 @@ object UnlockerSerializer extends Serializer[Unlocker] {
 
   def toBytesWithoutProof(obj: Unlocker): Array[Byte] = obj.boxId
 
-  override def toBytes(obj: Unlocker): Array[Byte] =
-    obj.boxId ++ obj.proofOpt.map(ProofSerializer.toBytes).getOrElse(Array.empty)
+  override def toBytes(obj: Unlocker): Array[Byte] = if (obj.proofs.isEmpty && obj.namedProofs.isEmpty) obj.boxId else {
+    val proofsBytes: Array[Byte] = obj.proofs.foldLeft(Array.empty[Byte]) { case (acc, proof) =>
+      val proofBytes: Array[Byte] = ProofSerializer.toBytes(proof)
+      acc ++ Shorts.toByteArray(proofBytes.length.toShort) ++ proofBytes
+    }
+    val namedProofsBytes: Array[Byte] = obj.namedProofs.foldLeft(Array.empty[Byte]) { case (acc, (name, proof)) =>
+      val proofBytes: Array[Byte] = ProofSerializer.toBytes(proof)
+      val nameBytes: Array[Byte] = name.getBytes(Algos.charset)
+      acc ++ Array(nameBytes.length.toByte) ++ nameBytes ++ Shorts.toByteArray(proofBytes.length.toShort) ++ proofBytes
+    }
+    obj.boxId ++ Array(obj.proofs.size.toByte) ++ proofsBytes ++ Array(obj.namedProofs.size.toByte) ++ namedProofsBytes
+  }
 
   override def parseBytes(bytes: Array[Byte]): Try[Unlocker] = Try {
-    val boxId = ADKey @@ bytes.take(EncryBox.BoxIdSize)
-    val proof = if (bytes.length == EncryBox.BoxIdSize) None
-      else Some(ProofSerializer.parseBytes(bytes.drop(EncryBox.BoxIdSize)).get)
-    Unlocker(boxId, proof)
+    if (bytes.lengthCompare(Constants.ModifierIdSize) == 0) Unlocker(ADKey @@ bytes, List.empty)
+    else {
+      val boxId: ADKey = ADKey @@ bytes.take(Constants.ModifierIdSize)
+      val proofsQty: Int = bytes.drop(Constants.ModifierIdSize).head
+      val (proofs, leftBytes) = (0 to proofsQty).foldLeft(List.empty[Proof], bytes.drop(Constants.ModifierIdSize + 1)) { case ((acc, bytesAcc), _) =>
+        val proofLen: Int = Shorts.fromByteArray(bytesAcc.take(2))
+        val proof: Proof = ProofSerializer.parseBytes(bytesAcc.slice(2, proofLen + 2)).getOrElse(throw SerializationException)
+        (acc :+ proof) -> bytesAcc.drop(proofLen + 2)
+      }
+      val namedProofsQty: Int = leftBytes.head
+      val (namedProofs, _) = (0 to namedProofsQty).foldLeft(List.empty[(String, Proof)], leftBytes.tail) { case ((acc, bytesAcc), _) =>
+        val nameLen: Int = bytesAcc.head
+        val name: String = new String(bytesAcc.slice(1, 1 + nameLen), Algos.charset)
+        val proofLen: Int = Shorts.fromByteArray(bytesAcc.slice(1 + nameLen, 1 + nameLen + 2))
+        val proof: Proof = ProofSerializer.parseBytes(bytesAcc.slice(1 + nameLen + 2, 1 + nameLen + 2 + proofLen)).getOrElse(throw SerializationException)
+        (acc :+ (name -> proof)) -> bytesAcc.drop(1 + nameLen + 2 + proofLen)
+      }
+      Unlocker(boxId, proofs, namedProofs)
+    }
   }
 }

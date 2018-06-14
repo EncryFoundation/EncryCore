@@ -5,11 +5,10 @@ import encry.modifiers.mempool.EncryBaseTransaction.TransactionValidationExcepti
 import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
 import encry.modifiers.state.box.proof.{Proof, ProofSerializer}
 import encry.settings.{Algos, Constants}
-import encrywm.lang.backend.env.{ESObject, ESValue}
-import encrywm.lib.Types
-import encrywm.lib.Types.{ESByteVector, ESList, ESLong, ESTransaction}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
+import org.encryfoundation.prismlang.core.Types
+import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import scorex.core.serialization.{SerializationException, Serializer}
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.hash.Digest32
@@ -43,19 +42,16 @@ case class EncryTransaction(override val fee: Amount,
         else Success()
       }
 
-  override val esType: Types.ESProduct = ESTransaction
+  override val esType: Types.Product = Types.EncryTransaction
 
-  override def asVal: ESValue = ESValue(ESTransaction.ident.toLowerCase, ESTransaction)(convert)
+  override def asVal: PValue = PValue(esType)(convert)
 
-  override def convert: ESObject = {
-    val fields = Map(
-      "fee" -> ESValue("fee", ESLong)(fee),
-      "messageToSign" -> ESValue("messageToSign", ESByteVector)(txHash),
-      "outputs" -> ESValue("outputs", ESList(Types.ESBox))(newBoxes.map(_.convert).toList),
-      "unlockers" -> ESValue("unlockers", ESList(Types.ESUnlocker))(unlockers.map(_.convert).toList),
-      "timestamp" -> ESValue("timestamp", ESLong)(timestamp)
+  override def convert: PObject = {
+    val fields: Map[String, PValue] = Map(
+      "inputs" -> PValue(Types.PCollection(Types.PCollection.ofByte))(unlockers.map(_.boxId)),
+      "outputs" -> PValue(Types.PCollection(Types.EncryBox))(directives.flatMap(_.boxes(txHash)))
     )
-    ESObject(Types.ESTransaction.ident, fields, esType)
+    PObject(fields, esType)
   }
 }
 
