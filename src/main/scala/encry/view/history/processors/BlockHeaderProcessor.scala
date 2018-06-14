@@ -31,7 +31,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
   private val difficultyController = PowLinearController
 
-  val powScheme: ConsensusScheme = new EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
+  val powScheme: ConsensusScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
 
   protected val BestHeaderKey: ByteArrayWrapper =
     ByteArrayWrapper(Array.fill(DigestLength)(EncryBlockHeader.modifierTypeId))

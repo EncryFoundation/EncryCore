@@ -82,7 +82,7 @@ object EncryApp extends App with ScorexLogging {
 
   val scanner: ActorRef = system.actorOf(EncryScanner.props(), "scanner")
 
-  //val statsSender: ActorRef = system.actorOf(Props[StatsSender], "statsSender")
+  lazy val statsSender: ActorRef = system.actorOf(Props[StatsSender], "statsSender")
 
   val apiRoutes: Seq[ApiRoute] = Seq(
     UtilsApiRoute(settings.restApi),

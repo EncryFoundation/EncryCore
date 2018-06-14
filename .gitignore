@@ -6,3 +6,6 @@
 /.idea/
 /target/
 /project/target/
+/project/project/target/
+/encry/data/
+/src/main/resources/local.conf

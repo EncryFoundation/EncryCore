@@ -1,10 +1,11 @@
 package encry.local.miner
 
 import akka.actor.Actor
-import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
-import encry.view.state.StateMode
-import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.EncryApp._
+import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
+import encry.stats.StatsSender.MiningEnd
+import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
+import encry.view.state.StateMode
 import scorex.core.utils.ScorexLogging
 
 class EncryMiningWorker(initialCandidate: CandidateBlock, myNumber: Int, numberOfWorkers: Int)
@@ -26,6 +27,7 @@ class EncryMiningWorker(initialCandidate: CandidateBlock, myNumber: Int, numberO
     case MineBlock(nonce) => ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, nonce) match {
       case Some(block) =>
         log.info(s"New block is found: $block on worker $self.")
+        statsSender ! MiningEnd(block.header, myNumber)
         nodeViewHolder ! LocallyGeneratedModifier(block.header)
         nodeViewHolder ! LocallyGeneratedModifier(block.payload)
         if (settings.node.stateMode == StateMode.Digest)
