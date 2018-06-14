@@ -2,7 +2,7 @@ package encry.settings
 
 import encry.consensus.{Difficulty, DifficultySerializer, NBits}
 import encry.view.history.Height
-import scorex.core.block.Block.Version
+import encry.modifiers.history.block.Block.Version
 import scorex.crypto.authds.ADKey
 
 import scala.concurrent.duration._
