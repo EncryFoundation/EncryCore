@@ -3,8 +3,8 @@ package encry.network
 import java.net.InetAddress
 
 import encry.settings.NetworkSettings
+import encry.utils.ScorexLogging
 import org.bitlet.weupnp.{GatewayDevice, GatewayDiscover}
-import scorex.core.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 import scala.util.Try

@@ -13,8 +13,8 @@ import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationStat
 import encry.EncryApp._
 import encry.network.message.MessageHandler
 import encry.settings.NetworkSettings
-import scorex.core.utils.ScorexLogging
 import PeerConnectionHandler._
+import encry.utils.ScorexLogging
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._

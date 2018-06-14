@@ -9,12 +9,13 @@ import encry.network.message.BasicMsgDataTypes._
 import encry.network.message.{InvSpec, RequestModifierSpec, _}
 import scorex.core.consensus.{History, HistoryReader, SyncInfo}
 import encry.settings.NetworkSettings
+import encry.utils.ScorexLogging
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.StateReader
 import scorex.core.transaction.{MempoolReader, Transaction}
-import scorex.core.utils.ScorexLogging
 import scorex.core.{PersistentNodeViewModifier, _}
 import scorex.crypto.encode.Base58
+
 import scala.concurrent.duration._
 import scala.language.postfixOps
 

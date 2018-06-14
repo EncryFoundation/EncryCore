@@ -6,13 +6,13 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.{Algos, Constants, NodeSettings}
+import encry.utils.ScorexLogging
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
 import scorex.core._
 import scorex.core.consensus.History._
 import scorex.core.consensus.{Unknown => _, _}
-import scorex.core.utils.ScorexLogging
 
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}

@@ -4,9 +4,9 @@ import akka.actor.Actor
 import encry.EncryApp._
 import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
 import encry.stats.StatsSender.MiningEnd
+import encry.utils.ScorexLogging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.state.StateMode
-import scorex.core.utils.ScorexLogging
 
 class EncryMiningWorker(initialCandidate: CandidateBlock, myNumber: Int, numberOfWorkers: Int)
   extends Actor with ScorexLogging {

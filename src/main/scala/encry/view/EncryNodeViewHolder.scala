@@ -33,7 +33,7 @@ import supertagged.@@
 import EncryNodeViewHolder.ReceivableMessages._
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import EncryNodeViewHolder._
-import scorex.core.utils.ScorexLogging
+import encry.utils.ScorexLogging
 
 import scala.annotation.tailrec
 import scala.collection.mutable

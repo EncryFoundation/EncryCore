@@ -5,8 +5,8 @@ import akka.http.scaladsl.server.{Directive0, Route}
 import akka.http.scaladsl.unmarshalling.PredefinedFromEntityUnmarshallers
 import akka.util.Timeout
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
+import encry.utils.ActorHelper
 import io.circe.Printer
-import scorex.core.utils.ActorHelper
 
 import scala.concurrent.{Await, Future}
 

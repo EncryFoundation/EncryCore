@@ -12,7 +12,8 @@ import io.circe.Json
 import io.circe.syntax._
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import encry.settings.RESTApiSettings
-import scorex.core.utils.{NetworkTime, NetworkTimeProvider}
+import encry.utils.{NetworkTime, NetworkTimeProvider}
+import encry.utils.NetworkTimeProvider
 import scorex.crypto.encode.Base58
 
 import scala.concurrent.Future

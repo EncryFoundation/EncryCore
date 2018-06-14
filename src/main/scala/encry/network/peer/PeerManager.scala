@@ -3,7 +3,6 @@ package encry.network.peer
 import java.net.InetSocketAddress
 
 import akka.actor.Actor
-import scorex.core.utils.ScorexLogging
 import encry.EncryApp._
 import PeerManager.ReceivableMessages._
 import encry.network.{Handshake, SendingStrategy}
@@ -11,6 +10,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, 
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler._
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
+import encry.utils.ScorexLogging
 
 import scala.collection.mutable
 import scala.util.Random

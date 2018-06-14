@@ -14,7 +14,7 @@ import io.circe.Json
 import io.circe.syntax._
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, SemanticallySuccessfulModifier}
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
-import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
+import encry.utils.{NetworkTimeProvider, ScorexLogging}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
