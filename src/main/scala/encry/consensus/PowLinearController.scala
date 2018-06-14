@@ -32,8 +32,6 @@ object PowLinearController {
   def getHeightsForRetargetingAt(height: Height): Seq[Height] = {
     if ((height - 1) % chainParams.EpochLength == 0 && height > chainParams.EpochLength * chainParams.RetargetingEpochsQty)
       (0 to chainParams.RetargetingEpochsQty).reverse.map(i => (height - 1) - i * chainParams.EpochLength)
-    else if ((height - 1) % chainParams.EpochLength == 0 && chainParams.EpochLength > 1)
-      (0 to chainParams.RetargetingEpochsQty).reverse.map(i => (height - 1) - i * chainParams.EpochLength).filter(_ >= Constants.Chain.GenesisHeight)
     else Seq(height - 1)
   }.map(i => Height @@ i)
 
