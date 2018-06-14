@@ -1,8 +1,6 @@
-package scorex.core.consensus
+package encry.consensus
 
-import encry.consensus.SyncInfo
-import scorex.core._
-
+import scorex.core.{ModifierId, NodeViewComponent, PersistentNodeViewModifier}
 
 trait HistoryReader[PM <: PersistentNodeViewModifier, SI <: SyncInfo] extends NodeViewComponent {
 

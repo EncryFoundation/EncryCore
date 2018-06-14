@@ -22,7 +22,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.{NodeViewHolderEven
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import scorex.core
-import scorex.core.consensus.History.ProgressInfo
+import encry.consensus.History.ProgressInfo
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.TransactionValidation

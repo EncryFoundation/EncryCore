@@ -2,7 +2,7 @@ package encry.view.history.processors
 
 import com.google.common.primitives.{Ints, Longs}
 import encry.EncryApp
-import encry.consensus._
+import encry.consensus.{ModifierSemanticValidity, _}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
@@ -13,8 +13,7 @@ import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core._
-import scorex.core.consensus.History.ProgressInfo
-import scorex.core.consensus.ModifierSemanticValidity
+import encry.consensus.History.ProgressInfo
 
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
@@ -57,7 +56,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   protected def validityKey(id: Array[Byte]): ByteArrayWrapper =
     ByteArrayWrapper(Algos.hash("validity".getBytes(Algos.charset) ++ id))
 
-  // Defined if `scorex.core.consensus.HistoryReader`.
+  // Defined if `encry.consensus.HistoryReader`.
   def contains(id: ModifierId): Boolean
 
   def bestBlockOpt: Option[EncryBlock]

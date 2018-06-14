@@ -6,7 +6,7 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.utils.ScorexLogging
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
-import scorex.core.consensus.History.ProgressInfo
+import encry.consensus.History.ProgressInfo
 
 import scala.util.{Failure, Success, Try}
 
