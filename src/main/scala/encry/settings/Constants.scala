@@ -70,10 +70,10 @@ object Constants {
     // Desired time interval between blocks
     val DesiredBlockInterval: FiniteDuration = 30.seconds
 
-    // Number of last epochs that will  be used for difficulty recalculation
+    // Number of last epochs for difficulty recalculation
     val RetargetingEpochsQty: Int = 30
 
-    val EpochLength: Int = 1
+    val EpochLength: Int = 10
 
     val GenesisHeight: Height = Height @@ 0
 
