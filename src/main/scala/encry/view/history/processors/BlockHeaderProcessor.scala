@@ -267,18 +267,15 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
   def requiredDifficultyAfter(parent: EncryBlockHeader): NBits = {
     val parentHeight: Block.Height = parent.height
-    if (parent.height <= 2) chainParams.InitialNBits
-    else {
-      val requiredHeights =
-        difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
-          .ensuring(_.last == parentHeight, "Incorrect heights sequence!")
-      val chain: EncryHeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1,
-        parent, (_: EncryBlockHeader) => false)
-      val requiredHeaders: immutable.IndexedSeq[(Int, EncryBlockHeader)] = (requiredHeights.min to requiredHeights.max)
-        .zip(chain.headers).filter(p => requiredHeights.contains(p._1))
-      assert(requiredHeights.length == requiredHeaders.length,
-        s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}")
-      difficultyController.getDifficulty(requiredHeaders)
-    }
+    val requiredHeights: Seq[Height] =
+      difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
+        .ensuring(_.last == parentHeight, "Incorrect heights sequence!")
+    val chain: EncryHeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1,
+      parent, (_: EncryBlockHeader) => false)
+    val requiredHeaders: immutable.IndexedSeq[(Int, EncryBlockHeader)] = (requiredHeights.min to requiredHeights.max)
+      .zip(chain.headers).filter(p => requiredHeights.contains(p._1))
+    assert(requiredHeights.length == requiredHeaders.length,
+      s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}")
+    difficultyController.getDifficulty(requiredHeaders)
   }
 }
