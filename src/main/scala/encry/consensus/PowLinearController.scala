@@ -1,56 +1,56 @@
 package encry.consensus
 
+import encry.consensus
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.settings.Constants
 import encry.view.history.Height
+import supertagged.@@
 
 object PowLinearController {
 
   private val chainParams = Constants.Chain
 
-  def getDifficulty(previousHeaders: Seq[(Int, EncryBlockHeader)]): NBits = {
-    if (previousHeaders.length == chainParams.RetargetingEpochsQty) {
+  val PrecisionConstant: Int = 1000000000
+
+  def getDifficulty(previousHeaders: Seq[(Int, EncryBlockHeader)]): NBits =
+    if (previousHeaders.lengthCompare(1) == 0 || previousHeaders.head._2.timestamp >= previousHeaders.last._2.timestamp)
+      previousHeaders.head._2.nBits
+    else {
       val data: Seq[(Int, Difficulty)] = previousHeaders.sliding(2).toList.map { d =>
-        val start = d.head
-        val end = d.last
+        val start: (Int, EncryBlockHeader) = d.head
+        val end: (Int, EncryBlockHeader) = d.last
         require(end._1 - start._1 == chainParams.EpochLength, s"Incorrect heights interval for $d")
-        val diff = Difficulty @@ (end._2.requiredDifficulty * chainParams.DesiredBlockInterval.toMillis *
+        val diff: @@[BigInt, consensus.Difficulty.Tag] = Difficulty @@ (end._2.requiredDifficulty * chainParams.DesiredBlockInterval.toMillis *
           chainParams.EpochLength / (end._2.timestamp - start._2.timestamp))
         (end._1, diff)
       }
-      val diff = interpolate(data)
-      if (diff >= 1) diff else chainParams.InitialNBits
-    } else previousHeaders.maxBy(_._1)._2.nBits
-  }
+      val diff: Difficulty = interpolate(data)
+      if (diff >= chainParams.InitialDifficulty) DifficultySerializer.encodeCompactBits(diff) else chainParams.InitialNBits
+    }
+
+  /** Used to provide `getDifficulty()` with the sequence of headers of correct heights. */
+  def getHeightsForRetargetingAt(height: Height): Seq[Height] = {
+    if ((height - 1) % chainParams.EpochLength == 0 && height > chainParams.EpochLength * chainParams.RetargetingEpochsQty)
+      (0 to chainParams.RetargetingEpochsQty).reverse.map(i => (height - 1) - i * chainParams.EpochLength)
+    else Seq(height - 1)
+  }.map(i => Height @@ i)
 
   // y = a + bx
-  private[consensus] def interpolate(data: Seq[(Int, Difficulty)]): NBits = {
-    val size = data.size
+  private def interpolate(data: Seq[(Int, Difficulty)]): Difficulty = {
+    val size: Int = data.size
     val xy: Iterable[BigInt] = data.map(d => d._1 * d._2)
     val x: Iterable[BigInt] = data.map(d => BigInt(d._1))
     val x2: Iterable[BigInt] = data.map(d => BigInt(d._1) * d._1)
     val y: Iterable[BigInt] = data.map(d => d._2)
-    val xySum = xy.sum
-    val x2Sum = x2.sum
-    val ySum = y.sum
-    val xSum = x.sum
+    val xySum: BigInt = xy.sum
+    val x2Sum: BigInt = x2.sum
+    val ySum: BigInt = y.sum
+    val xSum: BigInt = x.sum
 
     val k: BigInt = (xySum * size - xSum * ySum) * PrecisionConstant / (x2Sum * size - xSum * xSum)
     val b: BigInt = (ySum * PrecisionConstant - k * xSum) / size / PrecisionConstant
 
-    val point = data.map(_._1).max + chainParams.EpochLength
-    DifficultySerializer.encodeCompactBits(b + k * point / PrecisionConstant)
+    val point: Int = data.map(_._1).max + chainParams.EpochLength
+    Difficulty @@ (b + k * point / PrecisionConstant)
   }
-
-  // Used to provide `getTimedelta()` with the sequence of headers of right heights.
-  def getHeightsForRetargetingAt(height: Height): Seq[Height] = {
-    if ((height - 1) > chainParams.RetargetingEpochsQty)
-      (0 until chainParams.RetargetingEpochsQty)
-        .map(i => (height - 1) - i).reverse.map(i => Height @@ i)
-    else
-      (0 until height)
-        .map(i => (height - 1) - i).filter(i => i > 1).reverse.map(i => Height @@ i)
-  }
-
-  val PrecisionConstant: Int = 1000000000
 }

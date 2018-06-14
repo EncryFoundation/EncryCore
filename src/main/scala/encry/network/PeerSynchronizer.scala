@@ -6,7 +6,7 @@ import akka.actor.Actor
 import akka.pattern.ask
 import akka.util.Timeout
 import encry.EncryApp._
-import encry.network.message.{GetPeersSpec, Message, MessageSpec, PeersSpec}
+import encry.network.message.{GetPeersSpec, Message, PeersSpec}
 import scorex.core.utils.ScorexLogging
 import shapeless.syntax.typeable._
 import scala.concurrent.duration._

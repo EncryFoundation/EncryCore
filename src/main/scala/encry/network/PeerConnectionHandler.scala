@@ -109,9 +109,8 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   def workingCycleLocalInterface: Receive = {
     case msg: message.Message[_] =>
       def sendOutMessage(): Unit = {
-        val bytes: Array[Byte] = msg.bytes
         log.info("Send message " + msg.spec + " to " + remote)
-        connection ! Write(ByteString(Ints.toByteArray(bytes.length) ++ bytes))
+        connection ! Write(ByteString(Ints.toByteArray(msg.bytes.length) ++ msg.bytes))
       }
       //simulating network delays
       settings.addedMaxDelay match {
@@ -180,7 +179,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
     val headerSize: Int = 4
 
     @tailrec
-    def multiPacket(packets: List[ByteString], current: ByteString): (List[ByteString], ByteString) = {
+    def multiPacket(packets: List[ByteString], current: ByteString): (List[ByteString], ByteString) =
       if (current.length < headerSize) (packets.reverse, current)
       else {
         val len: Int = current.iterator.getInt(ByteOrder.BIG_ENDIAN)
@@ -193,8 +192,6 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
           multiPacket(front :: packets, back)
         }
       }
-    }
-
     multiPacket(List[ByteString](), data)
   }
 }

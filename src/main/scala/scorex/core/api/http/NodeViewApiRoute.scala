@@ -4,12 +4,11 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.network.PeerConnectionHandler
 import io.circe.syntax._
-import encry.view.NodeViewHolder.CurrentView
 import scorex.core.consensus.History
 import scorex.core.serialization.SerializerRegistry
 import encry.settings.RESTApiSettings
+import encry.view.EncryNodeViewHolder.CurrentView
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.MinimalState
 import scorex.core.transaction.wallet.Vault
@@ -26,9 +25,9 @@ case class NodeViewApiRoute[P <: Proposition, TX <: Transaction[P]]
 (override val settings: RESTApiSettings, nodeViewHolderRef: ActorRef)
 (implicit val context: ActorRefFactory, val serializerReg: SerializerRegistry) extends ApiRoute {
 
-  import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+  import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 
-  override val route = (pathPrefix("nodeView") & withCors) {
+  override val route: Route = (pathPrefix("nodeView") & withCors) {
     openSurface ~ persistentModifierById ~ pool
   }
 

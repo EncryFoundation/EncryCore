@@ -88,7 +88,7 @@ class PeerManager extends Actor with ScorexLogging {
           if (peer.publicPeer) self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
           else peerDatabase.remove(peer.socketAddress)
           connectedPeers += peer.socketAddress -> peer
-          context.system.eventStream.publish(HandshakedPeer(peer))
+          nodeViewSynchronizer ! HandshakedPeer(peer)
         }
       }
     case Disconnected(remote) =>

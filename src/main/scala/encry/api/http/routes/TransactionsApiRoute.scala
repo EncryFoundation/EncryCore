@@ -12,7 +12,7 @@ import encry.view.mempool.EncryMempoolReader
 import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
-import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
+import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
 import encry.settings.RESTApiSettings
 
 import scala.concurrent.Future

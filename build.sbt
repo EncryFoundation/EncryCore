@@ -55,11 +55,12 @@ libraryDependencies ++= Seq(
   "org.rudogma" %% "supertagged" % "1.+",
   "org.scorexfoundation" %% "scrypto" % "2.1.1",
   "org.scorexfoundation" %% "iodb" % "0.3.2",
-  "com.storm-enroute" %% "scalameter" % "0.8.+",
   "io.spray" %%  "spray-json" % "1.3.3",
   "io.monix" %% "monix" % "2.3.3",
   "com.github.oskin1" %% "encryscript" % "0.3.1",
-  "de.heikoseeberger" %% "akka-http-circe" % "1.20.1"
+  "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
+  "org.influxdb" % "influxdb-java" % "2.10",
+  "org.apache.commons" % "commons-io" % "1.3.2"
 ) ++ networkDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
 
 fork := true
@@ -79,8 +80,8 @@ logLevel := Level.Error
 
 val opts = Seq(
   "-server",
-  "-Xms128m",
-  "-Xmx2G",
+  "-Xms512m",
+  "-Xmx4G",
   "-XX:+ExitOnOutOfMemoryError",
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",

@@ -10,26 +10,27 @@ import akka.stream.ActorMaterializer
 import encry.api.http.routes.{AccountInfoApiRoute, HistoryApiRoute, InfoApiRoute, TransactionsApiRoute}
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
+import encry.local.TransactionGenerator
 import encry.local.TransactionGenerator.StartGeneration
 import encry.local.miner.EncryMiner
 import encry.local.miner.EncryMiner.StartMining
 import encry.local.scanner.EncryScanner
-import encry.local.TransactionGenerator
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
+import encry.network.message._
+import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, NetworkController, UPnP}
 import encry.settings.{Algos, EncryAppSettings}
+import encry.stats.StatsSender
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import scorex.core.api.http._
-import encry.network.message._
 import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
-import encry.network.peer.PeerManager
 
 import scala.concurrent.ExecutionContextExecutor
-import scala.io.Source
 import scala.concurrent.duration._
+import scala.io.Source
 
 object EncryApp extends App with ScorexLogging {
 
@@ -72,7 +73,7 @@ object EncryApp extends App with ScorexLogging {
 
   lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
 
-  val nodeViewSynchronizer: ActorRef =
+  lazy val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
 
   lazy val miner: ActorRef = system.actorOf(Props[EncryMiner], "miner")
@@ -80,6 +81,8 @@ object EncryApp extends App with ScorexLogging {
   val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
 
   val scanner: ActorRef = system.actorOf(EncryScanner.props(), "scanner")
+
+  lazy val statsSender: ActorRef = system.actorOf(Props[StatsSender], "statsSender")
 
   val apiRoutes: Seq[ApiRoute] = Seq(
     UtilsApiRoute(settings.restApi),

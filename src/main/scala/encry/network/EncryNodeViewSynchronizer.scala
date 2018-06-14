@@ -9,45 +9,35 @@ import encry.modifiers.state.box.proposition.EncryProposition
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.EncryMempool
 import encry.EncryApp._
-import encry.view.NodeViewHolder._
 import encry.network.NetworkController.ReceivableMessages.SendToNetwork
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallySuccessfulModifier}
 import encry.network.message.BasicMsgDataTypes.ModifiersData
 import encry.network.message.{Message, ModifiersSpec}
-import encry.settings.NetworkSettings
+import encry.view.EncryNodeViewHolder.DownloadRequest
 import scorex.core.{ModifierId, ModifierTypeId}
-import scala.concurrent.duration._
 
-class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type)
-  extends NodeViewSynchronizer[EncryProposition, EncryBaseTransaction,
-    EncrySyncInfo, EncrySyncInfoMessageSpec.type, EncryPersistentModifier, EncryHistory,
-    EncryMempool](networkController, nodeViewHolder, syncInfoSpec, settings.network, timeProvider) {
+class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends
+  NodeViewSynchronizer[EncryProposition, EncryBaseTransaction, EncrySyncInfo, EncrySyncInfoMessageSpec.type,
+    EncryPersistentModifier, EncryHistory, EncryMempool](syncInfoSpec) {
 
   import EncryNodeViewSynchronizer._
 
-  override protected val deliveryTracker = EncryDeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self, timeProvider)
+  override val deliveryTracker: EncryDeliveryTracker = EncryDeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self, timeProvider)
 
-  val networkSettings: NetworkSettings = settings.network
-
-  val toDownloadCheckInterval: FiniteDuration = 3.seconds
-
-  val downloadListSize: Int = networkSettings.networkChunkSize
+  val downloadListSize: Int = settings.network.networkChunkSize
 
   val onSemanticallySuccessfulModifier: Receive = {
-    case SemanticallySuccessfulModifier(_: EncryBlock) =>
-    //Do nothing, other nodes will request required modifiers via ProgressInfo.toDownload
+    case SemanticallySuccessfulModifier(_: EncryBlock) => //Do nothing, other nodes will request required modifiers via ProgressInfo.toDownload
     case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
   }
 
   override def preStart(): Unit = {
-    val toDownloadCheckInterval = networkSettings.syncInterval
     super.preStart()
-    context.system.eventStream.subscribe(self, classOf[DownloadRequest])
-    context.system.scheduler.schedule(toDownloadCheckInterval, toDownloadCheckInterval)(self ! CheckModifiersToDownload)
+    context.system.scheduler.schedule(settings.network.syncInterval, settings.network.syncInterval)(self ! CheckModifiersToDownload)
   }
 
-  override protected def viewHolderEvents: Receive =
+  override def viewHolderEvents: Receive =
     onSyntacticallySuccessfulModifier orElse
       onDownloadRequest orElse
       onCheckModifiersToDownload orElse
@@ -82,12 +72,12 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type)
 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     modifierIds.foreach(id => deliveryTracker.expectFromRandom(modifierTypeId, id))
-    val msg = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
+    val msg: Message[(ModifierTypeId, Seq[ModifierId])] = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
     //todo: Full nodes should be here, not a random peer
     networkController ! SendToNetwork(msg, SendToRandom)
   }
 
-  override protected def modifiersFromRemote: Receive = {
+  override def modifiersFromRemote: Receive = {
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       super.modifiersFromRemote(DataFromPeer(spec, data, remote))
       //If queue is empty - check, whether there are more modifiers to download
