@@ -6,9 +6,10 @@ import encry.settings.Algos
 import encry.view.history.Height
 import io.circe.Encoder
 import io.circe.syntax._
+import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer}
-import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
-import org.encryfoundation.prismlang.core.{Ast, PConvertible, TypeSystem, Types}
+import org.encryfoundation.prismlang.core.wrapped.PObject
+import org.encryfoundation.prismlang.core.{Ast, TypeSystem, Types}
 import org.encryfoundation.prismlang.evaluator.{Evaluator, ScopedRuntimeEnvironment}
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.Proposition
@@ -17,17 +18,11 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-case class EncryProposition(contract: CompiledContract) extends Proposition with PConvertible {
+case class EncryProposition(contract: CompiledContract) extends Proposition {
 
   override type M = EncryProposition
 
   override def serializer: Serializer[EncryProposition] = EncryPropositionSerializer
-
-  override val esType: Types.Product = Types.EncryProposition
-
-  override def asVal: PValue = PValue(esType)(convert)
-
-  override def convert: PObject = PObject(Map("fingerprint" -> PValue(Types.PCollection.ofByte)(contractHash)), esType)
 
   def canUnlock(ctx: Context, proofs: Seq[Proof], namedProofs: Seq[(String, Proof)]): Boolean = {
     val env: List[(String, Types.Product, PObject)] = if (contract.args.isEmpty) List.empty else {
@@ -44,6 +39,10 @@ case class EncryProposition(contract: CompiledContract) extends Proposition with
   }
 
   lazy val contractHash: Digest32 = Algos.hash(contract.bytes)
+
+  def isOpen: Boolean = ByteArrayWrapper(contractHash) == ByteArrayWrapper(EncryProposition.open.contractHash)
+
+  def isHeightLockedAt(height: Height): Boolean = ByteArrayWrapper(contractHash) == ByteArrayWrapper(EncryProposition.heightLocked(height).contractHash)
 }
 
 object EncryProposition {

@@ -2,38 +2,35 @@ package encry.modifiers.state.box
 
 import com.google.common.primitives.Longs
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import encry.modifiers.state.box.proposition.{ContractProposition, EncryProposition, HeightProposition, OpenProposition}
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.Algos
-import encrywm.lang.backend.env.{ESEnvConvertable, ESObject, ESValue}
-import encrywm.lib.Types
 import io.circe.Encoder
+import org.encryfoundation.prismlang.core.{PConvertible, Types}
+import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import scorex.core.transaction.box.Box
 import scorex.crypto.authds.ADKey
 
-trait EncryBaseBox extends Box[EncryProposition] with ESEnvConvertable {
+trait EncryBaseBox extends Box[EncryProposition] with PConvertible {
 
   val typeId: BxTypeId
 
   val nonce: Long
 
-  override lazy val id: ADKey = ADKey @@ Algos.hash(Longs.toByteArray(nonce)).updated(0, typeId) // 32 bytes!
+  override lazy val id: ADKey = ADKey @@ Algos.hash(Longs.toByteArray(nonce)).updated(0, typeId)
 
   def isAmountCarrying: Boolean = this.isInstanceOf[MonetaryBox]
-  def isOpen: Boolean = this.proposition.isInstanceOf[OpenProposition.type]
-  def isHeightLocked: Boolean = this.proposition.isInstanceOf[HeightProposition]
-  def isLockedByScript: Boolean = this.proposition.isInstanceOf[ContractProposition]
 
-  override val esType: Types.ESProduct = Types.ESBox
+  override val esType: Types.Product = Types.EncryBox
 
-  override def asVal: ESValue = ESValue(Types.ESBox.ident.toLowerCase, Types.ESBox)(convert)
+  override def asVal: PValue = PValue(esType)(convert)
 
-  override def convert: ESObject = {
+  override def convert: PObject = {
     val fields = Map(
-      "proposition" -> ESValue("proposition", Types.ESProposition)(proposition.convert),
-      "typeId" -> ESValue("typeId", Types.ESInt)(typeId),
-      "id" -> ESValue("id", Types.ESByteVector)(id)
+      "contractHash" -> PValue(Types.PCollection.ofByte)(proposition.contractHash),
+      "typeId" -> PValue(Types.PInt)(typeId),
+      "id" -> PValue(Types.PCollection.ofByte)(id)
     )
-    ESObject(Types.ESBox.ident, fields, esType)
+    PObject(fields, esType)
   }
 }
 
