@@ -14,7 +14,7 @@ import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core._
 import encry.consensus.History.ProgressInfo
-
+import encry.modifiers.history.block.Block
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.{Failure, Success, Try}
