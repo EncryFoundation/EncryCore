@@ -20,6 +20,7 @@ case class EncrySyncInfo(lastHeaderIds: Seq[ModifierId]) extends SyncInfo {
 
 object EncrySyncInfo {
 
+  //Todo magic number: config?
   val MaxBlockIds = 1000
 }
 
