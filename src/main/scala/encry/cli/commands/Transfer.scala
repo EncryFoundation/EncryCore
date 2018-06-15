@@ -15,8 +15,8 @@ import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
-import scorex.core.utils.NetworkTime.Time
-import scorex.core.utils.NetworkTimeProvider
+import encry.utils.NetworkTime.Time
+import encry.utils.NetworkTimeProvider
 
 import scala.concurrent.Future
 import scala.util.Try

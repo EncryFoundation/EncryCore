@@ -1,4 +1,4 @@
-package scorex.core.utils
+package encry.utils
 
 import scorex.crypto.encode.Base58
 

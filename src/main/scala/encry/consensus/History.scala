@@ -1,7 +1,7 @@
-package scorex.core.consensus
+package encry.consensus
 
+import encry.consensus.History.ProgressInfo
 import scorex.core._
-import scorex.core.consensus.History.ProgressInfo
 import scorex.crypto.encode.Base58
 
 import scala.util.Try

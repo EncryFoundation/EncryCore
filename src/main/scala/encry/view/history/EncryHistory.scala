@@ -2,19 +2,19 @@ package encry.view.history
 
 import java.io.File
 
+import encry.consensus.History
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings._
+import encry.utils.NetworkTimeProvider
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
 import encry.view.history.storage.{FileHistoryObjectsStore, HistoryStorage}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
-import scorex.core.consensus.History
-import scorex.core.consensus.History.ProgressInfo
-import scorex.core.utils.NetworkTimeProvider
+import encry.consensus.History.ProgressInfo
 import scorex.crypto.encode.Base58
 
 import scala.util.Try

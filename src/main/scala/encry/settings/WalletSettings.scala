@@ -2,7 +2,7 @@ package encry.settings
 
 import java.io.File
 
-import scorex.core.utils.ByteStr
+import encry.utils.ByteStr
 
 case class WalletSettings (seed: ByteStr,
                            password: String,
