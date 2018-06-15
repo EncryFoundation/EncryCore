@@ -8,7 +8,7 @@ import encry.consensus.{HistoryReader, SyncInfo}
 import encry.network.PeerConnectionHandler._
 import encry.network.message.BasicMsgDataTypes._
 import encry.network.message.{InvSpec, RequestModifierSpec, _}
-import encry.settings.NetworkSettings
+import encry.settings.{Algos, NetworkSettings}
 import encry.utils.ScorexLogging
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.StateReader
@@ -160,9 +160,7 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
       }
   }
 
-  /**
-    * Logic to process modifiers got from another peer
-    */
+  /** Logic to process modifiers got from another peer */
   def modifiersFromRemote: Receive = {
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       val typeId: ModifierTypeId = data._1
