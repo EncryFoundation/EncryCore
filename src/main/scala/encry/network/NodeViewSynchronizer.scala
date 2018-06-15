@@ -40,7 +40,7 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
 
   val deliveryTimeout: FiniteDuration = networkSettings.deliveryTimeout
   val maxDeliveryChecks: Int = networkSettings.maxDeliveryChecks
-  val invSpec = new InvSpec(networkSettings.maxInvObjects)
+  val invSpec: InvSpec = new InvSpec(networkSettings.maxInvObjects)
   val requestModifierSpec = new RequestModifierSpec(networkSettings.maxInvObjects)
 
   val deliveryTracker: DeliveryTracker = new DeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self)
@@ -211,9 +211,9 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
     case ResponseFromLocal(peer, _, modifiers: Seq[NodeViewModifier]) =>
       if (modifiers.nonEmpty) {
         @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-        val modType = modifiers.head.modifierTypeId
-        val m = modType -> modifiers.map(m => m.id -> m.bytes).toMap
-        val msg = Message(ModifiersSpec, Right(m), None)
+        val modType: ModifierTypeId = modifiers.head.modifierTypeId
+        val m: (ModifierTypeId, Map[ModifierId, Array[Byte]]) = modType -> modifiers.map(m => m.id -> m.bytes).toMap
+        val msg: Message[(ModifierTypeId, Map[ModifierId, Array[Byte]])] = Message(ModifiersSpec, Right(m), None)
         peer.handlerRef ! msg
       }
   }
