@@ -255,9 +255,8 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   object HeaderValidator extends ModifierValidator {
 
     def validate(header: EncryBlockHeader): ValidationResult = {
-      if (header.isGenesis) {
-        validateGenesisBlockHeader(header)
-      } else {
+      if (header.isGenesis) validateGenesisBlockHeader(header)
+      else {
         val parentOpt = typedModifierById[EncryBlockHeader](header.parentId)
         parentOpt map { parent =>
           validateChildBlockHeader(header, parent)
