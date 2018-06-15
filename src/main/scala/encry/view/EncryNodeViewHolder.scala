@@ -4,40 +4,36 @@ import java.io.File
 
 import akka.actor.{Actor, Props}
 import encry.EncryApp
-import encry.EncryApp._
+import encry.EncryApp.{settings, timeProvider, _}
+import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer}
 import encry.modifiers.state.box.proposition.EncryProposition
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{NodeViewHolderEvent, SuccessfulTransaction, _}
+import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
+import encry.utils.ScorexLogging
+import encry.view.EncryNodeViewHolder.ReceivableMessages._
+import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.{DigestState, EncryState, StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
-import encry.EncryApp.{networkController, settings, timeProvider}
-import scorex.core._
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{NodeViewHolderEvent, SuccessfulTransaction}
-import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.view.EncryNodeViewHolder.DownloadRequest
 import scorex.core
-import encry.consensus.History.ProgressInfo
+import scorex.core._
 import scorex.core.serialization.Serializer
+import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.TransactionValidation
-import scorex.core.transaction.Transaction
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base58
 import supertagged.@@
-import EncryNodeViewHolder.ReceivableMessages._
-import encry.network.NodeViewSynchronizer.ReceivableMessages._
-import EncryNodeViewHolder._
-import encry.utils.ScorexLogging
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.collection.mutable.WrappedArray
 import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with ScorexLogging {
@@ -60,7 +56,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   )
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    super.preRestart(reason, message)
     reason.printStackTrace()
     System.exit(100)
   }
@@ -72,7 +67,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def receive: Receive = {
-    case ModifiersFromRemote(remote, modifierTypeId, remoteObjects) =>
+    case ModifiersFromRemote(_, modifierTypeId, remoteObjects) =>
       modifierSerializers.get(modifierTypeId) foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
@@ -82,9 +77,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             else modifiersCache.put(key(pmod.id), pmod)
         }
         log.debug(s"Cache before(${modifiersCache.size}): ${modifiersCache.keySet.map(_.array).map(Base58.encode).mkString(",")}")
-
         def found: Option[(mutable.WrappedArray.ofByte, PMOD)] = modifiersCache.find(x => nodeView.history.applicable(x._2))
-        Iterator.continually(found).takeWhile(_.isDefined).flatten.foreach { case (k,v) =>
+        Iterator.continually(found).takeWhile(_.isDefined).flatten.foreach { case (k, v) =>
             modifiersCache.remove(k)
             pmodModify(v)
         }
@@ -145,7 +139,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   def requestDownloads(pi: ProgressInfo[EncryPersistentModifier]): Unit =
-    pi.toDownload.foreach { case (tid, id) => networkController ! DownloadRequest(tid, id) }
+    pi.toDownload.foreach { case (tid, id) => nodeViewSynchronizer ! DownloadRequest(tid, id) }
 
   def trimChainSuffix(suffix: IndexedSeq[EncryPersistentModifier], rollbackPoint: ModifierId): IndexedSeq[EncryPersistentModifier] = {
     val idx: Int = suffix.indexWhere(_.id.sameElements(rollbackPoint))
