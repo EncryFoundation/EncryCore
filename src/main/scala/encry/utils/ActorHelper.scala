@@ -1,4 +1,4 @@
-package scorex.core.utils
+package encry.utils
 
 import akka.actor.ActorRef
 import akka.pattern.ask

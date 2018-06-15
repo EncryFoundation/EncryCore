@@ -11,9 +11,9 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Algos
 import encry.stats.StatsSender.MiningEnd
+import encry.utils.ScorexLogging
 import org.apache.commons.io.FileUtils
 import org.influxdb.{InfluxDB, InfluxDBFactory}
-import scorex.core.utils.ScorexLogging
 
 class StatsSender extends Actor with ScorexLogging {
 

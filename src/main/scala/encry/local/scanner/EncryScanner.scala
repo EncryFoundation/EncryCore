@@ -17,7 +17,7 @@ import io.circe.syntax._
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.VersionTag
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedState, RollbackSucceed, SemanticallySuccessfulModifier}
-import scorex.core.utils.ScorexLogging
+import encry.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
 
 import scala.collection.mutable

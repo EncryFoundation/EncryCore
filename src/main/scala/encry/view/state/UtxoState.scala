@@ -14,13 +14,12 @@ import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
 import encry.settings.Algos.HF
 import encry.settings.{Algos, Constants}
-import encry.utils.BalanceCalculator
+import encry.utils.{BalanceCalculator, ScorexLogging}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.VersionTag
 import scorex.core.transaction.box.Box.Amount
-import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds._
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.hash.Digest32

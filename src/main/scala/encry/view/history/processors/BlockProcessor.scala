@@ -3,10 +3,10 @@ package encry.view.history.processors
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
+import encry.utils.ScorexLogging
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
-import scorex.core.consensus.History.ProgressInfo
-import scorex.core.utils.ScorexLogging
+import encry.consensus.History.ProgressInfo
 
 import scala.util.{Failure, Success, Try}
 

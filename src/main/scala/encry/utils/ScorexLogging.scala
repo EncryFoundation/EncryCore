@@ -1,4 +1,4 @@
-package scorex.core.utils
+package encry.utils
 
 import com.typesafe.scalalogging.StrictLogging
 
