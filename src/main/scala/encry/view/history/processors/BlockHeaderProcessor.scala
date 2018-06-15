@@ -89,7 +89,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
       case Some(bestHeaderId) =>
         // If we verify transactions, we don't need to send this header to state.
         // If we don't and this is the best header, we should send this header to state to update state root hash
-        val toProcess = if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
+        val toProcess: Seq[EncryBlockHeader] = if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
         ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
       case None =>
         log.error("Should always have best header after header application")
@@ -150,7 +150,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   }
 
   protected def validate(header: EncryBlockHeader): Try[Unit] = {
-    lazy val parentOpt = typedModifierById[EncryBlockHeader](header.parentId)
+    lazy val parentOpt: Option[EncryBlockHeader] = typedModifierById[EncryBlockHeader](header.parentId)
     if (header.parentId sameElements EncryBlockHeader.GenesisParentId) {
       if (bestHeaderIdOpt.nonEmpty) Failure(new Exception("Trying to append genesis block to non-empty history."))
       else if (header.height != chainParams.GenesisHeight) Failure(new Exception("Invalid height for genesis block header."))

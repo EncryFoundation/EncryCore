@@ -31,7 +31,7 @@ case class EncryBlockHeader(override val version: Version,
                              override val transactionsRoot: Digest32,
                              override val timestamp: Timestamp,
                              override val height: Height,
-                             var nonce: Long = 0L,
+                             nonce: Long,
                              nBits: NBits,
                              equihashSolution: EquihashSolution) extends EncryBaseBlockHeader {
 
