@@ -1,5 +1,6 @@
 package encry.modifiers.state.box.proposition
 
+import encry.account.Account
 import encry.modifiers.state.box.Context
 import encry.modifiers.state.box.proof.Proof
 import encry.settings.Algos
@@ -13,7 +14,7 @@ import org.encryfoundation.prismlang.core.{Ast, TypeSystem, Types}
 import org.encryfoundation.prismlang.evaluator.{Evaluator, ScopedRuntimeEnvironment}
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.Proposition
-import scorex.crypto.encode.Base58
+import scorex.crypto.encode.{Base16, Base58}
 import scorex.crypto.hash.Digest32
 
 import scala.util.Try
@@ -43,6 +44,8 @@ case class EncryProposition(contract: CompiledContract) extends Proposition {
   def isOpen: Boolean = ByteArrayWrapper(contractHash) == ByteArrayWrapper(EncryProposition.open.contractHash)
 
   def isHeightLockedAt(height: Height): Boolean = ByteArrayWrapper(contractHash) == ByteArrayWrapper(EncryProposition.heightLocked(height).contractHash)
+
+  def isLockedByAccount(account: Account): Boolean = ByteArrayWrapper(contractHash) == ByteArrayWrapper(EncryProposition.accountLock(account).contractHash)
 }
 
 object EncryProposition {
@@ -75,6 +78,29 @@ object EncryProposition {
         ),
         Expr.True,
         Expr.False,
+        Types.PBoolean
+      )
+    )
+  )
+
+  def accountLock(account: Account): EncryProposition = EncryProposition(
+    CompiledContract(
+      List.empty,
+      Expr.Call(
+        Expr.Name(Ident("checkSig"), Types.Nit),
+        List(
+          Expr.Attribute(
+            Expr.Name(Ident("sig"), Types.Nit),
+            Ident("sigBytes"),
+            Types.Signature25519
+          ),
+          Expr.Attribute(
+            Expr.Name(Ident("tx"), Types.Nit),
+            Ident("messageToSign"),
+            Types.PCollection.ofByte
+          ),
+          Expr.Base16Str(Base16.encode(account.pubKey))
+        ),
         Types.PBoolean
       )
     )
