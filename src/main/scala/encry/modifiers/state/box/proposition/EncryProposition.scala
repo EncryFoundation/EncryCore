@@ -10,8 +10,9 @@ import io.circe.syntax._
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer}
 import org.encryfoundation.prismlang.core.wrapped.PObject
-import org.encryfoundation.prismlang.core.{Ast, TypeSystem, Types}
-import org.encryfoundation.prismlang.evaluator.{Evaluator, ScopedRuntimeEnvironment}
+import org.encryfoundation.prismlang.core.{Ast, Types}
+import org.encryfoundation.prismlang.evaluator.Evaluator
+import org.encryfoundation.prismlang.lib.predefined.signature.CheckSig
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.crypto.encode.{Base16, Base58}
@@ -35,8 +36,7 @@ case class EncryProposition(contract: CompiledContract) extends Proposition {
       env.find(_._1 == name).orElse(env.find(_._2 == tpe)).map(elt => elt._1 -> elt._3)
         .getOrElse(throw new Exception("Not enough arguments for contact"))
     }
-    val evaluator: Evaluator = Evaluator(ScopedRuntimeEnvironment.initialized(1, args.toMap), TypeSystem.default)
-    evaluator.eval[Boolean](contract.script)
+    Evaluator.initializedWith(args).eval[Boolean](contract.script)
   }
 
   lazy val contractHash: Digest32 = Algos.hash(contract.bytes)
@@ -85,17 +85,17 @@ object EncryProposition {
 
   def accountLock(account: Account): EncryProposition = EncryProposition(
     CompiledContract(
-      List.empty,
+      List("tx" -> Types.EncryTransaction, "sig" -> Types.Signature25519),
       Expr.Call(
-        Expr.Name(Ident("checkSig"), Types.Nit),
+        Expr.Name(Ident("checkSig"), Types.PFunc(CheckSig.args.toList, Types.PBoolean)),
         List(
           Expr.Attribute(
-            Expr.Name(Ident("sig"), Types.Nit),
+            Expr.Name(Ident("sig"), Types.Signature25519),
             Ident("sigBytes"),
-            Types.Signature25519
+            Types.PCollection.ofByte
           ),
           Expr.Attribute(
-            Expr.Name(Ident("tx"), Types.Nit),
+            Expr.Name(Ident("tx"), Types.EncryTransaction),
             Ident("messageToSign"),
             Types.PCollection.ofByte
           ),
