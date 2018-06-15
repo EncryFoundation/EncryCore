@@ -67,7 +67,6 @@ trait DownloadProcessor extends ScorexLogging {
     * Checks, whether it's time to download full chain and return toDownload modifiers
     */
   protected def toDownload(header: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] = {
-
     if (!nodeSettings.verifyTransactions) {
       // Regime that do not download and verify transaction
       Seq.empty
@@ -79,7 +78,7 @@ trait DownloadProcessor extends ScorexLogging {
       log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
       isHeadersChainSyncedVar = true
       blockDownloadProcessor.updateBestBlock(header)
-      Seq.empty
+      requiredModifiersForHeader(header)
     } else {
       Seq.empty
     }
