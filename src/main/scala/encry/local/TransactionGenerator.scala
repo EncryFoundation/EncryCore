@@ -14,8 +14,8 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedTransaction}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import scorex.core.utils.NetworkTime.Time
-import scorex.core.utils.ScorexLogging
+import encry.utils.NetworkTime.Time
+import encry.utils.ScorexLogging
 
 import scala.concurrent.duration._
 

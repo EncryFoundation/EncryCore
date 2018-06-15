@@ -4,10 +4,10 @@ import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
 import encry.settings.Algos
 import encry.settings.Algos.HF
+import encry.utils.ScorexLogging
 import encry.view.history.Height
 import io.iohk.iodb.Store
 import scorex.core.transaction.state.StateReader
-import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
 import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import scorex.crypto.hash.Digest32

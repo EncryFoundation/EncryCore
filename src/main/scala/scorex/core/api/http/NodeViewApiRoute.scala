@@ -4,8 +4,8 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import encry.consensus.History
 import io.circe.syntax._
-import scorex.core.consensus.History
 import scorex.core.serialization.SerializerRegistry
 import encry.settings.RESTApiSettings
 import encry.view.EncryNodeViewHolder.CurrentView

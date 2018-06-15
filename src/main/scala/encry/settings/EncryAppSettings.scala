@@ -4,9 +4,9 @@ import java.io.File
 
 import com.typesafe.config.{Config, ConfigFactory}
 import encry.EncryApp
+import encry.utils.{NetworkTimeProviderSettings, ScorexLogging}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-import scorex.core.utils.{NetworkTimeProviderSettings, ScorexLogging}
 
 case class EncryAppSettings(directory: String,
                             testing: TestingSettings,

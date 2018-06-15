@@ -3,11 +3,11 @@ package encry.view.mempool
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.view.mempool.EncryMempool._
 import encry.settings.EncryAppSettings
+import encry.utils.{NetworkTimeProvider, ScorexLogging}
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
 import scorex.core.ModifierId
 import scorex.core.transaction.MemoryPool
-import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 
 import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}

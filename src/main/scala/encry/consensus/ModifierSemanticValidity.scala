@@ -1,4 +1,4 @@
-package scorex.core.consensus
+package encry.consensus
 
 sealed trait ModifierSemanticValidity {
   val code: Byte

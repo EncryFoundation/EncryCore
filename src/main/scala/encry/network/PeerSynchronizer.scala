@@ -7,13 +7,14 @@ import akka.pattern.ask
 import akka.util.Timeout
 import encry.EncryApp._
 import encry.network.message.{GetPeersSpec, Message, PeersSpec}
-import scorex.core.utils.ScorexLogging
 import shapeless.syntax.typeable._
+
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import encry.network.NetworkController.ReceivableMessages.{RegisterMessagesHandler, SendToNetwork}
 import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
+import encry.utils.ScorexLogging
 
 class PeerSynchronizer extends Actor with ScorexLogging {
 

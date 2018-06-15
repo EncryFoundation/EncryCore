@@ -1,8 +1,8 @@
 package encry.view.history.processors.payload
 
+import encry.consensus.History
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import scorex.core.consensus.History
 
 import scala.util.Try
 

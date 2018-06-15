@@ -1,4 +1,4 @@
-package scorex.core.consensus
+package encry.consensus
 
 import scorex.core.serialization.BytesSerializable
 

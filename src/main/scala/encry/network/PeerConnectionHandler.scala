@@ -11,11 +11,11 @@ import com.google.common.primitives.Ints
 import encry.EncryApp
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle}
 import encry.EncryApp._
-import scorex.core.app.Version
 import encry.network.message.MessageHandler
 import encry.settings.NetworkSettings
-import scorex.core.utils.ScorexLogging
 import PeerConnectionHandler._
+import encry.utils.ScorexLogging
+
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}

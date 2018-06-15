@@ -23,8 +23,8 @@ import scorex.core.ModifierId
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import scorex.core.transaction.box.Box.Amount
-import scorex.core.utils.NetworkTime.Time
-import scorex.core.utils.ScorexLogging
+import encry.utils.NetworkTime.Time
+import encry.utils.ScorexLogging
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scorex.crypto.hash.Digest32
 
