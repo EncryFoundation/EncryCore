@@ -9,7 +9,7 @@ import encry.settings.{Constants, NodeSettings}
   */
 case class BlockDownloadProcessor(nodeSettings: NodeSettings) {
 
-  private[history] var minimalBlockHeightVar: Int = Int.MaxValue
+  private[history] var minimalBlockHeightVar: Int = 0//Int.MaxValue
 
   /**
     * Start height to download full blocks.
