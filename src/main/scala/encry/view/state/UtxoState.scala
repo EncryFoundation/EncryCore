@@ -83,7 +83,7 @@ class UtxoState(override val version: VersionTag,
 
       applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] =
-          metadata(VersionTag @@ block.id, block.header.stateRoot, Height @@ block.header.height, block.header.timestamp)
+          metadata(VersionTag !@@ block.id, block.header.stateRoot, Height @@ block.header.height, block.header.timestamp)
         val proofBytes: SerializedAdProof = persistentProver.generateProofAndUpdateStorage(meta)
         val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
 
@@ -100,7 +100,7 @@ class UtxoState(override val version: VersionTag,
         else if (!(block.header.stateRoot sameElements persistentProver.digest))
           throw new Exception("Calculated stateRoot is not equal to the declared one.")
 
-        new UtxoState(VersionTag @@ block.id, Height @@ block.header.height, stateStore, lastBlockTimestamp, nodeViewHolderRef)
+        new UtxoState(VersionTag !@@ block.id, Height @@ block.header.height, stateStore, lastBlockTimestamp, nodeViewHolderRef)
       }.recoverWith[UtxoState] { case e =>
         log.warn(s"Failed to apply block with header ${block.header.encodedId} to UTXOState with root" +
           s" ${Algos.encode(rootHash)}: ", e)
@@ -108,7 +108,7 @@ class UtxoState(override val version: VersionTag,
       }
 
     case header: EncryBlockHeader =>
-      Success(new UtxoState(VersionTag @@ header.id, height, stateStore, lastBlockTimestamp, nodeViewHolderRef))
+      Success(new UtxoState(VersionTag !@@ header.id, height, stateStore, lastBlockTimestamp, nodeViewHolderRef))
 
     case _ => Failure(new Exception("Got Modifier of unknown type."))
   }
@@ -172,10 +172,8 @@ class UtxoState(override val version: VersionTag,
         .map(_.toOption -> u)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, unlocker)) =>
         (bxOpt, tx.defaultProofOpt) match {
           // If no `proofs` provided, then `defaultProof` is used.
-          case (Some(bx), _) if unlocker.proofs.nonEmpty || unlocker.namedProofs.nonEmpty =>
-            if (bx.proposition.canUnlock(context, unlocker.proofs, unlocker.namedProofs)) acc :+ bx else acc
-          case (Some(bx), Some(defaultProof)) =>
-            if (bx.proposition.canUnlock(context, unlocker.proofs :+ defaultProof, unlocker.namedProofs)) acc :+ bx else acc
+          case (Some(bx), _) if unlocker.proofs.nonEmpty => if (bx.proposition.canUnlock(context, unlocker.proofs)) acc :+ bx else acc
+          case (Some(bx), Some(defaultProof)) => if (bx.proposition.canUnlock(context, unlocker.proofs :+ defaultProof)) acc :+ bx else acc
           case _ => throw TransactionValidationException(s"Failed to spend some boxes referenced in $tx")
         }
       }
