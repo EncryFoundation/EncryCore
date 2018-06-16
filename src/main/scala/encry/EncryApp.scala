@@ -32,6 +32,7 @@ import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.io.Source
 
+//Travis, hello!
 object EncryApp extends App with ScorexLogging {
 
   type P = EncryProposition
