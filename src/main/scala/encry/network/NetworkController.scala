@@ -9,15 +9,17 @@ import akka.io.{IO, Tcp}
 import akka.pattern.ask
 import akka.util.Timeout
 import encry.EncryApp._
-import encry.view.history.EncrySyncInfoMessageSpec
+import encry.network.NetworkController.ReceivableMessages._
+import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
+import encry.network.PeerConnectionHandler._
 import encry.network.message.Message.MessageCode
 import encry.network.message.{Message, MessageHandler}
-import encry.settings.NetworkSettings
-import NetworkController.ReceivableMessages._
-import PeerConnectionHandler.ReceivableMessages.CloseConnection
-import PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
+import encry.settings.NetworkSettings
+import encry.stats.StatsSender.DownloadModifierEnd
 import encry.utils.ScorexLogging
+import encry.view.history.EncrySyncInfoMessageSpec
+import scorex.core.{ModifierId, ModifierTypeId}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -60,8 +62,6 @@ class NetworkController extends Actor with ScorexLogging {
     }
   }
 
-  log.info(s"Declared address: $externalSocketAddress")
-
   tcpManager ! Bind(self, networkSettings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
 
   override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
@@ -81,7 +81,14 @@ class NetworkController extends Actor with ScorexLogging {
       spec.parseBytes(msgBytes) match {
         case Success(content) =>
           messageHandlers.find(_._1.contains(msgId)).map(_._2) match {
-            case Some(handler) => handler ! DataFromPeer(spec, content, remote)
+            case Some(handler) =>
+              content match {
+
+                case (id: ModifierTypeId, mapWithModifiers: Map[ModifierId, Array[Byte]]) =>
+                  statsSender ! DownloadModifierEnd(mapWithModifiers.keys.toSeq)
+                case _ =>
+              }
+              handler ! DataFromPeer(spec, content, remote)
             case None => log.error("No handlers found for message: " + msgId)
           }
         case Failure(e) => log.error("Failed to deserialize data: ", e)
@@ -141,6 +148,7 @@ object NetworkController {
   object ReceivableMessages {
 
     import encry.network.message.MessageSpec
+
     import scala.reflect.runtime.universe.TypeTag
 
     case class DataFromPeer[DT: TypeTag](spec: MessageSpec[DT], data: DT, source: ConnectedPeer)

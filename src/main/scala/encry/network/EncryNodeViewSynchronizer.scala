@@ -1,20 +1,20 @@
 package encry.network
 
+import encry.EncryApp._
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
-import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
-import encry.view.mempool.EncryMempool
-import encry.EncryApp._
-import encry.network.NetworkController.ReceivableMessages.SendToNetwork
-import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallySuccessfulModifier}
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToNetwork}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallySuccessfulModifier}
 import encry.network.message.BasicMsgDataTypes.ModifiersData
 import encry.network.message.{Message, ModifiersSpec}
+import encry.stats.StatsSender.DownloadModifierStart
 import encry.view.EncryNodeViewHolder.DownloadRequest
+import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
+import encry.view.mempool.EncryMempool
 import scorex.core.{ModifierId, ModifierTypeId}
 
 class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends
@@ -74,6 +74,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
     modifierIds.foreach(id => deliveryTracker.expectFromRandom(modifierTypeId, id))
     val msg: Message[(ModifierTypeId, Seq[ModifierId])] = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
     //todo: Full nodes should be here, not a random peer
+    statsSender ! DownloadModifierStart(modifierTypeId, modifierIds)
     networkController ! SendToNetwork(msg, SendToRandom)
   }
 
