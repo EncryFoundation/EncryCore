@@ -87,7 +87,7 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
       networkController ! SendToNetwork(Message(syncInfoSpec, Right(syncInfo), None), SendToPeers(peers))
   }
 
-  //sync info is coming from another node
+  /** sync info is coming from another node */
   def processSync: Receive = {
     case DataFromPeer(spec, syncInfo: SI@unchecked, remote)
       if spec.messageCode == syncInfoSpec.messageCode =>
@@ -110,8 +110,7 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
       }
   }
 
-
-  // Send history extension to the (less developed) peer 'remote' which does not have it.
+  /** Send history extension to the (less developed) peer 'remote' which does not have it. */
   def sendExtension(remote: ConnectedPeer,
                     status: HistoryComparisonResult,
                     extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit = extOpt match {
@@ -123,7 +122,7 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
       }
   }
 
-  //view holder is telling other node status
+  /** View holder is telling other node status */
   def processSyncStatus: Receive = {
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       statusTracker.updateStatus(remote, status)
@@ -135,7 +134,7 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
       }
   }
 
-  //object ids coming from other node
+  /** object ids coming from other node */
   def processInv: Receive = {
     case DataFromPeer(spec, invData: InvData@unchecked, remote)
       if spec.messageCode == InvSpec.MessageCode =>
@@ -143,7 +142,7 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
   }
 
-  //other node asking for objects by their ids
+  /** other node asking for objects by their ids */
   def modifiersReq: Receive = {
     case DataFromPeer(spec, invData: InvData@unchecked, remote)
       if spec.messageCode == RequestModifierSpec.MessageCode =>
@@ -173,13 +172,9 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
       if (spam.nonEmpty) {
         log.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
           s": ${spam.keys.map(Base58.encode)}")
-        val mids: Seq[ModifierId] = spam.keys.toSeq
-        deliveryTracker.deleteSpam(mids)
+        deliveryTracker.deleteSpam(spam.keys.toSeq)
       }
-      if (fm.nonEmpty) {
-        val mods: Seq[Array[Byte]] = fm.values.toSeq
-        nodeViewHolder ! ModifiersFromRemote(remote, typeId, mods)
-      }
+      if (fm.nonEmpty) nodeViewHolder ! ModifiersFromRemote(remote, typeId, fm.values.toSeq)
   }
 
   //local node sending object ids to remote
@@ -315,7 +310,5 @@ object NodeViewSynchronizer {
     case class SyntacticallySuccessfulModifier[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends ModificationOutcome
 
     case class SemanticallySuccessfulModifier[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends ModificationOutcome
-
   }
-
 }
