@@ -58,7 +58,7 @@ libraryDependencies ++= Seq(
   "io.spray" %%  "spray-json" % "1.3.3",
   "io.monix" %% "monix" % "2.3.3",
   "com.github.oskin1" %% "encryscript" % "0.3.1",
-  "com.github.oskin1" %% "prism" % "0.1.2",
+  "com.github.oskin1" %% "prism" % "0.1.3",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
   "org.influxdb" % "influxdb-java" % "2.10",
   "org.apache.commons" % "commons-io" % "1.3.2"

@@ -3,7 +3,6 @@ package encry.modifiers.mempool
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.mempool.EncryBaseTransaction.TransactionValidationException
 import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
-import encry.modifiers.state.box.proof.{Proof, ProofSerializer}
 import encry.settings.{Algos, Constants}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
@@ -44,12 +43,12 @@ case class EncryTransaction(override val fee: Amount,
 
   override val esType: Types.Product = Types.EncryTransaction
 
-  override def asVal: PValue = PValue(esType)(convert)
+  override def asVal: PValue = PValue(convert, esType)
 
   override def convert: PObject = {
     val fields: Map[String, PValue] = Map(
-      "inputs" -> PValue(Types.PCollection(Types.PCollection.ofByte))(unlockers.map(_.boxId)),
-      "outputs" -> PValue(Types.PCollection(Types.EncryBox))(directives.flatMap(_.boxes(txHash)))
+      "inputs" -> PValue(unlockers.map(_.boxId), Types.PCollection(Types.PCollection.ofByte)),
+      "outputs" -> PValue(directives.flatMap(_.boxes(txHash)), Types.PCollection(Types.EncryBox))
     )
     PObject(fields, esType)
   }

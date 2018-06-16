@@ -38,8 +38,6 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Scor
     val digest = new Blake2bDigest(null, bytesPerWord * wordsPerHash, null, seed) // scalastyle:ignore
     val h = EncryBlockHeader(
       version,
-      candidateBlock.accountPubKey,
-      candidateBlock.signature,
       parentId,
       adProofsRoot,
       candidateBlock.stateRoot,

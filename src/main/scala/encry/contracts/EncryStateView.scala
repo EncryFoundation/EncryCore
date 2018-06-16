@@ -9,13 +9,13 @@ case class EncryStateView(height: Height, lastBlockTimestamp: Long, stateDigest:
 
   override val esType: Types.Product = Types.EncryState
 
-  override def asVal: PValue = PValue(esType)(convert)
+  override def asVal: PValue = PValue(convert, esType)
 
   override def convert: PObject = {
     val fields = Map(
-      "height" -> PValue(Types.PInt)(height),
-      "lastBlockTimestamp" -> PValue(Types.PInt)(lastBlockTimestamp),
-      "stateDigest" -> PValue(Types.PCollection.ofByte)(stateDigest)
+      "height" -> PValue(height, Types.PInt),
+      "lastBlockTimestamp" -> PValue(lastBlockTimestamp, Types.PInt),
+      "stateDigest" -> PValue(stateDigest, Types.PCollection.ofByte)
     )
     PObject(fields, esType)
   }

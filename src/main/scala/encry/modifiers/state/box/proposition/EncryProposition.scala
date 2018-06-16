@@ -1,15 +1,15 @@
 package encry.modifiers.state.box.proposition
 
 import encry.account.Account
+import encry.modifiers.mempool.Proof
 import encry.modifiers.state.box.Context
-import encry.modifiers.state.box.proof.Proof
 import encry.settings.Algos
 import encry.view.history.Height
 import io.circe.Encoder
 import io.circe.syntax._
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer}
-import org.encryfoundation.prismlang.core.wrapped.PObject
+import org.encryfoundation.prismlang.core.wrapped.PValue
 import org.encryfoundation.prismlang.core.{Ast, Types}
 import org.encryfoundation.prismlang.evaluator.Evaluator
 import org.encryfoundation.prismlang.lib.predefined.signature.CheckSig
@@ -26,14 +26,12 @@ case class EncryProposition(contract: CompiledContract) extends Proposition {
 
   override def serializer: Serializer[EncryProposition] = EncryPropositionSerializer
 
-  def canUnlock(ctx: Context, proofs: Seq[Proof], namedProofs: Seq[(String, Proof)]): Boolean = {
-    val env: List[(String, Types.Product, PObject)] = if (contract.args.isEmpty) List.empty else {
-      List(("*", ctx.transaction.esType, ctx.transaction.convert), ("*", ctx.state.esType, ctx.state.convert)) ++
-        proofs.map(proof => ("*", proof.esType, proof.convert)) ++
-        namedProofs.map { case (name, proof) => (name, proof.esType, proof.convert) }
-    }
-    val args: List[(String, PObject)] = contract.args.map { case (name, tpe) =>
-      env.find(_._1 == name).orElse(env.find(_._2 == tpe)).map(elt => elt._1 -> elt._3)
+  def canUnlock(ctx: Context, proofs: Seq[Proof]): Boolean = {
+    val env: List[(Option[String], PValue)] =
+      if (contract.args.isEmpty) List.empty
+      else List((None, ctx.transaction.asVal), (None, ctx.state.asVal)) ++ proofs.map(proof => (proof.tagOpt, proof.value))
+    val args: List[(String, PValue)] = contract.args.map { case (name, tpe) =>
+      env.find(_._1.contains(name)).orElse(env.find(_._2.tpe == tpe)).map(elt => name -> elt._2)
         .getOrElse(throw new Exception("Not enough arguments for contact"))
     }
     Evaluator.initializedWith(args).eval[Boolean](contract.script)
@@ -43,9 +41,11 @@ case class EncryProposition(contract: CompiledContract) extends Proposition {
 
   def isOpen: Boolean = ByteArrayWrapper(contractHash) == ByteArrayWrapper(EncryProposition.open.contractHash)
 
-  def isHeightLockedAt(height: Height): Boolean = ByteArrayWrapper(contractHash) == ByteArrayWrapper(EncryProposition.heightLocked(height).contractHash)
+  def isHeightLockedAt(height: Height): Boolean =
+    ByteArrayWrapper(contractHash) == ByteArrayWrapper(EncryProposition.heightLocked(height).contractHash)
 
-  def isLockedByAccount(account: Account): Boolean = ByteArrayWrapper(contractHash) == ByteArrayWrapper(EncryProposition.accountLock(account).contractHash)
+  def isLockedByAccount(account: Account): Boolean =
+    ByteArrayWrapper(contractHash) == ByteArrayWrapper(EncryProposition.accountLock(account).contractHash)
 }
 
 object EncryProposition {

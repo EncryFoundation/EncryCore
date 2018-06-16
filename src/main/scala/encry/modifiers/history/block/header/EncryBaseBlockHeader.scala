@@ -6,7 +6,7 @@ import scorex.core.block.Block._
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.hash.Digest32
 
-trait EncryBaseBlockHeader extends EncryPersistentModifier with Signable25519 {
+trait EncryBaseBlockHeader extends EncryPersistentModifier {
 
   val version: Version
 
