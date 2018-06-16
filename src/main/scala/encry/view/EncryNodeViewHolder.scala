@@ -30,7 +30,6 @@ import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.TransactionValidation
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base58
-import supertagged.@@
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -68,7 +67,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   override def receive: Receive = {
     case ModifiersFromRemote(_, modifierTypeId, remoteObjects) =>
-      modifierSerializers.get(modifierTypeId) foreach { companion =>
+      modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
@@ -158,16 +157,17 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                                  suffix: IndexedSeq[EncryPersistentModifier])
 
     requestDownloads(progressInfo)
-    val branchingPointOpt: Option[Array[Byte] @@ core.ModifierId.Tag with core.VersionTag.Tag] = progressInfo.branchPoint.map(VersionTag @@ _)
+    val branchingPointOpt: Option[core.VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
     val (stateToApplyTry: Try[MS], suffixTrimmed: IndexedSeq[EncryPersistentModifier]) = if (progressInfo.chainSwitchingNeeded) {
-      if (!state.version.sameElements(branchingPointOpt))
-        state.rollbackTo(branchingPointOpt.get) -> trimChainSuffix(suffixApplied, branchingPointOpt.get)
-      else Success(state) -> IndexedSeq()
+      branchingPointOpt.map { branchPoint =>
+        if (!state.version.sameElements(branchPoint))
+          state.rollbackTo(branchPoint) -> trimChainSuffix(suffixApplied, ModifierId !@@ branchPoint)
+        else Success(state) -> IndexedSeq()
+      }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty")))
     } else Success(state) -> suffixApplied
 
     stateToApplyTry match {
       case Success(stateToApply) =>
-        log.info(s"Rollback succeed: BranchPoint(${progressInfo.branchPoint.map(Base58.encode)})")
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
@@ -177,14 +177,15 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Failure(e) =>
-              val (newHis: HIS, newProgressInfo: ProgressInfo[EncryPersistentModifier]) = history.reportModifierIsInvalid(modToApply, progressInfo)
+              val (newHis: HIS, newProgressInfo: ProgressInfo[EncryPersistentModifier]) =
+                history.reportModifierIsInvalid(modToApply, progressInfo)
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           }
           else u
         }
         uf.failedMod match {
-          case Some(mod) => updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
+          case Some(_) => updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
           case None => (uf.history, Success(uf.state), uf.suffix)
         }
       case Failure(e) =>
@@ -209,7 +210,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             case Success(newMinState) =>
               val newMemPool: MP = updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)
               val newVault: VL = if (progressInfo.chainSwitchingNeeded)
-                nodeView.wallet.rollback(VersionTag @@ progressInfo.branchPoint.get).get
+                nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
               else nodeView.wallet
               blocksApplied.foreach(newVault.scanPersistent)
               log.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
@@ -288,13 +289,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         getRecreatedState()
       case (_, Some(bestBlock), _: DigestState) =>
         log.debug(s"State and history are inconsistent. Going to switch state to version ${bestBlock.encodedId}")
-        getRecreatedState(Some(VersionTag @@ bestBlock.id), Some(bestBlock.header.stateRoot))
+        getRecreatedState(Some(VersionTag !@@ bestBlock.id), Some(bestBlock.header.stateRoot))
       case (stateId, Some(historyBestBlock), state: StateType@unchecked) =>
-        val stateBestHeaderOpt = history.typedModifierById[EncryBlockHeader](ModifierId @@ stateId)
+        val stateBestHeaderOpt = history.typedModifierById[EncryBlockHeader](ModifierId !@@ stateId)
         val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
         log.debug(s"State and history are inconsistent. Going to rollback to ${rollbackId.map(Algos.encode)} and " +
           s"apply ${newChain.length} modifiers")
-        val startState = rollbackId.map(id => state.rollbackTo(VersionTag @@ id).get)
+        val startState = rollbackId.map(id => state.rollbackTo(VersionTag !@@ id).get)
           .getOrElse(getRecreatedState())
         val toApply = newChain.headers.map { h =>
           history.getBlock(h) match {
@@ -335,7 +336,7 @@ object EncryNodeViewHolder {
   }
 
   def props(): Props = settings.node.stateMode match {
-    case digestType@StateMode.Digest => Props(classOf[EncryNodeViewHolder[DigestState]])
-    case utxoType@StateMode.Utxo => Props(classOf[EncryNodeViewHolder[UtxoState]])
+    case StateMode.Digest => Props(classOf[EncryNodeViewHolder[DigestState]])
+    case StateMode.Utxo => Props(classOf[EncryNodeViewHolder[UtxoState]])
   }
 }

@@ -64,6 +64,8 @@ case class EncryBlockHeader(override val version: Version,
   }
 
   override def serializer: Serializer[M] = EncryBlockHeaderSerializer
+
+  override def toString: String = s"Header(height=$height, id=$encodedId, parentId=${Algos.encode(parentId)})"
 }
 
 object EncryBlockHeader {

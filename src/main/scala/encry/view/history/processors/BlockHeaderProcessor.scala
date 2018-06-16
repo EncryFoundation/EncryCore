@@ -257,12 +257,10 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
     def validate(header: EncryBlockHeader): ValidationResult = {
       if (header.isGenesis) validateGenesisBlockHeader(header)
       else {
-        val parentOpt = typedModifierById[EncryBlockHeader](header.parentId)
-        parentOpt map { parent =>
+        val parentOpt: Option[EncryBlockHeader] = typedModifierById[EncryBlockHeader](header.parentId)
+        parentOpt.map { parent =>
           validateChildBlockHeader(header, parent)
-        } getOrElse {
-          fatal(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
-        }
+        } getOrElse fatal(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
       }
     }
 
@@ -297,9 +295,10 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
         .validate(realDifficulty(header) >= header.requiredDifficulty) {
           fatal(s"Block difficulty ${realDifficulty(header)} is less than required ${header.requiredDifficulty}")
         }
-        .validateEquals(header.nBits)(requiredDifficultyAfter(parent)) { detail =>
-          fatal(s"Incorrect required difficulty. $detail")
-        }
+        // TODO: Enable this step when nBits decoding issue solved.
+//        .validateEquals(header.nBits)(requiredDifficultyAfter(parent)) { detail =>
+//          fatal(s"Incorrect required difficulty. $detail")
+//        }
         .validate(heightOf(header.parentId).exists(h => bestHeaderHeight - h < Constants.Chain.MaxRollbackDepth)) {
           fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
         }
