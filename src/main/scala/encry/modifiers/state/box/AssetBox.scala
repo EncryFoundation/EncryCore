@@ -1,14 +1,13 @@
 package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import encry.account.{Account, Address}
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import encry.modifiers.state.box.proposition.EncryProposition
+import encry.modifiers.state.box.proposition.{EncryProposition, EncryPropositionSerializer}
 import encry.settings.{Algos, Constants}
-import encrywm.lang.backend.env.{ESObject, ESValue}
-import encrywm.lib.Types
 import io.circe.Encoder
 import io.circe.syntax._
+import org.encryfoundation.prismlang.core.Types
+import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.ADKey
@@ -33,19 +32,16 @@ case class AssetBox(override val proposition: EncryProposition,
 
   lazy val isIntrinsic: Boolean = tokenIdOpt.isEmpty
 
-  override val tpe: Types.ESProduct = Types.AssetBox
+  override val tpe: Types.Product = Types.AssetBox
 
-  override def asVal: ESValue = ESValue(Types.AssetBox.ident.toLowerCase, Types.AssetBox)(convert)
+  override def asVal: PValue = PValue(convert, Types.AssetBox)
 
-  override def convert: ESObject = {
+  override def convert: PObject = {
     val fields = Map(
-      "proposition" -> ESValue("proposition", Types.ESProposition)(proposition.convert),
-      "typeId" -> ESValue("typeId", Types.ESInt)(typeId.toInt),
-      "id" -> ESValue("id", Types.ESByteVector)(id),
-      "amount" -> ESValue("amount", Types.ESLong)(amount),
-      "tokenIdOpt" -> ESValue("tokenIdOpt", Types.ESOption(Types.ESByteVector))(tokenIdOpt.flatMap(bytes => Some(bytes.untag(ADKey))))
+      "amount" -> PValue(amount, Types.PInt),
+      "tokenIdOpt" -> PValue(tokenIdOpt.flatMap(bytes => Some(bytes.untag(ADKey))), Types.POption(Types.PCollection.ofByte))
     )
-    ESObject(Types.AssetBox.ident, fields, tpe)
+    PObject(fields, tpe)
   }
 }
 
@@ -61,18 +57,12 @@ object AssetBox {
     "value" -> bx.amount.asJson,
     "tokenId" -> bx.tokenIdOpt.map(id => Algos.encode(id)).asJson
   ).asJson
-
-  def apply(address: Address, nonce: Long, amount: Amount, tokenIdOpt: Option[ADKey]): AssetBox =
-    AssetBox(AccountProposition(address), nonce, amount, tokenIdOpt)
-
-  def apply(account: Account, nonce: Long, amount: Amount, tokenIdOpt: Option[ADKey]): AssetBox =
-    AssetBox(AccountProposition(account), nonce, amount, tokenIdOpt)
 }
 
 object AssetBoxSerializer extends Serializer[AssetBox] {
 
   override def toBytes(obj: AssetBox): Array[Byte] = {
-    val propBytes = PropositionSerializer.toBytes(obj.proposition)
+    val propBytes = EncryPropositionSerializer.toBytes(obj.proposition)
     Bytes.concat(
       Shorts.toByteArray(propBytes.length.toShort),
       propBytes,
@@ -85,7 +75,7 @@ object AssetBoxSerializer extends Serializer[AssetBox] {
   override def parseBytes(bytes: Array[Byte]): Try[AssetBox] = Try {
     val propositionLen = Shorts.fromByteArray(bytes.take(2))
     val iBytes = bytes.drop(2)
-    val proposition = PropositionSerializer.parseBytes(iBytes.take(propositionLen)).get
+    val proposition = EncryPropositionSerializer.parseBytes(iBytes.take(propositionLen)).get
     val nonce = Longs.fromByteArray(iBytes.slice(propositionLen, propositionLen + 8))
     val amount = Longs.fromByteArray(iBytes.slice(propositionLen + 8, propositionLen + 8 + 8))
     val tokenIdOpt = if ((iBytes.length - (propositionLen + 8 + 8)) == Constants.ModifierIdSize) {

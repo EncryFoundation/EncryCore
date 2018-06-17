@@ -3,6 +3,7 @@ package encry.modifiers.mempool.directive
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.{Account, Address}
 import encry.modifiers.mempool.directive.Directive.DTypeId
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.{Algos, Constants}
 import encry.utils.Utils
@@ -25,7 +26,8 @@ case class TransferDirective(address: Address,
   override val typeId: DTypeId = TransferDirective.TypeId
 
   override def boxes(digest: Digest32, idx: Int): Seq[EncryBaseBox] =
-    Seq(AssetBox(address, Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)), amount, tokenIdOpt))
+    Seq(AssetBox(EncryProposition.accountLock(Account(address)),
+      Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)), amount, tokenIdOpt))
 
   override val cost: Amount = 4
 

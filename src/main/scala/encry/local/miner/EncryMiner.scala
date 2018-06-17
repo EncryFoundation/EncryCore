@@ -134,13 +134,11 @@ class EncryMiner extends Actor with ScorexLogging {
     view.pool.removeAsync(txsToDrop)
 
     val minerSecret: PrivateKey25519 = view.vault.keyManager.mainKey
-
     val feesTotal: Amount = txsToPut.map(_.fee).sum
-
     val supplyBox: AssetBox = EncrySupplyController.supplyBoxAt(view.state.height)
 
     val coinbase: EncryTransaction = TransactionFactory
-      .coinbaseTransactionScratch(minerSecret, timestamp, Seq(supplyBox), feesTotal)
+      .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, IndexedSeq(supplyBox), feesTotal)
 
     val txs: Seq[TX] = txsToPut.sortBy(_.timestamp) :+ coinbase
 

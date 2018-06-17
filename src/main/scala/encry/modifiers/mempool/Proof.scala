@@ -19,6 +19,8 @@ case class Proof(value: BoxedValue, tagOpt: Option[String]) extends BytesSeriali
 
 object Proof {
 
+  def apply(value: BoxedValue): Proof = Proof(value, None)
+
   implicit val jsonEncoder: Encoder[Proof] = (p: Proof) => Map(
     "serializedValue" -> Algos.encode(PCodec.boxedValCodec.encode(p.value).require.toByteArray).asJson,
     "tag" -> p.tagOpt.map(_.asJson)

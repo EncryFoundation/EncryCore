@@ -31,7 +31,7 @@ case class EncryTransaction(fee: Amount,
   override lazy val serializer: Serializer[M] = EncryTransactionSerializer
 
   override val messageToSign: Array[Byte] =
-    UnsignedEncryTransaction.getHash(fee, timestamp, inputs, directives)
+    UnsignedEncryTransaction.bytesToSign(fee, timestamp, inputs, directives)
 
   override lazy val semanticValidity: Try[Unit] = validateStateless.toTry
 
@@ -137,20 +137,22 @@ case class UnsignedEncryTransaction(fee: Amount,
                                     directives: IndexedSeq[Directive]) {
 
   val messageToSign: Array[Byte] =
-    UnsignedEncryTransaction.getHash(fee, timestamp, inputs, directives)
+    UnsignedEncryTransaction.bytesToSign(fee, timestamp, inputs, directives)
 
   def toSigned(proofs: IndexedSeq[Seq[Proof]], defaultProofOpt: Option[Proof]): EncryTransaction = {
-    val signedInputs: IndexedSeq[Input] = inputs.zip(proofs).map { case (input, proof) => input.copy(proofs = proof.toList) }
+    val signedInputs: IndexedSeq[Input] = inputs.zipWithIndex.map { case (input, idx) =>
+      if (proofs.lengthCompare(idx + 1) <= 0) input.copy(proofs = proofs(idx).toList) else input
+    }
     EncryTransaction(fee, timestamp, signedInputs, directives, defaultProofOpt)
   }
 }
 
 object UnsignedEncryTransaction {
 
-  def getHash(fee: Amount,
-              timestamp: Long,
-              unlockers: IndexedSeq[Input],
-              directives: IndexedSeq[Directive]): Digest32 =
+  def bytesToSign(fee: Amount,
+                  timestamp: Long,
+                  unlockers: IndexedSeq[Input],
+                  directives: IndexedSeq[Directive]): Digest32 =
     Algos.hash(Bytes.concat(
       unlockers.map(_.bytesWithoutProof).foldLeft(Array[Byte]())(_ ++ _),
       directives.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
