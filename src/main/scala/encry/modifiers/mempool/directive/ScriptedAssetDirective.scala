@@ -6,12 +6,12 @@ import encry.modifiers.state.box.proposition.EncryProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.{Algos, Constants}
 import encry.utils.Utils
-import encrywm.common.{EncryContract, ScriptMeta}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer}
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
+import scorex.crypto.authds
 import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
@@ -31,7 +31,7 @@ case class ScriptedAssetDirective(contract: CompiledContract,
 
   override val cost: Amount = 4
 
-  override lazy val isValid: Boolean = amount > 0
+  override lazy val isValid: Boolean = amount > 0 && contract.bytes.lengthCompare(Short.MaxValue) <= 0
 
   override def serializer: Serializer[M] = ScriptedAssetDirectiveSerializer
 
@@ -70,16 +70,14 @@ object ScriptedAssetDirectiveSerializer extends Serializer[ScriptedAssetDirectiv
       obj.tokenIdOpt.getOrElse(Array.empty)
     )
 
-  override def parseBytes(bytes: Array[Byte]): Try[ScriptedAssetDirective] = Try {
-    val scriptLen = Shorts.fromByteArray(bytes.take(2))
-    val complexity = Ints.fromByteArray(bytes.slice(scriptLen + 2, scriptLen + 2 + 4))
-    val fingerprint = bytes.slice(scriptLen + 2 + 4, scriptLen + 2 + 4 + 8)
-    val contract = EncryContract(bytes.slice(2, scriptLen), ScriptMeta(complexity, fingerprint))
-    val amount = Longs.fromByteArray(bytes.slice(scriptLen + 2 + 4 + 8, scriptLen + 2 + 4 + 8 + 8))
-    val idx = Ints.fromByteArray(bytes.slice(scriptLen + 2 + 4 + 8 + 8, scriptLen + 2 + 4 + 8 + 8 + 4))
-    val tokenIdOpt = if ((bytes.length - (scriptLen + 2 + 4 + 8 + 8 + 4)) == Constants.ModifierIdSize) {
-      Some(ADKey @@ bytes.takeRight(Constants.ModifierIdSize))
-    } else None
-    ScriptedAssetDirective(contract, amount, idx, tokenIdOpt)
+  override def parseBytes(bytes: Array[Byte]): Try[ScriptedAssetDirective] = {
+    val scriptLen: Short = Shorts.fromByteArray(bytes.take(2))
+    CompiledContractSerializer.parseBytes(bytes.slice(2, scriptLen)).map { contract =>
+      val amount: Amount = Longs.fromByteArray(bytes.slice(scriptLen + 2, scriptLen + 2 + 8))
+      val tokenIdOpt: Option[authds.ADKey] = if ((bytes.length - (scriptLen + 2 + 8)) == Constants.ModifierIdSize) {
+        Some(ADKey @@ bytes.takeRight(Constants.ModifierIdSize))
+      } else None
+      ScriptedAssetDirective(contract, amount, tokenIdOpt)
+    }
   }
 }
