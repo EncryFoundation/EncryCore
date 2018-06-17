@@ -22,7 +22,7 @@ object TransactionFactory {
 
     val pubKey: PublicKey25519 = privKey.publicImage
 
-    val unlockers: IndexedSeq[Unlocker] = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
+    val unlockers: IndexedSeq[Input] = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
 
     val change: Amount = useBoxes.map(_.amount).sum - (amount + fee)
 
@@ -47,7 +47,7 @@ object TransactionFactory {
 
     val directives: IndexedSeq[TransferDirective] = IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt))
 
-    val unlockers: IndexedSeq[Unlocker] = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
+    val unlockers: IndexedSeq[Input] = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
 
     val signature: Signature25519 = privKey.head.sign(EncryTransaction.getMessageToSign(fee, timestamp, unlockers, directives))
 
@@ -64,7 +64,7 @@ object TransactionFactory {
                                 amount: Amount,
                                 tokenIdOpt: Option[ADKey] = None): EncryTransaction = {
 
-    val unlockers: immutable.IndexedSeq[Unlocker] = useBoxesIds.map(id => Unlocker(id, None)).toIndexedSeq
+    val unlockers: immutable.IndexedSeq[Input] = useBoxesIds.map(id => Unlocker(id, None)).toIndexedSeq
 
     val directives: IndexedSeq[TransferDirective] = if (change > 0) {
       IndexedSeq(TransferDirective(recipient, amount, 0, tokenIdOpt), TransferDirective(accPubKey.address, change, 1, tokenIdOpt))
@@ -82,7 +82,7 @@ object TransactionFactory {
 
     val pubKey: PublicKey25519 = privKey.publicImage
 
-    val unlockers: IndexedSeq[Unlocker] = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
+    val unlockers: IndexedSeq[Input] = useBoxes.map(bx => Unlocker(bx.id, None)).toIndexedSeq
 
     val directives: IndexedSeq[Directive with Product] = IndexedSeq(TransferDirective(pubKey.address, useBoxes.map(_.amount).sum + fees, 0))
 

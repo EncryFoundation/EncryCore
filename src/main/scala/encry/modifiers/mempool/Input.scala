@@ -9,38 +9,38 @@ import scorex.crypto.authds.ADKey
 
 import scala.util.Try
 
-case class Unlocker(boxId: ADKey,
-                    proofs: List[Proof]) extends BytesSerializable {
+case class Input(boxId: ADKey,
+                 proofs: List[Proof]) extends BytesSerializable {
 
-  override type M = Unlocker
+  override type M = Input
 
   override def serializer: Serializer[M] = UnlockerSerializer
 
   lazy val bytesWithoutProof: Array[Byte] = UnlockerSerializer.toBytesWithoutProof(this)
 }
 
-object Unlocker {
+object Input {
 
-  implicit val jsonEncoder: Encoder[Unlocker] = (u: Unlocker) => Map(
+  implicit val jsonEncoder: Encoder[Input] = (u: Input) => Map(
     "boxId" -> Algos.encode(u.boxId).asJson,
     "proofs" -> u.proofs.map(_.asJson)
   ).asJson
 
-  implicit val jsonDecoder: Decoder[Unlocker] = (c: HCursor) => {
+  implicit val jsonDecoder: Decoder[Input] = (c: HCursor) => {
     for {
       boxId <- c.downField("boxId").as[String]
       proofs <- c.downField("proof").as[List[Proof]]
     } yield {
-      Unlocker(ADKey @@ Algos.decode(boxId).get, proofs)
+      Input(ADKey @@ Algos.decode(boxId).get, proofs)
     }
   }
 }
 
-object UnlockerSerializer extends Serializer[Unlocker] {
+object UnlockerSerializer extends Serializer[Input] {
 
-  def toBytesWithoutProof(obj: Unlocker): Array[Byte] = obj.boxId
+  def toBytesWithoutProof(obj: Input): Array[Byte] = obj.boxId
 
-  override def toBytes(obj: Unlocker): Array[Byte] = if (obj.proofs.isEmpty) obj.boxId else {
+  override def toBytes(obj: Input): Array[Byte] = if (obj.proofs.isEmpty) obj.boxId else {
     val proofsBytes: Array[Byte] = obj.proofs.foldLeft(Array.empty[Byte]) { case (acc, proof) =>
       val proofBytes: Array[Byte] = ProofSerializer.toBytes(proof)
       acc ++ Shorts.toByteArray(proofBytes.length.toShort) ++ proofBytes
@@ -48,8 +48,8 @@ object UnlockerSerializer extends Serializer[Unlocker] {
     obj.boxId ++ Array(obj.proofs.size.toByte) ++ proofsBytes
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[Unlocker] = Try {
-    if (bytes.lengthCompare(Constants.ModifierIdSize) == 0) Unlocker(ADKey @@ bytes, List.empty)
+  override def parseBytes(bytes: Array[Byte]): Try[Input] = Try {
+    if (bytes.lengthCompare(Constants.ModifierIdSize) == 0) Input(ADKey @@ bytes, List.empty)
     else {
       val boxId: ADKey = ADKey @@ bytes.take(Constants.ModifierIdSize)
       val proofsQty: Int = bytes.drop(Constants.ModifierIdSize).head
@@ -58,7 +58,7 @@ object UnlockerSerializer extends Serializer[Unlocker] {
         val proof: Proof = ProofSerializer.parseBytes(bytesAcc.slice(2, proofLen + 2)).getOrElse(throw SerializationException)
         (acc :+ proof) -> bytesAcc.drop(proofLen + 2)
       }
-      Unlocker(boxId, proofs)
+      Input(boxId, proofs)
     }
   }
 }

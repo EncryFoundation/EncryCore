@@ -17,7 +17,7 @@ import scala.util.Try
 /** Transaction is an atomic state modifier. */
 case class EncryTransaction(override val fee: Amount,
                             override val timestamp: Long,
-                            override val unlockers: IndexedSeq[Unlocker],
+                            override val inputs: IndexedSeq[Input],
                             override val directives: IndexedSeq[Directive],
                             override val defaultProofOpt: Option[Proof])
   extends EncryBaseTransaction with ModifierValidator {
@@ -31,7 +31,7 @@ case class EncryTransaction(override val fee: Amount,
   override lazy val serializer: Serializer[M] = EncryTransactionSerializer
 
   override lazy val txHash: Digest32 =
-    EncryTransaction.getHash(fee, timestamp, unlockers, directives)
+    EncryTransaction.getHash(fee, timestamp, inputs, directives)
 
   override lazy val semanticValidity: Try[Unit] = validateStateless.toTry
 
@@ -39,12 +39,14 @@ case class EncryTransaction(override val fee: Amount,
     accumulateErrors
       .demand(validSize, "Invalid size")
       .demand(directives.forall(_.isValid), "Invalid outputs")
+      .demand(inputs.size <= Short.MaxValue, s"Too many inputs in transaction $toString")
+      .demand(directives.size <= Short.MaxValue, s"Too many directives in transaction $toString")
       .result
 
   override val tpe: Types.Product = Types.EncryTransaction
 
   override def asVal: PValue = PValue(PObject(Map(
-    "inputs" -> PValue(unlockers.map(_.boxId).toList, Types.PCollection(Types.PCollection.ofByte)),
+    "inputs" -> PValue(inputs.map(_.boxId).toList, Types.PCollection(Types.PCollection.ofByte)),
     "outputs" -> PValue(newBoxes.map(_.convert).toList, Types.PCollection(Types.EncryBox))
   ), tpe), tpe)
 }
@@ -55,7 +57,7 @@ object EncryTransaction {
     "id" -> Algos.encode(tx.id).asJson,
     "fee" -> tx.fee.asJson,
     "timestamp" -> tx.timestamp.asJson,
-    "unlockers" -> tx.unlockers.map(_.asJson).asJson,
+    "unlockers" -> tx.inputs.map(_.asJson).asJson,
     "directives" -> tx.directives.map(_.asJson).asJson,
     "defaultProofOpt" -> tx.defaultProofOpt.map(_.asJson).asJson
   ).asJson
@@ -64,7 +66,7 @@ object EncryTransaction {
     for {
       fee <- c.downField("fee").as[Long]
       timestamp <- c.downField("timestamp").as[Long]
-      unlockers <- c.downField("unlockers").as[IndexedSeq[Unlocker]]
+      unlockers <- c.downField("unlockers").as[IndexedSeq[Input]]
       directives <- c.downField("directives").as[IndexedSeq[Directive]]
       defaultProofOpt <- c.downField("defaultProofOpt").as[Option[Proof]]
     } yield {
@@ -80,7 +82,7 @@ object EncryTransaction {
 
   def getHash(fee: Amount,
               timestamp: Long,
-              unlockers: IndexedSeq[Unlocker],
+              unlockers: IndexedSeq[Input],
               directives: IndexedSeq[Directive]): Digest32 =
     Algos.hash(Bytes.concat(
       unlockers.map(_.bytesWithoutProof).foldLeft(Array[Byte]())(_ ++ _),
@@ -92,7 +94,7 @@ object EncryTransaction {
 
   def getMessageToSign(fee: Amount,
                        timestamp: Long,
-                       unlockers: IndexedSeq[Unlocker],
+                       unlockers: IndexedSeq[Input],
                        directives: IndexedSeq[Directive]): Array[Byte] =
     getHash(fee, timestamp, unlockers, directives)
 }
@@ -103,9 +105,9 @@ object EncryTransactionSerializer extends Serializer[EncryTransaction] {
     Bytes.concat(
       Longs.toByteArray(obj.fee),
       Longs.toByteArray(obj.timestamp),
-      Shorts.toByteArray(obj.unlockers.size.toShort),
+      Shorts.toByteArray(obj.inputs.size.toShort),
       Shorts.toByteArray(obj.directives.size.toShort),
-      obj.unlockers.map(u => Shorts.toByteArray(u.bytes.length.toShort) ++ u.bytes).foldLeft(Array[Byte]())(_ ++ _),
+      obj.inputs.map(u => Shorts.toByteArray(u.bytes.length.toShort) ++ u.bytes).foldLeft(Array[Byte]())(_ ++ _),
       obj.directives.map { d =>
         val bytes: Array[Byte] = DirectiveSerializer.toBytes(d)
         Shorts.toByteArray(bytes.length.toShort) ++ bytes
@@ -121,8 +123,8 @@ object EncryTransactionSerializer extends Serializer[EncryTransaction] {
     val unlockersQty: Int = Shorts.fromByteArray(bytes.slice(16, 18))
     val directivesQty: Int = Shorts.fromByteArray(bytes.slice(18, 20))
     val leftBytes1: Array[Byte] = bytes.drop(20)
-    val (unlockers: IndexedSeq[Unlocker], unlockersLen: Int) = (0 until unlockersQty)
-      .foldLeft(IndexedSeq[Unlocker](), 0) { case ((acc, shift), _) =>
+    val (unlockers: IndexedSeq[Input], unlockersLen: Int) = (0 until unlockersQty)
+      .foldLeft(IndexedSeq[Input](), 0) { case ((acc, shift), _) =>
         val len: Int = Shorts.fromByteArray(leftBytes1.slice(shift, shift + 2))
         UnlockerSerializer.parseBytes(leftBytes1.slice(shift + 2, shift + 2 + len))
           .map(u => (acc :+ u, shift + 2 + len))

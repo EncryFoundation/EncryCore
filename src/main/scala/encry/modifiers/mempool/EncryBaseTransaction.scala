@@ -28,7 +28,7 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
 
   val timestamp: Long
 
-  val unlockers: IndexedSeq[Unlocker]
+  val inputs: IndexedSeq[Input]
 
   val directives: IndexedSeq[Directive]
 
@@ -40,7 +40,7 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
   lazy val minimalFee: Amount = Constants.FeeMinAmount +
     directives.map(_.cost).sum + (Constants.PersistentByteCost * length)
 
-  override def toString: String = s"<EncryTransaction id=${Algos.encode(id)} fee=$fee inputs=${unlockers.map(u => Algos.encode(u.boxId))}>"
+  override def toString: String = s"<EncryTransaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}>"
 }
 
 object EncryBaseTransaction {

@@ -167,7 +167,7 @@ class UtxoState(override val version: VersionTag,
 
       val context: Context = Context(tx, EncryStateView(height, lastBlockTimestamp, rootHash))
 
-      val bxs: IndexedSeq[EncryBaseBox] = tx.unlockers.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
+      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
         .map(_.toOption -> u)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, unlocker)) =>
         (bxOpt, tx.defaultProofOpt) match {

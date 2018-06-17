@@ -54,7 +54,7 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
                     case _ => nBxs2
                   }
                 }
-              val spendBxsIdsL: Seq[ADKey] = tx.unlockers.map(_.boxId)
+              val spendBxsIdsL: Seq[ADKey] = tx.inputs.map(_.boxId)
                 .foldLeft(Seq[ADKey]()) { case (sBxs2, id) =>
                   val bxsIdsCurrent: Seq[ADKey] = walletStorage.boxIds
                   if (bxsIdsCurrent.exists(_.sameElements(id))) sBxs2 :+ id
@@ -62,7 +62,7 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
                 }
               val isRelatedTransaction: Boolean = {
                 val walletPropositionsSet: Set[ByteArrayWrapper] = propositions.map(p => ByteArrayWrapper(Algos.hash(p.bytes)))
-                val txPropositionsSet: Set[ByteArrayWrapper] = tx.unlockers.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc, u) =>
+                val txPropositionsSet: Set[ByteArrayWrapper] = tx.inputs.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc, u) =>
                   u.proofOpt match {
                     case Some(proof) => acc :+ ByteArrayWrapper(Algos.hash(proof.bytes))
                     case _ => acc

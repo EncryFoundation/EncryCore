@@ -3,7 +3,7 @@ package encry.modifiers.state.box
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.account.{Account, Address}
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import encry.modifiers.state.box.proposition.{AccountProposition, EncryProposition}
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.{Algos, Constants}
 import encrywm.lang.backend.env.{ESObject, ESValue}
 import encrywm.lib.Types

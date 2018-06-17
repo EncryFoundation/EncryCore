@@ -2,13 +2,14 @@ package encry.modifiers.mempool.directive
 
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import encry.modifiers.mempool.directive.Directive.DTypeId
-import encry.modifiers.state.box.proposition.ContractProposition
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.{Algos, Constants}
 import encry.utils.Utils
 import encrywm.common.{EncryContract, ScriptMeta}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
+import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer}
 import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.ADKey
@@ -17,21 +18,20 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-case class ScriptedAssetDirective(script: EncryContract,
+case class ScriptedAssetDirective(contract: CompiledContract,
                                   amount: Amount,
-                                  override val idx: Int,
                                   tokenIdOpt: Option[ADKey] = None) extends Directive {
 
   override type M = ScriptedAssetDirective
 
   override val typeId: DTypeId = ScriptedAssetDirective.TypeId
 
-  override def boxes(digest: Digest32): Seq[EncryBaseBox] =
-    Seq(AssetBox(ContractProposition(script), Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)), amount))
+  override def boxes(digest: Digest32, idx: Int): Seq[EncryBaseBox] =
+    Seq(AssetBox(EncryProposition(contract), Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)), amount))
 
-  override val cost: Amount = 4 * script.meta.complexityScore
+  override val cost: Amount = 4
 
-  override lazy val isValid: Boolean = amount > 0 && script.validMeta
+  override lazy val isValid: Boolean = amount > 0
 
   override def serializer: Serializer[M] = ScriptedAssetDirectiveSerializer
 
@@ -44,33 +44,19 @@ object ScriptedAssetDirective {
 
   implicit val jsonEncoder: Encoder[ScriptedAssetDirective] = (d: ScriptedAssetDirective) => Map(
     "typeId" -> d.typeId.asJson,
-    "script" -> Base58.encode(d.script.serializedScript).asJson,
-    "complexityScore" -> d.script.meta.complexityScore.asJson,
-    "scriptFingerprint" -> Base58.encode(d.script.meta.scriptFingerprint).asJson,
+    "contract" -> Base58.encode(d.contract.bytes).asJson,
     "amount" -> d.amount.asJson,
-    "tokenId" -> d.tokenIdOpt.map(id => Algos.encode(id)).getOrElse("null").asJson,
-    "idx" -> d.idx.asJson
+    "tokenId" -> d.tokenIdOpt.map(id => Algos.encode(id)).getOrElse("null").asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[ScriptedAssetDirective] = (c: HCursor) => for {
-    scriptStr <- c.downField("script").as[String]
-    complexityScore <- c.downField("complexityScore").as[Int]
-    scriptFingerprint <- c.downField("scriptFingerprint").as[String]
+    contractBytes <- c.downField("contract").as[String]
     amount <- c.downField("amount").as[Long]
     tokenIdOpt <- c.downField("tokenId").as[Option[String]]
-    idx <- c.downField("idx").as[Int]
   } yield {
-    ScriptedAssetDirective(
-      Base58.decode(scriptStr).map(scriptDes =>
-        EncryContract(
-          scriptDes,
-          ScriptMeta(complexityScore, Base58.decode(scriptFingerprint).getOrElse(Array.emptyByteArray))
-        )
-      ).getOrElse(throw new Exception("Incorrect script deserialize from json")),
-      amount,
-      idx,
-      tokenIdOpt.flatMap(id => Algos.decode(id).map(ADKey @@ _).toOption)
-    )
+    val contract: CompiledContract = Algos.decode(contractBytes).flatMap(CompiledContractSerializer.parseBytes)
+      .getOrElse(throw new Exception("Decoding failed"))
+    ScriptedAssetDirective(contract, amount, tokenIdOpt.map(Algos.decode).flatten)
   }
 }
 
@@ -78,12 +64,9 @@ object ScriptedAssetDirectiveSerializer extends Serializer[ScriptedAssetDirectiv
 
   override def toBytes(obj: ScriptedAssetDirective): Array[Byte] =
     Bytes.concat(
-      Shorts.toByteArray(obj.script.serializedScript.length.toShort),
-      obj.script.serializedScript,
-      Ints.toByteArray(obj.script.meta.complexityScore),
-      obj.script.meta.scriptFingerprint,
+      Shorts.toByteArray(obj.contract.bytes.length.toShort),
+      obj.contract.bytes,
       Longs.toByteArray(obj.amount),
-      Ints.toByteArray(obj.idx),
       obj.tokenIdOpt.getOrElse(Array.empty)
     )
 

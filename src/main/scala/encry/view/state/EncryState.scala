@@ -32,7 +32,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   def extractStateChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
     EncryBoxStateChanges(
       txs.flatMap { tx =>
-        tx.unlockers.map(u => Removal(u.boxId)) ++ tx.newBoxes.map(bx => Insertion(bx))
+        tx.inputs.map(u => Removal(u.boxId)) ++ tx.newBoxes.map(bx => Insertion(bx))
       }
     )
   }

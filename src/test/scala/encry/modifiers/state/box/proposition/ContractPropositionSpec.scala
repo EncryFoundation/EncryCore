@@ -98,7 +98,7 @@ class ContractPropositionSpec extends PropSpec with Matchers with SmartContracts
     val proposition: ContractProposition = ContractProposition(multiSigContract(pubKeys.head, pubKeys(1), pubKeys.last))
 
     val multiSigProof: MultiSig = MultiSig(
-      privKeys.map(_.sign(EncryTransaction.getMessageToSign(tx.fee, tx.timestamp, tx.unlockers, tx.directives)))
+      privKeys.map(_.sign(EncryTransaction.getMessageToSign(tx.fee, tx.timestamp, tx.inputs, tx.directives)))
     )
 
     val unlockR: Try[Unit] = proposition.unlockTry(multiSigProof, defaultCtx)
