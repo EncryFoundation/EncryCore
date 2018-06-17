@@ -1,8 +1,9 @@
 package encry.modifiers
 
+import encry.account.Account
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
-import encry.modifiers.state.box.proposition.{AccountProposition, OpenProposition}
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.modifiers.state.box.{AssetBox, AssetCreationBox}
 import encry.utils.TestHelper
 import encry.view.history.Height
@@ -36,7 +37,7 @@ trait InstanceFactory extends Keys {
     val fee = genHelper.Props.txFee
     val useBoxes = (0 to 5).map(_ => {
       AssetBox(
-        AccountProposition(secret.publicImage.address),
+        EncryProposition.accountLock(Account(secret.publicImage.address)),
         Scarand.nextLong(),
         999L
       )
@@ -55,19 +56,19 @@ trait InstanceFactory extends Keys {
 
   lazy val coinbaseTransaction: EncryTransaction = {
     val useBoxes = IndexedSeq(genHelper.genAssetBox(secret.publicImage.address))
-    TransactionFactory.coinbaseTransactionScratch(secret, timestamp, useBoxes, Height @@ 0)
+    TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, useBoxes, 0)
   }
 
   lazy val AssetBoxI: AssetBox =
     AssetBox(
-      AccountProposition(secret.publicImage.address),
+      EncryProposition.accountLock(Account(secret.publicImage.address)),
       999L,
       100000L
     )
 
   lazy val AssetCreationBoxI: AssetCreationBox =
     AssetCreationBox(
-      AccountProposition(secret.publicImage.address),
+      EncryProposition.accountLock(Account(secret.publicImage.address)),
       999L,
       10000L,
       "SYM"
@@ -75,7 +76,7 @@ trait InstanceFactory extends Keys {
 
   lazy val OpenAssetBoxI: AssetBox =
     AssetBox(
-      OpenProposition,
+      EncryProposition.open,
       999L,
       100000L
     )

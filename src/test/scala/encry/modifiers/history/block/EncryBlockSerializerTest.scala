@@ -1,19 +1,17 @@
 package encry.modifiers.history.block
 
-import encry.crypto.PublicKey25519
+import encry.crypto.{PublicKey25519, Signature25519}
 import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.TransactionFactory
-import encry.modifiers.state.box.proof.Signature25519
 import encry.settings.Constants
 import encry.utils.TestHelper
 import org.scalatest.FunSuite
 import scorex.core.ModifierId
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scorex.crypto.hash.Digest32
-import scorex.crypto.signatures.{PublicKey, Signature}
 import scorex.utils.Random
 
 class EncryBlockSerializerTest extends FunSuite {
@@ -22,8 +20,6 @@ class EncryBlockSerializerTest extends FunSuite {
 
     val blockHeader = EncryBlockHeader(
       99: Byte,
-      PublicKey25519(PublicKey @@ Random.randomBytes()),
-      Signature25519(Signature @@ Random.randomBytes(64)),
       ModifierId @@ Random.randomBytes(),
       Digest32 @@ Random.randomBytes(),
       ADDigest @@ Random.randomBytes(33),

@@ -26,7 +26,7 @@ import scala.util.Try
 case class EncryWallet(walletStore: Store, keyManager: KeyManager)
   extends Vault[EncryProposition, EncryBaseTransaction, EncryPersistentModifier, EncryWallet] with ScorexLogging {
 
-  val propositions: Set[AccountProposition] = publicKeys.map(pk => AccountProposition(Account(pk.pubKeyBytes)))
+  val propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.accountLock(Account(pk.pubKeyBytes)))
 
   val walletStorage: WalletStorage = WalletStorage(walletStore, publicKeys)
 
@@ -48,11 +48,8 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
           .foldLeft(Seq[EncryBaseTransaction](), Seq[EncryBaseBox](), Seq[ADKey]()) {
             case ((nTxs, nBxs, sBxs), tx: EncryBaseTransaction) =>
               val newBxsL: Seq[EncryBaseBox] = tx.newBoxes
-                .foldLeft(Seq[EncryBaseBox]()) {
-                  case (nBxs2, bx) => bx.proposition match {
-                    case ap: AccountProposition if publicKeys.exists(_.address == ap.account.address) => nBxs2 :+ bx
-                    case _ => nBxs2
-                  }
+                .foldLeft(Seq[EncryBaseBox]()) { case (nBxs2, bx) =>
+                  if (propositions.exists(_.contractHash sameElements bx.proposition.contractHash)) nBxs2 :+ bx else nBxs2
                 }
               val spendBxsIdsL: Seq[ADKey] = tx.inputs.map(_.boxId)
                 .foldLeft(Seq[ADKey]()) { case (sBxs2, id) =>
@@ -62,11 +59,9 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
                 }
               val isRelatedTransaction: Boolean = {
                 val walletPropositionsSet: Set[ByteArrayWrapper] = propositions.map(p => ByteArrayWrapper(Algos.hash(p.bytes)))
-                val txPropositionsSet: Set[ByteArrayWrapper] = tx.inputs.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc, u) =>
-                  u.proofOpt match {
-                    case Some(proof) => acc :+ ByteArrayWrapper(Algos.hash(proof.bytes))
-                    case _ => acc
-                  }
+                val txPropositionsSet: Set[ByteArrayWrapper] = tx.inputs.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc, input) =>
+                  acc ++ input.proofs.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc2, proof) =>
+                    acc2 :+ ByteArrayWrapper(Algos.hash(proof.bytes)) }
                 }.toSet
                 walletPropositionsSet.intersect(txPropositionsSet).nonEmpty ||
                   tx.defaultProofOpt.exists(pr => walletPropositionsSet.exists(_.data sameElements Algos.hash(pr.bytes)))

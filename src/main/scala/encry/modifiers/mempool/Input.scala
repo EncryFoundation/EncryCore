@@ -26,7 +26,7 @@ object Input {
 
   implicit val jsonEncoder: Encoder[Input] = (u: Input) => Map(
     "boxId" -> Algos.encode(u.boxId).asJson,
-    "proofs" -> u.proofs.map(_.asJson)
+    "proofs" -> u.proofs.map(_.asJson).asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[Input] = (c: HCursor) => {

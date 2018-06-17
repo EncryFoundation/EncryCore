@@ -46,7 +46,7 @@ object ScriptedAssetDirective {
     "typeId" -> d.typeId.asJson,
     "contract" -> Base58.encode(d.contract.bytes).asJson,
     "amount" -> d.amount.asJson,
-    "tokenId" -> d.tokenIdOpt.map(id => Algos.encode(id)).getOrElse("null").asJson
+    "tokenId" -> d.tokenIdOpt.map(id => Algos.encode(id)).asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[ScriptedAssetDirective] = (c: HCursor) => for {
@@ -56,7 +56,7 @@ object ScriptedAssetDirective {
   } yield {
     val contract: CompiledContract = Algos.decode(contractBytes).flatMap(CompiledContractSerializer.parseBytes)
       .getOrElse(throw new Exception("Decoding failed"))
-    ScriptedAssetDirective(contract, amount, tokenIdOpt.map(Algos.decode).flatten)
+    ScriptedAssetDirective(contract, amount, tokenIdOpt.flatMap(id => Algos.decode(id).map(ADKey @@ _).toOption))
   }
 }
 

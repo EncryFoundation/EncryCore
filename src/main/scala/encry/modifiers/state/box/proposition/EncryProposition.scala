@@ -1,6 +1,6 @@
 package encry.modifiers.state.box.proposition
 
-import encry.account.Account
+import encry.account.{Account, Address}
 import encry.modifiers.mempool.Proof
 import encry.modifiers.state.box.Context
 import encry.settings.Algos
@@ -104,6 +104,8 @@ object EncryProposition {
       )
     )
   )
+
+  def accountLock(address: Address): EncryProposition = accountLock(Account(address))
 }
 
 object EncryPropositionSerializer extends Serializer[EncryProposition] {

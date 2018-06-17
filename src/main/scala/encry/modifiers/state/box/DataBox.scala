@@ -2,12 +2,12 @@ package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import encry.modifiers.state.box.proposition.EncryProposition
+import encry.modifiers.state.box.proposition.{EncryProposition, EncryPropositionSerializer}
 import encry.settings.Algos
-import encrywm.lang.backend.env.{ESObject, ESValue}
-import encrywm.lib.Types
 import io.circe.Encoder
 import io.circe.syntax._
+import org.encryfoundation.prismlang.core.Types
+import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import scorex.core.serialization.Serializer
 
 import scala.util.Try
@@ -24,18 +24,18 @@ case class DataBox(override val proposition: EncryProposition,
 
   override def serializer: Serializer[M] = DataBoxSerializer
 
-  override val tpe: Types.ESProduct = Types.DataBox
+  override val tpe: Types.Product = Types.DataBox
 
-  override def asVal: ESValue = ESValue(Types.DataBox.ident.toLowerCase, Types.DataBox)(convert)
+  override def asVal: PValue = PValue(convert, Types.DataBox)
 
-  override def convert: ESObject = {
+  override def convert: PObject = {
     val fields = Map(
-      "proposition" -> ESValue("proposition", Types.ESProposition)(proposition.convert),
-      "typeId" -> ESValue("typeId", Types.ESInt)(typeId.toInt),
-      "id" -> ESValue("id", Types.ESByteVector)(id),
-      "data" -> ESValue("data", Types.ESByteVector)(data)
+      "contractHash" -> PValue(proposition.contractHash, Types.PCollection.ofByte),
+      "typeId" -> PValue(typeId, Types.PInt),
+      "id" -> PValue(id, Types.PInt),
+      "data" -> PValue(data, Types.PCollection.ofByte)
     )
-    ESObject(Types.DataBox.ident, fields, tpe)
+    PObject(fields, tpe)
   }
 }
 
@@ -55,7 +55,7 @@ object DataBox {
 object DataBoxSerializer extends Serializer[DataBox] {
 
   override def toBytes(obj: DataBox): Array[Byte] = {
-    val propBytes = PropositionSerializer.toBytes(obj.proposition)
+    val propBytes = EncryPropositionSerializer.toBytes(obj.proposition)
     Bytes.concat(
       Shorts.toByteArray(propBytes.length.toShort),
       propBytes,
@@ -68,7 +68,7 @@ object DataBoxSerializer extends Serializer[DataBox] {
   override def parseBytes(bytes: Array[Byte]): Try[DataBox] = Try {
     val propositionLen = Shorts.fromByteArray(bytes.take(2))
     val iBytes = bytes.drop(2)
-    val proposition = PropositionSerializer.parseBytes(iBytes.take(propositionLen)).get
+    val proposition = EncryPropositionSerializer.parseBytes(iBytes.take(propositionLen)).get
     val nonce = Longs.fromByteArray(iBytes.slice(propositionLen, propositionLen + 8))
     val dataLen = Shorts.fromByteArray(iBytes.slice(propositionLen + 8, propositionLen + 8 + 2))
     val data = iBytes.takeRight(dataLen)

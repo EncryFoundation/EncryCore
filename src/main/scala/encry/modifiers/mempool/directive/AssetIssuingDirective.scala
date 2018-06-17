@@ -7,7 +7,6 @@ import encry.modifiers.state.box.proposition.EncryProposition
 import encry.modifiers.state.box.{AssetCreationBox, AssetIssuingBox, EncryBaseBox}
 import encry.settings.{Algos, Constants}
 import encry.utils.Utils
-import encrywm.common.{EncryContract, ScriptMeta}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer}
@@ -51,30 +50,20 @@ object AssetIssuingDirective {
 
   implicit val jsonEncoder: Encoder[AssetIssuingDirective] = (d: AssetIssuingDirective) => Map(
     "typeId" -> d.typeId.asJson,
-    "script" -> Base58.encode(d.contract.serializedScript).asJson,
-    "complexityScore" -> d.contract.meta.complexityScore.asJson,
-    "scriptFingerprint" -> Base58.encode(d.contract.meta.scriptFingerprint).asJson,
-    "amount" -> d.amount.asJson
+    "contract" -> Base58.encode(d.contract.bytes).asJson,
+    "amount" -> d.amount.asJson,
+    "symbol" -> d.symbol.asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[AssetIssuingDirective] = (c: HCursor) => {
     for {
-      scriptStr <- c.downField("script").as[String]
-      complexityScore <- c.downField("complexityScore").as[Int]
-      scriptFingerprint <- c.downField("scriptFingerprint").as[String]
+      contractBytes <- c.downField("contract").as[String]
       amount <- c.downField("amount").as[Long]
       symbol <- c.downField("symbol").as[String]
     } yield {
-      AssetIssuingDirective(
-        Base58.decode(scriptStr).map(scriptDes =>
-          EncryContract(
-            scriptDes,
-            ScriptMeta(complexityScore, Base58.decode(scriptFingerprint).getOrElse(Array.emptyByteArray))
-          )
-        ).getOrElse(throw new Exception("Incorrect script deserialize from json")),
-        amount,
-        symbol
-      )
+      val contract: CompiledContract = Algos.decode(contractBytes).flatMap(CompiledContractSerializer.parseBytes)
+        .getOrElse(throw new Exception("Decoding failed"))
+      AssetIssuingDirective(contract, amount, symbol)
     }
   }
 }

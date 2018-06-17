@@ -38,6 +38,9 @@ case class AssetBox(override val proposition: EncryProposition,
 
   override def convert: PObject = {
     val fields = Map(
+      "contractHash" -> PValue(proposition.contractHash, Types.PCollection.ofByte),
+      "typeId" -> PValue(typeId, Types.PInt),
+      "id" -> PValue(id, Types.PInt),
       "amount" -> PValue(amount, Types.PInt),
       "tokenIdOpt" -> PValue(tokenIdOpt.flatMap(bytes => Some(bytes.untag(ADKey))), Types.POption(Types.PCollection.ofByte))
     )
