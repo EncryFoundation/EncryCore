@@ -16,13 +16,11 @@ import scala.util.Try
 trait EncryBaseTransaction extends Transaction[EncryProposition]
   with ModifierWithSizeLimit with PConvertible {
 
-  val txHash: Digest32
-
-  lazy val messageToSign: Array[Byte] = txHash
+  val messageToSign: Array[Byte]
 
   val semanticValidity: Try[Unit]
 
-  override lazy val id: ModifierId = ModifierId !@@ txHash
+  override lazy val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
 
   val fee: Long
 
@@ -35,7 +33,7 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
   val defaultProofOpt: Option[Proof]
 
   lazy val newBoxes: Traversable[EncryBaseBox] =
-    directives.zipWithIndex.flatMap { case (d, idx) => d.boxes(txHash, idx) }
+    directives.zipWithIndex.flatMap { case (d, idx) => d.boxes(Digest32 !@@ id, idx) }
 
   lazy val minimalFee: Amount = Constants.FeeMinAmount +
     directives.map(_.cost).sum + (Constants.PersistentByteCost * length)

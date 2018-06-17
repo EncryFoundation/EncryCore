@@ -14,12 +14,12 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-/** Transaction is an atomic state modifier. */
-case class EncryTransaction(override val fee: Amount,
-                            override val timestamp: Long,
-                            override val inputs: IndexedSeq[Input],
-                            override val directives: IndexedSeq[Directive],
-                            override val defaultProofOpt: Option[Proof])
+/** Completely assembled atomic state modifier. */
+case class EncryTransaction(fee: Amount,
+                            timestamp: Long,
+                            inputs: IndexedSeq[Input],
+                            directives: IndexedSeq[Directive],
+                            defaultProofOpt: Option[Proof])
   extends EncryBaseTransaction with ModifierValidator {
 
   override type M = EncryTransaction
@@ -30,8 +30,8 @@ case class EncryTransaction(override val fee: Amount,
 
   override lazy val serializer: Serializer[M] = EncryTransactionSerializer
 
-  override lazy val txHash: Digest32 =
-    EncryTransaction.getHash(fee, timestamp, inputs, directives)
+  override val messageToSign: Array[Byte] =
+    UnsignedEncryTransaction.getHash(fee, timestamp, inputs, directives)
 
   override lazy val semanticValidity: Try[Unit] = validateStateless.toTry
 
@@ -79,24 +79,6 @@ object EncryTransaction {
       )
     }
   }
-
-  def getHash(fee: Amount,
-              timestamp: Long,
-              unlockers: IndexedSeq[Input],
-              directives: IndexedSeq[Directive]): Digest32 =
-    Algos.hash(Bytes.concat(
-      unlockers.map(_.bytesWithoutProof).foldLeft(Array[Byte]())(_ ++ _),
-      directives.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
-      Longs.toByteArray(timestamp),
-      Longs.toByteArray(fee)
-    )
-  )
-
-  def getMessageToSign(fee: Amount,
-                       timestamp: Long,
-                       unlockers: IndexedSeq[Input],
-                       directives: IndexedSeq[Directive]): Array[Byte] =
-    getHash(fee, timestamp, unlockers, directives)
 }
 
 object EncryTransactionSerializer extends Serializer[EncryTransaction] {
@@ -126,7 +108,7 @@ object EncryTransactionSerializer extends Serializer[EncryTransaction] {
     val (unlockers: IndexedSeq[Input], unlockersLen: Int) = (0 until unlockersQty)
       .foldLeft(IndexedSeq[Input](), 0) { case ((acc, shift), _) =>
         val len: Int = Shorts.fromByteArray(leftBytes1.slice(shift, shift + 2))
-        UnlockerSerializer.parseBytes(leftBytes1.slice(shift + 2, shift + 2 + len))
+        InputSerializer.parseBytes(leftBytes1.slice(shift + 2, shift + 2 + len))
           .map(u => (acc :+ u, shift + 2 + len))
           .getOrElse(throw SerializationException)
       }
@@ -145,4 +127,34 @@ object EncryTransactionSerializer extends Serializer[EncryTransaction] {
 
     EncryTransaction(fee, timestamp, unlockers, directives, proofOpt)
   }
+}
+
+/** Unsigned version of EncryTransaction (without any
+  * proofs for which interactive message is required) */
+case class UnsignedEncryTransaction(fee: Amount,
+                                    timestamp: Long,
+                                    inputs: IndexedSeq[Input],
+                                    directives: IndexedSeq[Directive]) {
+
+  val messageToSign: Array[Byte] =
+    UnsignedEncryTransaction.getHash(fee, timestamp, inputs, directives)
+
+  def toSigned(proofs: IndexedSeq[Seq[Proof]], defaultProofOpt: Option[Proof]): EncryTransaction = {
+    val signedInputs: IndexedSeq[Input] = inputs.zip(proofs).map { case (input, proof) => input.copy(proofs = proof.toList) }
+    EncryTransaction(fee, timestamp, signedInputs, directives, defaultProofOpt)
+  }
+}
+
+object UnsignedEncryTransaction {
+
+  def getHash(fee: Amount,
+              timestamp: Long,
+              unlockers: IndexedSeq[Input],
+              directives: IndexedSeq[Directive]): Digest32 =
+    Algos.hash(Bytes.concat(
+      unlockers.map(_.bytesWithoutProof).foldLeft(Array[Byte]())(_ ++ _),
+      directives.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
+      Longs.toByteArray(timestamp),
+      Longs.toByteArray(fee)
+    ))
 }

@@ -9,17 +9,20 @@ import scorex.crypto.authds.ADKey
 
 import scala.util.Try
 
-case class Input(boxId: ADKey,
-                 proofs: List[Proof]) extends BytesSerializable {
+case class Input(boxId: ADKey, proofs: List[Proof]) extends BytesSerializable {
 
   override type M = Input
 
-  override def serializer: Serializer[M] = UnlockerSerializer
+  override def serializer: Serializer[M] = InputSerializer
 
-  lazy val bytesWithoutProof: Array[Byte] = UnlockerSerializer.toBytesWithoutProof(this)
+  lazy val bytesWithoutProof: Array[Byte] = InputSerializer.toBytesWithoutProof(this)
+
+  def isUnsigned: Boolean = proofs.isEmpty
 }
 
 object Input {
+
+  def unsigned(boxId: ADKey): Input = Input(boxId, List.empty)
 
   implicit val jsonEncoder: Encoder[Input] = (u: Input) => Map(
     "boxId" -> Algos.encode(u.boxId).asJson,
@@ -36,11 +39,11 @@ object Input {
   }
 }
 
-object UnlockerSerializer extends Serializer[Input] {
+object InputSerializer extends Serializer[Input] {
 
   def toBytesWithoutProof(obj: Input): Array[Byte] = obj.boxId
 
-  override def toBytes(obj: Input): Array[Byte] = if (obj.proofs.isEmpty) obj.boxId else {
+  override def toBytes(obj: Input): Array[Byte] = if (obj.isUnsigned) obj.boxId else {
     val proofsBytes: Array[Byte] = obj.proofs.foldLeft(Array.empty[Byte]) { case (acc, proof) =>
       val proofBytes: Array[Byte] = ProofSerializer.toBytes(proof)
       acc ++ Shorts.toByteArray(proofBytes.length.toShort) ++ proofBytes

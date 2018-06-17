@@ -167,15 +167,15 @@ class UtxoState(override val version: VersionTag,
 
       val context: Context = Context(tx, EncryStateView(height, lastBlockTimestamp, rootHash))
 
-      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
-        .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
-        .map(_.toOption -> u)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, unlocker)) =>
+      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => persistentProver.unauthenticatedLookup(input.boxId)
+        .map(bytes => StateModifierDeserializer.parseBytes(bytes, input.boxId.head))
+        .map(_.toOption -> input)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
         (bxOpt, tx.defaultProofOpt) match {
           // If no `proofs` provided, then `defaultProof` is used.
-          case (Some(bx), _) if unlocker.proofs.nonEmpty => if (bx.proposition.canUnlock(context, unlocker.proofs)) acc :+ bx else acc
+          case (Some(bx), _) if input.proofs.nonEmpty => if (bx.proposition.canUnlock(context, input.proofs)) acc :+ bx else acc
           case (Some(bx), Some(defaultProof)) => if (bx.proposition.canUnlock(context, Seq(defaultProof))) acc :+ bx else acc
           case (Some(bx), _) => if (bx.proposition.canUnlock(context, Seq.empty)) acc :+ bx else acc
-          case _ => throw TransactionValidationException(s"Box(${Algos.encode(unlocker.boxId)}) not found")
+          case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
         }
       }
 
