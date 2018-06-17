@@ -1,9 +1,9 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import encry.modifiers.mempool.EncryBaseTransaction.TransactionValidationException
 import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
 import encry.settings.{Algos, Constants}
+import encry.validation.{ModifierValidator, ValidationResult}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.prismlang.core.Types
@@ -12,14 +12,15 @@ import scorex.core.serialization.{SerializationException, Serializer}
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.hash.Digest32
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 /** Transaction is an atomic state modifier. */
 case class EncryTransaction(override val fee: Amount,
                             override val timestamp: Long,
                             override val unlockers: IndexedSeq[Unlocker],
                             override val directives: IndexedSeq[Directive],
-                            override val defaultProofOpt: Option[Proof]) extends EncryBaseTransaction {
+                            override val defaultProofOpt: Option[Proof])
+  extends EncryBaseTransaction with ModifierValidator {
 
   override type M = EncryTransaction
 
@@ -32,26 +33,20 @@ case class EncryTransaction(override val fee: Amount,
   override lazy val txHash: Digest32 =
     EncryTransaction.getHash(fee, timestamp, unlockers, directives)
 
-  override lazy val semanticValidity: Try[Unit] =
-    Try(directives.map(_.idx).foldLeft(-1)((a, b) => if (b > a) b else throw TransactionValidationException("Invalid order")))
-      .flatMap { _ =>
-        if (!validSize) Failure(TransactionValidationException("Invalid size"))
-        else if (fee < 0) Failure(TransactionValidationException("Negative fee"))
-        else if (!directives.forall(_.isValid)) Failure(TransactionValidationException("Bad outputs"))
-        else Success()
-      }
+  override lazy val semanticValidity: Try[Unit] = validateStateless.toTry
 
-  override val esType: Types.Product = Types.EncryTransaction
+  def validateStateless: ValidationResult =
+    accumulateErrors
+      .demand(validSize, "Invalid size")
+      .demand(directives.forall(_.isValid), "Invalid outputs")
+      .result
 
-  override def asVal: PValue = PValue(convert, esType)
+  override val tpe: Types.Product = Types.EncryTransaction
 
-  override def convert: PObject = {
-    val fields: Map[String, PValue] = Map(
-      "inputs" -> PValue(unlockers.map(_.boxId), Types.PCollection(Types.PCollection.ofByte)),
-      "outputs" -> PValue(directives.flatMap(_.boxes(txHash)), Types.PCollection(Types.EncryBox))
-    )
-    PObject(fields, esType)
-  }
+  override def asVal: PValue = PValue(PObject(Map(
+    "inputs" -> PValue(unlockers.map(_.boxId).toList, Types.PCollection(Types.PCollection.ofByte)),
+    "outputs" -> PValue(newBoxes.map(_.convert).toList, Types.PCollection(Types.EncryBox))
+  ), tpe), tpe)
 }
 
 object EncryTransaction {

@@ -24,7 +24,7 @@ case class DataBox(override val proposition: EncryProposition,
 
   override def serializer: Serializer[M] = DataBoxSerializer
 
-  override val esType: Types.ESProduct = Types.DataBox
+  override val tpe: Types.ESProduct = Types.DataBox
 
   override def asVal: ESValue = ESValue(Types.DataBox.ident.toLowerCase, Types.DataBox)(convert)
 
@@ -35,7 +35,7 @@ case class DataBox(override val proposition: EncryProposition,
       "id" -> ESValue("id", Types.ESByteVector)(id),
       "data" -> ESValue("data", Types.ESByteVector)(data)
     )
-    ESObject(Types.DataBox.ident, fields, esType)
+    ESObject(Types.DataBox.ident, fields, tpe)
   }
 }
 

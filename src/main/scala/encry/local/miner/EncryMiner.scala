@@ -8,10 +8,13 @@ import encry.crypto.PrivateKey25519
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransaction, TransactionFactory}
-import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.AssetBox
+import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
+import encry.utils.NetworkTime.Time
+import encry.utils.ScorexLogging
 import encry.view.EncryNodeViewHolder.CurrentView
+import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
@@ -19,14 +22,8 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
-import scorex.core.ModifierId
-import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
-import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import scorex.core.transaction.box.Box.Amount
-import encry.utils.NetworkTime.Time
-import encry.utils.ScorexLogging
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
-import scorex.crypto.hash.Digest32
 
 import scala.collection._
 

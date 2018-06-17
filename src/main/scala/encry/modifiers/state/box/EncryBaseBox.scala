@@ -20,17 +20,17 @@ trait EncryBaseBox extends Box[EncryProposition] with PConvertible {
 
   def isAmountCarrying: Boolean = this.isInstanceOf[MonetaryBox]
 
-  override val esType: Types.Product = Types.EncryBox
+  override val tpe: Types.Product = Types.EncryBox
 
-  override def asVal: PValue = PValue(esType)(convert)
+  override def asVal: PValue = PValue(convert, tpe)
 
-  override def convert: PObject = {
+  def convert: PObject = {
     val fields = Map(
-      "contractHash" -> PValue(Types.PCollection.ofByte)(proposition.contractHash),
-      "typeId" -> PValue(Types.PInt)(typeId),
-      "id" -> PValue(Types.PCollection.ofByte)(id)
+      "contractHash" -> PValue(proposition.contractHash, Types.PCollection.ofByte),
+      "typeId" -> PValue(typeId, Types.PInt),
+      "id" -> PValue(id, Types.PInt)
     )
-    PObject(fields, esType)
+    PObject(fields, tpe)
   }
 }
 

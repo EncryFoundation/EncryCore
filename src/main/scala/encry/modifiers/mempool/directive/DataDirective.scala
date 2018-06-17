@@ -16,14 +16,13 @@ import scorex.crypto.hash.Digest32
 import scala.util.Try
 
 case class DataDirective(script: EncryContract,
-                         data: Array[Byte], // TODO: Tag
-                         override val idx: Int) extends Directive {
+                         data: Array[Byte]) extends Directive {
 
   override type M = DataDirective
 
   override val typeId: DTypeId = DataDirective.TypeId
 
-  override def boxes(digest: Digest32): Seq[EncryBaseBox] =
+  override def boxes(digest: Digest32, idx: Int): Seq[EncryBaseBox] =
     Seq(DataBox(ContractProposition(script), Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)), data))
 
   override val cost: Amount = 20 * script.meta.complexityScore
@@ -43,8 +42,7 @@ object DataDirective {
     "script" -> Algos.encode(d.script.serializedScript).asJson,
     "complexityScore" -> d.script.meta.complexityScore.asJson,
     "scriptFingerprint" -> Algos.encode(d.script.meta.scriptFingerprint).asJson,
-    "data" -> Algos.encode(d.data).asJson,
-    "idx" -> d.idx.asJson
+    "data" -> Algos.encode(d.data).asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[DataDirective] = (c: HCursor) => {
@@ -53,7 +51,6 @@ object DataDirective {
       complexityScore <- c.downField("complexityScore").as[Int]
       scriptFingerprint <- c.downField("scriptFingerprint").as[String]
       data <- c.downField("data").as[String]
-      idx <- c.downField("idx").as[Int]
     } yield {
       DataDirective(
         Algos.decode(scriptStr).map(scriptDes =>
@@ -63,8 +60,7 @@ object DataDirective {
             ScriptMeta(complexityScore, Algos.decode(scriptFingerprint).getOrElse(Array.emptyByteArray))
           )
         ).getOrElse(throw new Exception("Script decoding failed")),
-        Algos.decode(data).getOrElse(throw new Exception("Data decoding failed")),
-        idx
+        Algos.decode(data).getOrElse(throw new Exception("Data decoding failed"))
       )
     }
   }
@@ -79,8 +75,7 @@ object DataDirectiveSerializer extends Serializer[DataDirective] {
       Ints.toByteArray(obj.script.meta.complexityScore),
       obj.script.meta.scriptFingerprint,
       Shorts.toByteArray(obj.data.length.toShort),
-      obj.data,
-      Ints.toByteArray(obj.idx)
+      obj.data
     )
 
   // TODO: Use constant for `ScriptFingerprint` length storing.
@@ -91,7 +86,6 @@ object DataDirectiveSerializer extends Serializer[DataDirective] {
     val contract = EncryContract(bytes.slice(2, scriptLen), ScriptMeta(complexity, fingerprint))
     val dataLen = Shorts.fromByteArray(bytes.slice(scriptLen + 2 + 4 + 8, scriptLen + 2 + 4 + 8 + 2))
     val data = bytes.slice(scriptLen + 2 + 4 + 8 + 2, scriptLen + 2 + 4 + 8 + 2 + dataLen)
-    val idx = Ints.fromByteArray(bytes.slice(scriptLen + 2 + 4 + 8 + 2 + dataLen, scriptLen + 2 + 4 + 8 + 2 + dataLen + 4))
-    DataDirective(contract, data, idx)
+    DataDirective(contract, data)
   }
 }

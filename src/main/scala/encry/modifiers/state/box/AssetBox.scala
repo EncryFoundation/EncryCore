@@ -33,7 +33,7 @@ case class AssetBox(override val proposition: EncryProposition,
 
   lazy val isIntrinsic: Boolean = tokenIdOpt.isEmpty
 
-  override val esType: Types.ESProduct = Types.AssetBox
+  override val tpe: Types.ESProduct = Types.AssetBox
 
   override def asVal: ESValue = ESValue(Types.AssetBox.ident.toLowerCase, Types.AssetBox)(convert)
 
@@ -45,7 +45,7 @@ case class AssetBox(override val proposition: EncryProposition,
       "amount" -> ESValue("amount", Types.ESLong)(amount),
       "tokenIdOpt" -> ESValue("tokenIdOpt", Types.ESOption(Types.ESByteVector))(tokenIdOpt.flatMap(bytes => Some(bytes.untag(ADKey))))
     )
-    ESObject(Types.AssetBox.ident, fields, esType)
+    ESObject(Types.AssetBox.ident, fields, tpe)
   }
 }
 

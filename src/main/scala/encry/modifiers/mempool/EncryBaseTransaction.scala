@@ -35,7 +35,7 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
   val defaultProofOpt: Option[Proof]
 
   lazy val newBoxes: Traversable[EncryBaseBox] =
-    directives.flatMap(_.boxes(txHash))
+    directives.zipWithIndex.flatMap { case (d, idx) => d.boxes(txHash, idx) }
 
   lazy val minimalFee: Amount = Constants.FeeMinAmount +
     directives.map(_.cost).sum + (Constants.PersistentByteCost * length)

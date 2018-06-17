@@ -27,7 +27,7 @@ case class AssetIssuingBox(override val proposition: EncryProposition,
 
   override def serializer: Serializer[M] = AssetIssuingBoxSerializer
 
-  override val esType: Types.ESProduct = Types.AssetIssuingBox
+  override val tpe: Types.ESProduct = Types.AssetIssuingBox
 
   override def asVal: ESValue = ESValue(Types.DataBox.ident.toLowerCase, Types.DataBox)(convert)
 
@@ -38,7 +38,7 @@ case class AssetIssuingBox(override val proposition: EncryProposition,
       "id" -> ESValue("id", Types.ESByteVector)(id),
       "amount" -> ESValue("amount", Types.ESLong)(amount)
     )
-    ESObject(Types.DataBox.ident, fields, esType)
+    ESObject(Types.DataBox.ident, fields, tpe)
   }
 }
 

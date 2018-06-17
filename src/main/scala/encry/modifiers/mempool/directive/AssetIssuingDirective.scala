@@ -21,14 +21,13 @@ import scala.util.Try
 
 case class AssetIssuingDirective(script: EncryContract,
                                  amount: Amount,
-                                 symbol: String,
-                                 override val idx: Int) extends Directive {
+                                 symbol: String) extends Directive {
 
   override type M = AssetIssuingDirective
 
   override val typeId: DTypeId = AssetIssuingDirective.TypeId
 
-  override def boxes(digest: Digest32): Seq[EncryBaseBox] = {
+  override def boxes(digest: Digest32, idx: Int): Seq[EncryBaseBox] = {
     val assetCreationBox = AssetCreationBox(AccountProposition(Account(PublicKey @@ Random.randomBytes(32))),
       Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx) ++ Ints.toByteArray(1)), amount, symbol)
     Seq(
@@ -55,8 +54,7 @@ object AssetIssuingDirective {
     "script" -> Base58.encode(d.script.serializedScript).asJson,
     "complexityScore" -> d.script.meta.complexityScore.asJson,
     "scriptFingerprint" -> Base58.encode(d.script.meta.scriptFingerprint).asJson,
-    "amount" -> d.amount.asJson,
-    "idx" -> d.idx.asJson
+    "amount" -> d.amount.asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[AssetIssuingDirective] = (c: HCursor) => {
@@ -66,7 +64,6 @@ object AssetIssuingDirective {
       scriptFingerprint <- c.downField("scriptFingerprint").as[String]
       amount <- c.downField("amount").as[Long]
       symbol <- c.downField("symbol").as[String]
-      idx <- c.downField("idx").as[Int]
     } yield {
       AssetIssuingDirective(
         Base58.decode(scriptStr).map(scriptDes =>
@@ -76,8 +73,7 @@ object AssetIssuingDirective {
           )
         ).getOrElse(throw new Exception("Incorrect script deserialize from json")),
         amount,
-        symbol,
-        idx
+        symbol
       )
     }
   }
@@ -92,7 +88,6 @@ object AssetIssuingDirectiveSerializer extends Serializer[AssetIssuingDirective]
       Ints.toByteArray(obj.script.meta.complexityScore),
       obj.script.meta.scriptFingerprint,
       Longs.toByteArray(obj.amount),
-      Ints.toByteArray(obj.idx),
       obj.symbol.getBytes(Algos.charset)
     )
 
@@ -102,8 +97,7 @@ object AssetIssuingDirectiveSerializer extends Serializer[AssetIssuingDirective]
     val fingerprint = bytes.slice(scriptLen + 2 + 4, scriptLen + 2 + 4 + 8)
     val contract = EncryContract(bytes.slice(2, scriptLen), ScriptMeta(complexity, fingerprint))
     val amount = Longs.fromByteArray(bytes.slice(scriptLen + 2 + 4 + 8, scriptLen + 2 + 4 + 8 + 8))
-    val idx = Ints.fromByteArray(bytes.slice(scriptLen + 2 + 4 + 8 + 8, scriptLen + 2 + 4 + 8 + 8 + 4))
-    val symbol = new String(bytes.slice(scriptLen + 2 + 4 + 8 + 8 + 4, bytes.length), Algos.charset)
-    AssetIssuingDirective(contract, amount, symbol, idx)
+    val symbol = new String(bytes.slice(scriptLen + 2 + 4 + 8 + 8, bytes.length), Algos.charset)
+    AssetIssuingDirective(contract, amount, symbol)
   }
 }

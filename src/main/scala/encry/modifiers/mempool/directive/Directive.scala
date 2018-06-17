@@ -11,13 +11,11 @@ trait Directive extends BytesSerializable {
 
   val typeId: DTypeId
 
-  val idx: Int
-
   val cost: Amount
 
   val isValid: Boolean
 
-  def boxes(digest: Digest32): Seq[EncryBaseBox]
+  def boxes(digest: Digest32, idx: Int): Seq[EncryBaseBox]
 }
 
 object Directive {
