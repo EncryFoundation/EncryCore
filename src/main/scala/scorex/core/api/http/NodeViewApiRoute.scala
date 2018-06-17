@@ -1,11 +1,10 @@
 package scorex.core.api.http
 
 import akka.actor.{ActorRef, ActorRefFactory}
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import encry.consensus.History
 import io.circe.syntax._
-import scorex.core.consensus.History
 import scorex.core.serialization.SerializerRegistry
 import encry.settings.RESTApiSettings
 import encry.view.EncryNodeViewHolder.CurrentView
@@ -18,7 +17,7 @@ import scorex.crypto.encode.Base58
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.reflect.ClassTag
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 
 case class NodeViewApiRoute[P <: Proposition, TX <: Transaction[P]]
@@ -55,7 +54,7 @@ case class NodeViewApiRoute[P <: Proposition, TX <: Transaction[P]]
 
   def withPersistentModifier(encodedId: String)(fn: PM => Route): Route = {
     Base58.decode(encodedId) match {
-      case Failure(e) => complete(ApiError.notExists)
+      case Failure(_) => ApiError.NotExists
       case Success(rawId) =>
         val id = ModifierId @@ rawId
 
@@ -64,8 +63,8 @@ case class NodeViewApiRoute[P <: Proposition, TX <: Transaction[P]]
         val futurePersistentModifier = (nodeViewHolderRef ? GetDataFromCurrentView[HIS, MS, VL, MP, Option[PM]](f)).mapTo[Option[PM]]
         onComplete(futurePersistentModifier) {
           case Success(Some(tx)) => fn(tx)
-          case Success(None) => complete(ApiError.notExists)
-          case Failure(_) => complete(ApiError.notExists)
+          case Success(None) => ApiError.NotExists
+          case Failure(_) => ApiError.NotExists
         }
     }
   }
@@ -80,12 +79,12 @@ case class NodeViewApiRoute[P <: Proposition, TX <: Transaction[P]]
 
       val serializationErrors = txAsJson.filter(_.isLeft).toList
       if (serializationErrors.nonEmpty)
-        complete(ApiError(serializationErrors.map(_.left.get.getMessage).mkString(","), StatusCodes.InternalServerError))
+        ApiError(serializationErrors.map(_.left.get))
       else
-        complete(SuccessApiResponse(
+        ApiResponse(
           "size" -> mpd.size.asJson,
           "transactions" -> txAsJson.map(_.right.get).asJson
-        ))
+        )
     }
   }
 
@@ -98,11 +97,7 @@ case class NodeViewApiRoute[P <: Proposition, TX <: Transaction[P]]
   def persistentModifierById: Route = (get & path("persistentModifier" / Segment)) { encodedId =>
     withPersistentModifier(encodedId) { tx =>
       val clazz = ClassTag(tx.getClass).runtimeClass
-      val jsonOrErr = serializerReg.toJson(clazz, tx)
-      val response: ScorexApiResponse = Try(SuccessApiResponse(jsonOrErr.right.get) : ScorexApiResponse)
-        .getOrElse(ApiError(jsonOrErr.left.get.getMessage, StatusCodes.InternalServerError))
-      complete(response)
+      ApiResponse(serializerReg.toJson(clazz, tx))
     }
   }
-
 }

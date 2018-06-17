@@ -2,24 +2,23 @@ package encry.view.history.processors
 
 import com.google.common.primitives.{Ints, Longs}
 import encry.EncryApp
-import encry.consensus._
+import encry.consensus.History.ProgressInfo
+import encry.consensus.{ModifierSemanticValidity, _}
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.{Block, EncryBlock}
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.settings.Constants._
 import encry.settings.{Algos, Constants, NodeSettings}
+import encry.utils.{NetworkTimeProvider, ScorexLogging}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
+import encry.view.validation.{ModifierValidator, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core._
-import scorex.core.block.Block
-import scorex.core.consensus.History.ProgressInfo
-import scorex.core.consensus.ModifierSemanticValidity
-import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 
 import scala.annotation.tailrec
 import scala.collection.immutable
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
@@ -31,7 +30,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
   private val difficultyController = PowLinearController
 
-  val powScheme: ConsensusScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
+  val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
 
   protected val BestHeaderKey: ByteArrayWrapper =
     ByteArrayWrapper(Array.fill(DigestLength)(EncryBlockHeader.modifierTypeId))
@@ -42,7 +41,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
-  def realDifficulty(h: EncryBlockHeader): Difficulty = Difficulty @@ powScheme.realDifficulty(h)
+  def realDifficulty(h: EncryBlockHeader): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
 
   protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
 
@@ -59,7 +58,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   protected def validityKey(id: Array[Byte]): ByteArrayWrapper =
     ByteArrayWrapper(Algos.hash("validity".getBytes(Algos.charset) ++ id))
 
-  // Defined if `scorex.core.consensus.HistoryReader`.
+  // Defined if `encry.consensus.HistoryReader`.
   def contains(id: ModifierId): Boolean
 
   def bestBlockOpt: Option[EncryBlock]
@@ -91,7 +90,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
       case Some(bestHeaderId) =>
         // If we verify transactions, we don't need to send this header to state.
         // If we don't and this is the best header, we should send this header to state to update state root hash
-        val toProcess = if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
+        val toProcess: Seq[EncryBlockHeader] = if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
         ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
       case None =>
         log.error("Should always have best header after header application")
@@ -151,33 +150,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
     Seq(heightIdsKey(h.height) -> ByteArrayWrapper((headerIdsAtHeight(h.height) :+ h.id).flatten.toArray))
   }
 
-  protected def validate(header: EncryBlockHeader): Try[Unit] = {
-    lazy val parentOpt = typedModifierById[EncryBlockHeader](header.parentId)
-    if (header.parentId sameElements EncryBlockHeader.GenesisParentId) {
-      if (bestHeaderIdOpt.nonEmpty) Failure(new Exception("Trying to append genesis block to non-empty history."))
-      else if (header.height != chainParams.GenesisHeight) Failure(new Exception("Invalid height for genesis block header."))
-      else Success()
-    } else if (parentOpt.isEmpty) {
-      Failure(new Exception(s"Parental header <id: ${Algos.encode(header.parentId)}> does not exist!"))
-    } else if (header.height != parentOpt.get.height + 1) {
-      Failure(new Exception(s"Invalid height in header <id: ${header.id}>"))
-    } else if (header.timestamp - timeProvider.time() > Constants.Chain.MaxTimeDrift) {
-      Failure(new Exception(s"Invalid timestamp in header <id: ${header.id}>"))
-    } else if (header.timestamp < parentOpt.get.timestamp) {
-      Failure(new Exception("Header timestamp is less than parental`s"))
-    } else if (realDifficulty(header) < header.requiredDifficulty) {
-      Failure(new Exception("Header <id: ${header.id}> difficulty too low."))
-    } else if (!heightOf(header.parentId).exists(h => bestHeaderHeight - h < chainParams.MaxRollbackDepth)) {
-      Failure(new Exception("Header is too old to be applied."))
-    } else if (!header.validSignature) {
-      Failure(new Exception("Block signature is invalid."))
-    } else {
-      Success()
-    }.recoverWith { case exc =>
-      log.warn("Validation error: ", exc)
-      Failure(exc)
-    }
-  }
+  protected def validate(header: EncryBlockHeader): Try[Unit] = HeaderValidator.validate(header).toTry
 
   protected def reportInvalid(header: EncryBlockHeader): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
     val modifierId = header.id
@@ -277,5 +250,66 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
     assert(requiredHeights.length == requiredHeaders.length,
       s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}")
     difficultyController.getDifficulty(requiredHeaders)
+  }
+
+  object HeaderValidator extends ModifierValidator {
+
+    def validate(header: EncryBlockHeader): ValidationResult = {
+      if (header.isGenesis) validateGenesisBlockHeader(header)
+      else {
+        val parentOpt: Option[EncryBlockHeader] = typedModifierById[EncryBlockHeader](header.parentId)
+        parentOpt.map { parent =>
+          validateChildBlockHeader(header, parent)
+        } getOrElse fatal(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
+      }
+    }
+
+    private def validateGenesisBlockHeader(header: EncryBlockHeader): ValidationResult = {
+      accumulateErrors
+        .validateEqualIds(header.parentId, EncryBlockHeader.GenesisParentId) { detail =>
+          fatal(s"Genesis block should have genesis parent id. $detail")
+        }
+        .validate(bestHeaderIdOpt.isEmpty) {
+          fatal("Trying to append genesis block to non-empty history")
+        }
+        .validate(header.height == Constants.Chain.GenesisHeight) {
+          fatal(s"Height of genesis block $header is incorrect")
+        }
+        .result
+    }
+
+    private def validateChildBlockHeader(header: EncryBlockHeader, parent: EncryBlockHeader): ValidationResult = {
+      failFast
+        .validate(header.timestamp - timeProvider.time() <= Constants.Chain.MaxTimeDrift) {
+          error(s"Header timestamp ${header.timestamp} is too far in future from now ${timeProvider.time()}")
+        }
+        .validate(header.timestamp > parent.timestamp) {
+          fatal(s"Header timestamp ${header.timestamp} is not greater than parents ${parent.timestamp}")
+        }
+        .validate(header.height == parent.height + 1) {
+          fatal(s"Header height ${header.height} is not greater by 1 than parents ${parent.height}")
+        }
+        .validateNot(historyStorage.containsObject(header.id)) {
+          fatal("Header is already in history")
+        }
+        .validate(realDifficulty(header) >= header.requiredDifficulty) {
+          fatal(s"Block difficulty ${realDifficulty(header)} is less than required ${header.requiredDifficulty}")
+        }
+        // TODO: Enable this step when nBits decoding issue solved.
+//        .validateEquals(header.nBits)(requiredDifficultyAfter(parent)) { detail =>
+//          fatal(s"Incorrect required difficulty. $detail")
+//        }
+        .validate(heightOf(header.parentId).exists(h => bestHeaderHeight - h < Constants.Chain.MaxRollbackDepth)) {
+          fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
+        }
+        .validate(powScheme.verify(header)) {
+          fatal(s"Wrong proof-of-work solution for $header")
+        }
+        .validateSemantics(isSemanticallyValid(header.parentId)) {
+          fatal("Parent header is marked as semantically invalid")
+        }
+        .result
+    }
+
   }
 }

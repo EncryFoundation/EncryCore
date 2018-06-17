@@ -3,10 +3,12 @@ package encry.view.history.processors
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
+import encry.utils.ScorexLogging
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
-import scorex.core.consensus.History.ProgressInfo
-import scorex.core.utils.ScorexLogging
+import encry.consensus.History.ProgressInfo
+import encry.consensus.ModifierSemanticValidity.Invalid
+import encry.view.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 
 import scala.util.{Failure, Success, Try}
 
@@ -105,17 +107,14 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
   }
 
   private def calculateNewModRow(fullBlock: EncryBlock, txsAreNew: Boolean): EncryPersistentModifier = {
-    if (txsAreNew) {
-      fullBlock.payload
-    } else {
-      fullBlock.adProofsOpt
+    if (txsAreNew) fullBlock.payload
+    else fullBlock.adProofsOpt
         .getOrElse(throw new NoSuchElementException("Only transactions can be new when proofs are empty"))
-    }
   }
 
   private def calculateBestFullChain(block: EncryBlock): Seq[EncryBlock] = {
-    val continuations = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
-    val chains = continuations.map(hc => hc.map(getBlock).takeWhile(_.nonEmpty).flatten)
+    val continuations: Seq[Seq[EncryBlockHeader]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
+    val chains: Seq[Seq[EncryBlock]] = continuations.map(hc => hc.map(getBlock).takeWhile(_.nonEmpty).flatten)
     chains.map(c => block +: c).maxBy(c => scoreOf(c.last.id).get)
   }
 
@@ -136,7 +135,7 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
 
   private def updateStorage(newModRow: EncryPersistentModifier,
                             bestFullHeaderId: ModifierId): Unit = {
-    val indicesToInsert = Seq(BestBlockKey -> ByteArrayWrapper(bestFullHeaderId))
+    val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = Seq(BestBlockKey -> ByteArrayWrapper(bestFullHeaderId))
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
       .ensuring(bestHeaderHeight >= bestBlockHeight, s"Headers height $bestHeaderHeight should be >= " +
         s"full height $bestBlockHeight")
@@ -146,21 +145,9 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
 
   protected def modifierValidation(m: EncryPersistentModifier,
                                    headerOpt: Option[EncryBlockHeader]): Try[Unit] = {
-    if (historyStorage.containsObject(m.id)) {
-      Failure(new Exception(s"Modifier $m is already in history"))
-    } else {
-      val minimalHeight = blockDownloadProcessor.minimalBlockHeight
-      headerOpt match {
-        case None =>
-          Failure(new Exception(s"Header for modifier $m is undefined"))
-        case Some(header: EncryBlockHeader) if header.height < minimalHeight =>
-          Failure(new Exception(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight"))
-        case Some(header: EncryBlockHeader) if !header.isRelated(m) =>
-          Failure(new Exception(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}"))
-        case Some(_) =>
-          Success()
-      }
-    }
+    val minimalHeight: Int = blockDownloadProcessor.minimalBlockHeight
+    headerOpt.map(header => PayloadValidator.validate(m, header, minimalHeight).toTry)
+      .getOrElse(Failure(RecoverableModifierError(s"Header for modifier $m is not defined")))
   }
 
   private def logStatus(toRemove: Seq[EncryBlock],
@@ -176,6 +163,27 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
     }
     log.info(s"Full block ${appliedBlock.encodedId} appended, " +
       s"going to apply ${toApply.length}$toRemoveStr modifiers.$newStatusStr")
+  }
+
+  /** Validator for `BlockPayload` and `AdProofs` */
+  object PayloadValidator extends ModifierValidator {
+
+    def validate(m: EncryPersistentModifier, header: EncryBlockHeader, minimalHeight: Int): ValidationResult = {
+      failFast
+        .validate(!historyStorage.containsObject(m.id)) {
+          fatal(s"Modifier ${m.encodedId} is already in history")
+        }
+        .validate(header.height >= minimalHeight) {
+          fatal(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight")
+        }
+        .validate(header.isRelated(m)) {
+          fatal(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}")
+        }
+        .validate(isSemanticallyValid(header.id) != Invalid) {
+          fatal(s"Header ${header.encodedId} for modifier ${m.encodedId} is semantically invalid")
+        }
+        .result
+    }
   }
 }
 

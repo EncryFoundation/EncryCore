@@ -5,8 +5,8 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBaseBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
+import encry.utils.ScorexLogging
 import scorex.core.TransactionsCarryingPersistentNodeViewModifier
-import scorex.core.utils.ScorexLogging
 
 import scala.util.Try
 

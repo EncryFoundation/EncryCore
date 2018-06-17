@@ -2,9 +2,8 @@ package encry.view.mempool
 
 import encry.modifiers.mempool.EncryTransaction
 import encry.settings.EncryAppSettings
-import encry.utils.EncryGenerator
+import encry.utils.{EncryGenerator, NetworkTimeProvider}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.core.utils.NetworkTimeProvider
 
 class EncryMempoolSpec extends PropSpec with Matchers with EncryGenerator {
 

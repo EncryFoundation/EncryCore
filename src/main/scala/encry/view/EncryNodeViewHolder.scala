@@ -4,40 +4,35 @@ import java.io.File
 
 import akka.actor.{Actor, Props}
 import encry.EncryApp
-import encry.EncryApp._
+import encry.EncryApp.{settings, timeProvider, _}
+import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer}
 import encry.modifiers.state.box.proposition.EncryProposition
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{NodeViewHolderEvent, SuccessfulTransaction, _}
+import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
+import encry.utils.ScorexLogging
+import encry.view.EncryNodeViewHolder.ReceivableMessages._
+import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.{DigestState, EncryState, StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
-import encry.EncryApp.{networkController, settings, timeProvider}
-import scorex.core._
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{NodeViewHolderEvent, SuccessfulTransaction}
-import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.view.EncryNodeViewHolder.DownloadRequest
 import scorex.core
-import scorex.core.consensus.History.ProgressInfo
+import scorex.core._
 import scorex.core.serialization.Serializer
+import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.TransactionValidation
-import scorex.core.transaction.Transaction
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base58
-import supertagged.@@
-import EncryNodeViewHolder.ReceivableMessages._
-import encry.network.NodeViewSynchronizer.ReceivableMessages._
-import EncryNodeViewHolder._
-import scorex.core.utils.ScorexLogging
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.collection.mutable.WrappedArray
 import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with ScorexLogging {
@@ -60,7 +55,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   )
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    super.preRestart(reason, message)
     reason.printStackTrace()
     System.exit(100)
   }
@@ -72,8 +66,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def receive: Receive = {
-    case ModifiersFromRemote(remote, modifierTypeId, remoteObjects) =>
-      modifierSerializers.get(modifierTypeId) foreach { companion =>
+    case ModifiersFromRemote(_, modifierTypeId, remoteObjects) =>
+      modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
@@ -82,9 +76,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             else modifiersCache.put(key(pmod.id), pmod)
         }
         log.debug(s"Cache before(${modifiersCache.size}): ${modifiersCache.keySet.map(_.array).map(Base58.encode).mkString(",")}")
-
         def found: Option[(mutable.WrappedArray.ofByte, PMOD)] = modifiersCache.find(x => nodeView.history.applicable(x._2))
-        Iterator.continually(found).takeWhile(_.isDefined).flatten.foreach { case (k,v) =>
+        Iterator.continually(found).takeWhile(_.isDefined).flatten.foreach { case (k, v) =>
             modifiersCache.remove(k)
             pmodModify(v)
         }
@@ -145,7 +138,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   def requestDownloads(pi: ProgressInfo[EncryPersistentModifier]): Unit =
-    pi.toDownload.foreach { case (tid, id) => networkController ! DownloadRequest(tid, id) }
+    pi.toDownload.foreach { case (tid, id) => nodeViewSynchronizer ! DownloadRequest(tid, id) }
 
   def trimChainSuffix(suffix: IndexedSeq[EncryPersistentModifier], rollbackPoint: ModifierId): IndexedSeq[EncryPersistentModifier] = {
     val idx: Int = suffix.indexWhere(_.id.sameElements(rollbackPoint))
@@ -164,16 +157,17 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                                  suffix: IndexedSeq[EncryPersistentModifier])
 
     requestDownloads(progressInfo)
-    val branchingPointOpt: Option[Array[Byte] @@ core.ModifierId.Tag with core.VersionTag.Tag] = progressInfo.branchPoint.map(VersionTag @@ _)
+    val branchingPointOpt: Option[core.VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
     val (stateToApplyTry: Try[MS], suffixTrimmed: IndexedSeq[EncryPersistentModifier]) = if (progressInfo.chainSwitchingNeeded) {
-      if (!state.version.sameElements(branchingPointOpt))
-        state.rollbackTo(branchingPointOpt.get) -> trimChainSuffix(suffixApplied, branchingPointOpt.get)
-      else Success(state) -> IndexedSeq()
+      branchingPointOpt.map { branchPoint =>
+        if (!state.version.sameElements(branchPoint))
+          state.rollbackTo(branchPoint) -> trimChainSuffix(suffixApplied, ModifierId !@@ branchPoint)
+        else Success(state) -> IndexedSeq()
+      }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty")))
     } else Success(state) -> suffixApplied
 
     stateToApplyTry match {
       case Success(stateToApply) =>
-        log.info(s"Rollback succeed: BranchPoint(${progressInfo.branchPoint.map(Base58.encode)})")
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
@@ -183,14 +177,15 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Failure(e) =>
-              val (newHis: HIS, newProgressInfo: ProgressInfo[EncryPersistentModifier]) = history.reportModifierIsInvalid(modToApply, progressInfo)
+              val (newHis: HIS, newProgressInfo: ProgressInfo[EncryPersistentModifier]) =
+                history.reportModifierIsInvalid(modToApply, progressInfo)
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           }
           else u
         }
         uf.failedMod match {
-          case Some(mod) => updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
+          case Some(_) => updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
           case None => (uf.history, Success(uf.state), uf.suffix)
         }
       case Failure(e) =>
@@ -215,7 +210,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             case Success(newMinState) =>
               val newMemPool: MP = updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)
               val newVault: VL = if (progressInfo.chainSwitchingNeeded)
-                nodeView.wallet.rollback(VersionTag @@ progressInfo.branchPoint.get).get
+                nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
               else nodeView.wallet
               blocksApplied.foreach(newVault.scanPersistent)
               log.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
@@ -294,13 +289,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         getRecreatedState()
       case (_, Some(bestBlock), _: DigestState) =>
         log.debug(s"State and history are inconsistent. Going to switch state to version ${bestBlock.encodedId}")
-        getRecreatedState(Some(VersionTag @@ bestBlock.id), Some(bestBlock.header.stateRoot))
+        getRecreatedState(Some(VersionTag !@@ bestBlock.id), Some(bestBlock.header.stateRoot))
       case (stateId, Some(historyBestBlock), state: StateType@unchecked) =>
-        val stateBestHeaderOpt = history.typedModifierById[EncryBlockHeader](ModifierId @@ stateId)
+        val stateBestHeaderOpt = history.typedModifierById[EncryBlockHeader](ModifierId !@@ stateId)
         val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
         log.debug(s"State and history are inconsistent. Going to rollback to ${rollbackId.map(Algos.encode)} and " +
           s"apply ${newChain.length} modifiers")
-        val startState = rollbackId.map(id => state.rollbackTo(VersionTag @@ id).get)
+        val startState = rollbackId.map(id => state.rollbackTo(VersionTag !@@ id).get)
           .getOrElse(getRecreatedState())
         val toApply = newChain.headers.map { h =>
           history.getBlock(h) match {
@@ -341,7 +336,7 @@ object EncryNodeViewHolder {
   }
 
   def props(): Props = settings.node.stateMode match {
-    case digestType@StateMode.Digest => Props(classOf[EncryNodeViewHolder[DigestState]])
-    case utxoType@StateMode.Utxo => Props(classOf[EncryNodeViewHolder[UtxoState]])
+    case StateMode.Digest => Props(classOf[EncryNodeViewHolder[DigestState]])
+    case StateMode.Utxo => Props(classOf[EncryNodeViewHolder[UtxoState]])
   }
 }

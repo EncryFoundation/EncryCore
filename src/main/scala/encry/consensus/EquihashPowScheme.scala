@@ -8,9 +8,9 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.settings.{Algos, Constants}
+import encry.utils.ScorexLogging
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import scorex.core.ModifierId
-import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.SerializedAdProof
 import scorex.crypto.hash.Digest32
 

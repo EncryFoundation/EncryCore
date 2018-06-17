@@ -2,7 +2,7 @@ package encry.view.history.processors.proofs
 
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
-import scorex.core.consensus.History.ProgressInfo
+import encry.consensus.History.ProgressInfo
 
 import scala.util.{Failure, Try}
 

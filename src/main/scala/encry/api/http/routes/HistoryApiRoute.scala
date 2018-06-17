@@ -14,7 +14,7 @@ import io.circe.Json
 import io.circe.syntax._
 import scorex.core.ModifierId
 import encry.settings.RESTApiSettings
-import scorex.core.utils.ScorexLogging
+import encry.utils.ScorexLogging
 import scorex.crypto.encode.Base58
 
 import scala.concurrent.Future

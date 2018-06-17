@@ -8,10 +8,10 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
 import encry.modifiers.state.box._
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
+import encry.utils.ScorexLogging
 import io.iohk.iodb.Store
 import scorex.core.VersionTag
 import scorex.core.transaction.state.MinimalState
-import scorex.core.utils.ScorexLogging
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base16
 

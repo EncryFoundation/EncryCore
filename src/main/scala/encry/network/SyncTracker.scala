@@ -3,12 +3,12 @@ package encry.network
 import java.net.InetSocketAddress
 
 import akka.actor.{ActorContext, ActorRef, Cancellable}
+import encry.consensus.History
 import encry.network.NodeViewSynchronizer.Events.{BetterNeighbourAppeared, NoBetterNeighbour}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
 import encry.network.PeerConnectionHandler._
 import encry.settings.NetworkSettings
-import scorex.core.consensus.History
-import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
+import encry.utils.{NetworkTimeProvider, ScorexLogging}
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -24,7 +24,7 @@ case class SyncTracker(nvsRef: ActorRef,
                   timeProvider: NetworkTimeProvider) extends ScorexLogging {
 
   import History._
-  import scorex.core.utils.NetworkTime.Time
+  import encry.utils.NetworkTime.Time
 
   private var schedule: Option[Cancellable] = None
 

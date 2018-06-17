@@ -7,7 +7,7 @@ import encry.modifiers.state.box.proof.Signature25519
 import encry.settings.Algos
 import io.circe.Encoder
 import io.circe.syntax._
-import scorex.core.block.Block.{Timestamp, Version}
+import encry.modifiers.history.block.Block.{Timestamp, Version}
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 
 case class CandidateBlock(parentOpt: Option[EncryBlockHeader],

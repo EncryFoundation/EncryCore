@@ -2,9 +2,9 @@ package encry.storage
 
 import encry.settings.Algos
 import encry.storage.codec.FixLenComplexValueCodec
+import encry.utils.ScorexLogging
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.core.VersionTag
-import scorex.core.utils.ScorexLogging
 
 import scala.util.{Failure, Success, Try}
 

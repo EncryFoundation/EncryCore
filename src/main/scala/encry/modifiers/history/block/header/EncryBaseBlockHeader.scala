@@ -2,7 +2,7 @@ package encry.modifiers.history.block.header
 
 import encry.modifiers.{EncryPersistentModifier, Signable25519}
 import scorex.core.ModifierId
-import scorex.core.block.Block._
+import encry.modifiers.history.block.Block._
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.hash.Digest32
 

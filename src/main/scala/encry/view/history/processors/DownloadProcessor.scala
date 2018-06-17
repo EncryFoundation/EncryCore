@@ -6,8 +6,8 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.{Constants, NodeSettings}
+import encry.utils.{NetworkTimeProvider, ScorexLogging}
 import encry.view.history.Height
-import scorex.core.utils.{NetworkTimeProvider, ScorexLogging}
 import scorex.core.{ModifierId, ModifierTypeId}
 
 import scala.annotation.tailrec
@@ -74,7 +74,7 @@ trait DownloadProcessor extends ScorexLogging {
     } else if (header.height >= blockDownloadProcessor.minimalBlockHeight) {
       // Already synced and header is not too far back. Download required modifiers
       requiredModifiersForHeader(header)
-    } else if (!isHeadersChainSynced && isNewHeader(header)) {
+    } else if (!isHeadersChainSynced) {
       // Headers chain is synced after this header. Start downloading full blocks
       log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
       isHeadersChainSyncedVar = true
@@ -95,8 +95,6 @@ trait DownloadProcessor extends ScorexLogging {
     }
   }
 
-  private def isNewHeader(header: EncryBlockHeader): Boolean = {
-    // TODO: Magic Number
+  private def isNewHeader(header: EncryBlockHeader): Boolean =
     timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5
-  }
 }

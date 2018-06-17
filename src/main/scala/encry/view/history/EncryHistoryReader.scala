@@ -1,18 +1,18 @@
 package encry.view.history
 
+import encry.consensus.{HistoryReader, ModifierSemanticValidity}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.{Algos, Constants, NodeSettings}
+import encry.utils.ScorexLogging
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
 import scorex.core._
-import scorex.core.consensus.History._
-import scorex.core.consensus.{Unknown => _, _}
-import scorex.core.utils.ScorexLogging
+import encry.consensus.History._
 
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
@@ -69,7 +69,7 @@ trait EncryHistoryReader
         Younger
       case Some(_) =>
         //We are on different forks now.
-        if(si.lastHeaderIds.view.reverse.exists(m => contains(m))) {
+        if (si.lastHeaderIds.view.reverse.exists(m => contains(m))) {
           //Return Younger, because we can send blocks from our fork that other node can download.
           Younger
         } else {
@@ -144,9 +144,6 @@ trait EncryHistoryReader
       case adProofs: ADProofs => validate(adProofs)
       case mod: Any => Failure(new Exception(s"Modifier $mod is of incorrect type."))
     }
-  }.recoverWith {
-    case e: Exception => log.info(e.toString)
-      Failure(e)
   }
 
   /** Checks whether the modifier is applicable to the history. */
@@ -187,7 +184,7 @@ trait EncryHistoryReader
     * Return headers, required to apply to reach header2 if you are at header1 position.
     *
     * @param fromHeaderOpt - initial position
-    * @param toHeader - header you should reach
+    * @param toHeader      - header you should reach
     * @return (Modifier required to rollback first, header chain to apply)
     */
   def getChainToHeader(fromHeaderOpt: Option[EncryBlockHeader],
@@ -232,21 +229,18 @@ trait EncryHistoryReader
     (currentChain, commonBlockAndSuffixes)
   }
 
-  override def syncInfo: EncrySyncInfo = if (isEmpty) {
-    EncrySyncInfo(Seq.empty)
-  } else {
-    EncrySyncInfo(lastHeaders(EncrySyncInfo.MaxBlockIds).headers.map(_.id))
-  }
+  override def syncInfo: EncrySyncInfo = if (isEmpty) EncrySyncInfo(Seq.empty)
+  else EncrySyncInfo(lastHeaders(EncrySyncInfo.MaxBlockIds).headers.map(_.id))
 
-  override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity= {
+  override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity = {
     historyStorage.store.get(validityKey(modifierId)) match {
-      case Some(b) if b.data.headOption.contains(1.toByte) => Valid
-      case Some(b) if b.data.headOption.contains(0.toByte) => Invalid
-      case None if contains(modifierId) => scorex.core.consensus.Unknown
-      case None => Absent
+      case Some(b) if b.data.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
+      case Some(b) if b.data.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
+      case None if contains(modifierId) => ModifierSemanticValidity.Unknown
+      case None => ModifierSemanticValidity.Absent
       case m =>
         log.error(s"Incorrect validity status: $m")
-        Absent
+        ModifierSemanticValidity.Absent
     }
   }
 }

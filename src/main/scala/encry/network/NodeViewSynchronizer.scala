@@ -4,17 +4,18 @@ import java.net.InetSocketAddress
 
 import akka.actor.Actor
 import encry.EncryApp._
+import encry.consensus.{HistoryReader, SyncInfo}
 import encry.network.PeerConnectionHandler._
 import encry.network.message.BasicMsgDataTypes._
 import encry.network.message.{InvSpec, RequestModifierSpec, _}
-import scorex.core.consensus.{History, HistoryReader, SyncInfo}
-import encry.settings.NetworkSettings
+import encry.settings.{Algos, NetworkSettings}
+import encry.utils.ScorexLogging
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.StateReader
 import scorex.core.transaction.{MempoolReader, Transaction}
-import scorex.core.utils.ScorexLogging
 import scorex.core.{PersistentNodeViewModifier, _}
 import scorex.crypto.encode.Base58
+
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -30,8 +31,8 @@ class NodeViewSynchronizer[P <: Proposition, TX <: Transaction[P], SI <: SyncInf
 SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: HistoryReader[PMOD, SI], MR <: MempoolReader[TX]]
 (syncInfoSpec: SIS) extends Actor with ScorexLogging {
 
-  import History._
   import NodeViewSynchronizer.ReceivableMessages._
+  import encry.consensus.History._
   import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
   import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
 
@@ -86,7 +87,7 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
       networkController ! SendToNetwork(Message(syncInfoSpec, Right(syncInfo), None), SendToPeers(peers))
   }
 
-  //sync info is coming from another node
+  /** sync info is coming from another node */
   def processSync: Receive = {
     case DataFromPeer(spec, syncInfo: SI@unchecked, remote)
       if spec.messageCode == syncInfoSpec.messageCode =>
@@ -109,8 +110,7 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
       }
   }
 
-
-  // Send history extension to the (less developed) peer 'remote' which does not have it.
+  /** Send history extension to the (less developed) peer 'remote' which does not have it. */
   def sendExtension(remote: ConnectedPeer,
                     status: HistoryComparisonResult,
                     extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit = extOpt match {
@@ -122,34 +122,27 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
       }
   }
 
-  //view holder is telling other node status
+  /** View holder is telling other node status */
   def processSyncStatus: Receive = {
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       statusTracker.updateStatus(remote, status)
-
       status match {
-        case Unknown =>
-          //todo: should we ban peer if its status is unknown after getting info from it?
-          log.warn("Peer status is still unknown")
-        case Nonsense =>
-          //todo: fix, see https://github.com/ScorexFoundation/Scorex/issues/158
-          log.warn("Got nonsense")
-        case Younger =>
-          sendExtension(remote, status, extOpt)
+        case Unknown => log.warn("Peer status is still unknown")
+        case Nonsense => log.warn("Got nonsense") //todo: fix, see https://github.com/ScorexFoundation/Scorex/issues/158
+        case Younger => sendExtension(remote, status, extOpt)
         case _ => // does nothing for `Equal` and `Older`
       }
   }
 
-  //object ids coming from other node
+  /** object ids coming from other node */
   def processInv: Receive = {
     case DataFromPeer(spec, invData: InvData@unchecked, remote)
       if spec.messageCode == InvSpec.MessageCode =>
-
       //TODO can't replace viewHolderRef with a reader because of modifiers cache
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
   }
 
-  //other node asking for objects by their ids
+  /** other node asking for objects by their ids */
   def modifiersReq: Receive = {
     case DataFromPeer(spec, invData: InvData@unchecked, remote)
       if spec.messageCode == RequestModifierSpec.MessageCode =>
@@ -166,9 +159,7 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
       }
   }
 
-  /**
-    * Logic to process modifiers got from another peer
-    */
+  /** Logic to process modifiers got from another peer */
   def modifiersFromRemote: Receive = {
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       val typeId: ModifierTypeId = data._1
@@ -181,13 +172,9 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
       if (spam.nonEmpty) {
         log.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
           s": ${spam.keys.map(Base58.encode)}")
-        val mids: Seq[ModifierId] = spam.keys.toSeq
-        deliveryTracker.deleteSpam(mids)
+        deliveryTracker.deleteSpam(spam.keys.toSeq)
       }
-      if (fm.nonEmpty) {
-        val mods: Seq[Array[Byte]] = fm.values.toSeq
-        nodeViewHolder ! ModifiersFromRemote(remote, typeId, mods)
-      }
+      if (fm.nonEmpty) nodeViewHolder ! ModifiersFromRemote(remote, typeId, fm.values.toSeq)
   }
 
   //local node sending object ids to remote
@@ -282,7 +269,7 @@ object NodeViewSynchronizer {
                              modifierId: ModifierId)
 
     case class OtherNodeSyncingStatus[SI <: SyncInfo](remote: ConnectedPeer,
-                                                      status: History.HistoryComparisonResult,
+                                                      status: encry.consensus.History.HistoryComparisonResult,
                                                       extension: Option[Seq[(ModifierTypeId, ModifierId)]])
 
     trait PeerManagerEvent
@@ -323,7 +310,5 @@ object NodeViewSynchronizer {
     case class SyntacticallySuccessfulModifier[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends ModificationOutcome
 
     case class SemanticallySuccessfulModifier[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends ModificationOutcome
-
   }
-
 }

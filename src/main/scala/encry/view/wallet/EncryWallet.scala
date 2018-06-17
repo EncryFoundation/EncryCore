@@ -11,13 +11,12 @@ import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.EncryBaseBox
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.{Algos, Constants, EncryAppSettings}
-import encry.utils.{BalanceCalculator, BoxFilter}
+import encry.utils.{BalanceCalculator, BoxFilter, ScorexLogging}
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.transaction.box.Box.Amount
 import scorex.core.transaction.wallet.Vault
-import scorex.core.utils.ScorexLogging
 import scorex.core.{ModifierId, VersionTag}
 import scorex.crypto.authds.ADKey
 import scorex.utils.Random
