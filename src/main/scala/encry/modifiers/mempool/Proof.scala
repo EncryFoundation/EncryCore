@@ -1,5 +1,6 @@
 package encry.modifiers.mempool
 
+import com.google.common.primitives.{Bytes, Shorts}
 import encry.settings.Algos
 import org.encryfoundation.prismlang.codec.PCodec
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
@@ -40,7 +41,20 @@ object Proof {
 
 object ProofSerializer extends Serializer[Proof] {
 
-  override def toBytes(obj: Proof): Array[Byte] = ???
+  override def toBytes(obj: Proof): Array[Byte] = {
+    val valueBytes: Array[Byte] = PCodec.boxedValCodec.encode(obj.value).require.toByteArray
+    Bytes.concat(
+      Shorts.toByteArray(valueBytes.length.toShort),
+      valueBytes,
+      obj.tagOpt.map(_.getBytes(Algos.charset)).getOrElse(Array.empty)
+    )
+  }
 
-  override def parseBytes(bytes: Array[Byte]): Try[Proof] = ???
+  override def parseBytes(bytes: Array[Byte]): Try[Proof] = Try {
+    val valueLen: Short = Shorts.fromByteArray(bytes.take(2))
+    val value: BoxedValue = PCodec.boxedValCodec.decode(BitVector(bytes.slice(2, valueLen + 2))).require.value
+    val tagOpt: Option[String] = if (bytes.lengthCompare(valueLen + 2) != 0)
+      Some(new String(bytes.drop(valueLen + 2), Algos.charset)) else None
+    Proof(value, tagOpt)
+  }
 }

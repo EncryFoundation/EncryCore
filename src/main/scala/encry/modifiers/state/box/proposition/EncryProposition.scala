@@ -33,6 +33,7 @@ case class EncryProposition(contract: CompiledContract) extends Proposition {
     val args: List[(String, PValue)] = contract.args.map { case (name, tpe) =>
       env.find(_._1.contains(name)).orElse(env.find(_._2.tpe == tpe)).map(elt => name -> elt._2)
         .getOrElse(throw new Exception("Not enough arguments for contact")) }
+    println(args)
     Evaluator.initializedWith(args).eval[Boolean](contract.script)
   }
 
@@ -88,11 +89,7 @@ object EncryProposition {
       Expr.Call(
         Expr.Name(Ident("checkSig"), Types.PFunc(CheckSig.args.toList, Types.PBoolean)),
         List(
-          Expr.Attribute(
-            Expr.Name(Ident("sig"), Types.Signature25519),
-            Ident("sigBytes"),
-            Types.PCollection.ofByte
-          ),
+          Expr.Name(Ident("sig"), Types.Signature25519),
           Expr.Attribute(
             Expr.Name(Ident("tx"), Types.EncryTransaction),
             Ident("messageToSign"),
