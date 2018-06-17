@@ -2,7 +2,6 @@ package encry.modifiers.mempool
 
 import encry.modifiers.mempool.directive.Directive
 import encry.modifiers.state.box.EncryBaseBox
-import encry.modifiers.state.box.proof.Proof
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.{Algos, Constants}
 import io.circe.Encoder
@@ -19,7 +18,7 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
 
   val txHash: Digest32
 
-  lazy val dataToSign: Array[Byte] = txHash
+  lazy val messageToSign: Array[Byte] = txHash
 
   val semanticValidity: Try[Unit]
 
@@ -42,9 +41,6 @@ trait EncryBaseTransaction extends Transaction[EncryProposition]
     directives.map(_.cost).sum + (Constants.PersistentByteCost * length)
 
   override def toString: String = s"<EncryTransaction id=${Algos.encode(id)} fee=$fee inputs=${unlockers.map(u => Algos.encode(u.boxId))}>"
-
-  // Shadowed.
-  override lazy val messageToSign: Array[Byte] = Array.fill(32)(1.toByte)
 }
 
 object EncryBaseTransaction {

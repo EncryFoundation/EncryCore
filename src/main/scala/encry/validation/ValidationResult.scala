@@ -1,4 +1,4 @@
-package encry.view.validation
+package encry.validation
 
 import akka.http.scaladsl.server.Route
 import io.circe.{ACursor, Decoder, DecodingFailure}

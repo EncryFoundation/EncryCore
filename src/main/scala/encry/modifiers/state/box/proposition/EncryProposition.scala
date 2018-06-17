@@ -32,8 +32,7 @@ case class EncryProposition(contract: CompiledContract) extends Proposition {
       else List((None, ctx.transaction.asVal), (None, ctx.state.asVal)) ++ proofs.map(proof => (proof.tagOpt, proof.value))
     val args: List[(String, PValue)] = contract.args.map { case (name, tpe) =>
       env.find(_._1.contains(name)).orElse(env.find(_._2.tpe == tpe)).map(elt => name -> elt._2)
-        .getOrElse(throw new Exception("Not enough arguments for contact"))
-    }
+        .getOrElse(throw new Exception("Not enough arguments for contact")) }
     Evaluator.initializedWith(args).eval[Boolean](contract.script)
   }
 

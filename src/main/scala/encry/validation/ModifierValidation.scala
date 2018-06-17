@@ -1,7 +1,7 @@
-package encry.view.validation
+package encry.validation
 
 import encry.consensus.ModifierSemanticValidity
-import encry.view.validation.ValidationResult.{Invalid, Valid}
+import encry.validation.ValidationResult.{Invalid, Valid}
 import scorex.crypto.encode.Base58
 
 /** Base trait for the modifier validation process.

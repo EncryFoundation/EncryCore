@@ -12,7 +12,7 @@ import encry.settings.{Algos, Constants, NodeSettings}
 import encry.utils.{NetworkTimeProvider, ScorexLogging}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
-import encry.view.validation.{ModifierValidator, ValidationResult}
+import encry.validation.{ModifierValidator, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core._
 

@@ -8,7 +8,7 @@ import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.consensus.ModifierSemanticValidity.Invalid
-import encry.view.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
+import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 
 import scala.util.{Failure, Success, Try}
 

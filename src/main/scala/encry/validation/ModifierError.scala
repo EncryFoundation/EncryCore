@@ -1,4 +1,4 @@
-package encry.view.validation
+package encry.validation
 
 /** Base trait for errors that were occurred during NodeView Modifier validation */
 trait ModifierError {

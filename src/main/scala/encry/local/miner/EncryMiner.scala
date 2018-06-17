@@ -153,14 +153,7 @@ class EncryMiner extends Actor with ScorexLogging {
     val nBits: NBits = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
       .getOrElse(Constants.Chain.InitialNBits)
 
-    val derivedFields: (Byte, ModifierId, Digest32, Digest32, Int) = consensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
-
-    val blockSignature: Signature25519 = minerSecret.sign(
-      EncryBlockHeader.getMessageToSign(derivedFields._1, minerSecret.publicImage, derivedFields._2,
-        derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, nBits))
-
-    val candidate: CandidateBlock = CandidateBlock(minerSecret.publicImage,
-      blockSignature, bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, nBits)
+    val candidate: CandidateBlock = CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, nBits)
 
     log.debug(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
       s"and 1 coinbase for height $height")

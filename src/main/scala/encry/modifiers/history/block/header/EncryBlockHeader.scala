@@ -4,13 +4,13 @@ import com.google.common.primitives.{Ints, _}
 import encry.consensus.{Difficulty, DifficultySerializer, NBits}
 import encry.crypto.equihash.{Equihash, EquihashSolution, EquihashSolutionsSerializer}
 import encry.modifiers.history.ADProofs
+import encry.modifiers.history.block.Block.{Height, Timestamp, Version}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
 import encry.settings.{Algos, Constants}
 import io.circe.Encoder
 import io.circe.syntax._
 import org.bouncycastle.crypto.digests.Blake2bDigest
-import scorex.core.block.Block._
 import scorex.core.serialization.Serializer
 import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.crypto.authds.ADDigest

@@ -173,8 +173,9 @@ class UtxoState(override val version: VersionTag,
         (bxOpt, tx.defaultProofOpt) match {
           // If no `proofs` provided, then `defaultProof` is used.
           case (Some(bx), _) if unlocker.proofs.nonEmpty => if (bx.proposition.canUnlock(context, unlocker.proofs)) acc :+ bx else acc
-          case (Some(bx), Some(defaultProof)) => if (bx.proposition.canUnlock(context, unlocker.proofs :+ defaultProof)) acc :+ bx else acc
-          case _ => throw TransactionValidationException(s"Failed to spend some boxes referenced in $tx")
+          case (Some(bx), Some(defaultProof)) => if (bx.proposition.canUnlock(context, Seq(defaultProof))) acc :+ bx else acc
+          case (Some(bx), _) => if (bx.proposition.canUnlock(context, Seq.empty)) acc :+ bx else acc
+          case _ => throw TransactionValidationException(s"Box(${Algos.encode(unlocker.boxId)}) not found")
         }
       }
 
