@@ -71,7 +71,7 @@ object Constants {
     val DesiredBlockInterval: FiniteDuration = 30.seconds
 
     // Number of last epochs for difficulty recalculation
-    val RetargetingEpochsQty: Int = 30
+    val RetargetingEpochsQty: Int = 3
 
     val EpochLength: Int = 10
 
