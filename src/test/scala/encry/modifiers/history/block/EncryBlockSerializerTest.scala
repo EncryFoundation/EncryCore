@@ -1,12 +1,11 @@
 package encry.modifiers.history.block
 
-import encry.crypto.{PublicKey25519, Signature25519}
 import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.Constants
+import encry.settings.{Algos, Constants}
 import encry.utils.TestHelper
 import org.scalatest.FunSuite
 import scorex.core.ModifierId
@@ -55,6 +54,6 @@ class EncryBlockSerializerTest extends FunSuite {
 
     assert(block.adProofsOpt.get.bytes sameElements blockDeserealized.adProofsOpt.get.bytes,"ADProofs bytes mismatch.")
 
-    assert(block.id sameElements blockDeserealized.id, "Block Id mismatch.")
+    assert(Algos.hash(block.bytes) sameElements Algos.hash(blockDeserealized.bytes), "Block bytes mismatch.")
   }
 }
