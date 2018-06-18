@@ -83,22 +83,21 @@ trait EncryHistoryReader
   override def continuationIds(info: EncrySyncInfo, size: Int): Option[ModifierIds] = Try {
     if (isEmpty) info.startingPoints
     else if (info.lastHeaderIds.isEmpty) {
-      val heightFrom = Math.min(bestHeaderHeight, size - 1)
-      val startId = headerIdsAtHeight(heightFrom).head
-      val startHeader = typedModifierById[EncryBlockHeader](startId).get
-      val headers = headerChainBack(size, startHeader, _ => false)
+      val heightFrom: Int = Math.min(bestHeaderHeight, size - 1)
+      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
+      val startHeader: EncryBlockHeader = typedModifierById[EncryBlockHeader](startId).get
+      val headers: EncryHeaderChain = headerChainBack(size, startHeader, _ => false)
         .ensuring(_.headers.exists(_.height == Constants.Chain.GenesisHeight), "Should always contain genesis header")
       headers.headers.flatMap(h => Seq((EncryBlockHeader.modifierTypeId, h.id)))
     } else {
-      val ids = info.lastHeaderIds
+      val ids: Seq[ModifierId] = info.lastHeaderIds
       val lastHeaderInOurBestChain: ModifierId = ids.view.reverse.find(m => isInBestChain(m)).get
-      val theirHeight = heightOf(lastHeaderInOurBestChain).get
-      val heightFrom = Math.min(bestHeaderHeight, theirHeight + size)
-      val startId = headerIdsAtHeight(heightFrom).head
-      val startHeader = typedModifierById[EncryBlockHeader](startId).get
-      val headerIds = headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
+      val theirHeight: Height = heightOf(lastHeaderInOurBestChain).get
+      val heightFrom: Int = Math.min(bestHeaderHeight, theirHeight + size)
+      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
+      val startHeader: EncryBlockHeader = typedModifierById[EncryBlockHeader](startId).get
+      headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
         .headers.map(h => EncryBlockHeader.modifierTypeId -> h.id)
-      headerIds
     }
   }.toOption
 
@@ -217,5 +216,4 @@ trait EncryHistoryReader
         log.error(s"Incorrect validity status: $m")
         ModifierSemanticValidity.Absent
     }
-
 }
