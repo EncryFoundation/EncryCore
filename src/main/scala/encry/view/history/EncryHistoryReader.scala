@@ -59,30 +59,19 @@ trait EncryHistoryReader
   override def compare(si: EncrySyncInfo): HistoryComparisonResult = {
     bestHeaderIdOpt match {
       case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) =>
-        //Our best header is the same as other node best header
-        Equal
+        Equal //Our best header is the same as other node best header
       case Some(id) if si.lastHeaderIds.exists(_ sameElements id) =>
-        //Our best header is in other node best chain, but not at the last position
-        Older
+        Older //Our best header is in other node best chain, but not at the last position
       case Some(_) if si.lastHeaderIds.isEmpty =>
-        //Other history is empty, our contain some headers
-        Younger
+        Younger //Other history is empty, our contain some headers
       case Some(_) =>
         //We are on different forks now.
-        if (si.lastHeaderIds.view.reverse.exists(m => contains(m))) {
-          //Return Younger, because we can send blocks from our fork that other node can download.
-          Younger
-        } else {
-          //We don't have any of id's from other's node sync info in history.
-          //We don't know whether we can sync with it and what blocks to send in Inv message.
-          Unknown
-        }
-      case None if si.lastHeaderIds.isEmpty =>
-        //Both nodes do not keep any blocks
-        Equal
-      case None =>
-        //Our history is empty, other contain some headers
-        Older
+        if (si.lastHeaderIds.view.reverse.exists(m => contains(m)))
+          Younger //Return Younger, because we can send blocks from our fork that other node can download.
+        else Unknown //We don't have any of id's from other's node sync info in history.
+      //We don't know whether we can sync with it and what blocks to send in Inv message.
+      case None if si.lastHeaderIds.isEmpty => Equal //Both nodes do not keep any blocks
+      case None => Older //Our history is empty, other contain some headers
     }
   }
 
@@ -92,9 +81,8 @@ trait EncryHistoryReader
     * @return Ids of headers, that node with info should download and apply to synchronize
     */
   override def continuationIds(info: EncrySyncInfo, size: Int): Option[ModifierIds] = Try {
-    if (isEmpty) {
-      info.startingPoints
-    } else if (info.lastHeaderIds.isEmpty) {
+    if (isEmpty) info.startingPoints
+    else if (info.lastHeaderIds.isEmpty) {
       val heightFrom = Math.min(bestHeaderHeight, size - 1)
       val startId = headerIdsAtHeight(heightFrom).head
       val startHeader = typedModifierById[EncryBlockHeader](startId).get
@@ -123,9 +111,8 @@ trait EncryHistoryReader
         .flatMap { h => headerIdsAtHeight(h + 1) }
         .flatMap { id => typedModifierById[EncryBlockHeader](id) }
         .filter(filterCond)
-      if (nextLevelHeaders.isEmpty) {
-        acc.map(chain => chain.reverse)
-      } else {
+      if (nextLevelHeaders.isEmpty) acc.map(chain => chain.reverse)
+      else {
         val updatedChains: Seq[Seq[EncryBlockHeader]] = nextLevelHeaders.flatMap { h =>
           acc.find(chain => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(c => h +: c)
         }

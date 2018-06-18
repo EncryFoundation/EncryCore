@@ -91,7 +91,6 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
   def processSync: Receive = {
     case DataFromPeer(spec, syncInfo: SI@unchecked, remote)
       if spec.messageCode == syncInfoSpec.messageCode =>
-
       historyReaderOpt match {
         case Some(historyReader) =>
           val extensionOpt = historyReader.continuationIds(syncInfo, networkSettings.networkChunkSize)
