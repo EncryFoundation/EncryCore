@@ -72,8 +72,8 @@ object EncryProposition {
             Ast.Ident("height"),
             Types.PInt
           ),
-          List(Ast.CompOp.Gt),
-          List(Expr.IntConst(height))
+          List(Ast.CompOp.GtE),
+          List(Expr.IntConst(height.toLong))
         ),
         Expr.True,
         Expr.False,
