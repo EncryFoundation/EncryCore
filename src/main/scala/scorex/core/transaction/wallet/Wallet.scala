@@ -5,6 +5,7 @@ import scorex.core.serialization.{BytesSerializable, Serializer}
 import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.Box
 import scorex.core.transaction.box.proposition.{ProofOfKnowledgeProposition, Proposition}
+import scorex.core.transaction.state.Secret
 import scorex.core.{ModifierId, NodeViewModifier, PersistentNodeViewModifier}
 import scorex.crypto.encode.Base58
 
@@ -86,7 +87,7 @@ trait Wallet[P <: Proposition, TX <: Transaction[P], PMOD <: PersistentNodeViewM
   extends Vault[P, TX, PMOD, W] {
   self: W =>
 
-  type S
+  type S <: Secret
   type PI <: ProofOfKnowledgeProposition[S]
 
   //TODO Add Option[Seed] parameter, use provided seed it it exists
