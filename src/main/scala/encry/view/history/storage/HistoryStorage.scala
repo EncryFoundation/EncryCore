@@ -24,7 +24,6 @@ class HistoryStorage(override val store: Store, val objectsStore: ObjectsStore) 
     }
 
   def insertObjects(objectsToInsert: Seq[EncryPersistentModifier]): Unit = {
-    log.warn(s"<<<inserted ${objectsToInsert.mkString("\n")}>>>")
     objectsToInsert.foreach(o => objectsStore.put(o))
   }
 
