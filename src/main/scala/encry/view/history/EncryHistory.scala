@@ -180,11 +180,11 @@ object EncryHistory {
 
   def readOrGenerate(settings: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistory = {
 
-    val historyDir = getHistoryDir(settings)
+    val historyDir: File = getHistoryDir(settings)
 
-    val db = new LSMStore(historyDir, keepVersions = 0)
-    val objectsStore = new FileHistoryObjectsStore(historyDir.getAbsolutePath)
-    val storage = new HistoryStorage(db, objectsStore)
+    val db: LSMStore = new LSMStore(historyDir, keepVersions = 0)
+    val objectsStore: FileHistoryObjectsStore = new FileHistoryObjectsStore(historyDir.getAbsolutePath)
+    val storage: HistoryStorage = new HistoryStorage(db, objectsStore)
 
     val history: EncryHistory = (settings.node.stateMode.isDigest, settings.node.verifyTransactions) match {
       case (true, true) =>
@@ -205,8 +205,7 @@ object EncryHistory {
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
         }
-      case m =>
-        throw new Error(s"Unsupported settings ADState=:${m._1}, verifyTransactions=:${m._2}, ")
+      case m => throw new Error(s"Unsupported settings ADState=:${m._1}, verifyTransactions=:${m._2}, ")
     }
     history
   }
