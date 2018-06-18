@@ -33,9 +33,7 @@ object Input {
     for {
       boxId <- c.downField("boxId").as[String]
       proofs <- c.downField("proofs").as[List[Proof]]
-    } yield {
-      Input(ADKey @@ Algos.decode(boxId).get, proofs)
-    }
+    } yield Input(ADKey @@ Algos.decode(boxId).get, proofs)
   }
 }
 

@@ -81,8 +81,8 @@ object AssetIssuingDirectiveSerializer extends Serializer[AssetIssuingDirective]
   override def parseBytes(bytes: Array[Byte]): Try[AssetIssuingDirective] = {
     val scriptLen = Shorts.fromByteArray(bytes.take(2))
     CompiledContractSerializer.parseBytes(bytes.slice(2, scriptLen + 2)).map { contract =>
-      val amount = Longs.fromByteArray(bytes.slice(scriptLen + 2, scriptLen + 2 + 8))
-      val symbol = new String(bytes.slice(scriptLen + 2 + 8, bytes.length), Algos.charset)
+      val amount: Amount = Longs.fromByteArray(bytes.slice(scriptLen + 2, scriptLen + 2 + 8))
+      val symbol: String = new String(bytes.slice(scriptLen + 2 + 8, bytes.length), Algos.charset)
       AssetIssuingDirective(contract, amount, symbol)
     }
   }

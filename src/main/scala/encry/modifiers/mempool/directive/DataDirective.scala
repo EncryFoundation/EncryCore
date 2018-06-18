@@ -16,8 +16,7 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-case class DataDirective(contract: CompiledContract,
-                         data: Array[Byte]) extends Directive {
+case class DataDirective(contract: CompiledContract, data: Array[Byte]) extends Directive {
 
   override type M = DataDirective
 

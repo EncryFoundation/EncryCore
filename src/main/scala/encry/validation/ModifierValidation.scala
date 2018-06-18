@@ -18,7 +18,7 @@ trait ModifierValidator {
   /** report non-recoverable modifier error that could be fixed by retries and requires modifier change */
   def fatal(errorMessage: String): Invalid = invalid(MalformedModifierError(errorMessage))
 
-  /** unsuccessful validation with a given error*/
+  /** unsuccessful validation with a given error */
   def invalid(error: ModifierError): Invalid = Invalid(Seq(error))
 
   /** successful validation */
@@ -50,39 +50,17 @@ case class ValidationState(result: ValidationResult, strategy: ValidationStrateg
   /** Reverse condition: Validate the condition is `false` or else return the `error` given */
   def validateNot(condition: => Boolean)(error: => Invalid): ValidationState = validate(!condition)(error)
 
-  /** Validate the first argument equals the second. This should not be used with `Id` of type `Array[Byte]`.
-    * The `error` callback will be provided with detail on argument values for better reporting
-    */
-  def validateEquals[T](given: => T)(expected: => T)(error: String => Invalid): ValidationState = {
-    (given, expected) match {
-      case (a: Array[_], b: Array[_]) if a sameElements b =>
-        pass(Valid)
-      case (_: Array[_], _) =>
-        pass(error(s"Given: $given, expected: $expected. Use validateEqualIds when comparing Arrays"))
-      case _ =>
-        validate(given == expected)(error(s"Given: $given, expected $expected"))
-    }
-  }
-
   /** Validate the `id`s are equal. The `error` callback will be provided with detail on argument values */
-  def validateEqualIds(given: => Array[Byte], expected: => Array[Byte])(error: String => Invalid): ValidationState = {
+  def validateEqualIds(given: => Array[Byte], expected: => Array[Byte])(error: String => Invalid): ValidationState =
     validate(given sameElements expected)(error(s"Given: ${Base58.encode(given)}, expected ${Base58.encode(expected)}"))
-  }
-
 
   /** Wrap semantic validity to the validation state: if semantic validity was not Valid, then return the `error` given
     */
-  def validateSemantics(validity: => ModifierSemanticValidity)(error: => Invalid): ValidationState = {
+  def validateSemantics(validity: => ModifierSemanticValidity)(error: => Invalid): ValidationState =
     validateNot(validity == ModifierSemanticValidity.Invalid)(error)
-  }
 
   /** Validate the condition is `true` or else return the `error` given */
-  def validate(condition: => Boolean)(error: => Invalid): ValidationState = {
-    pass(if (condition) Valid else error)
-  }
-
-  /** This is for nested validations that allow mixing fail-fast and accumulate-errors validation strategies */
-  def validate(operation: => ValidationResult): ValidationState = pass(operation)
+  def validate(condition: => Boolean)(error: => Invalid): ValidationState = pass(if (condition) Valid else error)
 
   /** Create the next validation state as the result of given `operation` */
   def pass(operation: => ValidationResult): ValidationState = {
@@ -96,16 +74,8 @@ case class ValidationState(result: ValidationResult, strategy: ValidationStrateg
   /** Shortcut `require`-like method for the simple validation with fatal error.
     * If you need more convenient checks, use `validate` methods.
     */
-  def demand(condition: => Boolean, fatalError: => String): ValidationState = {
+  def demand(condition: => Boolean, fatalError: => String): ValidationState =
     validate(condition)(ModifierValidator.fatal(fatalError))
-  }
-
-  /** Shortcut `require`-like method for the simple validation with recoverable error.
-    * If you need more convenient checks, use `validate` methods.
-    */
-  def recoverable(condition: => Boolean, recoverableError: => String): ValidationState = {
-    validate(condition)(ModifierValidator.error(recoverableError))
-  }
 }
 
 /** The strategy indicates are we going to perform fail-fast or error-accumulative validation.
