@@ -254,17 +254,12 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
   object HeaderValidator extends ModifierValidator {
 
-    def validate(header: EncryBlockHeader): ValidationResult = {
-      if (header.isGenesis) validateGenesisBlockHeader(header)
-      else {
-        val parentOpt: Option[EncryBlockHeader] = typedModifierById[EncryBlockHeader](header.parentId)
-        parentOpt.map { parent =>
-          validateChildBlockHeader(header, parent)
-        } getOrElse fatal(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
-      }
-    }
+    def validate(header: EncryBlockHeader): ValidationResult = if (header.isGenesis) validateGenesisBlockHeader(header)
+    else typedModifierById[EncryBlockHeader](header.parentId).map { parent =>
+      validateChildBlockHeader(header, parent)
+    } getOrElse fatal(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
 
-    private def validateGenesisBlockHeader(header: EncryBlockHeader): ValidationResult = {
+    private def validateGenesisBlockHeader(header: EncryBlockHeader): ValidationResult =
       accumulateErrors
         .validateEqualIds(header.parentId, EncryBlockHeader.GenesisParentId) { detail =>
           fatal(s"Genesis block should have genesis parent id. $detail")
@@ -276,7 +271,6 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
           fatal(s"Height of genesis block $header is incorrect")
         }
         .result
-    }
 
     private def validateChildBlockHeader(header: EncryBlockHeader, parent: EncryBlockHeader): ValidationResult = {
       failFast
@@ -296,12 +290,12 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
           fatal(s"Block difficulty ${realDifficulty(header)} is less than required ${header.requiredDifficulty}")
         }
         // TODO: Enable this step when nBits decoding issue solved.
-//        .validateEquals(header.nBits)(requiredDifficultyAfter(parent)) { detail =>
-//          fatal(s"Incorrect required difficulty. $detail")
-//        }
+        //        .validateEquals(header.nBits)(requiredDifficultyAfter(parent)) { detail =>
+        //          fatal(s"Incorrect required difficulty. $detail")
+        //        }
         .validate(heightOf(header.parentId).exists(h => bestHeaderHeight - h < Constants.Chain.MaxRollbackDepth)) {
-          fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
-        }
+        fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
+      }
         .validate(powScheme.verify(header)) {
           fatal(s"Wrong proof-of-work solution for $header")
         }
@@ -312,4 +306,5 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
     }
 
   }
+
 }

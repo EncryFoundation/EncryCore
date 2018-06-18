@@ -4,15 +4,6 @@ import encry.consensus.ModifierSemanticValidity
 import encry.validation.ValidationResult.{Invalid, Valid}
 import scorex.crypto.encode.Base58
 
-/** Base trait for the modifier validation process.
-  *
-  * This code was pretty much inspired by cats `Validated` facility. There is a reason why don't we use the original
-  * cats facility in our code. It doesn't suit well for modifier validation in Encry as being supposed mostly
-  * for the web from validation. It's really good in accumulating all the validated fields and constructing
-  * a composite object from all these fields.
-  *
-  * The distinction from cats `Validated` is that we do support both fail-fast and error-accumulating validation
-  * while cats `Validated` supports only accumulative approach. */
 trait ModifierValidator {
 
   /** Start validation in Fail-Fast mode */
@@ -37,23 +28,18 @@ trait ModifierValidator {
     * If you need to validate against multiple checks, which is usual,
     * then use [[failFast]] and [[accumulateErrors]] to start the validation
     */
-  def validate(condition: Boolean)(error: => Invalid): ValidationResult = {
-    accumulateErrors.validate(condition)(error).result
-  }
+  def validate(condition: Boolean)(error: => Invalid): ValidationResult = accumulateErrors.validate(condition)(error).result
 
   /** Shortcut `require`-like method for the simple single-check validation with fatal error.
     * If you need to validate against multiple checks then use [[failFast]] and [[accumulateErrors]]
     */
-  def demand(condition: Boolean, fatalError: => String): ValidationResult = {
-    validate(condition)(fatal(fatalError))
-  }
+  def demand(condition: Boolean, fatalError: => String): ValidationResult = validate(condition)(fatal(fatalError))
 
   /** Shortcut `require`-like method for the simple single-check validation with recoverable error.
     * If you need to validate against multiple checks then use [[failFast]] and [[accumulateErrors]]
     */
-  def recoverable(condition: Boolean, recoverableError: => String): ValidationResult = {
-    validate(condition)(error(recoverableError))
-  }
+  def recoverable(condition: Boolean, recoverableError: => String): ValidationResult = validate(condition)(error(recoverableError))
+
 }
 
 object ModifierValidator extends ModifierValidator
@@ -62,9 +48,7 @@ object ModifierValidator extends ModifierValidator
 case class ValidationState(result: ValidationResult, strategy: ValidationStrategy) {
 
   /** Reverse condition: Validate the condition is `false` or else return the `error` given */
-  def validateNot(condition: => Boolean)(error: => Invalid): ValidationState = {
-    validate(!condition)(error)
-  }
+  def validateNot(condition: => Boolean)(error: => Invalid): ValidationState = validate(!condition)(error)
 
   /** Validate the first argument equals the second. This should not be used with `Id` of type `Array[Byte]`.
     * The `error` callback will be provided with detail on argument values for better reporting
