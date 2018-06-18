@@ -12,9 +12,9 @@ object PowLinearController {
 
   val PrecisionConstant: Int = 1000000000
 
-  def getDifficulty(previousHeaders: Seq[(Int, EncryBlockHeader)]): NBits =
+  def getDifficulty(previousHeaders: Seq[(Int, EncryBlockHeader)]): Difficulty =
     if (previousHeaders.lengthCompare(1) == 0 || previousHeaders.head._2.timestamp >= previousHeaders.last._2.timestamp)
-      previousHeaders.head._2.nBits
+      previousHeaders.head._2.difficulty
     else {
       val data: Seq[(Int, Difficulty)] = previousHeaders.sliding(2).toList.map { d =>
         val start: (Int, EncryBlockHeader) = d.head
@@ -25,7 +25,7 @@ object PowLinearController {
         (end._1, diff)
       }
       val diff: Difficulty = interpolate(data)
-      if (diff >= chainParams.InitialDifficulty) DifficultySerializer.encodeCompactBits(diff) else chainParams.InitialNBits
+      if (diff >= chainParams.InitialDifficulty) diff else chainParams.InitialDifficulty
     }
 
   /** Used to provide `getDifficulty()` with the sequence of headers of correct heights. */
