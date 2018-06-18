@@ -57,7 +57,6 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
   @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def viewHolderEvents: Receive = {
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
-    case SyntacticallySuccessfulModifier(mod) =>
     case SyntacticallyFailedModification(mod, throwable) =>
     case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
     case SemanticallyFailedModification(mod, throwable) =>
@@ -290,13 +289,7 @@ object NodeViewSynchronizer {
 
     case class RollbackSucceed(branchPointOpt: Option[VersionTag]) extends NodeViewHolderEvent
 
-    case class NewOpenSurface(newSurface: Seq[ModifierId]) extends NodeViewHolderEvent
-
-    case class StartingPersistentModifierApplication[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends NodeViewHolderEvent
-
     trait ModificationOutcome extends NodeViewHolderEvent
-
-    case class FailedTransaction[P <: Proposition, TX <: Transaction[P]](transaction: TX, error: Throwable) extends ModificationOutcome
 
     case class SuccessfulTransaction[P <: Proposition, TX <: Transaction[P]](transaction: TX) extends ModificationOutcome
 

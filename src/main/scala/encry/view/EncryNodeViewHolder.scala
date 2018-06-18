@@ -16,7 +16,7 @@ import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.{DigestState, EncryState, StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
-import encry.EncryApp.{networkController, settings, timeProvider}
+import encry.EncryApp.{settings, timeProvider}
 import scorex.core._
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{NodeViewHolderEvent, SuccessfulTransaction}
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -181,7 +181,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Failure(e) =>
               val (newHis: HIS, newProgressInfo: ProgressInfo[EncryPersistentModifier]) = history.reportModifierIsInvalid(modToApply, progressInfo)
-              context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
+              nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           }
           else u
@@ -198,13 +198,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
-    context.system.eventStream.publish(StartingPersistentModifierApplication(pmod))
     log.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
         log.debug(s"Going to apply modifications to the state: $progressInfo")
-        context.system.eventStream.publish(SyntacticallySuccessfulModifier(pmod))
-        context.system.eventStream.publish(NewOpenSurface(historyBeforeStUpdate.openSurfaceIds()))
+        nodeViewSynchronizer ! SyntacticallySuccessfulModifier(pmod)
         if (progressInfo.toApply.nonEmpty) {
           val (newHistory: HIS, newStateTry: Try[MS], blocksApplied: Seq[EncryPersistentModifier]) =
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
@@ -220,7 +218,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             case Failure(e) =>
               log.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
               updateNodeView(updatedHistory = Some(newHistory))
-              context.system.eventStream.publish(SemanticallyFailedModification(pmod, e))
+              nodeViewSynchronizer ! SemanticallyFailedModification(pmod, e)
           }
         } else {
           requestDownloads(progressInfo)
@@ -228,7 +226,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
       case Failure(e) =>
         log.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to history", e)
-        context.system.eventStream.publish(SyntacticallyFailedModification(pmod, e))
+        nodeViewSynchronizer ! SyntacticallyFailedModification(pmod, e)
     }
   } else log.warn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
 
@@ -237,7 +235,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       log.debug(s"Unconfirmed transaction $tx added to the memory pool")
       val newVault: VL = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
-      context.system.eventStream.publish(SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx))
+      nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx)
     case Failure(e) =>
   }
 
