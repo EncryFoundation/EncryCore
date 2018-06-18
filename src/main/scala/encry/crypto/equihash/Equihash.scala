@@ -27,6 +27,7 @@ object Equihash {
     hashXi(digest, _)
   }
 
+
   def hashXi[T <: Digest](digest: T, xi: Int): Unit = {
     val arr: Array[Byte] = leIntToByteArray(xi)
     digest.update(arr, 0, arr.length)
@@ -168,6 +169,7 @@ object Equihash {
     */
   @SuppressWarnings(Array("NullParameter"))
   def validateSolution(n: Char, k: Char, personal: Array[Byte], header: Array[Byte], solutionIndices: IndexedSeq[Int]): Boolean = {
+
     assert(n > 1)
     assert(k >= 3)
     assert(n % 8 == 0)

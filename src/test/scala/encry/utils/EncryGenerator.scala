@@ -6,13 +6,13 @@ import akka.actor.ActorRef
 import encry.account.{Account, Address}
 import encry.crypto.equihash.EquihashSolution
 import encry.crypto.{PrivateKey25519, PublicKey25519}
-import TestHelper.{Props, rndGen}
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.proposition.AccountProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, MonetaryBox}
 import encry.settings.{Algos, Constants}
+import encry.utils.TestHelper.{Props, rndGen}
 import encry.view.state.{BoxHolder, EncryState, UtxoState}
 import io.iohk.iodb.LSMStore
 import scorex.core.ModifierId
@@ -118,7 +118,7 @@ trait EncryGenerator {
       random.nextLong(),
       random.nextInt(),
       random.nextLong(),
-      Constants.Chain.InitialNBits,
+      Constants.Chain.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
   }

@@ -1,10 +1,11 @@
 package encry.modifiers.history.block.header
 
 import com.google.common.primitives.{Ints, _}
-import encry.consensus.{Difficulty, DifficultySerializer, NBits}
+import encry.consensus.Difficulty
 import encry.crypto.PublicKey25519
 import encry.crypto.equihash.{Equihash, EquihashSolution, EquihashSolutionsSerializer}
 import encry.modifiers.history.ADProofs
+import encry.modifiers.history.block.Block._
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
@@ -12,7 +13,6 @@ import encry.settings.{Algos, Constants}
 import io.circe.Encoder
 import io.circe.syntax._
 import org.bouncycastle.crypto.digests.Blake2bDigest
-import encry.modifiers.history.block.Block._
 import scorex.core.serialization.Serializer
 import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.crypto.authds.ADDigest
@@ -32,7 +32,7 @@ case class EncryBlockHeader(override val version: Version,
                              override val timestamp: Timestamp,
                              override val height: Height,
                              var nonce: Long = 0L,
-                             nBits: NBits,
+                             difficulty: Difficulty,
                              equihashSolution: EquihashSolution) extends EncryBaseBlockHeader {
 
   import EncryBlockHeader._
@@ -43,12 +43,12 @@ case class EncryBlockHeader(override val version: Version,
 
   lazy val powHash: Digest32 = getPowHash(this)
 
-  lazy val requiredDifficulty: Difficulty = Difficulty @@ DifficultySerializer.decodeCompactBits(nBits)
+  lazy val requiredDifficulty: Difficulty = difficulty
 
   override lazy val id: ModifierId = ModifierId @@ powHash.untag(Digest32)
 
   override val dataToSign: Array[Byte] =
-    getMessageToSign(version, accountPubKey, parentId, adProofsRoot, stateRoot, transactionsRoot, timestamp, height, nBits)
+    getMessageToSign(version, accountPubKey, parentId, adProofsRoot, stateRoot, transactionsRoot, timestamp, height, difficulty)
 
   lazy val isGenesis: Boolean = height == Constants.Chain.GenesisHeight
 
@@ -81,7 +81,7 @@ object EncryBlockHeader {
     "txRoot" -> Algos.encode(h.transactionsRoot).asJson,
     "timestamp" -> h.timestamp.asJson,
     "height" -> h.height.asJson,
-    "nBits" -> h.nBits.untag(NBits).asJson,
+    "difficulty" -> h.difficulty.toString.asJson,
   ).asJson
 
   def getPowHash(header: EncryBlockHeader): Digest32 = {
@@ -109,7 +109,7 @@ object EncryBlockHeader {
                        txsRoot: Digest32,
                        timestamp: Timestamp,
                        height: Int,
-                       nBits: NBits): Array[Byte] = Algos.hash(
+                       difficulty: Difficulty): Array[Byte] = Algos.hash(
     Bytes.concat(
       Array(version),
       accountPubKey.pubKeyBytes,
@@ -119,7 +119,7 @@ object EncryBlockHeader {
       txsRoot,
       Longs.toByteArray(timestamp),
       Ints.toByteArray(height),
-      Longs.toByteArray(nBits)
+      difficulty.toByteArray
     )
   )
 }
@@ -134,7 +134,8 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
       h.transactionsRoot,
       h.stateRoot,
       Longs.toByteArray(h.timestamp),
-      DifficultySerializer.uint32ToByteArrayBE(h.nBits),
+      Ints.toByteArray(h.difficulty.toByteArray.length),
+      h.difficulty.toByteArray,
       Ints.toByteArray(h.height))
 
   override def toBytes(obj: EncryBlockHeader): Array[Byte] =
@@ -149,7 +150,8 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
       Longs.toByteArray(obj.timestamp),
       Ints.toByteArray(obj.height),
       Longs.toByteArray(obj.nonce),
-      DifficultySerializer.uint32ToByteArrayBE(obj.nBits),
+      Ints.toByteArray(obj.difficulty.toByteArray.length),
+      obj.difficulty.toByteArray,
       obj.equihashSolution.bytes
     )
 
@@ -164,8 +166,9 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
     val timestamp: Long = Longs.fromByteArray(bytes.slice(226, 234))
     val height: Int = Ints.fromByteArray(bytes.slice(234, 238))
     val nonce: Long = Longs.fromByteArray(bytes.slice(238, 246))
-    val difficulty: NBits = DifficultySerializer.readUint32BE(bytes.slice(246, 250))
-    val equihashSolution: EquihashSolution = EquihashSolutionsSerializer.parseBytes(bytes.slice(250, bytes.length)).get
+    val diificultySize: Int = Ints.fromByteArray(bytes.slice(246, 250))
+    val difficulty: Difficulty = Difficulty @@ BigInt(bytes.slice(250, 250 + diificultySize))
+    val equihashSolution: EquihashSolution = EquihashSolutionsSerializer.parseBytes(bytes.slice(250 + diificultySize, bytes.length)).get
 
     EncryBlockHeader(
       version, proposition, signature, parentId, adProofsRoot, stateRoot, txsRoot, timestamp, height, nonce, difficulty, equihashSolution)

@@ -2,19 +2,18 @@ package encry.local
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import encry.Version
-import encry.consensus.NBits
 import encry.local.EncryLocalInterface.{GetNodeInfo, NodeInfo}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.network.Handshake
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, SemanticallySuccessfulModifier}
+import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import encry.settings.{Algos, Constants, EncryAppSettings}
+import encry.utils.{NetworkTimeProvider, ScorexLogging}
 import encry.view.history.EncryHistory
 import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, SemanticallySuccessfulModifier}
-import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
-import encry.utils.{NetworkTimeProvider, ScorexLogging}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -96,7 +95,7 @@ object EncryLocalInterface {
       "bestHeaderId" -> bestHeaderOpt.map(_.encodedId).getOrElse("null").asJson,
       "bestFullHeaderId" -> bestFullBlockOpt.map(_.header.encodedId).getOrElse("null").asJson,
       "previousFullHeaderId" -> bestFullBlockOpt.map(_.header.parentId).map(Algos.encode).getOrElse("null").asJson,
-      "difficulty" -> bestFullBlockOpt.map(_.header.nBits.untag(NBits)).getOrElse(Constants.Chain.InitialNBits).asJson,
+      "difficulty" -> bestFullBlockOpt.map(_.header.difficulty.toString).getOrElse(Constants.Chain.InitialDifficulty.toString).asJson,
       "unconfirmedCount" -> unconfirmedCount.asJson,
       "stateRoot" -> stateRoot.asJson,
       "stateType" -> stateType.verboseName.asJson,
