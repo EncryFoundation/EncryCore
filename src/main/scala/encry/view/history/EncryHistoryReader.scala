@@ -1,6 +1,6 @@
 package encry.view.history
 
-import encry.consensus.{Absent, HistoryReader, ModifierSemanticValidity, Valid, Invalid}
+import encry.consensus.{HistoryReader, ModifierSemanticValidity}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -144,9 +144,6 @@ trait EncryHistoryReader
       case adProofs: ADProofs => validate(adProofs)
       case mod: Any => Failure(new Exception(s"Modifier $mod is of incorrect type."))
     }
-  }.recoverWith {
-    case e: Exception => log.info(e.toString)
-      Failure(e)
   }
 
   /** Checks whether the modifier is applicable to the history. */
@@ -237,13 +234,13 @@ trait EncryHistoryReader
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity = {
     historyStorage.store.get(validityKey(modifierId)) match {
-      case Some(b) if b.data.headOption.contains(1.toByte) => Valid
-      case Some(b) if b.data.headOption.contains(0.toByte) => Invalid
-      case None if contains(modifierId) => encry.consensus.Unknown
-      case None => Absent
+      case Some(b) if b.data.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
+      case Some(b) if b.data.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
+      case None if contains(modifierId) => ModifierSemanticValidity.Unknown
+      case None => ModifierSemanticValidity.Absent
       case m =>
         log.error(s"Incorrect validity status: $m")
-        Absent
+        ModifierSemanticValidity.Absent
     }
   }
 }

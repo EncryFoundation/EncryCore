@@ -31,7 +31,7 @@ case class EncryBlockHeader(override val version: Version,
                              override val transactionsRoot: Digest32,
                              override val timestamp: Timestamp,
                              override val height: Height,
-                             var nonce: Long = 0L,
+                             nonce: Long,
                              nBits: NBits,
                              equihashSolution: EquihashSolution) extends EncryBaseBlockHeader {
 
@@ -64,6 +64,8 @@ case class EncryBlockHeader(override val version: Version,
   }
 
   override def serializer: Serializer[M] = EncryBlockHeaderSerializer
+
+  override def toString: String = s"Header(height=$height, id=$encodedId, parentId=${Algos.encode(parentId)})"
 }
 
 object EncryBlockHeader {

@@ -48,12 +48,9 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
       requestDownload(modifierTypeId, Seq(modifierId))
   }
 
-  /**
-    * Broadcast inv on successful Header and BlockPayload application
+  /** Broadcast inv on successful Header and BlockPayload application
     * Do not broadcast Inv messages during initial synchronization (the rest of the network should already have all
-    * this messages)
-    *
-    */
+    * this messages) */
   def onSyntacticallySuccessfulModifier: Receive = {
     case SyntacticallySuccessfulModifier(mod) if (mod.isInstanceOf[EncryBlockHeader] || mod.isInstanceOf[EncryBlockPayload]) &&
       historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
