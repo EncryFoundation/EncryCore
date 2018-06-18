@@ -27,7 +27,7 @@ class EncryBlockSerializerTest extends FunSuite {
       99999L,
       199,
       999L,
-      Constants.Chain.InitialNBits,
+      Constants.Chain.InitialDifficulty,
       EquihashSolution(Seq(1, 2, 3))
     )
 

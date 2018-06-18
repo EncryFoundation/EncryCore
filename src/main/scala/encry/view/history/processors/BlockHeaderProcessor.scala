@@ -1,6 +1,6 @@
 package encry.view.history.processors
 
-import com.google.common.primitives.{Ints, Longs}
+import com.google.common.primitives.Ints
 import encry.EncryApp
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
@@ -99,14 +99,14 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   }
 
   private def getHeaderInfoUpdate(h: EncryBlockHeader): (Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier) = {
-    val difficulty: NBits = h.nBits
+    val difficulty: Difficulty = h.difficulty
     if (h.isGenesis) {
       log.info(s"Initialize header chain with genesis header ${h.encodedId}")
       (Seq(
         BestHeaderKey -> ByteArrayWrapper(h.id),
         heightIdsKey(chainParams.GenesisHeight) -> ByteArrayWrapper(h.id),
         headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(chainParams.GenesisHeight)),
-        headerScoreKey(h.id) -> ByteArrayWrapper(Longs.toByteArray(difficulty))), h)
+        headerScoreKey(h.id) -> ByteArrayWrapper(difficulty.toByteArray)), h)
     } else {
       val score = Difficulty @@ (scoreOf(h.parentId).get + difficulty)
       val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
@@ -238,7 +238,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
     }
   }
 
-  def requiredDifficultyAfter(parent: EncryBlockHeader): NBits = {
+  def requiredDifficultyAfter(parent: EncryBlockHeader): Difficulty = {
     val parentHeight: Block.Height = parent.height
     val requiredHeights: Seq[Height] =
       difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))

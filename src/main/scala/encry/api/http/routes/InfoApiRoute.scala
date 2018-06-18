@@ -3,17 +3,14 @@ package encry.api.http.routes
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.consensus.DifficultySerializer
 import encry.local.miner.EncryMiner.{GetMinerStatus, MinerStatus}
 import encry.network.Handshake
-import encry.settings.{Algos, Constants, EncryAppSettings}
+import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
+import encry.settings.{Algos, Constants, EncryAppSettings, RESTApiSettings}
+import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import io.circe.Json
 import io.circe.syntax._
-import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
-import encry.settings.RESTApiSettings
-import encry.utils.{NetworkTime, NetworkTimeProvider}
-import encry.utils.NetworkTimeProvider
 import scorex.crypto.encode.Base58
 
 import scala.concurrent.Future
@@ -73,8 +70,8 @@ object InfoApiRoute {
       "bestHeaderId" -> bestHeader.map(_.encodedId).asJson,
       "bestFullHeaderId" -> bestFullBlock.map(_.header.encodedId).asJson,
       "previousFullHeaderId" -> bestFullBlock.map(_.header.parentId).map(Base58.encode).asJson,
-      "difficulty" -> bestFullBlock.map(block => DifficultySerializer.decodeCompactBits(block.header.nBits))
-        .getOrElse(Constants.Chain.InitialDifficulty).asJson,
+      "difficulty" -> bestFullBlock.map(block => block.header.difficulty.toString)
+        .getOrElse(Constants.Chain.InitialDifficulty.toString).asJson,
       "unconfirmedCount" -> unconfirmedCount.asJson,
       "stateType" -> stateType.asJson,
       "stateVersion" -> stateVersion.asJson,

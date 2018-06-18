@@ -27,7 +27,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Scor
                                startingNonce: Long): Option[EncryBlock] = {
     require(finishingNonce >= startingNonce)
 
-    val difficulty = DifficultySerializer.decodeCompactBits(candidateBlock.nBits)
+    val difficulty: Difficulty = candidateBlock.difficulty
 
     val (version, parentId, adProofsRoot, txsRoot, height) =
       getDerivedHeaderFields(candidateBlock.parentOpt, candidateBlock.adProofBytes, candidateBlock.transactions)
@@ -45,7 +45,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Scor
       candidateBlock.timestamp,
       height,
       0L,
-      candidateBlock.nBits,
+      candidateBlock.difficulty,
       EquihashSolution.empty
     )
 

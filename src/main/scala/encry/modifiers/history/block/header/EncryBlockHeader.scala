@@ -1,11 +1,13 @@
 package encry.modifiers.history.block.header
 
 import com.google.common.primitives.{Ints, _}
-import encry.consensus.{Difficulty, DifficultySerializer, NBits}
+import encry.consensus.Difficulty
+import encry.crypto.PublicKey25519
 import encry.crypto.equihash.{Equihash, EquihashSolution, EquihashSolutionsSerializer}
 import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.Block.{Height, Timestamp, Version}
+import encry.modifiers.history.block.Block._
 import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
 import encry.settings.{Algos, Constants}
 import io.circe.Encoder
@@ -16,19 +18,22 @@ import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
+import scorex.crypto.signatures.{PublicKey, Signature}
 
 import scala.util.Try
 
 case class EncryBlockHeader(override val version: Version,
-                            override val parentId: ModifierId,
-                            override val adProofsRoot: Digest32,
-                            override val stateRoot: ADDigest, // 32 bytes + 1 (tree height)
-                            override val transactionsRoot: Digest32,
-                            override val timestamp: Timestamp,
-                            override val height: Height,
-                            nonce: Long,
-                            nBits: NBits,
-                            equihashSolution: EquihashSolution) extends EncryBaseBlockHeader {
+                             override val accountPubKey: PublicKey25519,
+                             override val signature: Signature25519,
+                             override val parentId: ModifierId,
+                             override val adProofsRoot: Digest32,
+                             override val stateRoot: ADDigest, // 32 bytes + 1 (tree height)
+                             override val transactionsRoot: Digest32,
+                             override val timestamp: Timestamp,
+                             override val height: Height,
+                             var nonce: Long = 0L,
+                             difficulty: Difficulty,
+                             equihashSolution: EquihashSolution) extends EncryBaseBlockHeader {
 
   import EncryBlockHeader._
 
@@ -38,9 +43,12 @@ case class EncryBlockHeader(override val version: Version,
 
   lazy val powHash: Digest32 = getPowHash(this)
 
-  lazy val requiredDifficulty: Difficulty = Difficulty @@ DifficultySerializer.decodeCompactBits(nBits)
+  lazy val requiredDifficulty: Difficulty = difficulty
 
   override lazy val id: ModifierId = ModifierId @@ powHash.untag(Digest32)
+
+  override val dataToSign: Array[Byte] =
+    getMessageToSign(version, accountPubKey, parentId, adProofsRoot, stateRoot, transactionsRoot, timestamp, height, difficulty)
 
   lazy val isGenesis: Boolean = height == Constants.Chain.GenesisHeight
 
@@ -73,7 +81,7 @@ object EncryBlockHeader {
     "txRoot" -> Algos.encode(h.transactionsRoot).asJson,
     "timestamp" -> h.timestamp.asJson,
     "height" -> h.height.asJson,
-    "nBits" -> h.nBits.untag(NBits).asJson,
+    "difficulty" -> h.difficulty.toString.asJson,
   ).asJson
 
   def getPowHash(header: EncryBlockHeader): Digest32 = {
@@ -92,6 +100,28 @@ object EncryBlockHeader {
 
     Digest32 @@ result
   }
+
+  def getMessageToSign(version: Version,
+                       accountPubKey: PublicKey25519,
+                       parentId: ModifierId,
+                       adProofsRoot: Digest32,
+                       stateRoot: ADDigest, // 32 bytes + 1 (tree height)
+                       txsRoot: Digest32,
+                       timestamp: Timestamp,
+                       height: Int,
+                       difficulty: Difficulty): Array[Byte] = Algos.hash(
+    Bytes.concat(
+      Array(version),
+      accountPubKey.pubKeyBytes,
+      parentId,
+      adProofsRoot,
+      stateRoot,
+      txsRoot,
+      Longs.toByteArray(timestamp),
+      Ints.toByteArray(height),
+      difficulty.toByteArray
+    )
+  )
 }
 
 object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
@@ -104,12 +134,15 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
       h.transactionsRoot,
       h.stateRoot,
       Longs.toByteArray(h.timestamp),
-      DifficultySerializer.uint32ToByteArrayBE(h.nBits),
+      Ints.toByteArray(h.difficulty.toByteArray.length),
+      h.difficulty.toByteArray,
       Ints.toByteArray(h.height))
 
   override def toBytes(obj: EncryBlockHeader): Array[Byte] =
     Bytes.concat(
       Array(obj.version),
+      obj.accountPubKey.pubKeyBytes,
+      obj.signature.signature,
       obj.parentId,
       obj.adProofsRoot,
       obj.stateRoot,
@@ -117,23 +150,27 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
       Longs.toByteArray(obj.timestamp),
       Ints.toByteArray(obj.height),
       Longs.toByteArray(obj.nonce),
-      DifficultySerializer.uint32ToByteArrayBE(obj.nBits),
+      Ints.toByteArray(obj.difficulty.toByteArray.length),
+      obj.difficulty.toByteArray,
       obj.equihashSolution.bytes
     )
 
   override def parseBytes(bytes: Array[Byte]): Try[EncryBlockHeader] = Try {
     val version: Version = bytes.head
-    val parentId: ModifierId = ModifierId @@ bytes.slice(1, 33)
-    val adProofsRoot: Digest32 = Digest32 @@ bytes.slice(33, 65)
-    val stateRoot: ADDigest = ADDigest @@ bytes.slice(65, 98) // 32 bytes + 1 (tree height)
-    val txsRoot: Digest32 = Digest32 @@ bytes.slice(98, 130)
-    val timestamp: Long = Longs.fromByteArray(bytes.slice(130, 138))
-    val height: Int = Ints.fromByteArray(bytes.slice(138, 142))
-    val nonce: Long = Longs.fromByteArray(bytes.slice(142, 150))
-    val difficulty: NBits = DifficultySerializer.readUint32BE(bytes.slice(150, 154))
-    val equihashSolution: EquihashSolution = EquihashSolutionsSerializer.parseBytes(bytes.slice(154, bytes.length)).get
+    val proposition: PublicKey25519 = PublicKey25519(PublicKey @@ bytes.slice(1, 33))
+    val signature: Signature25519 = Signature25519(Signature @@ bytes.slice(33, 97))
+    val parentId: ModifierId = ModifierId @@ bytes.slice(97, 129)
+    val adProofsRoot: Digest32 = Digest32 @@ bytes.slice(129, 161)
+    val stateRoot: ADDigest =  ADDigest @@ bytes.slice(161, 194)  // 32 bytes + 1 (tree height)
+    val txsRoot: Digest32 = Digest32 @@ bytes.slice(194, 226)
+    val timestamp: Long = Longs.fromByteArray(bytes.slice(226, 234))
+    val height: Int = Ints.fromByteArray(bytes.slice(234, 238))
+    val nonce: Long = Longs.fromByteArray(bytes.slice(238, 246))
+    val diificultySize: Int = Ints.fromByteArray(bytes.slice(246, 250))
+    val difficulty: Difficulty = Difficulty @@ BigInt(bytes.slice(250, 250 + diificultySize))
+    val equihashSolution: EquihashSolution = EquihashSolutionsSerializer.parseBytes(bytes.slice(250 + diificultySize, bytes.length)).get
 
     EncryBlockHeader(
-      version, parentId, adProofsRoot, stateRoot, txsRoot, timestamp, height, nonce, difficulty, equihashSolution)
+      version, proposition, signature, parentId, adProofsRoot, stateRoot, txsRoot, timestamp, height, nonce, difficulty, equihashSolution)
   }
 }
