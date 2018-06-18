@@ -58,8 +58,6 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val (_: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(transactions).get
 
-    state.applyBlockTransactions(transactions, adDigest).get
-
     state.applyBlockTransactions(transactions, adDigest).isSuccess shouldBe true
   }
 
