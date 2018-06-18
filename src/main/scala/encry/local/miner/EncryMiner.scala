@@ -8,10 +8,14 @@ import encry.crypto.PrivateKey25519
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransaction, TransactionFactory}
-import encry.modifiers.state.box.proof.Signature25519
 import encry.modifiers.state.box.AssetBox
+import encry.modifiers.state.box.proof.Signature25519
+import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
+import encry.utils.NetworkTime.Time
+import encry.utils.ScorexLogging
 import encry.view.EncryNodeViewHolder.CurrentView
+import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
@@ -20,11 +24,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
-import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
-import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import scorex.core.transaction.box.Box.Amount
-import encry.utils.NetworkTime.Time
-import encry.utils.ScorexLogging
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scorex.crypto.hash.Digest32
 
@@ -150,17 +150,17 @@ class EncryMiner extends Actor with ScorexLogging {
     val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
       .getOrElse(throw new Exception("ADProof generation failed"))
 
-    val nBits: NBits = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
-      .getOrElse(Constants.Chain.InitialNBits)
+    val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
+      .getOrElse(Constants.Chain.InitialDifficulty)
 
     val derivedFields: (Byte, ModifierId, Digest32, Digest32, Int) = consensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
 
     val blockSignature: Signature25519 = minerSecret.sign(
       EncryBlockHeader.getMessageToSign(derivedFields._1, minerSecret.publicImage, derivedFields._2,
-        derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, nBits))
+        derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, difficulty))
 
     val candidate: CandidateBlock = CandidateBlock(minerSecret.publicImage,
-      blockSignature, bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, nBits)
+      blockSignature, bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
 
     log.debug(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
       s"and 1 coinbase for height $height")

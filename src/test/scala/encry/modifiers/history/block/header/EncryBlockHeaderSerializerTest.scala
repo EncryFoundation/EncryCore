@@ -18,6 +18,6 @@ class EncryBlockHeaderSerializerTest extends PropSpec with Matchers with EncryGe
 
     blockHeader.id shouldEqual blockHeaderDeserialized.get.id
 
-    blockHeader.nBits shouldEqual blockHeaderDeserialized.get.nBits
+    blockHeader.difficulty shouldEqual blockHeaderDeserialized.get.difficulty
   }
 }
