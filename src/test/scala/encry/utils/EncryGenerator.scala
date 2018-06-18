@@ -99,8 +99,7 @@ trait EncryGenerator {
 
     keys.map { k =>
       val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genAssetBox(PublicKey25519(PublicKey @@ Random.randomBytes(32)).address))
-      TransactionFactory.defaultPaymentTransactionScratch(k, -100,
-        timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
+      TransactionFactory.defaultPaymentTransactionScratch(k, -100, timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
     }
   }
 

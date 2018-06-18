@@ -32,7 +32,7 @@ object Input {
   implicit val jsonDecoder: Decoder[Input] = (c: HCursor) => {
     for {
       boxId <- c.downField("boxId").as[String]
-      proofs <- c.downField("proof").as[List[Proof]]
+      proofs <- c.downField("proofs").as[List[Proof]]
     } yield {
       Input(ADKey @@ Algos.decode(boxId).get, proofs)
     }

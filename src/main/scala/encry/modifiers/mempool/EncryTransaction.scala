@@ -38,6 +38,7 @@ case class EncryTransaction(fee: Amount,
   def validateStateless: ValidationResult =
     accumulateErrors
       .demand(validSize, "Invalid size")
+      .demand(fee >= 0, "Negative fee amount")
       .demand(directives.forall(_.isValid), "Invalid outputs")
       .demand(inputs.size <= Short.MaxValue, s"Too many inputs in transaction $toString")
       .demand(directives.size <= Short.MaxValue, s"Too many directives in transaction $toString")
@@ -58,7 +59,7 @@ object EncryTransaction {
     "id" -> Algos.encode(tx.id).asJson,
     "fee" -> tx.fee.asJson,
     "timestamp" -> tx.timestamp.asJson,
-    "unlockers" -> tx.inputs.map(_.asJson).asJson,
+    "inputs" -> tx.inputs.map(_.asJson).asJson,
     "directives" -> tx.directives.map(_.asJson).asJson,
     "defaultProofOpt" -> tx.defaultProofOpt.map(_.asJson).asJson
   ).asJson
@@ -67,14 +68,14 @@ object EncryTransaction {
     for {
       fee <- c.downField("fee").as[Long]
       timestamp <- c.downField("timestamp").as[Long]
-      unlockers <- c.downField("unlockers").as[IndexedSeq[Input]]
+      inputs <- c.downField("inputs").as[IndexedSeq[Input]]
       directives <- c.downField("directives").as[IndexedSeq[Directive]]
       defaultProofOpt <- c.downField("defaultProofOpt").as[Option[Proof]]
     } yield {
       EncryTransaction(
         fee,
         timestamp,
-        unlockers,
+        inputs,
         directives,
         defaultProofOpt
       )
