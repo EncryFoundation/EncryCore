@@ -22,7 +22,7 @@ import scala.language.postfixOps
 /**
   * A component which synchronizes local node view with p2p network.
   *
-  * @param syncInfoSpec         SyncInfo specification
+  * @param syncInfoSpec SyncInfo specification
   * @tparam P   proposition
   * @tparam TX  transaction
   * @tparam SIS SyncInfoMessage specification
@@ -73,12 +73,10 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
   def getLocalSyncInfo: Receive = {
     case SendLocalSyncInfo =>
       //todo: why this condition?
-      if (statusTracker.elapsedTimeSinceLastSync() < (networkSettings.syncInterval.toMillis / 2)) {
-        //TODO should never reach this point
+      if (statusTracker.elapsedTimeSinceLastSync() < (networkSettings.syncInterval.toMillis / 2))
+      //TODO should never reach this point
         log.debug("Trying to send sync info too often")
-      } else {
-        historyReaderOpt.foreach(r => sendSync(r.syncInfo))
-      }
+      else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
   }
 
   def sendSync(syncInfo: SI): Unit = {
@@ -91,36 +89,28 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
   def processSync: Receive = {
     case DataFromPeer(spec, syncInfo: SI@unchecked, remote)
       if spec.messageCode == syncInfoSpec.messageCode =>
-
       historyReaderOpt match {
         case Some(historyReader) =>
-          val extensionOpt = historyReader.continuationIds(syncInfo, networkSettings.networkChunkSize)
-          val ext = extensionOpt.getOrElse(Seq())
-          val comparison = historyReader.compare(syncInfo)
+          val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, networkSettings.networkChunkSize)
+          val ext: ModifierIds = extensionOpt.getOrElse(Seq())
+          val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
           log.debug(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}")
           log.trace(s"Extension ids: ${idsToString(ext)}")
-
-          if (!(extensionOpt.nonEmpty || comparison != Younger)) {
-            log.warn("Extension is empty while comparison is younger")
-          }
-
+          if (!(extensionOpt.nonEmpty || comparison != Younger)) log.warn("Extension is empty while comparison is younger")
           self ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
       }
   }
-
 
   // Send history extension to the (less developed) peer 'remote' which does not have it.
   def sendExtension(remote: ConnectedPeer,
                     status: HistoryComparisonResult,
                     extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit = extOpt match {
     case None => log.warn(s"extOpt is empty for: $remote. Its status is: $status.")
-    case Some(ext) =>
-      ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
-        case (mid, mods) =>
-          networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
-      }
+    case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
+      case (mid, mods) => networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
+    }
   }
 
   //view holder is telling other node status
