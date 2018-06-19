@@ -80,7 +80,7 @@ logLevel := Level.Error
 
 val opts = Seq(
   "-server",
-  "-Xms512m",
+  "-Xms4G",
   "-Xmx4G",
   "-XX:+ExitOnOutOfMemoryError",
   "-XX:+IgnoreUnrecognizedVMOptions",
