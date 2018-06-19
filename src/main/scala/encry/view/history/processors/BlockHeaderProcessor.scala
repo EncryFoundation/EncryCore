@@ -5,11 +5,12 @@ import encry.EncryApp
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.block.{Block, EncryBlock}
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
+import encry.modifiers.history.block.{Block, EncryBlock}
 import encry.settings.Constants._
 import encry.settings.{Algos, Constants, NodeSettings}
 import encry.utils.{NetworkTimeProvider, ScorexLogging}
+import encry.validation.{ModifierValidator, ValidationResult}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
@@ -17,7 +18,7 @@ import scorex.core._
 
 import scala.annotation.tailrec
 import scala.collection.immutable
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
@@ -29,7 +30,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
   private val difficultyController = PowLinearController
 
-  val powScheme: ConsensusScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
+  val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
 
   protected val BestHeaderKey: ByteArrayWrapper =
     ByteArrayWrapper(Array.fill(DigestLength)(EncryBlockHeader.modifierTypeId))
@@ -40,7 +41,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
-  def realDifficulty(h: EncryBlockHeader): Difficulty = Difficulty @@ powScheme.realDifficulty(h)
+  def realDifficulty(h: EncryBlockHeader): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
 
   protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
 
@@ -253,10 +254,11 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
   object HeaderValidator extends ModifierValidator {
 
-    def validate(header: EncryBlockHeader): ValidationResult = if (header.isGenesis) validateGenesisBlockHeader(header)
-    else typedModifierById[EncryBlockHeader](header.parentId).map { parent =>
-      validateChildBlockHeader(header, parent)
-    } getOrElse fatal(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
+    def validate(header: EncryBlockHeader): ValidationResult =
+      if (header.isGenesis) validateGenesisBlockHeader(header)
+      else typedModifierById[EncryBlockHeader](header.parentId).map { parent =>
+        validateChildBlockHeader(header, parent)
+      } getOrElse fatal(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
 
     private def validateGenesisBlockHeader(header: EncryBlockHeader): ValidationResult =
       accumulateErrors
@@ -293,17 +295,14 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
         //          fatal(s"Incorrect required difficulty. $detail")
         //        }
         .validate(heightOf(header.parentId).exists(h => bestHeaderHeight - h < Constants.Chain.MaxRollbackDepth)) {
-        fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
-      }
+          fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
+        }
         .validate(powScheme.verify(header)) {
           fatal(s"Wrong proof-of-work solution for $header")
         }
         .validateSemantics(isSemanticallyValid(header.parentId)) {
           fatal("Parent header is marked as semantically invalid")
-        }
-        .result
+        }.result
     }
-
   }
-
 }

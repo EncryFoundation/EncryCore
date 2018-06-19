@@ -31,6 +31,5 @@ case class BlockDownloadProcessor(nodeSettings: NodeSettings) {
       else Math.max(Constants.Chain.GenesisHeight, header.height - nodeSettings.blocksToKeep + 1) // Start from config.blocksToKeep blocks back
     } else if (nodeSettings.blocksToKeep >= 0) Math.max(header.height - nodeSettings.blocksToKeep + 1, minimalBlockHeightVar)
     else Constants.Chain.GenesisHeight
-
   }
 }
