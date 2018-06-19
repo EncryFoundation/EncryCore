@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorContext, ActorRef, Cancellable}
 import encry.consensus.History
-import encry.network.NodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
 import encry.network.PeerConnectionHandler._
 import encry.settings.NetworkSettings
 import encry.utils.{NetworkTimeProvider, ScorexLogging}

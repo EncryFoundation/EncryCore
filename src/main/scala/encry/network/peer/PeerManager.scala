@@ -6,7 +6,7 @@ import akka.actor.Actor
 import encry.EncryApp._
 import PeerManager.ReceivableMessages._
 import encry.network.{Handshake, SendingStrategy}
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler._
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}

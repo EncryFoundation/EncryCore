@@ -18,7 +18,6 @@ import encry.view.state.{DigestState, EncryState, StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
 import encry.EncryApp.{settings, timeProvider}
 import scorex.core._
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{NodeViewHolderEvent, SuccessfulTransaction}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import scorex.core
@@ -31,7 +30,7 @@ import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base58
 import supertagged.@@
 import EncryNodeViewHolder.ReceivableMessages._
-import encry.network.NodeViewSynchronizer.ReceivableMessages._
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import EncryNodeViewHolder._
 import encry.utils.ScorexLogging
 

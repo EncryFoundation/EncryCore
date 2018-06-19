@@ -7,7 +7,7 @@ import akka.actor.Actor
 import encry.EncryApp.{settings, timeProvider}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Algos
 import encry.stats.StatsSender.MiningEnd
 import encry.utils.ScorexLogging

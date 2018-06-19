@@ -6,7 +6,7 @@ import encry.local.EncryLocalInterface.{GetNodeInfo, NodeInfo}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.network.Handshake
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, SemanticallySuccessfulModifier}
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, SemanticallySuccessfulModifier}
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import encry.settings.{Algos, Constants, EncryAppSettings}
 import encry.utils.{NetworkTimeProvider, ScorexLogging}
