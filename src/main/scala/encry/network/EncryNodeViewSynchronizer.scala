@@ -96,13 +96,9 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
       if (spam.nonEmpty) {
         log.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
           s": ${spam.keys.map(Base58.encode)}")
-        val mids: Seq[ModifierId] = spam.keys.toSeq
-        deliveryTracker.deleteSpam(mids)
+        deliveryTracker.deleteSpam(spam.keys.toSeq)
       }
-      if (fm.nonEmpty) {
-        val mods: Seq[Array[Byte]] = fm.values.toSeq
-        nodeViewHolder ! ModifiersFromRemote(remote, typeId, mods)
-      }
+      if (fm.nonEmpty) nodeViewHolder ! ModifiersFromRemote(remote, typeId, fm.values.toSeq)
       //If queue is empty - check, whether there are more modifiers to download
       historyReaderOpt foreach { h =>
         if (!h.isHeadersChainSynced && !deliveryTracker.isExpecting) sendSync(h.syncInfo)

@@ -49,8 +49,6 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
   var historyReaderOpt: Option[HR] = None
   var mempoolReaderOpt: Option[MR] = None
 
-  def readersOpt: Option[(HR, MR)] = historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp)))
-
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
     networkController ! SendToNetwork(Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None), Broadcast)
 
@@ -117,7 +115,7 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
           deliveryTracker.reexpect(peer, modifierTypeId, modifierId)
         }
       case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == RequestModifierSpec.MessageCode =>
-        readersOpt.foreach { readers =>
+        historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
           val objs: Seq[NodeViewModifier] = invData._1 match {
             case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
             case _: ModifierTypeId => invData._2.flatMap(id => readers._1.modifierById(id))
@@ -177,7 +175,6 @@ object NodeViewSynchronizer {
 
     case class ChangedHistory[HR <: HistoryReader[_ <: PersistentNodeViewModifier, _ <: SyncInfo]](reader: HR) extends NodeViewChange
 
-    //TODO: return mempool reader
     case class ChangedMempool[MR <: MempoolReader[_ <: Transaction[_]]](mempool: MR) extends NodeViewChange
 
     case class ChangedState[SR <: StateReader](reader: SR) extends NodeViewChange
