@@ -124,118 +124,45 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
       }
   }
 
-  //object ids coming from other node
-  def processInv: Receive = {
-    case DataFromPeer(spec, invData: InvData@unchecked, remote)
-      if spec.messageCode == InvSpec.MessageCode =>
-      //TODO can't replace viewHolderRef with a reader because of modifiers cache
-      nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
-  }
-
-  //other node asking for objects by their ids
-  def modifiersReq: Receive = {
-    case DataFromPeer(spec, invData: InvData@unchecked, remote)
-      if spec.messageCode == RequestModifierSpec.MessageCode =>
-      readersOpt.foreach { readers =>
-        val objs: Seq[NodeViewModifier] = invData._1 match {
-          case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId =>
-            readers._2.getAll(invData._2)
-          case _: ModifierTypeId =>
-            invData._2.flatMap(id => readers._1.modifierById(id))
-        }
-        log.debug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
-          s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
-        self ! ResponseFromLocal(remote, invData._1, objs)
-      }
-  }
-
-  /**
-    * Logic to process modifiers got from another peer
-    */
-  def modifiersFromRemote: Receive = {
-    case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
-      val typeId: ModifierTypeId = data._1
-      val modifiers: Map[ModifierId, Array[Byte]] = data._2
-      log.info(s"Got modifiers of type $typeId from remote connected peer: $remote")
-      log.trace(s"Received modifier ids ${data._2.keySet.map(Base58.encode).mkString(",")}")
-      for ((id, _) <- modifiers) deliveryTracker.receive(typeId, id, remote)
-      val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
-        modifiers partition { case (id, _) => deliveryTracker.isSpam(id) }
-      if (spam.nonEmpty) {
-        log.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
-          s": ${spam.keys.map(Base58.encode)}")
-        val mids: Seq[ModifierId] = spam.keys.toSeq
-        deliveryTracker.deleteSpam(mids)
-      }
-      if (fm.nonEmpty) {
-        val mods: Seq[Array[Byte]] = fm.values.toSeq
-        nodeViewHolder ! ModifiersFromRemote(remote, typeId, mods)
-      }
-  }
-
-  //local node sending object ids to remote
-  def requestFromLocal: Receive = {
-    case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
-      if (modifierIds.nonEmpty) {
-        val msg: Message[(ModifierTypeId, Seq[ModifierId])] =
-          Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
-        peer.handlerRef ! msg
-      }
-      deliveryTracker.expect(peer, modifierTypeId, modifierIds)
-  }
-
-  //scheduler asking node view synchronizer to check whether requested messages have been delivered
-  @SuppressWarnings(Array("org.wartremover.warts.JavaSerializable"))
-  def checkDelivery: Receive = {
-    case CheckDelivery(peer, modifierTypeId, modifierId) =>
-      if (deliveryTracker.peerWhoDelivered(modifierId).contains(peer)) deliveryTracker.delete(modifierId)
-      else {
-        log.info(s"Peer $peer has not delivered asked modifier ${Base58.encode(modifierId)} on time")
-        deliveryTracker.reexpect(peer, modifierTypeId, modifierId)
-      }
-  }
-
-  //local node sending out objects requested to remote
-  def responseFromLocal: Receive = {
-    case ResponseFromLocal(peer, _, modifiers: Seq[NodeViewModifier]) =>
-      if (modifiers.nonEmpty) {
-        @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-        val modType: ModifierTypeId = modifiers.head.modifierTypeId
-        val m: (ModifierTypeId, Map[ModifierId, Array[Byte]]) = modType -> modifiers.map(m => m.id -> m.bytes).toMap
-        val msg: Message[(ModifierTypeId, Map[ModifierId, Array[Byte]])] = Message(ModifiersSpec, Right(m), None)
-        peer.handlerRef ! msg
-      }
-  }
-
-  override def preStart(): Unit = {
-    //register as a handler for synchronization-specific types of messages
-    val messageSpecs: Seq[MessageSpec[_]] = Seq(invSpec, requestModifierSpec, ModifiersSpec, syncInfoSpec)
-    networkController ! RegisterMessagesHandler(messageSpecs, self)
-    //register as a listener for peers got connected (handshaked) or disconnected
-    context.system.eventStream.subscribe(self, classOf[DisconnectedPeer])
-    // todo: replace the two lines above by a single line with classOf[PeerManagementEvent]
-
-
-    //subscribe for all the node view holder events involving modifiers and transactions
-    context.system.eventStream.subscribe(self, classOf[NodeViewChange])
-    context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
-    nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = true)
-
-    statusTracker.scheduleSendSyncInfo()
-  }
-
   override def receive: Receive =
     getLocalSyncInfo orElse
       processSync orElse
       processSyncStatus orElse
-      processInv orElse
-      modifiersReq orElse
-      requestFromLocal orElse
-      responseFromLocal orElse
-      modifiersFromRemote orElse
       viewHolderEvents orElse
-      peerManagerEvents orElse
-      checkDelivery orElse {
+      peerManagerEvents orElse {
+      case CheckDelivery(peer, modifierTypeId, modifierId) =>
+        if (deliveryTracker.peerWhoDelivered(modifierId).contains(peer)) deliveryTracker.delete(modifierId)
+        else {
+          log.info(s"Peer $peer has not delivered asked modifier ${Base58.encode(modifierId)} on time")
+          deliveryTracker.reexpect(peer, modifierTypeId, modifierId)
+        }
+      case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == RequestModifierSpec.MessageCode =>
+        readersOpt.foreach { readers =>
+          val objs: Seq[NodeViewModifier] = invData._1 match {
+            case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
+            case _: ModifierTypeId => invData._2.flatMap(id => readers._1.modifierById(id))
+          }
+          log.debug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
+            s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
+          self ! ResponseFromLocal(remote, invData._1, objs)
+        }
+      case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
+        nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
+      case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
+        if (modifierIds.nonEmpty) {
+          val msg: Message[(ModifierTypeId, Seq[ModifierId])] =
+            Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
+          peer.handlerRef ! msg
+        }
+        deliveryTracker.expect(peer, modifierTypeId, modifierIds)
+      case ResponseFromLocal(peer, _, modifiers: Seq[NodeViewModifier]) =>
+        if (modifiers.nonEmpty) {
+          @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+          val modType: ModifierTypeId = modifiers.head.modifierTypeId
+          val m: (ModifierTypeId, Map[ModifierId, Array[Byte]]) = modType -> modifiers.map(m => m.id -> m.bytes).toMap
+          val msg: Message[(ModifierTypeId, Map[ModifierId, Array[Byte]])] = Message(ModifiersSpec, Right(m), None)
+          peer.handlerRef ! msg
+        }
       case a: Any => log.error("Strange input: " + a)
     }
 }
