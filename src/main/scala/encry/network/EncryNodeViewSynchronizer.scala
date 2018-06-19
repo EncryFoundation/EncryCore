@@ -3,25 +3,25 @@ package encry.network
 import java.net.InetSocketAddress
 
 import akka.actor.Actor
+import encry.EncryApp._
+import encry.consensus.{HistoryReader, SyncInfo}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
-import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
-import encry.EncryApp._
-import encry.consensus.{HistoryReader, SyncInfo}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.message._
 import encry.settings.NetworkSettings
 import encry.utils.ScorexLogging
 import encry.view.EncryNodeViewHolder.DownloadRequest
+import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.EncryMempool
-import scorex.core.transaction.{MempoolReader, Transaction}
+import scorex.core._
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.StateReader
-import scorex.core._
+import scorex.core.transaction.{MempoolReader, Transaction}
 import scorex.crypto.encode.Base58
 
 import scala.concurrent.duration.FiniteDuration
@@ -118,6 +118,24 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
         }
       case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
         nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
+      case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
+        val typeId: ModifierTypeId = data._1
+        val modifiers: Map[ModifierId, Array[Byte]] = data._2
+        log.info(s"Got modifiers of type $typeId from remote connected peer: $remote")
+        log.trace(s"Received modifier ids ${data._2.keySet.map(Base58.encode).mkString(",")}")
+        for ((id, _) <- modifiers) deliveryTracker.receive(typeId, id, remote)
+        val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
+          modifiers partition { case (id, _) => deliveryTracker.isSpam(id) }
+        if (spam.nonEmpty) {
+          log.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
+            s": ${spam.keys.map(Base58.encode)}")
+          deliveryTracker.deleteSpam(spam.keys.toSeq)
+        }
+        if (fm.nonEmpty) nodeViewHolder ! ModifiersFromRemote(remote, typeId, fm.values.toSeq)
+        historyReaderOpt foreach { h =>
+          if (!h.isHeadersChainSynced && !deliveryTracker.isExpecting) sendSync(h.syncInfo)
+          else if (h.isHeadersChainSynced && !deliveryTracker.isExpectingFromRandom) self ! CheckModifiersToDownload
+        }
       case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
         if (modifierIds.nonEmpty) {
           val msg: Message[(ModifierTypeId, Seq[ModifierId])] =
@@ -190,28 +208,6 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
     modifierIds.foreach(id => deliveryTracker.expectFromRandom(modifierTypeId, id))
     val msg: Message[(ModifierTypeId, Seq[ModifierId])] = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
     networkController ! SendToNetwork(msg, SendToRandom)
-  }
-
-  def modifiersFromRemote: Receive = {
-    case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
-      val typeId: ModifierTypeId = data._1
-      val modifiers: Map[ModifierId, Array[Byte]] = data._2
-      log.info(s"Got modifiers of type $typeId from remote connected peer: $remote")
-      log.trace(s"Received modifier ids ${data._2.keySet.map(Base58.encode).mkString(",")}")
-      for ((id, _) <- modifiers) deliveryTracker.receive(typeId, id, remote)
-      val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
-        modifiers partition { case (id, _) => deliveryTracker.isSpam(id) }
-      if (spam.nonEmpty) {
-        log.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
-          s": ${spam.keys.map(Base58.encode)}")
-        deliveryTracker.deleteSpam(spam.keys.toSeq)
-      }
-      if (fm.nonEmpty) nodeViewHolder ! ModifiersFromRemote(remote, typeId, fm.values.toSeq)
-      //If queue is empty - check, whether there are more modifiers to download
-      historyReaderOpt foreach { h =>
-        if (!h.isHeadersChainSynced && !deliveryTracker.isExpecting) sendSync(h.syncInfo)
-        else if (h.isHeadersChainSynced && !deliveryTracker.isExpectingFromRandom) self ! CheckModifiersToDownload
-      }
   }
 }
 
