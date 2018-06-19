@@ -19,7 +19,7 @@ import scorex.crypto.encode.Base58
 
 class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends
   NodeViewSynchronizer[EncryProposition, EncryBaseTransaction, EncrySyncInfo, EncrySyncInfoMessageSpec.type,
-    EncryPersistentModifier, EncryHistory, EncryMempool](syncInfoSpec) {
+    EncryPersistentModifier, EncryHistory](syncInfoSpec) {
 
   case object CheckModifiersToDownload
 

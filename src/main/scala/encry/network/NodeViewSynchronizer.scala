@@ -10,6 +10,7 @@ import encry.network.message.BasicMsgDataTypes._
 import encry.network.message.{InvSpec, RequestModifierSpec, _}
 import encry.settings.NetworkSettings
 import encry.utils.ScorexLogging
+import encry.view.mempool.EncryMempool
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.StateReader
 import scorex.core.transaction.{MempoolReader, Transaction}
@@ -21,7 +22,7 @@ import scala.language.postfixOps
 
 
 class NodeViewSynchronizer[P <: Proposition, TX <: Transaction[P], SI <: SyncInfo,
-SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: HistoryReader[PMOD, SI], MR <: MempoolReader[TX]]
+SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: HistoryReader[PMOD, SI]]
 (syncInfoSpec: SIS) extends Actor with ScorexLogging {
 
   import NodeViewSynchronizer.ReceivableMessages._
@@ -40,7 +41,7 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
   val statusTracker: SyncTracker = SyncTracker(self, context, networkSettings, timeProvider)
 
   var historyReaderOpt: Option[HR] = None
-  var mempoolReaderOpt: Option[MR] = None
+  var mempoolReaderOpt: Option[EncryMempool] = None
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
     networkController ! SendToNetwork(Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None), Broadcast)
@@ -52,7 +53,7 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
     case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
     case SemanticallyFailedModification(mod, throwable) =>
     case ChangedHistory(reader: HR@unchecked) if reader.isInstanceOf[HR] => historyReaderOpt = Some(reader)
-    case ChangedMempool(reader: MR@unchecked) if reader.isInstanceOf[MR] => mempoolReaderOpt = Some(reader)
+    case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
   }
 
   def sendSync(syncInfo: SI): Unit = {
