@@ -12,13 +12,12 @@ import encry.settings.{Algos, Constants, NodeSettings}
 import encry.utils.{NetworkTimeProvider, ScorexLogging}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
-import encry.validation.{ModifierValidator, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core._
 
 import scala.annotation.tailrec
 import scala.collection.immutable
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
@@ -30,7 +29,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
   private val difficultyController = PowLinearController
 
-  val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
+  val powScheme: ConsensusScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
 
   protected val BestHeaderKey: ByteArrayWrapper =
     ByteArrayWrapper(Array.fill(DigestLength)(EncryBlockHeader.modifierTypeId))
@@ -41,7 +40,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
-  def realDifficulty(h: EncryBlockHeader): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
+  def realDifficulty(h: EncryBlockHeader): Difficulty = Difficulty @@ powScheme.realDifficulty(h)
 
   protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
 

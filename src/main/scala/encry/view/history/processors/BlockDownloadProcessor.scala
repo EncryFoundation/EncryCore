@@ -7,7 +7,7 @@ import encry.settings.{Constants, NodeSettings}
   * blocks from the network and keep them in our history. */
 case class BlockDownloadProcessor(nodeSettings: NodeSettings) {
 
-  private[history] var minimalBlockHeightVar: Int = 0
+  private[history] var minimalBlockHeightVar: Int = Int.MaxValue
 
   /** Start height to download full blocks.
     * Int.MaxValue when headers chain is not synchronized with the network and no full blocks download needed */
