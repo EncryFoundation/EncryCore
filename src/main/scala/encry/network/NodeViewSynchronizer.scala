@@ -64,42 +64,10 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
     case ChangedMempool(reader: MR@unchecked) if reader.isInstanceOf[MR] => mempoolReaderOpt = Some(reader)
   }
 
-  def peerManagerEvents: Receive = {
-    case HandshakedPeer(remote) => statusTracker.updateStatus(remote, Unknown)
-    case DisconnectedPeer(remote) => statusTracker.clearStatus(remote)
-  }
-
-  def getLocalSyncInfo: Receive = {
-    case SendLocalSyncInfo =>
-      //todo: why this condition?
-      if (statusTracker.elapsedTimeSinceLastSync() < (networkSettings.syncInterval.toMillis / 2))
-      //TODO should never reach this point
-        log.debug("Trying to send sync info too often")
-      else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
-  }
-
   def sendSync(syncInfo: SI): Unit = {
     val peers = statusTracker.peersToSyncWith()
     if (peers.nonEmpty)
       networkController ! SendToNetwork(Message(syncInfoSpec, Right(syncInfo), None), SendToPeers(peers))
-  }
-
-  //sync info is coming from another node
-  def processSync: Receive = {
-    case DataFromPeer(spec, syncInfo: SI@unchecked, remote)
-      if spec.messageCode == syncInfoSpec.messageCode =>
-      historyReaderOpt match {
-        case Some(historyReader) =>
-          val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, networkSettings.networkChunkSize)
-          val ext: ModifierIds = extensionOpt.getOrElse(Seq())
-          val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
-          log.debug(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
-            s"Comparison result is $comparison. Sending extension of length ${ext.length}")
-          log.trace(s"Extension ids: ${idsToString(ext)}")
-          if (!(extensionOpt.nonEmpty || comparison != Younger)) log.warn("Extension is empty while comparison is younger")
-          self ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
-        case _ =>
-      }
   }
 
   // Send history extension to the (less developed) peer 'remote' which does not have it.
@@ -112,24 +80,36 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
     }
   }
 
-  //view holder is telling other node status
-  def processSyncStatus: Receive = {
-    case OtherNodeSyncingStatus(remote, status, extOpt) =>
-      statusTracker.updateStatus(remote, status)
-      status match {
-        case Unknown => log.warn("Peer status is still unknown")
-        case Nonsense => log.warn("Got nonsense") //todo: fix, see https://github.com/ScorexFoundation/Scorex/issues/158
-        case Younger => sendExtension(remote, status, extOpt)
-        case _ => // does nothing for `Equal` and `Older`
-      }
-  }
-
   override def receive: Receive =
-    getLocalSyncInfo orElse
-      processSync orElse
-      processSyncStatus orElse
-      viewHolderEvents orElse
-      peerManagerEvents orElse {
+    viewHolderEvents orElse {
+      case DataFromPeer(spec, syncInfo: SI@unchecked, remote)
+        if spec.messageCode == syncInfoSpec.messageCode =>
+        historyReaderOpt match {
+          case Some(historyReader) =>
+            val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, networkSettings.networkChunkSize)
+            val ext: ModifierIds = extensionOpt.getOrElse(Seq())
+            val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
+            log.debug(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
+              s"Comparison result is $comparison. Sending extension of length ${ext.length}")
+            log.trace(s"Extension ids: ${idsToString(ext)}")
+            if (!(extensionOpt.nonEmpty || comparison != Younger)) log.warn("Extension is empty while comparison is younger")
+            self ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
+          case _ =>
+        }
+      case SendLocalSyncInfo =>
+        if (statusTracker.elapsedTimeSinceLastSync() < (networkSettings.syncInterval.toMillis / 2))
+          log.debug("Trying to send sync info too often")
+        else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
+      case OtherNodeSyncingStatus(remote, status, extOpt) =>
+        statusTracker.updateStatus(remote, status)
+        status match {
+          case Unknown => log.warn("Peer status is still unknown")
+          case Nonsense => log.warn("Got nonsense") //todo: fix, see https://github.com/ScorexFoundation/Scorex/issues/158
+          case Younger => sendExtension(remote, status, extOpt)
+          case _ => // does nothing for `Equal` and `Older`
+        }
+      case HandshakedPeer(remote) => statusTracker.updateStatus(remote, Unknown)
+      case DisconnectedPeer(remote) => statusTracker.clearStatus(remote)
       case CheckDelivery(peer, modifierTypeId, modifierId) =>
         if (deliveryTracker.peerWhoDelivered(modifierId).contains(peer)) deliveryTracker.delete(modifierId)
         else {
@@ -168,16 +148,6 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
 }
 
 object NodeViewSynchronizer {
-
-  object Events {
-
-    trait NodeViewSynchronizerEvent
-
-    case object NoBetterNeighbour extends NodeViewSynchronizerEvent
-
-    case object BetterNeighbourAppeared extends NodeViewSynchronizerEvent
-
-  }
 
   object ReceivableMessages {
 
