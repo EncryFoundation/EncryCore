@@ -5,11 +5,8 @@ import java.net.InetSocketAddress
 import akka.actor.Actor
 import encry.EncryApp._
 import encry.consensus.{HistoryReader, SyncInfo}
-import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.state.box.proposition.EncryProposition
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.message._
@@ -26,13 +23,7 @@ import scorex.crypto.encode.Base58
 
 import scala.concurrent.duration.FiniteDuration
 
-abstract class NodeViewSynchronizer[P <: Proposition, TX <: Transaction[P], SI <: SyncInfo,
-SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: HistoryReader[PMOD, SI]]
-(syncInfoSpec: SIS) extends Actor with ScorexLogging {}
-
-class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends
-  NodeViewSynchronizer[EncryProposition, EncryBaseTransaction, EncrySyncInfo, EncrySyncInfoMessageSpec.type,
-    EncryPersistentModifier, EncryHistory](syncInfoSpec) {
+class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with ScorexLogging {
 
   import EncryNodeViewSynchronizer.ReceivableMessages._
   import encry.consensus.History._
