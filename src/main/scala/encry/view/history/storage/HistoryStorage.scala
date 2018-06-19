@@ -15,8 +15,7 @@ class HistoryStorage(override val store: Store, val objectsStore: ObjectsStore) 
   def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
     objectsStore.get(id).flatMap { bytes =>
       HistoryModifierSerializer.parseBytes(bytes) match {
-        case Success(b) =>
-          Some(b)
+        case Success(b) => Some(b)
         case Failure(e) =>
           log.warn(s"Failed to parse block from db: ", e)
           None
@@ -33,9 +32,7 @@ class HistoryStorage(override val store: Store, val objectsStore: ObjectsStore) 
     insert(version, indexesToInsert)
   }
 
-  def getObject(id: ModifierId): Option[Array[Byte]] = objectsStore.get(id)
-
-  def containsObject(id: ModifierId): Boolean = getObject(id).isDefined
+  def containsObject(id: ModifierId): Boolean = objectsStore.get(id).isDefined
 
   def removeObjects(ids: Seq[ModifierId]): Unit = ids.foreach(id => objectsStore.delete(id))
 

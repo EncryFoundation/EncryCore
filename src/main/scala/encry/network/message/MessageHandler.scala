@@ -8,7 +8,6 @@ import scorex.crypto.hash.Blake2b256
 import scala.language.existentials
 import scala.util.Try
 
-
 case class MessageHandler(specs: Seq[MessageSpec[_]]) {
 
   import Message._
@@ -18,39 +17,25 @@ case class MessageHandler(specs: Seq[MessageSpec[_]]) {
 
   //MAGIC ++ Array(spec.messageCode) ++ Ints.toByteArray(dataLength) ++ dataWithChecksum
   def parseBytes(bytes: ByteBuffer, sourceOpt: Option[ConnectedPeer]): Try[Message[_]] = Try {
-    val magic = new Array[Byte](MagicLength)
+    val magic: Array[MessageCode] = new Array[Byte](MagicLength)
     bytes.get(magic)
-
     require(magic.sameElements(Message.MAGIC), "Wrong magic bytes" + magic.mkString)
-
-    val msgCode = bytes.get
-
-    val length = bytes.getInt
+    val msgCode: MessageCode = bytes.get
+    val length: Int = bytes.getInt
     require(length >= 0, "Data length is negative!")
-
     val msgData: Array[Byte] = if (length > 0) {
-      val data = new Array[Byte](length)
-      //READ CHECKSUM
-      val checksum = new Array[Byte](Message.ChecksumLength)
+      val data: Array[MessageCode] = new Array[Byte](length)
+      val checksum: Array[MessageCode] = new Array[Byte](Message.ChecksumLength)
       bytes.get(checksum)
-
-      //READ DATA
       bytes.get(data)
-
-      //VALIDATE CHECKSUM
-      val digest = Blake2b256.hash(data).take(Message.ChecksumLength)
-
-      //CHECK IF CHECKSUM MATCHES
-      if(!checksum.sameElements(digest)) throw new Error(s"Invalid data checksum length = $length")
+      val digest: Array[MessageCode] = Blake2b256.hash(data).take(Message.ChecksumLength)
+      if (!checksum.sameElements(digest)) throw new Exception(s"Invalid data checksum length = $length")
       data
-    }
-    else Array()
-
-    val spec = specsMap.get(msgCode) match {
+    } else Array()
+    val spec: MessageSpec[_] = specsMap.get(msgCode) match {
       case Some(h) => h
-      case None => throw new Error(s"No message handler found for $msgCode")
+      case None => throw new Exception(s"No message handler found for $msgCode")
     }
-
     Message(spec, Left(msgData), sourceOpt)
   }
 }

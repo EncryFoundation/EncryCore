@@ -82,7 +82,7 @@ object EncryApp extends App with ScorexLogging {
 
   val scanner: ActorRef = system.actorOf(EncryScanner.props(), "scanner")
 
-  lazy val statsSender: ActorRef = system.actorOf(Props[StatsSender], "statsSender")
+  val statsSender: ActorRef = system.actorOf(Props[StatsSender], "statsSender")
 
   val apiRoutes: Seq[ApiRoute] = Seq(
     UtilsApiRoute(settings.restApi),
@@ -106,10 +106,7 @@ object EncryApp extends App with ScorexLogging {
 
   if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
 
-  if (settings.testing.transactionGeneration) {
-    val transactionGenerator: ActorRef = system.actorOf(Props[TransactionGenerator], "tx-generator")
-    transactionGenerator ! StartGeneration
-  }
+  if (settings.testing.transactionGeneration) system.actorOf(Props[TransactionGenerator], "tx-generator") ! StartGeneration
 
   if (settings.node.enableCLI) cliListener ! StartListening
 
