@@ -58,7 +58,7 @@ class EncryScanner(indexStore: Store) extends Actor with ScorexLogging {
   }
 
   def scanTransactions(txs: Seq[EncryBaseTransaction]): ScanningResult = {
-    val boxIdsToRemove: Seq[ADKey] = txs.flatMap(_.unlockers.map(_.boxId))
+    val boxIdsToRemove: Seq[ADKey] = txs.flatMap(_.inputs.map(_.boxId))
     val (newIndexes, boxesToInsert) = txs.flatMap(_.newBoxes)
       .foldLeft(mutable.TreeMap[ByteArrayWrapper, Seq[ADKey]](), Seq[EncryBaseBox]()) { case ((cache, bxs), bx) =>
         if (!boxIdsToRemove.exists(_.sameElements(bx.id))) {

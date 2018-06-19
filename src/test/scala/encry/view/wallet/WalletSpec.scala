@@ -7,7 +7,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryTransaction
 import encry.modifiers.state.box.MonetaryBox
-import encry.modifiers.state.box.proposition.AccountProposition
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.{Constants, EncryAppSettings}
 import encry.utils.{EncryGenerator, FileHelper}
 import encry.view.wallet.keys.KeyManager
@@ -38,8 +38,9 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
       case (sum, transaction) => sum + transaction.newBoxes.foldLeft(0L) {
         case (boxSum, bx) =>
           bx match {
-          case ac: MonetaryBox if keyManager.keys.exists(privKey => AccountProposition(privKey.publicImage.address) == ac.proposition) =>
-            boxSum + ac.amount
+          case ac: MonetaryBox
+            if keyManager.keys.exists(privKey => EncryProposition.accountLock(privKey.publicImage.address) == ac.proposition) =>
+              boxSum + ac.amount
           case _ =>
             boxSum
           }

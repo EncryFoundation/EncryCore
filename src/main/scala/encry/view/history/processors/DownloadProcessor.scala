@@ -74,7 +74,7 @@ trait DownloadProcessor extends ScorexLogging {
     } else if (header.height >= blockDownloadProcessor.minimalBlockHeight) {
       // Already synced and header is not too far back. Download required modifiers
       requiredModifiersForHeader(header)
-    } else if (!isHeadersChainSynced && isNewHeader(header)) {
+    } else if (!isHeadersChainSynced) {
       // Headers chain is synced after this header. Start downloading full blocks
       log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
       isHeadersChainSyncedVar = true
@@ -95,8 +95,6 @@ trait DownloadProcessor extends ScorexLogging {
     }
   }
 
-  private def isNewHeader(header: EncryBlockHeader): Boolean = {
-    // TODO: Magic Number
+  private def isNewHeader(header: EncryBlockHeader): Boolean =
     timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5
-  }
 }

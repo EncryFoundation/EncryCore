@@ -27,7 +27,7 @@ class EncryMiningWorker(initialCandidate: CandidateBlock, myNumber: Int, numberO
     case MineBlock(nonce) => ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, nonce) match {
       case Some(block) =>
         log.info(s"New block is found: $block on worker $self.")
-        statsSender ! MiningEnd(block.header, myNumber)
+        //statsSender ! MiningEnd(block.header, myNumber)
         nodeViewHolder ! LocallyGeneratedModifier(block.header)
         nodeViewHolder ! LocallyGeneratedModifier(block.payload)
         if (settings.node.stateMode == StateMode.Digest)

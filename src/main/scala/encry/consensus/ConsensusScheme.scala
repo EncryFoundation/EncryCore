@@ -21,7 +21,7 @@ trait ConsensusScheme {
   def realDifficulty(header: EncryBlockHeader): BigInt
 
   def getDerivedHeaderFields(parentOpt: Option[EncryBlockHeader], adProofBytes: SerializedAdProof,
-                                       transactions: Seq[EncryBaseTransaction]): (Byte, ModifierId, Digest32, Digest32, Int)
+                             transactions: Seq[EncryBaseTransaction]): (Byte, ModifierId, Digest32, Digest32, Int)
 
   def correctWorkDone(realDifficulty: Difficulty, difficulty: BigInt): Boolean = {
     realDifficulty >= difficulty

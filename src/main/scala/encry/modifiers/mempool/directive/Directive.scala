@@ -7,18 +7,15 @@ import scorex.core.serialization.BytesSerializable
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.hash.Digest32
 
-// Directive is sub-modifier of the state.
 trait Directive extends BytesSerializable {
 
   val typeId: DTypeId
-
-  val idx: Int
 
   val cost: Amount
 
   val isValid: Boolean
 
-  def boxes(digest: Digest32): Seq[EncryBaseBox]
+  def boxes(digest: Digest32, idx: Int): Seq[EncryBaseBox]
 }
 
 object Directive {

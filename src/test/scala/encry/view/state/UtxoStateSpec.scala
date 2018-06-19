@@ -52,7 +52,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val fees: Amount = regularTransactions.map(_.fee).sum
 
-    val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(secret, timestamp, Seq.empty, fees)
+    val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, IndexedSeq.empty, fees)
 
     val transactions: Seq[EncryTransaction] = regularTransactions.sortBy(_.timestamp) :+ coinbase
 

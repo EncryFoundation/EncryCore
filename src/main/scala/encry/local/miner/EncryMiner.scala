@@ -23,10 +23,8 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
-import scorex.core.ModifierId
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
-import scorex.crypto.hash.Digest32
 
 import scala.collection._
 
@@ -125,7 +123,7 @@ class EncryMiner extends Actor with ScorexLogging {
     val (txsToPut, txsToDrop, _) = view.pool.takeAll.toSeq.sortBy(_.fee).reverse
       .foldLeft((Seq[EncryBaseTransaction](), Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) {
         case ((validTxs, invalidTxs, bxsAcc), tx) =>
-          val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.unlockers.map(u => ByteArrayWrapper(u.boxId))
+          val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.inputs.map(u => ByteArrayWrapper(u.boxId))
           if ((validTxs.map(_.length).sum + tx.length) <= Constants.BlockMaxSize - 124) {
             if (view.state.validate(tx).isSuccess && bxsRaw.forall(k => !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size)
               (validTxs :+ tx, invalidTxs, bxsAcc ++ bxsRaw)
@@ -137,13 +135,11 @@ class EncryMiner extends Actor with ScorexLogging {
     view.pool.removeAsync(txsToDrop)
 
     val minerSecret: PrivateKey25519 = view.vault.keyManager.mainKey
-
     val feesTotal: Amount = txsToPut.map(_.fee).sum
-
     val supplyBox: AssetBox = EncrySupplyController.supplyBoxAt(view.state.height)
 
     val coinbase: EncryTransaction = TransactionFactory
-      .coinbaseTransactionScratch(minerSecret, timestamp, Seq(supplyBox), feesTotal)
+      .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, IndexedSeq(supplyBox), feesTotal)
 
     val txs: Seq[TX] = txsToPut.sortBy(_.timestamp) :+ coinbase
 
@@ -153,14 +149,7 @@ class EncryMiner extends Actor with ScorexLogging {
     val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
       .getOrElse(Constants.Chain.InitialDifficulty)
 
-    val derivedFields: (Byte, ModifierId, Digest32, Digest32, Int) = consensus.getDerivedHeaderFields(bestHeaderOpt, adProof, txs)
-
-    val blockSignature: Signature25519 = minerSecret.sign(
-      EncryBlockHeader.getMessageToSign(derivedFields._1, minerSecret.publicImage, derivedFields._2,
-        derivedFields._3, adDigest, derivedFields._4, timestamp, derivedFields._5, difficulty))
-
-    val candidate: CandidateBlock = CandidateBlock(minerSecret.publicImage,
-      blockSignature, bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
+    val candidate: CandidateBlock = CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
 
     log.debug(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
       s"and 1 coinbase for height $height")

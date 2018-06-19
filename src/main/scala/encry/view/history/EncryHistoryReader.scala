@@ -1,6 +1,6 @@
 package encry.view.history
 
-import encry.consensus.{Absent, HistoryReader, ModifierSemanticValidity, Valid, Invalid}
+import encry.consensus.{HistoryReader, ModifierSemanticValidity}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -59,30 +59,19 @@ trait EncryHistoryReader
   override def compare(si: EncrySyncInfo): HistoryComparisonResult = {
     bestHeaderIdOpt match {
       case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) =>
-        //Our best header is the same as other node best header
-        Equal
+        Equal //Our best header is the same as other node best header
       case Some(id) if si.lastHeaderIds.exists(_ sameElements id) =>
-        //Our best header is in other node best chain, but not at the last position
-        Older
+        Older //Our best header is in other node best chain, but not at the last position
       case Some(_) if si.lastHeaderIds.isEmpty =>
-        //Other history is empty, our contain some headers
-        Younger
+        Younger //Other history is empty, our contain some headers
       case Some(_) =>
         //We are on different forks now.
-        if (si.lastHeaderIds.view.reverse.exists(m => contains(m))) {
-          //Return Younger, because we can send blocks from our fork that other node can download.
-          Younger
-        } else {
-          //We don't have any of id's from other's node sync info in history.
-          //We don't know whether we can sync with it and what blocks to send in Inv message.
-          Unknown
-        }
-      case None if si.lastHeaderIds.isEmpty =>
-        //Both nodes do not keep any blocks
-        Equal
-      case None =>
-        //Our history is empty, other contain some headers
-        Older
+        if (si.lastHeaderIds.view.reverse.exists(m => contains(m)))
+          Younger //Return Younger, because we can send blocks from our fork that other node can download.
+        else Unknown //We don't have any of id's from other's node sync info in history.
+      //We don't know whether we can sync with it and what blocks to send in Inv message.
+      case None if si.lastHeaderIds.isEmpty => Equal //Both nodes do not keep any blocks
+      case None => Older //Our history is empty, other contain some headers
     }
   }
 
@@ -92,25 +81,23 @@ trait EncryHistoryReader
     * @return Ids of headers, that node with info should download and apply to synchronize
     */
   override def continuationIds(info: EncrySyncInfo, size: Int): Option[ModifierIds] = Try {
-    if (isEmpty) {
-      info.startingPoints
-    } else if (info.lastHeaderIds.isEmpty) {
-      val heightFrom = Math.min(bestHeaderHeight, size - 1)
-      val startId = headerIdsAtHeight(heightFrom).head
-      val startHeader = typedModifierById[EncryBlockHeader](startId).get
-      val headers = headerChainBack(size, startHeader, _ => false)
+    if (isEmpty) info.startingPoints
+    else if (info.lastHeaderIds.isEmpty) {
+      val heightFrom: Int = Math.min(bestHeaderHeight, size - 1)
+      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
+      val startHeader: EncryBlockHeader = typedModifierById[EncryBlockHeader](startId).get
+      val headers: EncryHeaderChain = headerChainBack(size, startHeader, _ => false)
         .ensuring(_.headers.exists(_.height == Constants.Chain.GenesisHeight), "Should always contain genesis header")
       headers.headers.flatMap(h => Seq((EncryBlockHeader.modifierTypeId, h.id)))
     } else {
-      val ids = info.lastHeaderIds
+      val ids: Seq[ModifierId] = info.lastHeaderIds
       val lastHeaderInOurBestChain: ModifierId = ids.view.reverse.find(m => isInBestChain(m)).get
-      val theirHeight = heightOf(lastHeaderInOurBestChain).get
-      val heightFrom = Math.min(bestHeaderHeight, theirHeight + size)
-      val startId = headerIdsAtHeight(heightFrom).head
-      val startHeader = typedModifierById[EncryBlockHeader](startId).get
-      val headerIds = headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
+      val theirHeight: Height = heightOf(lastHeaderInOurBestChain).get
+      val heightFrom: Int = Math.min(bestHeaderHeight, theirHeight + size)
+      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
+      val startHeader: EncryBlockHeader = typedModifierById[EncryBlockHeader](startId).get
+      headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
         .headers.map(h => EncryBlockHeader.modifierTypeId -> h.id)
-      headerIds
     }
   }.toOption
 
@@ -123,9 +110,8 @@ trait EncryHistoryReader
         .flatMap { h => headerIdsAtHeight(h + 1) }
         .flatMap { id => typedModifierById[EncryBlockHeader](id) }
         .filter(filterCond)
-      if (nextLevelHeaders.isEmpty) {
-        acc.map(chain => chain.reverse)
-      } else {
+      if (nextLevelHeaders.isEmpty) acc.map(chain => chain.reverse)
+      else {
         val updatedChains: Seq[Seq[EncryBlockHeader]] = nextLevelHeaders.flatMap { h =>
           acc.find(chain => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(c => h +: c)
         }
@@ -137,16 +123,11 @@ trait EncryHistoryReader
     loop(heightOf(header.id), Seq(Seq(header)))
   }
 
-  protected def testApplicable(modifier: EncryPersistentModifier): Try[Unit] = {
-    modifier match {
-      case header: EncryBlockHeader => validate(header)
-      case payload: EncryBlockPayload => validate(payload)
-      case adProofs: ADProofs => validate(adProofs)
-      case mod: Any => Failure(new Exception(s"Modifier $mod is of incorrect type."))
-    }
-  }.recoverWith {
-    case e: Exception => log.info(e.toString)
-      Failure(e)
+  protected def testApplicable(modifier: EncryPersistentModifier): Try[Unit] = modifier match {
+    case header: EncryBlockHeader => validate(header)
+    case payload: EncryBlockPayload => validate(payload)
+    case adProofs: ADProofs => validate(adProofs)
+    case mod: Any => Failure(new Exception(s"Modifier $mod is of incorrect type."))
   }
 
   /** Checks whether the modifier is applicable to the history. */
@@ -164,24 +145,19 @@ trait EncryHistoryReader
     case _ => None
   }
 
-  def getBlock(header: EncryBlockHeader): Option[EncryBlock] = {
+  def getBlock(header: EncryBlockHeader): Option[EncryBlock] =
     (typedModifierById[EncryBlockPayload](header.payloadId), typedModifierById[ADProofs](header.adProofsId)) match {
       case (Some(txs), Some(proofs)) => Some(EncryBlock(header, txs, Some(proofs)))
       case (Some(txs), None) if !nodeSettings.stateMode.isDigest => Some(EncryBlock(header, txs, None))
       case _ => None
     }
-  }
 
-  def missedModifiersForFullChain: Seq[(ModifierTypeId, ModifierId)] = {
-    if (nodeSettings.verifyTransactions) {
-      bestHeaderOpt.toSeq
-        .flatMap(h => headerChainBack(bestHeaderHeight + 1, h, _ => false).headers)
-        .flatMap(h => Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId)))
-        .filter(id => !contains(id._2))
-    } else {
-      Seq.empty
-    }
-  }
+  def missedModifiersForFullChain: Seq[(ModifierTypeId, ModifierId)] = if (nodeSettings.verifyTransactions) {
+    bestHeaderOpt.toSeq
+      .flatMap(h => headerChainBack(bestHeaderHeight + 1, h, _ => false).headers)
+      .flatMap(h => Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId)))
+      .filter(id => !contains(id._2))
+  } else Seq.empty
 
   /**
     * Return headers, required to apply to reach header2 if you are at header1 position.
@@ -191,14 +167,11 @@ trait EncryHistoryReader
     * @return (Modifier required to rollback first, header chain to apply)
     */
   def getChainToHeader(fromHeaderOpt: Option[EncryBlockHeader],
-                       toHeader: EncryBlockHeader): (Option[ModifierId], EncryHeaderChain) = {
-    fromHeaderOpt match {
-      case Some(h1) =>
-        val (prevChain, newChain) = commonBlockThenSuffixes(h1, toHeader)
-        (prevChain.headOption.map(_.id), newChain.tail)
-      case None =>
-        (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
-    }
+                       toHeader: EncryBlockHeader): (Option[ModifierId], EncryHeaderChain) = fromHeaderOpt match {
+    case Some(h1) =>
+      val (prevChain, newChain) = commonBlockThenSuffixes(h1, toHeader)
+      (prevChain.headOption.map(_.id), newChain.tail)
+    case None => (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
   }
 
   /** Finds common block and sub-chains from common block to header1 and header2. */
@@ -227,23 +200,20 @@ trait EncryHistoryReader
     def until(h: EncryBlockHeader): Boolean = otherChain.exists(_.id sameElements h.id)
 
     val currentChain: EncryHeaderChain = headerChainBack(limit, startHeader, until)
-    val commonBlock: EncryBlockHeader = currentChain.head
-    val commonBlockAndSuffixes: EncryHeaderChain = otherChain.takeAfter(commonBlock)
-    (currentChain, commonBlockAndSuffixes)
+    (currentChain, otherChain.takeAfter(currentChain.head))
   }
 
   override def syncInfo: EncrySyncInfo = if (isEmpty) EncrySyncInfo(Seq.empty)
   else EncrySyncInfo(lastHeaders(EncrySyncInfo.MaxBlockIds).headers.map(_.id))
 
-  override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity = {
+  override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
     historyStorage.store.get(validityKey(modifierId)) match {
-      case Some(b) if b.data.headOption.contains(1.toByte) => Valid
-      case Some(b) if b.data.headOption.contains(0.toByte) => Invalid
-      case None if contains(modifierId) => encry.consensus.Unknown
-      case None => Absent
+      case Some(b) if b.data.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
+      case Some(b) if b.data.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
+      case None if contains(modifierId) => ModifierSemanticValidity.Unknown
+      case None => ModifierSemanticValidity.Absent
       case m =>
         log.error(s"Incorrect validity status: $m")
-        Absent
+        ModifierSemanticValidity.Absent
     }
-  }
 }

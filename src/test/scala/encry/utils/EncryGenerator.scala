@@ -8,8 +8,7 @@ import encry.crypto.equihash.EquihashSolution
 import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
-import encry.modifiers.state.box.proof.Signature25519
-import encry.modifiers.state.box.proposition.AccountProposition
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, MonetaryBox}
 import encry.settings.{Algos, Constants}
 import encry.utils.TestHelper.{Props, rndGen}
@@ -30,7 +29,7 @@ trait EncryGenerator {
   def randomAddress: Address = Account(PublicKey @@ Random.randomBytes()).address
 
   def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None): AssetBox =
-    AssetBox(AccountProposition(address), rndGen.nextLong(), amount, tokenIdOpt)
+    AssetBox(EncryProposition.accountLock(Account(address)), rndGen.nextLong(), amount, tokenIdOpt)
 
   def genTxOutputs(boxes: Traversable[EncryBaseBox]): IndexedSeq[ADKey] =
     boxes.foldLeft(IndexedSeq[ADKey]()) { case (s, box) =>
@@ -39,7 +38,7 @@ trait EncryGenerator {
 
   def genValidAssetBoxes(secret: PrivateKey25519, amount: Amount, qty: Int): Seq[AssetBox] =
     (0 to qty).foldLeft(IndexedSeq[AssetBox]()) { case (bxs, _) =>
-      bxs :+ AssetBox(AccountProposition(Account(secret.publicKeyBytes)), rndGen.nextLong(), amount)
+      bxs :+ AssetBox(EncryProposition.accountLock(Account(secret.publicKeyBytes)), rndGen.nextLong(), amount)
     }
 
   def genPrivKeys(qty: Int): Seq[PrivateKey25519] = (0 until qty).map { _ =>
@@ -100,17 +99,14 @@ trait EncryGenerator {
 
     keys.map { k =>
       val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genAssetBox(PublicKey25519(PublicKey @@ Random.randomBytes(32)).address))
-      TransactionFactory.defaultPaymentTransactionScratch(k, -100,
-        timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
+      TransactionFactory.defaultPaymentTransactionScratch(k, -100, timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
     }
   }
 
   def genHeader: EncryBlockHeader = {
     val random = new scala.util.Random
     EncryBlockHeader(
-      Random.randomBytes(32)(random.nextInt(32)),
-      PublicKey25519(PublicKey @@ Random.randomBytes()),
-      Signature25519(Signature @@ Random.randomBytes(64)),
+      1.toByte,
       ModifierId @@ Random.randomBytes(),
       Digest32 @@ Random.randomBytes(),
       ADDigest @@ Random.randomBytes(33),

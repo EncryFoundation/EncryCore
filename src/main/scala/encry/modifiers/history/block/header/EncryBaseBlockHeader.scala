@@ -1,12 +1,12 @@
 package encry.modifiers.history.block.header
 
-import encry.modifiers.{EncryPersistentModifier, Signable25519}
+import encry.modifiers.EncryPersistentModifier
 import scorex.core.ModifierId
 import encry.modifiers.history.block.Block._
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.hash.Digest32
 
-trait EncryBaseBlockHeader extends EncryPersistentModifier with Signable25519 {
+trait EncryBaseBlockHeader extends EncryPersistentModifier {
 
   val version: Version
 
