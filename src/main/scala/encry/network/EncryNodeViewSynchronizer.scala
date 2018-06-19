@@ -1,7 +1,6 @@
 package encry.network
 
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
@@ -22,16 +21,9 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
   NodeViewSynchronizer[EncryProposition, EncryBaseTransaction, EncrySyncInfo, EncrySyncInfoMessageSpec.type,
     EncryPersistentModifier, EncryHistory, EncryMempool](syncInfoSpec) {
 
-  import EncryNodeViewSynchronizer._
+  case object CheckModifiersToDownload
 
   override val deliveryTracker: EncryDeliveryTracker = EncryDeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self, timeProvider)
-
-  val downloadListSize: Int = settings.network.networkChunkSize
-
-  val onSemanticallySuccessfulModifier: Receive = {
-    case SemanticallySuccessfulModifier(_: EncryBlock) => //Do nothing, other nodes will request required modifiers via ProgressInfo.toDownload
-    case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
-  }
 
   override def preStart(): Unit = {
     val messageSpecs: Seq[MessageSpec[_]] = Seq(invSpec, requestModifierSpec, ModifiersSpec, syncInfoSpec)
@@ -55,12 +47,6 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
       requestDownload(modifierTypeId, Seq(modifierId))
   }
 
-  /**
-    * Broadcast inv on successful Header and BlockPayload application
-    * Do not broadcast Inv messages during initial synchronization (the rest of the network should already have all
-    * this messages)
-    *
-    */
   def onSyntacticallySuccessfulModifier: Receive = {
     case SyntacticallySuccessfulModifier(mod) if (mod.isInstanceOf[EncryBlockHeader] || mod.isInstanceOf[EncryBlockPayload]) &&
       historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
@@ -71,7 +57,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
       deliveryTracker.removeOutdatedExpectingFromRandom()
       historyReaderOpt.foreach { h =>
         val currentQueue: Iterable[ModifierId] = deliveryTracker.expectingFromRandomQueue
-        val newIds: Seq[(ModifierTypeId, ModifierId)] = h.modifiersToDownload(downloadListSize - currentQueue.size, currentQueue)
+        val newIds: Seq[(ModifierTypeId, ModifierId)] = h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
         val oldIds: Seq[(ModifierTypeId, ModifierId)] = deliveryTracker.idsExpectingFromRandomToRetry()
         (newIds ++ oldIds).groupBy(_._1).foreach(ids => requestDownload(ids._1, ids._2.map(_._2)))
       }
@@ -80,7 +66,6 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     modifierIds.foreach(id => deliveryTracker.expectFromRandom(modifierTypeId, id))
     val msg: Message[(ModifierTypeId, Seq[ModifierId])] = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
-    //todo: Full nodes should be here, not a random peer
     networkController ! SendToNetwork(msg, SendToRandom)
   }
 
@@ -105,10 +90,4 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
         else if (h.isHeadersChainSynced && !deliveryTracker.isExpectingFromRandom) self ! CheckModifiersToDownload
       }
   }
-}
-
-object EncryNodeViewSynchronizer {
-
-  case object CheckModifiersToDownload
-
 }

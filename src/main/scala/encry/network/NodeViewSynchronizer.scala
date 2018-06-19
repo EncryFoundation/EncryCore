@@ -19,14 +19,7 @@ import scorex.crypto.encode.Base58
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-/**
-  * A component which synchronizes local node view with p2p network.
-  *
-  * @param syncInfoSpec SyncInfo specification
-  * @tparam P   proposition
-  * @tparam TX  transaction
-  * @tparam SIS SyncInfoMessage specification
-  */
+
 class NodeViewSynchronizer[P <: Proposition, TX <: Transaction[P], SI <: SyncInfo,
 SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: HistoryReader[PMOD, SI], MR <: MempoolReader[TX]]
 (syncInfoSpec: SIS) extends Actor with ScorexLogging {
