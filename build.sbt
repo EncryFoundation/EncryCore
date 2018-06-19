@@ -48,7 +48,7 @@ libraryDependencies ++= Seq(
   "javax.xml.bind" % "jaxb-api" % "2.+",
   "com.lihaoyi" %% "fastparse" % "1.0.0",
   "com.iheart" %% "ficus" % "1.4.2",
-  "com.google.guava" % "guava" % "19.+",
+  "com.google.guava" % "guava" % "21.+",
   "org.slf4j" % "slf4j-api" % "1.7.+",
   "org.bouncycastle" % "bcprov-jdk15on" % "1.58",
   "org.whispersystems" % "curve25519-java" % "+",
@@ -57,7 +57,7 @@ libraryDependencies ++= Seq(
   "org.scorexfoundation" %% "iodb" % "0.3.2",
   "io.spray" %%  "spray-json" % "1.3.3",
   "io.monix" %% "monix" % "2.3.3",
-  "com.github.oskin1" %% "encryscript" % "0.3.1",
+  "com.github.oskin1" %% "prism" % "0.1.8",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
   "org.influxdb" % "influxdb-java" % "2.10",
   "org.apache.commons" % "commons-io" % "1.3.2"
@@ -80,7 +80,7 @@ logLevel := Level.Error
 
 val opts = Seq(
   "-server",
-  "-Xms512m",
+  "-Xms4G",
   "-Xmx4G",
   "-XX:+ExitOnOutOfMemoryError",
   "-XX:+IgnoreUnrecognizedVMOptions",

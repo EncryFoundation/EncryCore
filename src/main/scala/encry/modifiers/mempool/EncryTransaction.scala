@@ -1,27 +1,26 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import encry.modifiers.mempool.EncryBaseTransaction.TransactionValidationException
 import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
-import encry.modifiers.state.box.proof.{Proof, ProofSerializer}
 import encry.settings.{Algos, Constants}
-import encrywm.lang.backend.env.{ESObject, ESValue}
-import encrywm.lib.Types
-import encrywm.lib.Types.{ESByteVector, ESList, ESLong, ESTransaction}
+import encry.validation.{ModifierValidator, ValidationResult}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
+import org.encryfoundation.prismlang.core.Types
+import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import scorex.core.serialization.{SerializationException, Serializer}
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.hash.Digest32
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
-/** Transaction is an atomic state modifier. */
-case class EncryTransaction(override val fee: Amount,
-                            override val timestamp: Long,
-                            override val unlockers: IndexedSeq[Unlocker],
-                            override val directives: IndexedSeq[Directive],
-                            override val defaultProofOpt: Option[Proof]) extends EncryBaseTransaction {
+/** Completely assembled atomic state modifier. */
+case class EncryTransaction(fee: Amount,
+                            timestamp: Long,
+                            inputs: IndexedSeq[Input],
+                            directives: IndexedSeq[Directive],
+                            defaultProofOpt: Option[Proof])
+  extends EncryBaseTransaction with ModifierValidator {
 
   override type M = EncryTransaction
 
@@ -31,32 +30,27 @@ case class EncryTransaction(override val fee: Amount,
 
   override lazy val serializer: Serializer[M] = EncryTransactionSerializer
 
-  override lazy val txHash: Digest32 =
-    EncryTransaction.getHash(fee, timestamp, unlockers, directives)
+  override val messageToSign: Array[Byte] =
+    UnsignedEncryTransaction.bytesToSign(fee, timestamp, inputs, directives)
 
-  override lazy val semanticValidity: Try[Unit] =
-    Try(directives.map(_.idx).foldLeft(-1)((a, b) => if (b > a) b else throw TransactionValidationException("Invalid order")))
-      .flatMap { _ =>
-        if (!validSize) Failure(TransactionValidationException("Invalid size"))
-        else if (fee < 0) Failure(TransactionValidationException("Negative fee"))
-        else if (!directives.forall(_.isValid)) Failure(TransactionValidationException("Bad outputs"))
-        else Success()
-      }
+  override lazy val semanticValidity: Try[Unit] = validateStateless.toTry
 
-  override val esType: Types.ESProduct = ESTransaction
+  def validateStateless: ValidationResult =
+    accumulateErrors
+      .demand(validSize, "Invalid size")
+      .demand(fee >= 0, "Negative fee amount")
+      .demand(directives.forall(_.isValid), "Invalid outputs")
+      .demand(inputs.size <= Short.MaxValue, s"Too many inputs in transaction $toString")
+      .demand(directives.size <= Short.MaxValue, s"Too many directives in transaction $toString")
+      .result
 
-  override def asVal: ESValue = ESValue(ESTransaction.ident.toLowerCase, ESTransaction)(convert)
+  override val tpe: Types.Product = Types.EncryTransaction
 
-  override def convert: ESObject = {
-    val fields = Map(
-      "fee" -> ESValue("fee", ESLong)(fee),
-      "messageToSign" -> ESValue("messageToSign", ESByteVector)(txHash),
-      "outputs" -> ESValue("outputs", ESList(Types.ESBox))(newBoxes.map(_.convert).toList),
-      "unlockers" -> ESValue("unlockers", ESList(Types.ESUnlocker))(unlockers.map(_.convert).toList),
-      "timestamp" -> ESValue("timestamp", ESLong)(timestamp)
-    )
-    ESObject(Types.ESTransaction.ident, fields, esType)
-  }
+  override def asVal: PValue = PValue(PObject(Map(
+    "inputs" -> PValue(inputs.map(_.boxId).toList, Types.PCollection(Types.PCollection.ofByte)),
+    "outputs" -> PValue(newBoxes.map(_.convert).toList, Types.PCollection(Types.EncryBox)),
+    "messageToSign" -> PValue(messageToSign.toList, Types.PCollection.ofByte)
+  ), tpe), tpe)
 }
 
 object EncryTransaction {
@@ -65,7 +59,7 @@ object EncryTransaction {
     "id" -> Algos.encode(tx.id).asJson,
     "fee" -> tx.fee.asJson,
     "timestamp" -> tx.timestamp.asJson,
-    "unlockers" -> tx.unlockers.map(_.asJson).asJson,
+    "inputs" -> tx.inputs.map(_.asJson).asJson,
     "directives" -> tx.directives.map(_.asJson).asJson,
     "defaultProofOpt" -> tx.defaultProofOpt.map(_.asJson).asJson
   ).asJson
@@ -74,37 +68,19 @@ object EncryTransaction {
     for {
       fee <- c.downField("fee").as[Long]
       timestamp <- c.downField("timestamp").as[Long]
-      unlockers <- c.downField("unlockers").as[IndexedSeq[Unlocker]]
+      inputs <- c.downField("inputs").as[IndexedSeq[Input]]
       directives <- c.downField("directives").as[IndexedSeq[Directive]]
       defaultProofOpt <- c.downField("defaultProofOpt").as[Option[Proof]]
     } yield {
       EncryTransaction(
         fee,
         timestamp,
-        unlockers,
+        inputs,
         directives,
         defaultProofOpt
       )
     }
   }
-
-  def getHash(fee: Amount,
-              timestamp: Long,
-              unlockers: IndexedSeq[Unlocker],
-              directives: IndexedSeq[Directive]): Digest32 =
-    Algos.hash(Bytes.concat(
-      unlockers.map(_.bytesWithoutProof).foldLeft(Array[Byte]())(_ ++ _),
-      directives.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
-      Longs.toByteArray(timestamp),
-      Longs.toByteArray(fee)
-    )
-  )
-
-  def getMessageToSign(fee: Amount,
-                       timestamp: Long,
-                       unlockers: IndexedSeq[Unlocker],
-                       directives: IndexedSeq[Directive]): Array[Byte] =
-    getHash(fee, timestamp, unlockers, directives)
 }
 
 object EncryTransactionSerializer extends Serializer[EncryTransaction] {
@@ -113,9 +89,9 @@ object EncryTransactionSerializer extends Serializer[EncryTransaction] {
     Bytes.concat(
       Longs.toByteArray(obj.fee),
       Longs.toByteArray(obj.timestamp),
-      Shorts.toByteArray(obj.unlockers.size.toShort),
+      Shorts.toByteArray(obj.inputs.size.toShort),
       Shorts.toByteArray(obj.directives.size.toShort),
-      obj.unlockers.map(u => Shorts.toByteArray(u.bytes.length.toShort) ++ u.bytes).foldLeft(Array[Byte]())(_ ++ _),
+      obj.inputs.map(u => Shorts.toByteArray(u.bytes.length.toShort) ++ u.bytes).foldLeft(Array[Byte]())(_ ++ _),
       obj.directives.map { d =>
         val bytes: Array[Byte] = DirectiveSerializer.toBytes(d)
         Shorts.toByteArray(bytes.length.toShort) ++ bytes
@@ -131,10 +107,10 @@ object EncryTransactionSerializer extends Serializer[EncryTransaction] {
     val unlockersQty: Int = Shorts.fromByteArray(bytes.slice(16, 18))
     val directivesQty: Int = Shorts.fromByteArray(bytes.slice(18, 20))
     val leftBytes1: Array[Byte] = bytes.drop(20)
-    val (unlockers: IndexedSeq[Unlocker], unlockersLen: Int) = (0 until unlockersQty)
-      .foldLeft(IndexedSeq[Unlocker](), 0) { case ((acc, shift), _) =>
+    val (unlockers: IndexedSeq[Input], unlockersLen: Int) = (0 until unlockersQty)
+      .foldLeft(IndexedSeq[Input](), 0) { case ((acc, shift), _) =>
         val len: Int = Shorts.fromByteArray(leftBytes1.slice(shift, shift + 2))
-        UnlockerSerializer.parseBytes(leftBytes1.slice(shift + 2, shift + 2 + len))
+        InputSerializer.parseBytes(leftBytes1.slice(shift + 2, shift + 2 + len))
           .map(u => (acc :+ u, shift + 2 + len))
           .getOrElse(throw SerializationException)
       }
@@ -153,4 +129,36 @@ object EncryTransactionSerializer extends Serializer[EncryTransaction] {
 
     EncryTransaction(fee, timestamp, unlockers, directives, proofOpt)
   }
+}
+
+/** Unsigned version of EncryTransaction (without any
+  * proofs for which interactive message is required) */
+case class UnsignedEncryTransaction(fee: Amount,
+                                    timestamp: Long,
+                                    inputs: IndexedSeq[Input],
+                                    directives: IndexedSeq[Directive]) {
+
+  val messageToSign: Array[Byte] =
+    UnsignedEncryTransaction.bytesToSign(fee, timestamp, inputs, directives)
+
+  def toSigned(proofs: IndexedSeq[Seq[Proof]], defaultProofOpt: Option[Proof]): EncryTransaction = {
+    val signedInputs: IndexedSeq[Input] = inputs.zipWithIndex.map { case (input, idx) =>
+      if (proofs.nonEmpty && proofs.lengthCompare(idx + 1) <= 0) input.copy(proofs = proofs(idx).toList) else input
+    }
+    EncryTransaction(fee, timestamp, signedInputs, directives, defaultProofOpt)
+  }
+}
+
+object UnsignedEncryTransaction {
+
+  def bytesToSign(fee: Amount,
+                  timestamp: Long,
+                  unlockers: IndexedSeq[Input],
+                  directives: IndexedSeq[Directive]): Digest32 =
+    Algos.hash(Bytes.concat(
+      unlockers.map(_.bytesWithoutProof).foldLeft(Array[Byte]())(_ ++ _),
+      directives.map(_.bytes).foldLeft(Array[Byte]())(_ ++ _),
+      Longs.toByteArray(timestamp),
+      Longs.toByteArray(fee)
+    ))
 }

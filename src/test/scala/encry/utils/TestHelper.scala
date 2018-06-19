@@ -4,7 +4,7 @@ import java.io.{File, FileWriter}
 
 import encry.account.{Account, Address}
 import encry.crypto.PrivateKey25519
-import encry.modifiers.state.box.proposition.AccountProposition
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.ADKey
@@ -55,12 +55,12 @@ object TestHelper {
   def genAssetBoxes: IndexedSeq[AssetBox] =
     getOrGenerateKeys(Props.keysFilePath).foldLeft(IndexedSeq[AssetBox]()) { case (bxs, pk) =>
       bxs :+ AssetBox(
-        AccountProposition(Account(pk.publicKeyBytes)),
+        EncryProposition.accountLock(Account(pk.publicKeyBytes)),
         rndGen.nextLong(), Props.boxValue)
     }
 
   def genAssetBox(address: Address, amount: Amount = 9L): AssetBox =
-    AssetBox(AccountProposition(address), amount, Props.boxValue)
+    AssetBox(EncryProposition.accountLock(address), amount, Props.boxValue)
 
   def genTxOutputs(boxes: Traversable[EncryBaseBox]): IndexedSeq[ADKey] =
     boxes.foldLeft(IndexedSeq[ADKey]()) { case(s, box) =>

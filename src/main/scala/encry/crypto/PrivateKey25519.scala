@@ -1,7 +1,6 @@
 package encry.crypto
 
 import com.google.common.primitives.Bytes
-import encry.modifiers.state.box.proof.Signature25519
 import scorex.core.serialization.{BytesSerializable, Serializer}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 

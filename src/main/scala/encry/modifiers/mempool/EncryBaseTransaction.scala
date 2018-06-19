@@ -1,12 +1,11 @@
 package encry.modifiers.mempool
 
 import encry.modifiers.mempool.directive.Directive
-import encry.modifiers.state.box.proof.Proof
+import encry.modifiers.state.box.EncryBaseBox
 import encry.modifiers.state.box.proposition.EncryProposition
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.{Algos, Constants}
-import encrywm.lang.backend.env.ESEnvConvertable
 import io.circe.Encoder
+import org.encryfoundation.prismlang.core.PConvertible
 import scorex.core.ModifierId
 import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.Box.Amount
@@ -15,36 +14,31 @@ import scorex.crypto.hash.Digest32
 import scala.util.Try
 
 trait EncryBaseTransaction extends Transaction[EncryProposition]
-  with ModifierWithSizeLimit with ESEnvConvertable {
+  with ModifierWithSizeLimit with PConvertible {
 
-  val txHash: Digest32
-
-  lazy val dataToSign: Array[Byte] = txHash
+  val messageToSign: Array[Byte]
 
   val semanticValidity: Try[Unit]
 
-  override lazy val id: ModifierId = ModifierId @@ txHash
+  override lazy val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
 
   val fee: Long
 
   val timestamp: Long
 
-  val unlockers: IndexedSeq[Unlocker]
+  val inputs: IndexedSeq[Input]
 
   val directives: IndexedSeq[Directive]
 
   val defaultProofOpt: Option[Proof]
 
   lazy val newBoxes: Traversable[EncryBaseBox] =
-    directives.flatMap(_.boxes(txHash))
+    directives.zipWithIndex.flatMap { case (d, idx) => d.boxes(Digest32 !@@ id, idx) }
 
   lazy val minimalFee: Amount = Constants.FeeMinAmount +
     directives.map(_.cost).sum + (Constants.PersistentByteCost * length)
 
-  override def toString: String = s"<EncryTransaction id=${Algos.encode(id)} fee=$fee inputs=${unlockers.map(u => Algos.encode(u.boxId))}>"
-
-  // Shadowed.
-  override lazy val messageToSign: Array[Byte] = Array.fill(32)(1.toByte)
+  override def toString: String = s"<EncryTransaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}>"
 }
 
 object EncryBaseTransaction {

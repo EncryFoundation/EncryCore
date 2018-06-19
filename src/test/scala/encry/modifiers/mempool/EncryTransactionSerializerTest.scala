@@ -5,7 +5,7 @@ import org.scalatest.FunSuite
 
 class EncryTransactionSerializerTest extends FunSuite with InstanceFactory {
 
-  test("toBytes & parseBytes (Transafer)") {
+  test("toBytes & parseBytes (Transfer)") {
 
     val tx = paymentTransactionDynamic
 
@@ -15,7 +15,7 @@ class EncryTransactionSerializerTest extends FunSuite with InstanceFactory {
 
     assert(txDeserialized.isSuccess, "Deserialization failed.")
 
-    assert(tx.txHash sameElements txDeserialized.get.txHash, "Id mismatch.")
+    assert(tx.id sameElements txDeserialized.get.id, "Id mismatch.")
   }
 
   test("toBytes & parseBytes (Coinbase)") {
@@ -28,6 +28,6 @@ class EncryTransactionSerializerTest extends FunSuite with InstanceFactory {
 
     assert(txDeserialized.isSuccess, "Deserialization failed.")
 
-    assert(tx.txHash sameElements txDeserialized.get.txHash, "Id mismatch.")
+    assert(tx.id sameElements txDeserialized.get.id, "Id mismatch.")
   }
 }

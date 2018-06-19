@@ -55,7 +55,7 @@ class TransactionGenerator extends Actor with ScorexLogging {
         // Generate new transaction if wallet contains enough coins and transaction limit is not exhausted.
         case Some(walletData) if walletData.boxes.map(_.amount).sum >= (amountD + minimalFeeD) && (limit > 0 || noLimitMode) =>
           val tx: EncryTransaction = createTransaction(walletData)
-          val leftBoxes: Seq[AssetBox] = walletData.boxes.filterNot(bx => tx.unlockers.map(_.boxId).contains(bx.id))
+          val leftBoxes: Seq[AssetBox] = walletData.boxes.filterNot(bx => tx.inputs.map(_.boxId).contains(bx.id))
           walletDataOpt = Some(walletData.copy(boxes = leftBoxes))
           limit -= 1
           nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)

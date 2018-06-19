@@ -6,16 +6,17 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderS
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.EncryBaseTransaction
+import encry.validation.{ModifierValidator, ValidationResult}
 import io.circe.Encoder
 import io.circe.syntax._
 import scorex.core.serialization.Serializer
 import scorex.core.{ModifierId, ModifierTypeId}
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class EncryBlock(override val header: EncryBlockHeader,
                       override val payload: EncryBlockPayload,
-                      adProofsOpt: Option[ADProofs]) extends EncryBaseBlock {
+                      adProofsOpt: Option[ADProofs]) extends EncryBaseBlock with ModifierValidator {
 
   override type M = EncryBlock
 
@@ -23,11 +24,12 @@ case class EncryBlock(override val header: EncryBlockHeader,
 
   override def transactions: Seq[EncryBaseTransaction] = payload.transactions
 
-  override def semanticValidity: Try[Unit] = {
-    if (header.transactionsRoot != payload.digest) Failure(new Exception("Invalid payload root hash"))
-    else if (!header.validSignature) Failure(new Exception("Invalid signature"))
-    else Success()
-  }
+  override def semanticValidity: Try[Unit] = validateSemantically.toTry
+
+  def validateSemantically: ValidationResult =
+    accumulateErrors
+      .demand(header.transactionsRoot != payload.digest, "Invalid payload root hash")
+      .result
 
   override def parentId: ModifierId = header.parentId
 

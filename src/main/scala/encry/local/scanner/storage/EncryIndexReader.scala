@@ -1,8 +1,8 @@
 package encry.local.scanner.storage
 
-import encry.account.Address
+import encry.account.{Account, Address}
 import encry.modifiers.state.box.EncryBox
-import encry.modifiers.state.box.proposition.AccountProposition
+import encry.modifiers.state.box.proposition.EncryProposition
 import encry.storage.codec.FixLenComplexValueCodec
 import encry.utils.ScorexLogging
 import scorex.core.transaction.box.proposition.Proposition
@@ -16,5 +16,5 @@ case class EncryIndexReader(index: IndexStorage) extends ScorexLogging {
         .getOrElse(Seq.empty).map(ADKey @@ _))
 
   def boxIdsByAddress(address: Address): Option[Seq[ADKey]] =
-    boxIdsByProposition(AccountProposition(address))
+    boxIdsByProposition(EncryProposition.accountLock(Account(address)))
 }

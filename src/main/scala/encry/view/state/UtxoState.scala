@@ -4,6 +4,7 @@ import java.io.File
 
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
+import encry.contracts.EncryStateView
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -17,6 +18,7 @@ import encry.settings.{Algos, Constants}
 import encry.utils.{BalanceCalculator, ScorexLogging}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.Height
+import encry.EncryApp.settings
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.VersionTag
 import scorex.core.transaction.box.Box.Amount
@@ -81,11 +83,11 @@ class UtxoState(override val version: VersionTag,
 
       applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] =
-          metadata(VersionTag @@ block.id, block.header.stateRoot, Height @@ block.header.height, block.header.timestamp)
+          metadata(VersionTag !@@ block.id, block.header.stateRoot, Height @@ block.header.height, block.header.timestamp)
         val proofBytes: SerializedAdProof = persistentProver.generateProofAndUpdateStorage(meta)
         val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
 
-        if (block.adProofsOpt.isEmpty) onAdProofGenerated(ADProofs(block.header.id, proofBytes))
+        if (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest) onAdProofGenerated(ADProofs(block.header.id, proofBytes))
         log.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with " +
           s"root hash ${Algos.encode(rootHash)}")
 
@@ -98,7 +100,7 @@ class UtxoState(override val version: VersionTag,
         else if (!(block.header.stateRoot sameElements persistentProver.digest))
           throw new Exception("Calculated stateRoot is not equal to the declared one.")
 
-        new UtxoState(VersionTag @@ block.id, Height @@ block.header.height, stateStore, lastBlockTimestamp, nodeViewHolderRef)
+        new UtxoState(VersionTag !@@ block.id, Height @@ block.header.height, stateStore, lastBlockTimestamp, nodeViewHolderRef)
       }.recoverWith[UtxoState] { case e =>
         log.warn(s"Failed to apply block with header ${block.header.encodedId} to UTXOState with root" +
           s" ${Algos.encode(rootHash)}: ", e)
@@ -106,7 +108,7 @@ class UtxoState(override val version: VersionTag,
       }
 
     case header: EncryBlockHeader =>
-      Success(new UtxoState(VersionTag @@ header.id, height, stateStore, lastBlockTimestamp, nodeViewHolderRef))
+      Success(new UtxoState(VersionTag !@@ header.id, height, stateStore, lastBlockTimestamp, nodeViewHolderRef))
 
     case _ => Failure(new Exception("Got Modifier of unknown type."))
   }
@@ -163,18 +165,19 @@ class UtxoState(override val version: VersionTag,
   def validate(tx: EncryBaseTransaction, allowedOutputDelta: Amount = 0L): Try[Unit] =
     tx.semanticValidity.map { _: Unit =>
 
-      val context: Context = Context(tx, height, lastBlockTimestamp, rootHash)
+      val context: Context = Context(tx, EncryStateView(height, lastBlockTimestamp, rootHash))
 
-      val bxs: IndexedSeq[EncryBaseBox] = tx.unlockers.flatMap(u => persistentProver.unauthenticatedLookup(u.boxId)
-        .map(bytes => StateModifierDeserializer.parseBytes(bytes, u.boxId.head))
-        .map(t => t.toOption -> u.proofOpt)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, proofOpt)) =>
-        (bxOpt, proofOpt, tx.defaultProofOpt) match {
-          // If `proofOpt` from unlocker is `None` then `defaultProofOpt` is used.
-          case (Some(bx), Some(proof), _) if bx.proposition.unlockTry(proof, context).isSuccess => acc :+ bx
-          case (Some(bx), _, Some(defaultProof)) if bx.proposition.unlockTry(defaultProof, context).isSuccess => acc :+ bx
-          case _ => throw TransactionValidationException(s"Failed to spend some boxes referenced in $tx")
+      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => persistentProver.unauthenticatedLookup(input.boxId)
+        .map(bytes => StateModifierDeserializer.parseBytes(bytes, input.boxId.head))
+        .map(_.toOption -> input)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
+          (bxOpt, tx.defaultProofOpt) match {
+            // If no `proofs` provided, then `defaultProof` is used.
+            case (Some(bx), _) if input.proofs.nonEmpty => if (bx.proposition.canUnlock(context, input.proofs)) acc :+ bx else acc
+            case (Some(bx), Some(defaultProof)) => if (bx.proposition.canUnlock(context, Seq(defaultProof))) acc :+ bx else acc
+            case (Some(bx), _) => if (bx.proposition.canUnlock(context, Seq.empty)) acc :+ bx else acc
+            case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
+          }
         }
-      }
 
       val validBalance: Boolean = {
         val debitB: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxs)
