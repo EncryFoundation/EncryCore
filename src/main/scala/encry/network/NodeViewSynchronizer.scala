@@ -41,7 +41,7 @@ SIS <: SyncInfoMessageSpec[SI], PMOD <: PersistentNodeViewModifier, HR <: Histor
   val deliveryTimeout: FiniteDuration = networkSettings.deliveryTimeout
   val maxDeliveryChecks: Int = networkSettings.maxDeliveryChecks
   val invSpec: InvSpec = new InvSpec(networkSettings.maxInvObjects)
-  val requestModifierSpec = new RequestModifierSpec(networkSettings.maxInvObjects)
+  val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(networkSettings.maxInvObjects)
 
   val deliveryTracker: DeliveryTracker = new DeliveryTracker(context, deliveryTimeout, maxDeliveryChecks, self)
   val statusTracker: SyncTracker = SyncTracker(self, context, networkSettings, timeProvider)
