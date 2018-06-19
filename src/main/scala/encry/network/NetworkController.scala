@@ -125,13 +125,6 @@ class NetworkController extends Actor with ScorexLogging {
       log.info(s"Registering handlers for ${specs.map(s => s.messageCode -> s.messageName)}")
       messageHandlers += specs.map(_.messageCode) -> handler
     case CommandFailed(cmd: Tcp.Command) => log.info("Failed to execute command : " + cmd)
-    case ShutdownNetwork =>
-      log.info("Going to shutdown all connections & unbind port")
-      (peerManager ? FilterPeers(Broadcast))
-        .map(_.asInstanceOf[Seq[ConnectedPeer]])
-        .foreach(_.foreach(_.handlerRef ! CloseConnection))
-      self ! Unbind
-      context stop self
     case nonsense: Any => log.warn(s"NetworkController: got something strange $nonsense")
   }
 }
@@ -148,8 +141,6 @@ object NetworkController {
     case class RegisterMessagesHandler(specs: Seq[MessageSpec[_]], handler: ActorRef)
 
     case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)
-
-    case object ShutdownNetwork
 
     case class ConnectTo(address: InetSocketAddress)
 
