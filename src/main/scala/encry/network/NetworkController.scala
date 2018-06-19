@@ -101,10 +101,6 @@ class NetworkController extends Actor with ScorexLogging {
         options = KeepAlive(true) :: Nil,
         timeout = Some(networkSettings.connectionTimeout),
         pullMode = true)
-    case DisconnectFrom(peer) =>
-      log.info(s"Disconnected from ${peer.socketAddress}")
-      peer.handlerRef ! CloseConnection
-      peerManager ! Disconnected(peer.socketAddress)
     case Connected(remote, local) =>
       val direction: ConnectionType = if (outgoing.contains(remote)) Outgoing else Incoming
       val logMsg: String = direction match {
@@ -143,8 +139,6 @@ object NetworkController {
     case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)
 
     case class ConnectTo(address: InetSocketAddress)
-
-    case class DisconnectFrom(peer: ConnectedPeer)
 
   }
 

@@ -128,19 +128,13 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           else if (h.isHeadersChainSynced && !deliveryTracker.isExpectingFromRandom) self ! CheckModifiersToDownload
         }
       case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
-        if (modifierIds.nonEmpty) {
-          val msg: Message[(ModifierTypeId, Seq[ModifierId])] =
-            Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
-          peer.handlerRef ! msg
-        }
+        if (modifierIds.nonEmpty) peer.handlerRef ! Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
         deliveryTracker.expect(peer, modifierTypeId, modifierIds)
       case ResponseFromLocal(peer, _, modifiers: Seq[NodeViewModifier]) =>
         if (modifiers.nonEmpty) {
           @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-          val modType: ModifierTypeId = modifiers.head.modifierTypeId
-          val m: (ModifierTypeId, Map[ModifierId, Array[Byte]]) = modType -> modifiers.map(m => m.id -> m.bytes).toMap
-          val msg: Message[(ModifierTypeId, Map[ModifierId, Array[Byte]])] = Message(ModifiersSpec, Right(m), None)
-          peer.handlerRef ! msg
+          val m: (ModifierTypeId, Map[ModifierId, Array[Byte]]) = modifiers.head.modifierTypeId -> modifiers.map(m => m.id -> m.bytes).toMap
+          peer.handlerRef ! Message(ModifiersSpec, Right(m), None)
         }
       case a: Any => log.error("Strange input: " + a)
     }
