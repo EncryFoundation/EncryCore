@@ -47,32 +47,27 @@ case class EncryDeliveryTracker(context: ActorContext, deliveryTimeout: FiniteDu
   /**
     * Remove old modifiers from download queue
     */
-  def removeOutdatedExpectingFromRandom(): Unit = {
-    val currentTime = timeProvider.time()
-    expectingFromRandom
-      .filter { case (_, status) => status.firstViewed < currentTime - ToDownloadLifetime.toMillis }
+  def removeOutdatedExpectingFromRandom(): Unit = expectingFromRandom
+      .filter { case (_, status) => status.firstViewed < timeProvider.time() - ToDownloadLifetime.toMillis }
       .foreach { case (key, _) => expectingFromRandom.remove(key) }
-  }
 
   /**
     * Id's that are already in queue to download but are not downloaded yet and were not requested recently
     */
-  def idsExpectingFromRandomToRetry(): Seq[(ModifierTypeId, ModifierId)] = {
-    val currentTime = timeProvider.time()
-    expectingFromRandom.filter(_._2.lastTry < currentTime - ToDownloadRetryInterval.toMillis).toSeq
+  def idsExpectingFromRandomToRetry(): Seq[(ModifierTypeId, ModifierId)] = expectingFromRandom
+      .filter(_._2.lastTry < timeProvider.time() - ToDownloadRetryInterval.toMillis).toSeq
       .sortBy(_._2.lastTry)
       .map(i => (i._2.tp, ModifierId @@ i._1.array))
-  }
+
 
   /**
     * Modifier downloaded
     */
-  override def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = {
+  override def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit =
     if (expectingFromRandom.contains(key(mid))) {
       expectingFromRandom.remove(key(mid))
       delivered(key(mid)) = cp
-    } else {
-      super.receive(mtid, mid, cp)
-    }
-  }
+    } else super.receive(mtid, mid, cp)
+
+
 }

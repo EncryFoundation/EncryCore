@@ -4,7 +4,7 @@ import java.io.File
 
 import akka.actor.{Actor, Props}
 import encry.EncryApp
-import encry.EncryApp.{settings, timeProvider, _}
+import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
@@ -12,18 +12,11 @@ import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPaylo
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer}
 import encry.modifiers.state.box.proposition.EncryProposition
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{NodeViewHolderEvent, SuccessfulTransaction, _}
-import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
-import encry.utils.ScorexLogging
-import encry.view.EncryNodeViewHolder.ReceivableMessages._
-import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.{DigestState, EncryState, StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
-import encry.EncryApp.{settings, timeProvider}
-import scorex.core._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import scorex.core
@@ -34,7 +27,6 @@ import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.TransactionValidation
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base58
-import supertagged.@@
 import EncryNodeViewHolder.ReceivableMessages._
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import EncryNodeViewHolder._
