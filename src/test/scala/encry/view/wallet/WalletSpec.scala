@@ -18,7 +18,7 @@ import scorex.utils.Random
 
 class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator {
 
-  lazy val settings: EncryAppSettings = EncryAppSettings.read(None)
+  lazy val settings: EncryAppSettings = EncryAppSettings.read
 
   property("Balance count (intrinsic coins only)"){
 
