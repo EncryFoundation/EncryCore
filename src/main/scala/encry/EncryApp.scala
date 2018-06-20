@@ -39,7 +39,8 @@ object EncryApp extends App with ScorexLogging {
   type PMOD = EncryPersistentModifier
   type NVHT = EncryNodeViewHolder[_]
 
-  lazy val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
+  lazy val settings: EncryAppSettings = EncryAppSettings.read
+  println(settings)
 
   implicit val system: ActorSystem = ActorSystem(settings.network.agentName)
   implicit val materializer: ActorMaterializer = ActorMaterializer()
@@ -82,8 +83,6 @@ object EncryApp extends App with ScorexLogging {
 
   val scanner: ActorRef = system.actorOf(EncryScanner.props(), "scanner")
 
-  val statsSender: ActorRef = system.actorOf(Props[StatsSender], "statsSender")
-
   val apiRoutes: Seq[ApiRoute] = Seq(
     UtilsApiRoute(settings.restApi),
     PeersApiRoute(peerManager, networkController, settings.restApi),
@@ -103,6 +102,8 @@ object EncryApp extends App with ScorexLogging {
     withinTimeRange = 60 seconds) {
     case _ => Escalate
   }
+
+  if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
 
   if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
 
