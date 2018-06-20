@@ -79,7 +79,7 @@ trait DownloadProcessor extends ScorexLogging {
       log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
       isHeadersChainSyncedVar = true
       blockDownloadProcessor.updateBestBlock(header)
-      requiredModifiersForHeader(header)
+      Seq.empty
     } else {
       Seq.empty
     }

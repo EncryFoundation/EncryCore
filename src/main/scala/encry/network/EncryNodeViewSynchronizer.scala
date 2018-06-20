@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.Actor
 import encry.EncryApp._
 import encry.consensus.{HistoryReader, SyncInfo}
+import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -136,7 +137,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           val m: (ModifierTypeId, Map[ModifierId, Array[Byte]]) = modifiers.head.modifierTypeId -> modifiers.map(m => m.id -> m.bytes).toMap
           peer.handlerRef ! Message(ModifiersSpec, Right(m), None)
         }
-      case a: Any => log.error("Strange input: " + a)
+      case a: Any => log.error(s"Strange input: ${a.getClass}\n" + a)
     }
 
   ///
@@ -174,7 +175,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
   }
 
   def onSyntacticallySuccessfulModifier: Receive = {
-    case SyntacticallySuccessfulModifier(mod) if (mod.isInstanceOf[EncryBlockHeader] || mod.isInstanceOf[EncryBlockPayload]) &&
+    case SyntacticallySuccessfulModifier(mod) if (mod.isInstanceOf[EncryBlockHeader] || mod.isInstanceOf[EncryBlockPayload] || mod.isInstanceOf[ADProofs]) &&
       historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
   }
 
