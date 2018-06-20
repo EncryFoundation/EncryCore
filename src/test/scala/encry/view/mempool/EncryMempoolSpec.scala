@@ -7,7 +7,7 @@ import org.scalatest.{Matchers, PropSpec}
 
 class EncryMempoolSpec extends PropSpec with Matchers with EncryGenerator {
 
-  lazy val settings: EncryAppSettings = EncryAppSettings.read(None)
+  lazy val settings: EncryAppSettings = EncryAppSettings.read
 
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
