@@ -165,6 +165,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
       case SyntacticallyFailedModification(mod, throwable) =>
       case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
       case SemanticallyFailedModification(mod, throwable) =>
+      case ChangedState =>
       case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] => historyReaderOpt = Some(reader)
       case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
       }
