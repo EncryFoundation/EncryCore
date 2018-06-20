@@ -40,7 +40,6 @@ object EncryApp extends App with ScorexLogging {
   type NVHT = EncryNodeViewHolder[_]
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read
-  println(settings)
 
   implicit val system: ActorSystem = ActorSystem(settings.network.agentName)
   implicit val materializer: ActorMaterializer = ActorMaterializer()
