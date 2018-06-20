@@ -94,7 +94,7 @@ class PeerManager extends Actor with ScorexLogging {
     case Disconnected(remote) =>
       connectedPeers -= remote
       connectingPeers -= remote
-      context.system.eventStream.publish(DisconnectedPeer(remote))
+      nodeViewSynchronizer ! DisconnectedPeer(remote)
     case CheckPeers =>
       if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
         randomPeer().foreach { address =>
