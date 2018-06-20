@@ -15,10 +15,8 @@ case class EncryDeliveryTracker(context: ActorContext, deliveryTimeout: FiniteDu
 
   case class ToDownloadStatus(tp: ModifierTypeId, firstViewed: Long, lastTry: Long)
 
-  val toDownload: mutable.Map[ModifierIdAsKey, ToDownloadStatus] = mutable.Map[ModifierIdAsKey, ToDownloadStatus]()
-
-  private val ToDownloadRetryInterval = 10.seconds
-  private val ToDownloadLifetime = 1.hour
+  private val ToDownloadRetryInterval: FiniteDuration = 10.seconds
+  private val ToDownloadLifetime: FiniteDuration = 1.hour
 
   // Modifiers we need to download, but do not know peer that have this modifier
   // TODO we may try to guess this peers using delivered map
@@ -59,7 +57,6 @@ case class EncryDeliveryTracker(context: ActorContext, deliveryTimeout: FiniteDu
       .sortBy(_._2.lastTry)
       .map(i => (i._2.tp, ModifierId @@ i._1.array))
 
-
   /**
     * Modifier downloaded
     */
@@ -68,6 +65,4 @@ case class EncryDeliveryTracker(context: ActorContext, deliveryTimeout: FiniteDu
       expectingFromRandom.remove(key(mid))
       delivered(key(mid)) = cp
     } else super.receive(mtid, mid, cp)
-
-
 }
