@@ -1,7 +1,7 @@
 package encry.network
 
 import akka.actor.{ActorContext, ActorRef, Cancellable}
-import encry.network.NodeViewSynchronizer.ReceivableMessages.CheckDelivery
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.CheckDelivery
 import encry.network.PeerConnectionHandler._
 import encry.utils.ScorexLogging
 import scorex.core.{ModifierId, ModifierTypeId}
