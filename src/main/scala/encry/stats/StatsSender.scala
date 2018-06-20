@@ -34,7 +34,7 @@ class StatsSender extends Actor with ScorexLogging {
 
       influxDB.write(8189, util.Arrays.asList(
         s"difficulty,nodeName=${settings.network.nodeName},height=${fb.header.height} value=${fb.header.difficulty.toString}",
-        s"height,nodeName=${settings.network.nodeName} value=${fb.header.height}",
+        s"height,nodeName=${settings.network.nodeName},headerId=${Algos.encode(fb.id)} value=${fb.header.height}",
         s"txsInBlock,nodeName=${settings.network.nodeName},height=${fb.header.height} value=${fb.payload.transactions.length}",
         s"stateWeight,nodeName=${settings.network.nodeName},height=${fb.header.height} value=${new File("encry/data/state/journal-1").length}",
         s"historyWeight,nodeName=${settings.network.nodeName},height=${fb.header.height} value=${FileUtils.sizeOfDirectory(new File("encry/data/history"))}",
