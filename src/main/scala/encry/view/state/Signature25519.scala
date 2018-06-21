@@ -1,16 +1,11 @@
-package scorex.core.transaction.proof
+package encry.view.state
 
 import encry.modifiers.Serializer
-import encry.view.state.PrivateKey25519
-import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.crypto.encode.Base58
 import scorex.crypto.signatures.{Curve25519, Signature}
 
 import scala.util.Try
 
-/**
-  * @param signature 25519 signature
-  */
 case class Signature25519(signature: Signature) extends ProofOfKnowledge[PrivateKey25519, PublicKey25519Proposition] {
   require(signature.isEmpty || signature.length == Curve25519.SignatureLength,
     s"${signature.length} != ${Curve25519.SignatureLength}")
@@ -32,5 +27,5 @@ object Signature25519Serializer extends Serializer[Signature25519] {
 }
 
 object Signature25519 {
-  lazy val SignatureSize = Curve25519.SignatureLength
+  lazy val SignatureSize: Int = Curve25519.SignatureLength
 }

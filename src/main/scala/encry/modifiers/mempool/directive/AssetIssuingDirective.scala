@@ -11,7 +11,7 @@ import encry.utils.Utils
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer}
-import scorex.core.transaction.box.Box.Amount
+import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.PublicKey
@@ -19,13 +19,12 @@ import scorex.utils.Random
 
 import scala.util.Try
 
-case class AssetIssuingDirective(contract: CompiledContract,
-                                 amount: Amount,
-                                 symbol: String) extends Directive {
+case class AssetIssuingDirective(contract: CompiledContract, amount: Amount, symbol: String) extends Directive {
 
   override type M = AssetIssuingDirective
-
   override val typeId: DTypeId = AssetIssuingDirective.TypeId
+  override val cost: Amount = 20
+  override lazy val isValid: Boolean = amount > 0 && symbol.length <= Constants.Chain.TokenSymbolMaxLength
 
   override def boxes(digest: Digest32, idx: Int): Seq[EncryBaseBox] = {
     val assetCreationBox = AssetCreationBox(EncryProposition.accountLock(Account(PublicKey @@ Random.randomBytes(32))),
@@ -36,10 +35,6 @@ case class AssetIssuingDirective(contract: CompiledContract,
         Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx) ++ Ints.toByteArray(2)), amount, assetCreationBox.id)
     )
   }
-
-  override val cost: Amount = 20
-
-  override lazy val isValid: Boolean = amount > 0 && symbol.length <= Constants.Chain.TokenSymbolMaxLength
 
   override def serializer: Serializer[M] = AssetIssuingDirectiveSerializer
 }

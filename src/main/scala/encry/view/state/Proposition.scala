@@ -1,7 +1,6 @@
-package scorex.core.transaction.box.proposition
+package encry.view.state
 
 import encry.modifiers.BytesSerializable
-import encry.view.state.Secret
 
 trait Proposition extends BytesSerializable
 

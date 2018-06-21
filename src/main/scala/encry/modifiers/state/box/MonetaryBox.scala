@@ -1,6 +1,6 @@
 package encry.modifiers.state.box
 
-import scorex.core.transaction.box.Box.Amount
+import encry.modifiers.state.box.Box.Amount
 
 trait MonetaryBox extends EncryBaseBox {
 

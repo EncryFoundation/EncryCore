@@ -6,6 +6,7 @@ import encry.modifiers.mempool.Proof
 import encry.modifiers.state.box.Context
 import encry.settings.Algos
 import encry.view.history.Height
+import encry.view.state.Proposition
 import io.circe.Encoder
 import io.circe.syntax._
 import io.iohk.iodb.ByteArrayWrapper
@@ -14,7 +15,6 @@ import org.encryfoundation.prismlang.core.wrapped.PValue
 import org.encryfoundation.prismlang.core.{Ast, Types}
 import org.encryfoundation.prismlang.evaluator.Evaluator
 import org.encryfoundation.prismlang.lib.predefined.signature.CheckSig
-import scorex.core.transaction.box.proposition.Proposition
 import scorex.crypto.encode.{Base16, Base58}
 import scorex.crypto.hash.Digest32
 

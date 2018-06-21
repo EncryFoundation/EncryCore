@@ -1,7 +1,7 @@
 package encry.view.wallet
 
 import encry.modifiers.mempool.Transaction
-import scorex.core.transaction.box.proposition.Proposition
+import encry.view.state.Proposition
 import scorex.core.{NodeViewComponent, PersistentNodeViewModifier, VersionTag}
 
 import scala.util.Try

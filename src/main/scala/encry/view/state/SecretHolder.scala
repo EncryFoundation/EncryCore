@@ -1,10 +1,8 @@
 package encry.view.state
 
 import com.google.common.primitives.Bytes
+import encry.modifiers.state.box.Box
 import encry.modifiers.{BytesSerializable, Serializer}
-import scorex.core.transaction.box._
-import scorex.core.transaction.box.proposition.{ProofOfKnowledgeProposition, PublicKey25519Proposition}
-import scorex.core.transaction.proof.{ProofOfKnowledge, Signature25519}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
 import scala.util.Try

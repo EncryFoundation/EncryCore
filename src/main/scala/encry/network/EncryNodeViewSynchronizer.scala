@@ -17,14 +17,13 @@ import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.{EncryMempool, MempoolReader}
 import scorex.core._
-import scorex.core.transaction.box.proposition.Proposition
 import scorex.crypto.encode.Base58
 import EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.consensus.History._
 import encry.modifiers.mempool.Transaction
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
-import encry.view.state.StateReader
+import encry.view.state.{Proposition, StateReader}
 
 class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with ScorexLogging {
 

@@ -21,7 +21,7 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifie
 import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.VersionTag
-import scorex.core.transaction.box.Box.Amount
+import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.authds._
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.hash.Digest32

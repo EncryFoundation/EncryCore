@@ -1,6 +1,6 @@
 package encry.modifiers.mempool
 
-import scorex.core.transaction.box.proposition.Proposition
+import encry.view.state.Proposition
 import scorex.core.{EphemerealNodeViewModifier, ModifierId, ModifierTypeId}
 import scorex.crypto.hash.Blake2b256
 

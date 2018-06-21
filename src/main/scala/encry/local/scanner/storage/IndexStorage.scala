@@ -2,8 +2,8 @@ package encry.local.scanner.storage
 
 import encry.settings.Algos
 import encry.storage.EncryBaseStorage
+import encry.view.state.Proposition
 import io.iohk.iodb.{ByteArrayWrapper, Store}
-import scorex.core.transaction.box.proposition.Proposition
 import scorex.crypto.authds.ADKey
 
 case class IndexStorage(store: Store) extends EncryBaseStorage

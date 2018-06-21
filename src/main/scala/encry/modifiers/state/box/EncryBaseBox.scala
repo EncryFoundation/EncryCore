@@ -7,7 +7,6 @@ import encry.settings.Algos
 import io.circe.Encoder
 import org.encryfoundation.prismlang.core.{PConvertible, Types}
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
-import scorex.core.transaction.box.Box
 import scorex.crypto.authds.ADKey
 
 trait EncryBaseBox extends Box[EncryProposition] with PConvertible {

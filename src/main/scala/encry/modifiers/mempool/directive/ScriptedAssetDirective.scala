@@ -10,7 +10,7 @@ import encry.utils.Utils
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer}
-import scorex.core.transaction.box.Box.Amount
+import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.authds
 import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58

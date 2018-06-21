@@ -3,7 +3,7 @@ package scorex.core
 import com.typesafe.config.ConfigFactory
 import encry.modifiers.BytesSerializable
 import encry.modifiers.mempool.Transaction
-import scorex.core.transaction.box.proposition.Proposition
+import encry.view.state.Proposition
 import scorex.crypto.encode.Base58
 
 import scala.util.Try

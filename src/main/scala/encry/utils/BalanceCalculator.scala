@@ -2,7 +2,7 @@ package encry.utils
 
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.Constants
-import scorex.core.transaction.box.Box.Amount
+import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.authds.ADKey
 
 object BalanceCalculator {

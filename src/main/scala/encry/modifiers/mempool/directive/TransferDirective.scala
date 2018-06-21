@@ -10,7 +10,7 @@ import encry.settings.{Algos, Constants}
 import encry.utils.Utils
 import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
-import scorex.core.transaction.box.Box.Amount
+import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32

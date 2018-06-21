@@ -15,7 +15,7 @@ import encry.utils.{BalanceCalculator, BoxFilter, ScorexLogging}
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import scorex.core.transaction.box.Box.Amount
+import encry.modifiers.state.box.Box.Amount
 import scorex.core.{ModifierId, VersionTag}
 import scorex.crypto.authds.ADKey
 import scorex.utils.Random
