@@ -1,4 +1,4 @@
-package scorex.core.serialization
+package encry.modifiers
 
 trait BytesSerializable extends Serializable {
 

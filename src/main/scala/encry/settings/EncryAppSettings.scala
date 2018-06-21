@@ -21,6 +21,6 @@ case class EncryAppSettings(directory: String,
 object EncryAppSettings extends ScorexLogging with SettingsReaders with NodeSettingsReader {
 
   val read: EncryAppSettings = ConfigFactory.load("local.conf")
-    .withFallback(ConfigFactory.load).as[EncryAppSettings](s"encry")
+    .withFallback(ConfigFactory.load).as[EncryAppSettings]("encry")
 
 }

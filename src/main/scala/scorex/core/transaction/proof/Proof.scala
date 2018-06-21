@@ -1,6 +1,6 @@
 package scorex.core.transaction.proof
 
-import scorex.core.serialization.BytesSerializable
+import encry.modifiers.BytesSerializable
 import scorex.core.transaction.box.proposition.{ProofOfKnowledgeProposition, Proposition}
 import scorex.core.transaction.state.Secret
 

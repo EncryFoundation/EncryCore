@@ -1,11 +1,10 @@
 package encry.crypto
 
+import encry.modifiers.{BytesSerializable, Serializer}
 import encry.settings.Algos
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
-import scorex.core.serialization.Serializer
 import scorex.crypto.signatures.{Curve25519, Signature}
-import scorex.core.serialization.BytesSerializable
 
 import scala.util.Try
 

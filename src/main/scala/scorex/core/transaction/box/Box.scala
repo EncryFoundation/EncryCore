@@ -1,6 +1,6 @@
 package scorex.core.transaction.box
 
-import scorex.core.serialization.BytesSerializable
+import encry.modifiers.BytesSerializable
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.crypto.authds._
 

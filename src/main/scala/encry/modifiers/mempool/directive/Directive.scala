@@ -1,9 +1,9 @@
 package encry.modifiers.mempool.directive
 
+import encry.modifiers.BytesSerializable
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.EncryBaseBox
 import io.circe._
-import scorex.core.serialization.BytesSerializable
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.hash.Digest32
 

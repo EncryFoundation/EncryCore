@@ -1,7 +1,7 @@
 package encry.crypto
 
 import com.google.common.primitives.Bytes
-import scorex.core.serialization.{BytesSerializable, Serializer}
+import encry.modifiers.{BytesSerializable, Serializer}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
 import scala.util.Try

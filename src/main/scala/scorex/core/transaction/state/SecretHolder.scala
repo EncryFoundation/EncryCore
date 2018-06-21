@@ -1,7 +1,7 @@
 package scorex.core.transaction.state
 
 import com.google.common.primitives.Bytes
-import scorex.core.serialization.{BytesSerializable, Serializer}
+import encry.modifiers.{BytesSerializable, Serializer}
 import scorex.core.transaction.box._
 import scorex.core.transaction.box.proposition.{ProofOfKnowledgeProposition, PublicKey25519Proposition}
 import scorex.core.transaction.proof.{ProofOfKnowledge, Signature25519}

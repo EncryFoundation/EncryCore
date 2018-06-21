@@ -2,6 +2,7 @@ package encry.modifiers.mempool.directive
 
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import encry.account.Account
+import encry.modifiers.Serializer
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.modifiers.state.box.{AssetCreationBox, AssetIssuingBox, EncryBaseBox}
@@ -10,7 +11,6 @@ import encry.utils.Utils
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer}
-import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32

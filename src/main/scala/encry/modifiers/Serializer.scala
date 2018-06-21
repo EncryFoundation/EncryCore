@@ -1,4 +1,4 @@
-package scorex.core.serialization
+package encry.modifiers
 
 import scala.util.Try
 

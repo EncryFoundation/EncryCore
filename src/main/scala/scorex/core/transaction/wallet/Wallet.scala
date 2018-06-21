@@ -1,7 +1,7 @@
 package scorex.core.transaction.wallet
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import scorex.core.serialization.{BytesSerializable, Serializer}
+import encry.modifiers.{BytesSerializable, Serializer}
 import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.Box
 import scorex.core.transaction.box.proposition.{ProofOfKnowledgeProposition, Proposition}

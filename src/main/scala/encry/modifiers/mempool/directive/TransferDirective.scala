@@ -2,6 +2,7 @@ package encry.modifiers.mempool.directive
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account.{Account, Address}
+import encry.modifiers.Serializer
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
@@ -9,7 +10,6 @@ import encry.settings.{Algos, Constants}
 import encry.utils.Utils
 import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
-import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58

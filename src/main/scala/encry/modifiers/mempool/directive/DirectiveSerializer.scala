@@ -1,6 +1,6 @@
 package encry.modifiers.mempool.directive
 
-import scorex.core.serialization.Serializer
+import encry.modifiers.Serializer
 
 import scala.util.{Failure, Try}
 

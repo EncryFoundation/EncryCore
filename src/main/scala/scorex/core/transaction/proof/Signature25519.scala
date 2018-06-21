@@ -1,6 +1,6 @@
 package scorex.core.transaction.proof
 
-import scorex.core.serialization.Serializer
+import encry.modifiers.Serializer
 import scorex.core.transaction.box.proposition.PublicKey25519Proposition
 import scorex.core.transaction.state.PrivateKey25519
 import scorex.crypto.encode.Base58

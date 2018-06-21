@@ -6,7 +6,7 @@ import akka.actor.{Actor, Props}
 import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
-import encry.modifiers.EncryPersistentModifier
+import encry.modifiers.{EncryPersistentModifier, Serializer}
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
@@ -21,7 +21,6 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import scorex.core
 import scorex.core._
-import scorex.core.serialization.Serializer
 import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.TransactionValidation

@@ -3,8 +3,8 @@ package encry.view.history
 import encry.consensus.SyncInfo
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.consensus.History.ModifierIds
+import encry.modifiers.Serializer
 import encry.network.message.SyncInfoMessageSpec
-import scorex.core.serialization.Serializer
 import scorex.core.{ModifierId, NodeViewModifier}
 
 import scala.util.Try

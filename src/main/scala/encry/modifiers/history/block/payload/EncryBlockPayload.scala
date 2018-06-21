@@ -1,11 +1,11 @@
 package encry.modifiers.history.block.payload
 
 import com.google.common.primitives.{Bytes, Ints}
+import encry.modifiers.Serializer
 import encry.modifiers.mempool._
 import encry.settings.Algos
 import io.circe.Encoder
 import io.circe.syntax._
-import scorex.core.serialization.Serializer
 import scorex.core.{ModifierId, ModifierTypeId}
 import scorex.crypto.authds.LeafData
 import scorex.crypto.encode.Base58
