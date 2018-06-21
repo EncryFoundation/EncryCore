@@ -1,4 +1,4 @@
-package scorex.core.api.http
+package encry.api.http
 
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.{AuthorizationFailedRejection, Directive0, Directives}

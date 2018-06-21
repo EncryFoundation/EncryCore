@@ -1,11 +1,9 @@
-package scorex.core.api.http
+package encry.api.http
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import encry.api.http.ApiRoute
-import scorex.core.api.http.swagger.{CorsSupport, SwaggerConfigRoute}
 import encry.settings.RESTApiSettings
 
 case class CompositeHttpService(system: ActorSystem, routes: Seq[ApiRoute], settings: RESTApiSettings, swaggerConf: String)

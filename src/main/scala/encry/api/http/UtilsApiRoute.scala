@@ -1,16 +1,15 @@
-package scorex.core.api.http
+package encry.api.http
 
 import java.security.SecureRandom
 
 import akka.actor.ActorRefFactory
 import akka.http.scaladsl.server.Route
-import encry.api.http.ApiRoute
 import encry.settings.RESTApiSettings
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Blake2b256
 
 case class UtilsApiRoute(override val settings: RESTApiSettings)(implicit val context: ActorRefFactory) extends ApiRoute {
-  private val SeedSize = 32
+  private val SeedSize: Int = 32
 
   private def seed(length: Int): String = {
     val seed: Array[Byte] = new Array[Byte](length)

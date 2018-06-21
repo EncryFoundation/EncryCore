@@ -7,7 +7,7 @@ import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
-import encry.api.http.{ApiRoute, PeersApiRoute}
+import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
 import encry.api.http.routes.{AccountInfoApiRoute, HistoryApiRoute, InfoApiRoute, TransactionsApiRoute}
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
@@ -27,7 +27,6 @@ import encry.stats.StatsSender
 import encry.utils.{NetworkTimeProvider, ScorexLogging}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
-import scorex.core.api.http._
 
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._

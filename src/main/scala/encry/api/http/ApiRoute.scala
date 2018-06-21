@@ -7,41 +7,19 @@ import akka.util.Timeout
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.utils.ActorHelper
 import io.circe.Printer
-import scorex.core.api.http.{ApiDirectives, ScorexApiResponse}
-
-import scala.concurrent.{Await, Future}
 
 trait ApiRoute extends ApiDirectives with ActorHelper with FailFastCirceSupport with PredefinedFromEntityUnmarshallers {
 
   def context: ActorRefFactory
+
   def route: Route
 
   override val apiKeyHeaderName: String = "api_key"
 
-  implicit val printer: Printer = Printer.spaces2.copy(dropNullValues = true)
+  //implicit val printer: Printer = Printer.spaces2.copy(dropNullValues = true)
   implicit lazy val timeout: Timeout = Timeout(settings.timeout)
-
-  @deprecated("Use circe json support for answering with json", "31 January 2018")
-  def getJsonRoute(fn: Future[ScorexApiResponse]): Route =
-    jsonRoute(Await.result(fn, settings.timeout), get)
-
-  @deprecated("Use circe json support for answering with json", "31 January 2018")
-  def getJsonRoute(fn: ScorexApiResponse): Route = jsonRoute(fn, get)
-
-  @deprecated("Use circe json support for answering with json", "31 January 2018")
-  def postJsonRoute(fn: ScorexApiResponse): Route = jsonRoute(fn, post)
-
-  @deprecated("Use circe json support for answering with json", "31 January 2018")
-  def postJsonRoute(fn: Future[ScorexApiResponse]): Route = jsonRoute(Await.result(fn, settings.timeout), post)
-
-  @deprecated("Use circe json support for answering with json", "31 January 2018")
-  def deleteJsonRoute(fn: ScorexApiResponse): Route = jsonRoute(fn, delete)
-
-  @deprecated("Use circe json support for answering with json", "31 January 2018")
-  def deleteJsonRoute(fn: Future[ScorexApiResponse]): Route = jsonRoute(Await.result(fn, settings.timeout), delete)
 
   protected def jsonRoute(fn: ScorexApiResponse, method: Directive0): Route = method {
     withCors(complete(fn))
   }
-
 }
