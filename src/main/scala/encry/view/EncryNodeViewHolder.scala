@@ -12,13 +12,17 @@ import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPaylo
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer}
 import encry.modifiers.state.box.proposition.EncryProposition
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
+import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
+import encry.stats.StatsSender.BestHeaderInChain
+import encry.utils.ScorexLogging
+import encry.view.EncryNodeViewHolder.ReceivableMessages._
+import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.{DigestState, EncryState, StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
-import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.view.EncryNodeViewHolder.DownloadRequest
 import scorex.core
 import scorex.core._
 import scorex.core.serialization.Serializer
@@ -27,10 +31,6 @@ import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.TransactionValidation
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base58
-import EncryNodeViewHolder.ReceivableMessages._
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
-import EncryNodeViewHolder._
-import encry.utils.ScorexLogging
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -212,6 +212,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               else nodeView.wallet
               blocksApplied.foreach(newVault.scanPersistent)
               log.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
+              if (settings.node.sendStat)
+                newHistory.bestHeaderOpt.foreach(header => context.system.eventStream.publish(BestHeaderInChain(header)))
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
               log.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)

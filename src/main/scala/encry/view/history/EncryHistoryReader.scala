@@ -1,5 +1,6 @@
 package encry.view.history
 
+import encry.consensus.History._
 import encry.consensus.{HistoryReader, ModifierSemanticValidity}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
@@ -12,7 +13,6 @@ import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
 import scorex.core._
-import encry.consensus.History._
 
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
@@ -30,7 +30,7 @@ trait EncryHistoryReader
   def isEmpty: Boolean = bestHeaderIdOpt.isEmpty
 
   /**
-    * Header of best Header chain. Empty if no genesis block is applied yet (from a chain or a PoPoW proof).
+    * Header of best Header chain. Empty if no genesis block is applied yet.
     * Transactions and ADProofs for this Header may be missed, to get block from best full chain (in mode that support
     * it) call bestFullBlockOpt.
     */

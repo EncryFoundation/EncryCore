@@ -1,16 +1,16 @@
 package encry.view.history.processors
 
+import encry.consensus.History.ProgressInfo
+import encry.consensus.ModifierSemanticValidity.Invalid
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.utils.ScorexLogging
+import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.core.ModifierId
-import encry.consensus.History.ProgressInfo
-import encry.consensus.ModifierSemanticValidity.Invalid
-import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
 
@@ -116,12 +116,6 @@ trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
     val continuations: Seq[Seq[EncryBlockHeader]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
     val chains: Seq[Seq[EncryBlock]] = continuations.map(hc => hc.map(getBlock).takeWhile(_.nonEmpty).flatten)
     chains.map(c => block +: c).maxBy(c => scoreOf(c.last.id).get)
-  }
-
-  // Unused
-  private def clipOnNewBestBlock(header: EncryBlockHeader): Unit = {
-    heightOf(header.id).filter(h => h > nodeSettings.blocksToKeep)
-      .foreach(h => clipBlockDataAt(Seq(h - nodeSettings.blocksToKeep)))
   }
 
   private def clipBlockDataAt(heights: Seq[Int]): Try[Unit] = Try {

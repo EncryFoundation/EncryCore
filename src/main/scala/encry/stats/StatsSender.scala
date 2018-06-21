@@ -1,17 +1,13 @@
 package encry.stats
 
-import java.io.File
 import java.util
 
 import akka.actor.Actor
 import encry.EncryApp.{settings, timeProvider}
-import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Algos
-import encry.stats.StatsSender.MiningEnd
+import encry.stats.StatsSender.{BestHeaderInChain, MiningEnd}
 import encry.utils.ScorexLogging
-import org.apache.commons.io.FileUtils
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 
 class StatsSender extends Actor with ScorexLogging {
@@ -22,7 +18,7 @@ class StatsSender extends Actor with ScorexLogging {
   influxDB.setRetentionPolicy("autogen")
 
   override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
+    context.system.eventStream.subscribe(self, classOf[BestHeaderInChain])
     influxDB.write(8189, util.Arrays.asList(
       s"nodesStartTime value=${settings.network.nodeName}"
     ))
@@ -30,17 +26,18 @@ class StatsSender extends Actor with ScorexLogging {
 
   override def receive: Receive = {
 
-    case SemanticallySuccessfulModifier(fb: EncryBlock) =>
+    case BestHeaderInChain(fb: EncryBlockHeader) =>
 
-      influxDB.write(8189, util.Arrays.asList(
-        s"difficulty,nodeName=${settings.network.nodeName},height=${fb.header.height} value=${fb.header.difficulty.toString}",
-        s"height,nodeName=${settings.network.nodeName},headerId=${Algos.encode(fb.id)} value=${fb.header.height}",
-        s"txsInBlock,nodeName=${settings.network.nodeName},height=${fb.header.height} value=${fb.payload.transactions.length}",
-        s"stateWeight,nodeName=${settings.network.nodeName},height=${fb.header.height} value=${new File("encry/data/state/journal-1").length}",
-        s"historyWeight,nodeName=${settings.network.nodeName},height=${fb.header.height} value=${FileUtils.sizeOfDirectory(new File("encry/data/history"))}",
-        s"lastBlockSize,nodeName=${settings.network.nodeName},height=${fb.header.height} value=${fb.bytes.length}"
-      )
-      )
+        influxDB.write(8189, util.Arrays.asList(
+          s"difficulty,nodeName=${settings.network.nodeName} diff=${fb.difficulty.toString},height=${fb.height}",
+          s"height,nodeName=${settings.network.nodeName},header=${Algos.encode(fb.id)} height=${fb.height}"
+          //s"stateWeight,nodeName=${settings.network.nodeName},height=${fb.height} value=${new File("encry/data/state/journal-1").length}",
+          //s"historyWeight,nodeName=${settings.network.nodeName},height=${fb.height} value=${FileUtils.sizeOfDirectory(new File("encry/data/history"))}",
+          //s"lastHeaderSize,nodeName=${settings.network.nodeName} height=${fb.height},headerId=${Algos.encode(fb.id)},size=${fb.bytes.length}"
+          )
+        )
+
+      //influxDB.write(8189, s"height,nodeName=${settings.network.nodeName} height=${fb.height},header=${Algos.encode(fb.id)}")
 
     case MiningEnd(blockHeader: EncryBlockHeader, workerNumber: Int) =>
 
@@ -53,4 +50,6 @@ class StatsSender extends Actor with ScorexLogging {
 object StatsSender {
 
   case class MiningEnd(blockHeader: EncryBlockHeader, workerNumber: Int)
+
+  case class BestHeaderInChain(bestHeader: EncryBlockHeader)
 }

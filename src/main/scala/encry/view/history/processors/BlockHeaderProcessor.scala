@@ -184,7 +184,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   /**
     * @param height - block height
     * @return ids of headers on chosen height.
-    *         Seq.empty we don't have any headers on this height (e.g. it is too big or we bootstrap in PoPoW regime)
+    *         Seq.empty we don't have any headers on this height
     *         single id if no forks on this height
     *         multiple ids if there are forks at chosen height.
     *         First id is always from the best headers chain.
