@@ -3,9 +3,9 @@ package encry.view.history
 import encry.consensus.SyncInfo
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.consensus.History.ModifierIds
-import encry.modifiers.Serializer
+import encry.modifiers.{NodeViewModifier, Serializer}
 import encry.network.message.SyncInfoMessageSpec
-import scorex.core.{ModifierId, NodeViewModifier}
+import scorex.core.ModifierId
 
 import scala.util.Try
 

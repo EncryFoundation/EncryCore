@@ -1,7 +1,8 @@
 package encry.view.state
 
+import encry.modifiers.PersistentNodeViewModifier
 import encry.modifiers.mempool.Transaction
-import scorex.core.{PersistentNodeViewModifier, VersionTag}
+import scorex.core.VersionTag
 
 import scala.util.Try
 

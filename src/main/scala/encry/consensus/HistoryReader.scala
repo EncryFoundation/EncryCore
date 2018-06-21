@@ -1,6 +1,8 @@
 package encry.consensus
 
-import scorex.core.{ModifierId, NodeViewComponent, PersistentNodeViewModifier}
+import encry.modifiers.PersistentNodeViewModifier
+import encry.view.wallet.NodeViewComponent
+import scorex.core.ModifierId
 
 trait HistoryReader[PM <: PersistentNodeViewModifier, SI <: SyncInfo] extends NodeViewComponent {
 

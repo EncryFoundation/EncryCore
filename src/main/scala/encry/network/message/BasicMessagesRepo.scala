@@ -6,7 +6,8 @@ import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
 import encry.consensus.SyncInfo
-import scorex.core.{ModifierId, ModifierTypeId, NodeViewModifier}
+import encry.modifiers.NodeViewModifier
+import scorex.core.{ModifierId, ModifierTypeId}
 import encry.network.message.Message.{MessageCode, _}
 import scorex.core
 import supertagged.@@

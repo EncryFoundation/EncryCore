@@ -20,6 +20,7 @@ import scorex.core._
 import scorex.crypto.encode.Base58
 import EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.consensus.History._
+import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.modifiers.mempool.Transaction
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}

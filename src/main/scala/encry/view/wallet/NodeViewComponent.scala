@@ -1,4 +1,4 @@
-package scorex.core
+package encry.view.wallet
 
 trait NodeViewComponent {
   self =>

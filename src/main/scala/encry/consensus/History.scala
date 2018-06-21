@@ -1,6 +1,7 @@
 package encry.consensus
 
 import encry.consensus.History.ProgressInfo
+import encry.modifiers.PersistentNodeViewModifier
 import scorex.core._
 import scorex.crypto.encode.Base58
 
