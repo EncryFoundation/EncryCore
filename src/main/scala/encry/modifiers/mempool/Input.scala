@@ -4,7 +4,8 @@ import com.google.common.primitives.Shorts
 import encry.settings.{Algos, Constants}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
-import scorex.core.serialization.{BytesSerializable, SerializationException, Serializer}
+import scorex.core.serialization.{BytesSerializable, Serializer}
+import encry.modifiers.mempool.EncryTransactionSerializer.SerializationException
 import scorex.crypto.authds.ADKey
 
 import scala.util.Try

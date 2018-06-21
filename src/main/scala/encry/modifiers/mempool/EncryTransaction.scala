@@ -8,7 +8,7 @@ import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.prismlang.core.Types
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
-import scorex.core.serialization.{SerializationException, Serializer}
+import scorex.core.serialization.Serializer
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.hash.Digest32
 
@@ -84,6 +84,8 @@ object EncryTransaction {
 }
 
 object EncryTransactionSerializer extends Serializer[EncryTransaction] {
+
+  case object SerializationException extends Exception("Serialization failed.")
 
   override def toBytes(obj: EncryTransaction): Array[Byte] = {
     Bytes.concat(
