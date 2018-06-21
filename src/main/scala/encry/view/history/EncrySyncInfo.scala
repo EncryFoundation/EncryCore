@@ -5,7 +5,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.consensus.History.ModifierIds
 import encry.modifiers.{NodeViewModifier, Serializer}
 import encry.network.message.SyncInfoMessageSpec
-import scorex.core.ModifierId
+import encry.ModifierId
 
 import scala.util.Try
 

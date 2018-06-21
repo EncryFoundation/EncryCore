@@ -9,7 +9,7 @@ import encry.modifiers.mempool.EncryBaseTransaction
 import encry.validation.{ModifierValidator, ValidationResult}
 import io.circe.Encoder
 import io.circe.syntax._
-import scorex.core.{ModifierId, ModifierTypeId}
+import encry.{ModifierId, ModifierTypeId}
 
 import scala.util.Try
 

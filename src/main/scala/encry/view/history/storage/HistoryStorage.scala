@@ -5,7 +5,7 @@ import encry.modifiers.history.HistoryModifierSerializer
 import encry.storage.EncryBaseStorage
 import encry.view.ObjectsStore
 import io.iohk.iodb.{ByteArrayWrapper, Store}
-import scorex.core.ModifierId
+import encry.ModifierId
 
 import scala.util.{Failure, Success}
 

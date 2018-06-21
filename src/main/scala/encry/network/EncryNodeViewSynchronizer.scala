@@ -16,9 +16,9 @@ import encry.utils.ScorexLogging
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.{EncryMempool, MempoolReader}
-import scorex.core._
 import scorex.crypto.encode.Base58
 import EncryNodeViewSynchronizer.ReceivableMessages._
+import encry.{ModifierId, ModifierTypeId, VersionTag}
 import encry.consensus.History._
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.modifiers.mempool.Transaction
@@ -84,9 +84,9 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, networkSettings.networkChunkSize)
           val ext: ModifierIds = extensionOpt.getOrElse(Seq())
           val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
-          log.debug(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
+          log.debug(s"Comparison with $remote having starting points ${encry.idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}")
-          log.trace(s"Extension ids: ${idsToString(ext)}")
+          log.trace(s"Extension ids: ${encry.idsToString(ext)}")
           if (!(extensionOpt.nonEmpty || comparison != Younger)) log.warn("Extension is empty while comparison is younger")
           self ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
@@ -97,8 +97,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
           case _: ModifierTypeId => invData._2.flatMap(id => readers._1.modifierById(id))
         }
-        log.debug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
-          s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
+        log.debug(s"Requested ${invData._2.length} modifiers ${encry.idsToString(invData)}, " +
+          s"sending ${objs.length} modifiers ${encry.idsToString(invData._1, objs.map(_.id))} ")
         self ! ResponseFromLocal(remote, invData._1, objs)
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>

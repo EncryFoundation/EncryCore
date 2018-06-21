@@ -1,6 +1,6 @@
 package encry.modifiers
 
-import scorex.core.ModifierId
+import encry.ModifierId
 
 trait EncryPersistentModifier extends PersistentNodeViewModifier {
 

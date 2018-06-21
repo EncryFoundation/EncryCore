@@ -1,7 +1,7 @@
 package encry.view.state
 
 import encry.view.wallet.NodeViewComponent
-import scorex.core.VersionTag
+import encry.VersionTag
 
 trait StateReader extends NodeViewComponent {
 

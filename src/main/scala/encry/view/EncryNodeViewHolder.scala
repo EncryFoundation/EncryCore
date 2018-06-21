@@ -3,7 +3,7 @@ package encry.view
 import java.io.File
 
 import akka.actor.{Actor, Props}
-import encry.EncryApp
+import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.modifiers._
@@ -19,8 +19,6 @@ import encry.view.state.{Proposition, _}
 import encry.view.wallet.EncryWallet
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.view.EncryNodeViewHolder.DownloadRequest
-import scorex.core
-import scorex.core._
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base58
 import EncryNodeViewHolder.ReceivableMessages._
@@ -154,7 +152,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                                  suffix: IndexedSeq[EncryPersistentModifier])
 
     requestDownloads(progressInfo)
-    val branchingPointOpt: Option[core.VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
+    val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
     val (stateToApplyTry: Try[MS], suffixTrimmed: IndexedSeq[EncryPersistentModifier]) = if (progressInfo.chainSwitchingNeeded) {
       branchingPointOpt.map { branchPoint =>
         if (!state.version.sameElements(branchPoint))

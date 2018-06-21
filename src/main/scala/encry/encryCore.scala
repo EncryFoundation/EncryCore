@@ -1,12 +1,9 @@
-package scorex
-
 import encry.network.message.BasicMsgDataTypes.InvData
 import scorex.crypto.encode.Base58
 import supertagged.TaggedType
 
-package object core {
+package object encry {
 
-  //TODO implement ModifierTypeId as a trait
   object ModifierTypeId extends TaggedType[Byte]
 
   object ModifierId extends TaggedType[Array[Byte]]

@@ -3,7 +3,7 @@ package encry.modifiers
 import com.typesafe.config.ConfigFactory
 import encry.modifiers.mempool.Transaction
 import encry.view.state.Proposition
-import scorex.core.{ModifierId, ModifierTypeId}
+import encry.{ModifierId, ModifierTypeId}
 import scorex.crypto.encode.Base58
 
 import scala.util.Try

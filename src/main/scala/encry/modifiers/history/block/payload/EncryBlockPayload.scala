@@ -6,7 +6,7 @@ import encry.modifiers.mempool._
 import encry.settings.Algos
 import io.circe.Encoder
 import io.circe.syntax._
-import scorex.core.{ModifierId, ModifierTypeId}
+import encry.{ModifierId, ModifierTypeId}
 import scorex.crypto.authds.LeafData
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32

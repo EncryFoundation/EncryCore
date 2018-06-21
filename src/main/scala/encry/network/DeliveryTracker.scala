@@ -4,7 +4,7 @@ import akka.actor.{ActorContext, ActorRef, Cancellable}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.CheckDelivery
 import encry.network.PeerConnectionHandler._
 import encry.utils.ScorexLogging
-import scorex.core.{ModifierId, ModifierTypeId}
+import encry.{ModifierId, ModifierTypeId}
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext

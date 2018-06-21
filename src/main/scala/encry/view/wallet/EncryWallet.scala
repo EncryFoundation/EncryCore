@@ -1,7 +1,6 @@
 package encry.view.wallet
 
 import java.io.File
-
 import com.google.common.primitives.Longs
 import encry.account.Account
 import encry.crypto.PublicKey25519
@@ -16,7 +15,7 @@ import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import encry.modifiers.state.box.Box.Amount
-import scorex.core.{ModifierId, VersionTag}
+import encry.{ModifierId, VersionTag}
 import scorex.crypto.authds.ADKey
 import scorex.utils.Random
 

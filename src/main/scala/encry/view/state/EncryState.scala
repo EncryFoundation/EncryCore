@@ -10,7 +10,7 @@ import encry.modifiers.state.box._
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
 import encry.utils.ScorexLogging
 import io.iohk.iodb.Store
-import scorex.core.VersionTag
+import encry.VersionTag
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base16
 

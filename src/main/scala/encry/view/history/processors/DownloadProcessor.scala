@@ -8,7 +8,7 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.{Constants, NodeSettings}
 import encry.utils.{NetworkTimeProvider, ScorexLogging}
 import encry.view.history.Height
-import scorex.core.{ModifierId, ModifierTypeId}
+import encry.{ModifierId, ModifierTypeId}
 
 import scala.annotation.tailrec
 

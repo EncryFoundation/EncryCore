@@ -2,7 +2,7 @@ package encry.view.mempool
 
 import encry.modifiers.mempool.Transaction
 import encry.view.wallet.NodeViewComponent
-import scorex.core.ModifierId
+import encry.ModifierId
 
 /**
   * Unconfirmed transactions pool

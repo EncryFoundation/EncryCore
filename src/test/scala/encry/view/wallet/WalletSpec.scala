@@ -13,7 +13,7 @@ import encry.utils.{EncryGenerator, FileHelper}
 import encry.view.wallet.keys.KeyManager
 import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
-import scorex.core.ModifierId
+import encry.{ModifierId, ModifierTypeId}
 import scorex.utils.Random
 
 class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator {

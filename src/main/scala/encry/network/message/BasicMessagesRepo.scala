@@ -7,9 +7,8 @@ import java.util
 import com.google.common.primitives.{Bytes, Ints}
 import encry.consensus.SyncInfo
 import encry.modifiers.NodeViewModifier
-import scorex.core.{ModifierId, ModifierTypeId}
+import encry.{ModifierId, ModifierTypeId}
 import encry.network.message.Message.{MessageCode, _}
-import scorex.core
 import supertagged.@@
 
 import scala.util.Try
@@ -45,7 +44,7 @@ class InvSpec(maxInvObjects: Int) extends MessageSpec[InvData] {
   override val messageName: String = MessageName
 
   override def parseBytes(bytes: Array[Byte]): Try[InvData] = Try {
-    val typeId: Byte @@ core.ModifierTypeId.Tag = ModifierTypeId @@ bytes.head
+    val typeId: Byte @@ ModifierTypeId.Tag = ModifierTypeId @@ bytes.head
     val count: Int = Ints.fromByteArray(bytes.slice(1, 5))
     require(count > 0, "empty inv list")
     require(count <= maxInvObjects, s"more invs than $maxInvObjects in a message")
@@ -107,7 +106,7 @@ object ModifiersSpec extends MessageSpec[ModifiersData] {
     val objBytes = bytes.slice(5, bytes.length)
     val (_, seq) = (0 until count).foldLeft(0 -> Seq[(ModifierId, Array[Byte])]()) {
       case ((pos, collected), _) =>
-        val id: Array[Byte] @@ core.ModifierId.Tag =
+        val id: Array[Byte] @@ ModifierId.Tag =
           ModifierId @@ objBytes.slice(pos, pos + NodeViewModifier.ModifierIdSize)
         val objBytesCnt: Int =
           Ints.fromByteArray(objBytes.slice(pos + NodeViewModifier.ModifierIdSize, pos + NodeViewModifier.ModifierIdSize + 4))

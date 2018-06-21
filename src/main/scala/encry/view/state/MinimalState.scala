@@ -2,7 +2,7 @@ package encry.view.state
 
 import encry.modifiers.PersistentNodeViewModifier
 import encry.modifiers.mempool.Transaction
-import scorex.core.VersionTag
+import encry.VersionTag
 
 import scala.util.Try
 

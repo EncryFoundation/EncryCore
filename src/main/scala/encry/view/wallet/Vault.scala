@@ -3,7 +3,7 @@ package encry.view.wallet
 import encry.modifiers.PersistentNodeViewModifier
 import encry.modifiers.mempool.Transaction
 import encry.view.state.Proposition
-import scorex.core.VersionTag
+import encry.VersionTag
 
 import scala.util.Try
 

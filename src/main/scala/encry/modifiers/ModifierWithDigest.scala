@@ -1,7 +1,7 @@
 package encry.modifiers
 
 import encry.settings.Algos
-import scorex.core.{ModifierId, ModifierTypeId}
+import encry.{ModifierId, ModifierTypeId}
 
 trait ModifierWithDigest extends PersistentNodeViewModifier {
 
