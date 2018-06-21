@@ -1,4 +1,4 @@
-package scorex.core.api.http
+package encry.api.http
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.server.{Directives, Route}
@@ -32,4 +32,3 @@ object ApiError {
   object ApiKeyNotValid extends ApiError(StatusCodes.Forbidden, "invalid.api-key")
   object NotExists extends ApiError(StatusCodes.NotFound, "not-found")
 }
-
