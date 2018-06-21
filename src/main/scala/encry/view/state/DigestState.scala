@@ -11,7 +11,6 @@ import encry.settings.{Algos, Constants, NodeSettings}
 import encry.utils.ScorexLogging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.core.VersionTag
-import scorex.core.transaction.state.ModifierValidation
 import scorex.crypto.authds.ADDigest
 
 import scala.util.{Failure, Success, Try}

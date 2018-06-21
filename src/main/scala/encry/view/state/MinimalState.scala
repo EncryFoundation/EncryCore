@@ -1,15 +1,11 @@
-package scorex.core.transaction.state
+package encry.view.state
 
 import encry.modifiers.mempool.Transaction
-import scorex.core.transaction._
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.{PersistentNodeViewModifier, VersionTag}
 
 import scala.util.Try
 
-/**
-  * Abstract functional interface of state which is a result of a sequential blocks applying
-  */
 trait MinimalState[M <: PersistentNodeViewModifier, MS <: MinimalState[M, MS]] extends StateReader {
   self: MS =>
 
@@ -17,13 +13,9 @@ trait MinimalState[M <: PersistentNodeViewModifier, MS <: MinimalState[M, MS]] e
 
   def rollbackTo(version: VersionTag): Try[MS]
 
-  /**
-    * @return read-only copy of this state
-    */
   def getReader: StateReader = this
 
 }
-
 
 trait StateFeature
 
@@ -37,12 +29,4 @@ trait TransactionValidation[P <: Proposition, TX <: Transaction[P]] extends Stat
 
 trait ModifierValidation[M <: PersistentNodeViewModifier] extends StateFeature {
   def validate(mod: M): Try[Unit]
-}
-
-trait BalanceSheet[P <: Proposition] extends StateFeature {
-  def balance(id: P, height: Option[Int] = None): Long
-}
-
-trait AccountTransactionsHistory[P <: Proposition, TX <: Transaction[P]] extends StateFeature {
-  def accountTransactions(id: P): Array[TX]
 }

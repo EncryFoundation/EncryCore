@@ -15,14 +15,13 @@ import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.Algos
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
-import encry.view.state.{DigestState, EncryState, StateMode, UtxoState}
+import encry.view.state._
 import encry.view.wallet.EncryWallet
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import scorex.core
 import scorex.core._
 import scorex.core.transaction.box.proposition.Proposition
-import scorex.core.transaction.state.TransactionValidation
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base58
 import EncryNodeViewHolder.ReceivableMessages._

@@ -11,7 +11,6 @@ import encry.settings.{Constants, EncryAppSettings, NodeSettings}
 import encry.utils.ScorexLogging
 import io.iohk.iodb.Store
 import scorex.core.VersionTag
-import scorex.core.transaction.state.MinimalState
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base16
 
@@ -60,12 +59,8 @@ object EncryState extends ScorexLogging {
 
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
-  def generateGenesisUtxoState(stateDir: File,
-                               nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
-
-    val genesisSupplyBoxes: Seq[EncryBaseBox] = EncrySupplyController.totalSupplyBoxes
-    val boxHolder: BoxHolder = BoxHolder(genesisSupplyBoxes)
-
+  def generateGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): (UtxoState, BoxHolder) = {
+    val boxHolder: BoxHolder = BoxHolder(EncrySupplyController.totalSupplyBoxes)
     UtxoState.fromBoxHolder(boxHolder, stateDir, nodeViewHolderRef).ensuring(us => {
       log.debug(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
       log.debug(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
@@ -77,11 +72,9 @@ object EncryState extends ScorexLogging {
   def generateGenesisDigestState(stateDir: File, settings: NodeSettings): DigestState =
     DigestState.create(Some(genesisStateVersion), Some(afterGenesisStateDigest), stateDir, settings)
 
-  def readOrGenerate(settings: EncryAppSettings,
-                     nodeViewHolderRef: Option[ActorRef]): EncryState[_] = {
+  def readOrGenerate(settings: EncryAppSettings, nodeViewHolderRef: Option[ActorRef]): EncryState[_] = {
     val stateDir: File = getStateDir(settings)
     stateDir.mkdirs()
-
     settings.node.stateMode match {
       case StateMode.Digest => DigestState.create(None, None, stateDir, settings.node)
       case StateMode.Utxo if stateDir.listFiles().nonEmpty => UtxoState.create(stateDir, nodeViewHolderRef)

@@ -7,7 +7,6 @@ import encry.settings.Algos.HF
 import encry.utils.ScorexLogging
 import encry.view.history.Height
 import io.iohk.iodb.Store
-import scorex.core.transaction.state.StateReader
 import scorex.crypto.authds.ADKey
 import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import scorex.crypto.hash.Digest32

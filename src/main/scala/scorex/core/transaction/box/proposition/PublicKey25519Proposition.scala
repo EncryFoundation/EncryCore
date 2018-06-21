@@ -1,7 +1,7 @@
 package scorex.core.transaction.box.proposition
 
 import encry.modifiers.Serializer
-import scorex.core.transaction.state.PrivateKey25519
+import encry.view.state.PrivateKey25519
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Blake2b256
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}

@@ -37,7 +37,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
   property("Proofs for transaction") {
 
     val (privKey: PrivateKey, pubKey: PublicKey) = Curve25519.createKeyPair(Random.randomBytes())
-    val secret: PrivateKey25519 = PrivateKey25519(privKey, pubKey)
+    val secret: encry.crypto.PrivateKey25519 = encry.crypto.PrivateKey25519(privKey, pubKey)
 
     val initialBoxes: Seq[AssetBox] = genValidAssetBoxes(secret, amount = 100000, qty = 50)
 

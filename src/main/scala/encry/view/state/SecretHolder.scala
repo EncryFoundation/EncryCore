@@ -1,4 +1,4 @@
-package scorex.core.transaction.state
+package encry.view.state
 
 import com.google.common.primitives.Bytes
 import encry.modifiers.{BytesSerializable, Serializer}

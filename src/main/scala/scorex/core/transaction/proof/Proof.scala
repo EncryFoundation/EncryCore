@@ -1,8 +1,8 @@
 package scorex.core.transaction.proof
 
 import encry.modifiers.BytesSerializable
+import encry.view.state.Secret
 import scorex.core.transaction.box.proposition.{ProofOfKnowledgeProposition, Proposition}
-import scorex.core.transaction.state.Secret
 
 /**
   * The most general abstraction of fact a prover can provide a non-interactive proof

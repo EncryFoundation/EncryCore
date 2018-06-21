@@ -1,4 +1,4 @@
-package scorex.core.transaction.state
+package encry.view.state
 
 import scorex.core.{NodeViewComponent, VersionTag}
 
