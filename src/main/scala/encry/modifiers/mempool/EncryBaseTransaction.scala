@@ -7,7 +7,6 @@ import encry.settings.{Algos, Constants}
 import io.circe.Encoder
 import org.encryfoundation.prismlang.core.PConvertible
 import scorex.core.ModifierId
-import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.Box.Amount
 import scorex.crypto.hash.Digest32
 

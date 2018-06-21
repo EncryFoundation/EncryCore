@@ -10,7 +10,7 @@ import encry.modifiers.{EncryPersistentModifier, Serializer}
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
-import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer}
+import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer, Transaction}
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.Algos
 import encry.view.history.EncryHistory
@@ -21,7 +21,6 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import scorex.core
 import scorex.core._
-import scorex.core.transaction.Transaction
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.TransactionValidation
 import scorex.crypto.authds.ADDigest

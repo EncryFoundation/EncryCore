@@ -2,7 +2,7 @@ package scorex.core
 
 import com.typesafe.config.ConfigFactory
 import encry.modifiers.BytesSerializable
-import scorex.core.transaction.Transaction
+import encry.modifiers.mempool.Transaction
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.crypto.encode.Base58
 

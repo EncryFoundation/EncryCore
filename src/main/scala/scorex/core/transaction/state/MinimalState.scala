@@ -1,5 +1,6 @@
 package scorex.core.transaction.state
 
+import encry.modifiers.mempool.Transaction
 import scorex.core.transaction._
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.{PersistentNodeViewModifier, VersionTag}

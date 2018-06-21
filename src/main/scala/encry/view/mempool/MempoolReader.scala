@@ -1,8 +1,7 @@
-package scorex.core.transaction
+package encry.view.mempool
 
+import encry.modifiers.mempool.Transaction
 import scorex.core.{ModifierId, NodeViewComponent}
-
-import scala.util.Try
 
 /**
   * Unconfirmed transactions pool

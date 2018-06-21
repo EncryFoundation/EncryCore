@@ -3,7 +3,6 @@ package encry.view.mempool
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.view.mempool.EncryMempool.{MemPoolRequest, MemPoolResponse, TxKey}
 import scorex.core.ModifierId
-import scorex.core.transaction.MempoolReader
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable

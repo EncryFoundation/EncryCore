@@ -1,6 +1,6 @@
 package encry.view.wallet
 
-import scorex.core.transaction.Transaction
+import encry.modifiers.mempool.Transaction
 import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.{NodeViewComponent, PersistentNodeViewModifier, VersionTag}
 
