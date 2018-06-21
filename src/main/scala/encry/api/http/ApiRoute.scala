@@ -1,4 +1,4 @@
-package scorex.core.api.http
+package encry.api.http
 
 import akka.actor.ActorRefFactory
 import akka.http.scaladsl.server.{Directive0, Route}
@@ -7,6 +7,7 @@ import akka.util.Timeout
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.utils.ActorHelper
 import io.circe.Printer
+import scorex.core.api.http.{ApiDirectives, ScorexApiResponse}
 
 import scala.concurrent.{Await, Future}
 
@@ -15,7 +16,6 @@ trait ApiRoute extends ApiDirectives with ActorHelper with FailFastCirceSupport 
   def context: ActorRefFactory
   def route: Route
 
-  //TODO: should we move it to the settings?
   override val apiKeyHeaderName: String = "api_key"
 
   implicit val printer: Printer = Printer.spaces2.copy(dropNullValues = true)

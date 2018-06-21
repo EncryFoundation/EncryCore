@@ -3,9 +3,9 @@ package encry.api.http.routes
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.{Directive, Directive1, Route}
 import encry.account.Address
+import encry.api.http.ApiRoute
 import io.circe.Json
 import scorex.core.ModifierId
-import scorex.core.api.http.ApiRoute
 import scorex.crypto.encode.Base58
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
