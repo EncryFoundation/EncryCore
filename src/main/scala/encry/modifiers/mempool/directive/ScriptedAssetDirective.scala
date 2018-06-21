@@ -72,7 +72,7 @@ object ScriptedAssetDirectiveSerializer extends Serializer[ScriptedAssetDirectiv
 
   override def parseBytes(bytes: Array[Byte]): Try[ScriptedAssetDirective] = {
     val scriptLen: Short = Shorts.fromByteArray(bytes.take(2))
-    CompiledContractSerializer.parseBytes(bytes.slice(2, scriptLen)).map { contract =>
+    CompiledContractSerializer.parseBytes(bytes.slice(2, scriptLen + 2)).map { contract =>
       val amount: Amount = Longs.fromByteArray(bytes.slice(scriptLen + 2, scriptLen + 2 + 8))
       val tokenIdOpt: Option[authds.ADKey] = if ((bytes.length - (scriptLen + 2 + 8)) == Constants.ModifierIdSize) {
         Some(ADKey @@ bytes.takeRight(Constants.ModifierIdSize))
