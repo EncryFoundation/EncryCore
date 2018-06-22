@@ -9,6 +9,8 @@ import encry.consensus.{HistoryReader, SyncInfo}
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.mempool.Transaction
+import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -21,15 +23,9 @@ import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.{EncryMempool, MempoolReader}
-import scorex.crypto.encode.Base58
-import EncryNodeViewSynchronizer.ReceivableMessages._
-import encry.{ModifierId, ModifierTypeId, VersionTag}
-import encry.consensus.History._
-import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
-import encry.modifiers.mempool.Transaction
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
 import encry.view.state.{Proposition, StateReader}
+import encry.{ModifierId, ModifierTypeId, VersionTag}
+import scorex.crypto.encode.Base58
 
 class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with ScorexLogging {
 

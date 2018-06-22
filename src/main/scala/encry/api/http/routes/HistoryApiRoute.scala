@@ -3,18 +3,17 @@ package encry.api.http.routes
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import encry.ModifierId
 import encry.local.miner.EncryMiner.{GetMinerStatus, MinerStatus}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.settings.EncryAppSettings
+import encry.settings.{EncryAppSettings, RESTApiSettings}
+import encry.utils.ScorexLogging
 import encry.view.EncryViewReadersHolder.GetDataFromHistory
 import encry.view.history.EncryHistoryReader
 import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
-import encry.ModifierId
-import encry.settings.RESTApiSettings
-import encry.utils.ScorexLogging
 import scorex.crypto.encode.Base58
 
 import scala.concurrent.Future

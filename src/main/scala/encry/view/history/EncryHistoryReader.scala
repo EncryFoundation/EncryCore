@@ -1,5 +1,6 @@
 package encry.view.history
 
+import encry._
 import encry.consensus.History._
 import encry.consensus.{HistoryReader, ModifierSemanticValidity}
 import encry.modifiers.EncryPersistentModifier
@@ -12,8 +13,6 @@ import encry.utils.ScorexLogging
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
-import encry._
-import encry.consensus.History._
 
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}

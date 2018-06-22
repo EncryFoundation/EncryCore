@@ -5,7 +5,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import encry.api.http.PeersApiRoute.{BlacklistedPeers, PeerInfoResponse}
+import encry.api.http.PeersApiRoute.PeerInfoResponse
 import encry.network.Handshake
 import encry.network.peer.PeerInfo
 import encry.settings.RESTApiSettings
@@ -22,7 +22,7 @@ case class PeersApiRoute(peerManager: ActorRef,
   extends ApiRoute {
 
   import encry.network.NetworkController.ReceivableMessages.ConnectTo
-  import encry.network.peer.PeerManager.ReceivableMessages.{GetAllPeers, GetBlacklistedPeers, GetConnectedPeers}
+  import encry.network.peer.PeerManager.ReceivableMessages.{GetAllPeers, GetConnectedPeers}
 
   override lazy val route: Route = pathPrefix("peers") { allPeers ~ connectedPeers ~ connect }
   private val addressAndPortRegexp: Regex = "\\w+:\\d{1,5}".r

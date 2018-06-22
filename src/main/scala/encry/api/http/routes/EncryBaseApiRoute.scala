@@ -2,10 +2,10 @@ package encry.api.http.routes
 
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.{Directive, Directive1, Route}
+import encry.ModifierId
 import encry.account.Address
 import encry.api.http.ApiRoute
 import io.circe.Json
-import encry.ModifierId
 import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 

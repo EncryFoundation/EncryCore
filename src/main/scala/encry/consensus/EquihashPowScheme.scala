@@ -1,6 +1,7 @@
 package encry.consensus
 
 import com.google.common.primitives.Chars
+import encry.ModifierId
 import encry.crypto.equihash.{Equihash, EquihashSolution}
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -10,7 +11,6 @@ import encry.modifiers.mempool.EncryBaseTransaction
 import encry.settings.{Algos, Constants}
 import encry.utils.ScorexLogging
 import org.bouncycastle.crypto.digests.Blake2bDigest
-import encry.ModifierId
 import scorex.crypto.authds.SerializedAdProof
 import scorex.crypto.hash.Digest32
 

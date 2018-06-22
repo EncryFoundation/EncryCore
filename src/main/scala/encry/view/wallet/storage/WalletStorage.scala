@@ -1,6 +1,7 @@
 package encry.view.wallet.storage
 
 import com.google.common.primitives.Longs
+import encry.ModifierId
 import encry.crypto.PublicKey25519
 import encry.modifiers.mempool.{EncryTransaction, EncryTransactionSerializer}
 import encry.modifiers.state.StateModifierDeserializer
@@ -8,7 +9,6 @@ import encry.modifiers.state.box._
 import encry.settings.Algos
 import encry.storage.EncryBaseStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
-import encry.ModifierId
 import scorex.crypto.authds.ADKey
 
 import scala.util.Try

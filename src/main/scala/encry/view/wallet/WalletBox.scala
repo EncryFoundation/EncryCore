@@ -1,7 +1,7 @@
 package encry.view.wallet
 
-import encry.modifiers.{BytesSerializable, Serializer}
 import encry.modifiers.state.box._
+import encry.modifiers.{BytesSerializable, Serializer}
 
 import scala.util.Try
 

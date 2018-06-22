@@ -4,9 +4,9 @@ import java.io.{File, FileWriter}
 
 import encry.account.{Account, Address}
 import encry.crypto.PrivateKey25519
+import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
-import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.authds.ADKey
 import scorex.crypto.signatures.Curve25519
 

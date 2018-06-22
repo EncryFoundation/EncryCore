@@ -1,7 +1,6 @@
 package encry.view.history.processors
 
 import com.google.common.primitives.Ints
-import encry.EncryApp
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
 import encry.modifiers.EncryPersistentModifier
@@ -13,8 +12,8 @@ import encry.utils.{NetworkTimeProvider, ScorexLogging}
 import encry.validation.{ModifierValidator, ValidationResult}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
+import encry.{EncryApp, _}
 import io.iohk.iodb.ByteArrayWrapper
-import encry._
 
 import scala.annotation.tailrec
 import scala.collection.immutable

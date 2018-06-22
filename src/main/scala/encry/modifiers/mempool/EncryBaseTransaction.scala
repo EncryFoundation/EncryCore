@@ -1,13 +1,13 @@
 package encry.modifiers.mempool
 
+import encry.ModifierId
 import encry.modifiers.mempool.directive.Directive
+import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.EncryBaseBox
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.{Algos, Constants}
 import io.circe.Encoder
 import org.encryfoundation.prismlang.core.PConvertible
-import encry.ModifierId
-import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.hash.Digest32
 
 import scala.util.Try

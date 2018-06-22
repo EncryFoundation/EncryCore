@@ -3,7 +3,6 @@ package encry.view
 import java.io.File
 
 import akka.actor.{Actor, Props}
-import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.modifiers._
@@ -23,8 +22,7 @@ import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.{Proposition, _}
 import encry.view.wallet.EncryWallet
-import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.view.EncryNodeViewHolder.DownloadRequest
+import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base58
 

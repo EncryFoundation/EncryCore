@@ -1,5 +1,6 @@
 package encry.view.history.processors
 
+import encry.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.consensus.ModifierSemanticValidity.Invalid
 import encry.modifiers.EncryPersistentModifier
@@ -8,10 +9,6 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.utils.ScorexLogging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
-import encry.ModifierId
-import encry.consensus.History.ProgressInfo
-import encry.consensus.ModifierSemanticValidity.Invalid
-import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 
 import scala.util.{Failure, Try}
 
