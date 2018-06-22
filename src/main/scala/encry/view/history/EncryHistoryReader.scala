@@ -12,7 +12,8 @@ import encry.utils.ScorexLogging
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
-import scorex.core._
+import encry._
+import encry.consensus.History._
 
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}

@@ -5,7 +5,7 @@ import encry.modifiers.state.box.EncryBox
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.storage.codec.FixLenComplexValueCodec
 import encry.utils.ScorexLogging
-import scorex.core.transaction.box.proposition.Proposition
+import encry.view.state.Proposition
 import scorex.crypto.authds.ADKey
 
 case class EncryIndexReader(index: IndexStorage) extends ScorexLogging {

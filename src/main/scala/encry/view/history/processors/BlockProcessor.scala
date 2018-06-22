@@ -8,7 +8,10 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.utils.ScorexLogging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
-import scorex.core.ModifierId
+import encry.ModifierId
+import encry.consensus.History.ProgressInfo
+import encry.consensus.ModifierSemanticValidity.Invalid
+import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 
 import scala.util.{Failure, Try}
 

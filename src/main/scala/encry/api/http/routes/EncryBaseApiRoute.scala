@@ -3,9 +3,10 @@ package encry.api.http.routes
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.{Directive, Directive1, Route}
 import encry.account.Address
+import encry.api.http.ApiRoute
 import io.circe.Json
-import scorex.core.ModifierId
-import scorex.core.api.http.ApiRoute
+import encry.ModifierId
+import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -41,6 +42,13 @@ trait EncryBaseApiRoute extends ApiRoute {
   val accountAddress: Directive1[Address] = pathPrefix(Segment).flatMap { addr =>
     Base58.decode(addr) match {
       case Success(_) => provide(Address @@ addr)
+      case _ => reject
+    }
+  }
+
+  val boxId: Directive1[ADKey] = pathPrefix(Segment).flatMap { key =>
+    Base58.decode(key) match {
+      case Success(k) => provide(ADKey @@ k)
       case _ => reject
     }
   }

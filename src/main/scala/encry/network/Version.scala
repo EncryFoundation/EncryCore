@@ -1,6 +1,6 @@
 package encry.network
 
-import scorex.core.serialization.{BytesSerializable, Serializer}
+import encry.modifiers.{BytesSerializable, Serializer}
 
 import scala.util.Try
 

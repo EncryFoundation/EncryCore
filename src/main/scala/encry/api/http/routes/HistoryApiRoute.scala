@@ -12,7 +12,7 @@ import encry.view.history.EncryHistoryReader
 import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
-import scorex.core.ModifierId
+import encry.ModifierId
 import encry.settings.RESTApiSettings
 import encry.utils.ScorexLogging
 import scorex.crypto.encode.Base58

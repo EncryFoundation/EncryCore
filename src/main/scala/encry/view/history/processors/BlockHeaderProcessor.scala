@@ -14,7 +14,7 @@ import encry.validation.{ModifierValidator, ValidationResult}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
-import scorex.core._
+import encry._
 
 import scala.annotation.tailrec
 import scala.collection.immutable

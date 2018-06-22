@@ -1,13 +1,12 @@
 package encry.validation
 
 import akka.http.scaladsl.server.Route
+import encry.api.http.ApiError
 import io.circe.{ACursor, Decoder, DecodingFailure}
-import scorex.core.api.http.ApiError
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
-/** Base trait for the result of validation */
 sealed trait ValidationResult {
 
   import ValidationResult._
@@ -40,7 +39,6 @@ object ValidationResult {
 
   type Valid = ValidationResult.Valid.type
 
-  /** Successful validation result */
   final case object Valid extends ValidationResult {
     def isValid: Boolean = true
     def message: String = "OK"
@@ -49,7 +47,6 @@ object ValidationResult {
     def toTry: Try[Unit] = Success(())
   }
 
-  /** Unsuccessful validation result */
   final case class Invalid(errors: Seq[ModifierError]) extends ValidationResult {
     def isValid: Boolean = false
     def isFatal: Boolean = errors.exists(_.isFatal)

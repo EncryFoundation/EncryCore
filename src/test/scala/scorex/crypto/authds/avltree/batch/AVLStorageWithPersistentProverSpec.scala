@@ -1,7 +1,7 @@
 package scorex.crypto.authds.avltree.batch
 
 import encry.settings.Algos
-import io.iohk.iodb.{LSMStore, Store}
+import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.authds.avltree.batch.benchmark.IODBBenchmark.getRandomTempDir
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
@@ -15,12 +15,9 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
   type HF = Blake2b256.type
   implicit val hf: HF = Blake2b256
 
-  val stateStore: Store = new LSMStore(getRandomTempDir)
+  private lazy val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
 
-  private lazy val np =
-    NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
-
-  protected lazy val storage = new VersionedIODBAVLStorage(stateStore, np)
+  protected lazy val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(new LSMStore(getRandomTempDir), np)
 
   protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, HF] =
     PersistentBatchAVLProver.create(

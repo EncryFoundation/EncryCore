@@ -15,7 +15,7 @@ import encry.EncryApp._
 import io.circe.Json
 import io.circe.syntax._
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import scorex.core.VersionTag
+import encry.VersionTag
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{ChangedState, RollbackSucceed, SemanticallySuccessfulModifier}
 import encry.utils.ScorexLogging
 import scorex.crypto.authds.ADKey

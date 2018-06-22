@@ -1,6 +1,6 @@
 package encry.modifiers.history.block
 
-import scorex.core.NodeViewModifier
+import encry.modifiers.NodeViewModifier
 
 object Block {
   type Timestamp = Long

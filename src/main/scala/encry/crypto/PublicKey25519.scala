@@ -2,8 +2,8 @@ package encry.crypto
 
 import encry.account.Address
 import encry.crypto.encoding.Base58Check
+import encry.modifiers.{BytesSerializable, Serializer}
 import encry.settings.Algos
-import scorex.core.serialization.{BytesSerializable, Serializer}
 import scorex.crypto.signatures.{Curve25519, PublicKey}
 
 import scala.util.Try
