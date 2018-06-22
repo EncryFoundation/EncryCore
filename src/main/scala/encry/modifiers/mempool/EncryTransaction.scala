@@ -60,6 +60,7 @@ object EncryTransaction {
     "timestamp" -> tx.timestamp.asJson,
     "inputs" -> tx.inputs.map(_.asJson).asJson,
     "directives" -> tx.directives.map(_.asJson).asJson,
+    "outputs" -> tx.newBoxes.toSeq.map(_.asJson).asJson,
     "defaultProofOpt" -> tx.defaultProofOpt.map(_.asJson).asJson
   ).asJson
 
