@@ -21,7 +21,7 @@ import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.network.message._
 import encry.network.peer.PeerManager
-import encry.network.{EncryNodeViewSynchronizer, NetworkController, UPnP}
+import encry.network.{EncryNodeViewSynchronizer, ModifiersHolder, NetworkController, UPnP}
 import encry.settings.{Algos, EncryAppSettings}
 import encry.stats.StatsSender
 import encry.utils.{NetworkTimeProvider, ScorexLogging}
@@ -103,6 +103,8 @@ object EncryApp extends App with ScorexLogging {
   }
 
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
+
+  val persister: ActorRef = system.actorOf(Props[ModifiersHolder], "persister")
 
   if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
 

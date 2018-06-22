@@ -48,6 +48,7 @@ val testingDependencies = Seq(
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
   "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8",
+  "org.iq80.leveldb" % "leveldb" % "0.7",
   "javax.xml.bind" % "jaxb-api" % "2.+",
   "com.lihaoyi" %% "fastparse" % "1.0.0",
   "com.iheart" %% "ficus" % "1.4.2",
@@ -58,7 +59,7 @@ libraryDependencies ++= Seq(
   "org.rudogma" %% "supertagged" % "1.+",
   "org.scorexfoundation" %% "scrypto" % "2.1.1",
   "org.scorexfoundation" %% "iodb" % "0.3.2",
-  "io.spray" %%  "spray-json" % "1.3.3",
+  "io.spray" %% "spray-json" % "1.3.3",
   "io.monix" %% "monix" % "2.3.3",
   "com.github.oskin1" %% "prism" % "0.1.9",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
