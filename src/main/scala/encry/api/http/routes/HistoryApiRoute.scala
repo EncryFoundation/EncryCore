@@ -45,7 +45,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
     history.lastHeaders(n).headers.map(_.asJson).asJson
   }
 
-  private def getHeaderIds(limit: Int, offset: Int): Future[Json] = getHistory.map { history =>
+  private def getHeaderIds(offset: Int, limit: Int): Future[Json] = getHistory.map { history =>
     history.getHeaderIds(limit, offset).map(Base58.encode).asJson
   }
 
@@ -53,31 +53,31 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
     history.typedModifierById[EncryBlockHeader](headerId).flatMap(history.getBlock)
   }
 
-  def getBlocksR: Route = (pathEndOrSingleSlash & get & paging) { (offset, limit) =>
-    getHeaderIds(limit, offset).okJson()
+  def getBlocksR: Route = (pathEndOrSingleSlash & get & paging) {
+    getHeaderIds(_, _).okJson()
   }
 
-  def getLastHeadersR: Route = (pathPrefix("lastHeaders" / IntNumber) & get) { count =>
-    getLastHeaders(count).okJson()
+  def getLastHeadersR: Route = (pathPrefix("lastHeaders" / IntNumber) & get) {
+    getLastHeaders(_).okJson()
   }
 
-  def getBlockIdsAtHeightR: Route = (pathPrefix("at" / IntNumber) & get) { height =>
-    getHeaderIdsAtHeight(height).okJson()
+  def getBlockIdsAtHeightR: Route = (pathPrefix("at" / IntNumber) & get) {
+    getHeaderIdsAtHeight(_).okJson()
   }
 
-  def getBlockHeaderByHeaderIdR: Route = (modifierId & pathPrefix("header") & get) { id =>
-    getFullBlockByHeaderId(id).map(_.map(_.header.asJson)).okJson()
+  def getBlockHeaderByHeaderIdR: Route = (modifierId & pathPrefix("header") & get) {
+    getFullBlockByHeaderId(_).map(_.map(_.header.asJson)).okJson()
   }
 
-  def getBlockTransactionsByHeaderIdR: Route = (modifierId & pathPrefix("transactions") & get) { id =>
-    getFullBlockByHeaderId(id).map(_.map(_.transactions.map(_.asJson).asJson)).okJson()
+  def getBlockTransactionsByHeaderIdR: Route = (modifierId & pathPrefix("transactions") & get) {
+    getFullBlockByHeaderId(_).map(_.map(_.transactions.map(_.asJson).asJson)).okJson()
   }
 
   def candidateBlockR: Route = (path("candidateBlock") & pathEndOrSingleSlash & get) {
     (miner ? GetMinerStatus).mapTo[MinerStatus].map(_.json).okJson()
   }
 
-  def getFullBlockByHeaderIdR: Route = (modifierId & get) { id =>
-    getFullBlockByHeaderId(id).map(_.map(_.asJson)).okJson()
+  def getFullBlockByHeaderIdR: Route = (modifierId & get) {
+    getFullBlockByHeaderId(_).map(_.map(_.asJson)).okJson()
   }
 }
