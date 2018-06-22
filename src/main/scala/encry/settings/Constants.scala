@@ -1,8 +1,8 @@
 package encry.settings
 
 import encry.consensus.{Difficulty, DifficultySerializer, NBits}
-import encry.view.history.Height
 import encry.modifiers.history.block.Block.Version
+import encry.view.history.Height
 import scorex.crypto.authds.ADKey
 
 import scala.concurrent.duration._
@@ -80,7 +80,7 @@ object Constants {
     val PreGenesisHeight: Height = Height @@ (GenesisHeight - 1)
 
     // Maximum number of epochs blockchain state can be rolled back
-    val MaxRollbackDepth: Int = (10.days.toMillis / DesiredBlockInterval.toMillis).toInt
+    val MaxRollbackDepth: Int = 10
 
     val MaxTimeDrift: Long = 10 * DesiredBlockInterval.toMillis
 

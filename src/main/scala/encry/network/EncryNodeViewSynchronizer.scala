@@ -4,16 +4,21 @@ import java.net.InetSocketAddress
 
 import akka.actor.Actor
 import encry.EncryApp._
+import encry.consensus.History._
 import encry.consensus.{HistoryReader, SyncInfo}
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.message._
 import encry.settings.NetworkSettings
+import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.utils.ScorexLogging
 import encry.view.EncryNodeViewHolder.DownloadRequest
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.EncryMempool
 import scorex.core._
@@ -21,11 +26,6 @@ import scorex.core.transaction.box.proposition.Proposition
 import scorex.core.transaction.state.StateReader
 import scorex.core.transaction.{MempoolReader, Transaction}
 import scorex.crypto.encode.Base58
-
-import EncryNodeViewSynchronizer.ReceivableMessages._
-import encry.consensus.History._
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
 
 class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with ScorexLogging {
 
@@ -107,6 +107,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       val typeId: ModifierTypeId = data._1
       val modifiers: Map[ModifierId, Array[Byte]] = data._2
+      if (settings.node.sendStat)
+        context.system.eventStream.publish(GetModifiers(typeId, modifiers.keys.toSeq))
       log.info(s"Got modifiers of type $typeId from remote connected peer: $remote")
       log.trace(s"Received modifier ids ${data._2.keySet.map(Base58.encode).mkString(",")}")
       for ((id, _) <- modifiers) deliveryTracker.receive(typeId, id, remote)
@@ -181,6 +183,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     modifierIds.foreach(id => deliveryTracker.expectFromRandom(modifierTypeId, id))
     val msg: Message[(ModifierTypeId, Seq[ModifierId])] = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
+    if (settings.node.sendStat)
+      context.system.eventStream.publish(SendDownloadRequest(modifierTypeId, modifierIds))
     networkController ! SendToNetwork(msg, SendToRandom)
   }
 }
