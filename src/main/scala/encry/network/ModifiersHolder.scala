@@ -1,27 +1,27 @@
 package encry.network
 
 import akka.persistence.{PersistentActor, SnapshotOffer}
-import encry.network.ModifiersHolder.NewMessageToPersistentActor
+import encry.network.ModifiersHolder.{NewBlock, State}
 import encry.utils.ScorexLogging
 
 class ModifiersHolder extends PersistentActor with ScorexLogging {
 
-  var counter: Int = 0
+  var counter: State = State(0)
+
+  override def preStart(): Unit = {
+    logger.info(s"Before start counter: ${counter.counter}")
+  }
 
   override def receiveRecover: Receive = {
-    case NewMessageToPersistentActor =>
-      logger.info("------------- Message received on recovery ")
-      updateCounter()
-    case SnapshotOffer(_, snapshot: Int) =>
-      logger.info("------------- Snapshot received on recovery ")
-      counter = snapshot
+    case NewBlock => updateCounter()
+    case SnapshotOffer(_, snapshot: Int) => counter = State(snapshot)
   }
 
   override def receiveCommand: Receive = {
-    case cmd@Int =>
-      logger.info("------------- Command received " + cmd)
-      persist(Int) { _ => updateCounter() }
-    case x: Any => println(x)
+    case NewBlock =>
+      logger.info(s"New block is here. Before incrementing: ${counter.counter}")
+      persist(counter) { _ => updateCounter() }
+    case x: Any => println(s"+++ $x")
   }
 
   override def persistenceId: String = "persistent actor"
@@ -31,13 +31,14 @@ class ModifiersHolder extends PersistentActor with ScorexLogging {
   override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
 
   def updateCounter(): Unit = {
-    counter += 1
-    logger.info("------------- Current counter " + counter)
+    counter = State(counter.counter + 1)
   }
 }
 
 object ModifiersHolder {
 
-  case object NewMessageToPersistentActor
+  case object NewBlock
+
+  case class State(counter: Int)
 
 }

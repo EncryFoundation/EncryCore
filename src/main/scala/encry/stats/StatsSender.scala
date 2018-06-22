@@ -8,7 +8,7 @@ import encry.EncryApp.{persister, settings, timeProvider}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import encry.network.ModifiersHolder.NewMessageToPersistentActor
+import encry.network.ModifiersHolder.NewBlock
 import encry.settings.Algos
 import encry.stats.StatsSender.MiningEnd
 import encry.utils.ScorexLogging
@@ -35,7 +35,7 @@ class StatsSender extends Actor with ScorexLogging {
 
       logger.info("+++ Into SSM")
 
-      persister ! NewMessageToPersistentActor
+      persister ! NewBlock
 
       influxDB.write(8189, util.Arrays.asList(
         s"difficulty,nodeName=${settings.network.nodeName},height=${fb.header.height} value=${fb.header.difficulty.toString}",
