@@ -24,9 +24,6 @@ class StatsSender extends Actor with ScorexLogging {
   influxDB.setRetentionPolicy("autogen")
 
   override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[BestHeaderInChain])
-    context.system.eventStream.subscribe(self, classOf[SendDownloadRequest])
-    context.system.eventStream.subscribe(self, classOf[GetModifiers])
     influxDB.write(8189, s"nodesStartTime value=" + '\"' + settings.network.nodeName + '\"')
   }
 
@@ -53,6 +50,7 @@ class StatsSender extends Actor with ScorexLogging {
 //      influxDB.write(8189, s"error node=${settings.network.nodeName} value=" + '\"' + error + '\"')
 
     case SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
+
       modifiersToDownload = modifiersToDownload ++ modifiers.map(_ -> (modifierTypeId, System.currentTimeMillis()))
 
     case GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
