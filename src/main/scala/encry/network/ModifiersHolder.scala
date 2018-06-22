@@ -21,14 +21,14 @@ class ModifiersHolder extends PersistentActor with ScorexLogging {
     case cmd@Int =>
       logger.info("------------- Command received " + cmd)
       persist(Int) { _ => updateCounter() }
+    case x: Any => println(x)
   }
 
   override def persistenceId: String = "persistent actor"
 
-  override def journalPluginId = "akka.persistence.journal.leveldb.LeveldbJournal"
+  override def journalPluginId: String = "akka.persistence.journal.leveldb"
 
-  // Absolute path to the snapshot store plugin configuration entry, not defined in the `reference.conf`.
-  override def snapshotPluginId = "akka.persistence.journal.PersistencePluginProxy"
+  override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
 
   def updateCounter(): Unit = {
     counter += 1
