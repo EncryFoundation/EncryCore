@@ -14,7 +14,8 @@ resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repos
   "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/",
   "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/")
 
-val akkaVersion = "10.0.9"
+val akkaVersion = "2.5.13"
+val akkaHttpVersion = "10.0.9"
 val circeVersion = "0.9.3"
 
 val networkDependencies = Seq(
@@ -28,7 +29,7 @@ val apiDependencies = Seq(
   "io.circe" %% "circe-parser" % circeVersion,
   "io.swagger" %% "swagger-scala-module" % "1.0.3",
   "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.10.0",
-  "com.typesafe.akka" %% "akka-http" % akkaVersion
+  "com.typesafe.akka" %% "akka-http" % akkaHttpVersion
 )
 
 val loggingDependencies = Seq(
@@ -39,12 +40,14 @@ val loggingDependencies = Seq(
 
 val testingDependencies = Seq(
   "com.typesafe.akka" %% "akka-testkit" % "2.4.+" % "test",
-  "com.typesafe.akka" %% "akka-http-testkit" % akkaVersion % "test",
+  "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % "test",
   "org.scalatest" %% "scalatest" % "3.0.3" % "test",
   "org.scalacheck" %% "scalacheck" % "1.13.+" % "test"
 )
 
 libraryDependencies ++= Seq(
+  "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
+  "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8",
   "javax.xml.bind" % "jaxb-api" % "2.+",
   "com.lihaoyi" %% "fastparse" % "1.0.0",
   "com.iheart" %% "ficus" % "1.4.2",
