@@ -1,7 +1,7 @@
 package encry.view.wallet
 
+import encry.modifiers.{BytesSerializable, Serializer}
 import encry.modifiers.mempool._
-import scorex.core.serialization.{BytesSerializable, Serializer}
 
 import scala.util.Try
 

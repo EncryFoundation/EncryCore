@@ -1,8 +1,8 @@
 package encry.network.message
 
 import com.google.common.primitives.{Bytes, Ints}
+import encry.modifiers.{BytesSerializable, Serializer}
 import encry.network.PeerConnectionHandler._
-import scorex.core.serialization.{BytesSerializable, Serializer}
 import scorex.crypto.hash.Blake2b256
 
 import scala.util.{Success, Try}

@@ -2,8 +2,8 @@ package encry.modifiers.history.block.payload
 
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.proposition.EncryProposition
-import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
-import scorex.core.{ModifierId, TransactionsCarryingPersistentNodeViewModifier}
+import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest, TransactionsCarryingPersistentNodeViewModifier}
+import encry.ModifierId
 
 trait EncryBaseBlockPayload
   extends TransactionsCarryingPersistentNodeViewModifier[EncryProposition, EncryBaseTransaction]

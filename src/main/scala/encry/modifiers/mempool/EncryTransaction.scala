@@ -1,6 +1,7 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
+import encry.modifiers.Serializer
 import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
 import encry.settings.{Algos, Constants}
 import encry.validation.{ModifierValidator, ValidationResult}
@@ -8,13 +9,11 @@ import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.prismlang.core.Types
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
-import scorex.core.serialization.{SerializationException, Serializer}
-import scorex.core.transaction.box.Box.Amount
+import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-/** Completely assembled atomic state modifier. */
 case class EncryTransaction(fee: Amount,
                             timestamp: Long,
                             inputs: IndexedSeq[Input],
@@ -84,6 +83,8 @@ object EncryTransaction {
 }
 
 object EncryTransactionSerializer extends Serializer[EncryTransaction] {
+
+  case object SerializationException extends Exception("Serialization failed.")
 
   override def toBytes(obj: EncryTransaction): Array[Byte] = {
     Bytes.concat(

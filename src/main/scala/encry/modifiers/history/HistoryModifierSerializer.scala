@@ -1,9 +1,8 @@
 package encry.modifiers.history
 
-import encry.modifiers.EncryPersistentModifier
+import encry.modifiers.{EncryPersistentModifier, Serializer}
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
-import scorex.core.serialization.Serializer
 
 import scala.util.{Failure, Try}
 

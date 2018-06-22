@@ -8,7 +8,7 @@ import encry.modifiers.state.box._
 import encry.settings.Algos
 import encry.storage.EncryBaseStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
-import scorex.core.ModifierId
+import encry.ModifierId
 import scorex.crypto.authds.ADKey
 
 import scala.util.Try

@@ -1,6 +1,6 @@
 package encry.network.message
 
-import scorex.core.serialization.Serializer
+import encry.modifiers.Serializer
 
 trait MessageSpec[Content] extends Serializer[Content] {
   val messageCode: Message.MessageCode

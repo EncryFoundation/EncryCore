@@ -4,14 +4,13 @@ import java.io.File
 
 import akka.actor.ActorRef
 import encry.account.Address
-import encry.crypto.PrivateKey25519
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.settings.{Algos, Constants}
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
 import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
-import scorex.core.transaction.box.Box.Amount
+import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
@@ -37,7 +36,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
   property("Proofs for transaction") {
 
     val (privKey: PrivateKey, pubKey: PublicKey) = Curve25519.createKeyPair(Random.randomBytes())
-    val secret: PrivateKey25519 = PrivateKey25519(privKey, pubKey)
+    val secret: encry.crypto.PrivateKey25519 = encry.crypto.PrivateKey25519(privKey, pubKey)
 
     val initialBoxes: Seq[AssetBox] = genValidAssetBoxes(secret, amount = 100000, qty = 50)
 

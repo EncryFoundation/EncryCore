@@ -8,7 +8,7 @@ import encry.modifiers.mempool.TransactionFactory
 import encry.settings.{Algos, Constants}
 import encry.utils.TestHelper
 import org.scalatest.FunSuite
-import scorex.core.ModifierId
+import encry.{ModifierId, ModifierTypeId}
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random

@@ -2,9 +2,8 @@ package encry.modifiers.history.block.payload
 
 import encry.modifiers.mempool.TransactionFactory
 import encry.utils.TestHelper
-import encry.view.history.Height
 import org.scalatest.FunSuite
-import scorex.core.ModifierId
+import encry.ModifierId
 
 class EncryBlockPayloadSerializerTest extends FunSuite {
 

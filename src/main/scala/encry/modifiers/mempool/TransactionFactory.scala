@@ -5,7 +5,7 @@ import encry.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import encry.modifiers.mempool.directive.{Directive, TransferDirective}
 import encry.modifiers.state.box.MonetaryBox
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
-import scorex.core.transaction.box.Box.Amount
+import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.authds.ADKey
 
 object TransactionFactory {

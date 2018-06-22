@@ -1,7 +1,7 @@
 package encry.view
 
 import encry.modifiers.EncryPersistentModifier
-import scorex.core.ModifierId
+import encry.ModifierId
 
 import scala.util.Try
 

@@ -5,7 +5,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.utils.ScorexLogging
 import io.iohk.iodb.ByteArrayWrapper
-import scorex.core.ModifierId
+import encry.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.consensus.ModifierSemanticValidity.Invalid
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}

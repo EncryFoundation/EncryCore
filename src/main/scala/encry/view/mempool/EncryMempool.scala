@@ -6,8 +6,7 @@ import encry.settings.EncryAppSettings
 import encry.utils.{NetworkTimeProvider, ScorexLogging}
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
-import scorex.core.ModifierId
-import scorex.core.transaction.MemoryPool
+import encry.ModifierId
 
 import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}

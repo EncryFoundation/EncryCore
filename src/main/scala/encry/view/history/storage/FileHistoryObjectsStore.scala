@@ -6,7 +6,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.HistoryModifierSerializer
 import encry.settings.Algos
 import encry.view.ObjectsStore
-import scorex.core.ModifierId
+import encry.ModifierId
 
 import scala.util.Try
 

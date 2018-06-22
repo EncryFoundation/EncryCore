@@ -10,7 +10,7 @@ import encry.modifiers.mempool.EncryBaseTransaction
 import encry.settings.{Algos, Constants}
 import encry.utils.ScorexLogging
 import org.bouncycastle.crypto.digests.Blake2bDigest
-import scorex.core.ModifierId
+import encry.ModifierId
 import scorex.crypto.authds.SerializedAdProof
 import scorex.crypto.hash.Digest32
 

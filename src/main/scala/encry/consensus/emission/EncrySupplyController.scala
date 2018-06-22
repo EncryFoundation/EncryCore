@@ -4,7 +4,7 @@ import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.Constants
 import encry.view.history.Height
-import scorex.core.transaction.box.Box.Amount
+import encry.modifiers.state.box.Box.Amount
 
 object EncrySupplyController {
 

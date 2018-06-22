@@ -6,13 +6,12 @@ import encry.crypto.equihash.{Equihash, EquihashSolution, EquihashSolutionsSeria
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.Block._
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
+import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest, Serializer}
 import encry.settings.{Algos, Constants}
 import io.circe.Encoder
 import io.circe.syntax._
 import org.bouncycastle.crypto.digests.Blake2bDigest
-import scorex.core.serialization.Serializer
-import scorex.core.{ModifierId, ModifierTypeId}
+import encry.{ModifierId, ModifierTypeId}
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32

@@ -14,8 +14,8 @@ import encry.settings.{Algos, Constants}
 import encry.utils.TestHelper.{Props, rndGen}
 import encry.view.state.{BoxHolder, EncryState, UtxoState}
 import io.iohk.iodb.LSMStore
-import scorex.core.ModifierId
-import scorex.core.transaction.box.Box.Amount
+import encry.{ModifierId, ModifierTypeId}
+import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.authds.avltree.batch.{BatchAVLProver, Insert, PersistentBatchAVLProver}
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue}
 import scorex.crypto.hash.Digest32
