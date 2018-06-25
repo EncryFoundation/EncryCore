@@ -2,6 +2,7 @@ package encry.view.state
 
 import java.io.File
 
+import encry.VersionTag
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -10,7 +11,6 @@ import encry.modifiers.mempool.EncryBaseTransaction
 import encry.settings.{Algos, Constants, NodeSettings}
 import encry.utils.ScorexLogging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import encry.VersionTag
 import scorex.crypto.authds.ADDigest
 
 import scala.util.{Failure, Success, Try}

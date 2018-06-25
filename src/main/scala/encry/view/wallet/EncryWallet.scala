@@ -1,21 +1,22 @@
 package encry.view.wallet
 
 import java.io.File
+
 import com.google.common.primitives.Longs
 import encry.account.Account
 import encry.crypto.PublicKey25519
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
+import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.EncryBaseBox
 import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.{Algos, Constants, EncryAppSettings}
 import encry.utils.{BalanceCalculator, BoxFilter, ScorexLogging}
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import encry.modifiers.state.box.Box.Amount
 import encry.{ModifierId, VersionTag}
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.crypto.authds.ADKey
 import scorex.utils.Random
 

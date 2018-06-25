@@ -1,10 +1,10 @@
 package encry.storage
 
+import encry.VersionTag
 import encry.settings.Algos
 import encry.storage.codec.FixLenComplexValueCodec
 import encry.utils.ScorexLogging
 import io.iohk.iodb.{ByteArrayWrapper, Store}
-import encry.VersionTag
 
 import scala.util.{Failure, Success, Try}
 

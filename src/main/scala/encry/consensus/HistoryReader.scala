@@ -1,8 +1,8 @@
 package encry.consensus
 
+import encry.ModifierId
 import encry.modifiers.PersistentNodeViewModifier
 import encry.view.wallet.NodeViewComponent
-import encry.ModifierId
 
 trait HistoryReader[PM <: PersistentNodeViewModifier, SI <: SyncInfo] extends NodeViewComponent {
 

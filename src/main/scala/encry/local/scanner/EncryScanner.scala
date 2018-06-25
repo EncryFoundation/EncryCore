@@ -3,21 +3,21 @@ package encry.local.scanner
 import java.io.File
 
 import akka.actor.{Actor, Props}
+import encry.EncryApp._
+import encry.VersionTag
 import encry.local.scanner.storage.{EncryIndexReader, IndexStorage}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.EncryBaseBox
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{ChangedState, RollbackSucceed, SemanticallySuccessfulModifier}
 import encry.settings.{Algos, Constants, EncryAppSettings}
 import encry.storage.codec.FixLenComplexValueCodec
-import encry.EncryApp._
+import encry.utils.ScorexLogging
 import io.circe.Json
 import io.circe.syntax._
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import encry.VersionTag
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{ChangedState, RollbackSucceed, SemanticallySuccessfulModifier}
-import encry.utils.ScorexLogging
 import scorex.crypto.authds.ADKey
 
 import scala.collection.mutable

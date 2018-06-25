@@ -1,8 +1,8 @@
 package encry.view.mempool
 
+import encry.ModifierId
 import encry.modifiers.mempool.Transaction
 import encry.view.wallet.NodeViewComponent
-import encry.ModifierId
 
 /**
   * Unconfirmed transactions pool
