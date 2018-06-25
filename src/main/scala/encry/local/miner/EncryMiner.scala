@@ -169,10 +169,7 @@ class EncryMiner extends Actor with ScorexLogging {
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
       log.info("Starting candidate generation")
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
-      if (bestHeaderOpt.isDefined || settings.node.offlineGeneration) {
-        println(s"bestHeaderOpt: ${bestHeaderOpt.map(_.height).getOrElse(-99999999)}")
-        CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
-      }
+      if (bestHeaderOpt.isDefined || settings.node.offlineGeneration) CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
       else CandidateEnvelope.empty
     }
 }
