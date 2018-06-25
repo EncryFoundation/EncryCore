@@ -46,9 +46,6 @@ class StatsSender extends Actor with ScorexLogging {
         s"miningEnd,nodeName=${settings.network.nodeName},block=${Algos.encode(blockHeader.id)},height=${blockHeader.height},worker=$workerNumber value=${timeProvider.time() - blockHeader.timestamp}"
       )
 
-//    case SendErrorMsgToStat(error: String) =>
-//      influxDB.write(8189, s"error node=${settings.network.nodeName} value=" + '\"' + error + '\"')
-
     case SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
 
       modifiersToDownload = modifiersToDownload ++ modifiers.map(mod => (Algos.encode(mod), (modifierTypeId, System.currentTimeMillis())))
@@ -71,8 +68,6 @@ object StatsSender {
   case class MiningEnd(blockHeader: EncryBlockHeader, workerNumber: Int)
 
   case class BestHeaderInChain(bestHeader: EncryBlockHeader)
-
-  case class SendErrorMsgToStat(error: String)
 
   case class SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
 
