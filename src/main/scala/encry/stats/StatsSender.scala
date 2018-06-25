@@ -24,7 +24,7 @@ class StatsSender extends Actor with ScorexLogging {
   influxDB.setRetentionPolicy("autogen")
 
   override def preStart(): Unit = {
-    influxDB.write(8189, s"nodesStartTime value=" + '\"' + settings.network.nodeName + '\"')
+    influxDB.write(8189, s"""nodesStartTime value="${settings.network.nodeName}"""")
   }
 
   override def receive: Receive = {
