@@ -105,13 +105,8 @@ class EncryMiner extends Actor with ScorexLogging {
   }
 
   def receiverCandidateBlock: Receive = {
-    case c: CandidateBlock => {
-      println(s"FROM: ${sender()}")
-      procCandidateBlock(c)
-    }
-    case cEnv: CandidateEnvelope if cEnv.c.nonEmpty =>
-      println(s"FROM: ${sender()}")
-      procCandidateBlock(cEnv.c.get)
+    case c: CandidateBlock => procCandidateBlock(c)
+    case cEnv: CandidateEnvelope if cEnv.c.nonEmpty => procCandidateBlock(cEnv.c.get)
   }
 
   override def receive: Receive =
