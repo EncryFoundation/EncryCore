@@ -172,9 +172,9 @@ class UtxoState(override val version: VersionTag,
         .map(_.toOption -> input)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
           (bxOpt, tx.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
-            case (Some(bx), _) if input.proofs.nonEmpty => if (bx.proposition.canUnlock(context, input.proofs)) acc :+ bx else acc
-            case (Some(bx), Some(defaultProof)) => if (bx.proposition.canUnlock(context, Seq(defaultProof))) acc :+ bx else acc
-            case (Some(bx), _) => if (bx.proposition.canUnlock(context, Seq.empty)) acc :+ bx else acc
+            case (Some(bx), _) if input.proofs.nonEmpty => if (bx.proposition.canUnlock(context, input.contract, input.proofs)) acc :+ bx else acc
+            case (Some(bx), Some(defaultProof)) => if (bx.proposition.canUnlock(context, input.contract, Seq(defaultProof))) acc :+ bx else acc
+            case (Some(bx), _) => if (bx.proposition.canUnlock(context, input.contract, Seq.empty)) acc :+ bx else acc
             case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
           }
         }

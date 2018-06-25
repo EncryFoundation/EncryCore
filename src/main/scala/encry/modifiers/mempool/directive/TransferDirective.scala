@@ -1,6 +1,7 @@
 package encry.modifiers.mempool.directive
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import encry.account
 import encry.account.{Account, Address}
 import encry.modifiers.Serializer
 import encry.modifiers.mempool.directive.Directive.DTypeId
@@ -11,9 +12,11 @@ import encry.utils.Utils
 import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
 import encry.modifiers.state.box.Box.Amount
+import scorex.crypto.authds
 import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
+import supertagged.@@
 
 import scala.util.Try
 
@@ -72,9 +75,9 @@ object TransferDirectiveSerializer extends Serializer[TransferDirective] {
     )
 
   override def parseBytes(bytes: Array[Byte]): Try[TransferDirective] = Try {
-    val address = Address @@ Base58.encode(bytes.take(Account.AddressLength))
-    val amount = Longs.fromByteArray(bytes.slice(Account.AddressLength, Account.AddressLength + 8))
-    val tokenIdOpt = if ((bytes.length - (Account.AddressLength + 8)) == Constants.ModifierIdSize) {
+    val address: @@[String, account.Address.Tag] = Address @@ Base58.encode(bytes.take(Account.AddressLength))
+    val amount: Amount = Longs.fromByteArray(bytes.slice(Account.AddressLength, Account.AddressLength + 8))
+    val tokenIdOpt: Option[@@[Array[DTypeId], authds.ADKey.Tag]] = if ((bytes.length - (Account.AddressLength + 8)) == Constants.ModifierIdSize) {
       Some(ADKey @@ bytes.takeRight(Constants.ModifierIdSize))
     } else None
     TransferDirective(address, amount, tokenIdOpt)

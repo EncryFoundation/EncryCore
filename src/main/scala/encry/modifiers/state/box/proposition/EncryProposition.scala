@@ -4,39 +4,38 @@ import encry.account.{Account, Address}
 import encry.modifiers.Serializer
 import encry.modifiers.mempool.Proof
 import encry.modifiers.state.box.Context
-import encry.settings.Algos
+import encry.settings.Constants
 import encry.view.history.Height
 import encry.view.state.Proposition
 import io.circe.Encoder
 import io.circe.syntax._
 import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer, CostEstimator}
+import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
+import org.encryfoundation.prismlang.compiler.{CompiledContract, CostEstimator}
 import org.encryfoundation.prismlang.core.wrapped.PValue
 import org.encryfoundation.prismlang.core.{Ast, Types}
 import org.encryfoundation.prismlang.evaluator.Evaluator
 import org.encryfoundation.prismlang.lib.predefined.signature.CheckSig
 import scorex.crypto.encode.{Base16, Base58}
-import scorex.crypto.hash.Digest32
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
-case class EncryProposition(contract: CompiledContract) extends Proposition {
+case class EncryProposition(contractHash: ContractHash) extends Proposition {
 
   override type M = EncryProposition
 
   override def serializer: Serializer[EncryProposition] = EncryPropositionSerializer
 
-  def canUnlock(ctx: Context, proofs: Seq[Proof]): Boolean = {
-    val env: List[(Option[String], PValue)] =
-      if (contract.args.isEmpty) List.empty
-      else List((None, ctx.transaction.asVal), (None, ctx.state.asVal)) ++ proofs.map(proof => (proof.tagOpt, proof.value))
-    val args: List[(String, PValue)] = contract.args.map { case (name, tpe) =>
-      env.find(_._1.contains(name)).orElse(env.find(_._2.tpe == tpe)).map(elt => name -> elt._2)
-        .getOrElse(throw new Exception("Not enough arguments for contact")) }
-    Evaluator.initializedWith(args).eval[Boolean](contract.script)
-  }
-
-  lazy val contractHash: Digest32 = Algos.hash(contract.bytes)
+  def canUnlock(ctx: Context, contract: CompiledContract, proofs: Seq[Proof]): Boolean =
+    if (sameHash(contractHash, contract.hash)) {
+      val env: List[(Option[String], PValue)] =
+        if (contract.args.isEmpty) List.empty
+        else List((None, ctx.transaction.asVal), (None, ctx.state.asVal)) ++ proofs.map(proof => (proof.tagOpt, proof.value))
+      val args: List[(String, PValue)] = contract.args.map { case (name, tpe) =>
+        env.find(_._1.contains(name)).orElse(env.find(_._2.tpe == tpe)).map(elt => name -> elt._2)
+          .getOrElse(throw new Exception("Not enough arguments for contact")) }
+      Evaluator.initializedWith(args).eval[Boolean](contract.script)
+    } else false
 
   def isOpen: Boolean = ByteArrayWrapper(contractHash) == ByteArrayWrapper(EncryProposition.open.contractHash)
 
@@ -45,6 +44,8 @@ case class EncryProposition(contract: CompiledContract) extends Proposition {
 
   def isLockedByAccount(account: Account): Boolean =
     ByteArrayWrapper(contractHash) == ByteArrayWrapper(EncryProposition.accountLock(account).contractHash)
+
+  def sameHash(h1: Array[Byte], h2: Array[Byte]): Boolean = ByteArrayWrapper(h1) == ByteArrayWrapper(h2)
 }
 
 object EncryProposition {
@@ -54,12 +55,13 @@ object EncryProposition {
   case object UnlockFailedException extends Exception("Unlock failed")
 
   implicit val jsonEncoder: Encoder[EncryProposition] = (p: EncryProposition) => Map(
-    "script" -> Base58.encode(p.contract.bytes).asJson
+    "contractHash" -> Base58.encode(p.contractHash).asJson
   ).asJson
 
-  def open: EncryProposition = EncryProposition(calculateCost(CompiledContract(List.empty, Ast.Expr.True, 0)))
+  def openC: CompiledContract = calculateCost(CompiledContract(List.empty, Ast.Expr.True, 0))
+  def open: EncryProposition = EncryProposition(openC.hash)
 
-  def heightLocked(height: Height): EncryProposition = EncryProposition(calculateCost({
+  def heightLockedC(height: Height): CompiledContract = calculateCost({
     CompiledContract(
       List("state" -> Types.EncryState),
       Expr.If(
@@ -80,9 +82,10 @@ object EncryProposition {
         Types.PBoolean
       ), 0
     )
-  }))
+  })
+  def heightLocked(height: Height): EncryProposition = EncryProposition(heightLockedC(height).hash)
 
-  def accountLock(account: Account): EncryProposition = EncryProposition(calculateCost({
+  def accountLockC(account: Account): CompiledContract = calculateCost({
     CompiledContract(
       List("tx" -> Types.EncryTransaction, "sig" -> Types.Signature25519),
       Expr.Call(
@@ -99,8 +102,8 @@ object EncryProposition {
         Types.PBoolean
       ), 0
     )
-  }))
-
+  })
+  def accountLock(account: Account): EncryProposition = EncryProposition(accountLockC(account).hash)
   def accountLock(address: Address): EncryProposition = accountLock(Account(address))
 
   def calculateCost(contract: CompiledContract): CompiledContract =
@@ -109,8 +112,9 @@ object EncryProposition {
 
 object EncryPropositionSerializer extends Serializer[EncryProposition] {
 
-  override def toBytes(obj: EncryProposition): Array[Byte] = obj.contract.bytes
+  override def toBytes(obj: EncryProposition): Array[Byte] = obj.contractHash
 
-  override def parseBytes(bytes: Array[Byte]): Try[EncryProposition] = CompiledContractSerializer.parseBytes(bytes)
-    .map(EncryProposition.apply)
+  override def parseBytes(bytes: Array[Byte]): Try[EncryProposition] =
+    if (bytes.lengthCompare(Constants.DigestLength) == 0) Success(EncryProposition(bytes))
+    else Failure(new Exception("Invalid contract hash length"))
 }

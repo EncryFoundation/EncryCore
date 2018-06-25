@@ -24,13 +24,13 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val blockHeader: EncryBlockHeader = genHeader
 
-    val walletStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions)
+    val walletStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions)
 
-    val keyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), settings.keyManager, None)
+    val keyManager: KeyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), settings.keyManager, None)
 
     keyManager.initStorage(Random.randomBytes())
 
-    val wallet = EncryWallet(walletStore, keyManager)
+    val wallet: EncryWallet = EncryWallet(walletStore, keyManager)
 
     val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddr(4, keyManager.keys.head.publicImage.address)
 
@@ -38,18 +38,15 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
       case (sum, transaction) => sum + transaction.newBoxes.foldLeft(0L) {
         case (boxSum, bx) =>
           bx match {
-          case ac: MonetaryBox
-            if keyManager.keys.exists(privKey => EncryProposition.accountLock(privKey.publicImage.address) == ac.proposition) =>
-              boxSum + ac.amount
-          case _ =>
-            boxSum
+            case ac: MonetaryBox if wallet.propositions.exists(_.contractHash sameElements bx.proposition.contractHash) => boxSum + ac.amount
+            case _ => boxSum
           }
       }
     }
 
-    val blockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
+    val blockPayload: EncryBlockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
 
-    val block = EncryBlock(blockHeader, blockPayload, None)
+    val block: EncryBlock = EncryBlock(blockHeader, blockPayload, None)
 
     wallet.scanPersistent(block)
 
@@ -62,19 +59,19 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val blockHeader: EncryBlockHeader = genHeader
 
-    val walletStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions)
+    val walletStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions)
 
-    val keyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), settings.keyManager, None)
+    val keyManager: KeyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), settings.keyManager, None)
 
     keyManager.initStorage(Random.randomBytes())
 
-    val wallet = EncryWallet(walletStore, keyManager)
+    val wallet: EncryWallet = EncryWallet(walletStore, keyManager)
 
     val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.keys.head.publicImage.address)
 
-    val blockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
+    val blockPayload: EncryBlockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
 
-    val block = EncryBlock(blockHeader, blockPayload, None)
+    val block: EncryBlock = EncryBlock(blockHeader, blockPayload, None)
 
     wallet.scanPersistent(block)
 

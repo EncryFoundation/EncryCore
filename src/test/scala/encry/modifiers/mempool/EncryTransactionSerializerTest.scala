@@ -45,25 +45,38 @@ class EncryTransactionSerializerTest extends FunSuite with InstanceFactory {
         |  "directives" : [
         |    {
         |      "typeId" : 1,
-        |      "address" : "4GN4tJYvyKkP4XHZPLatmaDwYQDaSsasUUVxx9XSLGpVwP9pN2",
-        |      "amount" : 2317100,
-        |      "tokenId" : null
+        |      "address" : "3JZkxjCJXsg1Kf6cZMPg5cVkN4Dnn1pHB8jhzfKemCaAMbwWLN",
+        |      "amount" : 199000,
+        |      "tokenId" : "null"
+        |    },
+        |    {
+        |      "typeId" : 1,
+        |      "address" : "3JZkxjCJXsg1Kf6cZMPg5cVkN4Dnn1pHB8jhzfKemCaAMbwWLN",
+        |      "amount" : 1796700,
+        |      "tokenId" : "null"
         |    }
         |  ],
-        |  "timestamp" : 1529584879761,
+        |  "timestamp" : 1529938861189,
         |  "defaultProofOpt" : {
-        |    "serializedValue" : "oCNHxErcGTyoaoWSCAGBuJuRANsBgLqrmtGTzRj58zmisBZSbxRQLmiittc9oLn8EXxihggYs8rqx9u889Lj1LEvpYRF4T",
+        |    "serializedValue" : "oCNHxEvarQuZk9tdiwNmD9igNVri6Jdm7HWi6t6UwXwrZ69iZL7T9E8gMuzcVyggGEmSjdGogircnYwGn5HKhstSZMbUzj",
         |    "tag" : null
         |  },
-        |  "id" : "6RVZuxpihf1SncJEVt6pWfaEeGbnx5B49u3pjF5bCHGq",
+        |  "id" : "F6bD6Rrkw2G7Z5F5AzUAsgF8aeEULQbWAQjhTSJh6sLs",
         |  "inputs" : [
         |    {
-        |      "boxId" : "5nveWAFkSNJQdiM6bNySUUd8F5R6h3jyx648398qrMr",
+        |      "boxId" : "8DYAn2KiRDFtZcUyqYrnjTurgNgK216heLLUGMXL51b",
+        |      "contract" : "1114o4rYAeuF7S9dD9MNpoXJ3UkUUwk2JC85YpZ1BoDKx1HFypN8o2F25QGPTm4E8oAMKEUBwTUg8pP1n3sfET1HvxR5LVRyx8ANKBxrnWmJ8B4i4hvzYo5KkSdMTm55yiB9XZqM3o1m6DtQ6dSgP9LKbKhDiFF49otkj7RT79qWMMyairgRGDwtbTq8oNTDvvpZkZMZJ36YcXg3Pdxo7KAaicM5BWU2w5ZZoztga3zPfn9aAC4J",
+        |      "proofs" : [
+        |      ]
+        |    },
+        |    {
+        |      "boxId" : "8DYAn2KiRDFtZcUyqYrnjTurgNgK216heLLUGMXL51b",
+        |      "contract" : "1114o4rYAeuF7S9dD9MNpoXJ3UkUUwk2JC85YpZ1BoDKx1HFypN8o2F25QGPTm4E8oAMKEUBwTUg8pP1n3sfET1HvxR5LVRyx8ANKBxrnWmJ8B4i4hvzYo5KkSdMTm55yiB9XZqM3o1m6DtQ6dSgP9LKbKhDiFF49otkj7RT79qWMMyairgRGDwtbTq8oNTDvvpZkZMZJ36YcXg3Pdxo7KAaicM5BWU2w5ZZoztga3zPfn9aAC4J",
         |      "proofs" : [
         |      ]
         |    }
         |  ],
-        |  "fee" : 100
+        |  "fee" : 4300
         |}
       """.stripMargin
 

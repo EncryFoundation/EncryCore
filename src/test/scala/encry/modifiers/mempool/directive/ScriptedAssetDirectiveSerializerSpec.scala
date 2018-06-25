@@ -29,7 +29,7 @@ class ScriptedAssetDirectiveSerializerSpec extends PropSpec with Matchers {
           Expr.False,
           Types.PBoolean
         ), 100
-      ), 1000
+      ).hash, 1000
     )
 
     val directiveSerialized = directive.bytes

@@ -14,7 +14,7 @@ object EncrySupplyController {
   } else Constants.Chain.InitialEmissionAmount
 
   def supplyBoxAt(height: Height): AssetBox =
-    AssetBox(EncryProposition.heightLocked(height), height * 9, EncrySupplyController.supplyAt(height))
+    AssetBox(EncryProposition.heightLocked(height), height * 9, supplyAt(height))
 
   def totalSupplyBoxes: Seq[AssetBox] =
     (Constants.Chain.PreGenesisHeight until Constants.Chain.EmissionEpochLength).map(i => supplyBoxAt(Height @@ i))
