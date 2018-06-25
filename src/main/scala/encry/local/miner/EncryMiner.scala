@@ -1,6 +1,6 @@
 package encry.local.miner
 
-import akka.actor.SupervisorStrategy.Resume
+import akka.actor.SupervisorStrategy.Stop
 import akka.actor.{Actor, ActorKilledException, AllForOneStrategy, Kill, Props, SupervisorStrategy}
 import encry.EncryApp._
 import encry.consensus._
@@ -46,7 +46,7 @@ class EncryMiner extends Actor with ScorexLogging {
   def shouldStartMine(b: EncryBlock): Boolean = settings.node.mining && b.header.timestamp >= timeProvider.time()
 
   override def supervisorStrategy: SupervisorStrategy = AllForOneStrategy() {
-    case _: ActorKilledException => Resume
+    case _: ActorKilledException => Stop
   }
 
   def unknownMessage: Receive = {
