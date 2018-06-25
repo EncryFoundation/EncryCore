@@ -104,7 +104,7 @@ object EncryApp extends App with ScorexLogging {
 
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
 
-  lazy val persister: ActorRef = system.actorOf(Props[ModifiersHolder], "persister")
+  lazy val modifiersHolder: ActorRef = system.actorOf(Props[ModifiersHolder], "modifiersHolder")
 
   if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
 

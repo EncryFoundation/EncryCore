@@ -6,7 +6,7 @@ import java.util
 import akka.actor.Actor
 import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.emission.EncrySupplyController
-import encry.EncryApp.{persister, settings, timeProvider}
+import encry.EncryApp.{modifiersHolder, settings, timeProvider}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
@@ -35,9 +35,7 @@ class StatsSender extends Actor with ScorexLogging {
 
     case BestHeaderInChain(fb: EncryBlockHeader) =>
 
-      logger.info("+++ Into SSM")
-
-      persister ! NewBlock
+      modifiersHolder ! NewBlock
 
       influxDB.write(8189, util.Arrays.asList(
         s"difficulty,nodeName=${settings.network.nodeName} diff=${fb.difficulty.toString},height=${fb.height}",

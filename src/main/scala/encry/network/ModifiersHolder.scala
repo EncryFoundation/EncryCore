@@ -14,13 +14,13 @@ class ModifiersHolder extends PersistentActor with ScorexLogging {
 
   override def receiveRecover: Receive = {
     case NewBlock => updateCounter()
-    case SnapshotOffer(_, snapshot: Int) => counter = State(snapshot)
+    case SnapshotOffer(_, snapshot: State) => counter = snapshot
   }
 
   override def receiveCommand: Receive = {
     case NewBlock =>
       logger.info(s"New block is here. Before incrementing: ${counter.counter}")
-      persist(counter) { _ => updateCounter() }
+      persist(NewBlock) { _ => updateCounter() }
     case x: Any => println(s"+++ $x")
   }
 
