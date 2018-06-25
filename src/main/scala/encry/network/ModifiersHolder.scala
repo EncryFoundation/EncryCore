@@ -8,9 +8,7 @@ class ModifiersHolder extends PersistentActor with ScorexLogging {
 
   var counter: State = State(0)
 
-  override def preStart(): Unit = {
-    logger.info(s"Before start counter: ${counter.counter}")
-  }
+  override def preStart(): Unit = logger.info(s"Before start counter: ${counter.counter}")
 
   override def receiveRecover: Receive = {
     case NewBlock => updateCounter()
@@ -21,7 +19,7 @@ class ModifiersHolder extends PersistentActor with ScorexLogging {
     case NewBlock =>
       logger.info(s"New block is here. Before incrementing: ${counter.counter}")
       persist(NewBlock) { _ => updateCounter() }
-    case x: Any => println(s"+++ $x")
+    case x: Any => logger.info(s"Strange input: $x")
   }
 
   override def persistenceId: String = "persistent actor"
