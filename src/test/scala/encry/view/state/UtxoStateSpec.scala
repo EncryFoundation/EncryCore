@@ -6,11 +6,11 @@ import akka.actor.ActorRef
 import encry.account.Address
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
+import encry.modifiers.state.box.Box.Amount
 import encry.settings.{Algos, Constants}
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
 import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
-import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32

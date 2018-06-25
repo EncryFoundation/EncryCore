@@ -7,8 +7,8 @@ import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
+import encry.api.http.routes.{HistoryApiRoute, InfoApiRoute, StateInfoApiRoute, TransactionsApiRoute}
 import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
-import encry.api.http.routes.{AccountInfoApiRoute, HistoryApiRoute, InfoApiRoute, TransactionsApiRoute}
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator
@@ -88,7 +88,7 @@ object EncryApp extends App with ScorexLogging {
     InfoApiRoute(readersHolder, miner, peerManager, settings, nodeId, timeProvider),
     HistoryApiRoute(readersHolder, miner, settings, nodeId, settings.node.stateMode),
     TransactionsApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
-    AccountInfoApiRoute(readersHolder, nodeViewHolder, scanner, settings.restApi, settings.node.stateMode)
+    StateInfoApiRoute(readersHolder, nodeViewHolder, scanner, settings.restApi, settings.node.stateMode)
   )
 
   val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute

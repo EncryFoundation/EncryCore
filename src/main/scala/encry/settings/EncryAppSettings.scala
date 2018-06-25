@@ -1,7 +1,8 @@
 package encry.settings
 
 import java.io.File
-import com.typesafe.config.{Config, ConfigFactory}
+
+import com.typesafe.config.ConfigFactory
 import encry.utils.{NetworkTimeProviderSettings, ScorexLogging}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._

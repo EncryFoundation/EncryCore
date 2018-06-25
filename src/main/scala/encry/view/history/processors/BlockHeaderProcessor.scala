@@ -1,7 +1,6 @@
 package encry.view.history.processors
 
 import com.google.common.primitives.Ints
-import encry.EncryApp
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
 import encry.modifiers.EncryPersistentModifier
@@ -13,8 +12,8 @@ import encry.utils.{NetworkTimeProvider, ScorexLogging}
 import encry.validation.{ModifierValidator, ValidationResult}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
+import encry.{EncryApp, _}
 import io.iohk.iodb.ByteArrayWrapper
-import encry._
 
 import scala.annotation.tailrec
 import scala.collection.immutable
@@ -184,7 +183,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
   /**
     * @param height - block height
     * @return ids of headers on chosen height.
-    *         Seq.empty we don't have any headers on this height (e.g. it is too big or we bootstrap in PoPoW regime)
+    *         Seq.empty we don't have any headers on this height
     *         single id if no forks on this height
     *         multiple ids if there are forks at chosen height.
     *         First id is always from the best headers chain.

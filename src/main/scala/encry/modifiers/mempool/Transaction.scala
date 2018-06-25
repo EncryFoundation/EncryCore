@@ -2,8 +2,8 @@ package encry.modifiers.mempool
 
 import encry.modifiers.EphemerealNodeViewModifier
 import encry.view.state.Proposition
-import scorex.crypto.hash.Blake2b256
 import encry.{ModifierId, ModifierTypeId}
+import scorex.crypto.hash.Blake2b256
 
 abstract class Transaction[P <: Proposition] extends EphemerealNodeViewModifier {
   override val modifierTypeId: ModifierTypeId = Transaction.ModifierTypeId

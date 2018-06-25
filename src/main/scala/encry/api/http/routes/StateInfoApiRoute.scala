@@ -7,27 +7,27 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.account.{Address, Portfolio}
 import encry.local.scanner.EncryScanner.{GetIndexReader, IndexReader}
 import encry.local.scanner.storage.EncryIndexReader
-import encry.settings.Algos
+import encry.settings.{Algos, RESTApiSettings}
 import encry.utils.BalanceCalculator
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import encry.view.state.{StateMode, UtxoStateReader}
 import io.circe.Json
 import io.circe.syntax._
-import encry.settings.RESTApiSettings
 import scorex.crypto.authds.ADKey
 
 import scala.concurrent.Future
 
-case class AccountInfoApiRoute(readersHolder: ActorRef,
-                               nodeViewActorRef: ActorRef,
-                               scannerRef: ActorRef,
-                               restApiSettings: RESTApiSettings,
-                               stateMode: StateMode)(implicit val context: ActorRefFactory)
+case class StateInfoApiRoute(readersHolder: ActorRef,
+                             nodeViewActorRef: ActorRef,
+                             scannerRef: ActorRef,
+                             restApiSettings: RESTApiSettings,
+                             stateMode: StateMode)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
-  override val route: Route = pathPrefix("account") {
+  override val route: Route = pathPrefix("state") {
     getBoxesByAddressR ~
-      getPortfolioByAddressR
+      getPortfolioByAddressR ~
+      getBoxByIdR
   }
 
   override val settings: RESTApiSettings = restApiSettings
@@ -39,6 +39,8 @@ case class AccountInfoApiRoute(readersHolder: ActorRef,
   private def getBoxIdsByAddress(address: Address): Future[Option[Seq[ADKey]]] = getIndex.map {
     _.boxIdsByAddress(address)
   }
+
+  private def getBoxById(id: ADKey): Future[Option[Json]] = getState.map(_.boxById(id).map(_.asJson))
 
   private def getBoxesByAddress(address: Address): Future[Option[Json]] = getState.flatMap { s =>
     getBoxIdsByAddress(address).map(_.map(ids => s.boxesByIds(ids)))
@@ -54,11 +56,15 @@ case class AccountInfoApiRoute(readersHolder: ActorRef,
     })
   }.map(_.map(_.map(_.asJson).asJson))
 
-  def getBoxesByAddressR: Route = (accountAddress & pathPrefix("boxes") & get) { addr =>
+  def getBoxByIdR: Route = (boxId & get) { key =>
+    getBoxById(key).okJson()
+  }
+
+  def getBoxesByAddressR: Route = (pathPrefix("boxes") & accountAddress & get) { addr =>
     getBoxesByAddress(addr).okJson()
   }
 
-  def getPortfolioByAddressR: Route = (accountAddress & pathPrefix("portfolio") & get) { addr =>
+  def getPortfolioByAddressR: Route = (pathPrefix("portfolio") & accountAddress & get) { addr =>
     getPortfolioByAddress(addr).okJson()
   }
 }
