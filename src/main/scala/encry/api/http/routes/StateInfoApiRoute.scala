@@ -43,7 +43,7 @@ case class StateInfoApiRoute(readersHolder: ActorRef,
   private def getBoxById(id: ADKey): Future[Option[Json]] = getState.map(_.boxById(id).map(_.asJson))
 
   private def getBoxesByAddress(address: Address): Future[Option[Json]] = getState.flatMap { s =>
-    getBoxIdsByAddress(address).map(_.map(ids => s.boxesByIds(ids)))
+    getBoxIdsByAddress(address).map(_.map(s.boxesByIds))
   }.map(_.map(_.map(_.asJson).asJson))
 
   private def getPortfolioByAddress(address: Address): Future[Option[Json]] = getState.flatMap { s =>
@@ -56,15 +56,11 @@ case class StateInfoApiRoute(readersHolder: ActorRef,
     })
   }.map(_.map(_.map(_.asJson).asJson))
 
-  def getBoxByIdR: Route = (boxId & get) { key =>
-    getBoxById(key).okJson()
-  }
+  def getBoxByIdR: Route = (boxId & get) {getBoxById(_).okJson()}
 
-  def getBoxesByAddressR: Route = (pathPrefix("boxes") & accountAddress & get) { addr =>
-    getBoxesByAddress(addr).okJson()
-  }
+  def getBoxesByAddressR: Route =
+    (pathPrefix("boxes") & accountAddress & get) (getBoxesByAddress(_).okJson())
 
-  def getPortfolioByAddressR: Route = (pathPrefix("portfolio") & accountAddress & get) { addr =>
-    getPortfolioByAddress(addr).okJson()
-  }
+  def getPortfolioByAddressR: Route =
+    (pathPrefix("portfolio") & accountAddress & get) (getPortfolioByAddress(_).okJson())
 }

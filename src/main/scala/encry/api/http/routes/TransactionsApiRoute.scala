@@ -22,8 +22,7 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
   override val route: Route = pathPrefix("transactions") {
-    getUnconfirmedTransactionsR ~
-      defaultTransferTransactionR
+    getUnconfirmedTransactionsR ~ defaultTransferTransactionR
   }
 
   override val settings: RESTApiSettings = restApiSettings
