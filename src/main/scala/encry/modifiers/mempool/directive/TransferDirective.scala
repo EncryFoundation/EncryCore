@@ -29,8 +29,6 @@ case class TransferDirective(address: Address,
     Seq(AssetBox(EncryProposition.accountLock(Account(address)),
       Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)), amount, tokenIdOpt))
 
-  override val cost: Amount = 4
-
   override lazy val isValid: Boolean = amount > 0 && Account.validAddress(address)
 
   override def serializer: Serializer[M] = TransferDirectiveSerializer

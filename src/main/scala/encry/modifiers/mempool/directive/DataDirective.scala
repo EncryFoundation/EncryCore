@@ -9,8 +9,7 @@ import encry.settings.{Algos, Constants}
 import encry.utils.Utils
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
-import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer}
-import encry.modifiers.state.box.Box.Amount
+import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer, CostEstimator}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
@@ -25,11 +24,13 @@ case class DataDirective(contract: CompiledContract, data: Array[Byte]) extends 
   override def boxes(digest: Digest32, idx: Int): Seq[EncryBaseBox] =
     Seq(DataBox(EncryProposition(contract), Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)), data))
 
-  override val cost: Amount = 20
-
-  override lazy val isValid: Boolean = data.length <= Constants.MaxDataLength && contract.bytes.lengthCompare(Short.MaxValue) <= 0
+  override lazy val isValid: Boolean =
+    data.length <= Constants.MaxDataLength && contract.bytes.lengthCompare(Short.MaxValue) <= 0 && validContract
 
   override def serializer: Serializer[M] = DataDirectiveSerializer
+
+  def validContract: Boolean =
+    CostEstimator.default.costOf(contract.script) + contract.args.map(_._2.dataCost).sum == contract.cost
 }
 
 object DataDirective {

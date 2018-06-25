@@ -57,7 +57,7 @@ object EncryProposition {
     "script" -> Base58.encode(p.contract.bytes).asJson
   ).asJson
 
-  def open: EncryProposition = EncryProposition(CompiledContract(List.empty, Ast.Expr.True))
+  def open: EncryProposition = EncryProposition(CompiledContract(List.empty, Ast.Expr.True, 10))
 
   def heightLocked(height: Height): EncryProposition = EncryProposition(
     CompiledContract(
@@ -78,7 +78,7 @@ object EncryProposition {
         Expr.True,
         Expr.False,
         Types.PBoolean
-      )
+      ), 50
     )
   )
 
@@ -97,7 +97,7 @@ object EncryProposition {
           Expr.Base16Str(Base16.encode(account.pubKey))
         ),
         Types.PBoolean
-      )
+      ), 100
     )
   )
 

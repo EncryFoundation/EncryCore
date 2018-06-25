@@ -28,8 +28,10 @@ trait EncryBaseTransaction extends Transaction[EncryProposition] with ModifierWi
   lazy val newBoxes: Traversable[EncryBaseBox] =
     directives.zipWithIndex.flatMap { case (d, idx) => d.boxes(Digest32 !@@ id, idx) }
 
-  lazy val minimalFee: Amount = Constants.FeeMinAmount +
-    directives.map(_.cost).sum + (Constants.PersistentByteCost * length)
+  lazy val costMultiplier: Amount =
+    // spending scripts cost +
+    (Constants.PersistentByteCost * length) +
+    (Constants.StateByteCost * newBoxes.map(_.bytes).foldLeft(Array.empty[Byte])(_ ++ _).length)
 
   override def toString: String = s"<EncryTransaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}>"
 }

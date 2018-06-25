@@ -21,8 +21,6 @@ object Constants {
 
   val DefaultKeepVersions: Int = 200  // TODO: Move to `NodeSettings`.
 
-  val FeeMinAmount: Int = 100
-
   val PersistentByteCost: Int = 16
 
   val StateByteCost: Int = 26

@@ -9,7 +9,7 @@ import encry.settings.{Algos, Constants}
 import encry.utils.Utils
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
-import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer}
+import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer, CostEstimator}
 import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.authds
 import scorex.crypto.authds.ADKey
@@ -29,13 +29,14 @@ case class ScriptedAssetDirective(contract: CompiledContract,
   override def boxes(digest: Digest32, idx: Int): Seq[EncryBaseBox] =
     Seq(AssetBox(EncryProposition(contract), Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)), amount))
 
-  override val cost: Amount = 4
-
-  override lazy val isValid: Boolean = amount > 0 && contract.bytes.lengthCompare(Short.MaxValue) <= 0
+  override lazy val isValid: Boolean = amount > 0 && contract.bytes.lengthCompare(Short.MaxValue) <= 0 && validContract
 
   override def serializer: Serializer[M] = ScriptedAssetDirectiveSerializer
 
   lazy val isIntrinsic: Boolean = tokenIdOpt.isEmpty
+
+  def validContract: Boolean =
+    CostEstimator.default.costOf(contract.script) + contract.args.map(_._2.dataCost).sum == contract.cost
 }
 
 object ScriptedAssetDirective {

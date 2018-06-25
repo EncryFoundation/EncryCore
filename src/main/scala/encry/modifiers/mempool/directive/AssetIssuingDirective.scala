@@ -23,7 +23,6 @@ case class AssetIssuingDirective(contract: CompiledContract, amount: Amount, sym
 
   override type M = AssetIssuingDirective
   override val typeId: DTypeId = AssetIssuingDirective.TypeId
-  override val cost: Amount = 20
   override lazy val isValid: Boolean = amount > 0 && symbol.length <= Constants.Chain.TokenSymbolMaxLength
 
   override def boxes(digest: Digest32, idx: Int): Seq[EncryBaseBox] = {

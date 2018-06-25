@@ -10,7 +10,6 @@ import scorex.crypto.hash.Digest32
 trait Directive extends BytesSerializable {
 
   val typeId: DTypeId
-  val cost: Amount
   val isValid: Boolean
 
   def boxes(digest: Digest32, idx: Int): Seq[EncryBaseBox]
