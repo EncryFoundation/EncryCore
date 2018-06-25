@@ -5,24 +5,25 @@ import encry.EncryApp._
 import encry.consensus._
 import encry.consensus.emission.EncrySupplyController
 import encry.crypto.PrivateKey25519
+import encry.local.miner.EncryMiningWorker.{DropChallenge, NextChallenge}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
+import encry.modifiers.state.box.Box.Amount
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
 import encry.utils.NetworkTime.Time
 import encry.utils.ScorexLogging
 import encry.view.EncryNodeViewHolder.CurrentView
-import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
-import encry.view.state.UtxoState
+import encry.view.state.{StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
-import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 
 import scala.collection._
@@ -31,9 +32,6 @@ class EncryMiner extends Actor with ScorexLogging {
 
   import EncryMiner._
 
-  val startTime: Time = timeProvider.time()
-  val consensus: ConsensusScheme = ConsensusSchemeReaders.consensusScheme
-  var isMining: Boolean = false
   var candidateOpt: Option[CandidateBlock] = None
   var miningWorkers: Seq[ActorRef] = Seq.empty[ActorRef]
 
@@ -50,27 +48,39 @@ class EncryMiner extends Actor with ScorexLogging {
 
   def needNewCandidate(b: EncryBlock): Boolean = !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
 
-  def shouldStartMine(b: EncryBlock): Boolean = settings.node.mining && b.header.timestamp >= startTime
+  def shouldStartMine(b: EncryBlock): Boolean = settings.node.mining && b.header.timestamp >= timeProvider.time()
 
   def unknownMessage: Receive = {
     case m => log.warn(s"Unexpected message $m")
   }
 
   def mining: Receive = {
-    case StartMining if !isMining =>
+
+    case StartMining if miningWorkers.nonEmpty =>
       candidateOpt match {
         case Some(candidateBlock) =>
-          isMining = true
-          val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
-          miningWorkers = for (i <- 0 until numberOfWorkers) yield context.actorOf(
-            Props(classOf[EncryMiningWorker], candidateBlock, i, numberOfWorkers), s"worker$i")
-          miningWorkers.foreach(_ ! candidateBlock)
+          miningWorkers.foreach(_ ! NextChallenge(candidateBlock))
         case None => produceCandidate()
       }
-    case StopMining if isMining =>
-      isMining = false
+
+    case StartMining =>
+      val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
+      miningWorkers = for (i <- 0 until numberOfWorkers) yield context.actorOf(
+        Props(classOf[EncryMiningWorker], self, i, numberOfWorkers), s"worker$i")
+      self ! StartMining
+
+    case StopMining if miningWorkers.nonEmpty =>
       killAllWorkers()
-    case GetMinerStatus => sender ! MinerStatus(isMining, candidateOpt)
+
+    case MinedBlock(block) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
+      nodeViewHolder ! LocallyGeneratedModifier(block.header)
+      nodeViewHolder ! LocallyGeneratedModifier(block.payload)
+      if (settings.node.stateMode == StateMode.Digest) block.adProofsOpt.foreach { adp => nodeViewHolder ! LocallyGeneratedModifier(adp) }
+      candidateOpt = None
+      context.children.foreach(_ ! DropChallenge)
+
+    case GetMinerStatus => sender ! MinerStatus(miningWorkers.nonEmpty, candidateOpt)
+
     case _ =>
   }
 
@@ -81,7 +91,7 @@ class EncryMiner extends Actor with ScorexLogging {
       * That means that our candidate is outdated. Should produce new candidate for ourselves.
       * Stop all current threads and re-run them with newly produced candidate.
       */
-    case SemanticallySuccessfulModifier(mod: EncryBlock) if isMining && needNewCandidate(mod) => produceCandidate()
+    case SemanticallySuccessfulModifier(mod: EncryBlock) if miningWorkers.nonEmpty && needNewCandidate(mod) => produceCandidate()
 
     /**
       * Non obvious but case when mining is enabled, but miner doesn't started yet. Initialization case.
@@ -95,8 +105,13 @@ class EncryMiner extends Actor with ScorexLogging {
   }
 
   def receiverCandidateBlock: Receive = {
-    case c: CandidateBlock => procCandidateBlock(c)
-    case cEnv: CandidateEnvelope if cEnv.c.nonEmpty => procCandidateBlock(cEnv.c.get)
+    case c: CandidateBlock => {
+      println(s"FROM: ${sender()}")
+      procCandidateBlock(c)
+    }
+    case cEnv: CandidateEnvelope if cEnv.c.nonEmpty =>
+      println(s"FROM: ${sender()}")
+      procCandidateBlock(cEnv.c.get)
   }
 
   override def receive: Receive =
@@ -108,8 +123,7 @@ class EncryMiner extends Actor with ScorexLogging {
   def procCandidateBlock(c: CandidateBlock): Unit = {
     log.debug(s"Got candidate block $c")
     candidateOpt = Some(c)
-    if (!isMining) self ! StartMining
-    miningWorkers.foreach(_ ! c)
+    context.system.scheduler.scheduleOnce(settings.node.miningDelay, self, StartMining)
   }
 
   def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool],
@@ -160,8 +174,10 @@ class EncryMiner extends Actor with ScorexLogging {
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
       log.info("Starting candidate generation")
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
-      if (bestHeaderOpt.isDefined || settings.node.offlineGeneration)
+      if (bestHeaderOpt.isDefined || settings.node.offlineGeneration) {
+        println(s"bestHeaderOpt: ${bestHeaderOpt.map(_.height).getOrElse(-99999999)}")
         CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
+      }
       else CandidateEnvelope.empty
     }
 }
@@ -173,6 +189,8 @@ object EncryMiner extends ScorexLogging {
   case object StopMining
 
   case object GetMinerStatus
+
+  case class MinedBlock(block: EncryBlock)
 
   case class MinerStatus(isMining: Boolean, candidateBlock: Option[CandidateBlock]) {
     lazy val json: Json = Map(

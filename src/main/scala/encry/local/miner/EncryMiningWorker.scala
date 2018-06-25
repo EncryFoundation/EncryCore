@@ -1,41 +1,34 @@
 package encry.local.miner
 
-import akka.actor.Actor
-import encry.EncryApp._
+import akka.actor.{Actor, ActorRef}
 import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
-import encry.stats.StatsSender.MiningEnd
+import encry.local.miner.EncryMiner.MinedBlock
+import encry.local.miner.EncryMiningWorker.{DropChallenge, MineBlock, NextChallenge}
 import encry.utils.ScorexLogging
-import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
-import encry.view.state.StateMode
 
-class EncryMiningWorker(initialCandidate: CandidateBlock, myNumber: Int, numberOfWorkers: Int)
-  extends Actor with ScorexLogging {
-
-  case class MineBlock(nonce: Long)
-
-  var candidate: CandidateBlock = initialCandidate
-
-  override def preStart(): Unit = {
-    log.info("Starting new mining worker: " + self.path)
-    context.system.scheduler.scheduleOnce(settings.node.miningDelay) {
-      self ! MineBlock(Long.MaxValue / numberOfWorkers * myNumber)
-    }
-  }
+class EncryMiningWorker(miner: ActorRef, myNumber: Int, numberOfWorkers: Int) extends Actor with ScorexLogging {
 
   override def receive: Receive = {
-    case newCandidate: CandidateBlock => candidate = newCandidate
-    case MineBlock(nonce) => ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, nonce) match {
+
+    case NextChallenge(candidate: CandidateBlock) => self ! MineBlock(candidate, Long.MaxValue / numberOfWorkers * myNumber)
+
+    case MineBlock(candidate: CandidateBlock, nonce: Long) => ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, nonce) match {
       case Some(block) =>
         log.info(s"New block is found: $block on worker $self.")
         //statsSender ! MiningEnd(block.header, myNumber)
-        nodeViewHolder ! LocallyGeneratedModifier(block.header)
-        nodeViewHolder ! LocallyGeneratedModifier(block.payload)
-        if (settings.node.stateMode == StateMode.Digest)
-          block.adProofsOpt.foreach { adp => nodeViewHolder ! LocallyGeneratedModifier(adp) }
-        context.system.scheduler.scheduleOnce(settings.node.miningDelay) {
-          self ! MineBlock(Long.MaxValue / numberOfWorkers * myNumber)
-        }
-      case None => self ! MineBlock(nonce + 1)
+        miner ! MinedBlock(block)
+      case None => self ! MineBlock(candidate, nonce + 1)
     }
+
+    case DropChallenge =>
   }
+}
+
+object EncryMiningWorker {
+
+  case object DropChallenge
+
+  case class NextChallenge(candidateBlock: CandidateBlock)
+
+  case class MineBlock(candidateBlock: CandidateBlock, nonce: Long)
 }
