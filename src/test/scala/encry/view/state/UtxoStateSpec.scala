@@ -11,6 +11,7 @@ import encry.utils.{EncryGenerator, FileHelper, TestHelper}
 import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
 import encry.modifiers.state.box.Box.Amount
+import encry.view.history.Height
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
@@ -51,7 +52,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val fees: Amount = regularTransactions.map(_.fee).sum
 
-    val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, IndexedSeq.empty, fees)
+    val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, IndexedSeq.empty, fees, Height @@ 100)
 
     val transactions: Seq[EncryTransaction] = regularTransactions.sortBy(_.timestamp) :+ coinbase
 

@@ -192,7 +192,9 @@ class UtxoState(override val version: VersionTag,
         }
       }
 
-      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
+      import io.circe.syntax._
+
+      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in ${tx.asJson}")
     }
 
   def isValid(tx: EncryBaseTransaction, allowedOutputDelta: Amount = 0L): Boolean = validate(tx, allowedOutputDelta).isSuccess
@@ -232,13 +234,13 @@ object UtxoState extends ScorexLogging {
     Seq(idStateDigestIdxElem, stateDigestIdIdxElem, bestVersion, stateHeight, lastBlockTimestamp)
   }
 
-  def fromBoxHolder(bh: BoxHolder, stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
+  def genesis(boxes: List[EncryBaseBox], stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
     val p: BatchAVLProver[Digest32, HF] = new BatchAVLProver[Digest32, Algos.HF](keyLength = EncryBox.BoxIdSize, valueLengthOpt = None)
-    bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
+    boxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
     val stateStore: LSMStore = new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions)
 
-    log.info(s"Generating UTXO State with ${bh.boxes.size} boxes")
+    log.info(s"Generating UTXO State with ${boxes.size} boxes")
 
     new UtxoState(EncryState.genesisStateVersion, Constants.Chain.PreGenesisHeight, stateStore, 0L, nodeViewHolderRef) {
       override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Algos.HF] =

@@ -3,8 +3,7 @@ package encry.modifiers
 import encry.account.Account
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
-import encry.modifiers.state.box.proposition.EncryProposition
-import encry.modifiers.state.box.{AssetBox, AssetCreationBox}
+import encry.modifiers.state.box.{AssetBox, AssetCreationBox, EncryProposition}
 import encry.utils.TestHelper
 import encry.view.history.Height
 import org.encryfoundation.prismlang.compiler.CompiledContract
@@ -61,7 +60,7 @@ trait InstanceFactory extends Keys {
 
   lazy val coinbaseTransaction: EncryTransaction = {
     val useBoxes = IndexedSeq(genHelper.genAssetBox(secret.publicImage.address))
-    TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, useBoxes, 0)
+    TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, useBoxes, 0, Height @@ 100)
   }
 
   lazy val AssetBoxI: AssetBox =

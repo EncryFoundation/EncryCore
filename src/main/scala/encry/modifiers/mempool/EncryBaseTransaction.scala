@@ -1,8 +1,7 @@
 package encry.modifiers.mempool
 
 import encry.modifiers.mempool.directive.Directive
-import encry.modifiers.state.box.EncryBaseBox
-import encry.modifiers.state.box.proposition.EncryProposition
+import encry.modifiers.state.box.{EncryBaseBox, EncryProposition}
 import encry.settings.{Algos, Constants}
 import io.circe.Encoder
 import org.encryfoundation.prismlang.core.PConvertible

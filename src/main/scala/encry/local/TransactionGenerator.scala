@@ -6,8 +6,7 @@ import encry.account.Address
 import encry.crypto.PrivateKey25519
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
-import encry.modifiers.state.box.AssetBox
-import encry.modifiers.state.box.proposition.EncryProposition
+import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState

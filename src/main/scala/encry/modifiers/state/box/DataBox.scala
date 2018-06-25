@@ -3,7 +3,6 @@ package encry.modifiers.state.box
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.Serializer
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import encry.modifiers.state.box.proposition.{EncryProposition, EncryPropositionSerializer}
 import encry.settings.Algos
 import io.circe.Encoder
 import io.circe.syntax._
@@ -55,7 +54,7 @@ object DataBox {
 object DataBoxSerializer extends Serializer[DataBox] {
 
   override def toBytes(obj: DataBox): Array[Byte] = {
-    val propBytes = EncryPropositionSerializer.toBytes(obj.proposition)
+    val propBytes: Array[BxTypeId] = EncryPropositionSerializer.toBytes(obj.proposition)
     Bytes.concat(
       Shorts.toByteArray(propBytes.length.toShort),
       propBytes,
@@ -66,12 +65,12 @@ object DataBoxSerializer extends Serializer[DataBox] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[DataBox] = Try {
-    val propositionLen = Shorts.fromByteArray(bytes.take(2))
-    val iBytes = bytes.drop(2)
-    val proposition = EncryPropositionSerializer.parseBytes(iBytes.take(propositionLen)).get
-    val nonce = Longs.fromByteArray(iBytes.slice(propositionLen, propositionLen + 8))
-    val dataLen = Shorts.fromByteArray(iBytes.slice(propositionLen + 8, propositionLen + 8 + 2))
-    val data = iBytes.takeRight(dataLen)
+    val propositionLen: Short = Shorts.fromByteArray(bytes.take(2))
+    val iBytes: Array[BxTypeId] = bytes.drop(2)
+    val proposition: EncryProposition = EncryPropositionSerializer.parseBytes(iBytes.take(propositionLen)).get
+    val nonce: Long = Longs.fromByteArray(iBytes.slice(propositionLen, propositionLen + 8))
+    val dataLen: Short = Shorts.fromByteArray(iBytes.slice(propositionLen + 8, propositionLen + 8 + 2))
+    val data: Array[BxTypeId] = iBytes.takeRight(dataLen)
     DataBox(proposition, nonce, data)
   }
 }

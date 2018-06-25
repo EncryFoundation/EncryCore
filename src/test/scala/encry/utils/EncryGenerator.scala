@@ -8,8 +8,7 @@ import encry.crypto.equihash.EquihashSolution
 import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
-import encry.modifiers.state.box.proposition.EncryProposition
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox, MonetaryBox}
+import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, MonetaryBox}
 import encry.settings.{Algos, Constants}
 import encry.utils.TestHelper.{Props, rndGen}
 import encry.view.state.{BoxHolder, EncryState, UtxoState}

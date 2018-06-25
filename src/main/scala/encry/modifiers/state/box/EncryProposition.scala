@@ -1,9 +1,8 @@
-package encry.modifiers.state.box.proposition
+package encry.modifiers.state.box
 
 import encry.account.{Account, Address}
 import encry.modifiers.Serializer
 import encry.modifiers.mempool.Proof
-import encry.modifiers.state.box.Context
 import encry.settings.Constants
 import encry.view.history.Height
 import encry.view.state.Proposition

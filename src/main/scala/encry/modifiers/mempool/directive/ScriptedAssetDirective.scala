@@ -4,8 +4,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.modifiers.Serializer
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.proposition.EncryProposition
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
+import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import encry.settings.{Algos, Constants}
 import encry.utils.Utils
 import io.circe.syntax._

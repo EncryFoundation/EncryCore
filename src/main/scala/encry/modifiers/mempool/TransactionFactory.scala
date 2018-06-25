@@ -3,10 +3,10 @@ package encry.modifiers.mempool
 import encry.account.{Account, Address}
 import encry.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import encry.modifiers.mempool.directive.{Directive, TransferDirective}
-import encry.modifiers.state.box.MonetaryBox
+import encry.modifiers.state.box.{EncryProposition, MonetaryBox}
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.proposition.EncryProposition
+import encry.view.history.Height
 import scorex.crypto.authds.ADKey
 
 object TransactionFactory {
@@ -34,10 +34,11 @@ object TransactionFactory {
   def coinbaseTransactionScratch(pubKey: PublicKey25519,
                                  timestamp: Long,
                                  useBoxes: IndexedSeq[MonetaryBox],
-                                 amount: Amount): EncryTransaction = {
+                                 amount: Amount,
+                                 height: Height): EncryTransaction = {
     val directives: IndexedSeq[Directive with Product] =
       IndexedSeq(TransferDirective(pubKey.address, amount + useBoxes.map(_.amount).sum))
 
-    EncryTransaction(0, timestamp, useBoxes.map(bx => Input.unsigned(bx.id, EncryProposition.openC)), directives, None)
+    EncryTransaction(0, timestamp, useBoxes.map(bx => Input.unsigned(bx.id, EncryProposition.heightLockedC(height))), directives, None)
   }
 }

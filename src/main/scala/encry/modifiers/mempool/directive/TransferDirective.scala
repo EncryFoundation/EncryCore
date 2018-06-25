@@ -5,8 +5,7 @@ import encry.account
 import encry.account.{Account, Address}
 import encry.modifiers.Serializer
 import encry.modifiers.mempool.directive.Directive.DTypeId
-import encry.modifiers.state.box.proposition.EncryProposition
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
+import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import encry.settings.{Algos, Constants}
 import encry.utils.Utils
 import io.circe.{Decoder, Encoder, HCursor}

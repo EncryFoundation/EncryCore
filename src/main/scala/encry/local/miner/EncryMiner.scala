@@ -3,7 +3,6 @@ package encry.local.miner
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy}
 import encry.EncryApp._
 import encry.consensus._
-import encry.consensus.emission.EncrySupplyController
 import encry.crypto.PrivateKey25519
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
@@ -138,7 +137,7 @@ class EncryMiner extends Actor with ScorexLogging {
     val supplyBox: AssetBox = EncrySupplyController.supplyBoxAt(view.state.height)
 
     val coinbase: EncryTransaction = TransactionFactory
-      .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, IndexedSeq(supplyBox), feesTotal)
+      .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, IndexedSeq(supplyBox), feesTotal, view.state.height)
 
     val txs: Seq[TX] = txsToPut.sortBy(_.timestamp) :+ coinbase
 

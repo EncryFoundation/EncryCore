@@ -11,7 +11,6 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderS
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer, Transaction}
-import encry.modifiers.state.box.proposition.EncryProposition
 import encry.settings.Algos
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
@@ -24,6 +23,7 @@ import scorex.crypto.encode.Base58
 import EncryNodeViewHolder.ReceivableMessages._
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import EncryNodeViewHolder._
+import encry.modifiers.state.box.EncryProposition
 import encry.utils.ScorexLogging
 
 import scala.annotation.tailrec
@@ -237,7 +237,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
     val state: StateType = {
       if (settings.node.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings.node)
-      else EncryState.generateGenesisUtxoState(stateDir, Some(self))._1
+      else EncryState.generateGenesisUtxoState(stateDir, Some(self))
     }.asInstanceOf[StateType]
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)

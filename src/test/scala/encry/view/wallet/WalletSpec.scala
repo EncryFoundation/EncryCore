@@ -6,8 +6,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryTransaction
-import encry.modifiers.state.box.MonetaryBox
-import encry.modifiers.state.box.proposition.EncryProposition
+import encry.modifiers.state.box.{EncryProposition, MonetaryBox}
 import encry.settings.{Constants, EncryAppSettings}
 import encry.utils.{EncryGenerator, FileHelper}
 import encry.view.wallet.keys.KeyManager
