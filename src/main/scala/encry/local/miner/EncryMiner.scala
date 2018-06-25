@@ -1,6 +1,6 @@
 package encry.local.miner
 
-import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy}
+import akka.actor.{Actor, ActorRef, PoisonPill, Props, SupervisorStrategy}
 import encry.EncryApp._
 import encry.consensus._
 import encry.consensus.emission.EncrySupplyController
@@ -42,7 +42,7 @@ class EncryMiner extends Actor with ScorexLogging {
   override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
 
   def killAllWorkers(): Unit = {
-    miningWorkers.foreach(worker => context.stop(worker))
+    miningWorkers.foreach(_ ! PoisonPill)
     miningWorkers = Seq.empty[ActorRef]
   }
 
