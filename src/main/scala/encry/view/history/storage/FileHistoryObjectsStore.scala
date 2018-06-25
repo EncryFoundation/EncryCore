@@ -2,11 +2,11 @@ package encry.view.history.storage
 
 import java.nio.file.{Files, Paths, StandardOpenOption}
 
+import encry.ModifierId
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.HistoryModifierSerializer
 import encry.settings.Algos
 import encry.view.ObjectsStore
-import encry.ModifierId
 
 import scala.util.Try
 

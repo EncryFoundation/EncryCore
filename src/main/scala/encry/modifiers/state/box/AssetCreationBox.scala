@@ -2,12 +2,12 @@ package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.Serializer
+import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.proposition.{EncryProposition, EncryPropositionSerializer}
 import encry.settings.Algos
 import io.circe.Encoder
 import io.circe.syntax._
-import encry.modifiers.state.box.Box.Amount
 
 import scala.util.Try
 

@@ -1,7 +1,7 @@
 package encry.modifiers.history.block.header
 
-import encry.modifiers.EncryPersistentModifier
 import encry.ModifierId
+import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.Block._
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.hash.Digest32

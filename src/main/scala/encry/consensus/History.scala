@@ -1,8 +1,8 @@
 package encry.consensus
 
+import encry._
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.PersistentNodeViewModifier
-import encry._
 import scorex.crypto.encode.Base58
 
 import scala.util.Try

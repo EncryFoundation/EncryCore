@@ -4,7 +4,6 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import com.google.common.primitives.{Ints, Longs}
 import encry.modifiers.{BytesSerializable, Serializer}
-import encry.network.ApplicationVersionSerializer
 
 import scala.util.Try
 
