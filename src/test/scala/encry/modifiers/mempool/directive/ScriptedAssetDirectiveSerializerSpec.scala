@@ -28,7 +28,7 @@ class ScriptedAssetDirectiveSerializerSpec extends PropSpec with Matchers {
           Expr.True,
           Expr.False,
           Types.PBoolean
-        )
+        ), 100
       ), 1000
     )
 
