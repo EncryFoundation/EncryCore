@@ -44,12 +44,6 @@ class EncryTransactionSerializerTest extends FunSuite with InstanceFactory {
         |{
         |  "directives" : [
         |    {
-        |      "typeId" : 3,
-        |      "contract" : "2GyFdmWbQSUfKvDjmSYRuhv2w3SHEi3ZkJiVNV1WTqPviBdqVYwX676PyjsQbZJL9N98maYDxb6gHfybggbsWpU2Xajh7cNRiZvCWHqBHu9u3UP4HFpjiDEtz2uk8itvgyWYviyyLLyw9Mk9nsxFdnAcYW7jncqwDdd3pSFN9wPehJ8JTwoDkfRhhiDwaxy562sX8PbvVdqxWjQbe6BKT1xt696YzZWgMPTQwNdTmwF1pAe2Rss3veMcskm31AsPd7tqivNUrvgp67Naz9JsTgzaqvrjoqGw",
-        |      "amount" : 1000,
-        |      "tokenId" : null
-        |    },
-        |    {
         |      "typeId" : 1,
         |      "address" : "4GN4tJYvyKkP4XHZPLatmaDwYQDaSsasUUVxx9XSLGpVwP9pN2",
         |      "amount" : 2317100,
