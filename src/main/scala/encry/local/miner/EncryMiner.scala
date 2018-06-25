@@ -1,6 +1,7 @@
 package encry.local.miner
 
-import akka.actor.{Actor, ActorRef, PoisonPill, Props, SupervisorStrategy}
+import akka.actor.SupervisorStrategy.Resume
+import akka.actor.{Actor, ActorKilledException, AllForOneStrategy, Kill, Props, SupervisorStrategy}
 import encry.EncryApp._
 import encry.consensus._
 import encry.consensus.emission.EncrySupplyController
@@ -33,22 +34,20 @@ class EncryMiner extends Actor with ScorexLogging {
   import EncryMiner._
 
   var candidateOpt: Option[CandidateBlock] = None
-  var miningWorkers: Seq[ActorRef] = Seq.empty[ActorRef]
 
   override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
 
   override def postStop(): Unit = killAllWorkers()
 
-  override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
-
-  def killAllWorkers(): Unit = {
-    miningWorkers.foreach(_ ! PoisonPill)
-    miningWorkers = Seq.empty[ActorRef]
-  }
+  def killAllWorkers(): Unit = context.children.foreach(_ ! Kill)
 
   def needNewCandidate(b: EncryBlock): Boolean = !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
 
   def shouldStartMine(b: EncryBlock): Boolean = settings.node.mining && b.header.timestamp >= timeProvider.time()
+
+  override def supervisorStrategy: SupervisorStrategy = AllForOneStrategy() {
+    case _: ActorKilledException => Resume
+  }
 
   def unknownMessage: Receive = {
     case m => log.warn(s"Unexpected message $m")
@@ -56,20 +55,20 @@ class EncryMiner extends Actor with ScorexLogging {
 
   def mining: Receive = {
 
-    case StartMining if miningWorkers.nonEmpty =>
+    case StartMining if context.children.nonEmpty =>
       candidateOpt match {
         case Some(candidateBlock) =>
-          miningWorkers.foreach(_ ! NextChallenge(candidateBlock))
+          context.children.foreach(_ ! NextChallenge(candidateBlock))
         case None => produceCandidate()
       }
 
     case StartMining =>
       val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
-      miningWorkers = for (i <- 0 until numberOfWorkers) yield context.actorOf(
+      for (i <- 0 until numberOfWorkers) yield context.actorOf(
         Props(classOf[EncryMiningWorker], self, i, numberOfWorkers), s"worker$i")
       self ! StartMining
 
-    case StopMining if miningWorkers.nonEmpty =>
+    case StopMining if context.children.nonEmpty =>
       killAllWorkers()
 
     case MinedBlock(block) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
@@ -79,7 +78,7 @@ class EncryMiner extends Actor with ScorexLogging {
       candidateOpt = None
       context.children.foreach(_ ! DropChallenge)
 
-    case GetMinerStatus => sender ! MinerStatus(miningWorkers.nonEmpty, candidateOpt)
+    case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty, candidateOpt)
 
     case _ =>
   }
@@ -91,7 +90,7 @@ class EncryMiner extends Actor with ScorexLogging {
       * That means that our candidate is outdated. Should produce new candidate for ourselves.
       * Stop all current threads and re-run them with newly produced candidate.
       */
-    case SemanticallySuccessfulModifier(mod: EncryBlock) if miningWorkers.nonEmpty && needNewCandidate(mod) => produceCandidate()
+    case SemanticallySuccessfulModifier(mod: EncryBlock) if context.children.nonEmpty && needNewCandidate(mod) => produceCandidate()
 
     /**
       * Non obvious but case when mining is enabled, but miner doesn't started yet. Initialization case.
