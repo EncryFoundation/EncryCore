@@ -87,7 +87,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
           log.info(s"Comparison with $remote having starting points ${encry.idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}")
-          log.trace(s"Extension ids: ${encry.idsToString(ext)}")
+          log.info(s"Extension ids: ${encry.idsToString(ext)}")
           if (!(extensionOpt.nonEmpty || comparison != Younger)) log.warn("Extension is empty while comparison is younger")
           self ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
@@ -110,7 +110,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
       if (settings.node.sendStat)
         context.actorSelection("akka://encry/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
       log.info(s"Got modifiers of type $typeId from remote connected peer: $remote")
-      log.trace(s"Received modifier ids ${data._2.keySet.map(Base58.encode).mkString(",")}")
+      log.info(s"Received modifier ids ${data._2.keySet.map(Base58.encode).mkString(",")}")
       for ((id, _) <- modifiers) deliveryTracker.receive(typeId, id, remote)
       val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
         modifiers partition { case (id, _) => deliveryTracker.isSpam(id) }
