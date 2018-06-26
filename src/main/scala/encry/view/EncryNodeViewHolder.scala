@@ -10,6 +10,10 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderS
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer, Transaction}
+import encry.modifiers.serialization.Serializer
+import encry.modifiers.state.box.EncryProposition
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
+import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
 import encry.utils.ScorexLogging
@@ -22,12 +26,6 @@ import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base58
-import EncryNodeViewHolder.ReceivableMessages._
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
-import EncryNodeViewHolder._
-import encry.modifiers.serialization.Serializer
-import encry.modifiers.state.box.EncryProposition
-import encry.utils.ScorexLogging
 
 import scala.annotation.tailrec
 import scala.collection.mutable
