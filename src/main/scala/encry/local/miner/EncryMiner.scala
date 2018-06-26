@@ -69,7 +69,7 @@ class EncryMiner extends Actor with ScorexLogging {
     case MinedBlock(block) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
       nodeViewHolder ! LocallyGeneratedModifier(block.header)
       nodeViewHolder ! LocallyGeneratedModifier(block.payload)
-      if (settings.node.stateMode == StateMode.Digest) block.adProofsOpt.foreach { adp => nodeViewHolder ! LocallyGeneratedModifier(adp) }
+      if (settings.node.stateMode == StateMode.Digest) block.adProofsOpt.foreach ( adp => nodeViewHolder ! LocallyGeneratedModifier(adp) )
       candidateOpt = None
       context.children.foreach(_ ! DropChallenge)
 
@@ -129,11 +129,11 @@ class EncryMiner extends Actor with ScorexLogging {
   def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool],
                       bestHeaderOpt: Option[EncryBlockHeader]): CandidateBlock = {
     val timestamp: Time = timeProvider.time()
-    val height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
+    val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
 
     // `txsToPut` - valid, non-conflicting txs with respect to their fee amount.
     // `txsToDrop` - invalidated txs to be dropped from mempool.
-    val (txsToPut, txsToDrop, _) = view.pool.takeAll.toSeq.sortBy(_.fee).reverse
+    val (txsToPut: Seq[TX], txsToDrop: Seq[TX], _) = view.pool.takeAll.toSeq.sortBy(_.fee).reverse
       .foldLeft((Seq[EncryBaseTransaction](), Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) {
         case ((validTxs, invalidTxs, bxsAcc), tx) =>
           val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.inputs.map(u => ByteArrayWrapper(u.boxId))

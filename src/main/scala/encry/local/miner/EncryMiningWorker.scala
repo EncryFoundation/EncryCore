@@ -13,7 +13,7 @@ class EncryMiningWorker(miner: ActorRef, myNumber: Int, numberOfWorkers: Int) ex
   def miningInProgress: Receive = {
 
     case MineBlock(candidate: CandidateBlock, nonce: Long) => ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, nonce)
-      .fold(self ! MineBlock(candidate, nonce + 1)){ block =>
+      .fold(self ! MineBlock(candidate, nonce + 1)) { block =>
         log.info(s"New block is found: $block on worker $self.")
         miner ! MinedBlock(block)
       }
