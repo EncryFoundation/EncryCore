@@ -35,14 +35,6 @@ case class EncryProposition(contractHash: ContractHash) extends Proposition {
       Evaluator.initializedWith(args).eval[Boolean](contract.script)
     } else false
 
-  def isOpen: Boolean = ByteArrayWrapper(contractHash) == ByteArrayWrapper(EncryProposition.open.contractHash)
-
-  def isHeightLockedAt(height: Height): Boolean =
-    ByteArrayWrapper(contractHash) == ByteArrayWrapper(EncryProposition.heightLocked(height).contractHash)
-
-  def isLockedByAccount(account: Account): Boolean =
-    ByteArrayWrapper(contractHash) == ByteArrayWrapper(EncryProposition.accountLock(account).contractHash)
-
   def sameHash(h1: Array[Byte], h2: Array[Byte]): Boolean = ByteArrayWrapper(h1) == ByteArrayWrapper(h2)
 }
 

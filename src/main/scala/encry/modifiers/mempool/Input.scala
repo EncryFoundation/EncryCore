@@ -28,7 +28,6 @@ case class Input(boxId: ADKey, contract: Either[CompiledContract, RegularContrac
 
 object Input {
 
-  def unsigned(boxId: ADKey, contract: CompiledContract): Input = Input(boxId, Left(contract), List.empty)
   def unsigned(boxId: ADKey, contract: RegularContract): Input = Input(boxId, Right(contract), List.empty)
 
   implicit val jsonEncoder: Encoder[Input] = (u: Input) => Map(
@@ -51,8 +50,8 @@ object Input {
 
 object InputSerializer extends Serializer[Input] {
 
-  val CCTypeId: Byte = 98
-  val RCTypeId: Byte = 99
+  private val CCTypeId: Byte = 98
+  private val RCTypeId: Byte = 99
 
   def encodeEitherCompiledOrRegular(contract: Either[CompiledContract, RegularContract]): Array[Byte] =
     contract.fold(CCTypeId +: _.bytes, RCTypeId +: _.bytes)
