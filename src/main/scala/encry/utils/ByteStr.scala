@@ -19,5 +19,5 @@ case class ByteStr(arr: Array[Byte]) {
 
 object ByteStr {
   def decodeBase58(s: String): Try[ByteStr] = Base58.decode(s).map(ByteStr(_))
-  val empty : ByteStr = ByteStr(Array.emptyByteArray)
+  val empty: ByteStr = ByteStr(Array.emptyByteArray)
 }

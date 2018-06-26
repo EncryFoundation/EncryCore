@@ -1,11 +1,12 @@
 package encry.modifiers.history.block
 
 import com.google.common.primitives.{Bytes, Ints}
+import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.{EncryPersistentModifier, Serializer}
+import encry.modifiers.serialization.Serializer
 import encry.validation.{ModifierValidator, ValidationResult}
 import encry.{ModifierId, ModifierTypeId}
 import io.circe.Encoder

@@ -10,9 +10,7 @@ abstract class Transaction[P <: Proposition] extends EphemerealNodeViewModifier 
 
   val messageToSign: Array[Byte]
 
-  override lazy val id: ModifierId = encry.ModifierId @@ Blake2b256(messageToSign)
+  override lazy val id: ModifierId = encry.ModifierId !@@ Blake2b256(messageToSign)
 }
 
-object Transaction {
-  val ModifierTypeId: ModifierTypeId = encry.ModifierTypeId @@ 2.toByte
-}
+object Transaction { val ModifierTypeId: ModifierTypeId = encry.ModifierTypeId @@ 2.toByte }
