@@ -17,7 +17,7 @@
             <level>DEBUG</level>
         </filter>
         <encoder>
-            <pattern>[%thread] >> [%-5level] %logger{36} >> %d{HH:mm:ss.SSS} %msg%n</pattern>
+            <pattern>[%d{HH:mm:ss.S}][%-5level] [%thread] [%-36logger{36}] >> %msg%n</pattern>
         </encoder>
     </appender>
 
