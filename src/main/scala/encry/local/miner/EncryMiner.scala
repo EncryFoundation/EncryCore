@@ -43,7 +43,7 @@ class EncryMiner extends Actor with ScorexLogging {
 
   def needNewCandidate(b: EncryBlock): Boolean = !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
 
-  def shouldStartMine(b: EncryBlock): Boolean = settings.node.mining && b.header.timestamp >= timeProvider.time()
+  def shouldStartMine(b: EncryBlock): Boolean = settings.node.mining && b.header.timestamp >= timeProvider.time() && context.children.nonEmpty
 
   override def supervisorStrategy: SupervisorStrategy = AllForOneStrategy() {
     case _: ActorKilledException => Stop
@@ -68,8 +68,9 @@ class EncryMiner extends Actor with ScorexLogging {
         Props(classOf[EncryMiningWorker], self, i, numberOfWorkers), s"worker$i")
       self ! StartMining
 
-    case StopMining if context.children.nonEmpty =>
+    case DisableMining if context.children.nonEmpty =>
       killAllWorkers()
+      context.become(miningDisabled)
 
     case MinedBlock(block) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
       nodeViewHolder ! LocallyGeneratedModifier(block.header)
@@ -81,6 +82,15 @@ class EncryMiner extends Actor with ScorexLogging {
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty, candidateOpt)
 
     case _ =>
+  }
+
+  def miningDisabled: Receive = {
+
+    case EnableMining =>
+      context.become(miningEnabled)
+      self ! StartMining
+
+    case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty, candidateOpt)
   }
 
   def receiveSemanticallySuccessfulModifier: Receive = {
@@ -108,7 +118,9 @@ class EncryMiner extends Actor with ScorexLogging {
     case cEnv: CandidateEnvelope if cEnv.c.nonEmpty => procCandidateBlock(cEnv.c.get)
   }
 
-  override def receive: Receive =
+  override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
+
+  def miningEnabled: Receive =
     receiveSemanticallySuccessfulModifier orElse
       receiverCandidateBlock orElse
       mining orElse
@@ -175,9 +187,11 @@ class EncryMiner extends Actor with ScorexLogging {
 
 object EncryMiner extends ScorexLogging {
 
-  case object StartMining
+  case object DisableMining
 
-  case object StopMining
+  case object EnableMining
+
+  case object StartMining
 
   case object GetMinerStatus
 
