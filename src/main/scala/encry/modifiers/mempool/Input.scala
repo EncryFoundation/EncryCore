@@ -23,10 +23,7 @@ case class Input(boxId: ADKey, contract: Either[CompiledContract, RegularContrac
 
   def isUnsigned: Boolean = proofs.isEmpty
 
-  def realContract: CompiledContract = contract match {
-    case Left(cc) => cc
-    case Right(rc) => rc.contract
-  }
+  def realContract: CompiledContract = contract.fold(identity, _.contract)
 }
 
 object Input {
@@ -36,10 +33,7 @@ object Input {
 
   implicit val jsonEncoder: Encoder[Input] = (u: Input) => Map(
     "boxId" -> Algos.encode(u.boxId).asJson,
-    "contract" -> (u.contract match {
-      case l: Left[CompiledContract, RegularContract] => Algos.encode(InputSerializer.encodeEitherCompiledOrRegular(l)).asJson
-      case r: Right[CompiledContract, RegularContract] => Algos.encode(InputSerializer.encodeEitherCompiledOrRegular(r)).asJson
-    }),
+    "contract" -> Algos.encode(InputSerializer.encodeEitherCompiledOrRegular(u.contract)).asJson,
     "proofs" -> u.proofs.map(_.asJson).asJson
   ).asJson
 
@@ -60,10 +54,8 @@ object InputSerializer extends Serializer[Input] {
   val CCTypeId: Byte = 98
   val RCTypeId: Byte = 99
 
-  def encodeEitherCompiledOrRegular(contract: Either[CompiledContract, RegularContract]): Array[Byte] = contract match {
-    case Left(cc) => CCTypeId +: cc.bytes
-    case Right(rc) => RCTypeId +: rc.bytes
-  }
+  def encodeEitherCompiledOrRegular(contract: Either[CompiledContract, RegularContract]): Array[Byte] =
+    contract.fold(CCTypeId +: _.bytes, RCTypeId +: _.bytes)
 
   def decodeEitherCompiledOrRegular(bytes: Array[Byte]): Try[Either[CompiledContract, RegularContract]] = bytes.head match {
     case CCTypeId => CompiledContractSerializer.parseBytes(bytes.tail).map(Left.apply)
