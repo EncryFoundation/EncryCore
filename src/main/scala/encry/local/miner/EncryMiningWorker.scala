@@ -8,19 +8,26 @@ import encry.utils.ScorexLogging
 
 class EncryMiningWorker(miner: ActorRef, myNumber: Int, numberOfWorkers: Int) extends Actor with ScorexLogging {
 
-  override def receive: Receive = {
+  override def receive: Receive = miningPaused
 
-    case NextChallenge(candidate: CandidateBlock) => self ! MineBlock(candidate, Long.MaxValue / numberOfWorkers * myNumber)
+  def miningInProgress: Receive = {
 
-    case MineBlock(candidate: CandidateBlock, nonce: Long) => ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, nonce) match {
-      case Some(block) =>
+    case MineBlock(candidate: CandidateBlock, nonce: Long) => ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, nonce)
+      .fold(self ! MineBlock(candidate, nonce + 1)){ block =>
         log.info(s"New block is found: $block on worker $self.")
-        //statsSender ! MiningEnd(block.header, myNumber)
         miner ! MinedBlock(block)
-      case None => self ! MineBlock(candidate, nonce + 1)
-    }
+      }
 
-    case DropChallenge =>
+    case DropChallenge => context.become(miningPaused)
+  }
+
+  def miningPaused: Receive = {
+
+    case NextChallenge(candidate: CandidateBlock) =>
+      context.become(miningInProgress)
+      self ! MineBlock(candidate, Long.MaxValue / numberOfWorkers * myNumber)
+
+    case _ =>
   }
 }
 
