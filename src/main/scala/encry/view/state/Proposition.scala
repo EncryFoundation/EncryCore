@@ -1,6 +1,6 @@
 package encry.view.state
 
-import encry.modifiers.BytesSerializable
+import encry.modifiers.serialization.BytesSerializable
 
 trait Proposition extends BytesSerializable
 

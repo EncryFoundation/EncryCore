@@ -1,6 +1,6 @@
 package encry.modifiers.mempool.directive
 
-import encry.modifiers.Serializer
+import encry.modifiers.serialization.Serializer
 
 import scala.util.{Failure, Try}
 

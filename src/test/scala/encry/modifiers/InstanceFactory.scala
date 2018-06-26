@@ -106,5 +106,5 @@ trait InstanceFactory extends Keys {
     ), 0
   )
 
-  lazy val UnsignedInput: Input = Input(ADKey @@ Random.randomBytes(), Contract, List.empty)
+  lazy val UnsignedInput: Input = Input(ADKey @@ Random.randomBytes(), Left(Contract), List.empty)
 }

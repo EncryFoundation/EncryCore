@@ -1,21 +1,20 @@
 package encry.modifiers.state.box
 
 import encry.account.{Account, Address}
-import encry.modifiers.Serializer
 import encry.modifiers.mempool.Proof
+import encry.modifiers.mempool.regcontract.{AccountLockedContract, HeightLockedContract, OpenContract}
+import encry.modifiers.serialization.Serializer
 import encry.settings.Constants
 import encry.view.history.Height
 import encry.view.state.Proposition
 import io.circe.Encoder
 import io.circe.syntax._
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
-import org.encryfoundation.prismlang.compiler.{CompiledContract, CostEstimator}
 import org.encryfoundation.prismlang.core.wrapped.PValue
-import org.encryfoundation.prismlang.core.{Ast, Types}
 import org.encryfoundation.prismlang.evaluator.Evaluator
-import org.encryfoundation.prismlang.lib.predefined.signature.CheckSig
-import scorex.crypto.encode.{Base16, Base58}
+import scorex.crypto.encode.Base58
 
 import scala.util.{Failure, Success, Try}
 
@@ -49,64 +48,16 @@ case class EncryProposition(contractHash: ContractHash) extends Proposition {
 
 object EncryProposition {
 
-  import org.encryfoundation.prismlang.core.Ast._
-
   case object UnlockFailedException extends Exception("Unlock failed")
 
   implicit val jsonEncoder: Encoder[EncryProposition] = (p: EncryProposition) => Map(
     "contractHash" -> Base58.encode(p.contractHash).asJson
   ).asJson
 
-  def openC: CompiledContract = calculateCost(CompiledContract(List.empty, Ast.Expr.True, 0))
-  def open: EncryProposition = EncryProposition(openC.hash)
-
-  def heightLockedC(height: Height): CompiledContract = calculateCost({
-    CompiledContract(
-      List("state" -> Types.EncryState),
-      Expr.If(
-        Expr.Compare(
-          Expr.Attribute(
-            Expr.Name(
-              Ast.Ident("state"),
-              Types.EncryState
-            ),
-            Ast.Ident("height"),
-            Types.PInt
-          ),
-          List(Ast.CompOp.GtE),
-          List(Expr.IntConst(height.toLong))
-        ),
-        Expr.True,
-        Expr.False,
-        Types.PBoolean
-      ), 0
-    )
-  })
-  def heightLocked(height: Height): EncryProposition = EncryProposition(heightLockedC(height).hash)
-
-  def accountLockC(account: Account): CompiledContract = calculateCost({
-    CompiledContract(
-      List("tx" -> Types.EncryTransaction, "sig" -> Types.Signature25519),
-      Expr.Call(
-        Expr.Name(Ident("checkSig"), Types.PFunc(CheckSig.args.toList, Types.PBoolean)),
-        List(
-          Expr.Name(Ident("sig"), Types.Signature25519),
-          Expr.Attribute(
-            Expr.Name(Ident("tx"), Types.EncryTransaction),
-            Ident("messageToSign"),
-            Types.PCollection.ofByte
-          ),
-          Expr.Base16Str(Base16.encode(account.pubKey))
-        ),
-        Types.PBoolean
-      ), 0
-    )
-  })
-  def accountLock(account: Account): EncryProposition = EncryProposition(accountLockC(account).hash)
+  def open: EncryProposition = EncryProposition(OpenContract().contract.hash)
+  def heightLocked(height: Height): EncryProposition = EncryProposition(HeightLockedContract(height).contract.hash)
+  def accountLock(account: Account): EncryProposition = EncryProposition(AccountLockedContract(account).contract.hash)
   def accountLock(address: Address): EncryProposition = accountLock(Account(address))
-
-  def calculateCost(contract: CompiledContract): CompiledContract =
-    contract.copy(cost = CostEstimator.default.costOf(contract.script) + contract.args.map(_._2.dataCost).sum)
 }
 
 object EncryPropositionSerializer extends Serializer[EncryProposition] {

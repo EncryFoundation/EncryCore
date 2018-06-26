@@ -3,8 +3,8 @@ package encry.modifiers.mempool.directive
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account
 import encry.account.{Account, Address}
-import encry.modifiers.Serializer
 import encry.modifiers.mempool.directive.Directive.DTypeId
+import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import encry.settings.{Algos, Constants}
 import encry.utils.Utils

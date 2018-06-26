@@ -1,8 +1,8 @@
 package encry.modifiers.history.block.payload
 
 import com.google.common.primitives.{Bytes, Ints}
-import encry.modifiers.Serializer
 import encry.modifiers.mempool._
+import encry.modifiers.serialization.Serializer
 import encry.settings.Algos
 import io.circe.Encoder
 import io.circe.syntax._

@@ -1,11 +1,12 @@
 package encry.view.history.storage
 
-import encry.modifiers.{EncryPersistentModifier, Serializer}
+import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.HistoryModifierSerializer
 import encry.storage.EncryBaseStorage
 import encry.view.ObjectsStore
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import encry.ModifierId
+import encry.modifiers.serialization.Serializer
 
 import scala.util.{Failure, Success}
 

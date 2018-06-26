@@ -1,7 +1,7 @@
 package encry.modifiers.mempool.directive
 
-import encry.modifiers.BytesSerializable
 import encry.modifiers.mempool.directive.Directive.DTypeId
+import encry.modifiers.serialization.BytesSerializable
 import encry.modifiers.state.box.EncryBaseBox
 import io.circe._
 import encry.modifiers.state.box.Box.Amount

@@ -1,8 +1,8 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import encry.modifiers.Serializer
 import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
+import encry.modifiers.serialization.Serializer
 import encry.settings.{Algos, Constants}
 import encry.validation.{ModifierValidator, ValidationResult}
 import io.circe.syntax._

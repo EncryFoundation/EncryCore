@@ -5,7 +5,6 @@ import java.io.File
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import encry.EncryApp.settings
-import encry.contracts.EncryStateView
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -172,9 +171,9 @@ class UtxoState(override val version: VersionTag,
         .map(_.toOption -> input)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
           (bxOpt, tx.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
-            case (Some(bx), _) if input.proofs.nonEmpty => if (bx.proposition.canUnlock(context, input.contract, input.proofs)) acc :+ bx else acc
-            case (Some(bx), Some(defaultProof)) => if (bx.proposition.canUnlock(context, input.contract, Seq(defaultProof))) acc :+ bx else acc
-            case (Some(bx), _) => if (bx.proposition.canUnlock(context, input.contract, Seq.empty)) acc :+ bx else acc
+            case (Some(bx), _) if input.proofs.nonEmpty => if (bx.proposition.canUnlock(context, input.realContract, input.proofs)) acc :+ bx else acc
+            case (Some(bx), Some(defaultProof)) => if (bx.proposition.canUnlock(context, input.realContract, Seq(defaultProof))) acc :+ bx else acc
+            case (Some(bx), _) => if (bx.proposition.canUnlock(context, input.realContract, Seq.empty)) acc :+ bx else acc
             case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
           }
         }

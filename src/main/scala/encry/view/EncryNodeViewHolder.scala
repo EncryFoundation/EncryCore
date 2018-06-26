@@ -23,6 +23,7 @@ import scorex.crypto.encode.Base58
 import EncryNodeViewHolder.ReceivableMessages._
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import EncryNodeViewHolder._
+import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
 import encry.utils.ScorexLogging
 
