@@ -1,6 +1,6 @@
 package encry.network
 
-import encry.modifiers.{BytesSerializable, Serializer}
+import encry.modifiers.serialization.{BytesSerializable, Serializer}
 
 import scala.util.Try
 

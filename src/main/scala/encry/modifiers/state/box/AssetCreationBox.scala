@@ -1,10 +1,9 @@
 package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import encry.modifiers.Serializer
+import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import encry.modifiers.state.box.proposition.{EncryProposition, EncryPropositionSerializer}
 import encry.settings.Algos
 import io.circe.Encoder
 import io.circe.syntax._
@@ -50,12 +49,12 @@ object AssetCreationBoxSerializer extends Serializer[AssetCreationBox] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[AssetCreationBox] = Try {
-    val propositionLen = Shorts.fromByteArray(bytes.take(2))
-    val iBytes = bytes.drop(2)
-    val proposition = EncryPropositionSerializer.parseBytes(iBytes.take(propositionLen)).get
-    val nonce = Longs.fromByteArray(iBytes.slice(propositionLen, propositionLen + 8))
-    val amount = Longs.fromByteArray(iBytes.slice(propositionLen + 8, propositionLen + 8 + 8))
-    val symbol = new String(iBytes.slice(propositionLen + 8 + 8, iBytes.length), Algos.charset)
+    val propositionLen: Short = Shorts.fromByteArray(bytes.take(2))
+    val iBytes: Array[BxTypeId] = bytes.drop(2)
+    val proposition: EncryProposition = EncryPropositionSerializer.parseBytes(iBytes.take(propositionLen)).get
+    val nonce: Amount = Longs.fromByteArray(iBytes.slice(propositionLen, propositionLen + 8))
+    val amount: Amount = Longs.fromByteArray(iBytes.slice(propositionLen + 8, propositionLen + 8 + 8))
+    val symbol: String = new String(iBytes.slice(propositionLen + 8 + 8, iBytes.length), Algos.charset)
     AssetCreationBox(proposition, nonce, amount, symbol)
   }
 }

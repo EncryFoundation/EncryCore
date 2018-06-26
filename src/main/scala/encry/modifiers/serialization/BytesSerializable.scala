@@ -1,4 +1,4 @@
-package encry.modifiers
+package encry.modifiers.serialization
 
 trait BytesSerializable extends Serializable {
 

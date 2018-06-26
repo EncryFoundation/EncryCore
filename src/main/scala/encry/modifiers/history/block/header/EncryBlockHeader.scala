@@ -6,7 +6,8 @@ import encry.crypto.equihash.{Equihash, EquihashSolution, EquihashSolutionsSeria
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.Block._
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest, Serializer}
+import encry.modifiers.serialization.Serializer
+import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
 import encry.settings.{Algos, Constants}
 import encry.{ModifierId, ModifierTypeId}
 import io.circe.Encoder

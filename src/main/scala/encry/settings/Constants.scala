@@ -21,8 +21,6 @@ object Constants {
 
   val DefaultKeepVersions: Int = 200  // TODO: Move to `NodeSettings`.
 
-  val FeeMinAmount: Int = 100
-
   val PersistentByteCost: Int = 16
 
   val StateByteCost: Int = 26
@@ -32,7 +30,7 @@ object Constants {
 
   val MaxDataLength: Int = 1000
 
-  val AfterGenesisStateDigestHex: String = "2095f25398b6430c52cf8d91f76936896282d78f2fafd38d4d9529323742381810"
+  val AfterGenesisStateDigestHex: String = "489e56998fcd7a4d73118b84dbd38177260dc38c3e72bff879ab7398023d2d2b10"
 
   val IntrinsicTokenId: ADKey = ADKey !@@ Algos.hash("intrinsic_token")
 

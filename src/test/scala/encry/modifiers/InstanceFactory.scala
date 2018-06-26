@@ -3,10 +3,14 @@ package encry.modifiers
 import encry.account.Account
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
-import encry.modifiers.state.box.proposition.EncryProposition
-import encry.modifiers.state.box.{AssetBox, AssetCreationBox}
+import encry.modifiers.state.box.{AssetBox, AssetCreationBox, EncryProposition}
 import encry.utils.TestHelper
 import encry.view.history.Height
+import org.encryfoundation.prismlang.compiler.CompiledContract
+import org.encryfoundation.prismlang.core.{Ast, Types}
+import org.encryfoundation.prismlang.core.Ast.Expr
+import scorex.crypto.authds.ADKey
+import scorex.utils.Random
 
 import scala.util.{Random => Scarand}
 
@@ -56,7 +60,7 @@ trait InstanceFactory extends Keys {
 
   lazy val coinbaseTransaction: EncryTransaction = {
     val useBoxes = IndexedSeq(genHelper.genAssetBox(secret.publicImage.address))
-    TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, useBoxes, 0)
+    TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, useBoxes, 0, Height @@ 100)
   }
 
   lazy val AssetBoxI: AssetBox =
@@ -80,4 +84,27 @@ trait InstanceFactory extends Keys {
       999L,
       100000L
     )
+
+  lazy val Contract: CompiledContract = CompiledContract(
+    List("state" -> Types.EncryState),
+    Expr.If(
+      Expr.Compare(
+        Expr.Attribute(
+          Expr.Name(
+            Ast.Ident("state"),
+            Types.EncryState
+          ),
+          Ast.Ident("height"),
+          Types.PInt
+        ),
+        List(Ast.CompOp.GtE),
+        List(Expr.IntConst(1000L))
+      ),
+      Expr.True,
+      Expr.False,
+      Types.PBoolean
+    ), 0
+  )
+
+  lazy val UnsignedInput: Input = Input(ADKey @@ Random.randomBytes(), Left(Contract), List.empty)
 }

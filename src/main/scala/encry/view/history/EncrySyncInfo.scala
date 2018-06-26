@@ -1,11 +1,12 @@
 package encry.view.history
 
-import encry.ModifierId
-import encry.consensus.History.ModifierIds
 import encry.consensus.SyncInfo
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.{NodeViewModifier, Serializer}
+import encry.consensus.History.ModifierIds
+import encry.modifiers.NodeViewModifier
 import encry.network.message.SyncInfoMessageSpec
+import encry.ModifierId
+import encry.modifiers.serialization.Serializer
 
 import scala.util.Try
 

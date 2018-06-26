@@ -1,7 +1,7 @@
 package encry.network.message
 
 import com.google.common.primitives.{Bytes, Ints}
-import encry.modifiers.{BytesSerializable, Serializer}
+import encry.modifiers.serialization.{BytesSerializable, Serializer}
 import encry.network.PeerConnectionHandler._
 import scorex.crypto.hash.Blake2b256
 
