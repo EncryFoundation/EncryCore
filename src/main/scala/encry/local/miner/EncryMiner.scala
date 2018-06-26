@@ -1,7 +1,6 @@
 package encry.local.miner
 
-import akka.actor.SupervisorStrategy.Stop
-import akka.actor.{Actor, ActorKilledException, AllForOneStrategy, Kill, Props, SupervisorStrategy}
+import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus._
 import encry.consensus.emission.EncrySupplyController
@@ -39,15 +38,11 @@ class EncryMiner extends Actor with ScorexLogging {
 
   override def postStop(): Unit = killAllWorkers()
 
-  def killAllWorkers(): Unit = context.children.foreach(_ ! Kill)
+  def killAllWorkers(): Unit = context.children.foreach(context.stop)
 
   def needNewCandidate(b: EncryBlock): Boolean = !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
 
   def shouldStartMine(b: EncryBlock): Boolean = settings.node.mining && b.header.timestamp >= timeProvider.time() && context.children.nonEmpty
-
-  override def supervisorStrategy: SupervisorStrategy = AllForOneStrategy() {
-    case _: ActorKilledException => Stop
-  }
 
   def unknownMessage: Receive = {
     case m => log.warn(s"Unexpected message $m")
