@@ -38,7 +38,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
 
   /** Appends modifier to the history if it is applicable. */
   override def append(modifier: EncryPersistentModifier): Try[(EncryHistory, History.ProgressInfo[EncryPersistentModifier])] = {
-    log.debug(s"Trying to append modifier ${Base58.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
+    log.info(s"Trying to append modifier ${Base58.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     testApplicable(modifier).map { _ =>
       modifier match {
         case header: EncryBlockHeader => (this, process(header))
@@ -49,7 +49,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
   }
 
   override def reportModifierIsValid(modifier: EncryPersistentModifier): EncryHistory = {
-    log.debug(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as valid ")
+    log.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as valid ")
     markModifierValid(modifier)
     this
   }
@@ -57,7 +57,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
   /** Report some modifier as valid or invalid semantically */
   override def reportModifierIsInvalid(modifier: EncryPersistentModifier,
                                        progressInfo: ProgressInfo[EncryPersistentModifier]): (EncryHistory, ProgressInfo[EncryPersistentModifier]) = {
-    log.debug(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
+    log.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
     this -> markModifierInvalid(modifier)
   }
 

@@ -61,7 +61,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
   override def receive: Receive = viewHolderEvents orElse {
     case SendLocalSyncInfo =>
       if (statusTracker.elapsedTimeSinceLastSync() < (networkSettings.syncInterval.toMillis / 2))
-        log.debug("Trying to send sync info too often")
+        log.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       statusTracker.updateStatus(remote, status)
@@ -85,7 +85,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, networkSettings.networkChunkSize)
           val ext: ModifierIds = extensionOpt.getOrElse(Seq())
           val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
-          log.debug(s"Comparison with $remote having starting points ${encry.idsToString(syncInfo.startingPoints)}. " +
+          log.info(s"Comparison with $remote having starting points ${encry.idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}")
           log.trace(s"Extension ids: ${encry.idsToString(ext)}")
           if (!(extensionOpt.nonEmpty || comparison != Younger)) log.warn("Extension is empty while comparison is younger")
@@ -98,7 +98,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
           case _: ModifierTypeId => invData._2.flatMap(id => readers._1.modifierById(id))
         }
-        log.debug(s"Requested ${invData._2.length} modifiers ${encry.idsToString(invData)}, " +
+        log.info(s"Requested ${invData._2.length} modifiers ${encry.idsToString(invData)}, " +
           s"sending ${objs.length} modifiers ${encry.idsToString(invData._1, objs.map(_.id))} ")
         self ! ResponseFromLocal(remote, invData._1, objs)
       }
