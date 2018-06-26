@@ -2,6 +2,7 @@ package encry.modifiers.mempool.directive
 
 import com.google.common.primitives.{Bytes, Ints, Shorts}
 import encry.modifiers.mempool.directive.Directive.DTypeId
+import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.{DataBox, EncryBaseBox, EncryProposition}
 import encry.settings.{Algos, Constants}

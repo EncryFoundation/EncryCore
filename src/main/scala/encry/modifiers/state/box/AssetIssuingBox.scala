@@ -2,6 +2,7 @@ package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.serialization.Serializer
+import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.settings.{Algos, Constants}
 import io.circe.Encoder

@@ -4,8 +4,8 @@ import com.google.common.primitives.Longs
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.settings.Algos
 import io.circe.Encoder
-import org.encryfoundation.prismlang.core.{PConvertible, Types}
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
+import org.encryfoundation.prismlang.core.{PConvertible, Types}
 import scorex.crypto.authds.ADKey
 
 trait EncryBaseBox extends Box[EncryProposition] with PConvertible {

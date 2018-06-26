@@ -4,7 +4,6 @@ import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.serialization.BytesSerializable
 import encry.modifiers.state.box.EncryBaseBox
 import io.circe._
-import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.hash.Digest32
 
 trait Directive extends BytesSerializable {

@@ -7,6 +7,7 @@ import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
+import encry.api.http.routes.{HistoryApiRoute, InfoApiRoute, StateInfoApiRoute, TransactionsApiRoute}
 import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
 import encry.api.http.routes.{HistoryApiRoute, InfoApiRoute, StateInfoApiRoute, TransactionsApiRoute}
 import encry.cli.ConsolePromptListener

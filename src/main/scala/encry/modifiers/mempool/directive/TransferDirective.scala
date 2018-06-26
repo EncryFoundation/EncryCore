@@ -4,6 +4,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.account
 import encry.account.{Account, Address}
 import encry.modifiers.mempool.directive.Directive.DTypeId
+import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import encry.settings.{Algos, Constants}

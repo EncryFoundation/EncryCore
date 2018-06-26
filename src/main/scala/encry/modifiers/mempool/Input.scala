@@ -2,6 +2,7 @@ package encry.modifiers.mempool
 
 import com.google.common.primitives.{Ints, Shorts}
 import encry.modifiers.mempool.EncryTransactionSerializer.SerializationException
+import encry.modifiers.mempool.EncryTransactionSerializer.SerializationException
 import encry.modifiers.mempool.regcontract.RegularContract
 import encry.modifiers.serialization.{BytesSerializable, Serializer}
 import encry.settings.{Algos, Constants}

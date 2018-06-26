@@ -7,13 +7,12 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.account.{Address, Portfolio}
 import encry.local.scanner.EncryScanner.{GetIndexReader, IndexReader}
 import encry.local.scanner.storage.EncryIndexReader
-import encry.settings.Algos
+import encry.settings.{Algos, RESTApiSettings}
 import encry.utils.BalanceCalculator
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import encry.view.state.{StateMode, UtxoStateReader}
 import io.circe.Json
 import io.circe.syntax._
-import encry.settings.RESTApiSettings
 import scorex.crypto.authds.ADKey
 
 import scala.concurrent.Future

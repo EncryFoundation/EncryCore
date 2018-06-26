@@ -1,6 +1,6 @@
 package encry.view.wallet
 
-import encry.utils.TestHelper.Props
+import encry.ModifierId
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
@@ -8,11 +8,11 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryTransaction
 import encry.modifiers.state.box.{EncryProposition, MonetaryBox}
 import encry.settings.{Constants, EncryAppSettings}
+import encry.utils.TestHelper.Props
 import encry.utils.{EncryGenerator, FileHelper}
 import encry.view.wallet.keys.KeyManager
 import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
-import encry.{ModifierId, ModifierTypeId}
 import scorex.utils.Random
 
 class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator {

@@ -8,9 +8,9 @@ import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.serialization.Serializer
 import encry.validation.{ModifierValidator, ValidationResult}
+import encry.{ModifierId, ModifierTypeId}
 import io.circe.Encoder
 import io.circe.syntax._
-import encry.{ModifierId, ModifierTypeId}
 
 import scala.util.Try
 

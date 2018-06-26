@@ -1,8 +1,8 @@
 package encry.view.state
 
+import encry.VersionTag
 import encry.modifiers.PersistentNodeViewModifier
 import encry.modifiers.mempool.Transaction
-import encry.VersionTag
 
 import scala.util.Try
 

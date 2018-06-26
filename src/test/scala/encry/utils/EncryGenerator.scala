@@ -3,6 +3,7 @@ package encry.utils
 import java.io.File
 
 import akka.actor.ActorRef
+import encry.ModifierId
 import encry.account.{Account, Address}
 import encry.crypto.equihash.EquihashSolution
 import encry.crypto.{PrivateKey25519, PublicKey25519}
@@ -18,7 +19,7 @@ import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.authds.avltree.batch.{BatchAVLProver, Insert, PersistentBatchAVLProver}
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue}
 import scorex.crypto.hash.Digest32
-import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
+import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
 
 trait EncryGenerator {

@@ -12,6 +12,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.mempool.EncryBaseTransaction.TransactionValidationException
 import encry.modifiers.state.StateModifierDeserializer
+import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box._
 import encry.settings.Algos.HF
 import encry.settings.{Algos, Constants}

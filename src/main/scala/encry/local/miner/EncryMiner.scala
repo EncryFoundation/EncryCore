@@ -8,6 +8,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
+import encry.modifiers.state.box.Box.Amount
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
 import encry.utils.NetworkTime.Time
@@ -21,7 +22,6 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
-import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 
 import scala.collection._

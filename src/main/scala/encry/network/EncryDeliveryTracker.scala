@@ -1,10 +1,10 @@
 package encry.network
 
 import akka.actor.{ActorContext, ActorRef}
-import encry.{ModifierId, ModifierTypeId}
-import PeerConnectionHandler._
+import encry.network.PeerConnectionHandler._
 import encry.utils.NetworkTime.Time
 import encry.utils.NetworkTimeProvider
+import encry.{ModifierId, ModifierTypeId}
 
 import scala.collection.mutable
 import scala.concurrent.duration._
