@@ -65,8 +65,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   def startInteraction: Receive = {
     case StartInteraction =>
-      val hb: Array[Byte] = Handshake(settings.agentName,
-        Version(settings.appVersion), settings.nodeName,
+      val hb: Array[Byte] = Handshake(Version(settings.appVersion), settings.nodeName,
         ownSocketAddress, timeProvider.time()).bytes
       connection ! Tcp.Write(ByteString(hb))
       log.info(s"Handshake sent to $remote")
