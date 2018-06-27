@@ -1,6 +1,6 @@
 package encry.consensus
 
-import encry.modifiers.BytesSerializable
+import encry.modifiers.serialization.BytesSerializable
 
 /**
   * Syncing info provides information about starting points this node recommends another to start

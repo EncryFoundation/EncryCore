@@ -1,8 +1,7 @@
 package encry.modifiers.mempool.directive
 
-import encry.modifiers.BytesSerializable
 import encry.modifiers.mempool.directive.Directive.DTypeId
-import encry.modifiers.state.box.Box.Amount
+import encry.modifiers.serialization.BytesSerializable
 import encry.modifiers.state.box.EncryBaseBox
 import io.circe._
 import scorex.crypto.hash.Digest32
@@ -10,7 +9,6 @@ import scorex.crypto.hash.Digest32
 trait Directive extends BytesSerializable {
 
   val typeId: DTypeId
-  val cost: Amount
   val isValid: Boolean
 
   def boxes(digest: Digest32, idx: Int): Seq[EncryBaseBox]

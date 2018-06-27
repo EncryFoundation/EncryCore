@@ -1,6 +1,6 @@
 package encry.network.message
 
-import encry.modifiers.Serializer
+import encry.modifiers.serialization.Serializer
 
 trait MessageSpec[Content] extends Serializer[Content] {
   val messageCode: Message.MessageCode

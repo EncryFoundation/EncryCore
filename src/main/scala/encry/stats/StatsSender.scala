@@ -8,6 +8,7 @@ import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.emission.EncrySupplyController
 import encry.EncryApp.{modifiersHolder, settings, timeProvider}
 import encry.modifiers.history.block.EncryBlock
+import encry.consensus.EncrySupplyController
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.network.ModifiersHolder.NewBlock

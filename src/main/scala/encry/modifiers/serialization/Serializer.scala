@@ -1,4 +1,4 @@
-package encry.modifiers
+package encry.modifiers.serialization
 
 import scala.util.Try
 

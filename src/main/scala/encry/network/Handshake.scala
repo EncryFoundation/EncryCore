@@ -3,10 +3,9 @@ package encry.network
 import java.net.{InetAddress, InetSocketAddress}
 
 import com.google.common.primitives.{Ints, Longs}
-import encry.modifiers.{BytesSerializable, Serializer}
+import encry.modifiers.serialization.{BytesSerializable, Serializer}
 
 import scala.util.Try
-
 
 case class Handshake(applicationName: String,
                      protocolVersion: Version,
