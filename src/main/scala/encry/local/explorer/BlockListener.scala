@@ -25,6 +25,6 @@ class BlockListener extends Actor with ScorexLogging {
   }
 
   override def receive: Receive = {
-    case SemanticallySuccessfulModifier(block: EncryBlock) => log.debug("Got block: " + block)
+    case SemanticallySuccessfulModifier(block: EncryBlock) => DBService.processBlock(block, transactor).unsafeRunSync()
   }
 }
