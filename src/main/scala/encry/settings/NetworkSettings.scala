@@ -26,6 +26,5 @@ case class NetworkSettings(nodeName: String,
                             syncStatusRefresh: FiniteDuration,
                             syncIntervalStable: FiniteDuration,
                             syncStatusRefreshStable: FiniteDuration,
-                            syncTimeout: Option[FiniteDuration],
-                            controllerTimeout: Option[FiniteDuration]
+                            syncTimeout: Option[FiniteDuration]
                            )
