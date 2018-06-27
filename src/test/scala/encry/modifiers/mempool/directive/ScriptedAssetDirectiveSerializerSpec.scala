@@ -5,6 +5,8 @@ import org.encryfoundation.prismlang.core.Ast.Expr
 import org.encryfoundation.prismlang.core.{Ast, Types}
 import org.scalatest.{Matchers, PropSpec}
 
+import scala.util.Try
+
 class ScriptedAssetDirectiveSerializerSpec extends PropSpec with Matchers {
 
   property("toBytes/fromBytes") {
@@ -28,13 +30,13 @@ class ScriptedAssetDirectiveSerializerSpec extends PropSpec with Matchers {
           Expr.True,
           Expr.False,
           Types.PBoolean
-        ), 100
+        )
       ).hash, 1000
     )
 
-    val directiveSerialized = directive.bytes
+    val directiveSerialized: Array[Byte] = directive.bytes
 
-    val directiveDeserialized = ScriptedAssetDirectiveSerializer.parseBytes(directiveSerialized)
+    val directiveDeserialized: Try[ScriptedAssetDirective] = ScriptedAssetDirectiveSerializer.parseBytes(directiveSerialized)
 
     directiveDeserialized.isSuccess shouldBe true
   }

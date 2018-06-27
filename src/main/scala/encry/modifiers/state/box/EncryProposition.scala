@@ -46,7 +46,7 @@ object EncryProposition {
     "contractHash" -> Base58.encode(p.contractHash).asJson
   ).asJson
 
-  def open: EncryProposition = EncryProposition(OpenContract().contract.hash)
+  def open: EncryProposition = EncryProposition(OpenContract.contract.hash)
   def heightLocked(height: Height): EncryProposition = EncryProposition(HeightLockedContract(height).contract.hash)
   def accountLock(account: Account): EncryProposition = EncryProposition(AccountLockedContract(account).contract.hash)
   def accountLock(address: Address): EncryProposition = accountLock(Account(address))
