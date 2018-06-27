@@ -16,10 +16,18 @@ resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repos
 
 val akkaVersion = "10.0.9"
 val circeVersion = "0.9.3"
+val doobieVersion = "0.5.2"
 
 val networkDependencies = Seq(
   "org.bitlet" % "weupnp" % "0.1.+",
   "commons-net" % "commons-net" % "3.+"
+)
+
+val databaseDependencies = Seq(
+  "org.tpolecat" %% "doobie-core"     % doobieVersion,
+  "org.tpolecat" %% "doobie-postgres" % doobieVersion,
+  "org.tpolecat" %% "doobie-specs2"   % doobieVersion,
+  "org.tpolecat" %% "doobie-hikari"   % doobieVersion
 )
 
 val apiDependencies = Seq(
@@ -61,7 +69,7 @@ libraryDependencies ++= Seq(
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
   "org.influxdb" % "influxdb-java" % "2.10",
   "org.apache.commons" % "commons-io" % "1.3.2"
-) ++ networkDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
+) ++ networkDependencies ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
 
 fork := true
 

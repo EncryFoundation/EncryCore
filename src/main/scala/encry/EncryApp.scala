@@ -9,11 +9,11 @@ import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import encry.api.http.routes.{HistoryApiRoute, InfoApiRoute, StateInfoApiRoute, TransactionsApiRoute}
 import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
-import encry.api.http.routes.{HistoryApiRoute, InfoApiRoute, StateInfoApiRoute, TransactionsApiRoute}
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator
 import encry.local.TransactionGenerator.StartGeneration
+import encry.local.explorer.BlockListener
 import encry.local.miner.EncryMiner
 import encry.local.miner.EncryMiner.StartMining
 import encry.local.scanner.EncryScanner
@@ -78,6 +78,8 @@ object EncryApp extends App with ScorexLogging {
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
 
   lazy val miner: ActorRef = system.actorOf(Props[EncryMiner], "miner")
+
+  val blockListener: ActorRef = system.actorOf(Props[BlockListener], "blockListener")
 
   val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
 

@@ -17,6 +17,7 @@ case class EncryAppSettings(directory: String,
                             restApi: RESTApiSettings,
                             wallet: WalletSettings,
                             ntp: NetworkTimeProviderSettings,
+                            postgres: PostgresSettings,
                             influxDB: InfluxDBSettings)
 
 object EncryAppSettings extends ScorexLogging with SettingsReaders with NodeSettingsReader {
