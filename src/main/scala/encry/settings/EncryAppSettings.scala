@@ -14,7 +14,6 @@ case class EncryAppSettings(directory: String,
                             dataDir: File,
                             network: NetworkSettings,
                             restApi: RESTApiSettings,
-                            wallet: WalletSettings,
                             ntp: NetworkTimeProviderSettings,
                             influxDB: InfluxDBSettings)
 
