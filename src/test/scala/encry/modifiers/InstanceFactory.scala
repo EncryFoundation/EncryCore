@@ -103,7 +103,7 @@ trait InstanceFactory extends Keys {
       Expr.True,
       Expr.False,
       Types.PBoolean
-    ), 0
+    )
   )
 
   lazy val UnsignedInput: Input = Input(ADKey @@ Random.randomBytes(), Left(Contract), List.empty)

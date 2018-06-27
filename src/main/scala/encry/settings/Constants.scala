@@ -30,7 +30,7 @@ object Constants {
 
   val MaxDataLength: Int = 1000
 
-  val AfterGenesisStateDigestHex: String = "489e56998fcd7a4d73118b84dbd38177260dc38c3e72bff879ab7398023d2d2b10"
+  val AfterGenesisStateDigestHex: String = "3d8a96b8c629c9e4b2e1b6d3bb4e16731b28b6d927c818d94a733c3ddc2be86610"
 
   val IntrinsicTokenId: ADKey = ADKey !@@ Algos.hash("intrinsic_token")
 

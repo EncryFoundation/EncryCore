@@ -17,16 +17,14 @@ sealed trait RegularContract {
   lazy val bytes: Array[Byte] = RegularContract.Serializer.toBytes(this)
 }
 object RegularContract {
-  def calculateCost(contract: CompiledContract): CompiledContract =
-    contract.copy(cost = CostEstimator.default.costOf(contract.script) + contract.args.map(_._2.dataCost).sum)
   object Serializer {
     def toBytes(obj: RegularContract): Array[Byte] = obj match {
-      case OpenContract() => Array(OpenContract.TypeId)
+      case OpenContract => Array(OpenContract.typeId)
       case HeightLockedContract(h) => HeightLockedContract.TypeId +: Ints.toByteArray(h)
       case AccountLockedContract(acc) => AccountLockedContract.TypeId +: acc.bytes
     }
     def parseBytes(bytes: Array[Byte]): Try[RegularContract] = bytes.head match {
-      case OpenContract.TypeId => Success(OpenContract())
+      case OpenContract.typeId => Success(OpenContract)
       case HeightLockedContract.TypeId =>
         if (bytes.lengthCompare(5) == 0) Success(HeightLockedContract(Ints.fromByteArray(bytes.tail)))
         else Failure(SerializationException(s"`HeightLockedContract` deserialization failed"))
@@ -37,58 +35,53 @@ object RegularContract {
   }
 }
 
-case class OpenContract() extends RegularContract {
-  val typeId: Byte = OpenContract.TypeId
-  val contract: CompiledContract = RegularContract.calculateCost(CompiledContract(List.empty, Ast.Expr.True, 0))
+case object OpenContract extends RegularContract {
+  val typeId: Byte = 0
+  val contract: CompiledContract = CompiledContract(List.empty, Ast.Expr.True)
 }
-object OpenContract { val TypeId: Byte = 0 }
 
 case class HeightLockedContract(height: Int) extends RegularContract {
   val typeId: Byte = HeightLockedContract.TypeId
-  val contract: CompiledContract = RegularContract.calculateCost({
-    CompiledContract(
-      List("state" -> Types.EncryState),
-      Expr.If(
-        Expr.Compare(
-          Expr.Attribute(
-            Expr.Name(
-              Ast.Ident("state"),
-              Types.EncryState
-            ),
-            Ast.Ident("height"),
-            Types.PInt
+  val contract: CompiledContract = CompiledContract(
+    List("state" -> Types.EncryState),
+    Expr.If(
+      Expr.Compare(
+        Expr.Attribute(
+          Expr.Name(
+            Ast.Ident("state"),
+            Types.EncryState
           ),
-          List(Ast.CompOp.GtE),
-          List(Expr.IntConst(height.toLong))
+          Ast.Ident("height"),
+          Types.PInt
         ),
-        Expr.True,
-        Expr.False,
-        Types.PBoolean
-      ), 0
+        List(Ast.CompOp.GtE),
+        List(Expr.IntConst(height.toLong))
+      ),
+      Expr.True,
+      Expr.False,
+      Types.PBoolean
     )
-  })
+  )
 }
 object HeightLockedContract { val TypeId: Byte = 1 }
 
 case class AccountLockedContract(account: Account) extends RegularContract {
   val typeId: Byte = AccountLockedContract.TypeId
-  val contract: CompiledContract = RegularContract.calculateCost({
-    CompiledContract(
-      List("tx" -> Types.EncryTransaction, "sig" -> Types.Signature25519),
-      Expr.Call(
-        Expr.Name(Ident("checkSig"), Types.PFunc(CheckSig.args.toList, Types.PBoolean)),
-        List(
-          Expr.Name(Ident("sig"), Types.Signature25519),
-          Expr.Attribute(
-            Expr.Name(Ident("tx"), Types.EncryTransaction),
-            Ident("messageToSign"),
-            Types.PCollection.ofByte
-          ),
-          Expr.Base16Str(Base16.encode(account.pubKey))
+  val contract: CompiledContract = CompiledContract(
+    List("tx" -> Types.EncryTransaction, "sig" -> Types.Signature25519),
+    Expr.Call(
+      Expr.Name(Ident("checkSig"), Types.PFunc(CheckSig.args.toList, Types.PBoolean)),
+      List(
+        Expr.Name(Ident("sig"), Types.Signature25519),
+        Expr.Attribute(
+          Expr.Name(Ident("tx"), Types.EncryTransaction),
+          Ident("messageToSign"),
+          Types.PCollection.ofByte
         ),
-        Types.PBoolean
-      ), 0
+        Expr.Base16Str(Base16.encode(account.pubKey))
+      ),
+      Types.PBoolean
     )
-  })
+  )
 }
 object AccountLockedContract { val TypeId: Byte = 2 }

@@ -6,6 +6,7 @@ import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{EncryBaseBox, EncryProposition}
 import encry.settings.{Algos, Constants}
 import io.circe.Encoder
+import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.PConvertible
 import scorex.crypto.hash.Digest32
 
@@ -28,7 +29,7 @@ trait EncryBaseTransaction extends Transaction[EncryProposition] with ModifierWi
     directives.zipWithIndex.flatMap { case (d, idx) => d.boxes(Digest32 !@@ id, idx) }
 
   lazy val costMultiplier: Amount =
-    // spending scripts cost +
+    inputs.map(_.contract.fold(cc => cc, rc => rc.contract)).map(CompiledContract.costOf).sum +
     (Constants.PersistentByteCost * length) +
     (Constants.StateByteCost * newBoxes.map(_.bytes).foldLeft(Array.empty[Byte])(_ ++ _).length)
 
