@@ -41,8 +41,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: EncryMempool)
 
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
-  val modifiersCache: mutable.Map[scala.collection.mutable.WrappedArray.ofByte, EncryPersistentModifier] =
-    mutable.Map[scala.collection.mutable.WrappedArray.ofByte, EncryPersistentModifier]()
+  val modifiersCache: mutable.Map[mutable.WrappedArray.ofByte, EncryPersistentModifier] =
+    mutable.Map[mutable.WrappedArray.ofByte, EncryPersistentModifier]()
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,
@@ -62,7 +62,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def receive: Receive = {
-    case ModifiersFromRemote(_, modifierTypeId, remoteObjects) =>
+    case ModifiersFromRemote(peer, modifierTypeId, remoteObjects) =>
+      modifiersHolder ! ModifiersFromRemote(peer, modifierTypeId, remoteObjects)
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)

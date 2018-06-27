@@ -1,24 +1,28 @@
 package encry.network
 
 import akka.persistence.{PersistentActor, SnapshotOffer}
-import encry.network.ModifiersHolder.{NewBlock, State}
+import encry.ModifierTypeId
+import encry.network.ModifiersHolder.Mods
+import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.utils.ScorexLogging
+import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 
 class ModifiersHolder extends PersistentActor with ScorexLogging {
 
-  var counter: State = State(0)
+  var modsFromRemote: Mods = Mods(Map.empty, 0)
 
-  override def preStart(): Unit = logger.info(s"Before start counter: ${counter.counter}")
+  override def preStart(): Unit = logger.info(s"Started fucking actor")
 
   override def receiveRecover: Receive = {
-    case NewBlock => updateCounter()
-    case SnapshotOffer(_, snapshot: State) => counter = snapshot
+    case mods: ModifiersFromRemote => updateModsFromRemote(mods: ModifiersFromRemote)
+    case SnapshotOffer(_, snapshot: Mods) => modsFromRemote = snapshot
   }
 
   override def receiveCommand: Receive = {
-    case NewBlock =>
-      logger.info(s"New block is here. Before incrementing: ${counter.counter}")
-      persist(NewBlock) { _ => updateCounter() }
+    case mods@ModifiersFromRemote(peer, modifierTypeId, remoteObjects) =>
+      logger.info(s"Already received ${modsFromRemote.numberOfMessages} packs of modifiers. \n$modsFromRemote")
+      logger.info(s"New pack of modifiers $modifierTypeId from $peer. Size: ${remoteObjects.size}.")
+      persist(mods) { _ => updateModsFromRemote(mods) }
     case x: Any => logger.info(s"Strange input: $x")
   }
 
@@ -28,15 +32,13 @@ class ModifiersHolder extends PersistentActor with ScorexLogging {
 
   override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
 
-  def updateCounter(): Unit = {
-    counter = State(counter.counter + 1)
+  def updateModsFromRemote(newMods: ModifiersFromRemote): Unit = {
+    modsFromRemote = Mods(modsFromRemote.current + ((newMods.source, newMods.modifierTypeId) -> newMods.remoteObjects), modsFromRemote.numberOfMessages + 1)
   }
 }
 
 object ModifiersHolder {
 
-  case object NewBlock
-
-  case class State(counter: Int)
+  case class Mods(current: Map[(ConnectedPeer, ModifierTypeId), Seq[Array[Byte]]], numberOfMessages: Int)
 
 }

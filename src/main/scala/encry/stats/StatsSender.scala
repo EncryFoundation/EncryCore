@@ -4,10 +4,9 @@ import java.io.File
 import java.util
 
 import akka.actor.Actor
-import encry.EncryApp.{modifiersHolder, settings, timeProvider}
+import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.network.ModifiersHolder.NewBlock
 import encry.settings.Algos
 import encry.stats.StatsSender._
 import encry.utils.ScorexLogging
@@ -31,8 +30,6 @@ class StatsSender extends Actor with ScorexLogging {
   override def receive: Receive = {
 
     case BestHeaderInChain(fb: EncryBlockHeader) =>
-
-      modifiersHolder ! NewBlock
 
       influxDB.write(8189, util.Arrays.asList(
         s"difficulty,nodeName=${settings.network.nodeName} diff=${fb.difficulty.toString},height=${fb.height}",
