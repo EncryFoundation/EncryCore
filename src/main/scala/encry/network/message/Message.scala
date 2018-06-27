@@ -11,7 +11,7 @@ case class Message[Content](spec: MessageSpec[Content],
                             input: Either[Array[Byte], Content],
                             source: Option[ConnectedPeer]) extends BytesSerializable {
 
-  lazy val dataBytes = input match {
+  lazy val dataBytes: Array[Byte] = input match {
     case Left(db) => db
     case Right(d) => spec.toBytes(d)
   }
