@@ -87,7 +87,7 @@ case class EncryDeliveryTracker(context: ActorContext, deliveryTimeout: FiniteDu
 
   // Modifiers we need to download, but do not know peer that have this modifier
   // TODO we may try to guess this peers using delivered map
-  private val expectingFromRandom: mutable.Map[ModifierIdAsKey, ToDownloadStatus] = mutable.Map[ModifierIdAsKey, ToDownloadStatus]()
+  val expectingFromRandom: mutable.Map[ModifierIdAsKey, ToDownloadStatus] = mutable.Map[ModifierIdAsKey, ToDownloadStatus]()
 
   def isExpectingFromRandom: Boolean = expectingFromRandom.nonEmpty
 
@@ -128,17 +128,28 @@ case class EncryDeliveryTracker(context: ActorContext, deliveryTimeout: FiniteDu
     * Modifier downloaded
     */
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = tryWithLogging {
-    expectingFromRandom.keys.foreach(key => println(Algos.encode(key.asInstanceOf[Array[Byte]])))
-      if (isExpecting(mtid, mid, cp)) {
-        val eo = expecting.find(e => (mtid == e._1) && (mid sameElements e._2) && cp == e._3)
-        for (e <- eo) expecting -= e
-        delivered(key(mid)) = cp
-        val cancellableKey = (key(mid), cp)
-        for (c <- cancellables.get(cancellableKey)) c.cancel()
+    println("///////////////////////////////////////")
+    expectingFromRandom.keys.foreach(key => Algos.encode(key.toArray))
+    println(s"expectingFromRandom.contains(key(mid))[${Algos.encode(mid)}: ${expectingFromRandom.contains(key(mid))}")
+    println(s"isExpecting(mtid, mid, cp): ${isExpecting(mtid, mid, cp)}")
+    if (expectingFromRandom.contains(key(mid))) {
+      expectingFromRandom.remove(key(mid))
+      println(s"After remove: ${System.currentTimeMillis()}: ${expectingFromRandom.contains(key(mid))}")
+      println(s"Size: ${expectingFromRandom.size}")
+      delivered(key(mid)) = cp
+    } else if (isExpecting(mtid, mid, cp)) {
+      println("Here")
+      val eo = expecting.find(e => (mtid == e._1) && (mid sameElements e._2) && cp == e._3)
+      for (e <- eo) expecting -= e
+      delivered(key(mid)) = cp
+      val cancellableKey = (key(mid), cp)
+      for (c <- cancellables.get(cancellableKey)) c.cancel()
         cancellables -= cancellableKey
-      }
-      else {
-        deliveredSpam(key(mid)) = cp
-      }
     }
+    else {
+      println("222222")
+      deliveredSpam(key(mid)) = cp
+    }
+    println("////////////////////////////////////////")
+  }
 }
