@@ -2,7 +2,7 @@ package encry.view.state
 
 import com.google.common.primitives.Bytes
 import encry.modifiers.state.box.Box
-import encry.modifiers.{BytesSerializable, Serializer}
+import encry.modifiers.serialization.{BytesSerializable, Serializer}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
 import scala.util.Try

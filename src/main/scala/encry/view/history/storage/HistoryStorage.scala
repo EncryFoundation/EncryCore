@@ -1,8 +1,9 @@
 package encry.view.history.storage
 
 import encry.ModifierId
+import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.HistoryModifierSerializer
-import encry.modifiers.{EncryPersistentModifier, Serializer}
+import encry.modifiers.serialization.Serializer
 import encry.storage.EncryBaseStorage
 import encry.view.ObjectsStore
 import io.iohk.iodb.{ByteArrayWrapper, Store}

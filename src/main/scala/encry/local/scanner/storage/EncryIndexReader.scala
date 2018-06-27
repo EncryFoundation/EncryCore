@@ -1,8 +1,7 @@
 package encry.local.scanner.storage
 
 import encry.account.{Account, Address}
-import encry.modifiers.state.box.EncryBox
-import encry.modifiers.state.box.proposition.EncryProposition
+import encry.modifiers.state.box.{EncryBox, EncryProposition}
 import encry.storage.codec.FixLenComplexValueCodec
 import encry.utils.ScorexLogging
 import encry.view.state.Proposition

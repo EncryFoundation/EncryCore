@@ -5,7 +5,7 @@ import java.util
 
 import akka.actor.Actor
 import encry.EncryApp.{settings, timeProvider}
-import encry.consensus.emission.EncrySupplyController
+import encry.consensus.EncrySupplyController
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.settings.Algos
 import encry.stats.StatsSender._

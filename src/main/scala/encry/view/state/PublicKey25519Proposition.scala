@@ -1,6 +1,6 @@
 package encry.view.state
 
-import encry.modifiers.Serializer
+import encry.modifiers.serialization.Serializer
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Blake2b256
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}

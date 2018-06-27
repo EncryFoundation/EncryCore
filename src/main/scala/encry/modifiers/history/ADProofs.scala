@@ -1,8 +1,9 @@
 package encry.modifiers.history
 
 import com.google.common.primitives.Bytes
+import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box._
-import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest, Serializer}
+import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
 import encry.settings.{Algos, Constants}
 import encry.{ModifierId, ModifierTypeId}
 import io.circe.Encoder

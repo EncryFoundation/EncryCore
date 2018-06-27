@@ -1,5 +1,6 @@
 package encry.consensus.emission
 
+import encry.consensus.EncrySupplyController
 import encry.settings.Constants
 import encry.view.history.Height
 import org.scalatest.{Matchers, PropSpec}

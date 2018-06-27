@@ -2,7 +2,7 @@ package encry.crypto
 
 import encry.account.Address
 import encry.crypto.encoding.Base58Check
-import encry.modifiers.{BytesSerializable, Serializer}
+import encry.modifiers.serialization.{BytesSerializable, Serializer}
 import encry.settings.Algos
 import scorex.crypto.signatures.{Curve25519, PublicKey}
 

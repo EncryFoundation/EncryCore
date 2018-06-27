@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.modifiers.mempool.EncryTransaction
-import encry.modifiers.state.box.proposition.EncryProposition
+import encry.modifiers.state.box.EncryProposition
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import encry.view.mempool.EncryMempoolReader
 import encry.view.state.StateMode
