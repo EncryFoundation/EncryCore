@@ -25,9 +25,6 @@ object Constants {
 
   val StateByteCost: Int = 26
 
-  // Maximum number of computational `steps` contract can use.
-  val ContractMaxFuel: Int = 800
-
   val MaxDataLength: Int = 1000
 
   val AfterGenesisStateDigestHex: String = "3d8a96b8c629c9e4b2e1b6d3bb4e16731b28b6d927c818d94a733c3ddc2be86610"
@@ -45,14 +42,6 @@ object Constants {
     val InitialDifficulty: Difficulty = Difficulty @@ BigInt(1)
 
     val Version: Version = 0: Byte
-
-    val InitialNBits: NBits = DifficultySerializer.encodeCompactBits(InitialDifficulty)
-
-    val ModifierIdSize: Int = HashLength
-
-    val CoinbaseHeightLock: Int = 1
-
-    val GenesisBoxesAmount: Long = 1L
 
     // Number of fractions in one Encry Token.
     val FractionsInOneCoin: Int = 1000000
