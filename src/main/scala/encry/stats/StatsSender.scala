@@ -4,13 +4,9 @@ import java.io.File
 import java.util
 
 import akka.actor.Actor
-import encry.EncryApp.{settings, timeProvider}
-import encry.consensus.emission.EncrySupplyController
 import encry.EncryApp.{modifiersHolder, settings, timeProvider}
-import encry.modifiers.history.block.EncryBlock
 import encry.consensus.EncrySupplyController
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.network.ModifiersHolder.NewBlock
 import encry.settings.Algos
 import encry.stats.StatsSender._
