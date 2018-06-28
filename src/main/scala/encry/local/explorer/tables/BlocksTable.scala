@@ -21,7 +21,7 @@ object BlocksTable {
     "block_size",
     "equihash_solution",
     "ad_proofs",
-    "txs_qty",
+    "tx_qty",
     "miner_address",
     "miner_reward",
     "fees_total",

@@ -20,11 +20,11 @@ CREATE TABLE blocks (
 
 ALTER TABLE blocks OWNER TO encry_admin;
 
-CREATE INDEX "blocks__parent_id" ON headers (parent_id);
+CREATE INDEX "blocks__parent_id" ON blocks (parent_id);
 
-CREATE INDEX "blocks__height" ON headers (height);
+CREATE INDEX "blocks__height" ON blocks (height);
 
-CREATE INDEX "blocks__ts" ON headers (ts);
+CREATE INDEX "blocks__ts" ON blocks (ts);
 
 CREATE TABLE transactions (
   id VARCHAR(64) NOT NULL PRIMARY KEY,
