@@ -9,7 +9,7 @@
 |/peers/connect                      | post |  |  |
 |/peers/blacklisted                  | get  |  |  |
 |/utils/seed                         | get  |  |  |
-|/utils/hash/blake2b                 | get  |  |  |
+|/utils/hash/blake2b                 | post |  |  |
 |/state/boxes/{address}              | get  |  |  |
 |/state/portfolio/{address}          | get  |  |  |
 |/history                            | get  |  |  |
@@ -42,3 +42,34 @@ _output_:
   "isMining" : false  
 }
 ```
+
+## 2. History
+`/history/at/{0}`
+
+## 3. Transactions
+Usage:
+    `transactions/unconfirmed`
+    `transactions/{Id}`
+Output:
+```
+
+```
+Description: Get list of unconfirmed transactions or transaction with `Id` _[how to get?]_
+
+## 4. Peers.
+Usage:
+    `/peers/all`
+    `/peers/connected`
+    `/peers/blacklisted`
+Description: _[Always return [] (???)]_
+
+## 5. /utils/seed[/{SeedSize}]
+Usage: `/utils/seed` or `/utils/seed/16`
+_output_: `"VNpiGdoVzSekNqgywWZbjp"`
+Description: returns random Byte58 string for random value of `SeedSize` or 32 (default) bytes.
+
+
+# Post
+## 1. /utils/hash/blake2b
+_entity_: Any text or json
+_output_: `"3etZenM7MQb4w45xmhAgQzmMBtdA7QPV8nD6uBDgQ2wi"`
