@@ -9,6 +9,7 @@ import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import encry.api.http.routes.{HistoryApiRoute, InfoApiRoute, StateInfoApiRoute, TransactionsApiRoute}
 import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
+import encry.api.http.routes.{HistoryApiRoute, InfoApiRoute, StateInfoApiRoute, TransactionsApiRoute}
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator
@@ -18,7 +19,7 @@ import encry.local.miner.EncryMiner.StartMining
 import encry.local.scanner.EncryScanner
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.state.box.proposition.EncryProposition
+import encry.modifiers.state.box.EncryProposition
 import encry.network.message._
 import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, NetworkController, UPnP}

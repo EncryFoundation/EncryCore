@@ -1,6 +1,6 @@
 package encry.view.state
 
-import encry.consensus.emission.EncrySupplyController
+import encry.consensus.EncrySupplyController
 import encry.modifiers.state.box.AssetBox
 import encry.utils.EncryGenerator
 import org.scalatest.{Matchers, PropSpec}

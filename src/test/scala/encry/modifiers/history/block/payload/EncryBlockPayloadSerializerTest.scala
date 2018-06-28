@@ -1,9 +1,10 @@
 package encry.modifiers.history.block.payload
 
-import encry.ModifierId
 import encry.modifiers.mempool.TransactionFactory
 import encry.utils.TestHelper
 import org.scalatest.FunSuite
+import encry.ModifierId
+import encry.view.history.Height
 
 class EncryBlockPayloadSerializerTest extends FunSuite {
 
@@ -16,7 +17,7 @@ class EncryBlockPayloadSerializerTest extends FunSuite {
 
     val txs = keys.map { k =>
       val useBoxes = IndexedSeq(factory.genAssetBox(k.publicImage.address))
-      TransactionFactory.coinbaseTransactionScratch(k.publicImage, timestamp, useBoxes, 0)
+      TransactionFactory.coinbaseTransactionScratch(k.publicImage, timestamp, useBoxes, 0, Height @@ 100)
     }
 
     val blockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), txs)

@@ -1,7 +1,7 @@
 package encry.crypto.equihash
 
 import com.google.common.primitives.Ints
-import encry.modifiers.{BytesSerializable, Serializer}
+import encry.modifiers.serialization.{BytesSerializable, Serializer}
 import encry.settings.Constants
 import io.circe.Encoder
 
