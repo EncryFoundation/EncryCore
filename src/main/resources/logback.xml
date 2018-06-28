@@ -17,18 +17,12 @@
             <level>DEBUG</level>
         </filter>
         <encoder>
-            <pattern>[%d{HH:mm:ss.S}][%-5level] [%thread] [%-36logger{36}] >> %msg%n</pattern>
+            <pattern>[%d{HH:mm:ss.S}][%-5level] [%.5thread{3}] [%30.30logger] >> %msg%n</pattern>
         </encoder>
     </appender>
 
-    <appender name="SYSLOG">
-        <facility>USER</facility>
-        <suffixPattern>[%thread] %logger %msg</suffixPattern>
-        <syslogHost>localhost</syslogHost>
-    </appender>
-
     <root>
-        <appender-ref ref="SYSLOG"/>
+        <appender-ref ref="FILE"/>
     </root>
 
 </configuration>
