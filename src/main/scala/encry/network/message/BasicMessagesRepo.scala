@@ -109,8 +109,9 @@ object ModifiersSpec extends MessageSpec[ModifiersData] {
 
   override def toBytes(data: ModifiersData): Array[Byte] = {
     require(data._2.nonEmpty, "empty modifiers list")
+    val typeId: ModifierTypeId = data._1
     val modifiers: Map[ModifierId, Array[MessageCode]] = data._2
-    Array(data._1) ++ Ints.toByteArray(modifiers.size) ++ modifiers.map { case (id, modifier) =>
+    Array(typeId) ++ Ints.toByteArray(modifiers.size) ++ modifiers.map { case (id, modifier) =>
       id ++ Ints.toByteArray(modifier.length) ++ modifier
     }.fold(Array[Byte]())(_ ++ _)
   }
