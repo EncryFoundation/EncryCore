@@ -22,6 +22,7 @@ import scorex.crypto.authds.ADKey
 
 import scala.collection.mutable
 
+//Todo class with no use, delete?
 class EncryScanner(indexStore: Store) extends Actor with ScorexLogging {
 
   import EncryScanner._

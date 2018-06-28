@@ -17,6 +17,7 @@ import scorex.crypto.authds.ADKey
 
 import scala.concurrent.Future
 
+//Todo class with no use, delete?
 case class StateInfoApiRoute(readersHolder: ActorRef,
                              nodeViewActorRef: ActorRef,
                              scannerRef: ActorRef,
