@@ -37,17 +37,12 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
 
   private def getHistory: Future[EncryHistoryReader] = (readersHolder ? GetDataFromHistory[EncryHistoryReader](r => r)).mapTo[EncryHistoryReader]
 
-  private def getHeaderIdsAtHeight(h: Int): Future[Json] = getHistory.map { history =>
-    history.headerIdsAtHeight(h).map(Base58.encode).asJson
-  }
+  private def getHeaderIdsAtHeight(h: Int): Future[Json] = getHistory.map{ _.headerIdsAtHeight(h).map(Base58.encode).asJson}
 
-  private def getLastHeaders(n: Int): Future[Json] = getHistory.map { history =>
-    history.lastHeaders(n).headers.map(_.asJson).asJson
-  }
+  private def getLastHeaders(n: Int): Future[Json] = getHistory.map{ _.lastHeaders(n).headers.map(_.asJson).asJson }
 
-  private def getHeaderIds(offset: Int, limit: Int): Future[Json] = getHistory.map { history =>
-    history.getHeaderIds(limit, offset).map(Base58.encode).asJson
-  }
+  private def getHeaderIds(offset: Int, limit: Int): Future[Json] =
+    getHistory.map { _.getHeaderIds(limit, offset).map(Base58.encode).asJson }
 
   private def getFullBlockByHeaderId(headerId: ModifierId): Future[Option[EncryBlock]] = getHistory.map { history =>
     history.typedModifierById[EncryBlockHeader](headerId).flatMap(history.getBlock)
@@ -70,7 +65,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
   }
 
   def getBlockTransactionsByHeaderIdR: Route = (modifierId & pathPrefix("transactions") & get) {
-    getFullBlockByHeaderId(_).map(_.map(_.transactions.map(_.asJson).asJson)).okJson()
+    getFullBlockByHeaderId(_).map(_.map(_.transactions.asJson)).okJson()
   }
 
   def candidateBlockR: Route = (path("candidateBlock") & pathEndOrSingleSlash & get) {
