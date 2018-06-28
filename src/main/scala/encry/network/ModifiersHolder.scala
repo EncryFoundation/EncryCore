@@ -20,7 +20,7 @@ class ModifiersHolder extends PersistentActor with ScorexLogging {
 
   override def receiveCommand: Receive = {
     case mods@ModifiersFromRemote(peer, modifierTypeId, remoteObjects) =>
-      logger.info(s"Already received ${modsFromRemote.numberOfMessages} packs of modifiers. \n$modsFromRemote")
+      logger.info(s"Already received ${modsFromRemote.numberOfPacksFromRemotes} packs of modifiers. \n$modsFromRemote")
       logger.info(s"New pack of modifiers $modifierTypeId from $peer. Size: ${remoteObjects.size}.")
       persist(mods) { _ => updateModsFromRemote(mods) }
     case x: Any => logger.info(s"Strange input: $x")
@@ -33,12 +33,12 @@ class ModifiersHolder extends PersistentActor with ScorexLogging {
   override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
 
   def updateModsFromRemote(newMods: ModifiersFromRemote): Unit = {
-    modsFromRemote = Mods(modsFromRemote.current + ((newMods.source, newMods.modifierTypeId) -> newMods.remoteObjects), modsFromRemote.numberOfMessages + 1)
+    modsFromRemote = Mods(modsFromRemote.numberOfModsByPeerAndModType + ((newMods.source, newMods.modifierTypeId) -> newMods.remoteObjects.size), modsFromRemote.numberOfPacksFromRemotes + 1)
   }
 }
 
 object ModifiersHolder {
 
-  case class Mods(current: Map[(ConnectedPeer, ModifierTypeId), Seq[Array[Byte]]], numberOfMessages: Int)
+  case class Mods(numberOfModsByPeerAndModType: Map[(ConnectedPeer, ModifierTypeId), Int], numberOfPacksFromRemotes: Int)
 
 }
