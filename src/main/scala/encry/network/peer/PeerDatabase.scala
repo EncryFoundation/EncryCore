@@ -4,15 +4,16 @@ import java.net.InetSocketAddress
 
 import encry.network.PeerConnectionHandler._
 import encry.utils.NetworkTime
+import encry.utils.NetworkTime.Time
 
 import scala.collection.mutable
 
 //todo: persistence
 case class PeerDatabase(filename: Option[String])  {
 
-  private val whitelistPersistence = mutable.Map[InetSocketAddress, PeerInfo]()
+  private val whitelistPersistence: mutable.Map[InetSocketAddress, PeerInfo] = mutable.Map[InetSocketAddress, PeerInfo]()
 
-  private val blacklist = mutable.Map[String, NetworkTime.Time]()
+  private val blacklist: mutable.Map[String, Time] = mutable.Map[String, NetworkTime.Time]()
 
   def addOrUpdateKnownPeer(address: InetSocketAddress, peerInfo: PeerInfo): Unit = {
     val updatedPeerInfo: PeerInfo = whitelistPersistence.get(address).fold(peerInfo) { dbPeerInfo =>
@@ -23,13 +24,7 @@ case class PeerDatabase(filename: Option[String])  {
     whitelistPersistence.put(address, updatedPeerInfo)
   }
 
-  def blacklistPeer(address: InetSocketAddress, time: NetworkTime.Time): Unit = {
-    whitelistPersistence.remove(address)
-    if (!isBlacklisted(address)) blacklist += address.getHostName -> time
-  }
-
-  def isBlacklisted(address: InetSocketAddress): Boolean =
-    blacklist.synchronized(blacklist.contains(address.getHostName))
+  def isBlacklisted(address: InetSocketAddress): Boolean = blacklist.synchronized(blacklist.contains(address.getHostName))
 
   def knownPeers(): Map[InetSocketAddress, PeerInfo] =
     whitelistPersistence.keys.flatMap(k => whitelistPersistence.get(k).map(v => k -> v)).toMap

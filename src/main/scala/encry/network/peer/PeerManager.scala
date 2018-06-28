@@ -104,9 +104,6 @@ class PeerManager extends Actor with ScorexLogging {
           }
         }
       }
-    case AddToBlacklist(peer) =>
-      log.info(s"Blacklist peer $peer")
-      peerDatabase.blacklistPeer(peer, timeProvider.time())
   }
 }
 
@@ -115,8 +112,6 @@ object PeerManager {
   object ReceivableMessages {
 
     case object CheckPeers
-
-    case class AddToBlacklist(remote: InetSocketAddress)
 
     case class AddOrUpdatePeer(address: InetSocketAddress, peerName: Option[String], direction: Option[ConnectionType])
 
