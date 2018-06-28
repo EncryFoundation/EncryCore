@@ -5,7 +5,6 @@ import java.io.File
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import encry.EncryApp.settings
-import encry.contracts.EncryStateView
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -13,6 +12,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.mempool.EncryBaseTransaction.TransactionValidationException
 import encry.modifiers.state.StateModifierDeserializer
+import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box._
 import encry.settings.Algos.HF
 import encry.settings.{Algos, Constants}
@@ -172,9 +172,9 @@ class UtxoState(override val version: VersionTag,
         .map(_.toOption -> input)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
           (bxOpt, tx.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
-            case (Some(bx), _) if input.proofs.nonEmpty => if (bx.proposition.canUnlock(context, input.proofs)) acc :+ bx else acc
-            case (Some(bx), Some(defaultProof)) => if (bx.proposition.canUnlock(context, Seq(defaultProof))) acc :+ bx else acc
-            case (Some(bx), _) => if (bx.proposition.canUnlock(context, Seq.empty)) acc :+ bx else acc
+            case (Some(bx), _) if input.proofs.nonEmpty => if (bx.proposition.canUnlock(context, input.realContract, input.proofs)) acc :+ bx else acc
+            case (Some(bx), Some(defaultProof)) => if (bx.proposition.canUnlock(context, input.realContract, Seq(defaultProof))) acc :+ bx else acc
+            case (Some(bx), _) => if (bx.proposition.canUnlock(context, input.realContract, Seq.empty)) acc :+ bx else acc
             case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
           }
         }
@@ -192,7 +192,9 @@ class UtxoState(override val version: VersionTag,
         }
       }
 
-      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
+      import io.circe.syntax._
+
+      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in ${tx.asJson}")
     }
 
   def isValid(tx: EncryBaseTransaction, allowedOutputDelta: Amount = 0L): Boolean = validate(tx, allowedOutputDelta).isSuccess
@@ -232,13 +234,13 @@ object UtxoState extends ScorexLogging {
     Seq(idStateDigestIdxElem, stateDigestIdIdxElem, bestVersion, stateHeight, lastBlockTimestamp)
   }
 
-  def fromBoxHolder(bh: BoxHolder, stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
+  def genesis(boxes: List[EncryBaseBox], stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
     val p: BatchAVLProver[Digest32, HF] = new BatchAVLProver[Digest32, Algos.HF](keyLength = EncryBox.BoxIdSize, valueLengthOpt = None)
-    bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
+    boxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
     val stateStore: LSMStore = new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions)
 
-    log.info(s"Generating UTXO State with ${bh.boxes.size} boxes")
+    log.info(s"Generating UTXO State with ${boxes.size} boxes")
 
     new UtxoState(EncryState.genesisStateVersion, Constants.Chain.PreGenesisHeight, stateStore, 0L, nodeViewHolderRef) {
       override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Algos.HF] =

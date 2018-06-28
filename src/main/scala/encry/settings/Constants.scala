@@ -1,8 +1,8 @@
 package encry.settings
 
 import encry.consensus.{Difficulty, DifficultySerializer, NBits}
-import encry.view.history.Height
 import encry.modifiers.history.block.Block.Version
+import encry.view.history.Height
 import scorex.crypto.authds.ADKey
 
 import scala.concurrent.duration._
@@ -21,8 +21,6 @@ object Constants {
 
   val DefaultKeepVersions: Int = 200  // TODO: Move to `NodeSettings`.
 
-  val FeeMinAmount: Int = 100
-
   val PersistentByteCost: Int = 16
 
   val StateByteCost: Int = 26
@@ -32,7 +30,7 @@ object Constants {
 
   val MaxDataLength: Int = 1000
 
-  val AfterGenesisStateDigestHex: String = "2095f25398b6430c52cf8d91f76936896282d78f2fafd38d4d9529323742381810"
+  val AfterGenesisStateDigestHex: String = "3d8a96b8c629c9e4b2e1b6d3bb4e16731b28b6d927c818d94a733c3ddc2be86610"
 
   val IntrinsicTokenId: ADKey = ADKey !@@ Algos.hash("intrinsic_token")
 

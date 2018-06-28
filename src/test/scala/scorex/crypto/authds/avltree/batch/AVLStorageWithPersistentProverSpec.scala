@@ -1,7 +1,7 @@
 package scorex.crypto.authds.avltree.batch
 
 import encry.settings.Algos
-import io.iohk.iodb.{LSMStore, Store}
+import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.authds.avltree.batch.benchmark.IODBBenchmark.getRandomTempDir
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}

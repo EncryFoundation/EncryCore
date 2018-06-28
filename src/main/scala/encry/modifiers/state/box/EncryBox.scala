@@ -1,6 +1,5 @@
 package encry.modifiers.state.box
 
-import encry.modifiers.state.box.proposition.EncryProposition
 import encry.modifiers.state.box.Box.Amount
 
 trait EncryBox[P <: EncryProposition] extends EncryBaseBox {

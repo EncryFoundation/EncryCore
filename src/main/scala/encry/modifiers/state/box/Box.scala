@@ -1,6 +1,6 @@
 package encry.modifiers.state.box
 
-import encry.modifiers.BytesSerializable
+import encry.modifiers.serialization.BytesSerializable
 import encry.view.state.Proposition
 import scorex.crypto.authds._
 

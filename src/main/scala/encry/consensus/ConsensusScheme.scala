@@ -1,9 +1,9 @@
 package encry.consensus
 
+import encry.ModifierId
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.ModifierId
 import scorex.crypto.authds.SerializedAdProof
 import scorex.crypto.hash.Digest32
 

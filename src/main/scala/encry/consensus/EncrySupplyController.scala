@@ -1,10 +1,9 @@
-package encry.consensus.emission
+package encry.consensus
 
-import encry.modifiers.state.box.AssetBox
-import encry.modifiers.state.box.proposition.EncryProposition
+import encry.modifiers.state.box.Box.Amount
+import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.settings.Constants
 import encry.view.history.Height
-import encry.modifiers.state.box.Box.Amount
 
 object EncrySupplyController {
 
@@ -14,8 +13,8 @@ object EncrySupplyController {
   } else Constants.Chain.InitialEmissionAmount
 
   def supplyBoxAt(height: Height): AssetBox =
-    AssetBox(EncryProposition.heightLocked(height), height * 9, EncrySupplyController.supplyAt(height))
+    AssetBox(EncryProposition.heightLocked(height), height * 9, supplyAt(height))
 
-  def totalSupplyBoxes: Seq[AssetBox] =
+  def totalSupplyBoxes: IndexedSeq[AssetBox] =
     (Constants.Chain.PreGenesisHeight until Constants.Chain.EmissionEpochLength).map(i => supplyBoxAt(Height @@ i))
 }

@@ -1,9 +1,9 @@
 package encry.view.wallet
 
+import encry.VersionTag
 import encry.modifiers.PersistentNodeViewModifier
 import encry.modifiers.mempool.Transaction
 import encry.view.state.Proposition
-import encry.VersionTag
 
 import scala.util.Try
 

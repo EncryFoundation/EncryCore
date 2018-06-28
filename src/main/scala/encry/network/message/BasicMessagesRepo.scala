@@ -7,8 +7,8 @@ import java.util
 import com.google.common.primitives.{Bytes, Ints}
 import encry.consensus.SyncInfo
 import encry.modifiers.NodeViewModifier
+import encry.network.message.Message.MessageCode
 import encry.{ModifierId, ModifierTypeId}
-import encry.network.message.Message.{MessageCode, _}
 import supertagged.@@
 
 import scala.util.Try

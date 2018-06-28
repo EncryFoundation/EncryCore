@@ -3,7 +3,6 @@ package encry.view
 import java.io.File
 
 import akka.actor.{Actor, Props}
-import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.modifiers._
@@ -11,20 +10,22 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderS
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer, Transaction}
-import encry.modifiers.state.box.proposition.EncryProposition
+import encry.modifiers.serialization.Serializer
+import encry.modifiers.state.box.EncryProposition
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
+import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
+import encry.stats.StatsSender.BestHeaderInChain
+import encry.utils.ScorexLogging
+import encry.view.EncryNodeViewHolder.ReceivableMessages._
+import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.{Proposition, _}
 import encry.view.wallet.EncryWallet
-import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.view.EncryNodeViewHolder.DownloadRequest
+import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base58
-import EncryNodeViewHolder.ReceivableMessages._
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
-import EncryNodeViewHolder._
-import encry.utils.ScorexLogging
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -206,6 +207,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               else nodeView.wallet
               blocksApplied.foreach(newVault.scanPersistent)
               log.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
+              if (settings.node.sendStat)
+                newHistory.bestHeaderOpt.foreach(header => context.actorSelection("akka://encry/user/statsSender") ! BestHeaderInChain(header))
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
               log.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
@@ -237,7 +240,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
     val state: StateType = {
       if (settings.node.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings.node)
-      else EncryState.generateGenesisUtxoState(stateDir, Some(self))._1
+      else EncryState.generateGenesisUtxoState(stateDir, Some(self))
     }.asInstanceOf[StateType]
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)

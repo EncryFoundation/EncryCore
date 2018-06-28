@@ -1,12 +1,12 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Shorts}
-import encry.modifiers.{BytesSerializable, Serializer}
+import encry.modifiers.serialization.{BytesSerializable, Serializer}
 import encry.settings.Algos
+import io.circe.syntax._
+import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.prismlang.codec.PCodec
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
-import io.circe.{Decoder, Encoder, HCursor}
-import io.circe.syntax._
 import scodec.bits.BitVector
 
 import scala.util.Try

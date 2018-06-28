@@ -1,10 +1,10 @@
 package encry.modifiers.history.block
 
-import encry.modifiers.{EncryPersistentModifier, TransactionsCarryingPersistentNodeViewModifier}
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBaseBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.state.box.proposition.EncryProposition
+import encry.modifiers.state.box.EncryProposition
+import encry.modifiers.{EncryPersistentModifier, TransactionsCarryingPersistentNodeViewModifier}
 import encry.utils.ScorexLogging
 
 import scala.util.Try

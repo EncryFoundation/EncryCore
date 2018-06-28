@@ -1,11 +1,13 @@
 package encry.modifiers.mempool
 
-import encry.account.Address
+import encry.account.{Account, Address}
 import encry.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import encry.modifiers.mempool.directive.{Directive, TransferDirective}
-import encry.modifiers.state.box.MonetaryBox
-import org.encryfoundation.prismlang.core.wrapped.BoxedValue
+import encry.modifiers.mempool.regcontract.{AccountLockedContract, HeightLockedContract}
 import encry.modifiers.state.box.Box.Amount
+import encry.modifiers.state.box.MonetaryBox
+import encry.view.history.Height
+import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import scorex.crypto.authds.ADKey
 
 object TransactionFactory {
@@ -18,13 +20,11 @@ object TransactionFactory {
                                        amount: Amount,
                                        tokenIdOpt: Option[ADKey] = None): EncryTransaction = {
     val pubKey: PublicKey25519 = privKey.publicImage
-    val uInputs: IndexedSeq[Input] = useBoxes.map(bx => Input.unsigned(bx.id)).toIndexedSeq
+    val uInputs: IndexedSeq[Input] = useBoxes.map(bx => Input.unsigned(bx.id, AccountLockedContract(Account(pubKey.address)))).toIndexedSeq
     val change: Amount = useBoxes.map(_.amount).sum - (amount + fee)
     val directives: IndexedSeq[TransferDirective] = if (change > 0) {
       IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt), TransferDirective(pubKey.address, change, tokenIdOpt))
-    } else {
-      IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt))
-    }
+    } else IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt))
 
     val uTransaction: UnsignedEncryTransaction = UnsignedEncryTransaction(fee, timestamp, uInputs, directives)
     val signature: Signature25519 = privKey.sign(uTransaction.messageToSign)
@@ -35,10 +35,11 @@ object TransactionFactory {
   def coinbaseTransactionScratch(pubKey: PublicKey25519,
                                  timestamp: Long,
                                  useBoxes: IndexedSeq[MonetaryBox],
-                                 amount: Amount): EncryTransaction = {
+                                 amount: Amount,
+                                 height: Height): EncryTransaction = {
     val directives: IndexedSeq[Directive with Product] =
       IndexedSeq(TransferDirective(pubKey.address, amount + useBoxes.map(_.amount).sum))
 
-    EncryTransaction(0, timestamp, useBoxes.map(bx => Input.unsigned(bx.id)), directives, None)
+    EncryTransaction(0, timestamp, useBoxes.map(bx => Input.unsigned(bx.id, HeightLockedContract(height))), directives, None)
   }
 }

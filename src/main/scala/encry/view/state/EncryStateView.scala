@@ -1,4 +1,4 @@
-package encry.contracts
+package encry.view.state
 
 import encry.view.history.Height
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}

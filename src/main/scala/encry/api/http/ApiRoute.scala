@@ -6,7 +6,6 @@ import akka.http.scaladsl.unmarshalling.PredefinedFromEntityUnmarshallers
 import akka.util.Timeout
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.utils.ActorHelper
-import io.circe.Printer
 
 trait ApiRoute extends ApiDirectives with ActorHelper with FailFastCirceSupport with PredefinedFromEntityUnmarshallers {
 

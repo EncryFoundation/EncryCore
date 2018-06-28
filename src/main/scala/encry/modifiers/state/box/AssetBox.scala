@@ -1,16 +1,18 @@
 package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import encry.modifiers.Serializer
+import encry.modifiers.serialization.Serializer
+import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import encry.modifiers.state.box.proposition.{EncryProposition, EncryPropositionSerializer}
 import encry.settings.{Algos, Constants}
 import io.circe.Encoder
 import io.circe.syntax._
 import org.encryfoundation.prismlang.core.Types
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import encry.modifiers.state.box.Box.Amount
+import scorex.crypto.authds
 import scorex.crypto.authds.ADKey
+import supertagged.@@
 
 import scala.util.Try
 
@@ -76,12 +78,12 @@ object AssetBoxSerializer extends Serializer[AssetBox] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[AssetBox] = Try {
-    val propositionLen = Shorts.fromByteArray(bytes.take(2))
-    val iBytes = bytes.drop(2)
-    val proposition = EncryPropositionSerializer.parseBytes(iBytes.take(propositionLen)).get
-    val nonce = Longs.fromByteArray(iBytes.slice(propositionLen, propositionLen + 8))
-    val amount = Longs.fromByteArray(iBytes.slice(propositionLen + 8, propositionLen + 8 + 8))
-    val tokenIdOpt = if ((iBytes.length - (propositionLen + 8 + 8)) == Constants.ModifierIdSize) {
+    val propositionLen: Short = Shorts.fromByteArray(bytes.take(2))
+    val iBytes: Array[BxTypeId] = bytes.drop(2)
+    val proposition: EncryProposition = EncryPropositionSerializer.parseBytes(iBytes.take(propositionLen)).get
+    val nonce: Amount = Longs.fromByteArray(iBytes.slice(propositionLen, propositionLen + 8))
+    val amount: Amount = Longs.fromByteArray(iBytes.slice(propositionLen + 8, propositionLen + 8 + 8))
+    val tokenIdOpt: Option[@@[Array[BxTypeId], authds.ADKey.Tag]] = if ((iBytes.length - (propositionLen + 8 + 8)) == Constants.ModifierIdSize) {
       Some(ADKey @@ iBytes.takeRight(Constants.ModifierIdSize))
     } else None
     AssetBox(proposition, nonce, amount, tokenIdOpt)

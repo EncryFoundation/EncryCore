@@ -1,13 +1,13 @@
 package encry.modifiers.mempool
 
+import encry.ModifierId
 import encry.modifiers.mempool.directive.Directive
-import encry.modifiers.state.box.EncryBaseBox
-import encry.modifiers.state.box.proposition.EncryProposition
+import encry.modifiers.state.box.Box.Amount
+import encry.modifiers.state.box.{EncryBaseBox, EncryProposition}
 import encry.settings.{Algos, Constants}
 import io.circe.Encoder
+import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.PConvertible
-import encry.ModifierId
-import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.hash.Digest32
 
 import scala.util.Try
@@ -28,8 +28,10 @@ trait EncryBaseTransaction extends Transaction[EncryProposition] with ModifierWi
   lazy val newBoxes: Traversable[EncryBaseBox] =
     directives.zipWithIndex.flatMap { case (d, idx) => d.boxes(Digest32 !@@ id, idx) }
 
-  lazy val minimalFee: Amount = Constants.FeeMinAmount +
-    directives.map(_.cost).sum + (Constants.PersistentByteCost * length)
+  lazy val costMultiplier: Amount =
+    inputs.map(_.contract.fold(cc => cc, rc => rc.contract)).map(CompiledContract.costOf).sum +
+    (Constants.PersistentByteCost * length) +
+    (Constants.StateByteCost * newBoxes.map(_.bytes).foldLeft(Array.empty[Byte])(_ ++ _).length)
 
   override def toString: String = s"<EncryTransaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}>"
 }
