@@ -49,47 +49,37 @@ class PeerManager extends Actor with ScorexLogging {
   def apiInterface: Receive = {
     case GetConnectedPeers => sender() ! (connectedPeers.values.map(_.handshake).toSeq: Seq[Handshake])
     case GetAllPeers => sender() ! peerDatabase.knownPeers()
-    case GetBlacklistedPeers => sender() ! peerDatabase.blacklistedPeers()
   }
 
   def peerListOperations: Receive = {
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
       if (!isSelf(address, None))
         peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), peerNameOpt, connTypeOpt))
-    case KnownPeers => sender() ! peerDatabase.knownPeers().keys.toSeq
-    case RandomPeer => sender() ! randomPeer()
     case RandomPeers(howMany: Int) => sender() ! Random.shuffle(peerDatabase.knownPeers().keys.toSeq).take(howMany)
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
   }
 
   def connectOps: Receive = {
     case DoConnecting(remote, direction) =>
-      if (peerDatabase.isBlacklisted(remote)) log.info(s"Got incoming connection from blacklisted $remote")
-      else {
-        val isIncoming: Boolean = direction == Incoming
-        if (connectingPeers.contains(remote) && !isIncoming) {
-          log.info(s"Trying to connect twice to $remote, going to drop the duplicate connection")
-          sender() ! CloseConnection
-        } else {
-          if (!isIncoming) {
-            log.info(s"Connecting to $remote")
-            connectingPeers += remote
-          }
-          sender() ! StartInteraction
+      val isIncoming: Boolean = direction == Incoming
+      if (connectingPeers.contains(remote) && !isIncoming) {
+        log.info(s"Trying to connect twice to $remote, going to drop the duplicate connection")
+        sender() ! CloseConnection
+      } else {
+        if (!isIncoming) {
+          log.info(s"Connecting to $remote")
+          connectingPeers += remote
         }
+        sender() ! StartInteraction
       }
     case Handshaked(peer) =>
-      if (peerDatabase.isBlacklisted(peer.socketAddress))
-        log.info(s"Got handshake from blacklisted ${peer.socketAddress}")
-       else {
-        if (peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress))
-          peer.handlerRef ! CloseConnection
-        else {
-          if (peer.publicPeer) self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
-          else peerDatabase.remove(peer.socketAddress)
-          connectedPeers += peer.socketAddress -> peer
-          nodeViewSynchronizer ! HandshakedPeer(peer)
-        }
+      if (peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress))
+        peer.handlerRef ! CloseConnection
+      else {
+        if (peer.publicPeer) self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
+        else peerDatabase.remove(peer.socketAddress)
+        connectedPeers += peer.socketAddress -> peer
+        nodeViewSynchronizer ! HandshakedPeer(peer)
       }
     case Disconnected(remote) =>
       connectedPeers -= remote
@@ -114,10 +104,6 @@ object PeerManager {
     case object CheckPeers
 
     case class AddOrUpdatePeer(address: InetSocketAddress, peerName: Option[String], direction: Option[ConnectionType])
-
-    case object KnownPeers
-
-    case object RandomPeer
 
     case class RandomPeers(hawMany: Int)
 
