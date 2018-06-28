@@ -14,29 +14,17 @@ object DBService {
   def insert(table: String, fieldsString: String, dataString: String): ConnectionIO[Int] =
     Fragment.const(s"INSERT INTO $table $fieldsString VALUES $dataString;").update.run
 
-  def insertBlock(block: EncryBlock): ConnectionIO[Int] = {
-    import tables.BlocksTable._
+  def insertBlock(block: EncryBlock): ConnectionIO[Int] =
+    insert(tables.BlocksTable.name, tables.BlocksTable.fieldsString, tables.BlocksTable.dataString(block))
 
-    insert(name, fieldsString, dataString(block))
-  }
+  def insertTransactions(h: EncryBlockHeader, p: EncryBlockPayload): ConnectionIO[Int] =
+    insert(tables.TransactionsTable.name, tables.TransactionsTable.fieldsString, tables.TransactionsTable.dataStrings(h, p))
 
-  def insertTransactions(h: EncryBlockHeader, p: EncryBlockPayload): ConnectionIO[Int] = {
-    import tables.TransactionsTable._
+  def insertInputs(h: EncryBlockHeader, p: EncryBlockPayload): ConnectionIO[Int] =
+    insert(tables.InputsTable.name, tables.InputsTable.fieldsString, tables.InputsTable.dataStrings(h, p))
 
-    insert(name, fieldsString, dataStrings(h, p))
-  }
-
-  def insertInputs(h: EncryBlockHeader, p: EncryBlockPayload): ConnectionIO[Int] = {
-    import tables.InputsTable._
-
-    insert(name, fieldsString, dataStrings(h, p))
-  }
-
-  def insertOutputs(h: EncryBlockHeader, p: EncryBlockPayload): ConnectionIO[Int] = {
-    import tables.OutputsTable._
-
-    insert(name, fieldsString, dataStrings(h, p))
-  }
+  def insertOutputs(h: EncryBlockHeader, p: EncryBlockPayload): ConnectionIO[Int] =
+    insert(tables.OutputsTable.name, tables.OutputsTable.fieldsString, tables.OutputsTable.dataStrings(h, p))
 
   def processBlock(block: EncryBlock, transactor: Transactor[IO]): IO[Int] = (for {
     blockR <- insertBlock(block)
