@@ -21,8 +21,14 @@
         </encoder>
     </appender>
 
+    <appender name="SYSLOG">
+        <facility>USER</facility>
+        <suffixPattern>[%thread] %logger %msg</suffixPattern>
+        <syslogHost>localhost</syslogHost>
+    </appender>
+
     <root>
-        <appender-ref ref="FILE"/>
+        <appender-ref ref="SYSLOG"/>
     </root>
 
 </configuration>
