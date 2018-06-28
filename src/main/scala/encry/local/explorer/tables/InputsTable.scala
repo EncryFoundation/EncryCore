@@ -8,7 +8,7 @@ import scorex.crypto.encode.Base16
 
 object InputsTable {
 
-  val name: String = "outputs"
+  val name: String = "inputs"
   val fields: Seq[String] = Seq("id", "tx_id", "serialized_proofs")
   val fieldsString: String = fields.mkString("(", ", ", ")")
 

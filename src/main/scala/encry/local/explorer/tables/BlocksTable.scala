@@ -30,6 +30,7 @@ object BlocksTable {
   val fieldsString: String = fields.mkString("(", ", ", ")")
 
   def dataString(b: EncryBlock): String = {
+    val id: String = Base16.encode(b.id)
     val parentId: String = Base16.encode(b.parentId)
     val proofsRoot: String = Base16.encode(b.header.adProofsRoot)
     val stateRoot: String = Base16.encode(b.header.stateRoot)
@@ -40,7 +41,7 @@ object BlocksTable {
     val feesTotal: Long = b.payload.transactions.map(_.fee).sum
     val txsSize: Int = b.payload.transactions.map(_.bytes.length).sum
 
-    s"('$parentId', '${b.header.version}', '${b.header.version}', '${b.header.height}', '$proofsRoot', '$stateRoot', " +
+    s"('$id', '$parentId', '${b.header.version}', '${b.header.height}', '$proofsRoot', '$stateRoot', " +
       s"'$transactionsRoot', '${b.header.timestamp}', '${b.header.difficulty}', '${b.bytes.length}', '$solution', '$proofs', " +
       s"'${b.payload.transactions.size}', '$minerAddress', '$minerRaward', '$feesTotal', '$txsSize')"
   }
