@@ -3,7 +3,7 @@ package encry.local.explorer.tables
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.mempool.directive.TransferDirective
-import encry.settings.Algos
+import scorex.crypto.encode.Base16
 
 object BlocksTable {
 
@@ -16,12 +16,12 @@ object BlocksTable {
     "ad_proofs_root",
     "state_root",
     "transactions_root",
-    "timestamp",
+    "ts",
     "difficulty",
     "block_size",
     "equihash_solution",
     "ad_proofs",
-    "txs_count",
+    "txs_qty",
     "miner_address",
     "miner_reward",
     "fees_total",
@@ -30,10 +30,10 @@ object BlocksTable {
   val fieldsString: String = fields.mkString("(", ", ", ")")
 
   def dataString(b: EncryBlock): String = {
-    val parentId: String = Algos.encode(b.parentId)
-    val proofsRoot: String = Algos.encode(b.header.adProofsRoot)
-    val stateRoot: String = Algos.encode(b.header.stateRoot)
-    val transactionsRoot: String = Algos.encode(b.header.transactionsRoot)
+    val parentId: String = Base16.encode(b.parentId)
+    val proofsRoot: String = Base16.encode(b.header.adProofsRoot)
+    val stateRoot: String = Base16.encode(b.header.stateRoot)
+    val transactionsRoot: String = Base16.encode(b.header.transactionsRoot)
     val proofs: String = b.adProofsOpt.fold("{}")(_.bytes.mkString("{", ", ", "}"))
     val solution: String = b.header.equihashSolution.ints.mkString("{", ", ", "}")
     val (minerAddress: String, minerRaward: Long) = minerInfo(b.payload.transactions.last)

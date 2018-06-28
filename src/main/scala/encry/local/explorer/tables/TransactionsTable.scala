@@ -3,7 +3,7 @@ package encry.local.explorer.tables
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
-import encry.settings.Algos
+import scorex.crypto.encode.Base16
 
 object TransactionsTable {
 
@@ -12,10 +12,10 @@ object TransactionsTable {
   val fieldsString: String = fields.mkString("(", ", ", ")")
 
   def dataString(h: EncryBlockHeader, tx: EncryBaseTransaction, isCoinbase: Boolean): String = {
-    val id: String = Algos.encode(tx.id)
-    val blockId: String = Algos.encode(h.id)
-    val cb: String = if (isCoinbase) "TRUE" else "FALSE"
-    s"('$id', '$blockId', $cb, ${h.timestamp})"
+    val id: String = Base16.encode(tx.id)
+    val blockId: String = Base16.encode(h.id)
+    val isCb: String = if (isCoinbase) "TRUE" else "FALSE"
+    s"('$id', '$blockId', $isCb, ${h.timestamp})"
   }
 
   def dataStrings(h: EncryBlockHeader, p: EncryBlockPayload): String = {
