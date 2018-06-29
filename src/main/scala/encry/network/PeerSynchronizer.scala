@@ -38,6 +38,6 @@ class PeerSynchronizer extends Actor with ScorexLogging {
         .foreach { peers =>
           networkController ! SendToNetwork(Message(PeersSpec, Right(peers), None), SendToPeers(Seq(remote)))
         }
-    case nonsense: Any => log.warn(s"PeerSynchronizer: got something strange $nonsense")
+    case nonsense: Any => logWarn(s"PeerSynchronizer: got something strange $nonsense")
   }
 }

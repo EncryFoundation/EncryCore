@@ -40,7 +40,7 @@ class UtxoState(override val version: VersionTag,
   override def maxRollbackDepth: Int = Constants.Chain.MaxRollbackDepth
 
   private def onAdProofGenerated(proof: ADProofs): Unit = {
-    if (nodeViewHolderRef.isEmpty) log.warn("Got proof while nodeViewHolderRef is empty")
+    if (nodeViewHolderRef.isEmpty) logWarn("Got proof while nodeViewHolderRef is empty")
     nodeViewHolderRef.foreach(_ ! LocallyGeneratedModifier(proof))
   }
 
@@ -102,7 +102,7 @@ class UtxoState(override val version: VersionTag,
 
         new UtxoState(VersionTag !@@ block.id, Height @@ block.header.height, stateStore, lastBlockTimestamp, nodeViewHolderRef)
       }.recoverWith[UtxoState] { case e =>
-        log.warn(s"Failed to apply block with header ${block.header.encodedId} to UTXOState with root" +
+        logWarn(s"Failed to apply block with header ${block.header.encodedId} to UTXOState with root" +
           s" ${Algos.encode(rootHash)}: ", e)
         Failure(e)
       }
@@ -121,7 +121,7 @@ class UtxoState(override val version: VersionTag,
       throw new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}")
     persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
   }.flatten.recoverWith[(SerializedAdProof, ADDigest)] { case e =>
-    log.warn(s"Failed to generate ADProof", e)
+    logWarn(s"Failed to generate ADProof", e)
     Failure(e)
   }
 

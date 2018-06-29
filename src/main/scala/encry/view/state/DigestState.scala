@@ -47,7 +47,7 @@ class DigestState protected(override val version: VersionTag,
           log.info(s"Valid modifier applied to DigestState: ${block.encodedId}")
           s
         case Failure(e) =>
-          log.warn(s"Modifier $mod is not valid: ", e)
+          logWarn(s"Modifier $mod is not valid: ", e)
           Failure(e)
       }
     case mod: Any =>

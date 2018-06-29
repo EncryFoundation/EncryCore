@@ -121,7 +121,7 @@ class NetworkController extends Actor with ScorexLogging {
       log.info(s"Registering handlers for ${specs.map(s => s.messageCode -> s.messageName)}")
       messageHandlers += specs.map(_.messageCode) -> handler
     case CommandFailed(cmd: Tcp.Command) => log.info("Failed to execute command : " + cmd)
-    case nonsense: Any => log.warn(s"NetworkController: got something strange $nonsense")
+    case nonsense: Any => logWarn(s"NetworkController: got something strange $nonsense")
   }
 }
 

@@ -47,7 +47,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   def processErrors(stateName: CommunicationState): Receive = {
     case CommandFailed(w: Write) =>
-      log.warn(s"Write failed :$w " + remote + s" in state $stateName")
+      logWarn(s"Write failed :$w " + remote + s" in state $stateName")
       //      peerManager ! AddToBlacklist(remote)
       connection ! Close
       connection ! ResumeReading
@@ -145,7 +145,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   }
 
   def reportStrangeInput: Receive = {
-    case nonsense: Any => log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
+    case nonsense: Any => logWarn(s"Strange input for PeerConnectionHandler: $nonsense")
   }
 
   def workingCycle: Receive =

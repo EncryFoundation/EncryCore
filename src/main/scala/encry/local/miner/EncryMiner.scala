@@ -44,7 +44,7 @@ class EncryMiner extends Actor with ScorexLogging {
   def shouldStartMine(b: EncryBlock): Boolean = settings.node.mining && b.header.timestamp >= timeProvider.time() && context.children.nonEmpty
 
   def unknownMessage: Receive = {
-    case m => log.warn(s"Unexpected message $m")
+    case m => logWarn(s"Unexpected message $m")
   }
 
   def mining: Receive = {

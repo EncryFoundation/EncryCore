@@ -94,7 +94,7 @@ class DeliveryTracker(context: ActorContext,
   protected def tryWithLogging(fn: => Unit): Unit = {
     Try(fn).recoverWith {
       case e =>
-        log.warn("Unexpected error", e)
+        logWarn("Unexpected error", e)
         Failure(e)
     }
   }
