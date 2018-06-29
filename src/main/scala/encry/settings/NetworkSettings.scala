@@ -20,13 +20,10 @@ case class NetworkSettings(nodeName: String,
                             deliveryTimeout: FiniteDuration,
                             maxDeliveryChecks: Int,
                             appVersion: String,
-                            agentName: String,
-                            maxPacketLen: Int,
                             maxInvObjects: Int,
                             syncInterval: FiniteDuration,
                             syncStatusRefresh: FiniteDuration,
                             syncIntervalStable: FiniteDuration,
                             syncStatusRefreshStable: FiniteDuration,
-                            syncTimeout: Option[FiniteDuration],
-                            controllerTimeout: Option[FiniteDuration]
+                            syncTimeout: Option[FiniteDuration]
                            )
