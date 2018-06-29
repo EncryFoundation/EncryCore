@@ -40,11 +40,10 @@ object EncryApp extends App with ScorexLogging {
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read
 
-  implicit val system: ActorSystem = ActorSystem(settings.network.agentName)
+  implicit val system: ActorSystem = ActorSystem()
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
 
-  require(settings.network.agentName.length <= 50)
   lazy val bindAddress: InetSocketAddress = settings.restApi.bindAddress
 
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
@@ -101,7 +100,7 @@ object EncryApp extends App with ScorexLogging {
 
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
 
-  if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
+  if (settings.node.mining) miner ! StartMining
 
   if (settings.testing.transactionGeneration) system.actorOf(Props[TransactionGenerator], "tx-generator") ! StartGeneration
 

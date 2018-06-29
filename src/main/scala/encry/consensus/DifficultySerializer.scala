@@ -2,6 +2,7 @@ package encry.consensus
 
 import java.math.BigInteger
 
+//TODO object of no use
 object DifficultySerializer {
 
   def toBytes(target: Difficulty): Array[Byte] = uint32ToByteArrayBE(encodeCompactBits(target))
@@ -9,14 +10,13 @@ object DifficultySerializer {
   def parseBytes(array: Array[Byte]): Difficulty = Difficulty @@ decodeCompactBits(readUint32BE(array))
 
   private def decodeMPI(mpi: Array[Byte], hasLength: Boolean): BigInteger = {
-    var buf: Array[Byte] = null // scalastyle:ignore
+    var buf: Array[Byte] = null
     if (hasLength) {
       val length: Int = readUint32BE(mpi).toInt
       buf = new Array[Byte](length)
       System.arraycopy(mpi, 4, buf, 0, length)
-    } else {
-      buf = mpi
-    }
+    } else buf = mpi
+
     if (buf.length != 0){
       val isNegative: Boolean = (buf(0) & 0x80) == 0x80
       if (isNegative) buf(0) = (buf(0) & 0x7f).toByte
