@@ -70,13 +70,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               log.warn(s"Received modifier ${pmod.encodedId} that is already in history")
             else modifiersCache.put(key(pmod.id), pmod)
         }
-        log.debug(s"Cache before(${modifiersCache.size}): ${modifiersCache.keySet.map(_.array).map(Algos.encode).mkString(",")}")
+        log.info(s"Cache before(${modifiersCache.size})")
         def found: Option[(mutable.WrappedArray.ofByte, PMOD)] = modifiersCache.find(x => nodeView.history.applicable(x._2))
         Iterator.continually(found).takeWhile(_.isDefined).flatten.foreach { case (k, v) =>
             modifiersCache.remove(k)
             pmodModify(v)
         }
-        log.debug(s"Cache after(${modifiersCache.size}): ${modifiersCache.keySet.map(_.array).map(Algos.encode).mkString(",")}")
+        log.info(s"Cache after(${modifiersCache.size})")
       }
     case lt: LocallyGeneratedTransaction[P, EncryBaseTransaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
