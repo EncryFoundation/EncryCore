@@ -1,19 +1,15 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
-
 import com.google.common.primitives.{Ints, Longs}
 import encry.modifiers.serialization.{BytesSerializable, Serializer}
-
 import scala.util.Try
 
-case class Handshake(applicationName: String,
-                     protocolVersion: Version,
+case class Handshake(protocolVersion: Version,
                      nodeName: String,
                      declaredAddress: Option[InetSocketAddress],
                      time: Long) extends BytesSerializable {
 
-  require(Option(applicationName).isDefined)
   require(Option(protocolVersion).isDefined)
 
   override type M = Handshake
@@ -24,13 +20,13 @@ case class Handshake(applicationName: String,
 object HandshakeSerializer extends Serializer[Handshake] {
 
   override def toBytes(obj: Handshake): Array[Byte] = {
-    val anb = obj.applicationName.getBytes
+    val anb: Array[Byte] = "word".getBytes
 
-    val fab = obj.declaredAddress.map { isa =>
+    val fab: Array[Byte] = obj.declaredAddress.map { isa =>
       isa.getAddress.getAddress ++ Ints.toByteArray(isa.getPort)
     }.getOrElse(Array[Byte]())
 
-    val nodeNameBytes = obj.nodeName.getBytes
+    val nodeNameBytes: Array[Byte] = obj.nodeName.getBytes
 
     Array(anb.size.toByte) ++ anb ++
       obj.protocolVersion.bytes ++
@@ -47,34 +43,34 @@ object HandshakeSerializer extends Serializer[Handshake] {
 
     position += 1
 
-    val an = new String(bytes.slice(position, position + appNameSize))
+    val an: String = new String(bytes.slice(position, position + appNameSize))
     position += appNameSize
 
-    val av = ApplicationVersionSerializer.parseBytes(
+    val av: Version = ApplicationVersionSerializer.parseBytes(
       bytes.slice(position, position + ApplicationVersionSerializer.SerializedVersionLength)).get
     position += ApplicationVersionSerializer.SerializedVersionLength
 
-    val nodeNameSize = bytes.slice(position, position + 1).head
+    val nodeNameSize: Byte = bytes.slice(position, position + 1).head
     position += 1
 
-    val nodeName = new String(bytes.slice(position, position + nodeNameSize))
+    val nodeName: String = new String(bytes.slice(position, position + nodeNameSize))
     position += nodeNameSize
 
-    val fas = Ints.fromByteArray(bytes.slice(position, position + 4))
+    val fas: Int = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
 
-    val isaOpt = if (fas > 0) {
-      val fa = bytes.slice(position, position + fas - 4)
+    val isaOpt: Option[InetSocketAddress] = if (fas > 0) {
+      val fa: Array[Byte] = bytes.slice(position, position + fas - 4)
       position += fas - 4
 
-      val port = Ints.fromByteArray(bytes.slice(position, position + 4))
+      val port: Int = Ints.fromByteArray(bytes.slice(position, position + 4))
       position += 4
 
       Some(new InetSocketAddress(InetAddress.getByAddress(fa), port))
     } else None
 
-    val time = Longs.fromByteArray(bytes.slice(position, position + 8))
+    val time: Long = Longs.fromByteArray(bytes.slice(position, position + 8))
 
-    Handshake(an, av, nodeName, isaOpt, time)
+    Handshake(av, nodeName, isaOpt, time)
   }
 }
