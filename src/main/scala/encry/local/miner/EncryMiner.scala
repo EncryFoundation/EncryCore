@@ -51,15 +51,14 @@ class EncryMiner extends Actor with ScorexLogging {
 
     case StartMining if context.children.nonEmpty =>
       candidateOpt match {
-        case Some(candidateBlock) =>
-          context.children.foreach(_ ! NextChallenge(candidateBlock))
+        case Some(candidateBlock) => context.children.foreach(_ ! NextChallenge(candidateBlock))
         case None => produceCandidate()
       }
 
     case StartMining =>
       val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
       for (i <- 0 until numberOfWorkers) yield context.actorOf(
-        Props(classOf[EncryMiningWorker], self, i, numberOfWorkers), s"worker$i")
+        Props(classOf[EncryMiningWorker], i, numberOfWorkers).withDispatcher("mining-dispatcher"), s"worker$i")
       self ! StartMining
 
     case DisableMining if context.children.nonEmpty =>
@@ -69,7 +68,7 @@ class EncryMiner extends Actor with ScorexLogging {
     case MinedBlock(block) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
       nodeViewHolder ! LocallyGeneratedModifier(block.header)
       nodeViewHolder ! LocallyGeneratedModifier(block.payload)
-      if (settings.node.stateMode == StateMode.Digest) block.adProofsOpt.foreach ( adp => nodeViewHolder ! LocallyGeneratedModifier(adp) )
+      if (settings.node.stateMode == StateMode.Digest) block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
       candidateOpt = None
       context.children.foreach(_ ! DropChallenge)
 
