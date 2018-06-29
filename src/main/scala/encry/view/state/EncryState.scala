@@ -62,8 +62,8 @@ object EncryState extends ScorexLogging {
   def generateGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
     val supplyBoxes: List[EncryBaseBox] = EncrySupplyController.totalSupplyBoxes.toList
     UtxoState.genesis(supplyBoxes, stateDir, nodeViewHolderRef).ensuring(us => {
-      log.debug(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
-      log.debug(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
+      log.info(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
+      log.info(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
       log.info(s"Generated UTXO state with ${supplyBoxes.size} boxes inside.")
       us.rootHash.sameElements(afterGenesisStateDigest) && us.version.sameElements(genesisStateVersion)
     })
