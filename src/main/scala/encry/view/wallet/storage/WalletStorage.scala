@@ -18,18 +18,16 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
     .flatMap(d => StateModifierDeserializer.parseBytes(d.data, id.head).toOption)
 
   def allBoxes: Seq[EncryBaseBox] = store.getAll
-      .filter(dataFromStore => getTokensId.contains(dataFromStore._1.data) || dataFromStore._1.equals(tokensIdsKey))
-      .foldLeft(Seq[EncryBaseBox]()) { case (acc, id) =>
-        getBoxById(ADKey @@ id._1.data).map(bx => acc :+ bx).getOrElse(acc)
-      }
+    .filter(dataFromStore => getTokensId.contains(dataFromStore._1.data) || dataFromStore._1.equals(tokensIdsKey))
+    .foldLeft(Seq[EncryBaseBox]()) { case (acc, id) =>
+      getBoxById(ADKey @@ id._1.data).map(bx => acc :+ bx).getOrElse(acc)
+    }
 
   def containsBox(id: ADKey): Boolean = getBoxById(id).isDefined
 
-  def getTokenBalanceById(id: ADKey): Option[Amount] = store.get(keyByTokenId(id))
-    .map(v => Longs.fromByteArray(v.data))
+  def getTokenBalanceById(id: ADKey): Option[Amount] = store.get(keyByTokenId(id)).map(v => Longs.fromByteArray(v.data))
 
-  def getTokensId: Seq[ADKey] =
-    readComplexValue(tokensIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
+  def getTokensId: Seq[ADKey] = readComplexValue(tokensIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
 }
 
 object WalletStorage {

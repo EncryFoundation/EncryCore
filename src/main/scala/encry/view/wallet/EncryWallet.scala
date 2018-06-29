@@ -50,7 +50,7 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
           (nBxs ++ newBxsL) -> (sBxs ++ spendBxsIdsL)
       }
 
-      updateWalletAndInsertBalance(modifier.id, newBxs, spentBxs)
+      updateWallet(modifier.id, newBxs, spentBxs)
       this
 
     case _ => this
@@ -65,14 +65,12 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
     val prevBoxes: Map[ADKey, Amount] = getBalances.toMap
     val newBalanceSheet: Map[ADKey, Amount] =
       (prevBoxes.toSeq ++ bObj.toSeq).foldLeft(Map.empty[ADKey, Amount]) {
-        case (balanceMap, tokenInfo) =>
-          balanceMap.get(tokenInfo._1)
+        case (balanceMap, tokenInfo) => balanceMap.get(tokenInfo._1)
             .map(amount => balanceMap.updated(tokenInfo._1, amount + tokenInfo._2)).getOrElse(balanceMap.updated(tokenInfo._1, tokenInfo._2))
       }.map(tokenInfo => tokenInfo._1 ->
         (tokenInfo._2 - toRemove.find(ti => java.util.Arrays.equals(ti._1, tokenInfo._1)).map(_._2).getOrElse(0L)))
 
-    val decodedTokenBalance: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-      newBalanceSheet.foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()) {
+    val decodedTokenBalance: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = newBalanceSheet.foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()) {
         case (seq, (tId, balance)) => seq :+ (ByteArrayWrapper(tId) -> ByteArrayWrapper(Longs.toByteArray(balance)))
       }
     decodedTokenBalance ++ Seq(tokensIdsKey -> ByteArrayWrapper(bObj.keys.foldLeft(Array.empty[Byte]) {
@@ -80,9 +78,7 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
     }))
   }
 
-  private def updateWalletAndInsertBalance(modifierId: ModifierId,
-                                           newBxs: Seq[EncryBaseBox],
-                                           spentBxs: Seq[EncryBaseBox]): Unit = {
+  private def updateWallet(modifierId: ModifierId, newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]): Unit = {
     import WalletStorage._
     val bxsToInsert: Seq[EncryBaseBox] = newBxs.filter(bx => !spentBxs.contains(bx))
     val newBalance: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =

@@ -91,8 +91,7 @@ trait EncryGenerator {
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
     val timestamp: Amount = System.currentTimeMillis()
     keys.foldLeft(Seq[EncryTransaction]()) { (seq, key) =>
-      val useBoxes =
-        if (seq.isEmpty) IndexedSeq(genAssetBox(key.publicImage.address))
+      val useBoxes: IndexedSeq[MonetaryBox] = if (seq.isEmpty) IndexedSeq(genAssetBox(key.publicImage.address))
         else seq.last.newBoxes.map(_.asInstanceOf[MonetaryBox]).toIndexedSeq
       seq :+ TransactionFactory.defaultPaymentTransactionScratch(key, Props.txFee,
         timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
