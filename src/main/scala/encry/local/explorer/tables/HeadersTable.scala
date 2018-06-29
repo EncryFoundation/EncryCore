@@ -38,13 +38,13 @@ object HeadersTable {
     val transactionsRoot: String = Base16.encode(b.header.transactionsRoot)
     val proofs: String = b.adProofsOpt.fold("{}")(_.bytes.mkString("{", ", ", "}"))
     val solution: String = b.header.equihashSolution.ints.mkString("{", ", ", "}")
-    val (minerAddress: String, minerRaward: Long) = minerInfo(b.payload.transactions.last)
+    val (minerAddress: String, minerReward: Long) = minerInfo(b.payload.transactions.last)
     val feesTotal: Long = b.payload.transactions.map(_.fee).sum
     val txsSize: Int = b.payload.transactions.map(_.bytes.length).sum
 
     s"('$id', '$parentId', '${b.header.version}', '${b.header.height}', '$proofsRoot', '$stateRoot', " +
       s"'$transactionsRoot', '${b.header.timestamp}', '${b.header.difficulty}', '${b.bytes.length}', '$solution', '$proofs', " +
-      s"'${b.payload.transactions.size}', '$minerAddress', '$minerRaward', '$feesTotal', '$txsSize', TRUE)"
+      s"'${b.payload.transactions.size}', '$minerAddress', '$minerReward', '$feesTotal', '$txsSize', TRUE)"
   }
 
   private def minerInfo(coinbase: EncryBaseTransaction): (String, Long) = coinbase.directives.head match {
