@@ -78,7 +78,7 @@ class UtxoState(override val version: VersionTag,
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
 
     case block: EncryBlock =>
-      log.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
+      log.info(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
 
       applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
@@ -114,7 +114,7 @@ class UtxoState(override val version: VersionTag,
   }
 
   def generateProofs(txs: Seq[EncryBaseTransaction]): Try[(SerializedAdProof, ADDigest)] = Try {
-    log.debug(s"Generating proof for ${txs.length} transactions ...")
+    log.info(s"Generating proof for ${txs.length} transactions ...")
     val rootHash: ADDigest = persistentProver.digest
     if (txs.isEmpty) throw new Exception("Got empty transaction sequence")
     else if (!storage.version.exists(_.sameElements(rootHash)))

@@ -48,7 +48,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
   }
 
   override def reportModifierIsValid(modifier: EncryPersistentModifier): EncryHistory = {
-    log.debug(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as valid ")
+    log.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as valid ")
     markModifierValid(modifier)
     this
   }
@@ -56,7 +56,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
   /** Report some modifier as valid or invalid semantically */
   override def reportModifierIsInvalid(modifier: EncryPersistentModifier,
                                        progressInfo: ProgressInfo[EncryPersistentModifier]): (EncryHistory, ProgressInfo[EncryPersistentModifier]) = {
-    log.debug(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
+    log.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
     this -> markModifierInvalid(modifier)
   }
 

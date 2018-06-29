@@ -121,7 +121,7 @@ class EncryMiner extends Actor with ScorexLogging {
       unknownMessage
 
   def procCandidateBlock(c: CandidateBlock): Unit = {
-    log.debug(s"Got candidate block $c")
+    log.info(s"Got candidate block $c")
     candidateOpt = Some(c)
     context.system.scheduler.scheduleOnce(settings.node.miningDelay, self, StartMining)
   }
@@ -164,7 +164,7 @@ class EncryMiner extends Actor with ScorexLogging {
 
     val candidate: CandidateBlock = CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
 
-    log.debug(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
+    log.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
       s"and 1 coinbase for height $height")
 
     candidate
