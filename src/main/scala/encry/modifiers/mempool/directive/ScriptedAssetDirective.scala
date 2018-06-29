@@ -41,7 +41,7 @@ object ScriptedAssetDirective {
 
   implicit val jsonEncoder: Encoder[ScriptedAssetDirective] = (d: ScriptedAssetDirective) => Map(
     "typeId" -> d.typeId.asJson,
-    "contractHash" -> Base58.encode(d.contractHash).asJson,
+    "contractHash" -> Algos.encode(d.contractHash).asJson,
     "amount" -> d.amount.asJson,
     "tokenId" -> d.tokenIdOpt.map(id => Algos.encode(id)).asJson
   ).asJson
