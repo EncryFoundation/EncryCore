@@ -25,7 +25,6 @@ import encry.view.state.{Proposition, _}
 import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import scorex.crypto.authds.ADDigest
-import scorex.crypto.encode.Base58
 
 import scala.annotation.tailrec
 import scala.collection.mutable

@@ -1,8 +1,8 @@
 package encry.validation
 
 import encry.consensus.ModifierSemanticValidity
+import encry.settings.Algos
 import encry.validation.ValidationResult.{Invalid, Valid}
-import scorex.crypto.encode.Base58
 
 trait ModifierValidator {
 
@@ -52,7 +52,7 @@ case class ValidationState(result: ValidationResult, strategy: ValidationStrateg
 
   /** Validate the `id`s are equal. The `error` callback will be provided with detail on argument values */
   def validateEqualIds(given: => Array[Byte], expected: => Array[Byte])(error: String => Invalid): ValidationState =
-    validate(given sameElements expected)(error(s"Given: ${Base58.encode(given)}, expected ${Base58.encode(expected)}"))
+    validate(given sameElements expected)(error(s"Given: ${Algos.encode(given)}, expected ${Algos.encode(expected)}"))
 
   /** Wrap semantic validity to the validation state: if semantic validity was not Valid, then return the `error` given
     */
