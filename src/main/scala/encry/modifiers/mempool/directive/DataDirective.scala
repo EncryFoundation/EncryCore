@@ -1,8 +1,7 @@
 package encry.modifiers.mempool.directive
 
-import com.google.common.primitives.{Bytes, Ints, Shorts}
+import com.google.common.primitives.{Bytes, Ints}
 import encry.modifiers.mempool.directive.Directive.DTypeId
-import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.{DataBox, EncryBaseBox, EncryProposition}
 import encry.settings.{Algos, Constants}
@@ -10,7 +9,6 @@ import encry.utils.Utils
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
 import scala.util.Try
@@ -35,7 +33,7 @@ object DataDirective {
 
   implicit val jsonEncoder: Encoder[DataDirective] = (d: DataDirective) => Map(
     "typeId" -> d.typeId.asJson,
-    "contractHash" -> Base58.encode(d.contractHash).asJson,
+    "contractHash" -> Algos.encode(d.contractHash).asJson,
     "data" -> Algos.encode(d.data).asJson
   ).asJson
 

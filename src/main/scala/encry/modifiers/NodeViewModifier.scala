@@ -3,9 +3,9 @@ package encry.modifiers
 import com.typesafe.config.ConfigFactory
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.serialization.BytesSerializable
+import encry.settings.Algos
 import encry.view.state.Proposition
 import encry.{ModifierId, ModifierTypeId}
-import scorex.crypto.encode.Base58
 
 import scala.util.Try
 
@@ -16,7 +16,7 @@ sealed trait NodeViewModifier extends BytesSerializable {
 
   def id: ModifierId
 
-  def encodedId: String = Base58.encode(id)
+  def encodedId: String = Algos.encode(id)
 
   override def equals(obj: scala.Any): Boolean = obj match {
     case that: NodeViewModifier => (that.id sameElements id) && (that.modifierTypeId == modifierTypeId)
