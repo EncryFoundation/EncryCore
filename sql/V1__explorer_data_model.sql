@@ -15,7 +15,8 @@ CREATE TABLE blocks (
   miner_address VARCHAR NOT NULL,
   miner_reward BIGINT NOT NULL,
   fees_total BIGINT NOT NULL,
-  txs_size BIGINT NOT NULL
+  txs_size BIGINT NOT NULL,
+  best_chain BOOLEAN NOT NULL
 );
 
 ALTER TABLE blocks OWNER TO encry_admin;

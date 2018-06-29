@@ -25,7 +25,8 @@ object BlocksTable {
     "miner_address",
     "miner_reward",
     "fees_total",
-    "txs_size"
+    "txs_size",
+    "best_chain"
   )
   val fieldsString: String = fields.mkString("(", ", ", ")")
 
@@ -43,7 +44,7 @@ object BlocksTable {
 
     s"('$id', '$parentId', '${b.header.version}', '${b.header.height}', '$proofsRoot', '$stateRoot', " +
       s"'$transactionsRoot', '${b.header.timestamp}', '${b.header.difficulty}', '${b.bytes.length}', '$solution', '$proofs', " +
-      s"'${b.payload.transactions.size}', '$minerAddress', '$minerRaward', '$feesTotal', '$txsSize')"
+      s"'${b.payload.transactions.size}', '$minerAddress', '$minerRaward', '$feesTotal', '$txsSize', TRUE)"
   }
 
   private def minerInfo(coinbase: EncryBaseTransaction): (String, Long) = coinbase.directives.head match {
