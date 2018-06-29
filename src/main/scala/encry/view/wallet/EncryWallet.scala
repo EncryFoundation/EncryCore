@@ -10,14 +10,13 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{EncryBaseBox, EncryProposition}
-import encry.settings.{Algos, Constants, EncryAppSettings}
+import encry.settings.{Constants, EncryAppSettings}
 import encry.utils.{BalanceCalculator, BoxFilter, ScorexLogging}
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
 import encry.{ModifierId, VersionTag}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.crypto.authds.ADKey
-import scorex.utils.Random
 
 import scala.util.Try
 
@@ -39,71 +38,19 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
   override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = modifier match {
 
     case block: EncryBlock =>
-      val (newBxs: Seq[EncryBaseBox], spentBxsIds: Seq[ADKey]) = block.transactions.foldLeft(Seq[EncryBaseBox](), Seq[ADKey]()) {
+      val (newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]) = block.transactions.foldLeft(Seq[EncryBaseBox](), Seq[EncryBaseBox]()) {
         case ((nBxs, sBxs), tx: EncryBaseTransaction) =>
           val newBxsL: Seq[EncryBaseBox] = tx.newBoxes
             .foldLeft(Seq[EncryBaseBox]()) { case (nBxs2, bx) =>
               if (propositions.exists(_.contractHash sameElements bx.proposition.contractHash)) nBxs2 :+ bx else nBxs2
             }
-          val spendBxsIdsL: Seq[ADKey] = tx.inputs.map(_.boxId)
-            .foldLeft(Seq[ADKey]()) { case (sBxs2, id) =>
-              val bxsIdsCurrent: Seq[ADKey] = walletStorage.boxIds
-              if (bxsIdsCurrent.exists(_.sameElements(id))) sBxs2 :+ id
-              else sBxs2
-            }
-          val isRelatedTransaction: Boolean = {
-            val walletPropositionsSet: Set[ByteArrayWrapper] = propositions.map(p => ByteArrayWrapper(Algos.hash(p.bytes)))
-            val txPropositionsSet: Set[ByteArrayWrapper] = tx.inputs.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc, input) =>
-              acc ++ input.proofs.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc2, proof) =>
-                acc2 :+ ByteArrayWrapper(Algos.hash(proof.bytes))
-              }
-            }.toSet
-            walletPropositionsSet.intersect(txPropositionsSet).nonEmpty ||
-              tx.defaultProofOpt.exists(pr => walletPropositionsSet.exists(_.data sameElements Algos.hash(pr.bytes)))
-          }
-          if (newBxsL.nonEmpty || isRelatedTransaction) (nBxs ++ newBxsL, sBxs ++ spendBxsIdsL)
-          else (nBxs, sBxs)
+          val spendBxsIdsL: Seq[EncryBaseBox] =
+            tx.inputs.filter(input => walletStorage.containsBox(input.boxId))
+              .foldLeft(Seq.empty[EncryBaseBox]) { case (boxes, input) => walletStorage.getBoxById(input.boxId).map(bx => boxes :+ bx).getOrElse(boxes) }
+          (nBxs ++ newBxsL) -> (sBxs ++ spendBxsIdsL)
       }
 
-      updateWalletAndInsertBalance(modifier.id, newBxs, spentBxsIds)
-      this
-
-    case _ => this
-  }
-
-  def scanPersistentAndInsertBoxes(modifier: EncryPersistentModifier): EncryWallet = modifier match {
-
-    case block: EncryBlock =>
-      val (
-        newTxs: Seq[EncryBaseTransaction],
-        newBxs: Seq[EncryBaseBox],
-        spentBxsIds: Seq[ADKey]) = block.transactions
-        .foldLeft(Seq[EncryBaseTransaction](), Seq[EncryBaseBox](), Seq[ADKey]()) {
-          case ((nTxs, nBxs, sBxs), tx: EncryBaseTransaction) =>
-            val newBxsL: Seq[EncryBaseBox] = tx.newBoxes
-              .foldLeft(Seq[EncryBaseBox]()) { case (nBxs2, bx) =>
-                if (propositions.exists(_.contractHash sameElements bx.proposition.contractHash)) nBxs2 :+ bx else nBxs2
-              }
-            val spendBxsIdsL: Seq[ADKey] = tx.inputs.map(_.boxId)
-              .foldLeft(Seq[ADKey]()) { case (sBxs2, id) =>
-                val bxsIdsCurrent: Seq[ADKey] = walletStorage.boxIds
-                if (bxsIdsCurrent.exists(_.sameElements(id))) sBxs2 :+ id
-                else sBxs2
-              }
-            val isRelatedTransaction: Boolean = {
-              val walletPropositionsSet: Set[ByteArrayWrapper] = propositions.map(p => ByteArrayWrapper(Algos.hash(p.bytes)))
-              val txPropositionsSet: Set[ByteArrayWrapper] = tx.inputs.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc, input) =>
-                acc ++ input.proofs.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc2, proof) =>
-                  acc2 :+ ByteArrayWrapper(Algos.hash(proof.bytes))
-                }
-              }.toSet
-              walletPropositionsSet.intersect(txPropositionsSet).nonEmpty ||
-                tx.defaultProofOpt.exists(pr => walletPropositionsSet.exists(_.data sameElements Algos.hash(pr.bytes)))
-            }
-            if (newBxsL.nonEmpty || isRelatedTransaction) (nTxs :+ tx, nBxs ++ newBxsL, sBxs ++ spendBxsIdsL)
-            else (nTxs, nBxs, sBxs)
-        }
-      updateWallet(modifier.id, newTxs, newBxs, spentBxsIds)
+      updateWalletAndInsertBalance(modifier.id, newBxs, spentBxs)
       this
 
     case _ => this
@@ -111,12 +58,19 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
 
   override def rollback(to: VersionTag): Try[EncryWallet] = Try(walletStore.rollback(ByteArrayWrapper(to))).map(_ => this)
 
-  private def calculateNewBalance(bxs: Seq[EncryBaseBox]): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
+  private def calculateNewBalance(bxsToInsert: Seq[EncryBaseBox], bxsToRemove: Seq[EncryBaseBox]): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
     import WalletStorage._
-    val bObj: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxs)
-    val prevBoxes: Seq[(ADKey, Amount)] = getBalances
-    val newBalanceSheet: Map[ADKey, Amount] = bObj.map(tokenInfo => tokenInfo._1 -> (tokenInfo._2 + prevBoxes
-      .find(ti => java.util.Arrays.equals(ti._1, tokenInfo._1)).getOrElse((ADKey @@ Random.randomBytes(), 0L))._2))
+    val bObj: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxsToInsert)
+    val toRemove: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxsToRemove)
+    val prevBoxes: Map[ADKey, Amount] = getBalances.toMap
+    val newBalanceSheet: Map[ADKey, Amount] =
+      (prevBoxes.toSeq ++ bObj.toSeq).foldLeft(Map.empty[ADKey, Amount]) {
+        case (balanceMap, tokenInfo) =>
+          balanceMap.get(tokenInfo._1)
+            .map(amount => balanceMap.updated(tokenInfo._1, amount + tokenInfo._2)).getOrElse(balanceMap.updated(tokenInfo._1, tokenInfo._2))
+      }.map(tokenInfo => tokenInfo._1 ->
+        (tokenInfo._2 - toRemove.find(ti => java.util.Arrays.equals(ti._1, tokenInfo._1)).map(_._2).getOrElse(0L)))
+
     val decodedTokenBalance: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
       newBalanceSheet.foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()) {
         case (seq, (tId, balance)) => seq :+ (ByteArrayWrapper(tId) -> ByteArrayWrapper(Longs.toByteArray(balance)))
@@ -128,39 +82,14 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
 
   private def updateWalletAndInsertBalance(modifierId: ModifierId,
                                            newBxs: Seq[EncryBaseBox],
-                                           spentBxsIds: Seq[ADKey]): Unit = {
+                                           spentBxs: Seq[EncryBaseBox]): Unit = {
     import WalletStorage._
-    val bxsToInsert: Seq[EncryBaseBox] = newBxs.filter(bx => !spentBxsIds.exists(_.sameElements(bx.id)))
+    val bxsToInsert: Seq[EncryBaseBox] = newBxs.filter(bx => !spentBxs.contains(bx))
     val newBalance: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-      calculateNewBalance(BoxFilter.filterAmountCarryingBxs(walletStorage.allBoxes.filter(bx =>
-        !spentBxsIds.exists(_ sameElements bx.id))) ++ BoxFilter.filterAmountCarryingBxs(bxsToInsert))
-    val toRemoveSummary: Seq[ByteArrayWrapper] = spentBxsIds.map(keyByBoxId)
+      calculateNewBalance(BoxFilter.filterAmountCarryingBxs(bxsToInsert), spentBxs.filter(bx => !newBxs.contains(bx)))
+    val toRemoveSummary: Seq[ByteArrayWrapper] = spentBxs.map(bx => keyByBoxId(bx.id))
     val toInsertSummary: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = newBalance ++
-      BoxFilter.filterAmountCarryingBxs(bxsToInsert).map(bx => keyByBoxId(bx.id) -> ByteArrayWrapper(Longs.toByteArray(bx.amount)))
-
-    walletStorage.update(ByteArrayWrapper(modifierId), toRemoveSummary, toInsertSummary)
-  }
-
-  private def updateWallet(modifierId: ModifierId,
-                           newTxs: Seq[EncryBaseTransaction],
-                           newBxs: Seq[EncryBaseBox],
-                           spentBxsIds: Seq[ADKey]): Unit = {
-    import WalletStorage._
-    val bxsIdsCurrent: Seq[ADKey] = walletStorage.boxIds
-    val txIdsToInsertRaw = ByteArrayWrapper(walletStorage.get(transactionIdsKey).getOrElse(Array[Byte]()) ++
-      newTxs.map(_.id).foldLeft(Array[Byte]())(_ ++ _))
-    val bxsToInsert: Seq[EncryBaseBox] = newBxs.filter(bx => !spentBxsIds.exists(_.sameElements(bx.id)))
-    val bxIdsPacked: ByteArrayWrapper = walletStorage.packBoxIds(bxsIdsCurrent.filter(id =>
-      !spentBxsIds.exists(_ sameElements id)) ++ bxsToInsert.map(_.id))
-    val newBalance: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-      calculateNewBalance(BoxFilter.filterAmountCarryingBxs(walletStorage.allBoxes.filter(bx =>
-        !spentBxsIds.exists(_ sameElements bx.id))) ++ BoxFilter.filterAmountCarryingBxs(bxsToInsert))
-    val toRemoveSummary: Seq[ByteArrayWrapper] = spentBxsIds.map(keyByBoxId)
-    val toInsertSummary: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-      Seq(transactionIdsKey -> txIdsToInsertRaw, boxIdsKey -> bxIdsPacked) ++ newBalance ++
-        bxsToInsert.map(bx => keyByBoxId(bx.id) -> ByteArrayWrapper(bx.bytes)) ++
-        newTxs.map(tx => txKeyById(tx.id) -> ByteArrayWrapper(tx.bytes))
-
+      BoxFilter.filterAmountCarryingBxs(bxsToInsert).map(bx => keyByBoxId(bx.id) -> ByteArrayWrapper(bx.bytes))
     walletStorage.update(ByteArrayWrapper(modifierId), toRemoveSummary, toInsertSummary)
   }
 

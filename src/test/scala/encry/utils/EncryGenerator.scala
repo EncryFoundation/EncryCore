@@ -9,13 +9,12 @@ import encry.crypto.equihash.EquihashSolution
 import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
+import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, MonetaryBox}
 import encry.settings.{Algos, Constants}
 import encry.utils.TestHelper.{Props, rndGen}
 import encry.view.state.{BoxHolder, EncryState, UtxoState}
 import io.iohk.iodb.LSMStore
-import encry.{ModifierId, ModifierTypeId}
-import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.authds.avltree.batch.{BatchAVLProver, Insert, PersistentBatchAVLProver}
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue}
 import scorex.crypto.hash.Digest32
@@ -66,9 +65,16 @@ trait EncryGenerator {
     }
   }
 
+  def genValidPaymentTxToAddrWithSpentBoxes(boxes: IndexedSeq[AssetBox], address: Address): EncryTransaction = {
+    val key: PrivateKey25519 = genPrivKeys(1).head
+
+    TransactionFactory.defaultPaymentTransactionScratch(key, Props.txFee,
+      scala.util.Random.nextLong(), boxes, address, Props.boxValue)
+  }
+
   def genValidPaymentTxsToAddrWithDiffTokens(qty: Int, address: Address): Seq[EncryTransaction] = {
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
-    val tokens: Seq[ADKey] = (0 until qty).foldLeft(Seq[ADKey]()){
+    val tokens: Seq[ADKey] = (0 until qty).foldLeft(Seq[ADKey]()) {
       case (seq, _) => seq :+ (ADKey @@ Random.randomBytes())
     }
     val pksZipTokens: Seq[(PrivateKey25519, ADKey)] = keys.zip(tokens)
@@ -86,7 +92,7 @@ trait EncryGenerator {
     val timestamp: Amount = System.currentTimeMillis()
     keys.foldLeft(Seq[EncryTransaction]()) { (seq, key) =>
       val useBoxes =
-        if(seq.isEmpty) IndexedSeq(genAssetBox(key.publicImage.address))
+        if (seq.isEmpty) IndexedSeq(genAssetBox(key.publicImage.address))
         else seq.last.newBoxes.map(_.asInstanceOf[MonetaryBox]).toIndexedSeq
       seq :+ TransactionFactory.defaultPaymentTransactionScratch(key, Props.txFee,
         timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
@@ -133,6 +139,7 @@ trait EncryGenerator {
           ).get
       }
     }
+
     val bxs: IndexedSeq[AssetBox] = TestHelper.genAssetBoxes
 
     val boxHolder: BoxHolder = BoxHolder(bxs)
