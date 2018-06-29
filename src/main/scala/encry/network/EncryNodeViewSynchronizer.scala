@@ -16,7 +16,7 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, Registe
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.message._
-import encry.settings.NetworkSettings
+import encry.settings.{Algos, NetworkSettings}
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.utils.ScorexLogging
 import encry.view.EncryNodeViewHolder.DownloadRequest
@@ -25,7 +25,6 @@ import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec
 import encry.view.mempool.{EncryMempool, MempoolReader}
 import encry.view.state.{Proposition, StateReader}
 import encry.{ModifierId, ModifierTypeId, VersionTag}
-import scorex.crypto.encode.Base58
 
 class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with ScorexLogging {
 
@@ -61,7 +60,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
   override def receive: Receive = viewHolderEvents orElse {
     case SendLocalSyncInfo =>
       if (statusTracker.elapsedTimeSinceLastSync() < (networkSettings.syncInterval.toMillis / 2))
-        log.debug("Trying to send sync info too often")
+        log.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       statusTracker.updateStatus(remote, status)
@@ -76,7 +75,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
     case CheckDelivery(peer, modifierTypeId, modifierId) =>
       if (deliveryTracker.peerWhoDelivered(modifierId).contains(peer)) deliveryTracker.delete(modifierId)
       else {
-        log.info(s"Peer $peer has not delivered asked modifier ${Base58.encode(modifierId)} on time")
+        log.info(s"Peer $peer has not delivered asked modifier ${Algos.encode(modifierId)} on time")
         deliveryTracker.reexpect(peer, modifierTypeId, modifierId)
       }
     case DataFromPeer(spec, syncInfo: EncrySyncInfo@unchecked, remote) if spec.messageCode == syncInfoSpec.messageCode =>
@@ -85,9 +84,9 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, networkSettings.networkChunkSize)
           val ext: ModifierIds = extensionOpt.getOrElse(Seq())
           val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
-          log.debug(s"Comparison with $remote having starting points ${encry.idsToString(syncInfo.startingPoints)}. " +
+          log.info(s"Comparison with $remote having starting points ${encry.idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}")
-          log.trace(s"Extension ids: ${encry.idsToString(ext)}")
+          log.info(s"Extension ids: ${encry.idsToString(ext)}")
           if (!(extensionOpt.nonEmpty || comparison != Younger)) log.warn("Extension is empty while comparison is younger")
           self ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
@@ -98,7 +97,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
           case _: ModifierTypeId => invData._2.flatMap(id => readers._1.modifierById(id))
         }
-        log.debug(s"Requested ${invData._2.length} modifiers ${encry.idsToString(invData)}, " +
+        log.info(s"Requested ${invData._2.length} modifiers ${encry.idsToString(invData)}, " +
           s"sending ${objs.length} modifiers ${encry.idsToString(invData._1, objs.map(_.id))} ")
         self ! ResponseFromLocal(remote, invData._1, objs)
       }
@@ -110,13 +109,13 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
       if (settings.node.sendStat)
         context.actorSelection("/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
       log.info(s"Got modifiers of type $typeId from remote connected peer: $remote")
-      log.trace(s"Received modifier ids ${data._2.keySet.map(Base58.encode).mkString(",")}")
+      log.trace(s"Received modifier ids ${data._2.keySet.map(Algos.encode).mkString(",")}")
       for ((id, _) <- modifiers) deliveryTracker.receive(typeId, id, remote)
       val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
         modifiers partition { case (id, _) => deliveryTracker.isSpam(id) }
       if (spam.nonEmpty) {
         log.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
-          s": ${spam.keys.map(Base58.encode)}")
+          s": ${spam.keys.map(Algos.encode)}")
         deliveryTracker.deleteSpam(spam.keys.toSeq)
       }
       if (fm.nonEmpty) nodeViewHolder ! ModifiersFromRemote(remote, typeId, fm.values.toSeq)

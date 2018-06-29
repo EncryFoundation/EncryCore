@@ -4,7 +4,7 @@ import encry.account.{Account, Address}
 import encry.modifiers.mempool.Proof
 import encry.modifiers.mempool.regcontract.{AccountLockedContract, HeightLockedContract, OpenContract}
 import encry.modifiers.serialization.Serializer
-import encry.settings.Constants
+import encry.settings.{Algos, Constants}
 import encry.view.history.Height
 import encry.view.state.Proposition
 import io.circe.Encoder
@@ -14,7 +14,6 @@ import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import org.encryfoundation.prismlang.core.wrapped.PValue
 import org.encryfoundation.prismlang.evaluator.Evaluator
-import scorex.crypto.encode.Base58
 
 import scala.util.{Failure, Success, Try}
 
@@ -43,7 +42,7 @@ object EncryProposition {
   case object UnlockFailedException extends Exception("Unlock failed")
 
   implicit val jsonEncoder: Encoder[EncryProposition] = (p: EncryProposition) => Map(
-    "contractHash" -> Base58.encode(p.contractHash).asJson
+    "contractHash" -> Algos.encode(p.contractHash).asJson
   ).asJson
 
   def open: EncryProposition = EncryProposition(OpenContract.contract.hash)

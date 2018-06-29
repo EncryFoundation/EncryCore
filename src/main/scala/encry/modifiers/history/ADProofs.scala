@@ -10,7 +10,6 @@ import io.circe.Encoder
 import io.circe.syntax._
 import scorex.crypto.authds.avltree.batch.{BatchAVLVerifier, Insert, Modification, Remove}
 import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Success, Try}
@@ -26,7 +25,7 @@ case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
 
   override lazy val serializer: Serializer[ADProofs] = ADProofSerializer
 
-  override def toString: String = s"ADProofs(${Base58.encode(id)},${Base58.encode(headerId)},${Base58.encode(proofBytes)})"
+  override def toString: String = s"ADProofs(${Algos.encode(id)},${Algos.encode(headerId)},${Algos.encode(proofBytes)})"
 
   /**
     * Verify a set of box(outputs) operations on authenticated UTXO set by using the proof (this class wraps).
@@ -57,7 +56,7 @@ case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
           if (digest sameElements expectedHash) {
             Success()
           } else {
-            Failure(new IllegalArgumentException(s"Unexpected result digest: ${Base58.encode(digest)} != ${Base58.encode(expectedHash)}"))
+            Failure(new IllegalArgumentException(s"Unexpected result digest: ${Algos.encode(digest)} != ${Algos.encode(expectedHash)}"))
           }
         case None =>
           Failure(new IllegalStateException("Digest is undefined"))
@@ -73,9 +72,9 @@ object ADProofs {
   val KeyLength = 32
 
   implicit val jsonEncoder: Encoder[ADProofs] = (p: ADProofs) => Map(
-    "headerId" -> Base58.encode(p.headerId).asJson,
-    "proofBytes" -> Base58.encode(p.proofBytes).asJson,
-    "digest" -> Base58.encode(p.digest).asJson
+    "headerId" -> Algos.encode(p.headerId).asJson,
+    "proofBytes" -> Algos.encode(p.proofBytes).asJson,
+    "digest" -> Algos.encode(p.digest).asJson
   ).asJson
 
   def proofDigest(proofBytes: SerializedAdProof): Digest32 = Algos.hash(proofBytes)
