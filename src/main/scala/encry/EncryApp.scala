@@ -100,7 +100,7 @@ object EncryApp extends App with ScorexLogging {
 
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
 
-  if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
+  if (settings.node.mining) miner ! StartMining
 
   if (settings.testing.transactionGeneration) system.actorOf(Props[TransactionGenerator], "tx-generator") ! StartGeneration
 
