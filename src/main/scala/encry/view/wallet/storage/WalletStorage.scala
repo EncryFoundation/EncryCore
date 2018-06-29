@@ -17,8 +17,7 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
   def getBoxById(id: ADKey): Option[EncryBaseBox] = store.get(keyByBoxId(id))
     .flatMap(d => StateModifierDeserializer.parseBytes(d.data, id.head).toOption)
 
-  def allBoxes: Seq[EncryBaseBox] =
-    store.getAll
+  def allBoxes: Seq[EncryBaseBox] = store.getAll
       .filter(dataFromStore => getTokensId.contains(dataFromStore._1.data) || dataFromStore._1.equals(tokensIdsKey))
       .foldLeft(Seq[EncryBaseBox]()) { case (acc, id) =>
         getBoxById(ADKey @@ id._1.data).map(bx => acc :+ bx).getOrElse(acc)
@@ -35,7 +34,7 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
 
 object WalletStorage {
 
-  val tokensIdsKey = ByteArrayWrapper(Algos.hash("tokens_id"))
+  val tokensIdsKey: ByteArrayWrapper = ByteArrayWrapper(Algos.hash("tokens_id"))
 
   def keyByBoxId(id: ADKey): ByteArrayWrapper = ByteArrayWrapper(id)
 
