@@ -5,9 +5,9 @@ import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.mempool.directive.TransferDirective
 import scorex.crypto.encode.Base16
 
-object BlocksTable {
+object HeadersTable {
 
-  val name: String = "blocks"
+  val name: String = "headers"
   val fields: Seq[String] = Seq(
     "id",
     "parent_id",

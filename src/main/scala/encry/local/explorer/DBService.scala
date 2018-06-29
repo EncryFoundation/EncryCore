@@ -15,7 +15,7 @@ object DBService {
     Fragment.const(s"INSERT INTO $table $fieldsString VALUES $dataString;").update.run
 
   def insertBlock(block: EncryBlock): ConnectionIO[Int] =
-    insert(tables.BlocksTable.name, tables.BlocksTable.fieldsString, tables.BlocksTable.dataString(block))
+    insert(tables.HeadersTable.name, tables.HeadersTable.fieldsString, tables.HeadersTable.dataString(block))
 
   def insertTransactions(h: EncryBlockHeader, p: EncryBlockPayload): ConnectionIO[Int] =
     insert(tables.TransactionsTable.name, tables.TransactionsTable.fieldsString, tables.TransactionsTable.dataStrings(h, p))
