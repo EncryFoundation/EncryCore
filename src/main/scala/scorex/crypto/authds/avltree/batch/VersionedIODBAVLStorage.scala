@@ -1,6 +1,7 @@
 package scorex.crypto.authds.avltree.batch
 
 import com.google.common.primitives.Ints
+import encry.settings.Algos
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.crypto.authds.avltree.batch.VersionedIODBAVLStorage.{InternalNodePrefix, LeafPrefix}
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue, Balance}
@@ -27,7 +28,7 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
     val topHeight: Int = Ints.fromByteArray(store.get(TopNodeHeight).get.data)
     top -> topHeight
   }.recoverWith { case e =>
-    log.warn(s"Failed to recover tree for digest ${Base58.encode(version)}:", e)
+    log.warn(s"Failed to recover tree for digest ${Algos.encode(version)}:", e)
     Failure(e)
   }
 

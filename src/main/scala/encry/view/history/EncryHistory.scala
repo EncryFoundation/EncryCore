@@ -15,7 +15,6 @@ import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStatePro
 import encry.view.history.storage.{FileHistoryObjectsStore, HistoryStorage}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import encry.consensus.History.ProgressInfo
-import scorex.crypto.encode.Base58
 
 import scala.util.Try
 
@@ -38,7 +37,7 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
 
   /** Appends modifier to the history if it is applicable. */
   override def append(modifier: EncryPersistentModifier): Try[(EncryHistory, History.ProgressInfo[EncryPersistentModifier])] = {
-    log.debug(s"Trying to append modifier ${Base58.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
+    log.debug(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     testApplicable(modifier).map { _ =>
       modifier match {
         case header: EncryBlockHeader => (this, process(header))
