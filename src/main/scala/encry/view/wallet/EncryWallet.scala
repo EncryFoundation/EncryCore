@@ -10,7 +10,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{EncryBaseBox, EncryProposition}
-import encry.settings.{Constants, EncryAppSettings}
+import encry.settings.{Algos, Constants, EncryAppSettings}
 import encry.utils.{BalanceCalculator, BoxFilter, ScorexLogging}
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
@@ -63,12 +63,12 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
     val bObj: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxsToInsert)
     val toRemove: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxsToRemove)
     val prevBoxes: Map[ADKey, Amount] = getBalances.toMap
-    val newBalanceSheet: Map[ADKey, Amount] =
-      (prevBoxes.toSeq ++ bObj.toSeq).foldLeft(Map.empty[ADKey, Amount]) {
-        case (balanceMap, tokenInfo) => balanceMap.get(tokenInfo._1)
-            .map(amount => balanceMap.updated(tokenInfo._1, amount + tokenInfo._2)).getOrElse(balanceMap.updated(tokenInfo._1, tokenInfo._2))
-      }.map(tokenInfo => tokenInfo._1 ->
+    val newBalanceSheet: Map[ADKey, Amount] = {
+      (prevBoxes.toSeq ++ bObj.toSeq).map(elem => Algos.encode(elem._1) -> elem._2).groupBy(_._1).foldLeft(Map.empty[String, Amount]) {
+        case (balanceMap, tokenInfo) => balanceMap.updated(tokenInfo._1, tokenInfo._2.foldLeft(0L)((tokenSum, token) => tokenSum + token._2))
+      }.map(element => ADKey @@ Algos.decode(element._1).getOrElse(Array.emptyByteArray) -> element._2).map(tokenInfo => tokenInfo._1 ->
         (tokenInfo._2 - toRemove.find(ti => java.util.Arrays.equals(ti._1, tokenInfo._1)).map(_._2).getOrElse(0L)))
+    }
 
     val decodedTokenBalance: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = newBalanceSheet.foldLeft(Seq[(ByteArrayWrapper, ByteArrayWrapper)]()) {
         case (seq, (tId, balance)) => seq :+ (ByteArrayWrapper(tId) -> ByteArrayWrapper(Longs.toByteArray(balance)))
