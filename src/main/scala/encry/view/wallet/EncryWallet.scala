@@ -38,40 +38,85 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
 
   override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = modifier match {
 
-      case block: EncryBlock =>
-        val (
-          newTxs: Seq[EncryBaseTransaction],
-          newBxs: Seq[EncryBaseBox],
-          spentBxsIds: Seq[ADKey]) = block.transactions
-          .foldLeft(Seq[EncryBaseTransaction](), Seq[EncryBaseBox](), Seq[ADKey]()) {
-            case ((nTxs, nBxs, sBxs), tx: EncryBaseTransaction) =>
-              val newBxsL: Seq[EncryBaseBox] = tx.newBoxes
-                .foldLeft(Seq[EncryBaseBox]()) { case (nBxs2, bx) =>
-                  if (propositions.exists(_.contractHash sameElements bx.proposition.contractHash)) nBxs2 :+ bx else nBxs2
-                }
-              val spendBxsIdsL: Seq[ADKey] = tx.inputs.map(_.boxId)
-                .foldLeft(Seq[ADKey]()) { case (sBxs2, id) =>
-                  val bxsIdsCurrent: Seq[ADKey] = walletStorage.boxIds
-                  if (bxsIdsCurrent.exists(_.sameElements(id))) sBxs2 :+ id
-                  else sBxs2
-                }
-              val isRelatedTransaction: Boolean = {
-                val walletPropositionsSet: Set[ByteArrayWrapper] = propositions.map(p => ByteArrayWrapper(Algos.hash(p.bytes)))
-                val txPropositionsSet: Set[ByteArrayWrapper] = tx.inputs.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc, input) =>
-                  acc ++ input.proofs.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc2, proof) =>
-                    acc2 :+ ByteArrayWrapper(Algos.hash(proof.bytes)) }
-                }.toSet
-                walletPropositionsSet.intersect(txPropositionsSet).nonEmpty ||
-                  tx.defaultProofOpt.exists(pr => walletPropositionsSet.exists(_.data sameElements Algos.hash(pr.bytes)))
+    case block: EncryBlock =>
+      val (newBxs: Seq[EncryBaseBox], spentBxsIds: Seq[ADKey]) = block.transactions
+        .foldLeft(Seq[EncryBaseBox](), Seq[ADKey]()) {
+          case ((nBxs, sBxs), tx: EncryBaseTransaction) =>
+            val newBxsL: Seq[EncryBaseBox] = tx.newBoxes
+              .foldLeft(Seq[EncryBaseBox]()) { case (nBxs2, bx) =>
+                if (propositions.exists(_.contractHash sameElements bx.proposition.contractHash)) nBxs2 :+ bx else nBxs2
               }
-              if (newBxsL.nonEmpty || isRelatedTransaction) (nTxs :+ tx, nBxs ++ newBxsL, sBxs ++ spendBxsIdsL)
-              else (nTxs, nBxs, sBxs)
-          }
-        updateWallet(modifier.id, newTxs, newBxs, spentBxsIds)
-        this
+            val spendBxsIdsL: Seq[ADKey] = tx.inputs.map(_.boxId)
+              .foldLeft(Seq[ADKey]()) { case (sBxs2, id) =>
+                val bxsIdsCurrent: Seq[ADKey] = walletStorage.boxIds
+                if (bxsIdsCurrent.exists(_.sameElements(id))) sBxs2 :+ id
+                else sBxs2
+              }
+            val isRelatedTransaction: Boolean = {
+              val walletPropositionsSet: Set[ByteArrayWrapper] = propositions.map(p => ByteArrayWrapper(Algos.hash(p.bytes)))
+              val txPropositionsSet: Set[ByteArrayWrapper] = tx.inputs.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc, input) =>
+                acc ++ input.proofs.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc2, proof) =>
+                  acc2 :+ ByteArrayWrapper(Algos.hash(proof.bytes))
+                }
+              }.toSet
+              walletPropositionsSet.intersect(txPropositionsSet).nonEmpty ||
+                tx.defaultProofOpt.exists(pr => walletPropositionsSet.exists(_.data sameElements Algos.hash(pr.bytes)))
+            }
+            if (newBxsL.nonEmpty || isRelatedTransaction) (nBxs ++ newBxsL, sBxs ++ spendBxsIdsL)
+            else (nBxs, sBxs)
+        }
 
-      case _ => this
-    }
+      val addToBalance: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(newBxs)
+      val removeFromBalance: Map[ADKey, Amount] = spentBxsIds.foldLeft(Map.empty[ADKey, Amount]) {
+
+        case (balanceSheet, spentBoxId) =>
+          val boxInfo: (ADKey, Amount) = walletStorage.getBoxById(spentBoxId)
+      }
+
+      updateWallet(modifier.id, newBxs, spentBxsIds)
+      this
+
+    case _ => this
+  }
+
+  def scanPersistentAndUpdateStorageWithBoxes(modifier: EncryPersistentModifier): EncryWallet = modifier match {
+
+    case block: EncryBlock =>
+      val (
+        newTxs: Seq[EncryBaseTransaction],
+        newBxs: Seq[EncryBaseBox],
+        spentBxsIds: Seq[ADKey]) = block.transactions
+        .foldLeft(Seq[EncryBaseTransaction](), Seq[EncryBaseBox](), Seq[ADKey]()) {
+          case ((nTxs, nBxs, sBxs), tx: EncryBaseTransaction) =>
+            val newBxsL: Seq[EncryBaseBox] = tx.newBoxes
+              .foldLeft(Seq[EncryBaseBox]()) { case (nBxs2, bx) =>
+                if (propositions.exists(_.contractHash sameElements bx.proposition.contractHash)) nBxs2 :+ bx else nBxs2
+              }
+            val spendBxsIdsL: Seq[ADKey] = tx.inputs.map(_.boxId)
+              .foldLeft(Seq[ADKey]()) { case (sBxs2, id) =>
+                val bxsIdsCurrent: Seq[ADKey] = walletStorage.boxIds
+                if (bxsIdsCurrent.exists(_.sameElements(id))) sBxs2 :+ id
+                else sBxs2
+              }
+            val isRelatedTransaction: Boolean = {
+              val walletPropositionsSet: Set[ByteArrayWrapper] = propositions.map(p => ByteArrayWrapper(Algos.hash(p.bytes)))
+              val txPropositionsSet: Set[ByteArrayWrapper] = tx.inputs.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc, input) =>
+                acc ++ input.proofs.foldLeft(Seq.empty[ByteArrayWrapper]) { case (acc2, proof) =>
+                  acc2 :+ ByteArrayWrapper(Algos.hash(proof.bytes))
+                }
+              }.toSet
+              walletPropositionsSet.intersect(txPropositionsSet).nonEmpty ||
+                tx.defaultProofOpt.exists(pr => walletPropositionsSet.exists(_.data sameElements Algos.hash(pr.bytes)))
+            }
+            if (newBxsL.nonEmpty || isRelatedTransaction) (nTxs :+ tx, nBxs ++ newBxsL, sBxs ++ spendBxsIdsL)
+            else (nTxs, nBxs, sBxs)
+        }
+
+      updateWallet(modifier.id, newTxs, newBxs, spentBxsIds)
+      this
+
+    case _ => this
+  }
 
   override def rollback(to: VersionTag): Try[EncryWallet] = Try(walletStore.rollback(ByteArrayWrapper(to))).map(_ => this)
 
@@ -96,6 +141,7 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
                            spentBxsIds: Seq[ADKey]): Unit = {
     import WalletStorage._
     val bxsIdsCurrent: Seq[ADKey] = walletStorage.boxIds
+    println(s"Current ${bxsIdsCurrent.length}")
     val txIdsToInsertRaw = ByteArrayWrapper(walletStorage.get(transactionIdsKey).getOrElse(Array[Byte]()) ++
       newTxs.map(_.id).foldLeft(Array[Byte]())(_ ++ _))
     val bxsToInsert: Seq[EncryBaseBox] = newBxs.filter(bx => !spentBxsIds.exists(_.sameElements(bx.id)))
@@ -103,7 +149,7 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
       !spentBxsIds.exists(_ sameElements id)) ++ bxsToInsert.map(_.id))
     val newBalance: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
       calculateNewBalance(BoxFilter.filterAmountCarryingBxs(walletStorage.allBoxes.filter(bx =>
-      !spentBxsIds.exists(_ sameElements bx.id))) ++ BoxFilter.filterAmountCarryingBxs(bxsToInsert))
+        !spentBxsIds.exists(_ sameElements bx.id))) ++ BoxFilter.filterAmountCarryingBxs(bxsToInsert))
     val toRemoveSummary: Seq[ByteArrayWrapper] = spentBxsIds.map(keyByBoxId)
     val toInsertSummary: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
       Seq(transactionIdsKey -> txIdsToInsertRaw, boxIdsKey -> bxIdsPacked) ++ newBalance ++
