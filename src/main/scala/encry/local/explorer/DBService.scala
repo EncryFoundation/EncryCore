@@ -32,9 +32,9 @@ object DBService {
 
   def processBlock(block: EncryBlock, transactor: Transactor[IO]): IO[Int] = (for {
     blockR <- insertBlock(block)
-    txsR <- insertTransactions(block.header, block.payload)
-    outsR <- insertOutputs(block.header, block.payload)
-    insR <- insertInputs(block.header, block.payload)
+    txsR   <- insertTransactions(block.header, block.payload)
+    outsR  <- insertOutputs(block.header, block.payload)
+    insR   <- insertInputs(block.header, block.payload)
   } yield txsR + blockR + outsR + insR).transact(transactor)
 
   def markAsRemovedFromMainChain(ids: List[ModifierId], transactor: Transactor[IO]): IO[Int] =

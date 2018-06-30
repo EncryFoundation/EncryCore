@@ -21,11 +21,11 @@ CREATE TABLE headers (
 
 ALTER TABLE headers OWNER TO encry_admin;
 
-CREATE INDEX "blocks__parent_id" ON headers (parent_id);
+CREATE INDEX "headers__parent_id" ON headers (parent_id);
 
-CREATE INDEX "blocks__height" ON headers (height);
+CREATE INDEX "headers__height" ON headers (height);
 
-CREATE INDEX "blocks__ts" ON headers (ts);
+CREATE INDEX "headers__ts" ON headers (ts);
 
 CREATE TABLE transactions (
   id VARCHAR(64) NOT NULL PRIMARY KEY,
