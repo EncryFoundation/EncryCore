@@ -1,13 +1,17 @@
 package encry.local.explorer
 
 import cats.effect.IO
-import doobie.implicits._
+import cats.implicits._
 import doobie.free.connection.ConnectionIO
+import doobie.implicits._
 import doobie.util.fragment.Fragment
 import doobie.util.transactor.Transactor
+import doobie.util.update.Update
+import encry.ModifierId
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
+import scorex.crypto.encode.Base16
 
 object DBService {
 
@@ -32,4 +36,9 @@ object DBService {
     outsR <- insertOutputs(block.header, block.payload)
     insR <- insertInputs(block.header, block.payload)
   } yield txsR + blockR + outsR + insR).transact(transactor)
+
+  def markAsRemovedFromMainChain(ids: List[ModifierId], transactor: Transactor[IO]): IO[Int] =
+    Update[String](tables.HeadersTable.updateByIdSql("best_chain = FALSE"))
+      .updateMany(ids.map(Base16.encode))
+      .transact(transactor)
 }

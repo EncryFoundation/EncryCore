@@ -19,7 +19,7 @@ CREATE TABLE headers (
   best_chain BOOLEAN NOT NULL
 );
 
-ALTER TABLE blocks OWNER TO encry_admin;
+ALTER TABLE headers OWNER TO encry_admin;
 
 CREATE INDEX "blocks__parent_id" ON headers (parent_id);
 

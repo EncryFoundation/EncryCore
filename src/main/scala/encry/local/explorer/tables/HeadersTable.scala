@@ -30,6 +30,8 @@ object HeadersTable {
   )
   val fieldsString: String = fields.mkString("(", ", ", ")")
 
+  def updateByIdSql(updateString: String): String = s"UPDATE $name SET $updateString WHERE id = ?"
+
   def dataString(b: EncryBlock): String = {
     val id: String = Base16.encode(b.id)
     val parentId: String = Base16.encode(b.parentId)
