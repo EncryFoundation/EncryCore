@@ -35,7 +35,6 @@ class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) extends Scor
       Option(info.getOffset)
     } catch {
       case t: Throwable =>
-        logWarn("Problems with NTP: ", t)
         None
     } finally {
       client.close()

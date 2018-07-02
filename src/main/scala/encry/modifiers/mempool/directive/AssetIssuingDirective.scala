@@ -11,7 +11,6 @@ import encry.utils.Utils
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.PublicKey
 import scorex.utils.Random
@@ -43,7 +42,7 @@ object AssetIssuingDirective {
 
   implicit val jsonEncoder: Encoder[AssetIssuingDirective] = (d: AssetIssuingDirective) => Map(
     "typeId" -> d.typeId.asJson,
-    "contractHash" -> Base58.encode(d.contractHash).asJson,
+    "contractHash" -> Algos.encode(d.contractHash).asJson,
     "amount" -> d.amount.asJson,
     "symbol" -> d.symbol.asJson
   ).asJson

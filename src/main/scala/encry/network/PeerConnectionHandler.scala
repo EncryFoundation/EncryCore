@@ -48,7 +48,6 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   def processErrors(stateName: CommunicationState): Receive = {
     case CommandFailed(w: Write) =>
       logWarn(s"Write failed :$w " + remote + s" in state $stateName")
-      //      peerManager ! AddToBlacklist(remote)
       connection ! Close
       connection ! ResumeReading
       connection ! ResumeWriting
@@ -66,8 +65,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   def startInteraction: Receive = {
     case StartInteraction =>
-      val hb: Array[Byte] = Handshake(settings.agentName,
-        Version(settings.appVersion), settings.nodeName,
+      val hb: Array[Byte] = Handshake(Version(settings.appVersion), settings.nodeName,
         ownSocketAddress, timeProvider.time()).bytes
       connection ! Tcp.Write(ByteString(hb))
       log.info(s"Handshake sent to $remote")
@@ -112,7 +110,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
         log.info("Send message " + msg.spec + " to " + remote)
         connection ! Write(ByteString(Ints.toByteArray(msg.bytes.length) ++ msg.bytes))
       }
-      //simulating network delays
+
       settings.addedMaxDelay match {
         case Some(delay) =>
           context.system.scheduler.scheduleOnce(Random.nextInt(delay.toMillis.toInt).millis)(sendOutMessage())
@@ -136,8 +134,6 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
             false
           case Failure(e) =>
             log.info(s"Corrupted data from: " + remote, e)
-            //  connection ! Close
-            //  context stop self
             true
         }
       }
@@ -164,16 +160,6 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   override def postStop(): Unit = log.info(s"Peer handler to $remote destroyed")
 
-  /**
-    * Extracts complete packets of the specified length, preserving remainder
-    * data. If there is no complete packet, then we return an empty list. If
-    * there are multiple packets available, all packets are extracted, Any remaining data
-    * is returned to the caller for later submission
-    *
-    * @param data A list of the packets extracted from the raw data in order of receipt
-    * @return A list of ByteStrings containing extracted packets as well as any remaining buffer data not consumed
-    */
-
   def getPacket(data: ByteString): (List[ByteString], ByteString) = {
 
     val headerSize: Int = 4
@@ -183,7 +169,6 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
       if (current.length < headerSize) (packets.reverse, current)
       else {
         val len: Int = current.iterator.getInt(ByteOrder.BIG_ENDIAN)
-        if (len > settings.maxPacketLen || len < 0) throw new Exception(s"Invalid packet length: $len")
         if (current.length < len + headerSize) (packets.reverse, current)
         else {
           val rem: ByteString = current drop headerSize // Pop off header
@@ -192,6 +177,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
           multiPacket(front :: packets, back)
         }
       }
+
     multiPacket(List[ByteString](), data)
   }
 }

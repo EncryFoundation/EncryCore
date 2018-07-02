@@ -1,7 +1,8 @@
 package encry.utils
 
 import com.typesafe.scalalogging.StrictLogging
-import org.slf4j.{LoggerFactory, MDC}
+import org.slf4j._
+
 
 object ExtUtils extends StrictLogging {
 

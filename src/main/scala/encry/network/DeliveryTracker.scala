@@ -62,7 +62,7 @@ class DeliveryTracker(context: ActorContext,
   protected def stopExpecting(cp: ConnectedPeer, mtid: ModifierTypeId, mid: ModifierId): Unit = {
     val midAsKey = key(mid)
     expecting -= ((mtid, midAsKey, cp))
-    cancellables((midAsKey, cp)).cancel()
+    cancellables.get((midAsKey, cp)).foreach(_.cancel())
     cancellables -= ((midAsKey, cp))
   }
 

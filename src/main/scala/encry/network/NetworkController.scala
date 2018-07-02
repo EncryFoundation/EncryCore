@@ -34,7 +34,7 @@ class NetworkController extends Actor with ScorexLogging {
 
   val tcpManager: ActorRef = IO(Tcp)
 
-  implicit val timeout: Timeout = Timeout(networkSettings.controllerTimeout.getOrElse(5 seconds))
+  implicit val timeout: Timeout = Timeout(5 seconds)
 
   val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
 

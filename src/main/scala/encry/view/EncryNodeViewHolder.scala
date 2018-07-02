@@ -25,7 +25,6 @@ import encry.view.state.{Proposition, _}
 import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import scorex.crypto.authds.ADDigest
-import scorex.crypto.encode.Base58
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -208,7 +207,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               blocksApplied.foreach(newVault.scanPersistent)
               log.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
               if (settings.node.sendStat)
-                newHistory.bestHeaderOpt.foreach(header => context.actorSelection("akka://encry/user/statsSender") ! BestHeaderInChain(header))
+                newHistory.bestHeaderOpt.foreach(header => context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
               logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
