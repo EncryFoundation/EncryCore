@@ -17,11 +17,7 @@
             <level>DEBUG</level>
         </filter>
         <encoder>
-<<<<<<< HEAD
             <pattern>%X{color}[%d{HH:mm:ss.S}][%-5level][%.5thread{4}][%-30.30logger] >> %msg%X{reset}%n</pattern>
-=======
-            <pattern>[%d{HH:mm:ss.S}][%-5level] [%.5thread{3}] [%30.30logger] >> %msg%n</pattern>
->>>>>>> master
         </encoder>
     </appender>
 
