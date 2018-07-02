@@ -1,5 +1,5 @@
 import encry.network.message.BasicMsgDataTypes.InvData
-import scorex.crypto.encode.Base58
+import encry.settings.Algos
 import supertagged.TaggedType
 
 package object encry {
@@ -17,8 +17,8 @@ package object encry {
   type VersionTag = VersionTag.Type
 
   def idsToString(ids: Seq[(ModifierTypeId, ModifierId)]): String = (ids.headOption, ids.lastOption) match {
-    case (Some(f), Some(l)) if f._2 sameElements l._2 => s"[(${f._1},${Base58.encode(f._2)})]"
-    case (Some(f), Some(l)) => s"[(${f._1},${Base58.encode(f._2)})..(${l._1},${Base58.encode(l._2)})]"
+    case (Some(f), Some(l)) if f._2 sameElements l._2 => s"[(${f._1},${Algos.encode(f._2)})]"
+    case (Some(f), Some(l)) => s"[(${f._1},${Algos.encode(f._2)})..(${l._1},${Algos.encode(l._2)})]"
     case _ => "[]"
   }
 

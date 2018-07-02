@@ -5,9 +5,10 @@ import akka.http.scaladsl.server.{Directive, Directive1, Route}
 import encry.ModifierId
 import encry.account.Address
 import encry.api.http.ApiRoute
+import encry.crypto.encoding.Base58Check
+import encry.settings.Algos
 import io.circe.Json
 import scorex.crypto.authds.ADKey
-import scorex.crypto.encode.Base58
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.Success
@@ -33,21 +34,21 @@ trait EncryBaseApiRoute extends ApiRoute {
   val paging: Directive[(Int, Int)] = parameters("offset".as[Int] ? 0, "limit".as[Int] ? 50)
 
   val modifierId: Directive1[ModifierId] = pathPrefix(Segment).flatMap { h =>
-    Base58.decode(h) match {
+    Algos.decode(h) match {
       case Success(header) => provide(ModifierId @@ header)
       case _ => reject
     }
   }
 
   val accountAddress: Directive1[Address] = pathPrefix(Segment).flatMap { addr =>
-    Base58.decode(addr) match {
+    Base58Check.decode(addr) match {
       case Success(_) => provide(Address @@ addr)
       case _ => reject
     }
   }
 
   val boxId: Directive1[ADKey] = pathPrefix(Segment).flatMap { key =>
-    Base58.decode(key) match {
+    Algos.decode(key) match {
       case Success(k) => provide(ADKey @@ k)
       case _ => reject
     }

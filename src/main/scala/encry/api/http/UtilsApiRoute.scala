@@ -4,8 +4,7 @@ import java.security.SecureRandom
 
 import akka.actor.ActorRefFactory
 import akka.http.scaladsl.server.Route
-import encry.settings.RESTApiSettings
-import scorex.crypto.encode.Base58
+import encry.settings.{Algos, RESTApiSettings}
 import scorex.crypto.hash.Blake2b256
 
 case class UtilsApiRoute(override val settings: RESTApiSettings)(implicit val context: ActorRefFactory) extends ApiRoute {
@@ -14,7 +13,7 @@ case class UtilsApiRoute(override val settings: RESTApiSettings)(implicit val co
   private def seed(length: Int): String = {
     val seed: Array[Byte] = new Array[Byte](length)
     new SecureRandom().nextBytes(seed) //seed mutated here!
-    Base58.encode(seed)
+    Algos.encode(seed)
   }
 
   override val route: Route = pathPrefix("utils") {
@@ -27,7 +26,7 @@ case class UtilsApiRoute(override val settings: RESTApiSettings)(implicit val co
     }
   }
 
-  def length: Route = path("seed" / IntNumber) { case length =>
+  def length: Route = path("seed" / IntNumber) { length =>
     get {
       complete(seed(length))
     }
@@ -37,7 +36,7 @@ case class UtilsApiRoute(override val settings: RESTApiSettings)(implicit val co
     path("hash" / "blake2b") {
       post {
         entity(as[String]) { message =>
-          complete(Base58.encode(Blake2b256(message)))
+          complete(Algos.encode(Blake2b256(message)))
         }
       }
     }

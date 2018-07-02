@@ -7,8 +7,8 @@ import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
-import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
 import encry.api.http.routes.{HistoryApiRoute, InfoApiRoute, StateInfoApiRoute, TransactionsApiRoute}
+import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator
@@ -40,11 +40,10 @@ object EncryApp extends App with ScorexLogging {
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read
 
-  implicit val system: ActorSystem = ActorSystem(settings.network.agentName)
+  implicit val system: ActorSystem = ActorSystem()
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
 
-  require(settings.network.agentName.length <= 50)
   lazy val bindAddress: InetSocketAddress = settings.restApi.bindAddress
 
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
@@ -75,7 +74,7 @@ object EncryApp extends App with ScorexLogging {
   lazy val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
 
-  lazy val miner: ActorRef = system.actorOf(Props[EncryMiner], "miner")
+  lazy val miner: ActorRef = system.actorOf(Props[EncryMiner].withDispatcher("mining-dispatcher" ), "miner")
 
   val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
 
@@ -101,7 +100,7 @@ object EncryApp extends App with ScorexLogging {
 
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
 
-  if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
+  if (settings.node.mining) miner ! StartMining
 
   if (settings.testing.transactionGeneration) system.actorOf(Props[TransactionGenerator], "tx-generator") ! StartGeneration
 
