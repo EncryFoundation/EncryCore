@@ -22,7 +22,7 @@ object OutputsTable {
         case db: DataBox => (0L, Base16.encode(Constants.IntrinsicTokenId), db.data)
         case _ => (0L, Base16.encode(Constants.IntrinsicTokenId), None)
       }
-      val data: String = dataOpt.fold("{}")(_.mkString("{", ", ", "}"))
+      val data: String = dataOpt.map(Base16.encode).getOrElse("")
       val contractHash: String = Base16.encode(bx.proposition.contractHash)
       s"('$id', '$txId', '$monetaryValue', '$coinId', '$contractHash', '$data')"
     }.toIndexedSeq

@@ -38,7 +38,7 @@ object HeadersTable {
     val proofsRoot: String = Base16.encode(b.header.adProofsRoot)
     val stateRoot: String = Base16.encode(b.header.stateRoot)
     val transactionsRoot: String = Base16.encode(b.header.transactionsRoot)
-    val proofs: String = b.adProofsOpt.fold("{}")(_.bytes.mkString("{", ", ", "}"))
+    val proofs: String = b.adProofsOpt.map(p => Base16.encode(p.bytes)).getOrElse("")
     val solution: String = b.header.equihashSolution.ints.mkString("{", ", ", "}")
     val (minerAddress: String, minerReward: Long) = minerInfo(b.payload.transactions.last)
     val feesTotal: Long = b.payload.transactions.map(_.fee).sum

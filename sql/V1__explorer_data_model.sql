@@ -10,7 +10,7 @@ CREATE TABLE headers (
   difficulty BIGINT NOT NULL,
   block_size BIGINT NOT NULL,
   equihash_solution INTEGER ARRAY NOT NULL,
-  ad_proofs BYTEA,
+  ad_proofs VARCHAR,
   tx_qty BIGINT NOT NULL DEFAULT 0,
   miner_address VARCHAR NOT NULL,
   miner_reward BIGINT NOT NULL,
@@ -44,7 +44,7 @@ CREATE TABLE outputs (
   monetary_value BIGINT NOT NULL,
   coin_id VARCHAR NOT NULL,
   contract_hash VARCHAR NOT NULL,
-  data BYTEA
+  data VARCHAR
 );
 
 ALTER TABLE outputs OWNER to encry_admin;
