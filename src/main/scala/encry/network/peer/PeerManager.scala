@@ -11,19 +11,13 @@ import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler._
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
 import encry.utils.ScorexLogging
-
-import scala.collection.mutable
 import scala.util.Random
 
 class PeerManager extends Actor with ScorexLogging {
 
-  //peers after successful handshake
-  val connectedPeers: mutable.Map[InetSocketAddress, ConnectedPeer] = mutable.Map[InetSocketAddress, ConnectedPeer]()
+  var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map[InetSocketAddress, ConnectedPeer]()
 
-  //peers before handshake
-  val connectingPeers: mutable.Set[InetSocketAddress] = mutable.Set[InetSocketAddress]()
-
-  val peerDatabase: PeerDatabase = PeerDatabase(Some(settings.dataDir + "/peers.dat"))
+  var connectingPeers: Set[InetSocketAddress] = Set[InetSocketAddress]()
 
   if (peerDatabase.isEmpty) settings.network.knownPeers.foreach { address =>
     if (!isSelf(address, None)) peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), None))
@@ -35,31 +29,20 @@ class PeerManager extends Actor with ScorexLogging {
     else None
   }
 
-  /**
-    * Given a peer's address and declared address, returns `true` iff the peer is the same is this node.
-    */
   def isSelf(address: InetSocketAddress, declaredAddress: Option[InetSocketAddress]): Boolean =
     settings.network.bindAddress == address ||
       settings.network.declaredAddress.exists(da => declaredAddress.contains(da)) ||
       declaredAddress.contains(settings.network.bindAddress) ||
       settings.network.declaredAddress.contains(address)
 
-  override def receive: Receive = peerListOperations orElse apiInterface orElse connectOps
-
-  def apiInterface: Receive = {
+  override def receive: Receive = {
     case GetConnectedPeers => sender() ! (connectedPeers.values.map(_.handshake).toSeq: Seq[Handshake])
     case GetAllPeers => sender() ! peerDatabase.knownPeers()
-  }
-
-  def peerListOperations: Receive = {
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
       if (!isSelf(address, None))
         peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), peerNameOpt, connTypeOpt))
     case RandomPeers(howMany: Int) => sender() ! Random.shuffle(peerDatabase.knownPeers().keys.toSeq).take(howMany)
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
-  }
-
-  def connectOps: Receive = {
     case DoConnecting(remote, direction) =>
       val isIncoming: Boolean = direction == Incoming
       if (connectingPeers.contains(remote) && !isIncoming) {
@@ -78,7 +61,7 @@ class PeerManager extends Actor with ScorexLogging {
       else {
         if (peer.publicPeer) self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
         else peerDatabase.remove(peer.socketAddress)
-        connectedPeers += peer.socketAddress -> peer
+        connectedPeers += (peer.socketAddress -> peer)
         nodeViewSynchronizer ! HandshakedPeer(peer)
       }
     case Disconnected(remote) =>

@@ -4,8 +4,7 @@ import java.net.InetSocketAddress
 import encry.network.PeerConnectionHandler._
 import scala.collection.mutable
 
-//todo: persistence
-case class PeerDatabase(filename: Option[String]) {
+case object peerDatabase {
 
   private val whitelistPersistence: mutable.Map[InetSocketAddress, PeerInfo] = mutable.Map[InetSocketAddress, PeerInfo]()
 
