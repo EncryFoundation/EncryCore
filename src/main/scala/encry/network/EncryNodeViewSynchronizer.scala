@@ -11,13 +11,13 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
-import encry.network.EncryDeliveryTracker.{CheckForSync, FilteredModifiers, NeedToDownloadFromRandom}
+import encry.network.EncryDeliveryTracker.{CheckModifiersToDownload, FilteredModifiers, NeedToDownloadFromRandom}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.message._
-import encry.settings.{Algos, NetworkSettings}
+import encry.settings.NetworkSettings
 import encry.utils.ScorexLogging
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
@@ -96,17 +96,19 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
         self ! ResponseFromLocal(remote, invData._1, objs)
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
+      println("Get inv spec")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       deliveryTracker ! DataFromPeer(spec, data: ModifiersData@unchecked, remote)
     case FilteredModifiers(typeId: ModifierTypeId, modifiers: Seq[Array[Byte]]) =>
       nodeViewHolder ! ModifiersFromRemote(typeId, modifiers)
-      println(s"Current historyReaderOpt: ${historyReaderOpt.map(_.bestHeaderOpt.map(header => Algos.encode(header.id) + s"Height: ${header.height}"))}")
-      historyReaderOpt.foreach(history => deliveryTracker ! CheckForSync(history))
-
+      //println(s"Current historyReaderOpt: ${historyReaderOpt.map(_.bestHeaderOpt.map(header => Algos.encode(header.id) + s"Height: ${header.height}"))}")
     case SendSync => historyReaderOpt.foreach(history => sendSync(history.syncInfo))
 
+    case SendHistoryToDelTreacker => historyReaderOpt.foreach(history => deliveryTracker ! CheckModifiersToDownload(history))
+
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
+      println(s"In RFL: ${modifierIds.size}")
       deliveryTracker ! RequestFromLocal(peer, modifierTypeId, modifierIds)
     case ResponseFromLocal(peer, _, modifiers: Seq[NodeViewModifier]) =>
       if (modifiers.nonEmpty) {
@@ -116,7 +118,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
     case a: Any => log.error(s"Strange input (sender: ${sender()}): ${a.getClass}\n" + a)
   }
 
-  case object CheckModifiersToDownload
+  case object SendHistoryToDelTreacker
 
   override def preStart(): Unit = {
     val messageSpecs: Seq[MessageSpec[_]] = Seq(invSpec, requestModifierSpec, ModifiersSpec, syncInfoSpec)
@@ -125,7 +127,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
     nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = true)
     statusTracker.scheduleSendSyncInfo()
-    context.system.scheduler.schedule(settings.network.syncInterval, settings.network.syncInterval)(self ! CheckModifiersToDownload)
+    context.system.scheduler.schedule(settings.network.syncInterval, settings.network.syncInterval)(self ! SendSync)
   }
 
   def viewHolderEvents: Receive =

@@ -3,7 +3,7 @@ package encry.network
 import akka.actor.{Actor, ActorRef, Cancellable}
 import encry.EncryApp.{networkController, settings}
 import encry.network.EncryDeliveryTracker.{CheckForSync, CheckModifiersToDownload, FilteredModifiers, NeedToDownloadFromRandom}
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{CheckDelivery, RequestFromLocal, SendSync}
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{CheckDelivery, RequestFromLocal}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToNetwork}
 import encry.network.PeerConnectionHandler._
 import encry.network.message.BasicMsgDataTypes.ModifiersData
@@ -39,17 +39,20 @@ class EncryDeliveryTracker(networkSettings: NetworkSettings, timeProvider: Netwo
   private val cancellables = mutable.Map[ModifierIdAsKey, (ConnectedPeer, (Cancellable, Int))]()
 
   def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mids: Seq[ModifierId]): Unit = tryWithLogging {
-    for (mid <- mids) expect(cp, mtid, mid)
-  }
-
-  protected def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mid: ModifierId): Unit = {
-    val midAsKey = key(mid)
-    if (!cancellables.contains(midAsKey)) {
-      cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> Seq(mid)), None)
-      val cancellable = context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout, self, CheckDelivery(cp, mtid, mid))
-      cancellables(midAsKey) = cp -> (cancellable, 0)
+    val notRequestedIds: Seq[ModifierId] = mids.foldLeft(Seq[ModifierId]()) {
+      case (notRequested, modId) =>
+        val modifierKey = key(modId)
+        if (!cancellables.contains(modifierKey)) notRequested :+ modId
+        else {
+          peers(modifierKey) = (peers.getOrElseUpdate(modifierKey, Seq()) :+ cp).distinct
+          notRequested
+        }
     }
-    else peers(midAsKey) = (peers.getOrElseUpdate(midAsKey, Seq()) :+ cp).distinct
+    cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
+    notRequestedIds.foreach{id =>
+      val cancellable = context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
+      cancellables(key(id)) = cp -> (cancellable, 0)
+    }
   }
 
   // stops expecting, and expects again if the number of checks does not exceed the maximum
@@ -67,7 +70,7 @@ class EncryDeliveryTracker(networkSettings: NetworkSettings, timeProvider: Netwo
         downloadPeers.headOption.foreach { nextPeer =>
           cancellables -= midAsKey
           peers(midAsKey) = downloadPeers.filter(_ != nextPeer)
-          expect(cp, mtid, mid)
+          expect(cp, mtid, Seq(mid))
         }
       )
     )
@@ -94,6 +97,7 @@ class EncryDeliveryTracker(networkSettings: NetworkSettings, timeProvider: Netwo
   override def receive: Receive = {
 
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
+      println(s"In RFL123: ${modifierIds.size}")
       expect(peer, modifierTypeId, modifierIds)
 
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
@@ -101,8 +105,8 @@ class EncryDeliveryTracker(networkSettings: NetworkSettings, timeProvider: Netwo
       val modifiers: Map[ModifierId, Array[Byte]] = data._2
       if (settings.node.sendStat)
         context.actorSelection("/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
-      println(s"Got modifiers of type $typeId (${data._2.size}) from remote connected peer: $remote")
-      println(s"Received modifier ids ${data._2.keySet.map(Algos.encode).mkString(",")}")
+      //println(s"Got modifiers of type $typeId (${data._2.size}) from remote connected peer: $remote")
+      //println(s"Received modifier ids ${data._2.keySet.map(Algos.encode).mkString(",")}")
       for ((id, _) <- modifiers) receive(typeId, id, remote)
       val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
         modifiers partition { case (id, _) => isSpam(id) }
@@ -111,7 +115,10 @@ class EncryDeliveryTracker(networkSettings: NetworkSettings, timeProvider: Netwo
           s": ${spam.keys.map(Algos.encode)}")
         deleteSpam(spam.keys.toSeq)
       }
-      if (fm.nonEmpty) nodeViewSynchronizer ! FilteredModifiers(typeId, fm.values.toSeq)
+      if (fm.nonEmpty) {
+        println(s"Send ${fm.values.size}")
+        nodeViewSynchronizer ! FilteredModifiers(typeId, fm.values.toSeq)
+      }
 
     case CheckDelivery(peer, modifierTypeId, modifierId) =>
 
@@ -123,8 +130,7 @@ class EncryDeliveryTracker(networkSettings: NetworkSettings, timeProvider: Netwo
 
     case CheckModifiersToDownload(history: EncryHistory) =>
       removeOutdatedExpectingFromRandom()
-      if (!history.isHeadersChainSynced && !isExpecting) nodeViewSynchronizer ! SendSync
-      else if (history.isHeadersChainSynced && isExpectingFromRandom) {
+      if (history.isHeadersChainSynced && isExpectingFromRandom) {
         println("-----------------------------?onCheckModifiersToDownload?--------------------------------------")
         val currentQueue: Iterable[ModifierId] = expectingFromRandomQueue
         println(s"CurrentQueue: ${currentQueue.size}")
@@ -137,8 +143,7 @@ class EncryDeliveryTracker(networkSettings: NetworkSettings, timeProvider: Netwo
       }
 
     case CheckForSync(history: EncryHistory) =>
-      if (!history.isHeadersChainSynced && isExpecting) nodeViewSynchronizer ! SendSync
-      else if (history.isHeadersChainSynced && isExpectingFromRandom) {
+      if (history.isHeadersChainSynced && isExpectingFromRandom) {
         println(s"Request to download: ${System.currentTimeMillis()}")
         println(s"deliveryTracker size: ${expectingFromRandom.size}")
         self ! CheckModifiersToDownload(history)
@@ -205,27 +210,27 @@ class EncryDeliveryTracker(networkSettings: NetworkSettings, timeProvider: Netwo
     * Modifier downloaded
     */
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = tryWithLogging {
-    println("///////////////////////////////////////")
-    expectingFromRandom.keys.foreach(key => Algos.encode(key.toArray))
-    println(s"expectingFromRandom.contains(key(mid))[${Algos.encode(mid)}: ${expectingFromRandom.contains(key(mid))}")
-    println(s"isExpecting(mtid, mid, cp): ${isExpecting(mtid, mid, cp)}")
+    //println("///////////////////////////////////////")
+    //expectingFromRandom.keys.foreach(key => Algos.encode(key.toArray))
+    //println(s"expectingFromRandom.contains(key(mid))[${Algos.encode(mid)}: ${expectingFromRandom.contains(key(mid))}")
+    //println(s"isExpecting(mtid, mid, cp): ${isExpecting(mtid, mid, cp)}")
     if (expectingFromRandom.contains(key(mid))) {
       expectingFromRandom.remove(key(mid))
-      println(s"After remove: ${System.currentTimeMillis()}: ${expectingFromRandom.contains(key(mid))}")
-      println(s"Size: ${expectingFromRandom.size}")
+      //println(s"After remove: ${System.currentTimeMillis()}: ${expectingFromRandom.contains(key(mid))}")
+      //println(s"Size: ${expectingFromRandom.size}")
       delivered(key(mid)) = cp
     } else if (isExpecting(mtid, mid, cp)) {
-      println("Here")
+      //println("Here")
       delivered(key(mid)) = cp
       cancellables.get(key(mid)).foreach(_._2._1.cancel())
       cancellables -= key(mid)
       peers -= key(mid)
     }
     else {
-      println("222222")
+      //println("222222")
       deliveredSpam(key(mid)) = cp
     }
-    println("////////////////////////////////////////")
+    //println("////////////////////////////////////////")
   }
 }
 
