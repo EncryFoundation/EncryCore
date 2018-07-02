@@ -10,7 +10,10 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import encry.EncryApp._
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+
 import scala.concurrent.Future
+
+
 
 object PrintPubKeys extends Command {
 
@@ -21,4 +24,6 @@ object PrintPubKeys extends Command {
         Some(Response(view.vault.keyManager.keys.foldLeft("")((str, k) => str + Algos.encode(k.publicKeyBytes)) + "\n"))
       }).mapTo[Option[Response]]
   }
+
+  override def executeRequest(args: Command.Args, settings: EncryAppSettings): this.type = this
 }

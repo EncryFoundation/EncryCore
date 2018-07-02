@@ -1,9 +1,12 @@
 package encry.view
 
 import java.io.File
+import java.security.SecureRandom
 
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
+import encry.cli.{Ast, Response}
+import encry.cli.commands._
 import encry.consensus.History.ProgressInfo
 import encry.modifiers._
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
@@ -16,7 +19,7 @@ import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
-import encry.utils.ScorexLogging
+import encry.utils.{Mnemonic, ScorexLogging}
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
@@ -29,6 +32,7 @@ import scorex.crypto.authds.ADDigest
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
+
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with ScorexLogging {
 
@@ -49,6 +53,31 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     Transaction.ModifierTypeId -> EncryTransactionSerializer
   )
 
+  import encry.cli.commands.PrintPubKeys
+  def commandReceive: Receive = {
+    case AddKey =>
+      currentView.vault.keyManager.createNewKey()
+    case GetBalance =>
+      val r = currentView.vault.getBalances.foldLeft("")((str, tokenInfo) =>
+        str.concat(s"TokenID(${Algos.encode(tokenInfo._1)}) : ${tokenInfo._2}\n"))
+      val res = if (r.length == 0) "<empty>" else r
+      sender ! Some(Response(res))
+    case InitKeyStorage =>
+//      Try {
+//        val mnemonicCode = args.requireArgOrElse("seed", Ast.Str(Mnemonic.entropyToMnemonicCode(SecureRandom.getSeed(16)))).s
+//        currentView.vault.keyManager.initStorage(Mnemonic.mnemonicCodeToBytes(mnemonicCode))
+//        mnemonicCode
+//      }.toOption.map(code => Some(Response(s"Your mnemonic code is: $code"))).getOrElse(Some(Response("Operation failed. Couldn't init key storage.")))
+
+    case PrintMyAddrs =>
+      sender ! Some(Response(currentView.vault.keyManager.keys.foldLeft("")((str, k) => str + k.publicImage.address + "\n")))
+    case PrintPrivKeys =>
+      sender ! Some(Response(currentView.vault.keyManager.keys.foldLeft("")((str, k) => str + Algos.encode(k.privKeyBytes)) + "\n"))
+    case PrintPubKeys =>
+      sender ! Some(Response(currentView.vault.keyManager.keys.map(_.publicKeyBytes).map(Algos.encode).mkString("\n")))
+
+  }
+
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     reason.printStackTrace()
     System.exit(100)
@@ -60,7 +89,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     nodeView.state.closeStorage()
   }
 
-  override def receive: Receive = {
+  def currentView: CurrentView[HIS, StateType, VL, MP] = CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool)
+
+  override def receive: Receive = mainReceive orElse commandReceive orElse otherReceive
+  def mainReceive: Receive = {
     case ModifiersFromRemote(_, modifierTypeId, remoteObjects) =>
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
@@ -93,6 +125,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       }
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
+    case a: Any => log.error("Strange input: " + a)
+  }
+
+  def otherReceive: Receive = {
     case a: Any => log.error("Strange input: " + a)
   }
 

@@ -4,9 +4,11 @@ import encry.cli.{Ast, Response}
 import encry.settings.EncryAppSettings
 import scala.concurrent.Future
 
+
 trait Command {
 
   def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]]
+  def executeRequest(args: Command.Args, settings: EncryAppSettings): Any = None
 
 }
 
