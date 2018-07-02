@@ -219,7 +219,7 @@ object EncryNodeViewSynchronizer {
 
     case class ChangedHistory[HR <: HistoryReader[_ <: PersistentNodeViewModifier, _ <: SyncInfo]](reader: HR) extends NodeViewChange
 
-    case class ChangedMempool[MR <: MempoolReader[_ <: Transaction[_]]](mempool: MR) extends NodeViewChange
+    case class ChangedMempool[MR <: MempoolReader[_ <: Transaction]](mempool: MR) extends NodeViewChange
 
     case class ChangedState[SR <: StateReader](reader: SR) extends NodeViewChange
 
@@ -229,7 +229,7 @@ object EncryNodeViewSynchronizer {
 
     trait ModificationOutcome extends NodeViewHolderEvent
 
-    case class SuccessfulTransaction[P <: Proposition, TX <: Transaction[P]](transaction: TX) extends ModificationOutcome
+    case class SuccessfulTransaction[P <: Proposition, TX <: Transaction](transaction: TX) extends ModificationOutcome
 
     case class SyntacticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable) extends ModificationOutcome
 

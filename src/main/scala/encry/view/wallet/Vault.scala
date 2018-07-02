@@ -7,7 +7,7 @@ import encry.view.state.Proposition
 
 import scala.util.Try
 
-trait Vault[P <: Proposition, TX <: Transaction[P],
+trait Vault[P <: Proposition, TX <: Transaction,
             PMOD <: PersistentNodeViewModifier, V <: Vault[P, TX, PMOD, V]] extends NodeViewComponent {
   self: V =>
 

@@ -4,7 +4,7 @@ import encry.modifiers.mempool.Transaction
 
 import scala.util.Try
 
-trait MemoryPool[TX <: Transaction[_], M <: MemoryPool[TX, M]] extends MempoolReader[TX] {
+trait MemoryPool[TX <: Transaction, M <: MemoryPool[TX, M]] extends MempoolReader[TX] {
 
   def put(tx: TX): Try[M]
 

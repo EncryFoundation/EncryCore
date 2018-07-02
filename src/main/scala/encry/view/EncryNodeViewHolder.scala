@@ -323,7 +323,7 @@ object EncryNodeViewHolder {
 
     case class ModifiersFromRemote(source: ConnectedPeer, modifierTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
 
-    case class LocallyGeneratedTransaction[P <: Proposition, EncryBaseTransaction <: Transaction[P]](tx: EncryBaseTransaction)
+    case class LocallyGeneratedTransaction[P <: Proposition, EncryBaseTransaction <: Transaction](tx: EncryBaseTransaction)
 
     case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentNodeViewModifier](pmod: EncryPersistentModifier)
 

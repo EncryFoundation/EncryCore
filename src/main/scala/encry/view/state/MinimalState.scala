@@ -19,7 +19,7 @@ trait MinimalState[M <: PersistentNodeViewModifier, MS <: MinimalState[M, MS]] e
 
 trait StateFeature
 
-trait TransactionValidation[P <: Proposition, TX <: Transaction[P]] extends StateFeature {
+trait TransactionValidation[P <: Proposition, TX <: Transaction] extends StateFeature {
   def isValid(tx: TX): Boolean = validate(tx).isSuccess
 
   def filterValid(txs: Seq[TX]): Seq[TX] = txs.filter(isValid)

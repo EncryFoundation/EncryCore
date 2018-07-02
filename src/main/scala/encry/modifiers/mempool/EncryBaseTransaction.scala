@@ -12,7 +12,7 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-trait EncryBaseTransaction extends Transaction[EncryProposition] with ModifierWithSizeLimit with PConvertible {
+trait EncryBaseTransaction extends Transaction with ModifierWithSizeLimit with PConvertible {
 
   override lazy val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
 
