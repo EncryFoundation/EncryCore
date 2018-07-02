@@ -25,7 +25,6 @@ import encry.view.state.{Proposition, _}
 import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import scorex.crypto.authds.ADDigest
-import scorex.crypto.encode.Base58
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -71,13 +70,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               log.warn(s"Received modifier ${pmod.encodedId} that is already in history")
             else modifiersCache.put(key(pmod.id), pmod)
         }
-        log.debug(s"Cache before(${modifiersCache.size}): ${modifiersCache.keySet.map(_.array).map(Base58.encode).mkString(",")}")
+        log.info(s"Cache before(${modifiersCache.size})")
         def found: Option[(mutable.WrappedArray.ofByte, PMOD)] = modifiersCache.find(x => nodeView.history.applicable(x._2))
         Iterator.continually(found).takeWhile(_.isDefined).flatten.foreach { case (k, v) =>
             modifiersCache.remove(k)
             pmodModify(v)
         }
-        log.debug(s"Cache after(${modifiersCache.size}): ${modifiersCache.keySet.map(_.array).map(Base58.encode).mkString(",")}")
+        log.info(s"Cache after(${modifiersCache.size})")
       }
     case lt: LocallyGeneratedTransaction[P, EncryBaseTransaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
@@ -194,7 +193,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     log.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
-        log.debug(s"Going to apply modifications to the state: $progressInfo")
+        log.info(s"Going to apply modifications to the state: $progressInfo")
         nodeViewSynchronizer ! SyntacticallySuccessfulModifier(pmod)
         if (progressInfo.toApply.nonEmpty) {
           val (newHistory: HIS, newStateTry: Try[MS], blocksApplied: Seq[EncryPersistentModifier]) =
@@ -208,7 +207,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               blocksApplied.foreach(newVault.scanPersistent)
               log.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
               if (settings.node.sendStat)
-                newHistory.bestHeaderOpt.foreach(header => context.actorSelection("akka://encry/user/statsSender") ! BestHeaderInChain(header))
+                newHistory.bestHeaderOpt.foreach(header => context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
               log.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
@@ -227,7 +226,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   def txModify(tx: EncryBaseTransaction): Unit = nodeView.mempool.put(tx) match {
     case Success(newPool) =>
-      log.debug(s"Unconfirmed transaction $tx added to the memory pool")
+      log.info(s"Unconfirmed transaction $tx added to the memory pool")
       val newVault: VL = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx)
@@ -274,21 +273,21 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   def restoreConsistentState(stateIn: StateType, history: EncryHistory): StateType = Try {
     (stateIn.version, history.bestBlockOpt, stateIn) match {
       case (stateId, None, _) if stateId sameElements EncryState.genesisStateVersion =>
-        log.debug("State and history are both empty on startup")
+        log.info("State and history are both empty on startup")
         stateIn
       case (stateId, Some(block), _) if stateId sameElements block.id =>
-        log.debug(s"State and history have the same version ${Algos.encode(stateId)}, no recovery needed.")
+        log.info(s"State and history have the same version ${Algos.encode(stateId)}, no recovery needed.")
         stateIn
       case (_, None, _) =>
-        log.debug("State and history are inconsistent. History is empty on startup, rollback state to genesis.")
+        log.info("State and history are inconsistent. History is empty on startup, rollback state to genesis.")
         getRecreatedState()
       case (_, Some(bestBlock), _: DigestState) =>
-        log.debug(s"State and history are inconsistent. Going to switch state to version ${bestBlock.encodedId}")
+        log.info(s"State and history are inconsistent. Going to switch state to version ${bestBlock.encodedId}")
         getRecreatedState(Some(VersionTag !@@ bestBlock.id), Some(bestBlock.header.stateRoot))
       case (stateId, Some(historyBestBlock), state: StateType@unchecked) =>
         val stateBestHeaderOpt = history.typedModifierById[EncryBlockHeader](ModifierId !@@ stateId)
         val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
-        log.debug(s"State and history are inconsistent. Going to rollback to ${rollbackId.map(Algos.encode)} and " +
+        log.info(s"State and history are inconsistent. Going to rollback to ${rollbackId.map(Algos.encode)} and " +
           s"apply ${newChain.length} modifiers")
         val startState = rollbackId.map(id => state.rollbackTo(VersionTag !@@ id).get)
           .getOrElse(getRecreatedState())

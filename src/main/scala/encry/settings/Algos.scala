@@ -4,7 +4,7 @@ import java.nio.charset.Charset
 
 import scorex.crypto.authds.LeafData
 import scorex.crypto.authds.merkle.MerkleTree
-import scorex.crypto.encode.Base58
+import scorex.crypto.encode.Base16
 import scorex.crypto.hash.{Blake2b256, Digest32}
 
 import scala.util.Try
@@ -19,7 +19,7 @@ object Algos {
 
   val hash: HF = Blake2b256
 
-  val encoder: Base58.type = Base58
+  val encoder: Base16.type = Base16
 
   val charset: Charset = Charset.defaultCharset()
 

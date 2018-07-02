@@ -11,7 +11,6 @@ import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import io.circe.Json
 import io.circe.syntax._
-import scorex.crypto.encode.Base58
 
 import scala.concurrent.Future
 
@@ -69,7 +68,7 @@ object InfoApiRoute {
       "fullHeight" -> bestFullBlock.map(_.header.height).getOrElse(0).asJson,
       "bestHeaderId" -> bestHeader.map(_.encodedId).asJson,
       "bestFullHeaderId" -> bestFullBlock.map(_.header.encodedId).asJson,
-      "previousFullHeaderId" -> bestFullBlock.map(_.header.parentId).map(Base58.encode).asJson,
+      "previousFullHeaderId" -> bestFullBlock.map(_.header.parentId).map(Algos.encode).asJson,
       "difficulty" -> bestFullBlock.map(block => block.header.difficulty.toString)
         .getOrElse(Constants.Chain.InitialDifficulty.toString).asJson,
       "unconfirmedCount" -> unconfirmedCount.asJson,
