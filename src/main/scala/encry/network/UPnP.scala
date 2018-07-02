@@ -3,13 +3,13 @@ package encry.network
 import java.net.InetAddress
 
 import encry.settings.NetworkSettings
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 import org.bitlet.weupnp.{GatewayDevice, GatewayDiscover}
 
 import scala.collection.JavaConverters._
 import scala.util.Try
 
-class UPnP(settings: NetworkSettings) extends ScorexLogging {
+class UPnP(settings: NetworkSettings) extends EncryLogging {
 
   private var gateway: Option[GatewayDevice] = None
 

@@ -23,7 +23,7 @@ import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, NetworkController, UPnP}
 import encry.settings.{Algos, EncryAppSettings}
 import encry.stats.StatsSender
-import encry.utils.{NetworkTimeProvider, ScorexLogging}
+import encry.utils.{NetworkTimeProvider, EncryLogging}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 
@@ -31,7 +31,7 @@ import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.io.Source
 
-object EncryApp extends App with ScorexLogging {
+object EncryApp extends App with EncryLogging {
 
   type P = EncryProposition
   type TX = EncryBaseTransaction

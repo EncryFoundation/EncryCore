@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<configuration scan="true" scanPeriod="30 seconds" >
+<configuration scan="true" scanPeriod="10 seconds" >
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>
@@ -17,7 +17,7 @@
             <level>DEBUG</level>
         </filter>
         <encoder>
-            <pattern>%X{color}[%d{HH:mm:ss.S}][%-5level][%.5thread{4}][%-30.30logger] >> %msg%X{reset}%n</pattern>
+            <pattern>[%d{HH:mm:ss.SSS}] %X{color}[%-5level] %X{reset}[%-30.30logger] >> %msg%n</pattern>
         </encoder>
     </appender>
 

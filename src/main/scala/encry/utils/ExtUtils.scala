@@ -11,8 +11,8 @@ object ExtUtils extends StrictLogging {
     def iapply[S](f: T => S ): T = { f(obj); obj}
   }
 
-  val warningColor = Console.YELLOW
-  val errorColor = Console.RED
+  val warningColor: String = Console.YELLOW
+  val errorColor: String = Console.RED
 
 
   implicit class Loggable[T](val obj: T) extends AnyVal {

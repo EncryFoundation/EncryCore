@@ -17,7 +17,7 @@ import NetworkController.ReceivableMessages._
 import PeerConnectionHandler.ReceivableMessages.CloseConnection
 import PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -26,7 +26,7 @@ import scala.language.{existentials, postfixOps}
 import scala.util.{Failure, Success, Try}
 
 
-class NetworkController extends Actor with ScorexLogging {
+class NetworkController extends Actor with EncryLogging {
 
   val networkSettings: NetworkSettings = settings.network
 

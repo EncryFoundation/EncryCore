@@ -14,9 +14,9 @@ import scala.language.postfixOps
 import encry.network.NetworkController.ReceivableMessages.{RegisterMessagesHandler, SendToNetwork}
 import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 
-class PeerSynchronizer extends Actor with ScorexLogging {
+class PeerSynchronizer extends Actor with EncryLogging {
 
   implicit val timeout: Timeout = Timeout(settings.network.syncTimeout.getOrElse(5 seconds))
 

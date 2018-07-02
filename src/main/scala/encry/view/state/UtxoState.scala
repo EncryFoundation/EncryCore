@@ -16,7 +16,7 @@ import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box._
 import encry.settings.Algos.HF
 import encry.settings.{Algos, Constants}
-import encry.utils.{BalanceCalculator, ScorexLogging}
+import encry.utils.{BalanceCalculator, EncryLogging}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
@@ -202,7 +202,7 @@ class UtxoState(override val version: VersionTag,
   def filterValid(txs: Seq[EncryBaseTransaction]): Seq[EncryBaseTransaction] = txs.filter(tx => isValid(tx))
 }
 
-object UtxoState extends ScorexLogging {
+object UtxoState extends EncryLogging {
 
   private val bestVersionKey: Digest32 = Algos.hash("best_state_version")
 

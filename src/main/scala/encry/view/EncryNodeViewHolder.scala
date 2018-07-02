@@ -16,7 +16,7 @@ import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
@@ -30,7 +30,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
-class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with ScorexLogging {
+class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with EncryLogging {
 
   type HIS = EncryHistory
   type MS = StateType

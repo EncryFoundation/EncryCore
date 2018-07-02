@@ -13,7 +13,7 @@ import encry.modifiers.state.box.Box.Amount
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
 import encry.utils.NetworkTime.Time
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 import encry.view.EncryNodeViewHolder.CurrentView
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.{EncryHistory, Height}
@@ -27,7 +27,7 @@ import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 
 import scala.collection._
 
-class EncryMiner extends Actor with ScorexLogging {
+class EncryMiner extends Actor with EncryLogging {
 
   import EncryMiner._
 
@@ -178,7 +178,7 @@ class EncryMiner extends Actor with ScorexLogging {
     }
 }
 
-object EncryMiner extends ScorexLogging {
+object EncryMiner extends EncryLogging {
 
   case object DisableMining
 

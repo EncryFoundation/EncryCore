@@ -3,7 +3,7 @@ package encry.network
 import akka.actor.{ActorContext, ActorRef, Cancellable}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.CheckDelivery
 import encry.network.PeerConnectionHandler._
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 import encry.{ModifierId, ModifierTypeId}
 
 import scala.collection.mutable
@@ -19,7 +19,7 @@ import scala.util.{Failure, Try}
 class DeliveryTracker(context: ActorContext,
                       deliveryTimeout: FiniteDuration,
                       maxDeliveryChecks: Int,
-                      nvsRef: ActorRef) extends ScorexLogging {
+                      nvsRef: ActorRef) extends EncryLogging {
 
   protected type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
   protected def key(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
