@@ -5,7 +5,7 @@ import encry.network.PeerConnectionHandler._
 
 case object peerDatabase {
 
-  private var whitelistPersistence = Map[InetSocketAddress, PeerInfo]()
+  private var whitelistPersistence: Map[InetSocketAddress, PeerInfo] = Map[InetSocketAddress, PeerInfo]()
 
   def addOrUpdateKnownPeer(address: InetSocketAddress, peerInfo: PeerInfo): Unit = {
     val updatedPeerInfo: PeerInfo = whitelistPersistence.get(address).fold(peerInfo) { dbPeerInfo =>
