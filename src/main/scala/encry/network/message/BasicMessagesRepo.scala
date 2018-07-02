@@ -3,23 +3,19 @@ package encry.network.message
 
 import java.net.{InetAddress, InetSocketAddress}
 import java.util
-
 import com.google.common.primitives.{Bytes, Ints}
 import encry.consensus.SyncInfo
 import encry.modifiers.NodeViewModifier
 import encry.network.message.Message.MessageCode
+import encry.network.message.BasicMsgDataTypes._
 import encry.{ModifierId, ModifierTypeId}
 import supertagged.@@
-
 import scala.util.Try
-
 
 object BasicMsgDataTypes {
   type InvData = (ModifierTypeId, Seq[ModifierId])
   type ModifiersData = (ModifierTypeId, Map[ModifierId, Array[Byte]])
 }
-
-import encry.network.message.BasicMsgDataTypes._
 
 class SyncInfoMessageSpec[SI <: SyncInfo](deserializer: Array[Byte] => Try[SI]) extends MessageSpec[SI] {
 
@@ -44,20 +40,18 @@ class InvSpec(maxInvObjects: Int) extends MessageSpec[InvData] {
   override val messageName: String = MessageName
 
   override def parseBytes(bytes: Array[Byte]): Try[InvData] = Try {
-    val typeId: Byte @@ ModifierTypeId.Tag = ModifierTypeId @@ bytes.head
     val count: Int = Ints.fromByteArray(bytes.slice(1, 5))
     require(count > 0, "empty inv list")
     require(count <= maxInvObjects, s"more invs than $maxInvObjects in a message")
     val elems = (0 until count).map { c =>
       ModifierId @@ bytes.slice(5 + c * NodeViewModifier.ModifierIdSize, 5 + (c + 1) * NodeViewModifier.ModifierIdSize)
     }
-    typeId -> elems
+    ModifierTypeId @@ bytes.head -> elems
   }
 
   override def toBytes(data: InvData): Array[Byte] = {
     def concatBytes(seq: Traversable[Array[Byte]]): Array[Byte] = {
-      val length: Int = seq.map(_.length).sum
-      val result: Array[Byte] = new Array[Byte](length)
+      val result: Array[Byte] = new Array[Byte](seq.map(_.length).sum)
       var pos: Int = 0
       seq.foreach { array =>
         System.arraycopy(array, 0, result, pos, array.length)
@@ -65,6 +59,7 @@ class InvSpec(maxInvObjects: Int) extends MessageSpec[InvData] {
       }
       result
     }
+
     require(data._2.nonEmpty, "empty inv list")
     require(data._2.size <= maxInvObjects, s"more invs than $maxInvObjects in a message")
     data._2.foreach(e => require(e.length == NodeViewModifier.ModifierIdSize))
@@ -77,21 +72,17 @@ object RequestModifierSpec {
   val MessageName: String = "RequestModifier"
 }
 
-class RequestModifierSpec(maxInvObjects: Int)
-  extends MessageSpec[InvData] {
+class RequestModifierSpec(maxInvObjects: Int) extends MessageSpec[InvData] {
 
   import RequestModifierSpec._
 
   override val messageCode: MessageCode = MessageCode
   override val messageName: String = MessageName
-
   private val invSpec: InvSpec = new InvSpec(maxInvObjects)
 
-  override def toBytes(typeAndId: InvData): Array[Byte] =
-    invSpec.toBytes(typeAndId)
+  override def toBytes(typeAndId: InvData): Array[Byte] = invSpec.toBytes(typeAndId)
 
-  override def parseBytes(bytes: Array[Byte]): Try[InvData] =
-    invSpec.parseBytes(bytes)
+  override def parseBytes(bytes: Array[Byte]): Try[InvData] = invSpec.parseBytes(bytes)
 }
 
 
@@ -101,9 +92,8 @@ object ModifiersSpec extends MessageSpec[ModifiersData] {
   override val messageName: String = "Modifier"
 
   override def parseBytes(bytes: Array[Byte]): Try[ModifiersData] = Try {
-    val typeId = ModifierTypeId @@ bytes.head
-    val count = Ints.fromByteArray(bytes.slice(1, 5))
-    val objBytes = bytes.slice(5, bytes.length)
+    val count: Int = Ints.fromByteArray(bytes.slice(1, 5))
+    val objBytes: Array[MessageCode] = bytes.slice(5, bytes.length)
     val (_, seq) = (0 until count).foldLeft(0 -> Seq[(ModifierId, Array[Byte])]()) {
       case ((pos, collected), _) =>
         val id: Array[Byte] @@ ModifierId.Tag =
@@ -114,7 +104,7 @@ object ModifiersSpec extends MessageSpec[ModifiersData] {
           objBytes.slice(pos + NodeViewModifier.ModifierIdSize + 4, pos + NodeViewModifier.ModifierIdSize + 4 + objBytesCnt)
         (pos + NodeViewModifier.ModifierIdSize + 4 + objBytesCnt) -> (collected :+ (id -> obj))
     }
-    typeId -> seq.toMap
+    ModifierTypeId @@ bytes.head -> seq.toMap
   }
 
   override def toBytes(data: ModifiersData): Array[Byte] = {
@@ -129,7 +119,6 @@ object ModifiersSpec extends MessageSpec[ModifiersData] {
 
 object GetPeersSpec extends MessageSpec[Unit] {
   override val messageCode: Message.MessageCode = 1: Byte
-
   override val messageName: String = "GetPeers message"
 
   override def parseBytes(bytes: Array[Byte]): Try[Unit] = Try(require(bytes.isEmpty, "Non-empty data for GetPeers"))
@@ -141,9 +130,7 @@ object PeersSpec extends MessageSpec[Seq[InetSocketAddress]] {
   private val AddressLength: Int = 4
   private val PortLength: Int = 4
   private val DataLength: Int = 4
-
   override val messageCode: Message.MessageCode = 2: Byte
-
   override val messageName: String = "Peers message"
 
   override def parseBytes(bytes: Array[Byte]): Try[Seq[InetSocketAddress]] = Try {

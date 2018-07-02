@@ -7,14 +7,13 @@ import encry.ModifierId
 import encry.local.miner.EncryMiner.{GetMinerStatus, MinerStatus}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.settings.{EncryAppSettings, RESTApiSettings}
+import encry.settings.{Algos, EncryAppSettings, RESTApiSettings}
 import encry.utils.ScorexLogging
 import encry.view.EncryViewReadersHolder.GetDataFromHistory
 import encry.view.history.EncryHistoryReader
 import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
-import scorex.crypto.encode.Base58
 
 import scala.concurrent.Future
 
@@ -36,12 +35,14 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
 
   private def getHistory: Future[EncryHistoryReader] = (readersHolder ? GetDataFromHistory[EncryHistoryReader](r => r)).mapTo[EncryHistoryReader]
 
-  private def getHeaderIdsAtHeight(h: Int): Future[Json] = getHistory.map{ _.headerIdsAtHeight(h).map(Base58.encode).asJson}
+  private def getHeaderIdsAtHeight(h: Int): Future[Json] = getHistory.map{ _.headerIdsAtHeight(h).map(Algos.encode).asJson}
+
 
   private def getLastHeaders(n: Int): Future[Json] = getHistory.map{ _.lastHeaders(n).headers.map(_.asJson).asJson }
 
   private def getHeaderIds(offset: Int, limit: Int): Future[Json] =
-    getHistory.map { _.getHeaderIds(limit, offset).map(Base58.encode).asJson }
+    getHistory.map { _.getHeaderIds(limit, offset).map(Algos.encode).asJson }
+
 
   private def getFullBlockByHeaderId(headerId: ModifierId): Future[Option[EncryBlock]] = getHistory.map { history =>
     history.typedModifierById[EncryBlockHeader](headerId).flatMap(history.getBlock)
