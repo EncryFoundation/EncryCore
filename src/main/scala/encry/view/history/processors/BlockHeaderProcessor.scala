@@ -92,7 +92,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with EncryLogging {
         val toProcess: Seq[EncryBlockHeader] = if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
         ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
       case None =>
-        log.error("Should always have best header after header application")
+        logError("Should always have best header after header application")
         EncryApp.forceStopApplication()
     }
   }

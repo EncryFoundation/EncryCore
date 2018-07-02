@@ -11,5 +11,5 @@ trait EncryLogging extends StrictLogging {
   def logWarn(s: String): String = s.logWarn
   def logError(s: String): String = s.logErr
   def logWarn(message: String, cause: Throwable): Unit = log.warn(message, cause)
-  def logError(message: String, cause: Throwable): Unit = log.error(message, cause)
+  def logError(message: String, cause: Throwable): Unit = logError(message, cause)
 }

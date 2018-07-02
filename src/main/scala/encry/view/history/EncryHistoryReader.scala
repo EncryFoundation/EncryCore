@@ -213,7 +213,7 @@ trait EncryHistoryReader
       case None if contains(modifierId) => ModifierSemanticValidity.Unknown
       case None => ModifierSemanticValidity.Absent
       case m =>
-        log.error(s"Incorrect validity status: $m")
+        logError(s"Incorrect validity status: $m")
         ModifierSemanticValidity.Absent
     }
 }

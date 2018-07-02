@@ -93,7 +93,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       }
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
-    case a: Any => log.error("Strange input: " + a)
+    case a: Any => logError("Strange input: " + a)
   }
 
   def key(id: ModifierId): scala.collection.mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
@@ -183,7 +183,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           case None => (uf.history, Success(uf.state), uf.suffix)
         }
       case Failure(e) =>
-        log.error("Rollback failed: ", e)
+        logError("Rollback failed: ", e)
         context.system.eventStream.publish(RollbackFailed(branchingPointOpt))
         EncryApp.forceStopApplication(500)
     }
@@ -300,7 +300,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         toApply.foldLeft(startState) { (s, m) => s.applyModifier(m).get }
     }
   }.recoverWith { case e =>
-    log.error("Failed to recover state.", e)
+    logError("Failed to recover state.", e)
     EncryApp.forceStopApplication(500)
   }.get
 }

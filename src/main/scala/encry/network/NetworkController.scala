@@ -55,7 +55,7 @@ class NetworkController extends Actor with EncryLogging {
           intf.getInterfaceAddresses.asScala.exists { intfAddr => myAddrs.contains(intfAddr.getAddress) }
         } || (networkSettings.upnpEnabled && myAddrs.exists(_ == upnp.externalAddress))
       } recover { case t: Throwable =>
-        log.error("Declared address validation failed: ", t)
+        logError("Declared address validation failed: ", t)
       }
     }
   }
@@ -71,7 +71,7 @@ class NetworkController extends Actor with EncryLogging {
       log.info("Successfully bound to the port " + networkSettings.bindAddress.getPort)
       context.system.scheduler.schedule(600.millis, 5.seconds)(peerManager ! CheckPeers)
     case CommandFailed(_: Bind) =>
-      log.error("Network port " + networkSettings.bindAddress.getPort + " already in use!")
+      logError("Network port " + networkSettings.bindAddress.getPort + " already in use!")
       context stop self
   }
 
@@ -82,9 +82,9 @@ class NetworkController extends Actor with EncryLogging {
         case Success(content) =>
           messageHandlers.find(_._1.contains(msgId)).map(_._2) match {
             case Some(handler) => handler ! DataFromPeer(spec, content, remote)
-            case None => log.error("No handlers found for message: " + msgId)
+            case None => logError("No handlers found for message: " + msgId)
           }
-        case Failure(e) => log.error("Failed to deserialize data: ", e)
+        case Failure(e) => logError("Failed to deserialize data: ", e)
       }
     case SendToNetwork(message, sendingStrategy) =>
       (peerManager ? FilterPeers(sendingStrategy))
