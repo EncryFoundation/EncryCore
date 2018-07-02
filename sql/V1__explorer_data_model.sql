@@ -19,7 +19,7 @@ CREATE TABLE headers (
   best_chain BOOLEAN NOT NULL
 );
 
-ALTER TABLE headers OWNER TO encry_admin;
+ALTER TABLE headers OWNER TO db_admin;
 
 CREATE INDEX "headers__parent_id" ON headers (parent_id);
 
@@ -34,7 +34,7 @@ CREATE TABLE transactions (
   ts BIGINT NOT NULL
 );
 
-ALTER TABLE transactions OWNER to encry_admin;
+ALTER TABLE transactions OWNER to db_admin;
 
 CREATE INDEX "transactions__block_id" on transactions (block_id);
 
@@ -47,7 +47,7 @@ CREATE TABLE outputs (
   data VARCHAR
 );
 
-ALTER TABLE outputs OWNER to encry_admin;
+ALTER TABLE outputs OWNER to db_admin;
 
 CREATE INDEX "outputs__tx_id" on outputs (tx_id);
 
@@ -59,6 +59,6 @@ CREATE TABLE inputs (
   serialized_proofs VARCHAR NOT NULL
 );
 
-ALTER TABLE inputs OWNER to encry_admin;
+ALTER TABLE inputs OWNER to db_admin;
 
 CREATE INDEX "inputs__tx_id" on inputs (tx_id);
