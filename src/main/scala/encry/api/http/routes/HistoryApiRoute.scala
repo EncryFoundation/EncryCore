@@ -56,8 +56,8 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
     getLastHeaders(qty).okJson()
   }
 
-  def getBlockIdsAtHeightR: Route = (pathPrefix("at" / IntNumber) & get) { h =>
-    getHeaderIdsAtHeight(h).okJson()
+  def getBlockIdsAtHeightR: Route = (pathPrefix("at" / IntNumber) & get) { height =>
+    getHeaderIdsAtHeight(height).okJson()
   }
 
   def getBlockHeaderByHeaderIdR: Route = (modifierId & pathPrefix("header") & get) { id =>
@@ -72,7 +72,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
     (miner ? GetMinerStatus).mapTo[MinerStatus].map(_.json).okJson()
   }
 
-  def getFullBlockByHeaderIdR: Route = (modifierId & get) {
-    getFullBlockByHeaderId(_).map(_.map(_.asJson)).okJson()
+  def getFullBlockByHeaderIdR: Route = (modifierId & get) { id =>
+    getFullBlockByHeaderId(id).map(_.map(_.asJson)).okJson()
   }
 }
