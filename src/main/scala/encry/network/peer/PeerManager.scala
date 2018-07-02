@@ -44,17 +44,15 @@ class PeerManager extends Actor with ScorexLogging {
     case RandomPeers(howMany: Int) => sender() ! Random.shuffle(peerDatabase.knownPeers().keys.toSeq).take(howMany)
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
     case DoConnecting(remote, direction) =>
-      val isIncoming: Boolean = direction == Incoming
-      if (connectingPeers.contains(remote) && !isIncoming) {
+      if (connectingPeers.contains(remote) && direction != Incoming) {
         log.info(s"Trying to connect twice to $remote, going to drop the duplicate connection")
         sender() ! CloseConnection
-      } else {
-        if (!isIncoming) {
-          log.info(s"Connecting to $remote")
-          connectingPeers += remote
-        }
-        sender() ! StartInteraction
       }
+      else if (direction != Incoming) {
+        log.info(s"Connecting to $remote")
+        connectingPeers += remote
+      }
+      sender() ! StartInteraction
     case Handshaked(peer) =>
       if (peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress))
         peer.handlerRef ! CloseConnection
