@@ -3,7 +3,7 @@ package encry.consensus
 import encry._
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.PersistentNodeViewModifier
-import scorex.crypto.encode.Base58
+import encry.settings.Algos
 
 import scala.util.Try
 
@@ -79,7 +79,7 @@ object History {
     lazy val chainSwitchingNeeded: Boolean = toRemove.nonEmpty
 
     override def toString: String = {
-      s"ProgressInfo(BranchPoint: ${branchPoint.map(Base58.encode)}, " +
+      s"ProgressInfo(BranchPoint: ${branchPoint.map(Algos.encode)}, " +
         s" to remove: ${toRemove.map(_.encodedId)}, to apply: ${toApply.map(_.encodedId)})"
     }
   }

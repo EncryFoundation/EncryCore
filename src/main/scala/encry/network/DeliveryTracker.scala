@@ -3,7 +3,7 @@ package encry.network
 import akka.actor.{ActorContext, ActorRef, Cancellable}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.CheckDelivery
 import encry.network.PeerConnectionHandler._
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 import encry.{ModifierId, ModifierTypeId}
 
 import scala.collection.mutable
@@ -19,7 +19,7 @@ import scala.util.{Failure, Try}
 class DeliveryTracker(context: ActorContext,
                       deliveryTimeout: FiniteDuration,
                       maxDeliveryChecks: Int,
-                      nvsRef: ActorRef) extends ScorexLogging {
+                      nvsRef: ActorRef) extends EncryLogging {
 
   protected type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
   protected def key(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
@@ -62,7 +62,7 @@ class DeliveryTracker(context: ActorContext,
   protected def stopExpecting(cp: ConnectedPeer, mtid: ModifierTypeId, mid: ModifierId): Unit = {
     val midAsKey = key(mid)
     expecting -= ((mtid, midAsKey, cp))
-    cancellables((midAsKey, cp)).cancel()
+    cancellables.get((midAsKey, cp)).foreach(_.cancel())
     cancellables -= ((midAsKey, cp))
   }
 
@@ -94,7 +94,7 @@ class DeliveryTracker(context: ActorContext,
   protected def tryWithLogging(fn: => Unit): Unit = {
     Try(fn).recoverWith {
       case e =>
-        log.warn("Unexpected error", e)
+        logWarn("Unexpected error", e)
         Failure(e)
     }
   }

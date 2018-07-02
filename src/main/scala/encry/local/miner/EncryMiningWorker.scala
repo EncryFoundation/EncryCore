@@ -1,12 +1,13 @@
 package encry.local.miner
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.Actor
+import encry.EncryApp.miner
 import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
 import encry.local.miner.EncryMiner.MinedBlock
 import encry.local.miner.EncryMiningWorker.{DropChallenge, MineBlock, NextChallenge}
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 
-class EncryMiningWorker(miner: ActorRef, myNumber: Int, numberOfWorkers: Int) extends Actor with ScorexLogging {
+class EncryMiningWorker(myNumber: Int, numberOfWorkers: Int) extends Actor with EncryLogging {
 
   override def receive: Receive = miningPaused
 

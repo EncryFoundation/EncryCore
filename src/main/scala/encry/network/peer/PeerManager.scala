@@ -10,12 +10,12 @@ import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedP
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler._
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 
 import scala.collection.mutable
 import scala.util.Random
 
-class PeerManager extends Actor with ScorexLogging {
+class PeerManager extends Actor with EncryLogging {
 
   //peers after successful handshake
   val connectedPeers: mutable.Map[InetSocketAddress, ConnectedPeer] = mutable.Map[InetSocketAddress, ConnectedPeer]()

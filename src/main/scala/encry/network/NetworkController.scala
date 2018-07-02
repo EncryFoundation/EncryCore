@@ -17,7 +17,7 @@ import NetworkController.ReceivableMessages._
 import PeerConnectionHandler.ReceivableMessages.CloseConnection
 import PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -26,7 +26,7 @@ import scala.language.{existentials, postfixOps}
 import scala.util.{Failure, Success, Try}
 
 
-class NetworkController extends Actor with ScorexLogging {
+class NetworkController extends Actor with EncryLogging {
 
   val networkSettings: NetworkSettings = settings.network
 
@@ -121,7 +121,7 @@ class NetworkController extends Actor with ScorexLogging {
       log.info(s"Registering handlers for ${specs.map(s => s.messageCode -> s.messageName)}")
       messageHandlers += specs.map(_.messageCode) -> handler
     case CommandFailed(cmd: Tcp.Command) => log.info("Failed to execute command : " + cmd)
-    case nonsense: Any => log.warn(s"NetworkController: got something strange $nonsense")
+    case nonsense: Any => logWarn(s"NetworkController: got something strange $nonsense")
   }
 }
 

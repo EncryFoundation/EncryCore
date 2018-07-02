@@ -6,13 +6,13 @@ import encry.consensus.ModifierSemanticValidity.Invalid
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
 
 import scala.util.{Failure, Try}
 
-trait BlockProcessor extends BlockHeaderProcessor with ScorexLogging {
+trait BlockProcessor extends BlockHeaderProcessor with EncryLogging {
 
   import BlockProcessor._
 

@@ -1,7 +1,7 @@
 package encry.view.state
 
 import encry.modifiers.serialization.Serializer
-import scorex.crypto.encode.Base58
+import encry.settings.Algos
 import scorex.crypto.signatures.{Curve25519, Signature}
 
 import scala.util.Try
@@ -17,7 +17,7 @@ case class Signature25519(signature: Signature) extends ProofOfKnowledge[Private
 
   override def serializer: Serializer[Signature25519] = Signature25519Serializer
 
-  override def toString: String = s"Signature25519(${Base58.encode(signature)})"
+  override def toString: String = s"Signature25519(${Algos.encode(signature)})"
 }
 
 object Signature25519Serializer extends Serializer[Signature25519] {
