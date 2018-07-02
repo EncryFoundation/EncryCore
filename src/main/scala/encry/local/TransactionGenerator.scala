@@ -7,14 +7,15 @@ import encry.crypto.PrivateKey25519
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
+import encry.settings.Algos
+import encry.utils.NetworkTime.Time
+import encry.utils.ScorexLogging
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedTransaction}
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedTransaction}
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import encry.utils.NetworkTime.Time
-import encry.utils.ScorexLogging
 
 import scala.concurrent.duration._
 
@@ -40,7 +41,7 @@ class TransactionGenerator extends Actor with ScorexLogging {
   def handleTransactionGeneration: Receive = {
 
     case StartGeneration if !isActive =>
-      log.info("Starting transaction generation")
+      println("Starting transaction generation")
       isActive = true
       context.system.scheduler.scheduleOnce(500.millis)(self ! FetchWalletData)
       context.system.scheduler.scheduleOnce(1500.millis)(self ! GenerateTransaction)
@@ -80,6 +81,9 @@ class TransactionGenerator extends Actor with ScorexLogging {
   def fetchWalletData(): Unit =
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, WalletData] { v =>
       val wallet: EncryWallet = v.vault
+      println("----------------------------------")
+      println("size:" + wallet.walletStorage.allBoxes.size)
+      wallet.walletStorage.allBoxes.foreach(box => println(Algos.encode(box.id)))
       val availableBoxes: Seq[AssetBox] = wallet.walletStorage.allBoxes.foldLeft(Seq.empty[AssetBox]) {
         case (acc, box: AssetBox) if box.isIntrinsic => acc :+ box
         case (acc, _) => acc

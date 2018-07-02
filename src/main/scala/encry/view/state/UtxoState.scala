@@ -5,6 +5,7 @@ import java.io.File
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import encry.EncryApp.settings
+import encry.VersionTag
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -20,8 +21,6 @@ import encry.utils.{BalanceCalculator, ScorexLogging}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import encry.VersionTag
-import encry.modifiers.state.box.Box.Amount
 import scorex.crypto.authds._
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.hash.Digest32

@@ -1,12 +1,12 @@
 package encry.cli
 
 import akka.actor.Actor
+import encry.EncryApp.settings
 import encry.cli.commands._
+import encry.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
-import encry.EncryApp.settings
-import encry.utils.ScorexLogging
 
 class ConsolePromptListener extends Actor with ScorexLogging {
 
@@ -55,8 +55,7 @@ object ConsolePromptListener {
     "addKey" -> AddKey,
     "init" -> InitKeyStorage,
     "pubKeys" -> PrintPubKeys,
-    "balance" -> GetBalance,
-    "transfer" -> Transfer
+    "balance" -> GetBalance
   ))
 
   val cmdDictionary: Map[String, Map[String, Command]] =

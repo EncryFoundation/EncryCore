@@ -48,7 +48,7 @@ class EncryDeliveryTracker(networkSettings: NetworkSettings, timeProvider: Netwo
           notRequested
         }
     }
-    cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
+    if (notRequestedIds.nonEmpty) cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
     notRequestedIds.foreach{id =>
       val cancellable = context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
       cancellables(key(id)) = cp -> (cancellable, 0)
@@ -96,17 +96,12 @@ class EncryDeliveryTracker(networkSettings: NetworkSettings, timeProvider: Netwo
 
   override def receive: Receive = {
 
-    case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
-      println(s"In RFL123: ${modifierIds.size}")
-      expect(peer, modifierTypeId, modifierIds)
+    case RequestFromLocal(peer, modifierTypeId, modifierIds) => expect(peer, modifierTypeId, modifierIds)
 
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       val typeId: ModifierTypeId = data._1
       val modifiers: Map[ModifierId, Array[Byte]] = data._2
-      if (settings.node.sendStat)
-        context.actorSelection("/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
-      //println(s"Got modifiers of type $typeId (${data._2.size}) from remote connected peer: $remote")
-      //println(s"Received modifier ids ${data._2.keySet.map(Algos.encode).mkString(",")}")
+      if (settings.node.sendStat) context.actorSelection("/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
       for ((id, _) <- modifiers) receive(typeId, id, remote)
       val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
         modifiers partition { case (id, _) => isSpam(id) }
@@ -131,32 +126,20 @@ class EncryDeliveryTracker(networkSettings: NetworkSettings, timeProvider: Netwo
     case CheckModifiersToDownload(history: EncryHistory) =>
       removeOutdatedExpectingFromRandom()
       if (history.isHeadersChainSynced && isExpectingFromRandom) {
-        println("-----------------------------?onCheckModifiersToDownload?--------------------------------------")
         val currentQueue: Iterable[ModifierId] = expectingFromRandomQueue
-        println(s"CurrentQueue: ${currentQueue.size}")
         val newIds: Seq[(ModifierTypeId, ModifierId)] = history.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
-        println(s"newIds: ${newIds.size}")
         val oldIds: Seq[(ModifierTypeId, ModifierId)] = idsExpectingFromRandomToRetry()
-        println(s"olIds: ${oldIds.size}")
-        println("-----------------------------!onCheckModifiersToDownload!--------------------------------------")
         (newIds ++ oldIds).groupBy(_._1).foreach(ids => requestDownload(ids._1, ids._2.map(_._2)))
       }
 
     case CheckForSync(history: EncryHistory) =>
-      if (history.isHeadersChainSynced && isExpectingFromRandom) {
-        println(s"Request to download: ${System.currentTimeMillis()}")
-        println(s"deliveryTracker size: ${expectingFromRandom.size}")
-        self ! CheckModifiersToDownload(history)
-      }
+      if (history.isHeadersChainSynced && isExpectingFromRandom) self ! CheckModifiersToDownload(history)
 
     case NeedToDownloadFromRandom(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]) =>
       requestDownload(modifierTypeId, modifierIds)
   }
 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
-    modifierIds.foreach(modId => println(s"Request ${System.currentTimeMillis()}: ${Algos.encode(modId)}"))
-    println("-------------------")
-    modifierIds.foreach(id => expectFromRandom(modifierTypeId, id))
     val msg: Message[(ModifierTypeId, Seq[ModifierId])] = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
     if (settings.node.sendStat) context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
     networkController ! SendToNetwork(msg, SendToRandom)
@@ -210,27 +193,18 @@ class EncryDeliveryTracker(networkSettings: NetworkSettings, timeProvider: Netwo
     * Modifier downloaded
     */
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = tryWithLogging {
-    //println("///////////////////////////////////////")
-    //expectingFromRandom.keys.foreach(key => Algos.encode(key.toArray))
-    //println(s"expectingFromRandom.contains(key(mid))[${Algos.encode(mid)}: ${expectingFromRandom.contains(key(mid))}")
-    //println(s"isExpecting(mtid, mid, cp): ${isExpecting(mtid, mid, cp)}")
     if (expectingFromRandom.contains(key(mid))) {
       expectingFromRandom.remove(key(mid))
-      //println(s"After remove: ${System.currentTimeMillis()}: ${expectingFromRandom.contains(key(mid))}")
-      //println(s"Size: ${expectingFromRandom.size}")
       delivered(key(mid)) = cp
     } else if (isExpecting(mtid, mid, cp)) {
-      //println("Here")
       delivered(key(mid)) = cp
       cancellables.get(key(mid)).foreach(_._2._1.cancel())
       cancellables -= key(mid)
       peers -= key(mid)
     }
     else {
-      //println("222222")
       deliveredSpam(key(mid)) = cp
     }
-    //println("////////////////////////////////////////")
   }
 }
 

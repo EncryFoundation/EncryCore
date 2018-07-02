@@ -5,7 +5,6 @@ import encry.settings.Algos
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.crypto.authds.avltree.batch.VersionedIODBAVLStorage.{InternalNodePrefix, LeafPrefix}
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue, Balance}
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash
 import scorex.crypto.hash.{CryptographicHash, Digest}
 import scorex.utils.ScryptoLogging
