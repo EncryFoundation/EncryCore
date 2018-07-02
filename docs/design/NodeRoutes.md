@@ -1,24 +1,23 @@
 | Route | get/post | Args |
 |-------|----------|------|
-|/info                               | get  |  |
-|/transactions                       | post |  |
-|/transactions/{id}                  | get  |  |
-|/transactions/unconfirmed           | get  |* |
-|/peers/all                          | get  |  |
-|/peers/connected                    | get  |  |
-|/peers/connect                      | post |  |
-|/peers/blacklisted                  | get  |  |
-|/utils/seed                         | get  |  |
-|/utils/hash/blake2b                 | post |  |
-|/state/boxes/{address}              | get  |  |
-|/state/portfolio/{address}          | get  |  |
-|/history                            | get  |  |
-|/history/lastHeaders/{n}            | get  |  |
-|/history/at/{n}                     | get  |  |
-|/history/{modifierId}/header        | get  |  |
-|/history/{modifierId}/transactions  | get  |  |
-|/history/candidateBlock             | get  |  |
-|/api-docs/swagger.conf              | get  |  |
+|/info                               | get  | |
+|/transactions                       | post | |
+|/transactions/{id}                  | get  | |
+|/transactions/unconfirmed           | get  |*|
+|/peers/all                          | get  | |
+|/peers/connected                    | get  | |
+|/peers/connect                      | post | |
+|/peers/blacklisted                  | get  | |
+|/utils/seed                         | get  | |
+|/utils/hash/blake2b                 | post | |
+|/state/boxes/{address}              | get  | |
+|/history                            | get  |*|
+|/history/lastHeaders/{n}            | get  | |
+|/history/at/{n}                     | get  | |
+|/history/{modifierId}/header        | get  | |
+|/history/{modifierId}/transactions  | get  | |
+|/history/candidateBlock             | get  | |
+|/api-docs/swagger.conf              | get  | |
   
 * optional integer parameters `limit` and `offset`  
   
@@ -101,22 +100,25 @@ _Output example_ :
 ]
 ```
 
-`/state/portfolio/{address}`
 
 ## 5. Peers.
 Usage:
     `/peers/all`
     `/peers/connected`
     `/peers/blacklisted`
+    
 Description: _[Always returns [] (???)]_
 
 ## 6. Utils
 Usage: `/utils/seed` or `/utils/seed/{SeedSize}`
+
 _output_: `"VNpiGdoVzSekNqgywWZbjp"`
+
 Description: returns random Byte58 string for random value of `SeedSize` or 32 (default) bytes.
 
 
 # Post
 ## 1. /utils/hash/blake2b
 _entity_: Any text or json
+
 _output_: `"3etZenM7MQb4w45xmhAgQzmMBtdA7QPV8nD6uBDgQ2wi"`
