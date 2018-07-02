@@ -27,7 +27,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
                             remote: InetSocketAddress) extends Actor with ScorexLogging {
 
   import PeerConnectionHandler.ReceivableMessages._
-  import encry.network.peer.PeerManager.ReceivableMessages.{AddToBlacklist, Disconnected, DoConnecting, Handshaked}
+  import encry.network.peer.PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
 
   context watch connection
 
@@ -116,10 +116,6 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
           context.system.scheduler.scheduleOnce(Random.nextInt(delay.toMillis.toInt).millis)(sendOutMessage())
         case None => sendOutMessage()
       }
-    case Blacklist =>
-      log.info(s"Going to blacklist " + remote)
-      peerManager ! AddToBlacklist(remote)
-      connection ! Close
   }
 
   def workingCycleRemoteInterface: Receive = {
@@ -224,7 +220,6 @@ object PeerConnectionHandler {
 
     case object CloseConnection
 
-    case object Blacklist
 
   }
 
