@@ -52,20 +52,20 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
     getHeaderIds(offset, limit).okJson()
   }
 
-  def getLastHeadersR: Route = (pathPrefix("lastHeaders" / IntNumber) & get) {
-    getLastHeaders(_).okJson()
+  def getLastHeadersR: Route = (pathPrefix("lastHeaders" / IntNumber) & get) { qty =>
+    getLastHeaders(qty).okJson()
   }
 
-  def getBlockIdsAtHeightR: Route = (pathPrefix("at" / IntNumber) & get) {
-    getHeaderIdsAtHeight(_).okJson()
+  def getBlockIdsAtHeightR: Route = (pathPrefix("at" / IntNumber) & get) { h =>
+    getHeaderIdsAtHeight(h).okJson()
   }
 
-  def getBlockHeaderByHeaderIdR: Route = (modifierId & pathPrefix("header") & get) {
-    getFullBlockByHeaderId(_).map(_.map(_.header.asJson)).okJson()
+  def getBlockHeaderByHeaderIdR: Route = (modifierId & pathPrefix("header") & get) { id =>
+    getFullBlockByHeaderId(id).map(_.map(_.header.asJson)).okJson()
   }
 
-  def getBlockTransactionsByHeaderIdR: Route = (modifierId & pathPrefix("transactions") & get) {
-    getFullBlockByHeaderId(_).map(_.map(_.transactions.asJson)).okJson()
+  def getBlockTransactionsByHeaderIdR: Route = (modifierId & pathPrefix("transactions") & get) { id =>
+    getFullBlockByHeaderId(id).map(_.map(_.transactions.asJson)).okJson()
   }
 
   def candidateBlockR: Route = (path("candidateBlock") & pathEndOrSingleSlash & get) {
