@@ -15,16 +15,16 @@ import scala.util.Random
 
 class PeerManager extends Actor with ScorexLogging {
 
-  var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map[InetSocketAddress, ConnectedPeer]()
+  var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
 
-  var connectingPeers: Set[InetSocketAddress] = Set[InetSocketAddress]()
+  var connectingPeers: Set[InetSocketAddress] = Set.empty
 
-  if (peerDatabase.isEmpty) settings.network.knownPeers.foreach { address =>
-    if (!isSelf(address, None)) peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), None))
+  if (PeerDatabase.isEmpty) settings.network.knownPeers.foreach { address =>
+    if (!isSelf(address, None)) PeerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), None))
   }
 
-  def randomPeer(): Option[InetSocketAddress] = {
-    val peers: Seq[InetSocketAddress] = peerDatabase.knownPeers().keys.toSeq
+  def randomPeer: Option[InetSocketAddress] = {
+    val peers: Seq[InetSocketAddress] = PeerDatabase.knownPeers().keys.toSeq
     if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
     else None
   }
@@ -37,11 +37,11 @@ class PeerManager extends Actor with ScorexLogging {
 
   override def receive: Receive = {
     case GetConnectedPeers => sender() ! (connectedPeers.values.map(_.handshake).toSeq: Seq[Handshake])
-    case GetAllPeers => sender() ! peerDatabase.knownPeers()
+    case GetAllPeers => sender() ! PeerDatabase.knownPeers()
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
       if (!isSelf(address, None))
-        peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), peerNameOpt, connTypeOpt))
-    case RandomPeers(howMany: Int) => sender() ! Random.shuffle(peerDatabase.knownPeers().keys.toSeq).take(howMany)
+        PeerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), peerNameOpt, connTypeOpt))
+    case RandomPeers(howMany: Int) => sender() ! Random.shuffle(PeerDatabase.knownPeers().keys.toSeq).take(howMany)
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
     case DoConnecting(remote, direction) =>
       if (connectingPeers.contains(remote) && direction != Incoming) {
@@ -58,7 +58,7 @@ class PeerManager extends Actor with ScorexLogging {
         peer.handlerRef ! CloseConnection
       else {
         if (peer.publicPeer) self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
-        else peerDatabase.remove(peer.socketAddress)
+        else PeerDatabase.remove(peer.socketAddress)
         connectedPeers += (peer.socketAddress -> peer)
         nodeViewSynchronizer ! HandshakedPeer(peer)
       }
@@ -68,7 +68,7 @@ class PeerManager extends Actor with ScorexLogging {
       nodeViewSynchronizer ! DisconnectedPeer(remote)
     case CheckPeers =>
       if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
-        randomPeer().foreach { address =>
+        randomPeer.foreach { address =>
           if (!connectedPeers.exists(_._1 == address) &&
             !connectingPeers.exists(_.getHostName == address.getHostName)) {
             sender() ! ConnectTo(address)
@@ -86,7 +86,7 @@ object PeerManager {
 
     case class AddOrUpdatePeer(address: InetSocketAddress, peerName: Option[String], direction: Option[ConnectionType])
 
-    case class RandomPeers(hawMany: Int)
+    case class RandomPeers(howMany: Int)
 
     case class FilterPeers(sendingStrategy: SendingStrategy)
 
