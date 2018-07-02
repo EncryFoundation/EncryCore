@@ -1,9 +1,10 @@
 package encry.network
 
-import akka.actor.{ActorContext, ActorRef, Cancellable}
+import akka.actor.{Actor, Cancellable}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.CheckDelivery
 import encry.network.PeerConnectionHandler._
-import encry.settings.Algos
+import encry.network.message.{Message, RequestModifierSpec}
+import encry.settings.{Algos, NetworkSettings}
 import encry.utils.NetworkTime.Time
 import encry.utils.{NetworkTimeProvider, ScorexLogging}
 import encry.{ModifierId, ModifierTypeId}
@@ -13,52 +14,58 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.{Failure, Try}
 
-case class EncryDeliveryTracker(context: ActorContext, deliveryTimeout: FiniteDuration, maxDeliveryChecks: Int,
-                                nvsRef: ActorRef, timeProvider: NetworkTimeProvider) extends ScorexLogging {
+case class EncryDeliveryTracker(networkSettings: NetworkSettings, timeProvider: NetworkTimeProvider) extends Actor with ScorexLogging {
+
+  val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(networkSettings.maxInvObjects)
 
   protected type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
-  protected def key(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
-  // todo: Do we need to keep track of ModifierTypeIds? Maybe we could ignore them?
+  protected def key(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
   // when a remote peer is asked a modifier, we add the expected data to `expecting`
   // when a remote peer delivers expected data, it is removed from `expecting` and added to `delivered`.
   // when a remote peer delivers unexpected data, it is added to `deliveredSpam`.
-  protected val expecting = mutable.Set[(ModifierTypeId, ModifierIdAsKey, ConnectedPeer)]()
-  protected val delivered = mutable.Map[ModifierIdAsKey, ConnectedPeer]()
-  protected val deliveredSpam = mutable.Map[ModifierIdAsKey, ConnectedPeer]()
+  private val expecting = mutable.Set[(ModifierTypeId, ModifierIdAsKey, ConnectedPeer)]()
+  private val delivered = mutable.Map[ModifierIdAsKey, ConnectedPeer]()
+  private val deliveredSpam = mutable.Map[ModifierIdAsKey, ConnectedPeer]()
+  private val peers = mutable.Map[ModifierIdAsKey, Seq[ConnectedPeer]]()
 
-  protected val cancellables = mutable.Map[(ModifierIdAsKey, ConnectedPeer), Cancellable]()
-  protected val checksCounter = mutable.Map[(ModifierIdAsKey, ConnectedPeer), Int]()
+  private val cancellables = mutable.Map[ModifierIdAsKey, (ConnectedPeer, (Cancellable, Int))]()
 
   def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mids: Seq[ModifierId])(implicit ec: ExecutionContext): Unit = tryWithLogging {
     for (mid <- mids) expect(cp, mtid, mid)
   }
 
   protected def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mid: ModifierId)(implicit ec: ExecutionContext): Unit = {
-    val cancellable = context.system.scheduler.scheduleOnce(deliveryTimeout,
-      nvsRef,
-      CheckDelivery(cp, mtid, mid))
     val midAsKey = key(mid)
-    expecting += ((mtid, midAsKey, cp))
-    cancellables((midAsKey, cp)) = cancellable
+    if (!cancellables.contains(midAsKey)) {
+      cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> Seq(mid)), None)
+      val cancellable = context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout, self, CheckDelivery(cp, mtid, mid))
+      expecting += ((mtid, midAsKey, cp))
+      cancellable(midAsKey) = cp -> (cancellable, 0)
+    }
+    else peers(midAsKey) = (peers.getOrElseUpdate(midAsKey, Seq()) :+ cp).distinct
   }
 
   // stops expecting, and expects again if the number of checks does not exceed the maximum
   def reexpect(cp: ConnectedPeer, mtid: ModifierTypeId, mid: ModifierId)(implicit ec: ExecutionContext): Unit = tryWithLogging {
-    stopExpecting(cp, mtid, mid)
-    val midAsKey = key(mid)
-    val checks = checksCounter.getOrElseUpdate((midAsKey, cp), 0) + 1
-    checksCounter((midAsKey, cp)) = checks
-    if (checks < maxDeliveryChecks) expect(cp, mtid, mid)
-    else checksCounter -= ((midAsKey, cp))
-  }
 
-  protected def stopExpecting(cp: ConnectedPeer, mtid: ModifierTypeId, mid: ModifierId): Unit = {
     val midAsKey = key(mid)
-    expecting -= ((mtid, midAsKey, cp))
-    cancellables((midAsKey, cp)).cancel()
-    cancellables -= ((midAsKey, cp))
+
+    cancellables.get(midAsKey).foreach(peerInfo =>
+      if (peerInfo._2._2 < networkSettings.maxDeliveryChecks) {
+        cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> Seq(mid)), None)
+        val cancellable = context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout, self, CheckDelivery(cp, mtid, mid))
+        peerInfo._2._1.cancel()
+        cancellables(midAsKey) = cp -> (cancellable, peerInfo._2._2 + 1)
+      } else peers.get(midAsKey).foreach(downloadPeers =>
+        downloadPeers.headOption.foreach { nextPeer =>
+          cancellables -= midAsKey
+          peers(midAsKey) = downloadPeers.filter(_ != nextPeer)
+          expect(cp, mtid, mid)
+        }
+      )
+    )
   }
 
   protected def isExpecting(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Boolean =
@@ -78,6 +85,16 @@ case class EncryDeliveryTracker(context: ActorContext, deliveryTimeout: FiniteDu
         log.warn("Unexpected error", e)
         Failure(e)
     }
+  }
+
+  override def receive: Receive = {
+
+    case CheckDelivery(peer, modifierTypeId, modifierId) =>
+      if (peerWhoDelivered(modifierId).contains(peer)) delete(modifierId)
+      else {
+        log.info(s"Peer $peer has not delivered asked modifier ${Algos.encode(modifierId)} on time")
+        reexpect(peer, modifierTypeId, modifierId)
+      }
   }
 
   case class ToDownloadStatus(tp: ModifierTypeId, firstViewed: Long, lastTry: Long)
@@ -113,16 +130,16 @@ case class EncryDeliveryTracker(context: ActorContext, deliveryTimeout: FiniteDu
     * Remove old modifiers from download queue
     */
   def removeOutdatedExpectingFromRandom(): Unit = expectingFromRandom
-      .filter { case (_, status) => status.firstViewed < timeProvider.time() - ToDownloadLifetime.toMillis }
-      .foreach { case (key, _) => expectingFromRandom.remove(key) }
+    .filter { case (_, status) => status.firstViewed < timeProvider.time() - ToDownloadLifetime.toMillis }
+    .foreach { case (key, _) => expectingFromRandom.remove(key) }
 
   /**
     * Id's that are already in queue to download but are not downloaded yet and were not requested recently
     */
   def idsExpectingFromRandomToRetry(): Seq[(ModifierTypeId, ModifierId)] = expectingFromRandom
-      .filter(_._2.lastTry < timeProvider.time() - ToDownloadRetryInterval.toMillis).toSeq
-      .sortBy(_._2.lastTry)
-      .map(i => (i._2.tp, ModifierId @@ i._1.array))
+    .filter(_._2.lastTry < timeProvider.time() - ToDownloadRetryInterval.toMillis).toSeq
+    .sortBy(_._2.lastTry)
+    .map(i => (i._2.tp, ModifierId @@ i._1.array))
 
   /**
     * Modifier downloaded
@@ -142,9 +159,9 @@ case class EncryDeliveryTracker(context: ActorContext, deliveryTimeout: FiniteDu
       val eo = expecting.find(e => (mtid == e._1) && (mid sameElements e._2) && cp == e._3)
       for (e <- eo) expecting -= e
       delivered(key(mid)) = cp
-      val cancellableKey = (key(mid), cp)
-      for (c <- cancellables.get(cancellableKey)) c.cancel()
-        cancellables -= cancellableKey
+      cancellables.get(key(mid)).foreach(_._2._1.cancel())
+      cancellables -= key(mid)
+      peers -= key(mid)
     }
     else {
       println("222222")

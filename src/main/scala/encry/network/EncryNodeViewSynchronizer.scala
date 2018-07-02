@@ -2,7 +2,7 @@ package encry.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef, Props}
 import encry.EncryApp._
 import encry.consensus.History._
 import encry.consensus.{HistoryReader, SyncInfo}
@@ -30,8 +30,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
 
 
   val networkSettings: NetworkSettings = settings.network
-  val deliveryTracker: EncryDeliveryTracker =
-    EncryDeliveryTracker(context, networkSettings.deliveryTimeout, networkSettings.maxDeliveryChecks, self, timeProvider)
+  val deliveryTracker: ActorRef =
+    context.actorOf(Props(classOf[EncryDeliveryTracker], networkSettings, timeProvider))
   val invSpec: InvSpec = new InvSpec(networkSettings.maxInvObjects)
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(networkSettings.maxInvObjects)
   val statusTracker: SyncTracker = SyncTracker(self, context, networkSettings, timeProvider)
@@ -44,7 +44,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
   def sendSync(syncInfo: EncrySyncInfo): Unit = {
     val peers: Seq[ConnectedPeer] = statusTracker.peersToSyncWith()
     if (peers.nonEmpty)
-      networkController ! SendToNetwork(Message(syncInfoSpec, Right(syncInfo), None), SendToPeers(peers))
+      networkController ! SendToNetwork(Message(syncInfoSpec, Right(syncInfo), None), SendToPeers(Seq(peers.last)))
   }
 
   // Send history extension to the (less developed) peer 'remote' which does not have it.
@@ -59,7 +59,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
 
   override def receive: Receive = viewHolderEvents orElse {
     case SendLocalSyncInfo =>
-      if (statusTracker.elapsedTimeSinceLastSync() < (networkSettings.syncInterval.toMillis / 2))
+      if (statusTracker.elapsedTimeSinceLastSync() < networkSettings.syncInterval.toMillis)
         log.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
@@ -72,12 +72,6 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
       }
     case HandshakedPeer(remote) => statusTracker.updateStatus(remote, Unknown)
     case DisconnectedPeer(remote) => statusTracker.clearStatus(remote)
-    case CheckDelivery(peer, modifierTypeId, modifierId) =>
-      if (deliveryTracker.peerWhoDelivered(modifierId).contains(peer)) deliveryTracker.delete(modifierId)
-      else {
-        log.info(s"Peer $peer has not delivered asked modifier ${Algos.encode(modifierId)} on time")
-        deliveryTracker.reexpect(peer, modifierTypeId, modifierId)
-      }
     case DataFromPeer(spec, syncInfo: EncrySyncInfo@unchecked, remote) if spec.messageCode == syncInfoSpec.messageCode =>
       historyReaderOpt match {
         case Some(historyReader) =>
@@ -108,8 +102,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
       val modifiers: Map[ModifierId, Array[Byte]] = data._2
       if (settings.node.sendStat)
         context.actorSelection("/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
-      log.info(s"Got modifiers of type $typeId from remote connected peer: $remote")
-      log.trace(s"Received modifier ids ${data._2.keySet.map(Algos.encode).mkString(",")}")
+      println(s"Got modifiers of type $typeId (${data._2.size}) from remote connected peer: $remote")
+      println(s"Received modifier ids ${data._2.keySet.map(Algos.encode).mkString(",")}")
       for ((id, _) <- modifiers) deliveryTracker.receive(typeId, id, remote)
       val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
         modifiers partition { case (id, _) => deliveryTracker.isSpam(id) }
@@ -129,7 +123,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
         }
       }
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
-      if (modifierIds.nonEmpty) peer.handlerRef ! Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
+      peer.handlerRef ! Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
       deliveryTracker.expect(peer, modifierTypeId, modifierIds)
     case ResponseFromLocal(peer, _, modifiers: Seq[NodeViewModifier]) =>
       if (modifiers.nonEmpty) {
