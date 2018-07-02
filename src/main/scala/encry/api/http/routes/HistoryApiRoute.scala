@@ -48,8 +48,8 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
     history.typedModifierById[EncryBlockHeader](headerId).flatMap(history.getBlock)
   }
 
-  def getBlocksR: Route = (pathEndOrSingleSlash & get & paging) {
-    getHeaderIds(_, _).okJson()
+  def getBlocksR: Route = (pathEndOrSingleSlash & get & paging) { (offset, limit) =>
+    getHeaderIds(offset, limit).okJson()
   }
 
   def getLastHeadersR: Route = (pathPrefix("lastHeaders" / IntNumber) & get) {
