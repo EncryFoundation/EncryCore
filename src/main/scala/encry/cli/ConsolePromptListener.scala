@@ -1,19 +1,17 @@
 package encry.cli
 
-import akka.actor.{Actor, ActorSystem}
-import akka.stream.{ActorAttributes, ActorMaterializer}
-import akka.stream.scaladsl.{Sink, Source}
+import akka.actor.Actor
+import akka.stream.ActorMaterializer
 import encry.EncryApp
+import encry.EncryApp.settings
 import encry.cli.commands._
+import encry.utils.EncryLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import encry.EncryApp.settings
-import encry.utils.ScorexLogging
+import scala.util.Success
 
-import scala.concurrent.ExecutionContext
-import scala.util.{Failure, Success}
 
-class ConsolePromptListener extends Actor with ScorexLogging {
+class ConsolePromptListener extends Actor with EncryLogging {
 
   import ConsolePromptListener._
   implicit val materializer = ActorMaterializer()

@@ -15,15 +15,12 @@ import encry.local.TransactionGenerator
 import encry.local.TransactionGenerator.StartGeneration
 import encry.local.miner.EncryMiner
 import encry.local.miner.EncryMiner.StartMining
-import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.mempool.EncryBaseTransaction
-import encry.modifiers.state.box.EncryProposition
 import encry.network.message._
 import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, NetworkController, UPnP}
 import encry.settings.{Algos, EncryAppSettings}
 import encry.stats.StatsSender
-import encry.utils.{NetworkTimeProvider, ScorexLogging}
+import encry.utils.{NetworkTimeProvider, EncryLogging}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 
@@ -31,12 +28,7 @@ import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.io.Source
 
-object EncryApp extends App with ScorexLogging {
-
-  type P = EncryProposition
-  type TX = EncryBaseTransaction
-  type PMOD = EncryPersistentModifier
-  type NVHT = EncryNodeViewHolder[_]
+object EncryApp extends App with EncryLogging {
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read
 

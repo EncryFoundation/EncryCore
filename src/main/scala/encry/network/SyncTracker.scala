@@ -7,7 +7,7 @@ import encry.consensus.History
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
 import encry.network.PeerConnectionHandler._
 import encry.settings.NetworkSettings
-import encry.utils.{NetworkTimeProvider, ScorexLogging}
+import encry.utils.{NetworkTimeProvider, EncryLogging}
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -20,7 +20,7 @@ import scala.concurrent.duration.{FiniteDuration, _}
 case class SyncTracker(nvsRef: ActorRef,
                   context: ActorContext,
                   networkSettings: NetworkSettings,
-                  timeProvider: NetworkTimeProvider) extends ScorexLogging {
+                  timeProvider: NetworkTimeProvider) extends EncryLogging {
 
   import History._
   import encry.utils.NetworkTime.Time
@@ -61,11 +61,11 @@ case class SyncTracker(nvsRef: ActorRef,
   def clearStatus(remote: InetSocketAddress): Unit = {
     statuses.find(_._1.socketAddress == remote) match {
       case Some((peer, _)) => statuses -= peer
-      case None => log.warn(s"Trying to clear status for $remote, but it is not found")
+      case None => logWarn(s"Trying to clear status for $remote, but it is not found")
     }
     lastSyncSentTime.find(_._1.socketAddress == remote) match {
       case Some((peer, _)) => statuses -= peer
-      case None => log.warn(s"Trying to clear last sync time for $remote, but it is not found")
+      case None => logWarn(s"Trying to clear last sync time for $remote, but it is not found")
     }
   }
 

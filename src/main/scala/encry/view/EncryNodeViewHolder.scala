@@ -17,7 +17,7 @@ import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
@@ -31,7 +31,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
-class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with ScorexLogging with CommandReceiver[StateType] {
+class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with EncryLogging with CommandReceiver[StateType] {
 
   type HIS = EncryHistory
   type MS = StateType
@@ -56,7 +56,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def postStop(): Unit = {
-    log.warn("Stopping EncryNodeViewHolder")
+    logWarn("Stopping EncryNodeViewHolder")
     nodeView.history.closeStorage()
     nodeView.state.closeStorage()
   }
@@ -73,18 +73,18 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
             if (nodeView.history.contains(pmod) || modifiersCache.contains(key(pmod.id)))
-              log.warn(s"Received modifier ${pmod.encodedId} that is already in history")
+              logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else modifiersCache.put(key(pmod.id), pmod)
         }
         log.info(s"Cache before(${modifiersCache.size})")
-        def found: Option[(mutable.WrappedArray.ofByte, PMOD)] = modifiersCache.find(x => nodeView.history.applicable(x._2))
+        def found: Option[(mutable.WrappedArray.ofByte, EncryPersistentModifier)] = modifiersCache.find(x => nodeView.history.applicable(x._2))
         Iterator.continually(found).takeWhile(_.isDefined).flatten.foreach { case (k, v) =>
             modifiersCache.remove(k)
             pmodModify(v)
         }
         log.info(s"Cache after(${modifiersCache.size})")
       }
-    case lt: LocallyGeneratedTransaction[P, EncryBaseTransaction] => txModify(lt.tx)
+    case lt: LocallyGeneratedTransaction[EncryProposition, EncryBaseTransaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       log.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
@@ -102,7 +102,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   def otherReceive: Receive = {
-    case a: Any => log.error("Strange input: " + a)
+    case a: Any => logError("Strange input: " + a)
   }
 
   def key(id: ModifierId): scala.collection.mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
@@ -122,7 +122,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   def extractTransactions(mod: EncryPersistentModifier): Seq[EncryBaseTransaction] = mod match {
-    case tcm: TransactionsCarryingPersistentNodeViewModifier[P, EncryBaseTransaction] => tcm.transactions
+    case tcm: TransactionsCarryingPersistentNodeViewModifier[EncryProposition, EncryBaseTransaction] => tcm.transactions
     case _ => Seq()
   }
 
@@ -134,7 +134,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     memPool.putWithoutCheck(rolledBackTxs).filter { tx =>
       !appliedTxs.exists(t => t.id sameElements tx.id) && {
         state match {
-          case v: TransactionValidation[P, EncryBaseTransaction] => v.validate(tx).isSuccess
+          case v: TransactionValidation[EncryProposition, EncryBaseTransaction] => v.validate(tx).isSuccess
           case _ => true
         }
       }
@@ -192,7 +192,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           case None => (uf.history, Success(uf.state), uf.suffix)
         }
       case Failure(e) =>
-        log.error("Rollback failed: ", e)
+        logError("Rollback failed: ", e)
         context.system.eventStream.publish(RollbackFailed(branchingPointOpt))
         EncryApp.forceStopApplication(500)
     }
@@ -219,7 +219,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                 newHistory.bestHeaderOpt.foreach(header => context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
-              log.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
+              logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
               updateNodeView(updatedHistory = Some(newHistory))
               nodeViewSynchronizer ! SemanticallyFailedModification(pmod, e)
           }
@@ -228,14 +228,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Failure(e) =>
-        log.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to history", e)
+        logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to history", e)
         nodeViewSynchronizer ! SyntacticallyFailedModification(pmod, e)
     }
-  } else log.warn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
+  } else logWarn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
 
   def txModify(tx: EncryBaseTransaction): Unit = nodeView.mempool.put(tx) match {
     case Success(newPool) =>
-      log.info(s"Unconfirmed transaction $tx added to the memory pool")
       val newVault: VL = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx)
@@ -309,7 +308,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         toApply.foldLeft(startState) { (s, m) => s.applyModifier(m).get }
     }
   }.recoverWith { case e =>
-    log.error("Failed to recover state.", e)
+    logError("Failed to recover state.", e)
     EncryApp.forceStopApplication(500)
   }.get
 }
@@ -322,12 +321,10 @@ object EncryNodeViewHolder {
 
   object ReceivableMessages {
 
-    // Explicit request of NodeViewChange events of certain types.
     case class GetNodeViewChanges(history: Boolean, state: Boolean, vault: Boolean, mempool: Boolean)
 
     case class GetDataFromCurrentView[HIS, MS, VL, MP, A](f: CurrentView[HIS, MS, VL, MP] => A)
 
-    // Moved from NodeViewSynchronizer as this was only received here
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
     case class ModifiersFromRemote(source: ConnectedPeer, modifierTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
