@@ -9,7 +9,7 @@ import encry.network.Handshake
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, SemanticallySuccessfulModifier}
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import encry.settings.{Algos, Constants, EncryAppSettings}
-import encry.utils.{NetworkTimeProvider, ScorexLogging}
+import encry.utils.{NetworkTimeProvider, EncryLogging}
 import encry.view.history.EncryHistory
 import encry.view.state.StateMode
 import io.circe.Json
@@ -25,7 +25,7 @@ class EncryLocalInterface(viewHolderRef: ActorRef,
                           peerManager: ActorRef,
                           settings: EncryAppSettings,
                           timeProvider: NetworkTimeProvider)
-  extends Actor with ScorexLogging{
+  extends Actor with EncryLogging{
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[ChangedHistory[_]])

@@ -8,7 +8,7 @@ import encry.local.miner.EncryMiner.{GetMinerStatus, MinerStatus}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.settings.{Algos, EncryAppSettings, RESTApiSettings}
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 import encry.view.EncryViewReadersHolder.GetDataFromHistory
 import encry.view.history.EncryHistoryReader
 import encry.view.state.StateMode
@@ -19,7 +19,7 @@ import scala.concurrent.Future
 
 case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings: EncryAppSettings,
                            nodeId: Array[Byte], stateMode: StateMode)(implicit val context: ActorRefFactory)
-  extends EncryBaseApiRoute with ScorexLogging {
+  extends EncryBaseApiRoute with EncryLogging {
 
   override val route: Route = pathPrefix("history") {
     getBlocksR ~

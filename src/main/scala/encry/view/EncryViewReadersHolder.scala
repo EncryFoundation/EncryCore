@@ -8,9 +8,9 @@ import encry.view.state.UtxoStateReader
 import encry.EncryApp._
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetNodeViewChanges
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, NodeViewChange}
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 
-class EncryViewReadersHolder extends Actor with ScorexLogging {
+class EncryViewReadersHolder extends Actor with EncryLogging {
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
