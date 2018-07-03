@@ -5,6 +5,7 @@ import encry.crypto.PrivateKey25519
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.settings.Algos
+import encry.utils.Mnemonic
 import encry.view.EncryNodeViewHolder
 import encry.view.EncryNodeViewHolder.CurrentView
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
@@ -32,6 +33,11 @@ trait CommandReceiver[StateType <: EncryState[StateType]] {
     case PrintPubKeys =>
       val res: String = Try(currentView.vault.keyManager.keys.map(_.publicKeyBytes).map(Algos.encode).mkString("\n")).getOrElse("ERROR!")
       sender() ! Some(Response(res))
+    case InitKeyStorage.Request(mnemonicCode) =>
+      Try(currentView.vault.keyManager.initStorage(Mnemonic.mnemonicCodeToBytes(mnemonicCode)))
+        .map(_ => mnemonicCode)
+        .map(code => Some(Response(s"Your mnemonic code is: $code")))
+        .getOrElse(Some(Response("Operation failed. Couldn't init key storage.")))
     case Transfer.Request(recipient, fee, amount, timestamp) =>
       val view = currentView
       Try{
