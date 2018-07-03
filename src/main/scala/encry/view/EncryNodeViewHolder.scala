@@ -62,7 +62,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           case pmod: EncryPersistentModifier@unchecked =>
             if (nodeView.history.contains(pmod) || modifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
-            else modifiersCache.put(key(pmod.id), pmod)
+            else modifiersCache += (key(pmod.id) -> pmod)
         }
         log.info(s"Cache before(${modifiersCache.size})")
         Iterator.continually(modifiersCache.find(x => nodeView.history.applicable(x._2)))
@@ -219,7 +219,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   def txModify(tx: EncryBaseTransaction): Unit = nodeView.mempool.put(tx) match {
     case Success(newPool) =>
-      val newVault: VL = nodeView.wallet.scanOffchain(tx)
+      val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx)
     case Failure(e) =>
