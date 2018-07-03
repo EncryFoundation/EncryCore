@@ -35,8 +35,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: EncryMempool)
 
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
-  val modifiersCache: mutable.Map[scala.collection.mutable.WrappedArray.ofByte, EncryPersistentModifier] =
-    mutable.Map[scala.collection.mutable.WrappedArray.ofByte, EncryPersistentModifier]()
+  var modifiersCache: Map[mutable.WrappedArray.ofByte, EncryPersistentModifier] = Map.empty
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,
@@ -50,7 +49,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def postStop(): Unit = {
-    log.warn("Stopping EncryNodeViewHolder")
+    log.warn("EncryNodeViewHolder is stopped.")
     nodeView.history.closeStorage()
     nodeView.state.closeStorage()
   }
@@ -63,13 +62,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           case pmod: EncryPersistentModifier@unchecked =>
             if (nodeView.history.contains(pmod) || modifiersCache.contains(key(pmod.id)))
               log.warn(s"Received modifier ${pmod.encodedId} that is already in history")
-            else modifiersCache.put(key(pmod.id), pmod)
+            else modifiersCache += (key(pmod.id) -> pmod)
         }
         log.info(s"Cache before(${modifiersCache.size})")
-        def found: Option[(mutable.WrappedArray.ofByte, EncryPersistentModifier)] = modifiersCache.find(x => nodeView.history.applicable(x._2))
-        Iterator.continually(found).takeWhile(_.isDefined).flatten.foreach { case (k, v) =>
-            modifiersCache.remove(k)
-            pmodModify(v)
+        Iterator.continually(modifiersCache.find(x => nodeView.history.applicable(x._2)))
+          .takeWhile(_.isDefined).flatten.foreach { case (k, v) =>
+          modifiersCache -= k
+          pmodModify(v)
         }
         log.info(s"Cache after(${modifiersCache.size})")
       }
@@ -91,7 +90,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case a: Any => log.error("Strange input: " + a)
   }
 
-  def key(id: ModifierId): scala.collection.mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
+  def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
   def updateNodeView(updatedHistory: Option[EncryHistory] = None,
                      updatedState: Option[StateType] = None,
@@ -112,8 +111,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case _ => Seq()
   }
 
-  //todo: this method causes delays in a block processing as it removes transactions from mempool and checks
-  //todo: validity of remaining transactions in a synchronous way. Do this job async!
   def updateMemPool(blocksRemoved: Seq[EncryPersistentModifier], blocksApplied: Seq[EncryPersistentModifier],
                     memPool: EncryMempool, state: StateType): EncryMempool = {
     val rolledBackTxs: Seq[EncryBaseTransaction] = blocksRemoved.flatMap(extractTransactions)
