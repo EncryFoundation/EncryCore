@@ -33,7 +33,6 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
-
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with ScorexLogging {
 
   type HIS = EncryHistory
@@ -54,29 +53,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   )
 
   import encry.cli.commands.PrintPubKeys
-  def commandReceive: Receive = {
-    case AddKey =>
-      currentView.vault.keyManager.createNewKey()
-    case GetBalance =>
-      val r = currentView.vault.getBalances.foldLeft("")((str, tokenInfo) =>
-        str.concat(s"TokenID(${Algos.encode(tokenInfo._1)}) : ${tokenInfo._2}\n"))
-      val res = if (r.length == 0) "<empty>" else r
-      sender ! Some(Response(res))
-    case InitKeyStorage =>
-//      Try {
-//        val mnemonicCode = args.requireArgOrElse("seed", Ast.Str(Mnemonic.entropyToMnemonicCode(SecureRandom.getSeed(16)))).s
-//        currentView.vault.keyManager.initStorage(Mnemonic.mnemonicCodeToBytes(mnemonicCode))
-//        mnemonicCode
-//      }.toOption.map(code => Some(Response(s"Your mnemonic code is: $code"))).getOrElse(Some(Response("Operation failed. Couldn't init key storage.")))
 
-    case PrintMyAddrs =>
-      sender ! Some(Response(currentView.vault.keyManager.keys.foldLeft("")((str, k) => str + k.publicImage.address + "\n")))
-    case PrintPrivKeys =>
-      sender ! Some(Response(currentView.vault.keyManager.keys.foldLeft("")((str, k) => str + Algos.encode(k.privKeyBytes)) + "\n"))
-    case PrintPubKeys =>
-      sender ! Some(Response(currentView.vault.keyManager.keys.map(_.publicKeyBytes).map(Algos.encode).mkString("\n")))
-
-  }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     reason.printStackTrace()
@@ -91,7 +68,37 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   def currentView: CurrentView[HIS, StateType, VL, MP] = CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool)
 
-  override def receive: Receive = mainReceive orElse commandReceive orElse otherReceive
+//  override def receive: Receive = commandReceive orElse  mainReceive orElse otherReceive
+  override def receive: Receive = mainReceive orElse otherReceive
+
+  def commandReceive: Receive = {
+    case s: String =>
+      println("Received string")
+      sender() ! "PONG"
+    case AddKey =>
+      currentView.vault.keyManager.createNewKey()
+    case GetBalance =>
+      val r = currentView.vault.getBalances.foldLeft("")((str, tokenInfo) =>
+        str.concat(s"TokenID(${Algos.encode(tokenInfo._1)}) : ${tokenInfo._2}\n"))
+      val res = if (r.length == 0) "<empty>" else r
+      sender() ! Some(Response(res))
+    case InitKeyStorage =>
+    //      Try {
+    //        val mnemonicCode = args.requireArgOrElse("seed", Ast.Str(Mnemonic.entropyToMnemonicCode(SecureRandom.getSeed(16)))).s
+    //        currentView.vault.keyManager.initStorage(Mnemonic.mnemonicCodeToBytes(mnemonicCode))
+    //        mnemonicCode
+    //      }.toOption.map(code => Some(Response(s"Your mnemonic code is: $code"))).getOrElse(Some(Response("Operation failed. Couldn't init key storage.")))
+
+    case PrintMyAddrs =>
+      sender() ! Some(Response(currentView.vault.keyManager.keys.foldLeft("")((str, k) => str + k.publicImage.address + "\n")))
+    case PrintPrivKeys =>
+      sender() ! Some(Response(currentView.vault.keyManager.keys.foldLeft("")((str, k) => str + Algos.encode(k.privKeyBytes)) + "\n"))
+    case PrintPubKeys =>
+      val res: String = Try(currentView.vault.keyManager.keys.map(_.publicKeyBytes).map(Algos.encode).mkString("\n")).getOrElse("ERROR!")
+      println("PrintPubKeys:{}", res)
+      sender() ! Some(Response(res))
+  }
+
   def mainReceive: Receive = {
     case ModifiersFromRemote(_, modifierTypeId, remoteObjects) =>
       modifierSerializers.get(modifierTypeId).foreach { companion =>
@@ -125,11 +132,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       }
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
-    case a: Any => log.error("Strange input: " + a)
   }
 
   def otherReceive: Receive = {
-    case a: Any => log.error("Strange input: " + a)
+    case a: Any =>
+      println("RECEIVED?")
+      log.error("Strange input: " + a)
   }
 
   def key(id: ModifierId): scala.collection.mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)

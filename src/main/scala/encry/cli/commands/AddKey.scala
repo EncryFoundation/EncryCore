@@ -15,6 +15,7 @@ import scala.util.Try
 
 object AddKey extends Command {
 
+  override def executeRequest(args: Command.Args, settings: EncryAppSettings): Any = this
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = Try {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     nodeViewHolder ?
