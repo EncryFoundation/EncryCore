@@ -23,12 +23,6 @@ class PeerManager extends Actor with ScorexLogging {
     if (!isSelf(address, None)) PeerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), None))
   }
 
-  def randomPeer: Option[InetSocketAddress] = {
-    val peers: Seq[InetSocketAddress] = PeerDatabase.knownPeers().keys.toSeq
-    if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
-    else None
-  }
-
   def isSelf(address: InetSocketAddress, declaredAddress: Option[InetSocketAddress]): Boolean =
     settings.network.bindAddress == address ||
       settings.network.declaredAddress.exists(da => declaredAddress.contains(da)) ||
@@ -67,6 +61,11 @@ class PeerManager extends Actor with ScorexLogging {
       connectingPeers -= remote
       nodeViewSynchronizer ! DisconnectedPeer(remote)
     case CheckPeers =>
+      def randomPeer: Option[InetSocketAddress] = {
+        val peers: Seq[InetSocketAddress] = PeerDatabase.knownPeers().keys.toSeq
+        if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
+        else None
+      }
       if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
         randomPeer.foreach { address =>
           if (!connectedPeers.exists(_._1 == address) &&

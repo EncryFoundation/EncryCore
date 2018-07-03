@@ -43,18 +43,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
 
   def sendSync(syncInfo: EncrySyncInfo): Unit = {
     val peers: Seq[ConnectedPeer] = statusTracker.peersToSyncWith()
-    if (peers.nonEmpty)
-      networkController ! SendToNetwork(Message(syncInfoSpec, Right(syncInfo), None), SendToPeers(peers))
-  }
-
-  // Send history extension to the (less developed) peer 'remote' which does not have it.
-  def sendExtension(remote: ConnectedPeer,
-                    status: HistoryComparisonResult,
-                    extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit = extOpt match {
-    case None => log.warn(s"extOpt is empty for: $remote. Its status is: $status.")
-    case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
-      case (mid, mods) => networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
-    }
+    if (peers.nonEmpty) networkController ! SendToNetwork(Message(syncInfoSpec, Right(syncInfo), None), SendToPeers(peers))
   }
 
   override def receive: Receive = viewHolderEvents orElse {
@@ -66,8 +55,12 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
       statusTracker.updateStatus(remote, status)
       status match {
         case Unknown => log.warn("Peer status is still unknown")
-        case Nonsense => log.warn("Got nonsense")
-        case Younger => sendExtension(remote, status, extOpt)
+        case Younger => extOpt match {
+          case None => log.warn(s"extOpt is empty for: $remote. Its status is: $status.")
+          case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
+            case (mid, mods) => networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
+          }
+        }
         case _ =>
       }
     case HandshakedPeer(remote) => statusTracker.updateStatus(remote, Unknown)
