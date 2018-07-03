@@ -56,11 +56,11 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
   // when a remote peer is asked a modifier, we add the expected data to `expecting`
   // when a remote peer delivers expected data, it is removed from `expecting` and added to `delivered`.
   // when a remote peer delivers unexpected data, it is added to `deliveredSpam`.
-  val delivered: mutable.Map[ModifierIdAsKey, ConnectedPeer] = mutable.Map[ModifierIdAsKey, ConnectedPeer]()
-  val deliveredSpam: mutable.Map[ModifierIdAsKey, ConnectedPeer] = mutable.Map[ModifierIdAsKey, ConnectedPeer]()
-  val peers: mutable.Map[ModifierIdAsKey, Seq[ConnectedPeer]] = mutable.Map[ModifierIdAsKey, Seq[ConnectedPeer]]()
+  var delivered: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty[ModifierIdAsKey, ConnectedPeer]
+  var deliveredSpam: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty[ModifierIdAsKey, ConnectedPeer]
+  var peers: Map[ModifierIdAsKey, Seq[ConnectedPeer]] = Map.empty[ModifierIdAsKey, Seq[ConnectedPeer]]
 
-  val cancellables: mutable.Map[ModifierIdAsKey, (ConnectedPeer, (Cancellable, Int))] = mutable.Map[ModifierIdAsKey, (ConnectedPeer, (Cancellable, Int))]()
+  var cancellables: Map[ModifierIdAsKey, (ConnectedPeer, (Cancellable, Int))] = Map.empty[ModifierIdAsKey, (ConnectedPeer, (Cancellable, Int))]
 
   def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mids: Seq[ModifierId]): Unit = tryWithLogging {
     val notRequestedIds: Seq[ModifierId] = mids.foldLeft(Seq[ModifierId]()) {
@@ -69,7 +69,7 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
         if (historyReaderOpt.forall(history => !history.contains(modId))) {
           if (!cancellables.contains(modifierKey)) notRequested :+ modId
           else {
-            peers(modifierKey) = (peers.getOrElseUpdate(modifierKey, Seq()) :+ cp).distinct
+            peers = peers - modifierKey + (modifierKey -> (peers.getOrElse(modifierKey, Seq()) :+ cp).distinct)
             notRequested
           }
         } else notRequested
@@ -77,7 +77,7 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     if (notRequestedIds.nonEmpty) cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
     notRequestedIds.foreach { id =>
       val cancellable = context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
-      cancellables(key(id)) = cp -> (cancellable, 0)
+      cancellables = (cancellables - key(id)) + (key(id) -> (cp, (cancellable, 0)))
     }
   }
 
@@ -91,12 +91,12 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
         cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> Seq(mid)), None)
         val cancellable = context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout, self, CheckDelivery(cp, mtid, mid))
         peerInfo._2._1.cancel()
-        cancellables(midAsKey) = cp -> (cancellable, peerInfo._2._2 + 1)
+        cancellables = (cancellables - midAsKey) + (midAsKey -> (cp -> (cancellable, peerInfo._2._2 + 1)))
       } else {
         cancellables -= midAsKey
         peers.get(midAsKey).foreach(downloadPeers =>
           downloadPeers.headOption.foreach { nextPeer =>
-            peers(midAsKey) = downloadPeers.filter(_ != nextPeer)
+            peers = peers - midAsKey + (midAsKey -> downloadPeers.filter(_ != nextPeer))
             expect(nextPeer, mtid, Seq(mid))
           }
         )
@@ -240,13 +240,13 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = tryWithLogging {
     if (expectingFromRandom.contains(key(mid))) {
       expectingFromRandom.remove(key(mid))
-      delivered(key(mid)) = cp
+      delivered = delivered - key(mid) + (key(mid) -> cp)
     } else if (isExpecting(mtid, mid, cp)) {
-      delivered(key(mid)) = cp
+      delivered = delivered - key(mid) + (key(mid) -> cp)
       cancellables.get(key(mid)).foreach(_._2._1.cancel())
-      cancellables -= key(mid)
-      peers -= key(mid)
+      cancellables = cancellables - key(mid)
+      peers = peers - key(mid)
     }
-    else deliveredSpam(key(mid)) = cp
+    else deliveredSpam = deliveredSpam - key(mid) + (key(mid) -> cp)
   }
 }
