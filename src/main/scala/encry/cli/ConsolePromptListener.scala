@@ -1,7 +1,6 @@
 package encry.cli
 
 import akka.actor.Actor
-import akka.stream.ActorMaterializer
 import encry.EncryApp
 import encry.EncryApp.settings
 import encry.cli.commands._
@@ -14,7 +13,6 @@ import scala.util.Success
 class ConsolePromptListener extends Actor with EncryLogging {
 
   import ConsolePromptListener._
-  implicit val materializer = ActorMaterializer()
 
   override def receive: Receive = {
     case StartListening =>
