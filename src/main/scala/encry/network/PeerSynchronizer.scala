@@ -6,15 +6,14 @@ import akka.actor.Actor
 import akka.pattern.ask
 import akka.util.Timeout
 import encry.EncryApp._
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.message.{GetPeersSpec, Message, PeersSpec}
+import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
+import encry.utils.EncryLogging
 import shapeless.syntax.typeable._
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import encry.network.NetworkController.ReceivableMessages.{RegisterMessagesHandler, SendToNetwork}
-import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
-import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.utils.EncryLogging
 
 class PeerSynchronizer extends Actor with EncryLogging {
 

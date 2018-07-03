@@ -12,8 +12,8 @@ import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
-import encry.utils.NetworkTime.Time
 import encry.utils.EncryLogging
+import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.CurrentView
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.{EncryHistory, Height}

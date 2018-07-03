@@ -3,7 +3,7 @@ package encry.view.mempool
 import encry.ModifierId
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.settings.EncryAppSettings
-import encry.utils.{NetworkTimeProvider, EncryLogging}
+import encry.utils.{EncryLogging, NetworkTimeProvider}
 import encry.view.mempool.EncryMempool._
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}

@@ -5,11 +5,11 @@ import encry.Version
 import encry.local.EncryLocalInterface.{GetNodeInfo, NodeInfo}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.network.Handshake
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, SemanticallySuccessfulModifier}
+import encry.network.Handshake
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import encry.settings.{Algos, Constants, EncryAppSettings}
-import encry.utils.{NetworkTimeProvider, EncryLogging}
+import encry.utils.{EncryLogging, NetworkTimeProvider}
 import encry.view.history.EncryHistory
 import encry.view.state.StateMode
 import io.circe.Json

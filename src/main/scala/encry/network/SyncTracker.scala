@@ -7,7 +7,7 @@ import encry.consensus.History
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
 import encry.network.PeerConnectionHandler._
 import encry.settings.NetworkSettings
-import encry.utils.{NetworkTimeProvider, EncryLogging}
+import encry.utils.{EncryLogging, NetworkTimeProvider}
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -17,10 +17,10 @@ import scala.concurrent.duration.{FiniteDuration, _}
 /**
   * SyncTracker caches the peers' statuses (i.e. whether they are ahead or behind this node)
   */
-case class SyncTracker(nvsRef: ActorRef,
-                  context: ActorContext,
-                  networkSettings: NetworkSettings,
-                  timeProvider: NetworkTimeProvider) extends EncryLogging {
+case class SyncTracker(deliveryManager: ActorRef,
+                       context: ActorContext,
+                       networkSettings: NetworkSettings,
+                       timeProvider: NetworkTimeProvider) extends EncryLogging {
 
   import History._
   import encry.utils.NetworkTime.Time

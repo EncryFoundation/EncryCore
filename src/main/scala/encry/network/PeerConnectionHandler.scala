@@ -14,7 +14,6 @@ import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle, _}
 import encry.network.message.MessageHandler
 import encry.settings.NetworkSettings
-import PeerConnectionHandler._
 import encry.utils.EncryLogging
 
 import scala.annotation.tailrec

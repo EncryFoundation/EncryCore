@@ -12,7 +12,7 @@ import encry.network.message.{InvSpec, Message, ModifiersSpec, RequestModifierSp
 import encry.settings.NetworkSettings
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.utils.NetworkTime.Time
-import encry.utils.{NetworkTimeProvider, ScorexLogging}
+import encry.utils.{EncryLogging, NetworkTimeProvider}
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
@@ -28,7 +28,7 @@ import scala.util.{Failure, Try}
 class EncryDeliveryManager(networkSettings: NetworkSettings,
                            nvsRef: ActorRef, timeProvider:
                            NetworkTimeProvider,
-                           syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with ScorexLogging {
+                           syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with EncryLogging {
 
   protected type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 

@@ -16,8 +16,7 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, Registe
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.message._
-import encry.settings.{Algos, NetworkSettings}
-import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
+import encry.settings.NetworkSettings
 import encry.utils.EncryLogging
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}

@@ -20,7 +20,7 @@ import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, NetworkController, UPnP}
 import encry.settings.{Algos, EncryAppSettings}
 import encry.stats.StatsSender
-import encry.utils.{NetworkTimeProvider, EncryLogging}
+import encry.utils.{EncryLogging, NetworkTimeProvider}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 

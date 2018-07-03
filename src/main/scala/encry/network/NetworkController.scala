@@ -16,6 +16,7 @@ import encry.network.message.{Message, MessageHandler}
 import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import encry.settings.NetworkSettings
 import encry.utils.EncryLogging
+import encry.view.history.EncrySyncInfoMessageSpec
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -37,12 +38,6 @@ class NetworkController extends Actor with EncryLogging {
   val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
 
   val messageHandlers: mutable.Map[Seq[MessageCode], ActorRef] = mutable.Map[Seq[Message.MessageCode], ActorRef]()
-
-  override def supervisorStrategy: OneForOneStrategy =
-    OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = 1 second){
-      case ex: ActorKilledException => Restart
-      case _: Exception => Escalate
-    }
 
   val outgoing: mutable.Set[InetSocketAddress] = mutable.Set[InetSocketAddress]()
 
@@ -134,6 +129,7 @@ object NetworkController {
   object ReceivableMessages {
 
     import encry.network.message.MessageSpec
+
     import scala.reflect.runtime.universe.TypeTag
 
     case class DataFromPeer[DT: TypeTag](spec: MessageSpec[DT], data: DT, source: ConnectedPeer)

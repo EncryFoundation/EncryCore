@@ -6,7 +6,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.{Constants, NodeSettings}
-import encry.utils.{NetworkTimeProvider, EncryLogging}
+import encry.utils.{EncryLogging, NetworkTimeProvider}
 import encry.view.history.Height
 import encry.{ModifierId, ModifierTypeId}
 

@@ -1,8 +1,7 @@
 package encry.utils
 
 import com.typesafe.scalalogging.{Logger, StrictLogging}
-
-import ExtUtils._
+import encry.utils.ExtUtils._
 
 trait EncryLogging extends StrictLogging {
   implicit val log: Logger = logger
