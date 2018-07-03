@@ -31,7 +31,9 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
                            syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with ScorexLogging {
 
   protected type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
+
   protected def key(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
+
   var historyReaderOpt: Option[EncryHistory] = None
   var mempoolReaderOpt: Option[EncryMempool] = None
   val invSpec: InvSpec = new InvSpec(networkSettings.maxInvObjects)
@@ -45,8 +47,6 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
 
   def sendSync(syncInfo: EncrySyncInfo): Unit = {
     val peers: Seq[ConnectedPeer] = statusTracker.peersToSyncWith()
-    println(s"Peers size: ${peers.size}")
-    peers.foreach(peer => println(peer.socketAddress))
     if (peers.nonEmpty)
       networkController ! SendToNetwork(Message(syncInfoSpec, Right(syncInfo), None), SendToPeers(peers))
   }
@@ -75,7 +75,7 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
         } else notRequested
     }
     if (notRequestedIds.nonEmpty) cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
-    notRequestedIds.foreach{id =>
+    notRequestedIds.foreach { id =>
       val cancellable = context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
       cancellables(key(id)) = cp -> (cancellable, 0)
     }
@@ -175,14 +175,8 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
       requestDownload(modifierTypeId, Seq(modifierId))
     case SendLocalSyncInfo =>
-      println("Trying to sync")
-      if (statusTracker.elapsedTimeSinceLastSync() < (networkSettings.syncInterval.toMillis / 2))
-        log.debug("Trying to send sync info too often")
-      else {
-        println("Send sync")
-        println(historyReaderOpt)
-        historyReaderOpt.foreach(r => sendSync(r.syncInfo))
-      }
+      if (statusTracker.elapsedTimeSinceLastSync() < (networkSettings.syncInterval.toMillis / 2)) log.debug("Trying to send sync info too often")
+      else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] => historyReaderOpt = Some(reader)
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
   }

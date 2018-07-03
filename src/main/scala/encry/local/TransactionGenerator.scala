@@ -8,7 +8,6 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import encry.settings.Algos
 import encry.utils.NetworkTime.Time
 import encry.utils.ScorexLogging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedTransaction}
@@ -79,9 +78,6 @@ class TransactionGenerator extends Actor with ScorexLogging {
   def fetchWalletData(): Unit =
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, WalletData] { v =>
       val wallet: EncryWallet = v.vault
-      println("----------------------------------")
-      println("size:" + wallet.walletStorage.allBoxes.size)
-      wallet.walletStorage.allBoxes.foreach(box => println(Algos.encode(box.id)))
       val availableBoxes: Seq[AssetBox] = wallet.walletStorage.allBoxes.foldLeft(Seq.empty[AssetBox]) {
         case (acc, box: AssetBox) if box.isIntrinsic => acc :+ box
         case (acc, _) => acc

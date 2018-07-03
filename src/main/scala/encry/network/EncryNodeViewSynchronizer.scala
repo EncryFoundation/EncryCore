@@ -111,7 +111,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
       deliveryTracker ! ChangedHistory(reader)
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] =>
       mempoolReaderOpt = Some(reader)
-        deliveryTracker ! ChangedMempool(reader)
+      deliveryTracker ! ChangedMempool(reader)
     }
 
   def onDownloadRequest: Receive = {

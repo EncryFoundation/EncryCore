@@ -71,10 +71,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             else modifiersCache.put(key(pmod.id), pmod)
         }
         log.info(s"Cache before(${modifiersCache.size})")
+
         def found: Option[(mutable.WrappedArray.ofByte, EncryPersistentModifier)] = modifiersCache.find(x => nodeView.history.applicable(x._2))
+
         Iterator.continually(found).takeWhile(_.isDefined).flatten.foreach { case (k, v) =>
-            modifiersCache.remove(k)
-            pmodModify(v)
+          modifiersCache.remove(k)
+          pmodModify(v)
         }
         log.info(s"Cache after(${modifiersCache.size})")
       }

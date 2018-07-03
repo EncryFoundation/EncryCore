@@ -68,18 +68,14 @@ class PeerManager extends Actor with ScorexLogging {
       connectingPeers -= remote
       nodeViewSynchronizer ! DisconnectedPeer(remote)
     case CheckPeers =>
-      println("++++++++++++++")
-      println("In check peers")
-      connectedPeers.foreach(peer => println(peer._2.socketAddress))
-      println(connectedPeers.size + connectingPeers.size)
-      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
+      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections)
         randomPeer.foreach { address =>
           if (!connectedPeers.exists(_._1 == address) &&
             !connectingPeers.exists(_.getHostName == address.getHostName)) {
             sender() ! ConnectTo(address)
           }
         }
-      }
+
   }
 }
 
