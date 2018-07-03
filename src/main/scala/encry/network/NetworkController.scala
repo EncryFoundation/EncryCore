@@ -18,7 +18,6 @@ import PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import encry.utils.ScorexLogging
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
 import scala.util.{Failure, Success, Try}
@@ -27,18 +26,12 @@ import scala.util.{Failure, Success, Try}
 class NetworkController extends Actor with ScorexLogging {
 
   val networkSettings: NetworkSettings = settings.network
-
   val peerSynchronizer: ActorRef = context.actorOf(Props[PeerSynchronizer], "peerSynchronizer")
-
   val tcpManager: ActorRef = IO(Tcp)
-
-  implicit val timeout: Timeout = Timeout(5 seconds)
-
   val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
+  var messageHandlers: Map[Seq[MessageCode], ActorRef] = Map.empty
 
-  val messageHandlers: mutable.Map[Seq[MessageCode], ActorRef] = mutable.Map[Seq[Message.MessageCode], ActorRef]()
-
-  val outgoing: mutable.Set[InetSocketAddress] = mutable.Set[InetSocketAddress]()
+  var outgoing: Set[InetSocketAddress] = Set.empty
 
   lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse {
     if (networkSettings.upnpEnabled) upnp.externalAddress.map(a => new InetSocketAddress(a, networkSettings.bindAddress.getPort))
@@ -84,7 +77,7 @@ class NetworkController extends Actor with ScorexLogging {
         case Failure(e) => log.error("Failed to deserialize data: ", e)
       }
     case SendToNetwork(message, sendingStrategy) =>
-      (peerManager ? FilterPeers(sendingStrategy))
+      (peerManager ? FilterPeers(sendingStrategy))(5 seconds)
         .map(_.asInstanceOf[Seq[ConnectedPeer]])
         .foreach(_.foreach(_.handlerRef ! message))
   }
