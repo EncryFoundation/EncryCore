@@ -9,11 +9,11 @@ import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
 import encry.EncryApp
-import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle}
 import encry.EncryApp._
+import encry.network.NetworkController.ReceivableMessages.ConnectTo
+import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle, _}
 import encry.network.message.MessageHandler
 import encry.settings.NetworkSettings
-import PeerConnectionHandler._
 import encry.utils.ScorexLogging
 
 import scala.annotation.tailrec
@@ -54,6 +54,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
     case cc: ConnectionClosed =>
       peerManager ! Disconnected(remote)
       log.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
+      networkController ! ConnectTo(remote)
       context stop self
     case CloseConnection =>
       log.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")

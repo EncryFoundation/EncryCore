@@ -9,7 +9,7 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToN
 import encry.network.PeerConnectionHandler._
 import encry.network.message.BasicMsgDataTypes.ModifiersData
 import encry.network.message.{InvSpec, Message, ModifiersSpec, RequestModifierSpec}
-import encry.settings.{Algos, NetworkSettings}
+import encry.settings.NetworkSettings
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.utils.NetworkTime.Time
 import encry.utils.{NetworkTimeProvider, ScorexLogging}
@@ -45,9 +45,10 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
 
   def sendSync(syncInfo: EncrySyncInfo): Unit = {
     val peers: Seq[ConnectedPeer] = statusTracker.peersToSyncWith()
+    println(s"Peers size: ${peers.size}")
+    peers.foreach(peer => println(peer.socketAddress))
     if (peers.nonEmpty)
-      //todo: Change from random to next in peer's queue
-      networkController ! SendToNetwork(Message(syncInfoSpec, Right(syncInfo), None), SendToRandom)
+      networkController ! SendToNetwork(Message(syncInfoSpec, Right(syncInfo), None), SendToPeers(peers))
   }
 
   // todo: Do we need to keep track of ModifierTypeIds? Maybe we could ignore them?
@@ -65,11 +66,13 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     val notRequestedIds: Seq[ModifierId] = mids.foldLeft(Seq[ModifierId]()) {
       case (notRequested, modId) =>
         val modifierKey = key(modId)
-        if (!cancellables.contains(modifierKey)) notRequested :+ modId
-        else {
-          peers(modifierKey) = (peers.getOrElseUpdate(modifierKey, Seq()) :+ cp).distinct
-          notRequested
-        }
+        if (historyReaderOpt.forall(history => !history.contains(modId))) {
+          if (!cancellables.contains(modifierKey)) notRequested :+ modId
+          else {
+            peers(modifierKey) = (peers.getOrElseUpdate(modifierKey, Seq()) :+ cp).distinct
+            notRequested
+          }
+        } else notRequested
     }
     if (notRequestedIds.nonEmpty) cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
     notRequestedIds.foreach{id =>
@@ -147,13 +150,10 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     case CheckModifiersToDownload =>
       removeOutdatedExpectingFromRandom()
       historyReaderOpt.foreach { h =>
-        if (!h.isHeadersChainSynced && isExpecting) sendSync(h.syncInfo)
-        else if (h.isHeadersChainSynced && !isExpectingFromRandom) {
-          val currentQueue: Iterable[ModifierId] = expectingFromRandomQueue
-          val newIds: Seq[(ModifierTypeId, ModifierId)] = h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
-          val oldIds: Seq[(ModifierTypeId, ModifierId)] = idsExpectingFromRandomToRetry()
-          (newIds ++ oldIds).groupBy(_._1).foreach(ids => requestDownload(ids._1, ids._2.map(_._2)))
-        }
+        val currentQueue: Iterable[ModifierId] = expectingFromRandomQueue
+        val newIds: Seq[(ModifierTypeId, ModifierId)] = h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
+        val oldIds: Seq[(ModifierTypeId, ModifierId)] = idsExpectingFromRandomToRetry()
+        (newIds ++ oldIds).groupBy(_._1).foreach(ids => requestDownload(ids._1, ids._2.map(_._2)))
       }
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       if (modifierIds.nonEmpty) expect(peer, modifierTypeId, modifierIds)
@@ -175,10 +175,14 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
       requestDownload(modifierTypeId, Seq(modifierId))
     case SendLocalSyncInfo =>
+      println("Trying to sync")
       if (statusTracker.elapsedTimeSinceLastSync() < (networkSettings.syncInterval.toMillis / 2))
         log.debug("Trying to send sync info too often")
-      else if (historyReaderOpt.exists(h => !h.isHeadersChainSynced)) historyReaderOpt.foreach(r => sendSync(r.syncInfo))
-      else log.debug("Trying to send sync before sync process is done")
+      else {
+        println("Send sync")
+        println(historyReaderOpt)
+        historyReaderOpt.foreach(r => sendSync(r.syncInfo))
+      }
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] => historyReaderOpt = Some(reader)
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
   }
@@ -240,7 +244,6 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     * Modifier downloaded
     */
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = tryWithLogging {
-    cancellables.foreach(key => println(Algos.encode(key._1.toArray) + s" -- From ${key._2._1.socketAddress}"))
     if (expectingFromRandom.contains(key(mid))) {
       expectingFromRandom.remove(key(mid))
       delivered(key(mid)) = cp

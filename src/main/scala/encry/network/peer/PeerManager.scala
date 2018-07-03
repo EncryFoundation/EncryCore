@@ -4,13 +4,14 @@ import java.net.InetSocketAddress
 
 import akka.actor.Actor
 import encry.EncryApp._
-import PeerManager.ReceivableMessages._
-import encry.network.{Handshake, SendingStrategy}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
-import encry.network.PeerConnectionHandler._
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
+import encry.network.PeerConnectionHandler._
+import encry.network.peer.PeerManager.ReceivableMessages._
+import encry.network.{Handshake, SendingStrategy}
 import encry.utils.ScorexLogging
+
 import scala.util.Random
 
 class PeerManager extends Actor with ScorexLogging {
@@ -67,6 +68,10 @@ class PeerManager extends Actor with ScorexLogging {
       connectingPeers -= remote
       nodeViewSynchronizer ! DisconnectedPeer(remote)
     case CheckPeers =>
+      println("++++++++++++++")
+      println("In check peers")
+      connectedPeers.foreach(peer => println(peer._2.socketAddress))
+      println(connectedPeers.size + connectingPeers.size)
       if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
         randomPeer.foreach { address =>
           if (!connectedPeers.exists(_._1 == address) &&

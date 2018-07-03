@@ -2,6 +2,7 @@ package encry.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
 
+import akka.actor.SupervisorStrategy.{Escalate, Restart}
 import akka.actor._
 import akka.io.Tcp.SO.KeepAlive
 import akka.io.Tcp._
@@ -9,14 +10,15 @@ import akka.io.{IO, Tcp}
 import akka.pattern.ask
 import akka.util.Timeout
 import encry.EncryApp._
-import encry.view.history.EncrySyncInfoMessageSpec
+import encry.network.NetworkController.ReceivableMessages._
+import encry.network.PeerConnectionHandler._
 import encry.network.message.Message.MessageCode
 import encry.network.message.{Message, MessageHandler}
-import encry.settings.NetworkSettings
-import NetworkController.ReceivableMessages._
-import PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
+import encry.settings.NetworkSettings
 import encry.utils.ScorexLogging
+import encry.view.history.EncrySyncInfoMessageSpec
+
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.duration._
@@ -37,6 +39,12 @@ class NetworkController extends Actor with ScorexLogging {
   val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
 
   val messageHandlers: mutable.Map[Seq[MessageCode], ActorRef] = mutable.Map[Seq[Message.MessageCode], ActorRef]()
+
+  override def supervisorStrategy: OneForOneStrategy =
+    OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = 1 second){
+      case ex: ActorKilledException => Restart
+      case _: Exception => Escalate
+    }
 
   val outgoing: mutable.Set[InetSocketAddress] = mutable.Set[InetSocketAddress]()
 
@@ -61,8 +69,6 @@ class NetworkController extends Actor with ScorexLogging {
   log.info(s"Declared address: $externalSocketAddress")
 
   tcpManager ! Bind(self, networkSettings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
-
-  override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
 
   def bindingLogic: Receive = {
     case Bound(_) =>
@@ -128,6 +134,7 @@ object NetworkController {
   object ReceivableMessages {
 
     import encry.network.message.MessageSpec
+
     import scala.reflect.runtime.universe.TypeTag
 
     case class DataFromPeer[DT: TypeTag](spec: MessageSpec[DT], data: DT, source: ConnectedPeer)
