@@ -6,7 +6,6 @@ import ExtUtils._
 
 trait EncryLogging extends StrictLogging {
   implicit val log: Logger = logger
-//  implicit val ilog = logger
   def logInfo(s: String): String = s.logInfo
   def logWarn(s: String): String = s.logWarn
   def logError(s: String): String = s.logErr
