@@ -21,22 +21,6 @@ class ConsolePromptListener extends Actor with ScorexLogging {
 
   override def receive: Receive = {
     case StartListening =>
-//            Iterator.continually(scala.io.StdIn.readLine(prompt)).foreach { input =>
-//              InputParser.parse(input) match {
-//                case Success(command) =>
-//                  getCommand(command.category.name, command.ident.name) match {
-//                    case Some(cmd) =>
-//                      cmd.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings)
-//                        .map {
-//                          case Some(x) => print(x.msg + s"\n$prompt")
-//                          case None =>
-//                        }
-//                    case None => println("Unsupported command. Type 'app help' to get commands list")
-//                  }
-//                case Failure(_) => println("Bad input")
-//              }
-//            }
-
       Iterator.continually(scala.io.StdIn.readLine(prompt))
         .foreach { input =>
         val parsed = InputParser.parse(input)
@@ -52,6 +36,7 @@ class ConsolePromptListener extends Actor with ScorexLogging {
             else {
               println("Sending Ping")
               EncryApp.nodeViewHolder ! "PING"
+              EncryApp.nodeViewHolder ! request
             }
           }
         }
