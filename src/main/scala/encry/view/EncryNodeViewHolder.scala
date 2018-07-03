@@ -31,8 +31,6 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
-
-
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with ScorexLogging with CommandReceiver[StateType] {
 
   type HIS = EncryHistory
@@ -51,7 +49,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     ADProofs.modifierTypeId -> ADProofSerializer,
     Transaction.ModifierTypeId -> EncryTransactionSerializer
   )
-
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     reason.printStackTrace()
@@ -106,7 +103,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   def otherReceive: Receive = {
     case a: Any =>
-      println("RECEIVED?")
       log.error("Strange input: " + a)
   }
 
