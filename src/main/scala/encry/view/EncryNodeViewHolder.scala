@@ -71,14 +71,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             else modifiersCache.put(key(pmod.id), pmod)
         }
         log.info(s"Cache before(${modifiersCache.size})")
-        def found: Option[(mutable.WrappedArray.ofByte, PMOD)] = modifiersCache.find(x => nodeView.history.applicable(x._2))
+        def found: Option[(mutable.WrappedArray.ofByte, EncryPersistentModifier)] = modifiersCache.find(x => nodeView.history.applicable(x._2))
         Iterator.continually(found).takeWhile(_.isDefined).flatten.foreach { case (k, v) =>
             modifiersCache.remove(k)
             pmodModify(v)
         }
         log.info(s"Cache after(${modifiersCache.size})")
       }
-    case lt: LocallyGeneratedTransaction[P, EncryBaseTransaction] => txModify(lt.tx)
+    case lt: LocallyGeneratedTransaction[EncryProposition, EncryBaseTransaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       log.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
@@ -113,7 +113,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   def extractTransactions(mod: EncryPersistentModifier): Seq[EncryBaseTransaction] = mod match {
-    case tcm: TransactionsCarryingPersistentNodeViewModifier[P, EncryBaseTransaction] => tcm.transactions
+    case tcm: TransactionsCarryingPersistentNodeViewModifier[EncryProposition, EncryBaseTransaction] => tcm.transactions
     case _ => Seq()
   }
 
@@ -125,7 +125,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     memPool.putWithoutCheck(rolledBackTxs).filter { tx =>
       !appliedTxs.exists(t => t.id sameElements tx.id) && {
         state match {
-          case v: TransactionValidation[P, EncryBaseTransaction] => v.validate(tx).isSuccess
+          case v: TransactionValidation[EncryProposition, EncryBaseTransaction] => v.validate(tx).isSuccess
           case _ => true
         }
       }
@@ -312,12 +312,10 @@ object EncryNodeViewHolder {
 
   object ReceivableMessages {
 
-    // Explicit request of NodeViewChange events of certain types.
     case class GetNodeViewChanges(history: Boolean, state: Boolean, vault: Boolean, mempool: Boolean)
 
     case class GetDataFromCurrentView[HIS, MS, VL, MP, A](f: CurrentView[HIS, MS, VL, MP] => A)
 
-    // Moved from NodeViewSynchronizer as this was only received here
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
     case class ModifiersFromRemote(source: ConnectedPeer, modifierTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])

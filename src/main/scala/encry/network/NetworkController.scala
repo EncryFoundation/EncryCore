@@ -14,11 +14,9 @@ import encry.network.message.Message.MessageCode
 import encry.network.message.{Message, MessageHandler}
 import encry.settings.NetworkSettings
 import NetworkController.ReceivableMessages._
-import PeerConnectionHandler.ReceivableMessages.CloseConnection
 import PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import encry.utils.EncryLogging
-
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.duration._
