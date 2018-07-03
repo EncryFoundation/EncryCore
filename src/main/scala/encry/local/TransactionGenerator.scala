@@ -41,13 +41,11 @@ class TransactionGenerator extends Actor with ScorexLogging {
   def handleTransactionGeneration: Receive = {
 
     case StartGeneration if !isActive =>
-      println("Starting transaction generation")
       isActive = true
       context.system.scheduler.scheduleOnce(500.millis)(self ! FetchWalletData)
       context.system.scheduler.scheduleOnce(1500.millis)(self ! GenerateTransaction)
 
     case StopGeneration =>
-      log.info("Stopping transaction generation")
       isActive = false
 
     case GenerateTransaction if isActive =>

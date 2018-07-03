@@ -17,10 +17,10 @@ import scala.concurrent.duration.{FiniteDuration, _}
 /**
   * SyncTracker caches the peers' statuses (i.e. whether they are ahead or behind this node)
   */
-case class SyncTracker(nvsRef: ActorRef,
-                  context: ActorContext,
-                  networkSettings: NetworkSettings,
-                  timeProvider: NetworkTimeProvider) extends ScorexLogging {
+case class SyncTracker(deliveryManager: ActorRef,
+                       context: ActorContext,
+                       networkSettings: NetworkSettings,
+                       timeProvider: NetworkTimeProvider) extends ScorexLogging {
 
   import History._
   import encry.utils.NetworkTime.Time
@@ -36,7 +36,7 @@ case class SyncTracker(nvsRef: ActorRef,
 
   def scheduleSendSyncInfo(): Unit = {
     if (schedule.isDefined) schedule.get.cancel()
-    schedule = Some(context.system.scheduler.schedule(2.seconds, minInterval())(nvsRef ! SendLocalSyncInfo))
+    schedule = Some(context.system.scheduler.schedule(15.seconds, minInterval())(deliveryManager ! SendLocalSyncInfo))
   }
 
   def maxInterval(): FiniteDuration = if (stableSyncRegime) networkSettings.syncStatusRefreshStable else networkSettings.syncStatusRefresh
