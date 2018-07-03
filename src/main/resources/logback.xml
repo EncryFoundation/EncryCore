@@ -17,7 +17,7 @@
             <level>DEBUG</level>
         </filter>
         <encoder>
-            <pattern>[%d{HH:mm:ss.SSS}] %X{color}[%-5level] %X{reset}[%-30.30logger] >> %msg%n</pattern>
+            <pattern>[%d{HH:mm:ss.SSS}] [%-5level] [%-30.30logger] >> %msg%n</pattern>
         </encoder>
     </appender>
 
