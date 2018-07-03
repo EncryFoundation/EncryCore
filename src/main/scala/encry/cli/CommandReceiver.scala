@@ -14,9 +14,12 @@ import encry.view.state.EncryState
 
 import scala.util.Try
 
+import encry.utils.ExtUtils._
 trait CommandReceiver[StateType <: EncryState[StateType]] {
   this: EncryNodeViewHolder[StateType] =>
   def currentView: CurrentView[EncryHistory, StateType, VL, MP] = CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool)
+  def keys: Seq[PrivateKey25519] = currentView.vault.keyManager.keys
+  def response(s: String): Option[Response] = Some(Response(s))
   def commandReceive: Receive = {
     case AddKey =>
       if(Try(currentView.vault.keyManager.createNewKey()).isSuccess) Some(Response("OK"))
@@ -25,30 +28,30 @@ trait CommandReceiver[StateType <: EncryState[StateType]] {
       val balances = currentView.vault.getBalances
       val res = if(balances.isEmpty) "<empty>"
       else balances.map(tokenInfo => s"TokenID(${Algos.encode(tokenInfo._1)}) : ${tokenInfo._2}\n").mkString("\n")
-      sender() ! Some(Response(res))
+      sender() ! response(res)
     case PrintMyAddrs =>
-      sender() ! Some(Response(currentView.vault.keyManager.keys.map(_.publicImage.address).mkString("\n")))
+      sender() ! response(keys.map(_.publicImage.address).mkString("\n"))
     case PrintPrivKeys =>
-      sender() ! Some(Response(currentView.vault.keyManager.keys.map(k => Algos.encode(k.privKeyBytes)).mkString("\n")))
+      sender() ! response(keys.map(k => Algos.encode(k.privKeyBytes)).mkString("\n"))
     case PrintPubKeys =>
-      val res: String = Try(currentView.vault.keyManager.keys.map(_.publicKeyBytes).map(Algos.encode).mkString("\n")).getOrElse("ERROR!")
-      sender() ! Some(Response(res))
+      val res: String = Try(keys.map(_.publicKeyBytes).map(Algos.encode).mkString("\n")).getOrElse("ERROR!")
+      sender() ! response(res)
     case InitKeyStorage.Request(mnemonicCode) =>
-      Try(currentView.vault.keyManager.initStorage(Mnemonic.mnemonicCodeToBytes(mnemonicCode)))
+      sender() ! Try(currentView.vault.keyManager.initStorage(Mnemonic.mnemonicCodeToBytes(mnemonicCode)))
         .map(_ => mnemonicCode)
-        .map(code => Some(Response(s"Your mnemonic code is: $code")))
-        .getOrElse(Some(Response("Operation failed. Couldn't init key storage.")))
+        .map(code => response(s"Your mnemonic code is: $code"))
+        .getOrElse(response("Operation failed. Couldn't init key storage."))
     case Transfer.Request(recipient, fee, amount, timestamp) =>
       val view = currentView
-      Try{
-        val secret: PrivateKey25519 = view.vault.keyManager.keys.head
+      sender() ! Try{
         val boxes: IndexedSeq[AssetBox] = view.vault.walletStorage.allBoxes.collect{case x: AssetBox => x}
           .foldLeft(0L -> Seq.empty[AssetBox]) { case ((sum, seq), box) =>
             if (sum < (amount + fee)) (sum + box.amount, seq :+ box) else (sum, seq)
           }._2.toIndexedSeq
-        val tx: EncryTransaction = TransactionFactory.defaultPaymentTransactionScratch(secret, fee, timestamp, boxes, recipient, amount)
-        self ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
-        tx
-      }.toOption.map(tx => Some(Response(tx.toString))).getOrElse(Some(Response("Operation failed. Malformed data.")))
+        TransactionFactory.defaultPaymentTransactionScratch(keys.head, fee, timestamp, boxes, recipient, amount).iapply(
+          self ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](_)
+        )
+      }.toOption.map(tx => response(tx.toString)).getOrElse(response("Operation failed. Malformed data."))
+
   }
 }
