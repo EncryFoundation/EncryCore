@@ -13,11 +13,14 @@ import encry.view.history.EncryHistory
 import encry.view.state.EncryState
 
 import scala.util.Try
-
 import encry.utils.ExtUtils._
+import encry.view.mempool.EncryMempool
+import encry.view.wallet.EncryWallet
+
 trait CommandReceiver[StateType <: EncryState[StateType]] {
   this: EncryNodeViewHolder[StateType] =>
-  def currentView: CurrentView[EncryHistory, StateType, VL, MP] = CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool)
+  def currentView: CurrentView[EncryHistory, StateType, EncryWallet, EncryMempool] =
+    CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool)
   def keys: Seq[PrivateKey25519] = currentView.vault.keyManager.keys
   def response(s: String): Option[Response] = Some(Response(s))
   def commandReceive: Receive = {
@@ -52,6 +55,5 @@ trait CommandReceiver[StateType <: EncryState[StateType]] {
           self ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](_)
         )
       }.toOption.map(tx => response(tx.toString)).getOrElse(response("Operation failed. Malformed data."))
-
   }
 }
