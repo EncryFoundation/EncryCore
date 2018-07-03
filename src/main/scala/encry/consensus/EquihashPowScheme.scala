@@ -9,7 +9,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.settings.{Algos, Constants}
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import scorex.crypto.authds.SerializedAdProof
 import scorex.crypto.hash.Digest32
@@ -17,7 +17,7 @@ import scorex.crypto.hash.Digest32
 import scala.annotation.tailrec
 import scala.math.BigInt
 
-case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with ScorexLogging {
+case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with EncryLogging {
 
   private val seed: Array[Byte] =
     "equi_seed_12".getBytes(Algos.charset) ++ Chars.toByteArray(n) ++ Chars.toByteArray(k)

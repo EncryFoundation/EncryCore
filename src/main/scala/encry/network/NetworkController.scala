@@ -2,7 +2,6 @@ package encry.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
 
-import akka.actor.SupervisorStrategy.{Escalate, Restart}
 import akka.actor._
 import akka.io.Tcp.SO.KeepAlive
 import akka.io.Tcp._
@@ -16,8 +15,7 @@ import encry.network.message.Message.MessageCode
 import encry.network.message.{Message, MessageHandler}
 import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import encry.settings.NetworkSettings
-import encry.utils.ScorexLogging
-import encry.view.history.EncrySyncInfoMessageSpec
+import encry.utils.EncryLogging
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -26,7 +24,7 @@ import scala.language.{existentials, postfixOps}
 import scala.util.{Failure, Success, Try}
 
 
-class NetworkController extends Actor with ScorexLogging {
+class NetworkController extends Actor with EncryLogging {
 
   val networkSettings: NetworkSettings = settings.network
 
@@ -61,7 +59,7 @@ class NetworkController extends Actor with ScorexLogging {
           intf.getInterfaceAddresses.asScala.exists { intfAddr => myAddrs.contains(intfAddr.getAddress) }
         } || (networkSettings.upnpEnabled && myAddrs.exists(_ == upnp.externalAddress))
       } recover { case t: Throwable =>
-        log.error("Declared address validation failed: ", t)
+        logError("Declared address validation failed: ", t)
       }
     }
   }
@@ -70,12 +68,14 @@ class NetworkController extends Actor with ScorexLogging {
 
   tcpManager ! Bind(self, networkSettings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
 
+  override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
+
   def bindingLogic: Receive = {
     case Bound(_) =>
       log.info("Successfully bound to the port " + networkSettings.bindAddress.getPort)
       context.system.scheduler.schedule(600.millis, 5.seconds)(peerManager ! CheckPeers)
     case CommandFailed(_: Bind) =>
-      log.error("Network port " + networkSettings.bindAddress.getPort + " already in use!")
+      logError("Network port " + networkSettings.bindAddress.getPort + " already in use!")
       context stop self
   }
 
@@ -86,9 +86,9 @@ class NetworkController extends Actor with ScorexLogging {
         case Success(content) =>
           messageHandlers.find(_._1.contains(msgId)).map(_._2) match {
             case Some(handler) => handler ! DataFromPeer(spec, content, remote)
-            case None => log.error("No handlers found for message: " + msgId)
+            case None => logError("No handlers found for message: " + msgId)
           }
-        case Failure(e) => log.error("Failed to deserialize data: ", e)
+        case Failure(e) => logError("Failed to deserialize data: ", e)
       }
     case SendToNetwork(message, sendingStrategy) =>
       (peerManager ? FilterPeers(sendingStrategy))
@@ -125,7 +125,7 @@ class NetworkController extends Actor with ScorexLogging {
       log.info(s"Registering handlers for ${specs.map(s => s.messageCode -> s.messageName)}")
       messageHandlers += specs.map(_.messageCode) -> handler
     case CommandFailed(cmd: Tcp.Command) => log.info("Failed to execute command : " + cmd)
-    case nonsense: Any => log.warn(s"NetworkController: got something strange $nonsense")
+    case nonsense: Any => logWarn(s"NetworkController: got something strange $nonsense")
   }
 }
 
@@ -134,7 +134,6 @@ object NetworkController {
   object ReceivableMessages {
 
     import encry.network.message.MessageSpec
-
     import scala.reflect.runtime.universe.TypeTag
 
     case class DataFromPeer[DT: TypeTag](spec: MessageSpec[DT], data: DT, source: ConnectedPeer)

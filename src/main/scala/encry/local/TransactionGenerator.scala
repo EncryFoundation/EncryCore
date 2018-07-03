@@ -7,18 +7,18 @@ import encry.crypto.PrivateKey25519
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import encry.utils.NetworkTime.Time
-import encry.utils.ScorexLogging
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedTransaction}
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedTransaction}
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
+import encry.utils.NetworkTime.Time
+import encry.utils.EncryLogging
 
 import scala.concurrent.duration._
 
-class TransactionGenerator extends Actor with ScorexLogging {
+class TransactionGenerator extends Actor with EncryLogging {
 
   import TransactionGenerator._
 
@@ -40,11 +40,13 @@ class TransactionGenerator extends Actor with ScorexLogging {
   def handleTransactionGeneration: Receive = {
 
     case StartGeneration if !isActive =>
+      log.info("Starting transaction generation")
       isActive = true
       context.system.scheduler.scheduleOnce(500.millis)(self ! FetchWalletData)
       context.system.scheduler.scheduleOnce(1500.millis)(self ! GenerateTransaction)
 
     case StopGeneration =>
+      log.info("Stopping transaction generation")
       isActive = false
 
     case GenerateTransaction if isActive =>

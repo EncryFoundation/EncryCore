@@ -10,11 +10,11 @@ import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, 
 import encry.network.PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages._
 import encry.network.{Handshake, SendingStrategy}
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 
 import scala.util.Random
 
-class PeerManager extends Actor with ScorexLogging {
+class PeerManager extends Actor with EncryLogging {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
 

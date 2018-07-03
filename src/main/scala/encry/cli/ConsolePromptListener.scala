@@ -1,14 +1,14 @@
 package encry.cli
 
 import akka.actor.Actor
-import encry.EncryApp.settings
 import encry.cli.commands._
-import encry.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
+import encry.EncryApp.settings
+import encry.utils.EncryLogging
 
-class ConsolePromptListener extends Actor with ScorexLogging {
+class ConsolePromptListener extends Actor with EncryLogging {
 
   import ConsolePromptListener._
 

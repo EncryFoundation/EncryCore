@@ -14,7 +14,8 @@ import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle, _}
 import encry.network.message.MessageHandler
 import encry.settings.NetworkSettings
-import encry.utils.ScorexLogging
+import PeerConnectionHandler._
+import encry.utils.EncryLogging
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
@@ -24,7 +25,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
                             connection: ActorRef,
                             direction: ConnectionType,
                             ownSocketAddress: Option[InetSocketAddress],
-                            remote: InetSocketAddress) extends Actor with ScorexLogging {
+                            remote: InetSocketAddress) extends Actor with EncryLogging {
 
   import PeerConnectionHandler.ReceivableMessages._
   import encry.network.peer.PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
@@ -47,7 +48,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   def processErrors(stateName: CommunicationState): Receive = {
     case CommandFailed(w: Write) =>
-      log.warn(s"Write failed :$w " + remote + s" in state $stateName")
+      logWarn(s"Write failed :$w " + remote + s" in state $stateName")
       connection ! Close
       connection ! ResumeReading
       connection ! ResumeWriting
@@ -138,7 +139,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   }
 
   def reportStrangeInput: Receive = {
-    case nonsense: Any => log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
+    case nonsense: Any => logWarn(s"Strange input for PeerConnectionHandler: $nonsense")
   }
 
   def workingCycle: Receive =
