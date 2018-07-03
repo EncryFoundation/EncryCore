@@ -75,12 +75,11 @@ class NetworkController extends Actor with ScorexLogging {
 
   def businessLogic: Receive = {
     case Message(spec, Left(msgBytes), Some(remote)) =>
-      val msgId: MessageCode = spec.messageCode
       spec.parseBytes(msgBytes) match {
         case Success(content) =>
-          messageHandlers.find(_._1.contains(msgId)).map(_._2) match {
+          messageHandlers.find(_._1.contains(spec.messageCode)).map(_._2) match {
             case Some(handler) => handler ! DataFromPeer(spec, content, remote)
-            case None => log.error("No handlers found for message: " + msgId)
+            case None => log.error("No handlers found for message: " + spec.messageCode)
           }
         case Failure(e) => log.error("Failed to deserialize data: ", e)
       }
