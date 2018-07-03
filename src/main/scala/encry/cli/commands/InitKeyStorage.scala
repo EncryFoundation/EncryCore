@@ -18,7 +18,9 @@ import scala.util.Try
 
 object InitKeyStorage extends Command {
 
-  override def executeRequest(args: Command.Args, settings: EncryAppSettings): Any = None
+  case class InitKeyStorage(mnemonicCode: String)
+  override def executeRequest(args: Command.Args, settings: EncryAppSettings): Any =
+    InitKeyStorage(args.requireArgOrElse("seed", Ast.Str(Mnemonic.entropyToMnemonicCode(SecureRandom.getSeed(16)))).s)
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (nodeViewHolder ?

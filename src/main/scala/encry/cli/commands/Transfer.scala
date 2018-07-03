@@ -27,14 +27,18 @@ object Transfer extends ViewCommand {
     * Example "wallet transfer -addr='3jSD9fwHEHJwHq99ARqhnNhqGXeKnkJMyX4FZjHV6L3PjbCmjG' -fee=10000 -amount=2000"
     */
   // TODO: Notify `Vault` of spent boxes.
-  override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
-    implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
-    (nodeViewHolder ? Request(
+  override def executeRequest(args: Command.Args, settings: EncryAppSettings): Request = {
+    Request(
       Address @@ args.requireArg[Ast.Str]("addr").s,
       args.requireArg[Ast.Num]("fee").i,
       args.requireArg[Ast.Num]("amount").i,
       timeProvider.time()
-    )).mapTo[Option[Response]]
+    )
+  }
+
+  override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
+    implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
+    (nodeViewHolder ? executeRequest(args, settings)).mapTo[Option[Response]]
   }
 
   case class Request(recipient: Address, fee: Long, amount: Long, timestamp: Time)

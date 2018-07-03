@@ -29,12 +29,9 @@ class ConsolePromptListener extends Actor with ScorexLogging {
           if (cmd.isEmpty) println("Unsupported command. Type 'app help' to get commands list")
           cmd.foreach{ c =>
             val request = c.executeRequest(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings)
-            if (request == LocalCommand)
-              c.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings)
-              .onComplete{case Success(Some(x)) => print(x.msg + s"\n$prompt") }
-            else {
-              EncryApp.nodeViewHolder ! request
-            }
+            if (request == LocalCommand) c.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings)
+              .onComplete{case Success(Some(x)) => print(s"${x.msg}\n$prompt") }
+            else EncryApp.nodeViewHolder ! request
           }
         }
       }
