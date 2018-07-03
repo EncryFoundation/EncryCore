@@ -14,7 +14,5 @@ package object commands {
   object PrintPrivKeys extends ViewCommand
 
   case object PrintPubKeys extends ViewCommand
-
-  object Help extends Help
-
+  
 }
