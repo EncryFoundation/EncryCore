@@ -5,6 +5,7 @@ import encry.EncryApp
 import encry.EncryApp.settings
 import encry.cli.commands._
 import encry.utils.EncryLogging
+import encry.utils.ExtUtils._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Success
@@ -18,19 +19,18 @@ class ConsolePromptListener extends Actor with EncryLogging {
     case StartListening =>
       Iterator.continually(scala.io.StdIn.readLine(prompt))
         .foreach { input =>
-        val parsed = InputParser.parse(input)
-        if (parsed.isFailure) println("Bad input")
-        parsed.foreach { command =>
-          val cmd = getCommand(command.category.name, command.ident.name)
-          if (cmd.isEmpty) println("Unsupported command. Type 'app help' to get commands list")
-          cmd.foreach{ c =>
-            val request = c.executeRequest(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings)
-            if (request == LocalCommand) c.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings)
-              .onComplete{case Success(Some(x)) => print(s"${x.msg}\n$prompt") }
-            else EncryApp.nodeViewHolder ! request
+        InputParser.parse(input).iapply(parsed => if (parsed.isFailure) println("Bad input"))
+          .foreach { command =>
+            getCommand(command.category.name, command.ident.name)
+              .iapply(cmd => if (cmd.isEmpty) println("Unsupported command. Type 'app help' to get commands list"))
+              .foreach{ c =>
+                val request = c.executeRequest(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings)
+                if (request == LocalCommand) c.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings)
+                  .onComplete{case Success(Some(x)) => print(s"${x.msg}\n$prompt") }
+                else EncryApp.nodeViewHolder ! request
+              }
           }
         }
-      }
     case Some(Response(res)) => print(res + s"\n.$prompt")
   }
 }
