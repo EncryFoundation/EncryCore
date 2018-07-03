@@ -3,13 +3,13 @@ package encry.network
 import java.net.InetAddress
 
 import encry.settings.NetworkSettings
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 import org.bitlet.weupnp.{GatewayDevice, GatewayDiscover}
 
 import scala.collection.JavaConverters._
 import scala.util.Try
 
-class UPnP(settings: NetworkSettings) extends ScorexLogging {
+class UPnP(settings: NetworkSettings) extends EncryLogging {
 
   private var gateway: Option[GatewayDevice] = None
 
@@ -36,17 +36,17 @@ class UPnP(settings: NetworkSettings) extends ScorexLogging {
           log.info("External IP address is " + externalAddress.map(_.getHostAddress).getOrElse("err"))
       }
     }
-  }.recover { case t: Throwable => log.error("Unable to discover UPnP gateway devices: " + t.toString) }
+  }.recover { case t: Throwable => logError("Unable to discover UPnP gateway devices: " + t.toString) }
   if (settings.upnpEnabled) addPort(settings.bindAddress.getPort)
 
   def addPort(port: Int): Try[Unit] = Try {
     if (gateway.get.addPortMapping(port, port, localAddress.get.getHostAddress, "TCP", "EncryCore"))
       log.info("Mapped port [" + externalAddress.get.getHostAddress + "]:" + port)
     else log.info("Unable to map port " + port)
-  }.recover { case t: Throwable => log.error("Unable to map port " + port + ": " + t.toString) }
+  }.recover { case t: Throwable => logError("Unable to map port " + port + ": " + t.toString) }
 
   def deletePort(port: Int): Try[Unit] = Try {
     if (gateway.get.deletePortMapping(port, "TCP")) log.info("Mapping deleted for port " + port)
     else log.info("Unable to delete mapping for port " + port)
-  }.recover { case t: Throwable => log.error("Unable to delete mapping for port " + port + ": " + t.toString) }
+  }.recover { case t: Throwable => logError("Unable to delete mapping for port " + port + ": " + t.toString) }
 }

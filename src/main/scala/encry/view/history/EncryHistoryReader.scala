@@ -9,7 +9,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.{Algos, Constants, NodeSettings}
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
@@ -22,7 +22,7 @@ trait EncryHistoryReader
     with BlockHeaderProcessor
     with BaseBlockPayloadProcessor
     with BaseADProofProcessor
-    with ScorexLogging {
+    with EncryLogging {
 
   protected val nodeSettings: NodeSettings
 
@@ -213,7 +213,7 @@ trait EncryHistoryReader
       case None if contains(modifierId) => ModifierSemanticValidity.Unknown
       case None => ModifierSemanticValidity.Absent
       case m =>
-        log.error(s"Incorrect validity status: $m")
+        logError(s"Incorrect validity status: $m")
         ModifierSemanticValidity.Absent
     }
 }
