@@ -14,11 +14,11 @@ import encry.view.wallet.EncryWallet
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedTransaction}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.utils.NetworkTime.Time
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 
 import scala.concurrent.duration._
 
-class TransactionGenerator extends Actor with ScorexLogging {
+class TransactionGenerator extends Actor with EncryLogging {
 
   import TransactionGenerator._
 

@@ -4,14 +4,14 @@ import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
 import encry.settings.Algos
 import encry.settings.Algos.HF
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 import encry.view.history.Height
 import io.iohk.iodb.Store
 import scorex.crypto.authds.ADKey
 import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import scorex.crypto.hash.Digest32
 
-trait UtxoStateReader extends StateReader with ScorexLogging {
+trait UtxoStateReader extends StateReader with EncryLogging {
 
   implicit val hf: Algos.HF = Algos.hash
 

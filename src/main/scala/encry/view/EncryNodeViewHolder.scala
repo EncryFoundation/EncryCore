@@ -16,7 +16,7 @@ import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
@@ -30,7 +30,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
-class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with ScorexLogging {
+class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with EncryLogging {
 
   type HIS = EncryHistory
   type MS = StateType
@@ -55,7 +55,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def postStop(): Unit = {
-    log.warn("Stopping EncryNodeViewHolder")
+    logWarn("Stopping EncryNodeViewHolder")
     nodeView.history.closeStorage()
     nodeView.state.closeStorage()
   }
@@ -67,7 +67,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
             if (nodeView.history.contains(pmod) || modifiersCache.contains(key(pmod.id)))
-              log.warn(s"Received modifier ${pmod.encodedId} that is already in history")
+              logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else modifiersCache.put(key(pmod.id), pmod)
         }
         log.info(s"Cache before(${modifiersCache.size})")
@@ -93,7 +93,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       }
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
-    case a: Any => log.error("Strange input: " + a)
+    case a: Any => logError("Strange input: " + a)
   }
 
   def key(id: ModifierId): scala.collection.mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
@@ -183,7 +183,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           case None => (uf.history, Success(uf.state), uf.suffix)
         }
       case Failure(e) =>
-        log.error("Rollback failed: ", e)
+        logError("Rollback failed: ", e)
         context.system.eventStream.publish(RollbackFailed(branchingPointOpt))
         EncryApp.forceStopApplication(500)
     }
@@ -210,7 +210,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                 newHistory.bestHeaderOpt.foreach(header => context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
-              log.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
+              logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
               updateNodeView(updatedHistory = Some(newHistory))
               nodeViewSynchronizer ! SemanticallyFailedModification(pmod, e)
           }
@@ -219,14 +219,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Failure(e) =>
-        log.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to history", e)
+        logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to history", e)
         nodeViewSynchronizer ! SyntacticallyFailedModification(pmod, e)
     }
-  } else log.warn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
+  } else logWarn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
 
   def txModify(tx: EncryBaseTransaction): Unit = nodeView.mempool.put(tx) match {
     case Success(newPool) =>
-      log.info(s"Unconfirmed transaction $tx added to the memory pool")
       val newVault: VL = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx)
@@ -300,7 +299,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         toApply.foldLeft(startState) { (s, m) => s.applyModifier(m).get }
     }
   }.recoverWith { case e =>
-    log.error("Failed to recover state.", e)
+    logError("Failed to recover state.", e)
     EncryApp.forceStopApplication(500)
   }.get
 }

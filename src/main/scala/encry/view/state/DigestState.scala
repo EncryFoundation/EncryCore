@@ -9,7 +9,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.settings.{Algos, Constants, NodeSettings}
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.crypto.authds.ADDigest
 
@@ -22,7 +22,7 @@ class DigestState protected(override val version: VersionTag,
                             settings: NodeSettings)
   extends EncryState[DigestState]
     with ModifierValidation[EncryPersistentModifier]
-    with ScorexLogging {
+    with EncryLogging {
 
   stateStore.lastVersionID
     .foreach(id => assert(version sameElements id.data, "`version` should always be equal to store.lastVersionID"))
@@ -47,7 +47,7 @@ class DigestState protected(override val version: VersionTag,
           log.info(s"Valid modifier applied to DigestState: ${block.encodedId}")
           s
         case Failure(e) =>
-          log.warn(s"Modifier $mod is not valid: ", e)
+          logWarn(s"Modifier $mod is not valid: ", e)
           Failure(e)
       }
     case mod: Any =>

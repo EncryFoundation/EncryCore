@@ -4,16 +4,17 @@ import java.net.InetSocketAddress
 
 import akka.actor.Actor
 import encry.EncryApp._
-import PeerManager.ReceivableMessages._
-import encry.network.{Handshake, SendingStrategy}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
-import encry.network.PeerConnectionHandler._
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
-import encry.utils.ScorexLogging
+import encry.network.PeerConnectionHandler._
+import encry.network.peer.PeerManager.ReceivableMessages._
+import encry.network.{Handshake, SendingStrategy}
+import encry.utils.EncryLogging
+
 import scala.util.Random
 
-class PeerManager extends Actor with ScorexLogging {
+class PeerManager extends Actor with EncryLogging {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
 
