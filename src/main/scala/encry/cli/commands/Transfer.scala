@@ -29,6 +29,13 @@ object Transfer extends Command {
   // TODO: Notify `Vault` of spent boxes.
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
+    (nodeViewHolder ? Request(
+      Address @@ args.requireArg[Ast.Str]("addr").s,
+      args.requireArg[Ast.Num]("fee").i,
+      args.requireArg[Ast.Num]("amount").i,
+      timeProvider.time()
+    )).mapTo[Option[Response]]
+
     (nodeViewHolder ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
         Try {
@@ -51,4 +58,6 @@ object Transfer extends Command {
         }.toOption.map(tx => Some(Response(tx.toString))).getOrElse(Some(Response("Operation failed. Malformed data.")))
       }).mapTo[Option[Response]]
   }
+
+  case class Request(recipient: Address, fee: Long, amount: Long, timestamp: Time)
 }
