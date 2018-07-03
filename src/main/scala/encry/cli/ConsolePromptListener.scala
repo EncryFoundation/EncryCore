@@ -17,7 +17,6 @@ class ConsolePromptListener extends Actor with ScorexLogging {
 
   import ConsolePromptListener._
   implicit val materializer = ActorMaterializer()
-//  implicit val executionContext: ExecutionContext = context.system.dispatchers.lookup("miner-dispatcher")
 
   override def receive: Receive = {
     case StartListening =>
@@ -34,17 +33,12 @@ class ConsolePromptListener extends Actor with ScorexLogging {
               c.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings)
               .onComplete{case Success(Some(x)) => print(x.msg + s"\n$prompt") }
             else {
-              println("Sending Ping")
-              EncryApp.nodeViewHolder ! "PING"
               EncryApp.nodeViewHolder ! request
             }
           }
         }
       }
-
-      println("Done startListening")
     case Some(Response(res)) => print(res + s"\n.$prompt")
-    case s => println(s"Any: $s")
   }
 }
 
