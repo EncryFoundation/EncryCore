@@ -76,7 +76,6 @@ object Equihash {
     val collisionLength: Int = n / (k + 1)
     val hashLength: Int = (k + 1) * ((collisionLength + 7) / 8)
     val indicesPerHashOutput: Int = 512 / n
-    log.info("Generating first list")
     val tmpHash: Array[Byte] = new Array[Byte](digest.getDigestSize)
     var x = for {i <- (0 until Math.pow(2, collisionLength + 1).toInt).toVector} yield {
       val r: Int = i % indicesPerHashOutput

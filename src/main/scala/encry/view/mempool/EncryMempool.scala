@@ -3,7 +3,7 @@ package encry.view.mempool
 import encry.ModifierId
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.settings.EncryAppSettings
-import encry.utils.{NetworkTimeProvider, ScorexLogging}
+import encry.utils.{NetworkTimeProvider, EncryLogging}
 import encry.view.mempool.EncryMempool._
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
@@ -13,7 +13,7 @@ import scala.util.{Failure, Success, Try}
 
 class EncryMempool(val unconfirmed: TrieMap[TxKey, EncryBaseTransaction],
                    settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
-  extends MemoryPool[EncryBaseTransaction, EncryMempool] with EncryMempoolReader with AutoCloseable with ScorexLogging {
+  extends MemoryPool[EncryBaseTransaction, EncryMempool] with EncryMempoolReader with AutoCloseable with EncryLogging {
 
   private implicit val cleanupScheduler: Scheduler = Scheduler.singleThread("mempool-cleanup-thread")
 

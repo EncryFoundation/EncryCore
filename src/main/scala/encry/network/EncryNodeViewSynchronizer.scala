@@ -18,7 +18,7 @@ import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.message._
 import encry.settings.{Algos, NetworkSettings}
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
-import encry.utils.ScorexLogging
+import encry.utils.EncryLogging
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
@@ -26,7 +26,7 @@ import encry.view.mempool.{EncryMempool, MempoolReader}
 import encry.view.state.{Proposition, StateReader}
 import encry.{ModifierId, ModifierTypeId, VersionTag}
 
-class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with ScorexLogging {
+class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with EncryLogging {
 
 
   val networkSettings: NetworkSettings = settings.network
@@ -54,7 +54,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       statusTracker.updateStatus(remote, status)
       status match {
-        case Unknown => log.warn("Peer status is still unknown")
+        case Unknown => logWarn("Peer status is still unknown")
         case Younger => extOpt match {
           case None => log.warn(s"extOpt is empty for: $remote. Its status is: $status.")
           case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
@@ -80,7 +80,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           log.info(s"Comparison with $remote having starting points ${encry.idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}")
           log.info(s"Extension ids: ${encry.idsToString(ext)}")
-          if (!(extensionOpt.nonEmpty || comparison != Younger)) log.warn("Extension is empty while comparison is younger")
+          if (!(extensionOpt.nonEmpty || comparison != Younger)) logWarn("Extension is empty while comparison is younger")
+
           self ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
       }
@@ -102,7 +103,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
       if (settings.node.sendStat)
         context.actorSelection("/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
       log.info(s"Got modifiers of type $typeId from remote connected peer: $remote")
-      log.trace(s"Received modifier ids ${data._2.keySet.map(Algos.encode).mkString(",")}")
+
+      log.info(s"Received modifier ids ${data._2.keySet.map(Algos.encode).mkString(",")}")
       for ((id, _) <- modifiers) deliveryTracker.receive(typeId, id, remote)
       val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
         modifiers partition { case (id, _) => deliveryTracker.isSpam(id) }
@@ -124,7 +126,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
         val m: (ModifierTypeId, Map[ModifierId, Array[Byte]]) = modifiers.head.modifierTypeId -> modifiers.map(m => m.id -> m.bytes).toMap
         peer.handlerRef ! Message(ModifiersSpec, Right(m), None)
       }
-    case a: Any => log.error(s"Strange input (sender: ${sender()}): ${a.getClass}\n" + a)
+    case a: Any => logError(s"Strange input (sender: ${sender()}): ${a.getClass}\n" + a)
   }
 
   case object CheckModifiersToDownload
