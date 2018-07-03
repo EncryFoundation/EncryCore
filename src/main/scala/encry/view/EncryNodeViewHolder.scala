@@ -32,11 +32,6 @@ import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with ScorexLogging {
 
-  type HIS = EncryHistory
-  type MS = StateType
-  type VL = EncryWallet
-  type MP = EncryMempool
-
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: EncryMempool)
 
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
@@ -98,10 +93,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   def key(id: ModifierId): scala.collection.mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
-  def updateNodeView(updatedHistory: Option[HIS] = None,
-                     updatedState: Option[MS] = None,
-                     updatedVault: Option[VL] = None,
-                     updatedMempool: Option[MP] = None): Unit = {
+  def updateNodeView(updatedHistory: Option[EncryHistory] = None,
+                     updatedState: Option[StateType] = None,
+                     updatedVault: Option[EncryWallet] = None,
+                     updatedMempool: Option[EncryMempool] = None): Unit = {
     val newNodeView: NodeView = NodeView(updatedHistory.getOrElse(nodeView.history),
       updatedState.getOrElse(nodeView.state),
       updatedVault.getOrElse(nodeView.wallet),
@@ -119,7 +114,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   //todo: this method causes delays in a block processing as it removes transactions from mempool and checks
   //todo: validity of remaining transactions in a synchronous way. Do this job async!
-  def updateMemPool(blocksRemoved: Seq[EncryPersistentModifier], blocksApplied: Seq[EncryPersistentModifier], memPool: MP, state: MS): MP = {
+  def updateMemPool(blocksRemoved: Seq[EncryPersistentModifier], blocksApplied: Seq[EncryPersistentModifier],
+                    memPool: EncryMempool, state: StateType): EncryMempool = {
     val rolledBackTxs: Seq[EncryBaseTransaction] = blocksRemoved.flatMap(extractTransactions)
     val appliedTxs: Seq[EncryBaseTransaction] = blocksApplied.flatMap(extractTransactions)
     memPool.putWithoutCheck(rolledBackTxs).filter { tx =>
@@ -141,19 +137,19 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   @tailrec
-  private def updateState(history: HIS,
-                          state: MS,
+  private def updateState(history: EncryHistory,
+                          state: StateType,
                           progressInfo: ProgressInfo[EncryPersistentModifier],
-                          suffixApplied: IndexedSeq[EncryPersistentModifier]): (HIS, Try[MS], Seq[EncryPersistentModifier]) = {
-    case class UpdateInformation(history: HIS,
-                                 state: MS,
+                          suffixApplied: IndexedSeq[EncryPersistentModifier]): (EncryHistory, Try[StateType], Seq[EncryPersistentModifier]) = {
+    case class UpdateInformation(history: EncryHistory,
+                                 state: StateType,
                                  failedMod: Option[EncryPersistentModifier],
                                  alternativeProgressInfo: Option[ProgressInfo[EncryPersistentModifier]],
                                  suffix: IndexedSeq[EncryPersistentModifier])
 
     requestDownloads(progressInfo)
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
-    val (stateToApplyTry: Try[MS], suffixTrimmed: IndexedSeq[EncryPersistentModifier]) = if (progressInfo.chainSwitchingNeeded) {
+    val (stateToApplyTry: Try[StateType], suffixTrimmed: IndexedSeq[EncryPersistentModifier]) = if (progressInfo.chainSwitchingNeeded) {
       branchingPointOpt.map { branchPoint =>
         if (!state.version.sameElements(branchPoint))
           state.rollbackTo(branchPoint) -> trimChainSuffix(suffixApplied, ModifierId !@@ branchPoint)
@@ -168,11 +164,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
           if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
             case Success(stateAfterApply) =>
-              val newHis: HIS = history.reportModifierIsValid(modToApply)
+              val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Failure(e) =>
-              val (newHis: HIS, newProgressInfo: ProgressInfo[EncryPersistentModifier]) = history.reportModifierIsInvalid(modToApply, progressInfo)
+              val (newHis: EncryHistory, newProgressInfo: ProgressInfo[EncryPersistentModifier]) = history.reportModifierIsInvalid(modToApply, progressInfo)
               nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           }
@@ -196,12 +192,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         log.info(s"Going to apply modifications to the state: $progressInfo")
         nodeViewSynchronizer ! SyntacticallySuccessfulModifier(pmod)
         if (progressInfo.toApply.nonEmpty) {
-          val (newHistory: HIS, newStateTry: Try[MS], blocksApplied: Seq[EncryPersistentModifier]) =
+          val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
           newStateTry match {
             case Success(newMinState) =>
-              val newMemPool: MP = updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)
-              val newVault: VL = if (progressInfo.chainSwitchingNeeded)
+              val newMemPool: EncryMempool = updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)
+              val newVault: EncryWallet = if (progressInfo.chainSwitchingNeeded)
                 nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
               else nodeView.wallet
               blocksApplied.foreach(newVault.scanPersistent)
@@ -227,7 +223,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   def txModify(tx: EncryBaseTransaction): Unit = nodeView.mempool.put(tx) match {
     case Success(newPool) =>
       log.info(s"Unconfirmed transaction $tx added to the memory pool")
-      val newVault: VL = nodeView.wallet.scanOffchain(tx)
+      val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx)
     case Failure(e) =>
