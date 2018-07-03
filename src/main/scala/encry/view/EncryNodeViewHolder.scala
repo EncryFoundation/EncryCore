@@ -102,8 +102,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   def otherReceive: Receive = {
-    case a: Any =>
-      log.error("Strange input: " + a)
+    case a: Any => log.error("Strange input: " + a)
   }
 
   def key(id: ModifierId): scala.collection.mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
