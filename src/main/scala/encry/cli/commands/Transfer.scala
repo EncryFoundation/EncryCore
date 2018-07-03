@@ -20,7 +20,7 @@ import encry.utils.NetworkTimeProvider
 import scala.concurrent.Future
 import scala.util.Try
 
-object Transfer extends Command {
+object Transfer extends ViewCommand {
 
   /**
     * Command "wallet transfer -addr=<addr[String]> -fee=<fee[Num]> -amount=<amount[Num]>"
@@ -35,28 +35,6 @@ object Transfer extends Command {
       args.requireArg[Ast.Num]("amount").i,
       timeProvider.time()
     )).mapTo[Option[Response]]
-
-    (nodeViewHolder ?
-      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
-        Try {
-          lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
-          val secret: PrivateKey25519 = view.vault.keyManager.keys.head
-          val recipient: Address = Address @@ args.requireArg[Ast.Str]("addr").s
-          val fee: Long = args.requireArg[Ast.Num]("fee").i
-          val amount: Long = args.requireArg[Ast.Num]("amount").i
-          val timestamp: Time = timeProvider.time()
-          val boxes: IndexedSeq[AssetBox] = view.vault.walletStorage.allBoxes.filter(_.isInstanceOf[AssetBox])
-            .map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) { case (seq, box) =>
-            if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
-          }.toIndexedSeq
-
-          val tx: EncryTransaction = TransactionFactory.defaultPaymentTransactionScratch(secret, fee, timestamp, boxes, recipient, amount)
-
-          nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
-
-          tx
-        }.toOption.map(tx => Some(Response(tx.toString))).getOrElse(Some(Response("Operation failed. Malformed data.")))
-      }).mapTo[Option[Response]]
   }
 
   case class Request(recipient: Address, fee: Long, amount: Long, timestamp: Time)
