@@ -1,5 +1,6 @@
 package encry.network
 
+import encry.EncryApp._
 import akka.persistence.{PersistentActor, SnapshotOffer}
 import encry.ModifierTypeId
 import encry.modifiers.history.block.EncryBlock
@@ -8,10 +9,11 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder.{Mods, RequestedModifiers}
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.utils.ScorexLogging
+import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{LocallyGeneratedModifier, ModifiersFromRemote}
+import scala.concurrent.duration._
 
-class ModifiersHolder extends PersistentActor with ScorexLogging {
+class ModifiersHolder extends PersistentActor with Logging {
 
   var headers: Seq[EncryBlockHeader] = Seq.empty
   var payloads: Seq[EncryBlockPayload] = Seq.empty
@@ -19,10 +21,12 @@ class ModifiersHolder extends PersistentActor with ScorexLogging {
 
   var modsFromRemote: Mods = Mods(Map.empty, 0)
 
+  context.system.scheduler.schedule(10.second, 10.second)(logger.info(s"ModifiersHolder: ${headers.size} - ${payloads.size} - ${blocks.size}"))
+
   override def preStart(): Unit = logger.info(s"Started fucking actor")
 
   override def receiveRecover: Receive = {
-    case mods: ModifiersFromRemote => updateModsFromRemote(mods: ModifiersFromRemote)
+    //case mods: ModifiersFromRemote => updateModsFromRemote(mods: ModifiersFromRemote)
     case SnapshotOffer(_, snapshot: Mods) => modsFromRemote = snapshot
   }
 
@@ -38,12 +42,12 @@ class ModifiersHolder extends PersistentActor with ScorexLogging {
 
   override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
 
+  /*
   def updateModsFromRemote(newMods: ModifiersFromRemote): Unit = {
     modsFromRemote = Mods(modsFromRemote.numberOfModsByPeerAndModType + ((newMods.source, newMods.modifierTypeId) -> newMods.remoteObjects.size), modsFromRemote.numberOfPacksFromRemotes + 1)
   }
-
+*/
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
-
     case header: EncryBlockHeader => headers = headers :+ header
     case payload: EncryBlockPayload => payloads = payloads :+ payload
     case block: EncryBlock => blocks = blocks :+ block
