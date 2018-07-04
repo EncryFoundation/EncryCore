@@ -27,7 +27,7 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
     val topHeight: Int = Ints.fromByteArray(store.get(TopNodeHeight).get.data)
     top -> topHeight
   }.recoverWith { case e =>
-    log.warn(s"Failed to recover tree for digest ${Algos.encode(version)}:", e)
+    log.info(s"Failed to recover tree for digest ${Algos.encode(version)}:", e)
     Failure(e)
   }
 
@@ -48,7 +48,7 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
       s" ${toRemove.size} elements to remove")
     store.update(digestWrapper, toRemoveMerged, toUpdateWithWrapped)
   }.recoverWith { case e =>
-    log.warn("Failed to update tree", e)
+    log.info("Failed to update tree", e)
     Failure(e)
   }
 

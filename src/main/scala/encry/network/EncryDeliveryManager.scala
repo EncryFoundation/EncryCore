@@ -51,14 +51,9 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
       networkController ! SendToNetwork(Message(syncInfoSpec, Right(syncInfo), None), SendToPeers(peers))
   }
 
-  // todo: Do we need to keep track of ModifierTypeIds? Maybe we could ignore them?
-
-  // when a remote peer is asked a modifier, we add the expected data to `expecting`
-  // when a remote peer delivers expected data, it is removed from `expecting` and added to `delivered`.
-  // when a remote peer delivers unexpected data, it is added to `deliveredSpam`.
-  var delivered: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty[ModifierIdAsKey, ConnectedPeer]
-  var deliveredSpam: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty[ModifierIdAsKey, ConnectedPeer]
-  var peers: Map[ModifierIdAsKey, Seq[ConnectedPeer]] = Map.empty[ModifierIdAsKey, Seq[ConnectedPeer]]
+  var delivered: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty
+  var deliveredSpam: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty
+  var peers: Map[ModifierIdAsKey, Seq[ConnectedPeer]] = Map.empty
 
   var cancellables: Map[ModifierIdAsKey, (ConnectedPeer, (Cancellable, Int))] = Map.empty[ModifierIdAsKey, (ConnectedPeer, (Cancellable, Int))]
 
@@ -81,7 +76,6 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     }
   }
 
-  // stops expecting, and expects again if the number of checks does not exceed the maximum
   def reexpect(cp: ConnectedPeer, mtid: ModifierTypeId, mid: ModifierId): Unit = tryWithLogging {
 
     val midAsKey = key(mid)
@@ -118,7 +112,7 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
   def sendExtension(remote: ConnectedPeer,
                     status: HistoryComparisonResult,
                     extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit = extOpt match {
-    case None => log.warn(s"extOpt is empty for: $remote. Its status is: $status.")
+    case None => log.info(s"extOpt is empty for: $remote. Its status is: $status.")
     case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
       case (mid, mods) => networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
     }
@@ -127,7 +121,7 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
   protected def tryWithLogging(fn: => Unit): Unit = {
     Try(fn).recoverWith {
       case e =>
-        log.warn("Unexpected error", e)
+        log.info("Unexpected error", e)
         Failure(e)
     }
   }
@@ -137,8 +131,8 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       statusTracker.updateStatus(remote, status)
       status match {
-        case Unknown => log.warn("Peer status is still unknown")
-        case Nonsense => log.warn("Got nonsense")
+        case Unknown => log.info("Peer status is still unknown")
+        case Nonsense => log.info("Got nonsense")
         case Younger => sendExtension(remote, status, extOpt)
         case _ =>
       }
@@ -175,7 +169,7 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
       requestDownload(modifierTypeId, Seq(modifierId))
     case SendLocalSyncInfo =>
-      if (statusTracker.elapsedTimeSinceLastSync() < (networkSettings.syncInterval.toMillis / 2)) log.debug("Trying to send sync info too often")
+      if (statusTracker.elapsedTimeSinceLastSync() < (networkSettings.syncInterval.toMillis / 2)) log.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] => historyReaderOpt = Some(reader)
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
@@ -186,9 +180,7 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
   private val ToDownloadRetryInterval: FiniteDuration = 10.seconds
   private val ToDownloadLifetime: FiniteDuration = 1.hour
 
-  // Modifiers we need to download, but do not know peer that have this modifier
-  // TODO we may try to guess this peers using delivered map
-  val expectingFromRandom: mutable.Map[ModifierIdAsKey, ToDownloadStatus] = mutable.Map[ModifierIdAsKey, ToDownloadStatus]()
+  var expectingFromRandom: Map[ModifierIdAsKey, ToDownloadStatus] = Map.empty
 
   def isExpectingFromRandom: Boolean = expectingFromRandom.nonEmpty
 
@@ -207,7 +199,7 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     val newValue: ToDownloadStatus = expectingFromRandom.get(key(modifierId))
       .map(_.copy(lastTry = downloadRequestTime))
       .getOrElse(ToDownloadStatus(modifierTypeId, downloadRequestTime, downloadRequestTime))
-    expectingFromRandom.put(key(modifierId), newValue)
+    expectingFromRandom += key(modifierId) -> newValue
   }
 
   /**
@@ -215,7 +207,7 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     */
   def removeOutdatedExpectingFromRandom(): Unit = expectingFromRandom
     .filter { case (_, status) => status.firstViewed < timeProvider.time() - ToDownloadLifetime.toMillis }
-    .foreach { case (key, _) => expectingFromRandom.remove(key) }
+    .foreach { case (key, _) => expectingFromRandom -= key }
 
   /**
     * Id's that are already in queue to download but are not downloaded yet and were not requested recently
@@ -239,13 +231,13 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     */
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = tryWithLogging {
     if (expectingFromRandom.contains(key(mid))) {
-      expectingFromRandom.remove(key(mid))
+      expectingFromRandom -= key(mid)
       delivered = delivered - key(mid) + (key(mid) -> cp)
     } else if (isExpecting(mtid, mid, cp)) {
       delivered = delivered - key(mid) + (key(mid) -> cp)
       cancellables.get(key(mid)).foreach(_._2._1.cancel())
-      cancellables = cancellables - key(mid)
-      peers = peers - key(mid)
+      cancellables -= key(mid)
+      peers -= key(mid)
     }
     else deliveredSpam = deliveredSpam - key(mid) + (key(mid) -> cp)
   }
