@@ -3,7 +3,6 @@ package encry.network
 import akka.actor.{Actor, Cancellable}
 import encry.EncryApp.{networkController, nodeViewHolder, settings, timeProvider}
 import encry.consensus.History.{HistoryComparisonResult, Nonsense, Unknown, Younger}
-import encry.network.EncryNodeViewSynchronizer.CheckModifiersToDownload
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToNetwork}
 import encry.network.PeerConnectionHandler._
@@ -12,7 +11,6 @@ import encry.network.message.{InvSpec, Message, ModifiersSpec, RequestModifierSp
 import encry.settings.NetworkSettings
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.utils.EncryLogging
-import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
@@ -171,19 +169,7 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
   }
 
-  def isExpectingFromRandom: Boolean = expectingFromRandom.nonEmpty
-
-  def isExpecting: Boolean = cancellables.nonEmpty
-
   def expectingFromRandomQueue: Iterable[ModifierId] = ModifierId @@ expectingFromRandom.keys.map(_.array)
-
-  def expectFromRandom(modifierTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
-    val downloadRequestTime: Time = timeProvider.time()
-    val newValue: ToDownloadStatus = expectingFromRandom.get(key(modifierId))
-      .map(_.copy(lastTry = downloadRequestTime))
-      .getOrElse(ToDownloadStatus(modifierTypeId, downloadRequestTime, downloadRequestTime))
-    expectingFromRandom += key(modifierId) -> newValue
-  }
 
   def removeOutdatedExpectingFromRandom(): Unit = expectingFromRandom
     .filter { case (_, status) => status.firstViewed < timeProvider.time() - networkSettings.toDownloadLifetime.toMillis }

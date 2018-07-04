@@ -118,9 +118,9 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
 
 object EncryNodeViewSynchronizer {
 
-  case object CheckModifiersToDownload
-
   object ReceivableMessages {
+
+    case object CheckModifiersToDownload
 
     case object SendLocalSyncInfo
 
