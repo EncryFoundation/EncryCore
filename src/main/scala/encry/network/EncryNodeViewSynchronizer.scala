@@ -33,19 +33,10 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
   var historyReaderOpt: Option[EncryHistory] = None
   var mempoolReaderOpt: Option[EncryMempool] = None
   val deliveryManager: ActorRef =
-    context.actorOf(Props(classOf[EncryDeliveryManager], timeProvider, syncInfoSpec), "deliverManager")
+    context.actorOf(Props(classOf[EncryDeliveryManager], syncInfoSpec), "deliverManager")
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
     networkController ! SendToNetwork(Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None), Broadcast)
-
-  def sendExtension(remote: ConnectedPeer,
-                    status: HistoryComparisonResult,
-                    extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit = extOpt match {
-    case None => logWarn(s"extOpt is empty for: $remote. Its status is: $status.")
-    case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
-      case (mid, mods) => networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
-    }
-  }
 
   override def receive: Receive = viewHolderEvents orElse {
     case SendLocalSyncInfo => deliveryManager ! SendLocalSyncInfo

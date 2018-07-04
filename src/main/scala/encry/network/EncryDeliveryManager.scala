@@ -1,7 +1,7 @@
 package encry.network
 
 import akka.actor.{Actor, Cancellable}
-import encry.EncryApp.{networkController, nodeViewHolder, settings}
+import encry.EncryApp.{networkController, nodeViewHolder, settings, timeProvider}
 import encry.consensus.History.{HistoryComparisonResult, Nonsense, Unknown, Younger}
 import encry.network.EncryNodeViewSynchronizer.CheckModifiersToDownload
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
@@ -11,8 +11,8 @@ import encry.network.message.BasicMsgDataTypes.ModifiersData
 import encry.network.message.{InvSpec, Message, ModifiersSpec, RequestModifierSpec}
 import encry.settings.NetworkSettings
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
+import encry.utils.EncryLogging
 import encry.utils.NetworkTime.Time
-import encry.utils.{EncryLogging, NetworkTimeProvider}
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
@@ -24,8 +24,7 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Try}
 
-class EncryDeliveryManager(timeProvider: NetworkTimeProvider,
-                           syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with EncryLogging {
+class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with EncryLogging {
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
