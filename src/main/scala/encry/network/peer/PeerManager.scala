@@ -4,16 +4,17 @@ import java.net.InetSocketAddress
 
 import akka.actor.Actor
 import encry.EncryApp._
-import PeerManager.ReceivableMessages._
-import encry.network.{Handshake, SendingStrategy}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
-import encry.network.PeerConnectionHandler._
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
-import encry.utils.ScorexLogging
+import encry.network.PeerConnectionHandler._
+import encry.network.peer.PeerManager.ReceivableMessages._
+import encry.network.{Handshake, SendingStrategy}
+import encry.utils.Logging
+
 import scala.util.Random
 
-class PeerManager extends Actor with ScorexLogging {
+class PeerManager extends Actor with Logging {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
 
@@ -67,14 +68,14 @@ class PeerManager extends Actor with ScorexLogging {
       connectingPeers -= remote
       nodeViewSynchronizer ! DisconnectedPeer(remote)
     case CheckPeers =>
-      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
+      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections)
         randomPeer.foreach { address =>
           if (!connectedPeers.exists(_._1 == address) &&
             !connectingPeers.exists(_.getHostName == address.getHostName)) {
             sender() ! ConnectTo(address)
           }
         }
-      }
+
   }
 }
 

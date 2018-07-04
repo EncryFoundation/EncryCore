@@ -8,7 +8,7 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.{Block, EncryBlock}
 import encry.settings.Constants._
 import encry.settings.{Algos, Constants, NodeSettings}
-import encry.utils.{NetworkTimeProvider, ScorexLogging}
+import encry.utils.{Logging, NetworkTimeProvider}
 import encry.validation.{ModifierValidator, ValidationResult}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
@@ -19,7 +19,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
 
-trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
+trait BlockHeaderProcessor extends DownloadProcessor with Logging {
 
   protected val nodeSettings: NodeSettings
 
@@ -92,7 +92,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with ScorexLogging {
         val toProcess: Seq[EncryBlockHeader] = if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
         ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
       case None =>
-        log.error("Should always have best header after header application")
+        logError("Should always have best header after header application")
         EncryApp.forceStopApplication()
     }
   }
