@@ -46,30 +46,25 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
       processErrors(AwaitingHandshake)
 
   def processErrors(stateName: CommunicationState): Receive = {
-    case CommandFailed(w: Write) =>
-      logWarn(s"Write failed :$w " + remote + s" in state $stateName")
+    case CommandFailed(w: Write) => logWarn(s"Write failed :$w " + remote + s" in state $stateName")
       connection ! Close
       connection ! ResumeReading
       connection ! ResumeWriting
-    case cc: ConnectionClosed =>
+    case cc: ConnectionClosed => log.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
       peerManager ! Disconnected(remote)
-      log.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
       networkController ! ConnectTo(remote)
       context stop self
-    case CloseConnection =>
-      log.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")
+    case CloseConnection => log.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")
       connection ! Close
-    case CommandFailed(cmd: Tcp.Command) =>
-      log.info("Failed to execute command : " + cmd + s" in state $stateName")
+    case CommandFailed(cmd: Tcp.Command) => log.info("Failed to execute command : " + cmd + s" in state $stateName")
       connection ! ResumeReading
   }
 
   def startInteraction: Receive = {
-    case StartInteraction =>
+    case StartInteraction => log.info(s"Handshake sent to $remote")
       val hb: Array[Byte] = Handshake(Version(settings.appVersion), settings.nodeName,
         ownSocketAddress, timeProvider.time()).bytes
       connection ! Tcp.Write(ByteString(hb))
-      log.info(s"Handshake sent to $remote")
       handshakeSent = true
       if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
   }
@@ -77,20 +72,17 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   def receivedData: Receive = {
     case Received(data) =>
       HandshakeSerializer.parseBytes(data.toArray) match {
-        case Success(handshake) =>
+        case Success(handshake) => log.info(s"Got a Handshake from $remote")
           receivedHandshake = Some(handshake)
-          log.info(s"Got a Handshake from $remote")
           connection ! ResumeReading
           if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
-        case Failure(t) =>
-          log.info(s"Error during parsing a handshake", t)
+        case Failure(t) => log.info(s"Error during parsing a handshake", t)
           self ! CloseConnection
       }
   }
 
   def handshakeTimeout: Receive = {
-    case HandshakeTimeout =>
-      log.info(s"Handshake timeout with $remote, going to drop the connection")
+    case HandshakeTimeout => log.info(s"Handshake timeout with $remote, going to drop the connection")
       self ! CloseConnection
   }
 
@@ -113,8 +105,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
       }
 
       settings.addedMaxDelay match {
-        case Some(delay) =>
-          context.system.scheduler.scheduleOnce(Random.nextInt(delay.toMillis.toInt).millis)(sendOutMessage())
+        case Some(delay) => context.system.scheduler.scheduleOnce(Random.nextInt(delay.toMillis.toInt).millis)(sendOutMessage())
         case None => sendOutMessage()
       }
   }
@@ -125,12 +116,10 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
       chunksBuffer = t._2
       t._1.find { packet =>
         messagesHandler.parseBytes(packet.toByteBuffer, selfPeer) match {
-          case Success(message) =>
-            log.info("Received message " + message.spec + " from " + remote)
+          case Success(message) => log.info("Received message " + message.spec + " from " + remote)
             networkController ! message
             false
-          case Failure(e) =>
-            log.info(s"Corrupted data from: " + remote, e)
+          case Failure(e) => log.info(s"Corrupted data from: " + remote, e)
             true
         }
       }
@@ -168,9 +157,8 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
         val len: Int = current.iterator.getInt(ByteOrder.BIG_ENDIAN)
         if (current.length < len + headerSize) (packets.reverse, current)
         else {
-          val rem: ByteString = current drop headerSize // Pop off header
-          val (front: ByteString, back: ByteString) = rem.splitAt(len) // Front contains a completed packet, back contains the remaining data
-          // Pull of the packet and recurse to see if there is another packet available
+          val rem: ByteString = current drop headerSize
+          val (front: ByteString, back: ByteString) = rem.splitAt(len)
           multiPacket(front :: packets, back)
         }
       }

@@ -25,19 +25,26 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Try}
 
 class EncryDeliveryManager(networkSettings: NetworkSettings,
-                           nvsRef: ActorRef, timeProvider:
-                           NetworkTimeProvider,
+                           nvsRef: ActorRef,
+                           timeProvider: NetworkTimeProvider,
                            syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with EncryLogging {
 
   protected type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
-  protected def key(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
+  case class ToDownloadStatus(tp: ModifierTypeId, firstViewed: Long, lastTry: Long)
 
   var historyReaderOpt: Option[EncryHistory] = None
   var mempoolReaderOpt: Option[EncryMempool] = None
   val invSpec: InvSpec = new InvSpec(networkSettings.maxInvObjects)
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(networkSettings.maxInvObjects)
   val statusTracker: SyncTracker = SyncTracker(self, context, networkSettings, timeProvider)
+  var delivered: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty
+  var deliveredSpam: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty
+  var peers: Map[ModifierIdAsKey, Seq[ConnectedPeer]] = Map.empty
+  var cancellables: Map[ModifierIdAsKey, (ConnectedPeer, (Cancellable, Int))] = Map.empty
+  var expectingFromRandom: Map[ModifierIdAsKey, ToDownloadStatus] = Map.empty
+
+  protected def key(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
   override def preStart(): Unit = {
     statusTracker.scheduleSendSyncInfo()
@@ -50,16 +57,10 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
       networkController ! SendToNetwork(Message(syncInfoSpec, Right(syncInfo), None), SendToPeers(peers))
   }
 
-  var delivered: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty
-  var deliveredSpam: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty
-  var peers: Map[ModifierIdAsKey, Seq[ConnectedPeer]] = Map.empty
-
-  var cancellables: Map[ModifierIdAsKey, (ConnectedPeer, (Cancellable, Int))] = Map.empty[ModifierIdAsKey, (ConnectedPeer, (Cancellable, Int))]
-
   def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mids: Seq[ModifierId]): Unit = tryWithLogging {
     val notRequestedIds: Seq[ModifierId] = mids.foldLeft(Seq[ModifierId]()) {
       case (notRequested, modId) =>
-        val modifierKey = key(modId)
+        val modifierKey: ModifierIdAsKey = key(modId)
         if (historyReaderOpt.forall(history => !history.contains(modId))) {
           if (!cancellables.contains(modifierKey)) notRequested :+ modId
           else {
@@ -148,17 +149,15 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
         val oldIds: Seq[(ModifierTypeId, ModifierId)] = idsExpectingFromRandomToRetry()
         (newIds ++ oldIds).groupBy(_._1).foreach(ids => requestDownload(ids._1, ids._2.map(_._2)))
       }
-    case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
-      if (modifierIds.nonEmpty) expect(peer, modifierTypeId, modifierIds)
+    case RequestFromLocal(peer, modifierTypeId, modifierIds) => if (modifierIds.nonEmpty) expect(peer, modifierTypeId, modifierIds)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       val typeId: ModifierTypeId = data._1
       val modifiers: Map[ModifierId, Array[Byte]] = data._2
-      if (settings.node.sendStat) context.actorSelection("akka://encry/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
-      log.info(s"Got modifiers of type $typeId from remote connected peer: $remote")
-      log.trace(s"Received modifier ids ${data._2.keySet.map(Base58.encode).mkString(",")}")
-      for ((id, _) <- modifiers) receive(typeId, id, remote)
       val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
         modifiers partition { case (id, _) => isSpam(id) }
+      if (settings.node.sendStat) context.actorSelection("akka://encry/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
+      log.info(s"Got modifiers of type $typeId from remote connected peer: $remote")
+      for ((id, _) <- modifiers) receive(typeId, id, remote)
       if (spam.nonEmpty) {
         log.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
           s": ${spam.keys.map(Base58.encode)}")
@@ -173,10 +172,6 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] => historyReaderOpt = Some(reader)
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
   }
-
-  case class ToDownloadStatus(tp: ModifierTypeId, firstViewed: Long, lastTry: Long)
-
-  var expectingFromRandom: Map[ModifierIdAsKey, ToDownloadStatus] = Map.empty
 
   def isExpectingFromRandom: Boolean = expectingFromRandom.nonEmpty
 
