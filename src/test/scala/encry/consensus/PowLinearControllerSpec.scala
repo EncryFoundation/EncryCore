@@ -9,6 +9,7 @@ import scala.collection.immutable
 class PowLinearControllerSpec extends PropSpec with Matchers {
 
   property("getHeightsForRetargetingAt()") {
+
     val retargetingAtHeight: Int = 1001
 
     val expected: immutable.Seq[Int] = (0 to Constants.Chain.RetargetingEpochsQty).reverse

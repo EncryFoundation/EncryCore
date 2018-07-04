@@ -9,12 +9,12 @@ import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
 import encry.EncryApp
-import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle}
 import encry.EncryApp._
+import encry.network.NetworkController.ReceivableMessages.ConnectTo
+import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle, _}
 import encry.network.message.MessageHandler
 import encry.settings.NetworkSettings
-import PeerConnectionHandler._
-import encry.utils.EncryLogging
+import encry.utils.Logging
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
@@ -24,7 +24,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
                             connection: ActorRef,
                             direction: ConnectionType,
                             ownSocketAddress: Option[InetSocketAddress],
-                            remote: InetSocketAddress) extends Actor with EncryLogging {
+                            remote: InetSocketAddress) extends Actor with Logging {
 
   import PeerConnectionHandler.ReceivableMessages._
   import encry.network.peer.PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
@@ -52,8 +52,9 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
       connection ! ResumeReading
       connection ! ResumeWriting
     case cc: ConnectionClosed =>
-      peerManager ! Disconnected(remote)
       log.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
+      peerManager ! Disconnected(remote)
+      networkController ! ConnectTo(remote)
       context stop self
     case CloseConnection =>
       log.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")
@@ -65,10 +66,10 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   def startInteraction: Receive = {
     case StartInteraction =>
+      log.info(s"Handshake sent to $remote")
       val hb: Array[Byte] = Handshake(Version(settings.appVersion), settings.nodeName,
         ownSocketAddress, timeProvider.time()).bytes
       connection ! Tcp.Write(ByteString(hb))
-      log.info(s"Handshake sent to $remote")
       handshakeSent = true
       if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
   }
@@ -77,8 +78,8 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
     case Received(data) =>
       HandshakeSerializer.parseBytes(data.toArray) match {
         case Success(handshake) =>
-          receivedHandshake = Some(handshake)
           log.info(s"Got a Handshake from $remote")
+          receivedHandshake = Some(handshake)
           connection ! ResumeReading
           if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
         case Failure(t) =>
@@ -112,8 +113,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
       }
 
       settings.addedMaxDelay match {
-        case Some(delay) =>
-          context.system.scheduler.scheduleOnce(Random.nextInt(delay.toMillis.toInt).millis)(sendOutMessage())
+        case Some(delay) => context.system.scheduler.scheduleOnce(Random.nextInt(delay.toMillis.toInt).millis)(sendOutMessage())
         case None => sendOutMessage()
       }
   }
@@ -167,9 +167,8 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
         val len: Int = current.iterator.getInt(ByteOrder.BIG_ENDIAN)
         if (current.length < len + headerSize) (packets.reverse, current)
         else {
-          val rem: ByteString = current drop headerSize // Pop off header
-          val (front: ByteString, back: ByteString) = rem.splitAt(len) // Front contains a completed packet, back contains the remaining data
-          // Pull of the packet and recurse to see if there is another packet available
+          val rem: ByteString = current drop headerSize
+          val (front: ByteString, back: ByteString) = rem.splitAt(len)
           multiPacket(front :: packets, back)
         }
       }
@@ -219,8 +218,6 @@ object PeerConnectionHandler {
     case object HandshakeTimeout
 
     case object CloseConnection
-
-
   }
 
   def props(messagesHandler: MessageHandler, connection: ActorRef, direction: ConnectionType,

@@ -10,11 +10,11 @@ import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, 
 import encry.network.PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages._
 import encry.network.{Handshake, SendingStrategy}
-import encry.utils.EncryLogging
+import encry.utils.Logging
 
 import scala.util.Random
 
-class PeerManager extends Actor with EncryLogging {
+class PeerManager extends Actor with Logging {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
 
@@ -68,14 +68,14 @@ class PeerManager extends Actor with EncryLogging {
       connectingPeers -= remote
       nodeViewSynchronizer ! DisconnectedPeer(remote)
     case CheckPeers =>
-      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
+      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections)
         randomPeer.foreach { address =>
           if (!connectedPeers.exists(_._1 == address) &&
             !connectingPeers.exists(_.getHostName == address.getHostName)) {
             sender() ! ConnectTo(address)
           }
         }
-      }
+
   }
 }
 

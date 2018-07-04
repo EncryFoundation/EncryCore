@@ -9,7 +9,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.settings.{Algos, Constants, NodeSettings}
-import encry.utils.EncryLogging
+import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.crypto.authds.ADDigest
 
@@ -22,7 +22,7 @@ class DigestState protected(override val version: VersionTag,
                             settings: NodeSettings)
   extends EncryState[DigestState]
     with ModifierValidation[EncryPersistentModifier]
-    with EncryLogging {
+    with Logging {
 
   stateStore.lastVersionID
     .foreach(id => assert(version sameElements id.data, "`version` should always be equal to store.lastVersionID"))

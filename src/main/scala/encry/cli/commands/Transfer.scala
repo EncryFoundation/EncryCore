@@ -9,13 +9,13 @@ import encry.crypto.PrivateKey25519
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.settings.EncryAppSettings
+import encry.utils.NetworkTime.Time
+import encry.utils.NetworkTimeProvider
+import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
-import encry.view.EncryNodeViewHolder.ReceivableMessages._
-import encry.utils.NetworkTime.Time
-import encry.utils.NetworkTimeProvider
 
 import scala.concurrent.Future
 import scala.util.Try
