@@ -1,6 +1,7 @@
 package encry
 
-import akka.actor.SupervisorStrategy.Restart
+import java.net.InetSocketAddress
+import akka.actor.SupervisorStrategy.Escalate
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route

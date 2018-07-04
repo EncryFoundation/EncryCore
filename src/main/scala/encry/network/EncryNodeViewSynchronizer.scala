@@ -55,7 +55,6 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
       deliveryManager ! ChangedHistory(reader)
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] =>
       mempoolReaderOpt = Some(reader)
-      deliveryManager ! ChangedMempool(reader)
     case SendLocalSyncInfo => deliveryManager ! SendLocalSyncInfo
     case OtherNodeSyncingStatus(remote, status, extOpt) => deliveryManager ! OtherNodeSyncingStatus(remote, status, extOpt)
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
