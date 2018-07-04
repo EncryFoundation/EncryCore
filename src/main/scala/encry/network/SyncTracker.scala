@@ -7,20 +7,19 @@ import encry.consensus.History
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
 import encry.network.PeerConnectionHandler._
 import encry.settings.NetworkSettings
-import encry.utils.{NetworkTimeProvider, ScorexLogging}
+import encry.utils.{Logging, NetworkTimeProvider}
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.{FiniteDuration, _}
 
-
 /**
   * SyncTracker caches the peers' statuses (i.e. whether they are ahead or behind this node)
   */
-case class SyncTracker(nvsRef: ActorRef,
-                  context: ActorContext,
-                  networkSettings: NetworkSettings,
-                  timeProvider: NetworkTimeProvider) extends ScorexLogging {
+case class SyncTracker(deliveryManager: ActorRef,
+                       context: ActorContext,
+                       networkSettings: NetworkSettings,
+                       timeProvider: NetworkTimeProvider) extends Logging {
 
   import History._
   import encry.utils.NetworkTime.Time
@@ -36,7 +35,7 @@ case class SyncTracker(nvsRef: ActorRef,
 
   def scheduleSendSyncInfo(): Unit = {
     if (schedule.isDefined) schedule.get.cancel()
-    schedule = Some(context.system.scheduler.schedule(2.seconds, minInterval())(nvsRef ! SendLocalSyncInfo))
+    schedule = Some(context.system.scheduler.schedule(networkSettings.modifierDeliverTimeCheck, minInterval())(deliveryManager ! SendLocalSyncInfo))
   }
 
   def maxInterval(): FiniteDuration = if (stableSyncRegime) networkSettings.syncStatusRefreshStable else networkSettings.syncStatusRefresh
@@ -61,11 +60,11 @@ case class SyncTracker(nvsRef: ActorRef,
   def clearStatus(remote: InetSocketAddress): Unit = {
     statuses.find(_._1.socketAddress == remote) match {
       case Some((peer, _)) => statuses -= peer
-      case None => log.warn(s"Trying to clear status for $remote, but it is not found")
+      case None => logWarn(s"Trying to clear status for $remote, but it is not found")
     }
     lastSyncSentTime.find(_._1.socketAddress == remote) match {
       case Some((peer, _)) => statuses -= peer
-      case None => log.warn(s"Trying to clear last sync time for $remote, but it is not found")
+      case None => logWarn(s"Trying to clear last sync time for $remote, but it is not found")
     }
   }
 

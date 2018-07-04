@@ -6,7 +6,7 @@ import java.security.{AlgorithmParameters, SecureRandom}
 import com.google.common.primitives.{Ints, Longs}
 import encry.crypto.PrivateKey25519
 import encry.settings.{Algos, EncryAppSettings, KeyManagerSettings}
-import encry.utils.ScorexLogging
+import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import javax.crypto._
 import javax.crypto.spec.{IvParameterSpec, PBEKeySpec, SecretKeySpec}
@@ -27,7 +27,7 @@ import scala.util.Try
 
 case class KeyManager(store: LSMStore,
                       storageSettings: KeyManagerSettings,
-                      passwdBytes: Option[Array[Byte]]) extends ScorexLogging {
+                      passwdBytes: Option[Array[Byte]]) extends Logging {
   /**
     * Generate private key from some string bytes
     * @param seed
@@ -228,7 +228,7 @@ case class KeyManager(store: LSMStore,
   }
 }
 
-object KeyManager extends ScorexLogging {
+object KeyManager extends Logging {
 
   val lockFlag = Array(0: Byte)
 

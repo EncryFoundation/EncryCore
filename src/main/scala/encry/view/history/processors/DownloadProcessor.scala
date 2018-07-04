@@ -6,13 +6,13 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.{Constants, NodeSettings}
-import encry.utils.{NetworkTimeProvider, ScorexLogging}
+import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.history.Height
 import encry.{ModifierId, ModifierTypeId}
 
 import scala.annotation.tailrec
 
-trait DownloadProcessor extends ScorexLogging {
+trait DownloadProcessor extends Logging {
 
   protected val nodeSettings: NodeSettings
 
