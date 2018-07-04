@@ -2,7 +2,7 @@ package encry.network
 
 import akka.actor.{Actor, Cancellable}
 import encry.EncryApp.{networkController, nodeViewHolder, settings, timeProvider}
-import encry.consensus.History.{HistoryComparisonResult, Nonsense, Unknown, Younger}
+import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToNetwork}
 import encry.network.PeerConnectionHandler._
@@ -49,7 +49,6 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
       statusTracker.updateStatus(remote, status)
       status match {
         case Unknown => log.info("Peer status is still unknown")
-        case Nonsense => log.info("Got nonsense")
         case Younger => sendExtension(remote, status, extOpt)
         case _ =>
       }

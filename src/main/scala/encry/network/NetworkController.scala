@@ -28,8 +28,8 @@ class NetworkController extends Actor with Logging {
   val tcpManager: ActorRef = IO(Tcp)
   implicit val timeout: Timeout = Timeout(5 seconds)
   val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
-  val messageHandlers: mutable.Map[Seq[MessageCode], ActorRef] = mutable.Map[Seq[Message.MessageCode], ActorRef]()
-  val outgoing: mutable.Set[InetSocketAddress] = mutable.Set[InetSocketAddress]()
+  var messageHandlers: Map[Seq[MessageCode], ActorRef] = Map.empty
+  var outgoing: Set[InetSocketAddress] = Set.empty
   lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse {
     if (networkSettings.upnpEnabled) upnp.externalAddress.map(a => new InetSocketAddress(a, networkSettings.bindAddress.getPort))
     else None

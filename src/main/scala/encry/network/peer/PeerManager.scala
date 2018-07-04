@@ -1,7 +1,6 @@
 package encry.network.peer
 
 import java.net.InetSocketAddress
-
 import akka.actor.Actor
 import encry.EncryApp._
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
@@ -11,13 +10,11 @@ import encry.network.PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages._
 import encry.network.{Handshake, SendingStrategy}
 import encry.utils.Logging
-
 import scala.util.Random
 
 class PeerManager extends Actor with Logging {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
-
   var connectingPeers: Set[InetSocketAddress] = Set.empty
 
   if (PeerDatabase.isEmpty) settings.network.knownPeers.foreach { address =>
@@ -67,6 +64,7 @@ class PeerManager extends Actor with Logging {
         if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
         else None
       }
+
       if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
         randomPeer.foreach { address =>
           if (!connectedPeers.exists(_._1 == address) &&
@@ -74,7 +72,7 @@ class PeerManager extends Actor with Logging {
             sender() ! ConnectTo(address)
           }
         }
-
+      }
   }
 }
 
