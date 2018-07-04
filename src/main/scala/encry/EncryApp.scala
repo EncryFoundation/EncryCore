@@ -1,8 +1,7 @@
 package encry
 
 import java.net.InetSocketAddress
-
-import akka.actor.SupervisorStrategy.{Escalate, Restart}
+import akka.actor.SupervisorStrategy.Escalate
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
@@ -20,15 +19,14 @@ import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, NetworkController, UPnP}
 import encry.settings.{Algos, EncryAppSettings}
 import encry.stats.StatsSender
-import encry.utils.{EncryLogging, NetworkTimeProvider}
+import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
-
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.io.Source
 
-object EncryApp extends App with EncryLogging {
+object EncryApp extends App with Logging {
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read
 

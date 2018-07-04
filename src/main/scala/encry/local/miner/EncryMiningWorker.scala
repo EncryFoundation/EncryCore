@@ -5,9 +5,9 @@ import encry.EncryApp.miner
 import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
 import encry.local.miner.EncryMiner.MinedBlock
 import encry.local.miner.EncryMiningWorker.{DropChallenge, MineBlock, NextChallenge}
-import encry.utils.EncryLogging
+import encry.utils.Logging
 
-class EncryMiningWorker(myNumber: Int, numberOfWorkers: Int) extends Actor with EncryLogging {
+class EncryMiningWorker(myNumber: Int, numberOfWorkers: Int) extends Actor with Logging {
 
   override def receive: Receive = miningPaused
 

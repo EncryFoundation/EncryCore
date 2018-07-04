@@ -20,25 +20,11 @@ case class UtilsApiRoute(override val settings: RESTApiSettings)(implicit val co
     seedRoute ~ length ~ hashBlake2b
   }
 
-  def seedRoute: Route = path("seed") {
-    get {
-      complete(seed(SeedSize))
-    }
-  }
+  def seedRoute: Route = (path("seed") & get) (complete(seed(SeedSize)))
 
-  def length: Route = path("seed" / IntNumber) { length =>
-    get {
-      complete(seed(length))
-    }
-  }
+  def length: Route = (path("seed" / IntNumber) & get) (length => complete(seed(length)))
 
-  def hashBlake2b: Route = {
-    path("hash" / "blake2b") {
-      post {
-        entity(as[String]) { message =>
-          complete(Algos.encode(Blake2b256(message)))
-        }
-      }
-    }
+  def hashBlake2b: Route = (path("hash" / "blake2b") & post & entity(as[String])) { message =>
+    complete(Algos.encode(Blake2b256(message)))
   }
 }

@@ -5,7 +5,6 @@ import encry.settings.Algos
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.crypto.authds.avltree.batch.VersionedIODBAVLStorage.{InternalNodePrefix, LeafPrefix}
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue, Balance}
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash
 import scorex.crypto.hash.{CryptographicHash, Digest}
 import scorex.utils.ScryptoLogging
@@ -28,7 +27,7 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
     val topHeight: Int = Ints.fromByteArray(store.get(TopNodeHeight).get.data)
     top -> topHeight
   }.recoverWith { case e =>
-    log.warn(s"Failed to recover tree for digest ${Algos.encode(version)}:", e)
+    log.info(s"Failed to recover tree for digest ${Algos.encode(version)}:", e)
     Failure(e)
   }
 
@@ -49,7 +48,7 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
       s" ${toRemove.size} elements to remove")
     store.update(digestWrapper, toRemoveMerged, toUpdateWithWrapped)
   }.recoverWith { case e =>
-    log.warn("Failed to update tree", e)
+    log.info("Failed to update tree", e)
     Failure(e)
   }
 
