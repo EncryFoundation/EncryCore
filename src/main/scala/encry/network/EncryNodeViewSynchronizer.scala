@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.{Actor, ActorRef, Props}
 import encry.EncryApp._
 import encry.consensus.History._
@@ -16,7 +15,6 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, Registe
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.message._
-import encry.settings.NetworkSettings
 import encry.utils.EncryLogging
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
@@ -27,18 +25,37 @@ import encry.{ModifierId, ModifierTypeId, VersionTag}
 
 class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with EncryLogging {
 
-  val networkSettings: NetworkSettings = settings.network
-  val invSpec: InvSpec = new InvSpec(networkSettings.maxInvObjects)
-  val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(networkSettings.maxInvObjects)
   var historyReaderOpt: Option[EncryHistory] = None
   var mempoolReaderOpt: Option[EncryMempool] = None
-  val deliveryManager: ActorRef =
-    context.actorOf(Props(classOf[EncryDeliveryManager], syncInfoSpec), "deliverManager")
+  val invSpec: InvSpec = new InvSpec(settings.network.maxInvObjects)
+  val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
+  val deliveryManager: ActorRef = context.actorOf(Props(classOf[EncryDeliveryManager], syncInfoSpec), "deliveryManager")
 
-  def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
-    networkController ! SendToNetwork(Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None), Broadcast)
+  override def preStart(): Unit = {
+    val messageSpecs: Seq[MessageSpec[_]] = Seq(invSpec, requestModifierSpec, ModifiersSpec, syncInfoSpec)
+    networkController ! RegisterMessagesHandler(messageSpecs, self)
+    context.system.eventStream.subscribe(self, classOf[NodeViewChange])
+    context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
+    nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = true)
+  }
 
-  override def receive: Receive = viewHolderEvents orElse {
+  override def receive: Receive = {
+    case SyntacticallySuccessfulModifier(mod) if (mod.isInstanceOf[EncryBlockHeader] || mod.isInstanceOf[EncryBlockPayload] || mod.isInstanceOf[ADProofs]) &&
+      historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
+    case SyntacticallySuccessfulModifier(mod) =>
+    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
+      deliveryManager ! DownloadRequest(modifierTypeId, modifierId)
+    case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
+    case SyntacticallyFailedModification(mod, throwable) =>
+    case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
+    case SemanticallyFailedModification(mod, throwable) =>
+    case ChangedState(reader) =>
+    case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
+      historyReaderOpt = Some(reader)
+      deliveryManager ! ChangedHistory(reader)
+    case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] =>
+      mempoolReaderOpt = Some(reader)
+      deliveryManager ! ChangedMempool(reader)
     case SendLocalSyncInfo => deliveryManager ! SendLocalSyncInfo
     case OtherNodeSyncingStatus(remote, status, extOpt) => deliveryManager ! OtherNodeSyncingStatus(remote, status, extOpt)
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
@@ -46,14 +63,13 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
     case DataFromPeer(spec, syncInfo: EncrySyncInfo@unchecked, remote) if spec.messageCode == syncInfoSpec.messageCode =>
       historyReaderOpt match {
         case Some(historyReader) =>
-          val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, networkSettings.networkChunkSize)
+          val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, settings.network.networkChunkSize)
           val ext: ModifierIds = extensionOpt.getOrElse(Seq())
           val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
           log.info(s"Comparison with $remote having starting points ${encry.idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}")
           log.info(s"Extension ids: ${encry.idsToString(ext)}")
           if (!(extensionOpt.nonEmpty || comparison != Younger)) logWarn("Extension is empty while comparison is younger")
-
           self ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
       }
@@ -81,39 +97,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
     case a: Any => logError(s"Strange input (sender: ${sender()}): ${a.getClass}\n" + a)
   }
 
-  override def preStart(): Unit = {
-    val messageSpecs: Seq[MessageSpec[_]] = Seq(invSpec, requestModifierSpec, ModifiersSpec, syncInfoSpec)
-    networkController ! RegisterMessagesHandler(messageSpecs, self)
-    context.system.eventStream.subscribe(self, classOf[NodeViewChange])
-    context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
-    nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = true)
-  }
-
-  def viewHolderEvents: Receive =
-    onSyntacticallySuccessfulModifier orElse
-      onDownloadRequest orElse { case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
-    case SyntacticallyFailedModification(mod, throwable) =>
-    case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
-    case SemanticallyFailedModification(mod, throwable) =>
-    case ChangedState(reader) =>
-    case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
-      historyReaderOpt = Some(reader)
-      deliveryManager ! ChangedHistory(reader)
-    case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] =>
-      mempoolReaderOpt = Some(reader)
-      deliveryManager ! ChangedMempool(reader)
-    }
-
-  def onDownloadRequest: Receive = {
-    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
-      deliveryManager ! DownloadRequest(modifierTypeId, modifierId)
-  }
-
-  def onSyntacticallySuccessfulModifier: Receive = {
-    case SyntacticallySuccessfulModifier(mod) if (mod.isInstanceOf[EncryBlockHeader] || mod.isInstanceOf[EncryBlockPayload] || mod.isInstanceOf[ADProofs]) &&
-      historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
-    case SyntacticallySuccessfulModifier(mod) =>
-  }
+  def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
+    networkController ! SendToNetwork(Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None), Broadcast)
 }
 
 object EncryNodeViewSynchronizer {
