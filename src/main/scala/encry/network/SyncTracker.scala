@@ -13,7 +13,6 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.{FiniteDuration, _}
 
-
 /**
   * SyncTracker caches the peers' statuses (i.e. whether they are ahead or behind this node)
   */

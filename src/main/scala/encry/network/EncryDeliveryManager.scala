@@ -1,6 +1,6 @@
 package encry.network
 
-import akka.actor.{Actor, ActorRef, Cancellable}
+import akka.actor.{Actor, Cancellable}
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
 import encry.consensus.History.{HistoryComparisonResult, Nonsense, Unknown, Younger}
 import encry.network.EncryNodeViewSynchronizer.CheckModifiersToDownload
@@ -24,15 +24,14 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Try}
 
-class EncryDeliveryManager(networkSettings: NetworkSettings,
-                           nvsRef: ActorRef,
-                           timeProvider: NetworkTimeProvider,
+class EncryDeliveryManager(timeProvider: NetworkTimeProvider,
                            syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with EncryLogging {
 
-  protected type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
+  type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
   case class ToDownloadStatus(tp: ModifierTypeId, firstViewed: Long, lastTry: Long)
 
+  val networkSettings: NetworkSettings = settings.network
   var historyReaderOpt: Option[EncryHistory] = None
   var mempoolReaderOpt: Option[EncryMempool] = None
   val invSpec: InvSpec = new InvSpec(networkSettings.maxInvObjects)
@@ -44,7 +43,7 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
   var cancellables: Map[ModifierIdAsKey, (ConnectedPeer, (Cancellable, Int))] = Map.empty
   var expectingFromRandom: Map[ModifierIdAsKey, ToDownloadStatus] = Map.empty
 
-  protected def key(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
+  def key(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
   override def preStart(): Unit = {
     statusTracker.scheduleSendSyncInfo()
@@ -98,7 +97,7 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     )
   }
 
-  protected def isExpecting(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Boolean =
+  def isExpecting(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Boolean =
     cancellables.get(key(mid)).exists(_._1 == cp)
 
   def delete(mid: ModifierId): Unit = tryWithLogging(delivered -= key(mid))
@@ -118,7 +117,7 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     }
   }
 
-  protected def tryWithLogging(fn: => Unit): Unit = {
+  def tryWithLogging(fn: => Unit): Unit = {
     Try(fn).recoverWith {
       case e =>
         log.info("Unexpected error", e)
@@ -177,14 +176,8 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
 
   def isExpecting: Boolean = cancellables.nonEmpty
 
-  /**
-    * @return ids we're going to download
-    */
   def expectingFromRandomQueue: Iterable[ModifierId] = ModifierId @@ expectingFromRandom.keys.map(_.array)
 
-  /**
-    * Process download request of modifier of type modifierTypeId with id modifierId
-    */
   def expectFromRandom(modifierTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
     val downloadRequestTime: Time = timeProvider.time()
     val newValue: ToDownloadStatus = expectingFromRandom.get(key(modifierId))
@@ -193,16 +186,10 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     expectingFromRandom += key(modifierId) -> newValue
   }
 
-  /**
-    * Remove old modifiers from download queue
-    */
   def removeOutdatedExpectingFromRandom(): Unit = expectingFromRandom
     .filter { case (_, status) => status.firstViewed < timeProvider.time() - networkSettings.toDownloadLifetime.toMillis }
     .foreach { case (key, _) => expectingFromRandom -= key }
 
-  /**
-    * Id's that are already in queue to download but are not downloaded yet and were not requested recently
-    */
   def idsExpectingFromRandomToRetry(): Seq[(ModifierTypeId, ModifierId)] = expectingFromRandom
     .filter(_._2.lastTry < timeProvider.time() - networkSettings.toDownloadRetryInterval.toMillis).toSeq
     .sortBy(_._2.lastTry)
@@ -217,9 +204,6 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     })
   }
 
-  /**
-    * Modifier downloaded
-    */
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = tryWithLogging {
     if (expectingFromRandom.contains(key(mid))) {
       expectingFromRandom -= key(mid)
