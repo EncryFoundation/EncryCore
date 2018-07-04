@@ -72,7 +72,7 @@ class PeerManager extends Actor with Logging {
             sender() ! ConnectTo(address)
           }
         }
-
+      }
   }
 }
 
