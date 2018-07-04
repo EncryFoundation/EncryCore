@@ -35,28 +35,25 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
 
   private def getHistory: Future[EncryHistoryReader] = (readersHolder ? GetDataFromHistory[EncryHistoryReader](r => r)).mapTo[EncryHistoryReader]
 
-  private def getHeaderIdsAtHeight(h: Int): Future[Json] = getHistory.map { history =>
-    history.headerIdsAtHeight(h).map(Algos.encode).asJson
-  }
+  private def getHeaderIdsAtHeight(h: Int): Future[Json] = getHistory.map{ _.headerIdsAtHeight(h).map(Algos.encode).asJson}
 
-  private def getLastHeaders(n: Int): Future[Json] = getHistory.map { history =>
-    history.lastHeaders(n).headers.map(_.asJson).asJson
-  }
 
-  private def getHeaderIds(limit: Int, offset: Int): Future[Json] = getHistory.map { history =>
-    history.getHeaderIds(limit, offset).map(Algos.encode).asJson
-  }
+  private def getLastHeaders(n: Int): Future[Json] = getHistory.map{ _.lastHeaders(n).headers.map(_.asJson).asJson }
+
+  private def getHeaderIds(offset: Int, limit: Int): Future[Json] =
+    getHistory.map { _.getHeaderIds(limit, offset).map(Algos.encode).asJson }
+
 
   private def getFullBlockByHeaderId(headerId: ModifierId): Future[Option[EncryBlock]] = getHistory.map { history =>
     history.typedModifierById[EncryBlockHeader](headerId).flatMap(history.getBlock)
   }
 
   def getBlocksR: Route = (pathEndOrSingleSlash & get & paging) { (offset, limit) =>
-    getHeaderIds(limit, offset).okJson()
+    getHeaderIds(offset, limit).okJson()
   }
 
-  def getLastHeadersR: Route = (pathPrefix("lastHeaders" / IntNumber) & get) { count =>
-    getLastHeaders(count).okJson()
+  def getLastHeadersR: Route = (pathPrefix("lastHeaders" / IntNumber) & get) { qty =>
+    getLastHeaders(qty).okJson()
   }
 
   def getBlockIdsAtHeightR: Route = (pathPrefix("at" / IntNumber) & get) { height =>
@@ -68,7 +65,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
   }
 
   def getBlockTransactionsByHeaderIdR: Route = (modifierId & pathPrefix("transactions") & get) { id =>
-    getFullBlockByHeaderId(id).map(_.map(_.transactions.map(_.asJson).asJson)).okJson()
+    getFullBlockByHeaderId(id).map(_.map(_.transactions.asJson)).okJson()
   }
 
   def candidateBlockR: Route = (path("candidateBlock") & pathEndOrSingleSlash & get) {
