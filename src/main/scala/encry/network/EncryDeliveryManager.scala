@@ -16,6 +16,7 @@ import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec
 import encry.view.mempool.EncryMempool
 import encry.{ModifierId, ModifierTypeId}
 import scorex.crypto.encode.Base58
+
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Try}
@@ -87,7 +88,6 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
       if (statusTracker.elapsedTimeSinceLastSync() < (settings.network.syncInterval.toMillis / 2)) log.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] => historyReaderOpt = Some(reader)
-    case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
   }
 
   def sendSync(syncInfo: EncrySyncInfo): Unit = {
