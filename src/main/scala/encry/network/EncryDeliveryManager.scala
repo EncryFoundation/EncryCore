@@ -71,19 +71,19 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     }
     if (notRequestedIds.nonEmpty) cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
     notRequestedIds.foreach { id =>
-      val cancellable = context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
+      val cancellable: Cancellable = context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
       cancellables = (cancellables - key(id)) + (key(id) -> (cp, (cancellable, 0)))
     }
   }
 
   def reexpect(cp: ConnectedPeer, mtid: ModifierTypeId, mid: ModifierId): Unit = tryWithLogging {
 
-    val midAsKey = key(mid)
+    val midAsKey: ModifierIdAsKey = key(mid)
 
     cancellables.get(midAsKey).foreach(peerInfo =>
       if (peerInfo._2._2 < networkSettings.maxDeliveryChecks) {
         cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> Seq(mid)), None)
-        val cancellable = context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout, self, CheckDelivery(cp, mtid, mid))
+        val cancellable: Cancellable = context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout, self, CheckDelivery(cp, mtid, mid))
         peerInfo._2._1.cancel()
         cancellables = (cancellables - midAsKey) + (midAsKey -> (cp -> (cancellable, peerInfo._2._2 + 1)))
       } else {
