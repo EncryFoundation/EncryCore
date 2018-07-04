@@ -2,12 +2,20 @@ package encry.network
 
 import akka.persistence.{PersistentActor, SnapshotOffer}
 import encry.ModifierTypeId
-import encry.network.ModifiersHolder.Mods
+import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
+import encry.network.ModifiersHolder.{Mods, RequestedModifiers}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.utils.ScorexLogging
-import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{LocallyGeneratedModifier, ModifiersFromRemote}
 
 class ModifiersHolder extends PersistentActor with ScorexLogging {
+
+  var headers: Seq[EncryBlockHeader] = Seq.empty
+  var payloads: Seq[EncryBlockPayload] = Seq.empty
+  var blocks: Seq[EncryBlock] = Seq.empty
 
   var modsFromRemote: Mods = Mods(Map.empty, 0)
 
@@ -19,10 +27,8 @@ class ModifiersHolder extends PersistentActor with ScorexLogging {
   }
 
   override def receiveCommand: Receive = {
-    case mods@ModifiersFromRemote(peer, modifierTypeId, remoteObjects) =>
-      logger.info(s"Already received ${modsFromRemote.numberOfPacksFromRemotes} packs of modifiers. \n$modsFromRemote")
-      logger.info(s"New pack of modifiers $modifierTypeId from $peer. Size: ${remoteObjects.size}.")
-      persist(mods) { _ => updateModsFromRemote(mods) }
+    case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
+    case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
     case x: Any => logger.info(s"Strange input: $x")
   }
 
@@ -35,9 +41,19 @@ class ModifiersHolder extends PersistentActor with ScorexLogging {
   def updateModsFromRemote(newMods: ModifiersFromRemote): Unit = {
     modsFromRemote = Mods(modsFromRemote.numberOfModsByPeerAndModType + ((newMods.source, newMods.modifierTypeId) -> newMods.remoteObjects.size), modsFromRemote.numberOfPacksFromRemotes + 1)
   }
+
+  def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
+
+    case header: EncryBlockHeader => headers = headers :+ header
+    case payload: EncryBlockPayload => payloads = payloads :+ payload
+    case block: EncryBlock => blocks = blocks :+ block
+    case _ =>
+  }
 }
 
 object ModifiersHolder {
+
+  case class RequestedModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier])
 
   case class Mods(numberOfModsByPeerAndModType: Map[(ConnectedPeer, ModifierTypeId), Int], numberOfPacksFromRemotes: Int)
 
