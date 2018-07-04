@@ -13,6 +13,7 @@ import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
+import encry.network.ModifiersHolder.RequestedModifiers
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
@@ -63,15 +64,15 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   override def receive: Receive = {
     case ModifiersFromRemote(peer, modifierTypeId, remoteObjects) =>
-      modifiersHolder ! ModifiersFromRemote(peer, modifierTypeId, remoteObjects)
       modifierSerializers.get(modifierTypeId).foreach { companion =>
-        remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
+        remoteObjects.flatMap(companion.parseBytes(_).toOption).foreach {
           case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
             if (nodeView.history.contains(pmod) || modifiersCache.contains(key(pmod.id)))
               log.warn(s"Received modifier ${pmod.encodedId} that is already in history")
             else modifiersCache.put(key(pmod.id), pmod)
         }
+        modifiersHolder ! RequestedModifiers(modifierTypeId, remoteObjects.flatMap(companion.parseBytes(_).toOption))
         log.debug(s"Cache before(${modifiersCache.size}): ${modifiersCache.keySet.map(_.array).map(Base58.encode).mkString(",")}")
         def found: Option[(mutable.WrappedArray.ofByte, PMOD)] = modifiersCache.find(x => nodeView.history.applicable(x._2))
         Iterator.continually(found).takeWhile(_.isDefined).flatten.foreach { case (k, v) =>
@@ -83,6 +84,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case lt: LocallyGeneratedTransaction[P, EncryBaseTransaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       log.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
+      modifiersHolder ! lm
       pmodModify(lm.pmod)
     case GetDataFromCurrentView(f) => sender() ! f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool))
     case GetNodeViewChanges(history, state, vault, mempool) =>

@@ -2,10 +2,11 @@ package encry.network
 
 import akka.persistence.{PersistentActor, SnapshotOffer}
 import encry.ModifierTypeId
-import encry.network.ModifiersHolder.Mods
+import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
+import encry.network.ModifiersHolder.{Mods, RequestedModifiers}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.utils.ScorexLogging
-import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{LocallyGeneratedModifier, ModifiersFromRemote}
 
 class ModifiersHolder extends PersistentActor with ScorexLogging {
 
@@ -19,10 +20,8 @@ class ModifiersHolder extends PersistentActor with ScorexLogging {
   }
 
   override def receiveCommand: Receive = {
-    case mods@ModifiersFromRemote(peer, modifierTypeId, remoteObjects) =>
-      logger.info(s"Already received ${modsFromRemote.numberOfPacksFromRemotes} packs of modifiers. \n$modsFromRemote")
-      logger.info(s"New pack of modifiers $modifierTypeId from $peer. Size: ${remoteObjects.size}.")
-      persist(mods) { _ => updateModsFromRemote(mods) }
+    case RequestedModifiers(modifierTypeId, modifiers) => _
+    case lm: LocallyGeneratedModifier[EncryPersistentModifier] => _
     case x: Any => logger.info(s"Strange input: $x")
   }
 
@@ -38,6 +37,8 @@ class ModifiersHolder extends PersistentActor with ScorexLogging {
 }
 
 object ModifiersHolder {
+
+  case class RequestedModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier])
 
   case class Mods(numberOfModsByPeerAndModType: Map[(ConnectedPeer, ModifierTypeId), Int], numberOfPacksFromRemotes: Int)
 
