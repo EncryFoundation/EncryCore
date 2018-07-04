@@ -55,7 +55,8 @@ object ConsolePromptListener {
     "addKey" -> AddKey,
     "init" -> InitKeyStorage,
     "pubKeys" -> PrintPubKeys,
-    "balance" -> GetBalance
+    "balance" -> GetBalance,
+    "transfer" -> Transfer
   ))
 
   val cmdDictionary: Map[String, Map[String, Command]] =

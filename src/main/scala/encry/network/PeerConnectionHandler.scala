@@ -208,8 +208,6 @@ object PeerConnectionHandler {
     case object HandshakeTimeout
 
     case object CloseConnection
-
-
   }
 
   def props(messagesHandler: MessageHandler, connection: ActorRef, direction: ConnectionType,
