@@ -72,7 +72,7 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
       val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
         modifiers partition { case (id, _) => isSpam(id) }
       if (settings.node.sendStat) context.actorSelection("akka://encry/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
-      log.info(s"Got modifiers of type $typeId from remote connected peer: $remote")
+      log.info(s"Got modifiers (${modifiers.size}) of type $typeId from remote connected peer: $remote")
       for ((id, _) <- modifiers) receive(typeId, id, remote)
       if (spam.nonEmpty) {
         log.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
