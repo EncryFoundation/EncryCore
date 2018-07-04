@@ -36,7 +36,7 @@ case class SyncTracker(deliveryManager: ActorRef,
 
   def scheduleSendSyncInfo(): Unit = {
     if (schedule.isDefined) schedule.get.cancel()
-    schedule = Some(context.system.scheduler.schedule(30.seconds, minInterval())(deliveryManager ! SendLocalSyncInfo))
+    schedule = Some(context.system.scheduler.schedule(networkSettings.modifierDeliverTimeCheck, minInterval())(deliveryManager ! SendLocalSyncInfo))
   }
 
   def maxInterval(): FiniteDuration = if (stableSyncRegime) networkSettings.syncStatusRefreshStable else networkSettings.syncStatusRefresh

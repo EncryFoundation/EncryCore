@@ -22,7 +22,6 @@ import scorex.crypto.encode.Base58
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 import scala.util.{Failure, Try}
 
 class EncryDeliveryManager(networkSettings: NetworkSettings,
@@ -177,9 +176,6 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
 
   case class ToDownloadStatus(tp: ModifierTypeId, firstViewed: Long, lastTry: Long)
 
-  private val ToDownloadRetryInterval: FiniteDuration = 10.seconds
-  private val ToDownloadLifetime: FiniteDuration = 1.hour
-
   var expectingFromRandom: Map[ModifierIdAsKey, ToDownloadStatus] = Map.empty
 
   def isExpectingFromRandom: Boolean = expectingFromRandom.nonEmpty
@@ -206,14 +202,14 @@ class EncryDeliveryManager(networkSettings: NetworkSettings,
     * Remove old modifiers from download queue
     */
   def removeOutdatedExpectingFromRandom(): Unit = expectingFromRandom
-    .filter { case (_, status) => status.firstViewed < timeProvider.time() - ToDownloadLifetime.toMillis }
+    .filter { case (_, status) => status.firstViewed < timeProvider.time() - networkSettings.toDownloadLifetime.toMillis }
     .foreach { case (key, _) => expectingFromRandom -= key }
 
   /**
     * Id's that are already in queue to download but are not downloaded yet and were not requested recently
     */
   def idsExpectingFromRandomToRetry(): Seq[(ModifierTypeId, ModifierId)] = expectingFromRandom
-    .filter(_._2.lastTry < timeProvider.time() - ToDownloadRetryInterval.toMillis).toSeq
+    .filter(_._2.lastTry < timeProvider.time() - networkSettings.toDownloadRetryInterval.toMillis).toSeq
     .sortBy(_._2.lastTry)
     .map(i => (i._2.tp, ModifierId @@ i._1.array))
 
