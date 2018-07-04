@@ -13,7 +13,7 @@ import encry.settings._
 import encry.utils.NetworkTimeProvider
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
-import encry.view.history.storage.{FileHistoryObjectsStore, HistoryStorage}
+import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 
 import scala.util.Try
@@ -171,18 +171,25 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
 
 object EncryHistory {
 
-  def getHistoryDir(settings: EncryAppSettings): File = {
-    val dir = new File(s"${settings.directory}/history")
+  def getHistoryIndexDir(settings: EncryAppSettings): File = {
+    val dir = new File(s"${settings.directory}/history/index")
+    dir.mkdirs()
+    dir
+  }
+
+  def getHistoryObjectsDir(settings: EncryAppSettings): File = {
+    val dir = new File(s"${settings.directory}/history/objects")
     dir.mkdirs()
     dir
   }
 
   def readOrGenerate(settings: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistory = {
 
-    val historyDir: File = getHistoryDir(settings)
+    val historyIndexDir: File = getHistoryIndexDir(settings)
+    val historyObjectsDir: File = getHistoryObjectsDir(settings)
 
-    val db: LSMStore = new LSMStore(historyDir, keepVersions = 0)
-    val objectsStore: FileHistoryObjectsStore = new FileHistoryObjectsStore(historyDir.getAbsolutePath)
+    val db: LSMStore = new LSMStore(historyIndexDir, keepVersions = 0)
+    val objectsStore: LSMStore = new LSMStore(historyObjectsDir, keepVersions = 0)
     val storage: HistoryStorage = new HistoryStorage(db, objectsStore)
 
     val history: EncryHistory = (settings.node.stateMode.isDigest, settings.node.verifyTransactions) match {
