@@ -1,7 +1,7 @@
 package encry
 
 import java.net.InetSocketAddress
-import akka.actor.SupervisorStrategy.Escalate
+import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
@@ -22,6 +22,7 @@ import encry.stats.StatsSender
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
+
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.io.Source
@@ -47,6 +48,7 @@ object EncryApp extends App with Logging {
       ModifiersSpec
     )
   }
+
   lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props(), "nodeViewHolder")
   val readersHolder: ActorRef = system.actorOf(Props[EncryViewReadersHolder], "readersHolder")
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
@@ -56,6 +58,7 @@ object EncryApp extends App with Logging {
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
   lazy val miner: ActorRef = system.actorOf(Props[EncryMiner].withDispatcher("mining-dispatcher"), "miner")
   val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
+
   val apiRoutes: Seq[ApiRoute] = Seq(
     UtilsApiRoute(settings.restApi),
     PeersApiRoute(peerManager, networkController, settings.restApi),
@@ -68,16 +71,18 @@ object EncryApp extends App with Logging {
   Http().bindAndHandle(combinedRoute, bindAddress.getAddress.getHostAddress, bindAddress.getPort)
   lazy val upnp: UPnP = new UPnP(settings.network)
 
-  def commonSupervisorStrategy: OneForOneStrategy = OneForOneStrategy(
-    maxNrOfRetries = 5,
-    withinTimeRange = 60 seconds) {
-    case _ => Escalate
-  }
-
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.node.mining) miner ! StartMining
   if (settings.testing.transactionGeneration) system.actorOf(Props[TransactionGenerator], "tx-generator") ! StartGeneration
   if (settings.node.enableCLI) cliListener ! StartListening
+
+  def commonSupervisorStrategy: OneForOneStrategy = OneForOneStrategy(
+    maxNrOfRetries = 5,
+    withinTimeRange = 60 seconds) {
+    case e: Exception =>
+      logger.info(s"Supervisor strategy: $e")
+      Restart
+  }
 
   def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
 }
