@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
-
 import akka.actor._
 import akka.io.Tcp.SO.KeepAlive
 import akka.io.Tcp._
@@ -15,32 +14,23 @@ import encry.network.message.Message.MessageCode
 import encry.network.message.{Message, MessageHandler}
 import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import encry.settings.NetworkSettings
-import encry.utils.EncryLogging
+import encry.utils.Logging
 import encry.view.history.EncrySyncInfoMessageSpec
-
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
 import scala.util.{Failure, Success, Try}
 
-
-class NetworkController extends Actor with EncryLogging {
+class NetworkController extends Actor with Logging {
 
   val networkSettings: NetworkSettings = settings.network
-
   val peerSynchronizer: ActorRef = context.actorOf(Props[PeerSynchronizer], "peerSynchronizer")
-
   val tcpManager: ActorRef = IO(Tcp)
-
   implicit val timeout: Timeout = Timeout(5 seconds)
-
   val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
-
   val messageHandlers: mutable.Map[Seq[MessageCode], ActorRef] = mutable.Map[Seq[Message.MessageCode], ActorRef]()
-
   val outgoing: mutable.Set[InetSocketAddress] = mutable.Set[InetSocketAddress]()
-
   lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse {
     if (networkSettings.upnpEnabled) upnp.externalAddress.map(a => new InetSocketAddress(a, networkSettings.bindAddress.getPort))
     else None

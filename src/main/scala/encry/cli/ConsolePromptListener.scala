@@ -3,12 +3,12 @@ package encry.cli
 import akka.actor.Actor
 import encry.EncryApp.settings
 import encry.cli.commands._
-import encry.utils.EncryLogging
+import encry.utils.Logging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class ConsolePromptListener extends Actor with EncryLogging {
+class ConsolePromptListener extends Actor with Logging {
 
   import ConsolePromptListener._
 

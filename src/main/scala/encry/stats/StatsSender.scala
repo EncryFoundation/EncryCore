@@ -9,12 +9,12 @@ import encry.consensus.EncrySupplyController
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.settings.Algos
 import encry.stats.StatsSender._
-import encry.utils.EncryLogging
+import encry.utils.Logging
 import encry.view.history
 import encry.{ModifierId, ModifierTypeId}
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 
-class StatsSender extends Actor with EncryLogging {
+class StatsSender extends Actor with Logging {
 
   val influxDB: InfluxDB =
     InfluxDBFactory.connect(settings.influxDB.url, settings.influxDB.login, settings.influxDB.password )

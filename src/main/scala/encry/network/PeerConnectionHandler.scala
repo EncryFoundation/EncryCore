@@ -14,7 +14,7 @@ import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle, _}
 import encry.network.message.MessageHandler
 import encry.settings.NetworkSettings
-import encry.utils.EncryLogging
+import encry.utils.Logging
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
@@ -24,7 +24,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
                             connection: ActorRef,
                             direction: ConnectionType,
                             ownSocketAddress: Option[InetSocketAddress],
-                            remote: InetSocketAddress) extends Actor with EncryLogging {
+                            remote: InetSocketAddress) extends Actor with Logging {
 
   import PeerConnectionHandler.ReceivableMessages._
   import encry.network.peer.PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}

@@ -9,13 +9,13 @@ import encry.EncryApp._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.message.{GetPeersSpec, Message, PeersSpec}
 import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
-import encry.utils.EncryLogging
+import encry.utils.Logging
 import shapeless.syntax.typeable._
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class PeerSynchronizer extends Actor with EncryLogging {
+class PeerSynchronizer extends Actor with Logging {
 
   implicit val timeout: Timeout = Timeout(settings.network.syncTimeout.getOrElse(5 seconds))
 

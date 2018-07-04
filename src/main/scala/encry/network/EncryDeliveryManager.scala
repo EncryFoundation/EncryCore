@@ -9,7 +9,7 @@ import encry.network.PeerConnectionHandler._
 import encry.network.message.BasicMsgDataTypes.ModifiersData
 import encry.network.message.{InvSpec, Message, ModifiersSpec, RequestModifierSpec}
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
-import encry.utils.EncryLogging
+import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
@@ -20,7 +20,7 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Try}
 
-class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with EncryLogging {
+class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with Logging {
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 

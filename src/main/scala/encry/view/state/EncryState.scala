@@ -9,15 +9,14 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
 import encry.modifiers.state.box._
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
-import encry.utils.EncryLogging
+import encry.utils.Logging
 import io.iohk.iodb.Store
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base16
-
 import scala.util.Try
 
 trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
-  extends MinimalState[EncryPersistentModifier, IState] with EncryLogging {
+  extends MinimalState[EncryPersistentModifier, IState] with Logging {
 
   self: IState =>
 
@@ -50,7 +49,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   override type NVCT = this.type
 }
 
-object EncryState extends EncryLogging {
+object EncryState extends Logging {
 
   val afterGenesisStateDigest: ADDigest = ADDigest @@ Base16.decode(Constants.AfterGenesisStateDigestHex)
     .getOrElse(throw new Error("Failed to decode genesis state digest"))

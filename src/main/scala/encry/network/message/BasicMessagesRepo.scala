@@ -1,9 +1,7 @@
 package encry.network.message
 
-
 import java.net.{InetAddress, InetSocketAddress}
 import java.util
-
 import com.google.common.primitives.{Bytes, Ints}
 import encry.consensus.SyncInfo
 import encry.modifiers.NodeViewModifier
@@ -11,7 +9,6 @@ import encry.network.message.BasicMsgDataTypes._
 import encry.network.message.Message.MessageCode
 import encry.{ModifierId, ModifierTypeId}
 import supertagged.@@
-
 import scala.util.Try
 
 object BasicMsgDataTypes {

@@ -3,12 +3,12 @@ package encry.storage
 import encry.VersionTag
 import encry.settings.Algos
 import encry.storage.codec.FixLenComplexValueCodec
-import encry.utils.EncryLogging
+import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 
 import scala.util.{Failure, Success, Try}
 
-trait EncryBaseStorage extends AutoCloseable with EncryLogging {
+trait EncryBaseStorage extends AutoCloseable with Logging {
 
   val store: Store
 

@@ -8,7 +8,7 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.{Block, EncryBlock}
 import encry.settings.Constants._
 import encry.settings.{Algos, Constants, NodeSettings}
-import encry.utils.{EncryLogging, NetworkTimeProvider}
+import encry.utils.{Logging, NetworkTimeProvider}
 import encry.validation.{ModifierValidator, ValidationResult}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
@@ -19,7 +19,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
 
-trait BlockHeaderProcessor extends DownloadProcessor with EncryLogging {
+trait BlockHeaderProcessor extends DownloadProcessor with Logging {
 
   protected val nodeSettings: NodeSettings
 

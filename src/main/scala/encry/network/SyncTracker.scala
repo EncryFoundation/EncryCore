@@ -7,7 +7,7 @@ import encry.consensus.History
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
 import encry.network.PeerConnectionHandler._
 import encry.settings.NetworkSettings
-import encry.utils.{EncryLogging, NetworkTimeProvider}
+import encry.utils.{Logging, NetworkTimeProvider}
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -19,7 +19,7 @@ import scala.concurrent.duration.{FiniteDuration, _}
 case class SyncTracker(deliveryManager: ActorRef,
                        context: ActorContext,
                        networkSettings: NetworkSettings,
-                       timeProvider: NetworkTimeProvider) extends EncryLogging {
+                       timeProvider: NetworkTimeProvider) extends Logging {
 
   import History._
   import encry.utils.NetworkTime.Time

@@ -8,7 +8,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import encry.utils.EncryLogging
+import encry.utils.Logging
 import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedTransaction}
 import encry.view.history.EncryHistory
@@ -18,7 +18,7 @@ import encry.view.wallet.EncryWallet
 
 import scala.concurrent.duration._
 
-class TransactionGenerator extends Actor with EncryLogging {
+class TransactionGenerator extends Actor with Logging {
 
   import TransactionGenerator._
 
