@@ -1,6 +1,6 @@
 package encry.cli
 
-import encry.cli.commands._
+import encry.cli.Commands._
 import encry.crypto.PrivateKey25519
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}

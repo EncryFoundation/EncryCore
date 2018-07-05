@@ -1,6 +1,6 @@
-package encry.cli.commands
+package encry.cli
 
-import encry.cli.{Ast, Response}
+import encry.cli.Commands._
 import encry.settings.EncryAppSettings
 
 import scala.concurrent.Future

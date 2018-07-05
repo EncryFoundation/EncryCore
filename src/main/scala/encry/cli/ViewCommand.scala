@@ -1,12 +1,11 @@
-package encry.cli.commands
+package encry.cli
 
+import akka.pattern._
 import akka.util.Timeout
 import encry.EncryApp.nodeViewHolder
-import encry.cli.Response
 import encry.settings.EncryAppSettings
 
 import scala.concurrent.Future
-import akka.pattern._
 
 trait ViewCommand extends Command {
   override def executeRequest(args: Command.Args, settings: EncryAppSettings): Any = this

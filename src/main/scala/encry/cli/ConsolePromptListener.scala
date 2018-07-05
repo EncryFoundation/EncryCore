@@ -5,7 +5,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import encry.EncryApp
 import encry.EncryApp.settings
-import encry.cli.commands._
+import encry.cli.Commands._
 import encry.utils.ExtUtils._
 import encry.utils.Logging
 
