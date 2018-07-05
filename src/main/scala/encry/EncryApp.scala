@@ -59,18 +59,20 @@ object EncryApp extends App with Logging {
   lazy val miner: ActorRef = system.actorOf(Props[EncryMiner].withDispatcher("mining-dispatcher"), "miner")
   val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
 
-  val apiRoutes: Seq[ApiRoute] = Seq(
-    UtilsApiRoute(settings.restApi),
-    PeersApiRoute(peerManager, networkController, settings.restApi),
-    InfoApiRoute(readersHolder, miner, peerManager, settings, nodeId, timeProvider),
-    HistoryApiRoute(readersHolder, miner, settings, nodeId, settings.node.stateMode),
-    TransactionsApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
-    StateInfoApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode)
-  )
-  val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
-  Http().bindAndHandle(combinedRoute, bindAddress.getAddress.getHostAddress, bindAddress.getPort)
   lazy val upnp: UPnP = new UPnP(settings.network)
 
+  if (settings.restApi.enabled) {
+    val apiRoutes: Seq[ApiRoute] = Seq(
+      UtilsApiRoute(settings.restApi),
+      PeersApiRoute(peerManager, networkController, settings.restApi),
+      InfoApiRoute(readersHolder, miner, peerManager, settings, nodeId, timeProvider),
+      HistoryApiRoute(readersHolder, miner, settings, nodeId, settings.node.stateMode),
+      TransactionsApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
+      StateInfoApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode)
+    )
+    val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
+    Http().bindAndHandle(combinedRoute, bindAddress.getAddress.getHostAddress, bindAddress.getPort)
+  }
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.node.mining) miner ! StartMining
   if (settings.testing.transactionGeneration) system.actorOf(Props[TransactionGenerator], "tx-generator") ! StartGeneration

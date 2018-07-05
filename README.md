@@ -35,3 +35,10 @@ MacOS and Linux:
 ## License
 
 All contributions are made under the [GNU General Public License v3](https://www.gnu.org/licenses/gpl-3.0.en.html). See [LICENSE](LICENSE).
+
+
+schema CustomerBox:Object(
+    person:Object(name:String; age:Int);
+    orders:List[Object(product_id:Long; amount:Long;)];
+    id:Long;
+)
