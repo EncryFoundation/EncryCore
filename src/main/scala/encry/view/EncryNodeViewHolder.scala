@@ -63,6 +63,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
+          case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
             if (nodeView.history.contains(pmod) || modifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
@@ -87,7 +88,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       if (mempool) sender() ! ChangedMempool(nodeView.mempool)
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] =
-        if(modifierTypeId == Transaction.ModifierTypeId) nodeView.mempool.notIn(modifierIds)
+        if( modifierTypeId == Transaction.ModifierTypeId) nodeView.mempool.notIn(modifierIds)
         else modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
   }

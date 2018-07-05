@@ -1,13 +1,13 @@
 package encry.cli
 
 import akka.actor.Actor
-import akka.stream.{ActorMaterializer, Materializer}
+import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import encry.EncryApp
 import encry.EncryApp.settings
 import encry.cli.commands._
-import encry.utils.Logging
 import encry.utils.ExtUtils._
+import encry.utils.Logging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Success

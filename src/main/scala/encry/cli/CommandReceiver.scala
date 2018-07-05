@@ -25,7 +25,7 @@ trait CommandReceiver[StateType <: EncryState[StateType]] {
   def response(s: String): Option[Response] = Some(Response(s))
   def send(s: String): Unit = sender() ! Some(Response(s))
   def commandReceive: Receive = {
-    case AddKey => send(if (Try(currentView.vault.keyManager.createNewKey()).isSuccess) "OK" else "Operation failed")
+    case AddKey => send(if (Try(currentView.vault.keyManager.createNewKey()).isSuccess) "New key added." else "Operation failed")
     case GetBalance =>
       val balances = currentView.vault.getBalances.map(tokenInfo => s"TokenID(${Algos.encode(tokenInfo._1)}) : ${tokenInfo._2}\n")
       send(if(balances.isEmpty) "<empty>" else balances.mkString("\n"))
