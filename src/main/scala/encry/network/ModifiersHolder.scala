@@ -11,7 +11,6 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{LocallyGeneratedModifier, ModifiersFromRemote}
 import encry.{ModifierId, ModifierTypeId}
-
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 
@@ -24,7 +23,7 @@ class ModifiersHolder extends PersistentActor with Logging {
   var amount: Amount = Amount(0, 0, 0)
 
   /**
-    * Map, witch contains not completed blocks
+    * Map, which contains not completed blocks
     * Key can be payloadId or also header id. So value depends on key, and can contains: headerId, payloadId and adproof
     */
   var notCompletedBlocks: Map[ModifierId, Seq[ModifierId]] = Map.empty
@@ -40,7 +39,6 @@ class ModifiersHolder extends PersistentActor with Logging {
   override def preStart(): Unit = logger.info(s"ModifiersHolder actor is started.")
 
   override def receiveRecover: Receive = {
-    case mods: ModifiersFromRemote => updateModsFromRemote(mods: ModifiersFromRemote)
     case SnapshotOffer(_, snapshot: Mods) => modsFromRemote = snapshot
     case SnapshotOffer(_, snapshot: Amount) => amount = snapshot
   }
@@ -58,8 +56,6 @@ class ModifiersHolder extends PersistentActor with Logging {
   override def journalPluginId: String = "akka.persistence.journal.leveldb"
 
   override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
-
-  def updateModsFromRemote(newMods: ModifiersFromRemote): Unit = _
 
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
     case header: EncryBlockHeader => headers = (headers :+ header).distinct.sortBy(_.height)
