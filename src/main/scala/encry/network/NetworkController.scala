@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
+
 import akka.actor._
 import akka.io.Tcp.SO.KeepAlive
 import akka.io.Tcp._
@@ -10,12 +11,14 @@ import akka.util.Timeout
 import encry.EncryApp._
 import encry.network.NetworkController.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
+import encry.network.message.BasicMsgDataTypes.InvData
 import encry.network.message.Message.MessageCode
-import encry.network.message.{Message, MessageHandler}
+import encry.network.message.{InvSpec, Message, MessageHandler}
 import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import encry.settings.NetworkSettings
 import encry.utils.Logging
 import encry.view.history.EncrySyncInfoMessageSpec
+
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.duration._
@@ -70,7 +73,13 @@ class NetworkController extends Actor with Logging {
       spec.parseBytes(msgBytes) match {
         case Success(content) =>
           messageHandlers.find(_._1.contains(msgId)).map(_._2) match {
-            case Some(handler) => handler ! DataFromPeer(spec, content, remote)
+            case Some(handler) =>
+              val message: DataFromPeer[Any] = DataFromPeer(spec, content, remote)
+              message match {
+                case DataFromPeer(_, invData: InvData@unchecked, _) if spec.messageCode == InvSpec.MessageCode =>
+                  if (invData._1 != 2) handler ! DataFromPeer(spec, content, remote)
+                case _ => handler ! DataFromPeer(spec, content, remote)
+              }
             case None => logError("No handlers found for message: " + msgId)
           }
         case Failure(e) => logError("Failed to deserialize data: ", e)

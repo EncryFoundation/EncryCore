@@ -67,7 +67,7 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
         val oldIds: Seq[(ModifierTypeId, ModifierId)] = idsExpectingFromRandomToRetry()
         (newIds ++ oldIds).groupBy(_._1).foreach(ids => requestDownload(ids._1, ids._2.map(_._2)))
       }
-    case RequestFromLocal(peer, modifierTypeId, modifierIds) => if (modifierIds.nonEmpty) expect(peer, modifierTypeId, modifierIds)
+    case RequestFromLocal(peer, modifierTypeId, modifierIds) => if (modifierIds.nonEmpty && modifierTypeId != 2) expect(peer, modifierTypeId, modifierIds)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       val typeId: ModifierTypeId = data._1
       val modifiers: Map[ModifierId, Array[Byte]] = data._2
