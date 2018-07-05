@@ -22,7 +22,6 @@ trait CommandReceiver[StateType <: EncryState[StateType]] {
   def currentView: CurrentView[EncryHistory, StateType, EncryWallet, EncryMempool] =
     CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool)
   def keys: Seq[PrivateKey25519] = currentView.vault.keyManager.keys
-  def response(s: String): Option[Response] = Some(Response(s))
   def send(s: String): Unit = sender() ! Some(Response(s))
   def commandReceive: Receive = {
     case AddKey => send(if (Try(currentView.vault.keyManager.createNewKey()).isSuccess) "New key added." else "Operation failed")
