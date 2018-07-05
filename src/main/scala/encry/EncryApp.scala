@@ -1,10 +1,12 @@
 package encry
 
 import java.net.InetSocketAddress
+
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.model.HttpResponse
+import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.stream.ActorMaterializer
 import encry.api.http.routes.{HistoryApiRoute, InfoApiRoute, StateInfoApiRoute, TransactionsApiRoute}
 import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
@@ -62,6 +64,19 @@ object EncryApp extends App with Logging {
   lazy val upnp: UPnP = new UPnP(settings.network)
 
   if (settings.restApi.enabled) {
+
+    import akka.http.scaladsl.server.Directives._
+    import akka.http.scaladsl.model.StatusCodes._
+
+    implicit def apiExceptionHandler: ExceptionHandler =
+      ExceptionHandler {
+        case _: Exception =>
+          extractUri { uri =>
+            logError(s"Request to $uri could not be handled normally")
+            complete(HttpResponse(InternalServerError, entity = "Internal server error"))
+          }
+      }
+
     val apiRoutes: Seq[ApiRoute] = Seq(
       UtilsApiRoute(settings.restApi),
       PeersApiRoute(peerManager, networkController, settings.restApi),
