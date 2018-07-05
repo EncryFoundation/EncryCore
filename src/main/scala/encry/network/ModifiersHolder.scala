@@ -8,6 +8,7 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder.{UpdateBestHeaderHeight, _}
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.settings.Algos
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{ApplyModifier, LocallyGeneratedModifier}
 import encry.{ModifierId, ModifierTypeId}
@@ -35,9 +36,13 @@ class ModifiersHolder extends PersistentActor with Logging {
   var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
 
   context.system.scheduler.schedule(10.second, 10.second) {
-    amount = Amount(headers.size, payloads.size, blocks.size)
+    amount = Amount(headers.size, payloadCache.size, completedBlocks.size)
     saveSnapshot(amount)
-    logger.info(s"ModifiersHolder: ${amount.headers} - ${amount.payloads} - ${amount.blocks}")
+    logger.info(s"ModifiersHolder: ${amount.headers} : ${
+      if (headers.nonEmpty) {
+        Algos.encode(headers.last._2.id) + "---" + headerCache.last._2.height
+      }
+    } - ${amount.payloads} - ${amount.blocks}")
     self ! CheckCompletedBlocks
     self ! CheckHeaders
   }
@@ -59,8 +64,7 @@ class ModifiersHolder extends PersistentActor with Logging {
       case (headersToApply, (height, header)) =>
         if (height < bestHeaderHeight || height <= headersToApply.last._1 + 1) headersToApply + (header.height -> header)
         else headersToApply
-      }
-      headers.foreach{headerInfo =>
+    }.foreach { headerInfo =>
         nodeViewHolder ! ApplyModifier(headerInfo._2)
         headers -= headerInfo._1
       }
@@ -70,8 +74,7 @@ class ModifiersHolder extends PersistentActor with Logging {
       case (blockToApply, (height, block)) =>
         if (height < bestBlockHeight || height <= blockToApply.last._1 + 1) blockToApply + (block.header.height -> block)
         else blockToApply
-    }
-      headers.foreach{headerInfo =>
+    }.foreach { headerInfo =>
         nodeViewHolder ! ApplyModifier(headerInfo._2)
         completedBlocks -= headerInfo._1
       }
@@ -87,16 +90,18 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
 
-  def createBlockIfPossible(payloadId: ModifierId): Unit =
+  def createBlockIfPossible(payloadId: ModifierId): Unit = {
+    logger.info(s"Trying too create block with payload: ${Algos.encode(payloadId)}")
     notCompletedBlocks.get(payloadId).foreach(headerId => headerCache.get(headerId).foreach { header =>
-      payloadCache.get(payloadId).foreach{ payload =>
+      payloadCache.get(payloadId).foreach { payload =>
+        logger.info(s"Create succes on height: ${header.height} with ${Algos.encode(headerId)}")
         completedBlocks += header.height -> EncryBlock(header, payload, None)
         notCompletedBlocks -= payloadId
         payloadCache -= payloadId
         headerCache -= headerId
       }
     })
-
+  }
 
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
 
@@ -105,8 +110,13 @@ class ModifiersHolder extends PersistentActor with Logging {
         notCompletedBlocks += header.payloadId -> header.id
         headers += header.height -> header
         headerCache += header.id -> header
-      } else createBlockIfPossible(header.payloadId)
+      } else {
+        notCompletedBlocks = notCompletedBlocks - header.payloadId + (header.payloadId -> header.id)
+        createBlockIfPossible(header.payloadId)
+      }
     case payload: EncryBlockPayload =>
+      logger.info(s"Get payload of id: ${Algos.encode(payload.id)}")
+      logger.info(s"not completedBlocks contains it: ${!notCompletedBlocks.contains(payload.id)}")
       if (!notCompletedBlocks.contains(payload.id)) {
         notCompletedBlocks += payload.id -> ModifierId @@ Array.emptyByteArray
         payloadCache += payload.id -> payload
