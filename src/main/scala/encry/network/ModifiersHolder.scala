@@ -2,7 +2,6 @@ package encry.network
 
 import akka.persistence.{PersistentActor, SaveSnapshotFailure, SaveSnapshotSuccess, SnapshotOffer}
 import encry.EncryApp._
-import encry.modifiers.history.block.Block.{Height => BlockHeight}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
@@ -11,7 +10,6 @@ import encry.network.ModifiersHolder.{UpdateBestHeaderHeight, _}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{ApplyModifier, LocallyGeneratedModifier}
-import encry.view.history.Height
 import encry.{ModifierId, ModifierTypeId}
 
 import scala.collection.immutable.SortedMap
@@ -23,8 +21,8 @@ class ModifiersHolder extends PersistentActor with Logging {
   var blocks: Seq[EncryBlock] = Seq.empty
   var modsFromRemote: Mods = Mods(Map.empty, 0)
   var amount: Amount = Amount(0, 0, 0)
-  var bestHeaderHeight: Height = Height @@ Int.MaxValue
-  var bestBlockHeight: Height = Height @@ Int.MaxValue
+  var bestHeaderHeight: Int = Int.MaxValue
+  var bestBlockHeight: Int = Int.MaxValue
 
   /**
     * Map, which contains not completed blocks
@@ -32,9 +30,9 @@ class ModifiersHolder extends PersistentActor with Logging {
     */
   var notCompletedBlocks: Map[ModifierId, ModifierId] = Map.empty
   var headerCache: Map[ModifierId, EncryBlockHeader] = Map.empty
-  var headers: SortedMap[BlockHeight, EncryBlockHeader] = SortedMap.empty
+  var headers: SortedMap[Int, EncryBlockHeader] = SortedMap.empty
   var payloadCache: Map[ModifierId, EncryBlockPayload] = Map.empty
-  var completedBlocks: SortedMap[BlockHeight, EncryBlock] = SortedMap.empty
+  var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
 
   context.system.scheduler.schedule(10.second, 10.second) {
     amount = Amount(headers.size, payloads.size, blocks.size)
@@ -56,10 +54,10 @@ class ModifiersHolder extends PersistentActor with Logging {
     case SaveSnapshotFailure(metadata, reason) => logger.info("Failure with snapshot")
     case UpdateBestHeaderHeight(height) => bestHeaderHeight = height
     case UpdateBestBlockHeight(height) => bestBlockHeight = height
-    case CheckHeaders => headers.foldLeft(Map[BlockHeight, EncryBlockHeader]()) {
+    case CheckHeaders => headers.foldLeft(SortedMap[Int, EncryBlockHeader]()) {
 
       case (headersToApply, (height, header)) =>
-        if (height < bestHeaderHeight || height <= headersToApply.max._1 + 1) headersToApply + (header.height -> header)
+        if (height < bestHeaderHeight || height <= headersToApply.last._1 + 1) headersToApply + (header.height -> header)
         else headersToApply
       }
       headers.foreach{headerInfo =>
@@ -67,10 +65,10 @@ class ModifiersHolder extends PersistentActor with Logging {
         headers -= headerInfo._1
       }
 
-    case CheckCompletedBlocks => completedBlocks.foldLeft(Map[BlockHeight, EncryBlock]()) {
+    case CheckCompletedBlocks => completedBlocks.foldLeft(SortedMap[Int, EncryBlock]()) {
 
       case (blockToApply, (height, block)) =>
-        if (height < bestBlockHeight || height <= blockToApply.max._1 + 1) blockToApply + (block.header.height -> block)
+        if (height < bestBlockHeight || height <= blockToApply.last._1 + 1) blockToApply + (block.header.height -> block)
         else blockToApply
     }
       headers.foreach{headerInfo =>
@@ -110,7 +108,7 @@ class ModifiersHolder extends PersistentActor with Logging {
       } else createBlockIfPossible(header.payloadId)
     case payload: EncryBlockPayload =>
       if (!notCompletedBlocks.contains(payload.id)) {
-        notCompletedBlocks += payload.id -> Seq.empty
+        notCompletedBlocks += payload.id -> ModifierId @@ Array.emptyByteArray
         payloadCache += payload.id -> payload
       } else createBlockIfPossible(payload.id)
     case block: EncryBlock => completedBlocks += block.header.height -> block
@@ -124,9 +122,9 @@ object ModifiersHolder {
 
   case object CheckHeaders
 
-  case class UpdateBestHeaderHeight(height: Height)
+  case class UpdateBestHeaderHeight(height: Int)
 
-  case class UpdateBestBlockHeight(height: Height)
+  case class UpdateBestBlockHeight(height: Int)
 
   case class Amount(headers: Int, payloads: Int, blocks: Int)
 
