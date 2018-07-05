@@ -1,16 +1,16 @@
 package encry.view
 
 import akka.actor.Actor
+import encry.EncryApp._
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, NodeViewChange}
+import encry.utils.Logging
+import encry.view.EncryNodeViewHolder.ReceivableMessages.GetNodeViewChanges
 import encry.view.EncryViewReadersHolder.{GetDataFromHistory, GetReaders, Readers}
 import encry.view.history.EncryHistoryReader
 import encry.view.mempool.EncryMempoolReader
 import encry.view.state.UtxoStateReader
-import encry.EncryApp._
-import encry.view.EncryNodeViewHolder.ReceivableMessages.GetNodeViewChanges
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, NodeViewChange}
-import encry.utils.EncryLogging
 
-class EncryViewReadersHolder extends Actor with EncryLogging {
+class EncryViewReadersHolder extends Actor with Logging {
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])

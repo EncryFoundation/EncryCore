@@ -21,7 +21,7 @@ protected case class NetworkTime(offset: NetworkTime.Offset, lastUpdate: Network
 
 case class NetworkTimeProviderSettings(server: String, updateEvery: FiniteDuration, timeout: FiniteDuration)
 
-class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) extends EncryLogging {
+class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) extends Logging {
 
   private type State = Either[(NetworkTime, Future[NetworkTime]), NetworkTime]
 

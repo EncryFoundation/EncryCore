@@ -1,7 +1,6 @@
 package encry.view
 
 import java.io.File
-
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.cli.CommandReceiver
@@ -17,7 +16,7 @@ import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
-import encry.utils.EncryLogging
+import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
@@ -26,12 +25,11 @@ import encry.view.state.{Proposition, _}
 import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import scorex.crypto.authds.ADDigest
-
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
-class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with EncryLogging with CommandReceiver[StateType] {
+class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging with CommandReceiver[StateType] {
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: EncryMempool)
 
@@ -319,7 +317,7 @@ object EncryNodeViewHolder {
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    case class ModifiersFromRemote(source: ConnectedPeer, modifierTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
+    case class ModifiersFromRemote(peer: ConnectedPeer, modTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
 
     case class LocallyGeneratedTransaction[P <: Proposition, EncryBaseTransaction <: Transaction[P]](tx: EncryBaseTransaction)
 
