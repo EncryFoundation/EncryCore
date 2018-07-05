@@ -2,7 +2,6 @@ package encry.network
 
 import akka.persistence.{PersistentActor, SaveSnapshotFailure, SaveSnapshotSuccess, SnapshotOffer}
 import encry.EncryApp._
-import encry.ModifierTypeId
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
@@ -11,7 +10,9 @@ import encry.network.ModifiersHolder.{Amount, Mods, RequestedModifiers}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{LocallyGeneratedModifier, ModifiersFromRemote}
+import encry.{ModifierId, ModifierTypeId}
 
+import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 
 class ModifiersHolder extends PersistentActor with Logging {
@@ -21,6 +22,14 @@ class ModifiersHolder extends PersistentActor with Logging {
   var blocks: Seq[EncryBlock] = Seq.empty
   var modsFromRemote: Mods = Mods(Map.empty, 0)
   var amount: Amount = Amount(0, 0, 0)
+
+  /**
+    * Map, witch contains not completed blocks
+    * Key can be payloadId or also header id. So value depends on key, and can contains: headerId, payloadId and adproof
+    */
+  var notCompletedBlocks: Map[ModifierId, Seq[ModifierId]] = Map.empty
+  var modifiers: Map[ModifierId, NodeViewModifier] = Map.empty
+  var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
 
   context.system.scheduler.schedule(10.second, 10.second) {
     amount = Amount(headers.size, payloads.size, blocks.size)
