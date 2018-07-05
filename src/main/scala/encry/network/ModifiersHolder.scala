@@ -40,7 +40,7 @@ class ModifiersHolder extends PersistentActor with Logging {
     saveSnapshot(amount)
     logger.info(s"ModifiersHolder: ${amount.headers} : ${
       if (headers.nonEmpty) {
-        Algos.encode(headers.last._2.id) + "---" + headerCache.last._2.height
+        Algos.encode(headers.last._2.id) + "---" + headerCache.size
       }
     } - ${amount.payloads} - ${amount.blocks}")
     self ! CheckCompletedBlocks
@@ -62,17 +62,20 @@ class ModifiersHolder extends PersistentActor with Logging {
     case CheckHeaders => headers.foldLeft(SortedMap[Int, EncryBlockHeader]()) {
 
       case (headersToApply, (height, header)) =>
-        if (height < bestHeaderHeight || height <= headersToApply.last._1 + 1) headersToApply + (header.height -> header)
+        if (header.height < bestHeaderHeight || header.height <= headersToApply.last._2.height + 1) headersToApply + (header.height -> header)
         else headersToApply
     }.foreach { headerInfo =>
         nodeViewHolder ! ApplyModifier(headerInfo._2)
         headers -= headerInfo._1
       }
 
-    case CheckCompletedBlocks => completedBlocks.foldLeft(SortedMap[Int, EncryBlock]()) {
-
+    case CheckCompletedBlocks =>
+      logger.info(s"Trying to create block: ${completedBlocks.size} on headersHeight: ${bestHeaderHeight} and blockHeight: ${bestBlockHeight}")
+      completedBlocks.foldLeft(SortedMap[Int, EncryBlock]()) {
       case (blockToApply, (height, block)) =>
-        if (height < bestBlockHeight || height <= blockToApply.last._1 + 1) blockToApply + (block.header.height -> block)
+        logger.info(s"Check for: ${height} with ${bestBlockHeight} for: ${Algos.encode(block.id)}")
+        if (block.header.height < bestBlockHeight || block.header.height <= blockToApply.last._2.header.height + 1)
+          blockToApply + (block.header.height -> block)
         else blockToApply
     }.foreach { headerInfo =>
         nodeViewHolder ! ApplyModifier(headerInfo._2)
@@ -91,7 +94,7 @@ class ModifiersHolder extends PersistentActor with Logging {
   override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
 
   def createBlockIfPossible(payloadId: ModifierId): Unit = {
-    logger.info(s"Trying too create block with payload: ${Algos.encode(payloadId)}")
+    logger.info(s"Trying too create block with payload: ${Algos.encode(payloadId)} : ${notCompletedBlocks.contains(payloadId)}")
     notCompletedBlocks.get(payloadId).foreach(headerId => headerCache.get(headerId).foreach { header =>
       payloadCache.get(payloadId).foreach { payload =>
         logger.info(s"Create succes on height: ${header.height} with ${Algos.encode(headerId)}")
@@ -107,11 +110,13 @@ class ModifiersHolder extends PersistentActor with Logging {
 
     case header: EncryBlockHeader =>
       if (!notCompletedBlocks.contains(header.payloadId)) {
+        logger.info(s"Get header for height: ${header.height} and id: ${Algos.encode(header.id)}")
         notCompletedBlocks += header.payloadId -> header.id
         headers += header.height -> header
         headerCache += header.id -> header
       } else {
-        notCompletedBlocks = notCompletedBlocks - header.payloadId + (header.payloadId -> header.id)
+        logger.info("Exist: and add")
+        notCompletedBlocks = (notCompletedBlocks - header.payloadId) + (header.payloadId -> header.id)
         createBlockIfPossible(header.payloadId)
       }
     case payload: EncryBlockPayload =>

@@ -13,7 +13,7 @@ import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
-import encry.network.ModifiersHolder.{RequestedModifiers, UpdateBestHeaderHeight}
+import encry.network.ModifiersHolder.UpdateBestHeaderHeight
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
@@ -56,15 +56,25 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def receive: Receive = {
-    case ModifiersFromRemote(peer, modifierTypeId, remoteObjects) =>
+    case ModifiersFromRemote(_, modifierTypeId, remoteObjects) =>
       modifierSerializers.get(modifierTypeId).foreach { companion =>
-        remoteObjects.flatMap(companion.parseBytes(_).toOption).foreach {
+        remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
             if (nodeView.history.contains(pmod) || modifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
-            else modifiersHolder ! RequestedModifiers(modifierTypeId, remoteObjects.flatMap(companion.parseBytes(_).toOption))
+            else {
+              //modifiersHolder ! RequestedModifiers(modifierTypeId, remoteObjects.flatMap(companion.parseBytes(_).toOption))
+              modifiersCache += (key(pmod.id) -> pmod)
+            }
         }
+        log.info(s"Cache before(${modifiersCache.size})")
+        Iterator.continually(modifiersCache.find(x => nodeView.history.applicable(x._2)))
+          .takeWhile(_.isDefined).flatten.foreach { case (k, v) =>
+          modifiersCache -= k
+          pmodModify(v)
+        }
+        log.info(s"Cache after(${modifiersCache.size})")
       }
     case ApplyModifier(pmod) => if (nodeView.history.applicable(pmod)) pmodModify(pmod)
     case lt: LocallyGeneratedTransaction[EncryProposition, EncryBaseTransaction] => txModify(lt.tx)
