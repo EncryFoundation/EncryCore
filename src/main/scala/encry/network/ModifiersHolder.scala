@@ -2,6 +2,7 @@ package encry.network
 
 import akka.persistence.{PersistentActor, SaveSnapshotFailure, SaveSnapshotSuccess, SnapshotOffer}
 import encry.EncryApp._
+import encry.modifiers.history.block.Block.{Height => BlockHeight}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
@@ -31,9 +32,9 @@ class ModifiersHolder extends PersistentActor with Logging {
     */
   var notCompletedBlocks: Map[ModifierId, ModifierId] = Map.empty
   var headerCache: Map[ModifierId, EncryBlockHeader] = Map.empty
-  var headers: SortedMap[Int, EncryBlockHeader] = SortedMap.empty
+  var headers: SortedMap[BlockHeight, EncryBlockHeader] = SortedMap.empty
   var payloadCache: Map[ModifierId, EncryBlockPayload] = Map.empty
-  var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
+  var completedBlocks: SortedMap[BlockHeight, EncryBlock] = SortedMap.empty
 
   context.system.scheduler.schedule(10.second, 10.second) {
     amount = Amount(headers.size, payloads.size, blocks.size)
@@ -55,10 +56,10 @@ class ModifiersHolder extends PersistentActor with Logging {
     case SaveSnapshotFailure(metadata, reason) => logger.info("Failure with snapshot")
     case UpdateBestHeaderHeight(height) => bestHeaderHeight = height
     case UpdateBestBlockHeight(height) => bestBlockHeight = height
-    case CheckHeaders => headers.foldLeft(Seq[Int, EncryBlockHeader]()) {
+    case CheckHeaders => headers.foldLeft(Map[BlockHeight, EncryBlockHeader]()) {
 
       case (headersToApply, (height, header)) =>
-        if (height < bestHeaderHeight || height <= headersToApply.max.height + 1) headersToApply :+ header
+        if (height < bestHeaderHeight || height <= headersToApply.max._1 + 1) headersToApply + (header.height -> header)
         else headersToApply
       }
       headers.foreach{headerInfo =>
@@ -66,10 +67,10 @@ class ModifiersHolder extends PersistentActor with Logging {
         headers -= headerInfo._1
       }
 
-    case CheckCompletedBlocks => completedBlocks.foldLeft(Seq[Int, EncryBlock]()) {
+    case CheckCompletedBlocks => completedBlocks.foldLeft(Map[BlockHeight, EncryBlock]()) {
 
       case (blockToApply, (height, block)) =>
-        if (height < bestBlockHeight || height <= blockToApply.max.header.height + 1) blockToApply :+ block
+        if (height < bestBlockHeight || height <= blockToApply.max._1 + 1) blockToApply + (block.header.height -> block)
         else blockToApply
     }
       headers.foreach{headerInfo =>
