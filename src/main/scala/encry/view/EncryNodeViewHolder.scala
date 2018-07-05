@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
@@ -12,19 +13,20 @@ import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
-import encry.network.ModifiersHolder.RequestedModifiers
+import encry.network.ModifiersHolder.{RequestedModifiers, UpdateBestHeaderHeight}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
-import encry.view.history.EncryHistory
+import encry.view.history.{EncryHistory, Height}
 import encry.view.mempool.EncryMempool
 import encry.view.state.{Proposition, _}
 import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import scorex.crypto.authds.ADDigest
+
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
@@ -61,22 +63,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           case pmod: EncryPersistentModifier@unchecked =>
             if (nodeView.history.contains(pmod) || modifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
-            else modifiersCache += (key(pmod.id) -> pmod)
+            else modifiersHolder ! RequestedModifiers(modifierTypeId, remoteObjects.flatMap(companion.parseBytes(_).toOption))
         }
-        modifiersHolder ! RequestedModifiers(modifierTypeId, remoteObjects.flatMap(companion.parseBytes(_).toOption))
-        log.info(s"Cache before(${modifiersCache.size})")
-        Iterator.continually(modifiersCache.find(x => nodeView.history.applicable(x._2)))
-          .takeWhile(_.isDefined).flatten.foreach { case (k, v) =>
-          modifiersCache -= k
-          pmodModify(v)
-        }
-        log.info(s"Cache after(${modifiersCache.size})")
       }
+    case ApplyModifier(pmod) => if (nodeView.history.applicable(pmod)) pmodModify(pmod)
     case lt: LocallyGeneratedTransaction[EncryProposition, EncryBaseTransaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       log.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       modifiersHolder ! lm
-      pmodModify(lm.pmod)
     case GetDataFromCurrentView(f) => sender() ! f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool))
     case GetNodeViewChanges(history, state, vault, mempool) =>
       if (history) sender() ! ChangedHistory(nodeView.history)
@@ -202,6 +196,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               log.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
               if (settings.node.sendStat)
                 newHistory.bestHeaderOpt.foreach(header => context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
+              modifiersHolder ! UpdateBestHeaderHeight(Height @@ newHistory.bestHeaderHeight)
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
               logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
@@ -305,6 +300,8 @@ object EncryNodeViewHolder {
   case class CurrentView[HIS, MS, VL, MP](history: HIS, state: MS, vault: VL, pool: MP)
 
   object ReceivableMessages {
+
+    case class ApplyModifier(pmod: EncryPersistentModifier)
 
     case class GetNodeViewChanges(history: Boolean, state: Boolean, vault: Boolean, mempool: Boolean)
 
