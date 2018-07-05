@@ -172,13 +172,13 @@ trait EncryHistory extends History[EncryPersistentModifier, EncrySyncInfo, Encry
 object EncryHistory {
 
   def getHistoryIndexDir(settings: EncryAppSettings): File = {
-    val dir = new File(s"${settings.directory}/history/index")
+    val dir: File = new File(s"${settings.directory}/history/index")
     dir.mkdirs()
     dir
   }
 
   def getHistoryObjectsDir(settings: EncryAppSettings): File = {
-    val dir = new File(s"${settings.directory}/history/objects")
+    val dir: File = new File(s"${settings.directory}/history/objects")
     dir.mkdirs()
     dir
   }
