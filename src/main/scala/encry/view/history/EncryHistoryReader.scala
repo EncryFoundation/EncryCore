@@ -17,8 +17,7 @@ import encry.view.history.processors.proofs.BaseADProofProcessor
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
-trait EncryHistoryReader
-  extends HistoryReader[EncryPersistentModifier, EncrySyncInfo]
+trait EncryHistoryReader extends HistoryReader[EncryPersistentModifier, EncrySyncInfo]
     with BlockHeaderProcessor
     with BaseBlockPayloadProcessor
     with BaseADProofProcessor

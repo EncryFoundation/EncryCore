@@ -163,7 +163,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Failure(e) =>
-              val (newHis: EncryHistory, newProgressInfo: ProgressInfo[EncryPersistentModifier]) = history.reportModifierIsInvalid(modToApply, progressInfo)
+              val (newHis: EncryHistory, newProgressInfo: ProgressInfo[EncryPersistentModifier]) =
+                history.reportModifierIsInvalid(modToApply, progressInfo)
               nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           }
