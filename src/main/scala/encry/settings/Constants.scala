@@ -67,7 +67,7 @@ object Constants {
     val PreGenesisHeight: Height = Height @@ (GenesisHeight - 1)
 
     // Maximum number of epochs blockchain state can be rolled back
-    val MaxRollbackDepth: Int = (10.days.toMillis / DesiredBlockInterval.toMillis).toInt
+    val MaxRollbackDepth: Int = 100
 
     val MaxTimeDrift: Long = 10 * DesiredBlockInterval.toMillis
 
