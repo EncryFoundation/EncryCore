@@ -13,7 +13,6 @@ import encry.utils.Logging
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
-
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
