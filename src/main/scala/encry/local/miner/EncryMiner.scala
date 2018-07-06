@@ -72,7 +72,7 @@ class EncryMiner extends Actor with Logging {
       candidateOpt = None
       context.children.foreach(_ ! DropChallenge)
 
-    case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty, candidateOpt)
+    case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
 
     case _ =>
   }
@@ -159,7 +159,8 @@ class EncryMiner extends Actor with Logging {
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
       log.info("Starting candidate generation")
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
-      if (bestHeaderOpt.isDefined || settings.node.offlineGeneration) CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
+      if ((bestHeaderOpt.isDefined && view.history.isHeadersChainSynced) || settings.node.offlineGeneration)
+        CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
       else CandidateEnvelope.empty
     }
 }
