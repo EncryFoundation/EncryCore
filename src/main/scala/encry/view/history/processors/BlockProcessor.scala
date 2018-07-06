@@ -6,6 +6,7 @@ import encry.consensus.ModifierSemanticValidity.Invalid
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
+import encry.settings.Algos
 import encry.utils.Logging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
@@ -34,9 +35,9 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     * @return ProgressInfo required for State to process to be consistent with History
     */
   protected def processBlock(fullBlock: EncryBlock, payloadIsNew: Boolean): ProgressInfo[EncryPersistentModifier] = {
-    val newModRow = calculateNewModRow(fullBlock, payloadIsNew)
-    val bestFullChain = calculateBestFullChain(fullBlock)
-    val newBestAfterThis = bestFullChain.last.header
+    val newModRow: EncryPersistentModifier = calculateNewModRow(fullBlock, payloadIsNew)
+    val bestFullChain: Seq[EncryBlock] = calculateBestFullChain(fullBlock)
+    val newBestAfterThis: EncryBlockHeader = bestFullChain.last.header
     processing(ToProcess(fullBlock, newModRow, newBestAfterThis, bestFullChain, nodeSettings.blocksToKeep))
   }
 
@@ -52,7 +53,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def processValidFirstBlock: BlockProcessing = {
     case ToProcess(fullBlock, newModRow, newBestHeader, newBestChain, _)
       if isValidFirstBlock(fullBlock.header) =>
-
+      logger.info("FROM processValidFirstBlock")
       logStatus(Seq(), newBestChain, fullBlock, None)
       updateStorage(newModRow, newBestHeader.id)
       ProgressInfo(None, Seq.empty, newBestChain, Seq.empty)
@@ -73,6 +74,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
         nonBestBlock(toProcess)
       } else {
         //application of this block leads to full chain with higher score
+        logger.info(s"FROM processBetterChain. Going to apply: ${toApply.foldLeft(""){case (str, block) => str + s"|${block.header.height}" + Algos.encode(block.id)}}")
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint = toRemove.headOption.map(_ => prevChain.head.id)
 

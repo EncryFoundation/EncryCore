@@ -69,12 +69,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             }
         }
         log.info(s"Cache before(${modifiersCache.size})")
+        modifiersCache.foreach(modInfo => logger.info(modInfo._2.modifierTypeId + "-" + Algos.encode(modInfo._2.id)))
         Iterator.continually(modifiersCache.find(x => nodeView.history.applicable(x._2)))
           .takeWhile(_.isDefined).flatten.foreach { case (k, v) =>
           modifiersCache -= k
           pmodModify(v)
         }
         log.info(s"Cache after(${modifiersCache.size})")
+        modifiersCache.foreach(modInfo => logger.info(modInfo._2.modifierTypeId + "-" + Algos.encode(modInfo._2.id)))
       }
     case ApplyModifier(pmod) => if (nodeView.history.applicable(pmod)) pmodModify(pmod)
     case lt: LocallyGeneratedTransaction[EncryProposition, EncryBaseTransaction] => txModify(lt.tx)
@@ -164,15 +166,18 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
-          if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
-            case Success(stateAfterApply) =>
-              val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
-              context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
-              UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
-            case Failure(e) =>
-              val (newHis: EncryHistory, newProgressInfo: ProgressInfo[EncryPersistentModifier]) = history.reportModifierIsInvalid(modToApply, progressInfo)
-              nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
-              UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
+          if (u.failedMod.isEmpty) {
+            logger.info(s"FROM stateToApplyTry. Going to apply(${modToApply.modifierTypeId}): ${Algos.encode(modToApply.id)}")
+            u.state.applyModifier(modToApply) match {
+              case Success(stateAfterApply) =>
+                val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
+                context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
+                UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
+              case Failure(e) =>
+                val (newHis: EncryHistory, newProgressInfo: ProgressInfo[EncryPersistentModifier]) = history.reportModifierIsInvalid(modToApply, progressInfo)
+                nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
+                UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
+            }
           }
           else u
         }
@@ -295,7 +300,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             case None => throw new Exception(s"Failed to get full block for header $h")
           }
         }
-        toApply.foldLeft(startState) { (s, m) => s.applyModifier(m).get }
+        toApply.foldLeft(startState) { (s, m) =>
+          logger.info("FROM foreach")
+          s.applyModifier(m).get }
     }
   }.recoverWith { case e =>
     logError("Failed to recover state.", e)
