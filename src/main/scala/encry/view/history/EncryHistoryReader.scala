@@ -18,10 +18,10 @@ import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
 trait EncryHistoryReader extends HistoryReader[EncryPersistentModifier, EncrySyncInfo]
-    with BlockHeaderProcessor
-    with BaseBlockPayloadProcessor
-    with BaseADProofProcessor
-    with Logging {
+  with BlockHeaderProcessor
+  with BaseBlockPayloadProcessor
+  with BaseADProofProcessor
+  with Logging {
 
   protected val nodeSettings: NodeSettings
 
@@ -45,9 +45,6 @@ trait EncryHistoryReader extends HistoryReader[EncryPersistentModifier, EncrySyn
   /** @return ids of count headers starting from offset */
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
     .flatMap(h => headerIdsAtHeight(h).headOption)
-
-  /** Id of best block to mine */
-  override def openSurfaceIds(): Seq[ModifierId] = bestBlockIdOpt.orElse(bestHeaderIdOpt).toSeq
 
   /**
     * Whether another's node syncinfo shows that another node is ahead or behind ours
@@ -79,7 +76,7 @@ trait EncryHistoryReader extends HistoryReader[EncryPersistentModifier, EncrySyn
     * @param size max return size
     * @return Ids of headers, that node with info should download and apply to synchronize
     */
-  override def continuationIds(info: EncrySyncInfo, size: Int): Option[ModifierIds] = Try {
+  def continuationIds(info: EncrySyncInfo, size: Int): Option[ModifierIds] = Try {
     if (isEmpty) info.startingPoints
     else if (info.lastHeaderIds.isEmpty) {
       val heightFrom: Int = Math.min(bestHeaderHeight, size - 1)
@@ -130,7 +127,7 @@ trait EncryHistoryReader extends HistoryReader[EncryPersistentModifier, EncrySyn
   }
 
   /** Checks whether the modifier is applicable to the history. */
-  override def applicable(modifier: EncryPersistentModifier): Boolean = testApplicable(modifier).isSuccess
+  def applicable(modifier: EncryPersistentModifier): Boolean = testApplicable(modifier).isSuccess
 
   def lastHeaders(count: Int): EncryHeaderChain = bestHeaderOpt
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(EncryHeaderChain.empty)
@@ -176,7 +173,6 @@ trait EncryHistoryReader extends HistoryReader[EncryPersistentModifier, EncrySyn
   /** Finds common block and sub-chains from common block to header1 and header2. */
   protected[history] def commonBlockThenSuffixes(header1: EncryBlockHeader,
                                                  header2: EncryBlockHeader): (EncryHeaderChain, EncryHeaderChain) = {
-    assert(contains(header1) && contains(header2), "Got non-existing header(s)")
     val heightDelta: Int = Math.max(header1.height - header2.height, 0)
 
     def loop(numberBack: Int, otherChain: EncryHeaderChain): (EncryHeaderChain, EncryHeaderChain) = {
@@ -202,7 +198,7 @@ trait EncryHistoryReader extends HistoryReader[EncryPersistentModifier, EncrySyn
     (currentChain, otherChain.takeAfter(currentChain.head))
   }
 
-  override def syncInfo: EncrySyncInfo = if (isEmpty) EncrySyncInfo(Seq.empty)
+  def syncInfo: EncrySyncInfo = if (isEmpty) EncrySyncInfo(Seq.empty)
   else EncrySyncInfo(lastHeaders(EncrySyncInfo.MaxBlockIds).headers.map(_.id))
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
