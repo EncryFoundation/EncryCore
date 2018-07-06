@@ -58,7 +58,7 @@ object HeadersTable {
     val transactionsRoot: String = Base16.encode(h.transactionsRoot)
     val proofs: String = ""
     val solution: String = h.equihashSolution.ints.mkString("{", ", ", "}")
-    val (minerAddress: String, minerReward: Long) = "unknown" -> 0
+    val (minerAddress: String, minerReward: Long) = "unknown" -> 0L
     val feesTotal: Long = 0
     val txsSize: Int = 0
 
