@@ -106,7 +106,8 @@ class NetworkController extends Actor with Logging {
         case Outgoing => s"New outgoing connection to $remote established (bound to local $local)"
       }
       log.info(logMsg)
-      context.actorOf(PeerConnectionHandler.props(messagesHandler, sender(), direction, externalSocketAddress, remote))
+      context.actorOf(PeerConnectionHandler.props(messagesHandler, sender(), direction, externalSocketAddress, remote)
+        .withDispatcher("network-dispatcher"))
       outgoing -= remote
     case CommandFailed(c: Connect) =>
       outgoing -= c.remoteAddress
