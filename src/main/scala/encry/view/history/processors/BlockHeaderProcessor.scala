@@ -3,6 +3,7 @@ package encry.view.history.processors
 import com.google.common.primitives.Ints
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
+import encry.local.explorer.BlockListener.NewOrphaned
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.{Block, EncryBlock}
@@ -115,6 +116,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with Logging {
       val headerIdsRow = if (score > bestHeadersChainScore) {
         bestBlockHeaderIdsRow(h, score)
       } else {
+        EncryApp.system.actorSelection("/user/blockListener") ! NewOrphaned(h) // TODO: Remove direct system import when possible.
         orphanedBlockHeaderIdsRow(h, score)
       }
       (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, h)

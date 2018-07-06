@@ -5,12 +5,13 @@ import cats.effect.IO
 import doobie.hikari.HikariTransactor
 import encry.EncryApp.settings
 import encry.ModifierId
-import encry.local.explorer.BlockListener.ChainSwitching
+import encry.local.explorer.BlockListener.{ChainSwitching, NewOrphaned}
 import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import encry.utils.ScorexLogging
+import encry.utils.Logging
 
-class BlockListener extends Actor with ScorexLogging {
+class BlockListener extends Actor with Logging {
 
   val transactor: HikariTransactor[IO] = HikariTransactor
     .newHikariTransactor[IO](
@@ -28,10 +29,12 @@ class BlockListener extends Actor with ScorexLogging {
 
   override def receive: Receive = {
     case SemanticallySuccessfulModifier(block: EncryBlock) => DBService.processBlock(block, transactor).unsafeRunSync()
+    case NewOrphaned(header: EncryBlockHeader) => DBService.processHeader(header, transactor).unsafeRunSync()
     case ChainSwitching(ids) => DBService.markAsRemovedFromMainChain(ids.toList, transactor).unsafeRunSync()
   }
 }
 
 object BlockListener {
   case class ChainSwitching(switchedIds: Seq[ModifierId])
+  case class NewOrphaned(header: EncryBlockHeader)
 }

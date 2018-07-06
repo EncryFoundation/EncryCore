@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
@@ -15,7 +16,6 @@ import encry.modifiers.state.box.EncryProposition
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
-import encry.stats.StatsSender.BestHeaderInChain
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
@@ -25,6 +25,7 @@ import encry.view.state.{Proposition, _}
 import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import scorex.crypto.authds.ADDigest
+
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}

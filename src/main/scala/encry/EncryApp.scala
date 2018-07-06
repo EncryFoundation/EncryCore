@@ -31,7 +31,7 @@ import scala.io.Source
 object EncryApp extends App with Logging {
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read
-  implicit val system: ActorSystem = ActorSystem()
+  implicit lazy val system: ActorSystem = ActorSystem()
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
   lazy val bindAddress: InetSocketAddress = settings.restApi.bindAddress

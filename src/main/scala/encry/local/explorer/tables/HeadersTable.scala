@@ -1,6 +1,7 @@
 package encry.local.explorer.tables
 
 import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.mempool.directive.TransferDirective
 import scorex.crypto.encode.Base16
@@ -47,6 +48,23 @@ object HeadersTable {
     s"('$id', '$parentId', '${b.header.version}', '${b.header.height}', '$proofsRoot', '$stateRoot', " +
       s"'$transactionsRoot', '${b.header.timestamp}', '${b.header.difficulty}', '${b.bytes.length}', '$solution', '$proofs', " +
       s"'${b.payload.transactions.size}', '$minerAddress', '$minerReward', '$feesTotal', '$txsSize', TRUE)"
+  }
+
+  def dataString(h: EncryBlockHeader): String = {
+    val id: String = Base16.encode(h.id)
+    val parentId: String = Base16.encode(h.parentId)
+    val proofsRoot: String = Base16.encode(h.adProofsRoot)
+    val stateRoot: String = Base16.encode(h.stateRoot)
+    val transactionsRoot: String = Base16.encode(h.transactionsRoot)
+    val proofs: String = ""
+    val solution: String = h.equihashSolution.ints.mkString("{", ", ", "}")
+    val (minerAddress: String, minerReward: Long) = "unknown" -> 0
+    val feesTotal: Long = 0
+    val txsSize: Int = 0
+
+    s"('$id', '$parentId', '${h.version}', '${h.height}', '$proofsRoot', '$stateRoot', " +
+      s"'$transactionsRoot', '${h.timestamp}', '${h.difficulty}', '${h.bytes.length}', '$solution', '$proofs', " +
+      s"'0', '$minerAddress', '$minerReward', '$feesTotal', '$txsSize', TRUE)"
   }
 
   private def minerInfo(coinbase: EncryBaseTransaction): (String, Long) = coinbase.directives.head match {

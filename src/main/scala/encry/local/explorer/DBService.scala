@@ -21,6 +21,9 @@ object DBService {
   def insertBlock(block: EncryBlock): ConnectionIO[Int] =
     insert(tables.HeadersTable.name, tables.HeadersTable.fieldsString, tables.HeadersTable.dataString(block))
 
+  def insertHeader(header: EncryBlockHeader): ConnectionIO[Int] =
+    insert(tables.HeadersTable.name, tables.HeadersTable.fieldsString, tables.HeadersTable.dataString(header))
+
   def insertTransactions(h: EncryBlockHeader, p: EncryBlockPayload): ConnectionIO[Int] =
     insert(tables.TransactionsTable.name, tables.TransactionsTable.fieldsString, tables.TransactionsTable.dataStrings(h, p))
 
@@ -36,6 +39,10 @@ object DBService {
     outsR  <- insertOutputs(block.header, block.payload)
     insR   <- insertInputs(block.header, block.payload)
   } yield txsR + blockR + outsR + insR).transact(transactor)
+
+  def processHeader(header: EncryBlockHeader, transactor: Transactor[IO]): IO[Int] = (for {
+    header <- insertHeader(header)
+  } yield header).transact(transactor)
 
   def markAsRemovedFromMainChain(ids: List[ModifierId], transactor: Transactor[IO]): IO[Int] =
     Update[String](tables.HeadersTable.updateByIdSql("best_chain = FALSE"))
