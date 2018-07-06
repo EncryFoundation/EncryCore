@@ -1,7 +1,7 @@
 package encry
 
 import java.net.InetSocketAddress
-import akka.actor.SupervisorStrategy.Escalate
+import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
@@ -23,6 +23,7 @@ import encry.stats.StatsSender
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
+
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.io.Source
@@ -30,18 +31,13 @@ import scala.io.Source
 object EncryApp extends App with Logging {
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read
-
   implicit val system: ActorSystem = ActorSystem()
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
-
   lazy val bindAddress: InetSocketAddress = settings.restApi.bindAddress
-
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
-
   val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName).take(5)
-
   lazy val basicSpecs = {
     val invSpec = new InvSpec(settings.network.maxInvObjects)
     val requestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
@@ -55,16 +51,12 @@ object EncryApp extends App with Logging {
   }
 
   lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props(), "nodeViewHolder")
-
   val readersHolder: ActorRef = system.actorOf(Props[EncryViewReadersHolder], "readersHolder")
-
-  lazy val networkController: ActorRef = system.actorOf(Props[NetworkController], "networkController")
-
+  lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
+    .withDispatcher("network-dispatcher"), "networkController")
   lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
-
   lazy val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
-
   lazy val miner: ActorRef = system.actorOf(Props[EncryMiner].withDispatcher("mining-dispatcher"), "miner")
 
   val blockListener: ActorRef = system.actorOf(Props[BlockListener], "blockListener")
@@ -79,25 +71,25 @@ object EncryApp extends App with Logging {
     TransactionsApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
     StateInfoApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode)
   )
-
   val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
   Http().bindAndHandle(combinedRoute, bindAddress.getAddress.getHostAddress, bindAddress.getPort)
-
   lazy val upnp: UPnP = new UPnP(settings.network)
-
-  def commonSupervisorStrategy: OneForOneStrategy = OneForOneStrategy(
-    maxNrOfRetries = 5,
-    withinTimeRange = 60 seconds) {
-    case _ => Escalate
-  }
 
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
 
   if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
 
+  if (settings.node.mining) miner ! StartMining
   if (settings.testing.transactionGeneration) system.actorOf(Props[TransactionGenerator], "tx-generator") ! StartGeneration
-
   if (settings.node.enableCLI) cliListener ! StartListening
+
+  def commonSupervisorStrategy: OneForOneStrategy = OneForOneStrategy(
+    maxNrOfRetries = 5,
+    withinTimeRange = 60 seconds) {
+    case e: Exception =>
+      logger.info(s"Supervisor strategy: $e")
+      Restart
+  }
 
   def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
 }
