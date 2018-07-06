@@ -13,7 +13,7 @@ import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
-import encry.network.ModifiersHolder.UpdateBestHeaderHeight
+import encry.network.ModifiersHolder.{RequestedModifiers, UpdateBestHeaderHeight}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
@@ -66,6 +66,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             else {
               //modifiersHolder ! RequestedModifiers(modifierTypeId, remoteObjects.flatMap(companion.parseBytes(_).toOption))
               modifiersCache += (key(pmod.id) -> pmod)
+              modifiersHolder ! RequestedModifiers(modifierTypeId, Seq(pmod))
             }
         }
         log.info(s"Cache before(${modifiersCache.size})")
