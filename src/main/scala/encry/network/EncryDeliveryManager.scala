@@ -8,6 +8,7 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToN
 import encry.network.PeerConnectionHandler._
 import encry.network.message.BasicMsgDataTypes.ModifiersData
 import encry.network.message.{InvSpec, Message, ModifiersSpec, RequestModifierSpec}
+import encry.settings.Algos
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.DownloadRequest
@@ -15,7 +16,6 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.EncryMempool
 import encry.{ModifierId, ModifierTypeId}
-import scorex.crypto.encode.Base58
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -78,7 +78,7 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
       for ((id, _) <- modifiers) receive(typeId, id, remote)
       if (spam.nonEmpty) {
         log.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
-          s": ${spam.keys.map(Base58.encode)}")
+          s": ${spam.keys.map(Algos.encode)}")
         deleteSpam(spam.keys.toSeq)
       }
       if (fm.nonEmpty) nodeViewHolder ! ModifiersFromRemote(remote, typeId, fm.values.toSeq)
