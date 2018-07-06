@@ -58,7 +58,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
-            if (nodeView.history.contains(pmod) || modifiersCache.contains(key(pmod.id)))
+            if (nodeView.history.contains(pmod.id) || modifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else modifiersCache += (key(pmod.id) -> pmod)
         }

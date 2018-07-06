@@ -2,7 +2,7 @@ package encry.view.history
 
 import encry._
 import encry.consensus.History._
-import encry.consensus.{HistoryReader, ModifierSemanticValidity}
+import encry.consensus.ModifierSemanticValidity
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -17,16 +17,14 @@ import encry.view.history.processors.proofs.BaseADProofProcessor
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
-trait EncryHistoryReader extends HistoryReader[EncryPersistentModifier, EncrySyncInfo]
-  with BlockHeaderProcessor
-  with BaseBlockPayloadProcessor
-  with BaseADProofProcessor
-  with Logging {
+trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProcessor with BaseADProofProcessor with Logging {
 
   protected val nodeSettings: NodeSettings
 
   /** Is there's no history, even genesis block */
   def isEmpty: Boolean = bestHeaderIdOpt.isEmpty
+
+  def contains(id: ModifierId): Boolean = modifierById(id).isDefined
 
   /**
     * Header of best Header chain. Empty if no genesis block is applied yet.
@@ -52,7 +50,7 @@ trait EncryHistoryReader extends HistoryReader[EncryPersistentModifier, EncrySyn
     * @param si other's node sync info
     * @return Equal if nodes have the same history, Younger if another node is behind, Older if a new node is ahead
     */
-  override def compare(si: EncrySyncInfo): HistoryComparisonResult = {
+  def compare(si: EncrySyncInfo): HistoryComparisonResult = {
     bestHeaderIdOpt match {
       case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) =>
         Equal //Our best header is the same as other node best header
@@ -132,7 +130,7 @@ trait EncryHistoryReader extends HistoryReader[EncryPersistentModifier, EncrySyn
   def lastHeaders(count: Int): EncryHeaderChain = bestHeaderOpt
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(EncryHeaderChain.empty)
 
-  override def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
+  def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
     historyStorage.modifierById(id)
       .ensuring(_.forall(_.id sameElements id), s"Modifier ${Algos.encode(id)} id mismatch")
 
