@@ -13,7 +13,7 @@ import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
-import encry.network.ModifiersHolder.{RequestedModifiers, UpdateBestHeaderHeight}
+import encry.network.ModifiersHolder.RequestedModifiers
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
@@ -64,7 +64,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             if (nodeView.history.contains(pmod) || modifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
-              //modifiersHolder ! RequestedModifiers(modifierTypeId, remoteObjects.flatMap(companion.parseBytes(_).toOption))
               modifiersCache += (key(pmod.id) -> pmod)
               modifiersHolder ! RequestedModifiers(modifierTypeId, Seq(pmod))
             }
@@ -212,7 +211,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               log.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
               if (settings.node.sendStat)
                 newHistory.bestHeaderOpt.foreach(header => context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
-              modifiersHolder ! UpdateBestHeaderHeight(newHistory.bestHeaderHeight)
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
               logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
