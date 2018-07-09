@@ -23,6 +23,6 @@ class ModifiersHolderTest extends PropSpec with Matchers {
     val fakeHeightChain: Seq[Int] = (firstMinRange to firstMaxRange) ++ (secondMinRange to secondMaxRange) ++ (thirdMinRange to thirdMaxRange)
 
     ModifiersHolder.countGaps(fakeHeightChain) shouldEqual
-      Seq((1, firstMinRange - 1), (firstMaxRange + 1, secondMinRange - 1), (secondMaxRange + 1, thirdMinRange - 1))
+      Seq((0, firstMinRange - 1), (firstMaxRange + 1, secondMinRange - 1), (secondMaxRange + 1, thirdMinRange - 1))
   }
 }
