@@ -11,8 +11,6 @@ import encry.network.peer.PeerManager.ReceivableMessages._
 import encry.network.{Handshake, SendToRandom, SendingStrategy}
 import encry.utils.Logging
 import scala.util.Random
-import akka.pattern.ask
-import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class PeerManager extends Actor with Logging {
@@ -62,14 +60,19 @@ class PeerManager extends Actor with Logging {
       connectingPeers -= remote
       nodeViewSynchronizer ! DisconnectedPeer(remote)
     case CheckPeers =>
-      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
-        (peerManager ? RandomPeers(1)) (5 seconds)
-          .map(peers => {
-            val address: InetSocketAddress = peers.asInstanceOf[Seq[ConnectedPeer]].head.socketAddress
-            if (!connectedPeers.exists(_._1 == address) && !connectingPeers.exists(_.getHostName == address.getHostName))
-              sender() ! ConnectTo(address)
-          })
+      def randomPeer: Option[InetSocketAddress] = {
+        val peers: Seq[InetSocketAddress] = PeerDatabase.knownPeers().keys.toSeq
+        if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
+        else None
       }
+
+      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections)
+        randomPeer.foreach { address =>
+          if (!connectedPeers.exists(_._1 == address) &&
+            !connectingPeers.exists(_.getHostName == address.getHostName)) {
+            sender() ! ConnectTo(address)
+          }
+        }
   }
 }
 
