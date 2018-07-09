@@ -19,7 +19,7 @@ import scala.concurrent.duration._
 class ModifiersHolder extends PersistentActor with Logging {
 
   var modsFromRemote: Mods = Mods(Map.empty, 0)
-  var amount: Amount = Amount(0, 0, 0, 0)
+  var amount: Amount = Amount(0, 0, 0, 0, 0, Seq.empty)
 
   /**
     * Map, which contains not completed blocks
@@ -34,13 +34,17 @@ class ModifiersHolder extends PersistentActor with Logging {
     amount = Amount(headerCache.size,
       payloadCache.size,
       notCompletedBlocks.size,
-      completedBlocks.size
+      completedBlocks.size,
+      completedBlocks.keys.max,
+      gaps
     )
     saveSnapshot(amount)
     logger.info(s"${amount.receivedHeaders} headers received - " +
       s"${amount.receivedPayloads} payloads received - " +
       s"${amount.notCompletedBlocks} not full blocks - " +
-      s"${amount.completedBlocks} full blocks")
+      s"${amount.completedBlocks} full blocks - " +
+      s"max height: ${amount.maxHeight} " +
+      s"Gaps: ${amount.gaps.foldLeft(""){ case (str, gap) => str + s"(${gap._1}, ${gap._2})"}}")
   }
 
   override def preStart(): Unit = logger.info(s"ModifiersHolder actor is started.")
@@ -90,11 +94,22 @@ class ModifiersHolder extends PersistentActor with Logging {
     case block: EncryBlock => completedBlocks += block.header.height -> block
     case _ =>
   }
+
+  def gaps: Seq[(Int, Int)] = completedBlocks.keys.foldLeft(Seq[(Int, Int)](), 0) {
+      case ((gaps, prevHeight), blockHeight) =>
+        if (prevHeight + 1 != blockHeight) (gaps :+ (prevHeight, blockHeight - 1), blockHeight)
+        else (gaps, blockHeight)
+    }._1
 }
 
 object ModifiersHolder {
 
-  case class Amount(receivedHeaders: Int, receivedPayloads: Int, notCompletedBlocks: Int, completedBlocks: Int)
+  case class Amount(receivedHeaders: Int,
+                    receivedPayloads: Int,
+                    notCompletedBlocks: Int,
+                    completedBlocks: Int,
+                    maxHeight: Int,
+                    gaps: Seq[(Int, Int)])
 
   case class RequestedModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier])
 
