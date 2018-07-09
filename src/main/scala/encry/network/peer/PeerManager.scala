@@ -1,7 +1,6 @@
 package encry.network.peer
 
 import java.net.InetSocketAddress
-
 import akka.actor.Actor
 import encry.EncryApp._
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
@@ -11,11 +10,8 @@ import encry.network.PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages._
 import encry.network.{Handshake, SendToRandom, SendingStrategy}
 import encry.utils.Logging
-
 import scala.util.Random
 import akka.pattern.ask
-
-import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -67,7 +63,7 @@ class PeerManager extends Actor with Logging {
       nodeViewSynchronizer ! DisconnectedPeer(remote)
     case CheckPeers =>
       if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
-        (peerManager ? FilterPeers(SendToRandom)) (5 seconds)
+        (peerManager ? RandomPeers(1)) (5 seconds)
           .map(peers => {
             val address: InetSocketAddress = peers.asInstanceOf[Seq[ConnectedPeer]].head.socketAddress
             if (!connectedPeers.exists(_._1 == address) && !connectingPeers.exists(_.getHostName == address.getHostName))
