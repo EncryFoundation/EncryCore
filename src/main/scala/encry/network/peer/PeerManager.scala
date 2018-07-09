@@ -8,9 +8,10 @@ import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
 import encry.network.PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages._
-import encry.network.{Handshake, SendingStrategy}
+import encry.network.{Handshake, SendToRandom, SendingStrategy}
 import encry.utils.Logging
 import scala.util.Random
+import scala.language.postfixOps
 
 class PeerManager extends Actor with Logging {
 
