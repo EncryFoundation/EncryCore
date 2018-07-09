@@ -1,10 +1,10 @@
-package encry.utils
+package encry.network
 
 import org.scalatest.{Matchers, PropSpec}
 
 import scala.util.Random
 
-class ChainTest extends PropSpec with Matchers {
+class ModifiersHolderTest extends PropSpec with Matchers {
 
   property("Correct counting of gaps") {
 
@@ -22,6 +22,7 @@ class ChainTest extends PropSpec with Matchers {
 
     val fakeHeightChain: Seq[Int] = (firstMinRange to firstMaxRange) ++ (secondMinRange to secondMaxRange) ++ (thirdMinRange to thirdMaxRange)
 
-    Chain.countGaps(fakeHeightChain) shouldEqual Seq((1, firstMinRange - 1), (firstMaxRange + 1, secondMinRange - 1), (secondMaxRange + 1, thirdMinRange - 1))
+    ModifiersHolder.countGaps(fakeHeightChain) shouldEqual
+      Seq((1, firstMinRange - 1), (firstMaxRange + 1, secondMinRange - 1), (secondMaxRange + 1, thirdMinRange - 1))
   }
 }

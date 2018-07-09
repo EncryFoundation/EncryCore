@@ -9,7 +9,6 @@ import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
-import encry.utils.Chain._
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.{ModifierId, ModifierTypeId}
@@ -42,9 +41,9 @@ class ModifiersHolder extends PersistentActor with Logging {
     )
     saveSnapshot(amount)
     logger.info(s"${amount.receivedHeaders} headers received - " +
-      s"${amount.receivedPayloads} payloads received - " +
-      s"${amount.notCompletedBlocks} not full blocks - " +
-      s"${amount.completedBlocks} full blocks - " +
+      s" ${amount.receivedPayloads} payloads received - " +
+      s" ${amount.notCompletedBlocks} not full blocks - " +
+      s" ${amount.completedBlocks} full blocks - " +
       s"max height: ${amount.maxHeight} " +
       s"Gaps: ${amount.gaps.foldLeft("") { case (str, gap) => str + s"(${gap._1}, ${gap._2})" }} " +
       s"Duplicates: ${amount.duplicates.foldLeft(""){ case (str, duplicate) => str + s"(${Algos.encode(duplicate._1)}, ${duplicate._2})"  }}")
@@ -114,4 +113,9 @@ object ModifiersHolder {
 
   case class Mods(numberOfModsByPeerAndModType: Map[(ConnectedPeer, ModifierTypeId), Int], numberOfPacksFromRemotes: Int)
 
+  def countGaps(blocksHeight: Seq[Int]): Seq[(Int, Int)] = blocksHeight.foldLeft(Seq[(Int, Int)](), 0) {
+    case ((gaps, prevHeight), blockHeight) =>
+      if (prevHeight + 1 != blockHeight) (gaps :+ (prevHeight + 1, blockHeight - 1), blockHeight)
+      else (gaps, blockHeight)
+  }._1
 }
