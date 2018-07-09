@@ -2,7 +2,7 @@ package encry.network
 
 import akka.actor.{Actor, Cancellable}
 import encry.EncryApp.{networkController, nodeViewHolder, settings, timeProvider}
-import encry.consensus.History.{HistoryComparisonResult, Nonsense, Unknown, Younger}
+import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToNetwork}
 import encry.network.PeerConnectionHandler._
@@ -16,7 +16,7 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.EncryMempool
 import encry.{ModifierId, ModifierTypeId}
-
+import scorex.crypto.encode.Base58
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Try}
@@ -49,7 +49,6 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
       statusTracker.updateStatus(remote, status)
       status match {
         case Unknown => log.info("Peer status is still unknown")
-        case Nonsense => log.info("Got nonsense")
         case Younger => sendExtension(remote, status, extOpt)
         case _ =>
       }
@@ -71,7 +70,7 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
       val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
         modifiers partition { case (id, _) => isSpam(id) }
       if (settings.node.sendStat) context.actorSelection("akka://encry/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
-      log.info(s"Got modifiers of type $typeId from remote connected peer: $remote")
+      log.info(s"Got modifiers (${modifiers.size}) of type $typeId from remote connected peer: $remote")
       for ((id, _) <- modifiers) receive(typeId, id, remote)
       if (spam.nonEmpty) {
         log.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
@@ -85,6 +84,7 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
       if (statusTracker.elapsedTimeSinceLastSync() < (settings.network.syncInterval.toMillis / 2)) log.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] => historyReaderOpt = Some(reader)
+    case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
   }
 
   def sendSync(syncInfo: EncrySyncInfo): Unit = {

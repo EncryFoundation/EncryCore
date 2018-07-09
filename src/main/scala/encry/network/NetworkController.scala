@@ -20,7 +20,6 @@ import encry.utils.Logging
 import encry.view.history.EncrySyncInfoMessageSpec
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
 import scala.util.{Failure, Success, Try}
@@ -32,8 +31,8 @@ class NetworkController extends Actor with Logging {
   val tcpManager: ActorRef = IO(Tcp)
   implicit val timeout: Timeout = Timeout(5 seconds)
   val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
-  val messageHandlers: mutable.Map[Seq[MessageCode], ActorRef] = mutable.Map[Seq[Message.MessageCode], ActorRef]()
-  val outgoing: mutable.Set[InetSocketAddress] = mutable.Set[InetSocketAddress]()
+  var messageHandlers: Map[Seq[MessageCode], ActorRef] = Map.empty
+  var outgoing: Set[InetSocketAddress] = Set.empty
   lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse {
     if (networkSettings.upnpEnabled) upnp.externalAddress.map(a => new InetSocketAddress(a, networkSettings.bindAddress.getPort))
     else None
@@ -69,23 +68,16 @@ class NetworkController extends Actor with Logging {
 
   def businessLogic: Receive = {
     case Message(spec, Left(msgBytes), Some(remote)) =>
-      val msgId: MessageCode = spec.messageCode
       spec.parseBytes(msgBytes) match {
         case Success(content) =>
-          messageHandlers.find(_._1.contains(msgId)).map(_._2) match {
-            case Some(handler) =>
-              val message: DataFromPeer[Any] = DataFromPeer(spec, content, remote)
-              message match {
-                case DataFromPeer(_, invData: InvData@unchecked, _) if spec.messageCode == InvSpec.MessageCode =>
-                  if (invData._1 != 2) handler ! DataFromPeer(spec, content, remote)
-                case _ => handler ! DataFromPeer(spec, content, remote)
-              }
-            case None => logError("No handlers found for message: " + msgId)
+          messageHandlers.find(_._1.contains(spec.messageCode)).map(_._2) match {
+            case Some(handler) => handler ! DataFromPeer(spec, content, remote)
+            case None => logError("No handlers found for message: " + spec.messageCode)
           }
         case Failure(e) => logError("Failed to deserialize data: ", e)
       }
     case SendToNetwork(message, sendingStrategy) =>
-      (peerManager ? FilterPeers(sendingStrategy))
+      (peerManager ? FilterPeers(sendingStrategy))(5 seconds)
         .map(_.asInstanceOf[Seq[ConnectedPeer]])
         .foreach(_.foreach(_.handlerRef ! message))
   }

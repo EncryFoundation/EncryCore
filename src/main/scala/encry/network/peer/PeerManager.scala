@@ -1,7 +1,6 @@
 package encry.network.peer
 
 import java.net.InetSocketAddress
-
 import akka.actor.Actor
 import encry.EncryApp._
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
@@ -9,25 +8,18 @@ import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
 import encry.network.PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages._
-import encry.network.{Handshake, SendingStrategy}
+import encry.network.{Handshake, SendToRandom, SendingStrategy}
 import encry.utils.Logging
-
 import scala.util.Random
+import scala.language.postfixOps
 
 class PeerManager extends Actor with Logging {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
-
   var connectingPeers: Set[InetSocketAddress] = Set.empty
 
   if (PeerDatabase.isEmpty) settings.network.knownPeers.foreach { address =>
     if (!isSelf(address, None)) PeerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), None))
-  }
-
-  def randomPeer: Option[InetSocketAddress] = {
-    val peers: Seq[InetSocketAddress] = PeerDatabase.knownPeers().keys.toSeq
-    if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
-    else None
   }
 
   def isSelf(address: InetSocketAddress, declaredAddress: Option[InetSocketAddress]): Boolean =
@@ -68,6 +60,12 @@ class PeerManager extends Actor with Logging {
       connectingPeers -= remote
       nodeViewSynchronizer ! DisconnectedPeer(remote)
     case CheckPeers =>
+      def randomPeer: Option[InetSocketAddress] = {
+        val peers: Seq[InetSocketAddress] = PeerDatabase.knownPeers().keys.toSeq
+        if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
+        else None
+      }
+
       if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections)
         randomPeer.foreach { address =>
           if (!connectedPeers.exists(_._1 == address) &&
@@ -75,7 +73,6 @@ class PeerManager extends Actor with Logging {
             sender() ! ConnectTo(address)
           }
         }
-
   }
 }
 

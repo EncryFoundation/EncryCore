@@ -5,7 +5,7 @@ import encry.modifiers.serialization.{BytesSerializable, Serializer}
 import encry.network.PeerConnectionHandler._
 import scorex.crypto.hash.Blake2b256
 
-import scala.util.{Success, Try}
+import scala.util.Try
 
 case class Message[Content](spec: MessageSpec[Content],
                             input: Either[Array[Byte], Content],
@@ -14,11 +14,6 @@ case class Message[Content](spec: MessageSpec[Content],
   lazy val dataBytes: Array[Byte] = input match {
     case Left(db) => db
     case Right(d) => spec.toBytes(d)
-  }
-
-  lazy val data: Try[Content] = input match {
-    case Left(db) => spec.parseBytes(db)
-    case Right(d) => Success(d)
   }
 
   lazy val dataLength: Int = dataBytes.length
