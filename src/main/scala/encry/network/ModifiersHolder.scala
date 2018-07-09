@@ -19,7 +19,6 @@ import scala.concurrent.duration._
 
 class ModifiersHolder extends PersistentActor with Logging {
 
-  var modsFromRemote: Mods = Mods(Map.empty, 0)
   var amount: Amount = Amount(0, 0, 0, 0, 0, Seq.empty, Seq.empty)
 
   /**
@@ -54,7 +53,6 @@ class ModifiersHolder extends PersistentActor with Logging {
   override def preStart(): Unit = logger.info(s"ModifiersHolder actor is started.")
 
   override def receiveRecover: Receive = {
-    case SnapshotOffer(_, snapshot: Mods) => modsFromRemote = snapshot
     case SnapshotOffer(_, snapshot: Amount) => amount = snapshot
   }
 
