@@ -1,6 +1,7 @@
 package encry.network.peer
 
 import java.net.InetSocketAddress
+
 import akka.actor.Actor
 import encry.EncryApp._
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
@@ -8,9 +9,15 @@ import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
 import encry.network.PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages._
-import encry.network.{Handshake, SendingStrategy}
+import encry.network.{Handshake, SendToRandom, SendingStrategy}
 import encry.utils.Logging
+
 import scala.util.Random
+import akka.pattern.ask
+
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class PeerManager extends Actor with Logging {
 
@@ -59,19 +66,13 @@ class PeerManager extends Actor with Logging {
       connectingPeers -= remote
       nodeViewSynchronizer ! DisconnectedPeer(remote)
     case CheckPeers =>
-      def randomPeer: Option[InetSocketAddress] = {
-        val peers: Seq[InetSocketAddress] = PeerDatabase.knownPeers().keys.toSeq
-        if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
-        else None
-      }
-
       if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
-        randomPeer.foreach { address =>
-          if (!connectedPeers.exists(_._1 == address) &&
-            !connectingPeers.exists(_.getHostName == address.getHostName)) {
-            sender() ! ConnectTo(address)
-          }
-        }
+        (peerManager ? FilterPeers(SendToRandom)) (5 seconds)
+          .map(peers => {
+            val address: InetSocketAddress = peers.asInstanceOf[Seq[ConnectedPeer]].head.socketAddress
+            if (!connectedPeers.exists(_._1 == address) && !connectingPeers.exists(_.getHostName == address.getHostName))
+              sender() ! ConnectTo(address)
+          })
       }
   }
 }
