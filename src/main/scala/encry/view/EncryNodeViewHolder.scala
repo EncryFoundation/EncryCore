@@ -78,7 +78,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         log.info(s"Cache after(${modifiersCache.size})")
         modifiersCache.foreach(modInfo => logger.info(modInfo._2.modifierTypeId + "-" + Algos.encode(modInfo._2.id)))
       }
-    case ApplyModifier(pmod) => if (nodeView.history.applicable(pmod)) pmodModify(pmod)
     case lt: LocallyGeneratedTransaction[EncryProposition, EncryBaseTransaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       log.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
@@ -312,8 +311,6 @@ object EncryNodeViewHolder {
   case class CurrentView[HIS, MS, VL, MP](history: HIS, state: MS, vault: VL, pool: MP)
 
   object ReceivableMessages {
-
-    case class ApplyModifier(pmod: EncryPersistentModifier)
 
     case class GetNodeViewChanges(history: Boolean, state: Boolean, vault: Boolean, mempool: Boolean)
 
