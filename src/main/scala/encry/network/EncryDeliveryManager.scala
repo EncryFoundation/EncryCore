@@ -16,7 +16,7 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.EncryMempool
 import encry.{ModifierId, ModifierTypeId}
-import scorex.crypto.encode.Base58
+
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Try}

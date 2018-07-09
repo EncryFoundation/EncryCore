@@ -11,9 +11,8 @@ import akka.util.Timeout
 import encry.EncryApp._
 import encry.network.NetworkController.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
-import encry.network.message.BasicMsgDataTypes.InvData
 import encry.network.message.Message.MessageCode
-import encry.network.message.{InvSpec, Message, MessageHandler}
+import encry.network.message.{Message, MessageHandler}
 import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import encry.settings.NetworkSettings
 import encry.utils.Logging

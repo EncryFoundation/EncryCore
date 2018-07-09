@@ -22,6 +22,7 @@ import encry.stats.StatsSender
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
+
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.io.Source
@@ -61,8 +62,8 @@ object EncryApp extends App with Logging {
 
   if (settings.restApi.enabled) {
 
-    import akka.http.scaladsl.server.Directives._
     import akka.http.scaladsl.model.StatusCodes._
+    import akka.http.scaladsl.server.Directives._
 
     implicit def apiExceptionHandler: ExceptionHandler =
       ExceptionHandler {
