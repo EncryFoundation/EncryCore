@@ -70,14 +70,13 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
 
-  def createBlockIfPossible(payloadId: ModifierId): Unit = {
+  def createBlockIfPossible(payloadId: ModifierId): Unit =
     notCompletedBlocks.get(Algos.encode(payloadId)).foreach(headerId => headerCache.get(headerId).foreach { header =>
       payloadCache.get(Algos.encode(payloadId)).foreach { payload =>
         completedBlocks += header._1.height -> EncryBlock(header._1, payload._1, None)
         notCompletedBlocks -= Algos.encode(payloadId)
       }
     })
-  }
 
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
     case header: EncryBlockHeader =>
