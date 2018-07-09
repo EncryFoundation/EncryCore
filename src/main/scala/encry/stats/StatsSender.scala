@@ -17,7 +17,7 @@ import org.influxdb.{InfluxDB, InfluxDBFactory}
 class StatsSender extends Actor with Logging {
 
   val influxDB: InfluxDB =
-    InfluxDBFactory.connect(settings.influxDB.url, settings.influxDB.login, settings.influxDB.password )
+    InfluxDBFactory.connect(settings.influxDB.url, settings.influxDB.login, settings.influxDB.password)
 
   var modifiersToDownload: Map[String, (ModifierTypeId, Long)] = Map()
 
@@ -31,14 +31,14 @@ class StatsSender extends Actor with Logging {
 
     case BestHeaderInChain(fb: EncryBlockHeader) =>
 
-        influxDB.write(8189, util.Arrays.asList(
+      influxDB.write(8189, util.Arrays.asList(
           s"difficulty,nodeName=${settings.network.nodeName} diff=${fb.difficulty.toString},height=${fb.height}",
           s"height,nodeName=${settings.network.nodeName},header=${Algos.encode(fb.id)} height=${fb.height}",
           s"stateWeight,nodeName=${settings.network.nodeName},height=${fb.height} value=${new File("encry/data/state/").listFiles.foldLeft(0L)(_ + _.length())}",
           s"historyWeight,nodeName=${settings.network.nodeName},height=${fb.height} value=${new File("encry/data/history/").listFiles.foldLeft(0L)(_ + _.length())}",
           s"supply,nodeName=${settings.network.nodeName},height=${fb.height} value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[history.Height])}"
-          )
         )
+      )
 
     case MiningEnd(blockHeader: EncryBlockHeader, workerNumber: Int) =>
 
@@ -52,7 +52,7 @@ class StatsSender extends Actor with Logging {
 
     case GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
       modifiers.foreach(downloadedModifierId =>
-          modifiersToDownload.get(Algos.encode(downloadedModifierId)).foreach(dowloadInfo => {
+        modifiersToDownload.get(Algos.encode(downloadedModifierId)).foreach(dowloadInfo => {
           influxDB.write(8189,
             s"modDownloadStat,nodeName=${settings.network.nodeName},modId=${Algos.encode(downloadedModifierId)},modType=${dowloadInfo._1} value=${System.currentTimeMillis() - dowloadInfo._2}"
           )
@@ -72,4 +72,5 @@ object StatsSender {
   case class SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
 
   case class GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
+
 }

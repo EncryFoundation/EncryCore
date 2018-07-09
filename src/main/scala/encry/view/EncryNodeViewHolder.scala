@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
@@ -12,6 +13,7 @@ import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
+import encry.network.ModifiersHolder.RequestedModifiers
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
@@ -24,6 +26,7 @@ import encry.view.state.{Proposition, _}
 import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import scorex.crypto.authds.ADDigest
+
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
@@ -60,20 +63,26 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           case pmod: EncryPersistentModifier@unchecked =>
             if (nodeView.history.contains(pmod) || modifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
-            else modifiersCache += (key(pmod.id) -> pmod)
+            else {
+              modifiersCache += (key(pmod.id) -> pmod)
+              modifiersHolder ! RequestedModifiers(modifierTypeId, Seq(pmod))
+            }
         }
         log.info(s"Cache before(${modifiersCache.size})")
+        modifiersCache.foreach(modInfo => logger.info(modInfo._2.modifierTypeId + "-" + Algos.encode(modInfo._2.id)))
         Iterator.continually(modifiersCache.find(x => nodeView.history.applicable(x._2)))
           .takeWhile(_.isDefined).flatten.foreach { case (k, v) =>
           modifiersCache -= k
           pmodModify(v)
         }
         log.info(s"Cache after(${modifiersCache.size})")
+        modifiersCache.foreach(modInfo => logger.info(modInfo._2.modifierTypeId + "-" + Algos.encode(modInfo._2.id)))
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, EncryBaseTransaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       log.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
+      modifiersHolder ! lm
     case GetDataFromCurrentView(f) => sender() ! f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool))
     case GetNodeViewChanges(history, state, vault, mempool) =>
       if (history) sender() ! ChangedHistory(nodeView.history)
@@ -157,16 +166,17 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
-          if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
-            case Success(stateAfterApply) =>
-              val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
-              context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
-              UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
-            case Failure(e) =>
-              val (newHis: EncryHistory, newProgressInfo: ProgressInfo[EncryPersistentModifier]) = history.reportModifierIsInvalid(modToApply, progressInfo)
-              nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
-              UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
-          }
+          if (u.failedMod.isEmpty)
+            u.state.applyModifier(modToApply) match {
+              case Success(stateAfterApply) =>
+                val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
+                context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
+                UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
+              case Failure(e) =>
+                val (newHis: EncryHistory, newProgressInfo: ProgressInfo[EncryPersistentModifier]) = history.reportModifierIsInvalid(modToApply, progressInfo)
+                nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
+                UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
+            }
           else u
         }
         uf.failedMod match {
