@@ -166,8 +166,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
-          if (u.failedMod.isEmpty) {
-            logger.info(s"FROM stateToApplyTry. Going to apply(${modToApply.modifierTypeId}): ${Algos.encode(modToApply.id)}")
+          if (u.failedMod.isEmpty)
             u.state.applyModifier(modToApply) match {
               case Success(stateAfterApply) =>
                 val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
@@ -178,7 +177,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                 nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
                 UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
             }
-          }
           else u
         }
         uf.failedMod match {
@@ -299,9 +297,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             case None => throw new Exception(s"Failed to get full block for header $h")
           }
         }
-        toApply.foldLeft(startState) { (s, m) =>
-          logger.info("FROM foreach")
-          s.applyModifier(m).get }
+        toApply.foldLeft(startState) { (s, m) => s.applyModifier(m).get }
     }
   }.recoverWith { case e =>
     logError("Failed to recover state.", e)

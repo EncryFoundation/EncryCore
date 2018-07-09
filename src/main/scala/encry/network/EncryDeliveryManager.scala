@@ -107,7 +107,6 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
     }
     if (notRequestedIds.nonEmpty) cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
     notRequestedIds.foreach { id =>
-      logger.info(s"Request for ${Algos.encode(id)}")
       val cancellable: Cancellable = context.system.scheduler.scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
       cancellables = (cancellables - key(id)) + (key(id) -> (cp, (cancellable, 0)))
     }
@@ -170,7 +169,6 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
 
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = tryWithLogging {
     if (isExpecting(mtid, mid, cp)) {
-      logger.info(s"Get ${Algos.encode(mid)}")
       delivered = delivered - key(mid) + (key(mid) -> cp)
       cancellables.get(key(mid)).foreach(_._2._1.cancel())
       cancellables -= key(mid)

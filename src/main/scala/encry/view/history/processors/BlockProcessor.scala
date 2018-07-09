@@ -53,7 +53,6 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def processValidFirstBlock: BlockProcessing = {
     case ToProcess(fullBlock, newModRow, newBestHeader, newBestChain, _)
       if isValidFirstBlock(fullBlock.header) =>
-      logger.info("FROM processValidFirstBlock")
       logStatus(Seq(), newBestChain, fullBlock, None)
       updateStorage(newModRow, newBestHeader.id)
       ProgressInfo(None, Seq.empty, newBestChain, Seq.empty)
@@ -63,8 +62,8 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     case toProcess @ ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
 
-      val prevBest = bestBlockOpt.get
-      val (prevChain, newChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
+      val prevBest: EncryBlock = bestBlockOpt.get
+      val (prevChain: EncryHeaderChain, newChain: EncryHeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
       val toRemove: Seq[EncryBlock] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[EncryBlock] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
@@ -74,16 +73,15 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
         nonBestBlock(toProcess)
       } else {
         //application of this block leads to full chain with higher score
-        logger.info(s"FROM processBetterChain. Going to apply: ${toApply.foldLeft(""){case (str, block) => str + s"|${block.header.height}" + Algos.encode(block.id)}}")
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
-        val branchPoint = toRemove.headOption.map(_ => prevChain.head.id)
+        val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
 
         updateStorage(newModRow, newBestHeader.id)
 
         if (blocksToKeep >= 0) {
-          val lastKept = blockDownloadProcessor.updateBestBlock(fullBlock.header)
+          val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)
           val bestHeight: Int = toApply.last.header.height
-          val diff = bestHeight - prevBest.header.height
+          val diff: Int = bestHeight - prevBest.header.height
           clipBlockDataAt(((lastKept - diff) until lastKept).filter(_ >= 0))
         }
         ProgressInfo(branchPoint, toRemove, toApply, Seq.empty)
@@ -110,8 +108,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
 
   private def calculateNewModRow(fullBlock: EncryBlock, txsAreNew: Boolean): EncryPersistentModifier = {
     if (txsAreNew) fullBlock.payload
-    else fullBlock.adProofsOpt
-        .getOrElse(throw new NoSuchElementException("Only transactions can be new when proofs are empty"))
+    else fullBlock.adProofsOpt.getOrElse(throw new NoSuchElementException("Only transactions can be new when proofs are empty"))
   }
 
   private def calculateBestFullChain(block: EncryBlock): Seq[EncryBlock] = {
