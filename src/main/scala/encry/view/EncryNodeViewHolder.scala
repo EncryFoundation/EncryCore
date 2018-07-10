@@ -248,11 +248,21 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryDir(settings).listFiles.isEmpty) {
-    val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
-    val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
-    val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
-    val state: StateType = restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
-    Some(NodeView(history, state, wallet, memPool))
+    try {
+      val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
+      val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
+      val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
+      val state: StateType = restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
+      Some(NodeView(history, state, wallet, memPool))
+    } catch {
+      case ex: java.nio.file.NoSuchFileException =>
+        logger.info(s"${ex.getMessage} during state restore. Start with empty store!")
+        new File(settings.directory).delete()
+        Some(genesisState)
+      case er =>
+        logger.info(s"Unexpected error during state recover: ${er.getMessage}")
+        EncryApp.forceStopApplication(500)
+    }
   } else None
 
   def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): StateType = {
@@ -270,7 +280,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       .ensuring(_.rootHash sameElements digest.getOrElse(EncryState.afterGenesisStateDigest), "State root is incorrect")
   }
 
-  def restoreConsistentState(stateIn: StateType, history: EncryHistory): StateType = Try {
+  def restoreConsistentState(stateIn: StateType, history: EncryHistory): StateType =
     (stateIn.version, history.bestBlockOpt, stateIn) match {
       case (stateId, None, _) if stateId sameElements EncryState.genesisStateVersion =>
         log.info("State and history are both empty on startup")
@@ -299,10 +309,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
         toApply.foldLeft(startState) { (s, m) => s.applyModifier(m).get }
     }
-  }.recoverWith { case e =>
-    logError("Failed to recover state.", e)
-    EncryApp.forceStopApplication(500)
-  }.get
 }
 
 object EncryNodeViewHolder {
