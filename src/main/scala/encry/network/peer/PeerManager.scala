@@ -68,13 +68,14 @@ class PeerManager extends Actor with Logging {
         else None
       }
 
-      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections)
+      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
         randomPeer.foreach { address =>
           if (!connectedPeers.exists(_._1 == address) &&
             !connectingPeers.exists(_.getHostName == address.getHostName)) {
             sender() ! ConnectTo(address)
           }
         }
+      }
   }
 }
 

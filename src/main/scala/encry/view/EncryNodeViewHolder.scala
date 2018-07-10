@@ -61,7 +61,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
-            if (nodeView.history.contains(pmod) || modifiersCache.contains(key(pmod.id)))
+            if (nodeView.history.contains(pmod.id) || modifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
               modifiersCache += (key(pmod.id) -> pmod)
@@ -166,17 +166,17 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
-          if (u.failedMod.isEmpty)
-            u.state.applyModifier(modToApply) match {
-              case Success(stateAfterApply) =>
-                val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
-                context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
-                UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
-              case Failure(e) =>
-                val (newHis: EncryHistory, newProgressInfo: ProgressInfo[EncryPersistentModifier]) = history.reportModifierIsInvalid(modToApply, progressInfo)
-                nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
-                UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
-            }
+          if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
+            case Success(stateAfterApply) =>
+              val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
+              context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
+              UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
+            case Failure(e) =>
+              val (newHis: EncryHistory, newProgressInfo: ProgressInfo[EncryPersistentModifier]) =
+                history.reportModifierIsInvalid(modToApply, progressInfo)
+              nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
+              UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
+          }
           else u
         }
         uf.failedMod match {
