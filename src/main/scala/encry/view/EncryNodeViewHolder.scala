@@ -25,6 +25,7 @@ import encry.view.mempool.EncryMempool
 import encry.view.state.{Proposition, _}
 import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
+import org.apache.commons.io.FileUtils
 import scorex.crypto.authds.ADDigest
 
 import scala.annotation.tailrec
@@ -247,21 +248,21 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     NodeView(history, state, wallet, memPool)
   }
 
-  def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryDir(settings).listFiles.isEmpty) {
+  def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryDir(settings).listFiles.isEmpty)
     try {
       val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
       val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
       val state: StateType = restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
+      throw new java.nio.file.NoSuchFileException("test")
       Some(NodeView(history, state, wallet, memPool))
     } catch {
         case ex: Throwable =>
           logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
-          new File(settings.directory).delete()
+          new File(settings.directory).listFiles.foreach(dir => {FileUtils.cleanDirectory(dir)})
           modifiersHolder ! RecoverState
           Some(genesisState)
-    }
-  } else None
+    } else None
 
   def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): StateType = {
     val dir: File = EncryState.getStateDir(settings)

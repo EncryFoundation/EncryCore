@@ -1,13 +1,12 @@
 package encry.network
 
-import akka.persistence.{PersistentActor, SaveSnapshotFailure, SaveSnapshotSuccess, SnapshotOffer}
+import akka.persistence._
 import encry.EncryApp._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
-import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
@@ -18,8 +17,8 @@ import scala.concurrent.duration._
 
 class ModifiersHolder extends PersistentActor with Logging {
 
-  var modsFromRemote: Mods = Mods(Map.empty, 0)
   var stat: Statistics = Statistics(0, 0, 0, 0, 0, Seq.empty, Seq.empty)
+  var modifiers: Modifiers = Modifiers(Map.empty, Map.empty, Map.empty, SortedMap.empty)
 
   /** Map, which contains not completed blocks
     * Key can be payloadId or also header id. So value depends on key, and can contains: headerId, payloadId */
@@ -27,6 +26,8 @@ class ModifiersHolder extends PersistentActor with Logging {
   var headerCache: Map[String, (EncryBlockHeader, Int)] = Map.empty
   var payloadCache: Map[String, (EncryBlockPayload, Int)] = Map.empty
   var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
+
+  var state: State = State(Modifiers(Map.empty, Map.empty, Map.empty, SortedMap.empty), stat)
 
   context.system.scheduler.schedule(10.second, 10.second) {
     stat = Statistics(
@@ -39,21 +40,19 @@ class ModifiersHolder extends PersistentActor with Logging {
       headerCache.values.filter(_._2 > 1).map(headerWithDuplicatesQty => headerWithDuplicatesQty._1.id -> headerWithDuplicatesQty._2).toSeq ++
         payloadCache.values.filter(_._2 > 1).map(payloadWithDuplicatesQty => payloadWithDuplicatesQty._1.id -> payloadWithDuplicatesQty._2).toSeq
     )
-    saveSnapshot(stat)
-    logger.info(s"${stat.receivedHeaders} headers received - " +
-      s"${stat.receivedPayloads} payloads received - " +
-      s"${stat.notCompletedBlocks} not full blocks - " +
-      s"${stat.completedBlocks} full blocks - " +
-      s"max height: ${stat.maxHeight} " +
-      s"Gaps: ${stat.gaps.foldLeft("") { case (str, gap) => str + s"(${gap._1}, ${gap._2})" }} " +
-      s"Duplicates: ${stat.duplicates.foldLeft("") { case (str, duplicate) => str + s"(${Algos.encode(duplicate._1)}, ${duplicate._2})" }}")
+    modifiers = Modifiers(headerCache, payloadCache, notCompletedBlocks, completedBlocks)
+    state = State(modifiers, stat)
+    saveSnapshot(state)
+    info
   }
 
   override def preStart(): Unit = logger.info(s"ModifiersHolder actor is started.")
 
   override def receiveRecover: Receive = {
-    case SnapshotOffer(_, snapshot: Mods) => modsFromRemote = snapshot
-    case SnapshotOffer(_, snapshot: Statistics) => stat = snapshot
+    case SnapshotOffer(_, snapshot: State) => state = snapshot
+    case RecoveryCompleted =>
+      logger.info("Recover of state in modifiers holder is success")
+      info
   }
 
   override def receiveCommand: Receive = {
@@ -61,10 +60,21 @@ class ModifiersHolder extends PersistentActor with Logging {
     case SaveSnapshotFailure(_, _) => logger.info("Failure with snapshot")
     case RecoverState =>
       logger.info("Starting to recover state from Modifiers Holder")
-      headerCache.map(_._2._1).toSeq
+
+      val sortedHeaders: Seq[EncryBlockHeader] = state.modifiers.headerCache.map(_._2._1).toSeq
         .sortWith( (firstHeader, secondHeader) => firstHeader.height < secondHeader.height)
-        .foreach( header => nodeViewHolder ! LocallyGeneratedModifier(header))
-      completedBlocks.foreach((blockWithHeight) => nodeViewHolder ! LocallyGeneratedModifier(blockWithHeight._2.payload))
+
+      if (sortedHeaders.head.height == 0) sortedHeaders.tail.foldLeft(Seq(sortedHeaders.head)) {
+        case (applicableHeaders, header) =>
+          if (applicableHeaders.last.height + 1 == header.height) applicableHeaders :+ header
+          else applicableHeaders
+      }
+
+      if (completedBlocks.keys.headOption.contains(0)) state.modifiers.completedBlocks.foldLeft(Seq[EncryBlock]()) {
+        case (applicableBlocks, blockWithHeight) =>
+          if (applicableBlocks.last.header.height + 1 == blockWithHeight._1) applicableBlocks :+ blockWithHeight._2
+          else applicableBlocks
+      }.foreach(block => nodeViewHolder ! LocallyGeneratedModifier(block.payload))
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
     case x: Any => logger.info(s"Strange input: $x")
@@ -102,6 +112,15 @@ class ModifiersHolder extends PersistentActor with Logging {
     case block: EncryBlock => completedBlocks += block.header.height -> block
     case _ =>
   }
+
+  private def info: Unit =
+    logger.info(s"${state.stat.receivedHeaders} headers received - " +
+      s"${state.stat.receivedPayloads} payloads received - " +
+      s"${state.stat.notCompletedBlocks} not full blocks - " +
+      s"${state.stat.completedBlocks} full blocks - " +
+      s"max height: ${state.stat.maxHeight} " +
+      s"Gaps: ${state.stat.gaps.foldLeft("") { case (str, gap) => str + s"(${gap._1}, ${gap._2})" }} " +
+      s"Duplicates: ${state.stat.duplicates.foldLeft("") { case (str, duplicate) => str + s"(${Algos.encode(duplicate._1)}, ${duplicate._2})" }}")
 }
 
 object ModifiersHolder {
@@ -116,9 +135,14 @@ object ModifiersHolder {
                         gaps: Seq[(Int, Int)],
                         duplicates: Seq[(ModifierId, Int)])
 
-  case class RequestedModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier])
+  case class Modifiers(headerCache: Map[String, (EncryBlockHeader, Int)],
+                       payloadCache: Map[String, (EncryBlockPayload, Int)],
+                       notCompletedBlocks: Map[String, String],
+                       completedBlocks: SortedMap[Int, EncryBlock])
 
-  case class Mods(numberOfModsByPeerAndModType: Map[(ConnectedPeer, ModifierTypeId), Int], numberOfPacksFromRemotes: Int)
+  case class State(modifiers: Modifiers, stat: Statistics)
+
+  case class RequestedModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier])
 
   def countGaps(heights: Seq[Int]): Seq[(Int, Int)] = heights.foldLeft(Seq[(Int, Int)](), -1) {
     case ((gaps, prevHeight), blockHeight) =>
