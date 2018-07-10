@@ -59,6 +59,12 @@ class ModifiersHolder extends PersistentActor with Logging {
   override def receiveCommand: Receive = {
     case SaveSnapshotSuccess(_) => logger.info("Success with snapshot")
     case SaveSnapshotFailure(_, _) => logger.info("Failure with snapshot")
+    case RecoverState =>
+      logger.info("Starting to recover state from Modifiers Holder")
+      headerCache.map(_._2._1).toSeq
+        .sortWith( (firstHeader, secondHeader) => firstHeader.height < secondHeader.height)
+        .foreach( header => nodeViewHolder ! LocallyGeneratedModifier(header))
+      completedBlocks.foreach((blockWithHeight) => nodeViewHolder ! LocallyGeneratedModifier(blockWithHeight._2.payload))
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
     case x: Any => logger.info(s"Strange input: $x")
@@ -99,6 +105,8 @@ class ModifiersHolder extends PersistentActor with Logging {
 }
 
 object ModifiersHolder {
+
+  case object RecoverState
 
   case class Statistics(receivedHeaders: Int,
                         receivedPayloads: Int,

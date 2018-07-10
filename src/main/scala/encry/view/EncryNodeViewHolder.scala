@@ -13,7 +13,7 @@ import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
-import encry.network.ModifiersHolder.RequestedModifiers
+import encry.network.ModifiersHolder.{RecoverState, RequestedModifiers}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
@@ -255,13 +255,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       val state: StateType = restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
       Some(NodeView(history, state, wallet, memPool))
     } catch {
-      case ex: java.nio.file.NoSuchFileException =>
-        logger.info(s"${ex.getMessage} during state restore. Start with empty store!")
-        new File(settings.directory).delete()
-        Some(genesisState)
-      case er =>
-        logger.info(s"Unexpected error during state recover: ${er.getMessage}")
-        EncryApp.forceStopApplication(500)
+        case ex: Throwable =>
+          logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
+          new File(settings.directory).delete()
+          modifiersHolder ! RecoverState
+          Some(genesisState)
     }
   } else None
 
