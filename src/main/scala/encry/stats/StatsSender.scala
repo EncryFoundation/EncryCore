@@ -29,12 +29,8 @@ class StatsSender extends Actor with Logging {
 
   override def receive: Receive = {
 
-    case BlocksStat(notCompletedBlocks: Int,
-      headerCache: Int,
-      payloadCache: Int,
-      completedBlocks: Int) =>
-    influxDB.write(8189,s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache,completedBlocksStat=$completedBlocks,notCompletedBlocksStat=$notCompletedBlocks")
-
+    case BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int) =>
+      influxDB.write(8189, s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache,completedBlocksStat=$completedBlocks,notCompletedBlocksStat=$notCompletedBlocks")
     case BestHeaderInChain(fb: EncryBlockHeader) =>
 
       influxDB.write(8189, util.Arrays.asList(
@@ -79,9 +75,5 @@ object StatsSender {
 
   case class GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
 
-  case class BlocksStat(notCompletedBlocks: Int,
-                        headerCache: Int,
-                        payloadCache: Int,
-                        completedBlocks: Int)
-
+  case class BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int,completedBlocks: Int)
 }
