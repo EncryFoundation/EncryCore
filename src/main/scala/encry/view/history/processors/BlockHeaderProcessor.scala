@@ -79,7 +79,7 @@ trait BlockHeaderProcessor extends Logging {
     else Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
 
   private def isNewHeader(header: EncryBlockHeader): Boolean =
-    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5
+    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5//TODO magic number
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
