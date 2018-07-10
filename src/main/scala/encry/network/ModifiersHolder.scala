@@ -9,6 +9,7 @@ import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
+import encry.stats.StatsSender.BlocksStat
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.{ModifierId, ModifierTypeId}

@@ -100,14 +100,10 @@ trait BlockHeaderProcessor extends Logging {
   protected def validityKey(id: Array[Byte]): ByteArrayWrapper =
     ByteArrayWrapper(Algos.hash("validity".getBytes(Algos.charset) ++ id))
 
-  // Defined if `encry.consensus.HistoryReader`.
   def contains(id: ModifierId): Boolean
 
   def bestBlockOpt: Option[EncryBlock]
 
-  /**
-    * Id of best header with transactions and proofs. None in regime that do not process transactions
-    */
   def bestBlockIdOpt: Option[ModifierId]
 
   /**
