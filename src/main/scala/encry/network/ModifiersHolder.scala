@@ -9,6 +9,7 @@ import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
+import encry.stats.StatsSender.BlocksStat
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.{ModifierId, ModifierTypeId}
@@ -59,7 +60,10 @@ class ModifiersHolder extends PersistentActor with Logging {
   override def receiveCommand: Receive = {
     case SaveSnapshotSuccess(_) => logger.info("Success with snapshot")
     case SaveSnapshotFailure(_, _) => logger.info("Failure with snapshot")
-    case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
+    case RequestedModifiers(modifierTypeId, modifiers) =>
+      updateModifiers(modifierTypeId, modifiers)
+      if (settings.node.sendStat)
+        context.actorSelection("/user/statsSender") ! BlocksStat(notCompletedBlocks.size, headerCache.size, payloadCache.size, completedBlocks.size)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
     case x: Any => logger.info(s"Strange input: $x")
   }
