@@ -87,8 +87,8 @@ class UtxoState(override val version: VersionTag,
         val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
 
         if (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest) onAdProofGenerated(ADProofs(block.header.id, proofBytes))
-        log.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with " +
-          s"root hash ${Algos.encode(rootHash)}")
+        log.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with" +
+          s" root hash ${Algos.encode(rootHash)}")
 
         if (!stateStore.get(ByteArrayWrapper(block.id)).exists(_.data sameElements block.header.stateRoot))
           throw new Exception("Storage kept roothash is not equal to the declared one.")
