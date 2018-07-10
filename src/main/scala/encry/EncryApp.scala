@@ -85,11 +85,10 @@ object EncryApp extends App with Logging {
     val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
     Http().bindAndHandle(combinedRoute, settings.restApi.bindAddress.getAddress.getHostAddress, settings.restApi.bindAddress.getPort)
   }
+
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.node.mining) miner ! StartMining
-
-  lazy val modifiersHolder: ActorRef = system.actorOf(Props[ModifiersHolder], "modifiersHolder")
-
+  if (settings.node.leveldb) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
   if (settings.testing.transactionGeneration) system.actorOf(Props[TransactionGenerator], "tx-generator") ! StartGeneration
   if (settings.node.enableCLI) cliListener ! StartListening
 
