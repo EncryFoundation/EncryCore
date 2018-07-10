@@ -44,9 +44,9 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   override def receiveRecover: Receive = {
     case SnapshotOffer(_, snapshotAboutStat: Statistics) => stat = snapshotAboutStat
-    case header: EncryBlockHeader => updateHeaders(header)
-    case payload: EncryBlockPayload => updatePayloads(payload)
-    case block: EncryBlock => updateCompletedBlocks(block)
+    case header: EncryBlockHeader => { updateHeaders(header); logger.info(s"Header ${header.height} is recovered from leveldb") }
+    case payload: EncryBlockPayload => {updatePayloads(payload); logger.info(s"Payload ${Algos.encode(payload.headerId)} is recovered from leveldb") }
+    case block: EncryBlock => { updateCompletedBlocks(block); logger.info(s"Block ${block.header.height} is recovered from leveldb") }
   }
 
   override def receiveCommand: Receive = {
