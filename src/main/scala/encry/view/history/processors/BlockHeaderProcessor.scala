@@ -58,9 +58,7 @@ trait BlockHeaderProcessor extends Logging {
     }
   }
 
-  /**
-    * Checks, whether it's time to download full chain and return toDownload modifiers
-    */
+  //Checks, whether it's time to download full chain and return toDownload modifiers
   protected def toDownload(header: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] =
     if (!nodeSettings.verifyTransactions) Seq.empty // Regime that do not download and verify transaction
     else if (header.height >= blockDownloadProcessor.minimalBlockHeight)
@@ -79,7 +77,7 @@ trait BlockHeaderProcessor extends Logging {
     else Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
 
   private def isNewHeader(header: EncryBlockHeader): Boolean =
-    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5
+    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5 //TODO magic number
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
@@ -100,14 +98,10 @@ trait BlockHeaderProcessor extends Logging {
   protected def validityKey(id: Array[Byte]): ByteArrayWrapper =
     ByteArrayWrapper(Algos.hash("validity".getBytes(Algos.charset) ++ id))
 
-  // Defined if `encry.consensus.HistoryReader`.
   def contains(id: ModifierId): Boolean
 
   def bestBlockOpt: Option[EncryBlock]
 
-  /**
-    * Id of best header with transactions and proofs. None in regime that do not process transactions
-    */
   def bestBlockIdOpt: Option[ModifierId]
 
   /**

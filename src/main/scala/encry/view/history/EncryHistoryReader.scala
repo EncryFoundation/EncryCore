@@ -68,11 +68,6 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
     }
   }
 
-  /**
-    * @param info other's node sync info
-    * @param size max return size
-    * @return Ids of headers, that node with info should download and apply to synchronize
-    */
   def continuationIds(info: EncrySyncInfo, size: Int): Option[ModifierIds] = Try {
     if (isEmpty) info.startingPoints
     else if (info.lastHeaderIds.isEmpty) {
