@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
+
 import akka.actor._
 import akka.io.Tcp.SO.KeepAlive
 import akka.io.Tcp._
@@ -16,6 +17,7 @@ import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnect
 import encry.settings.NetworkSettings
 import encry.utils.Logging
 import encry.view.history.EncrySyncInfoMessageSpec
+
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}

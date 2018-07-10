@@ -36,7 +36,7 @@ trait EncryHistory extends EncryHistoryReader {
   /** Appends modifier to the history if it is applicable. */
   def append(modifier: EncryPersistentModifier): Try[(EncryHistory, History.ProgressInfo[EncryPersistentModifier])] = {
     log.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
-    testApplicable(modifier).map { _ =>
+    Try {
       modifier match {
         case header: EncryBlockHeader => (this, process(header))
         case payload: EncryBlockPayload => (this, process(payload))

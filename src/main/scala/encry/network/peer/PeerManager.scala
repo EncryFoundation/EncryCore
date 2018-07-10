@@ -1,6 +1,7 @@
 package encry.network.peer
 
 import java.net.InetSocketAddress
+
 import akka.actor.Actor
 import encry.EncryApp._
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
@@ -8,10 +9,11 @@ import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
 import encry.network.PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages._
-import encry.network.{Handshake, SendToRandom, SendingStrategy}
+import encry.network.{Handshake, SendingStrategy}
 import encry.utils.Logging
-import scala.util.Random
+
 import scala.language.postfixOps
+import scala.util.Random
 
 class PeerManager extends Actor with Logging {
 

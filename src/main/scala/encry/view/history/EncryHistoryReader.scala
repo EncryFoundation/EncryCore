@@ -113,7 +113,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
       }
     }
 
-    loop(heightOf(header.id), Seq(Seq(header)))
+    //TODO: Remove Some
+    loop(Some(header.height), Seq(Seq(header)))
   }
 
   protected def testApplicable(modifier: EncryPersistentModifier): Try[Unit] = modifier match {
