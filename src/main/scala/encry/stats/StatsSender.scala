@@ -23,14 +23,15 @@ class StatsSender extends Actor with Logging {
 
   influxDB.setRetentionPolicy("autogen")
 
-  override def preStart(): Unit = {
+  override def preStart(): Unit =
     influxDB.write(8189, s"""nodesStartTime value="${settings.network.nodeName}"""")
-  }
 
   override def receive: Receive = {
 
-    case BestHeaderInChain(fb: EncryBlockHeader) =>
+    case BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int) =>
+      influxDB.write(8189, s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache,completedBlocksStat=$completedBlocks,notCompletedBlocksStat=$notCompletedBlocks")
 
+    case BestHeaderInChain(fb: EncryBlockHeader) =>
       influxDB.write(8189, util.Arrays.asList(
           s"difficulty,nodeName=${settings.network.nodeName} diff=${fb.difficulty.toString},height=${fb.height}",
           s"height,nodeName=${settings.network.nodeName},header=${Algos.encode(fb.id)} height=${fb.height}",
@@ -41,24 +42,23 @@ class StatsSender extends Actor with Logging {
       )
 
     case MiningEnd(blockHeader: EncryBlockHeader, workerNumber: Int) =>
-
-      influxDB.write(8189,
+      influxDB.write(
+        8189,
         s"miningEnd,nodeName=${settings.network.nodeName},block=${Algos.encode(blockHeader.id)},height=${blockHeader.height},worker=$workerNumber value=${timeProvider.time() - blockHeader.timestamp}"
       )
 
     case SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
-
       modifiersToDownload = modifiersToDownload ++ modifiers.map(mod => (Algos.encode(mod), (modifierTypeId, System.currentTimeMillis())))
 
     case GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
       modifiers.foreach(downloadedModifierId =>
-        modifiersToDownload.get(Algos.encode(downloadedModifierId)).foreach(dowloadInfo => {
-          influxDB.write(8189,
+        modifiersToDownload.get(Algos.encode(downloadedModifierId)).foreach { dowloadInfo =>
+          influxDB.write(
+            8189,
             s"modDownloadStat,nodeName=${settings.network.nodeName},modId=${Algos.encode(downloadedModifierId)},modType=${dowloadInfo._1} value=${System.currentTimeMillis() - dowloadInfo._2}"
           )
           modifiersToDownload = modifiersToDownload - Algos.encode(downloadedModifierId)
         }
-        )
       )
   }
 }
@@ -73,4 +73,5 @@ object StatsSender {
 
   case class GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
 
+  case class BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int)
 }
