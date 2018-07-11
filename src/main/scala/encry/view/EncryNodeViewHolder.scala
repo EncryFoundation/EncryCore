@@ -13,7 +13,7 @@ import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
-import encry.network.ModifiersHolder.{RecoverMode, RequestedModifiers}
+import encry.network.ModifiersHolder.{ApplyState, RequestedModifiers}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
@@ -66,7 +66,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
               modifiersCache += (key(pmod.id) -> pmod)
-              if (settings.node.leveldb) context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
+              if (settings.levelDb.enable) context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
             }
         }
         log.info(s"Cache before(${modifiersCache.size})")
@@ -83,7 +83,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       log.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
-      if (settings.node.leveldb) context.actorSelection("/user/modifiersHolder") ! lm
+      if (settings.levelDb.enable) context.actorSelection("/user/modifiersHolder") ! lm
     case GetDataFromCurrentView(f) => sender() ! f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool))
     case GetNodeViewChanges(history, state, vault, mempool) =>
       if (history) sender() ! ChangedHistory(nodeView.history)
@@ -245,7 +245,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
     val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
-    if (settings.node.leveldb) context.actorSelection("akka://encry/user/statsSender") ! RecoverMode
+    if (settings.levelDb.recoverMode) context.actorSelection("/user/modifiersHolder") ! ApplyState
     NodeView(history, state, wallet, memPool)
   }
 

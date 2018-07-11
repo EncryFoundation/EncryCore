@@ -19,8 +19,7 @@ case class NodeSettings(stateMode: StateMode,
                         mempoolCleanupInterval: FiniteDuration,
                         mempoolMaxCapacity: Int,
                         enableCLI: Boolean,
-                        sendStat: Boolean,
-                        leveldb: Boolean
+                        sendStat: Boolean
                        )
 
 trait NodeSettingsReader {
@@ -40,8 +39,8 @@ trait NodeSettingsReader {
       cfg.as[FiniteDuration](s"$path.mempoolCleanupInterval"),
       cfg.as[Int](s"$path.mempoolMaxCapacity"),
       cfg.as[Boolean](s"$path.useCli"),
-      cfg.as[Boolean](s"$path.sendStat"),
-      cfg.as[Boolean](s"$path.leveldb"))
+      cfg.as[Boolean](s"$path.sendStat")
+    )
   }
 
   def stateModeFromString(modeName: String, path: String): StateMode = {

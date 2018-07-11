@@ -32,15 +32,7 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   override def preStart(): Unit = logger.info(s"ModifiersHolder actor is started.")
 
-  override def receiveRecover: Receive = basicMode
-
-  def recoveryMode: Receive =
-    modifierApplying orElse receiveWithStateRecover
-
-  def basicMode: Receive =
-    modifierApplying orElse receiveWithoutStateRecover
-
-  def modifierApplying: Receive = {
+  override def receiveRecover: Receive = {
     case header: EncryBlockHeader =>
       updateHeaders(header)
       logger.debug(s"Header ${header.height} is recovered from leveldb")
@@ -50,17 +42,6 @@ class ModifiersHolder extends PersistentActor with Logging {
     case block: EncryBlock =>
       updateCompletedBlocks(block)
       logger.debug(s"Block ${block.header.height} is recovered from leveldb")
-  }
-
-  def receiveWithStateRecover: Receive = {
-
-    case RecoveryCompleted => self ! ApplyState
-  }
-
-  def receiveWithoutStateRecover: Receive = {
-
-    case RecoverMode => context.become(recoveryMode)
-
     case RecoveryCompleted => logger.info("Recovery completed")
   }
 
@@ -140,8 +121,6 @@ class ModifiersHolder extends PersistentActor with Logging {
 }
 
 object ModifiersHolder {
-
-  case object RecoverMode
 
   case object ApplyState
 
