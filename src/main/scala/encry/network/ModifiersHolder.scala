@@ -11,6 +11,7 @@ import encry.settings.Algos
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.{ModifierId, ModifierTypeId}
+
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 
@@ -61,7 +62,7 @@ class ModifiersHolder extends PersistentActor with Logging {
       logger.info("Starting to recover state from Modifiers Holder")
       val sortedHeaders: Seq[EncryBlockHeader] = headers.map(_._2._1).toSeq
         .sortWith((firstHeader, secondHeader) => firstHeader.height < secondHeader.height)
-      if (sortedHeaders.head.height == 0) sortedHeaders.tail.foldLeft(Seq(sortedHeaders.head)) {
+      if (sortedHeaders.headOption.exists(_.height == 0)) sortedHeaders.tail.foldLeft(Seq(sortedHeaders.head)) {
         case (applicableHeaders, header) =>
           if (applicableHeaders.last.height + 1 == header.height) applicableHeaders :+ header
           else applicableHeaders
