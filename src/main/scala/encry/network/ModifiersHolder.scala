@@ -11,6 +11,7 @@ import encry.settings.Algos
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.{ModifierId, ModifierTypeId}
+
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 
@@ -76,9 +77,12 @@ class ModifiersHolder extends PersistentActor with Logging {
     })
 
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
-    case header: EncryBlockHeader => persist(header) { header => updateHeaders(header) }
-    case payload: EncryBlockPayload => persist(payload) { payload => updatePayloads(payload) }
-    case block: EncryBlock => persist(block) { block => updateCompletedBlocks(block) }
+    case header: EncryBlockHeader =>
+      if(!headers.contains(Algos.encode(header.id))) persist(header) { header => updateHeaders(header) }
+    case payload: EncryBlockPayload =>
+      if(!headers.contains(Algos.encode(payload.id))) persist(payload) { payload => updatePayloads(payload) }
+    case block: EncryBlock =>
+      if(!completedBlocks.values.toSeq.contains(block)) persist(block) { block => updateCompletedBlocks(block) }
     case _ => logger.error("Strange input")
   }
 
