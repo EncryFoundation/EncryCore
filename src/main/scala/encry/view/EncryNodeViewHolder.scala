@@ -245,6 +245,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
     val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
+    if (settings.node.leveldb)
+      context.actorSelection("/user/modifiersHolder") ! RecoverState
     NodeView(history, state, wallet, memPool)
   }
 
@@ -260,8 +262,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         case ex: Throwable =>
           logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
           new File(settings.directory).listFiles.foreach(dir => {FileUtils.cleanDirectory(dir)})
-          if (settings.node.leveldb)
-          context.actorSelection("/user/modifiersHolder") ! RecoverState
           Some(genesisState)
     } else None
 

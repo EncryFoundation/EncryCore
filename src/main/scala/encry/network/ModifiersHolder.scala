@@ -69,7 +69,7 @@ class ModifiersHolder extends PersistentActor with Logging {
         case (applicableHeaders, header) =>
           if (applicableHeaders.last.height + 1 == header.height) applicableHeaders :+ header
           else applicableHeaders
-      }
+      }.foreach(header => nodeViewHolder ! LocallyGeneratedModifier(header))
 
       if (completedBlocks.keys.headOption.contains(0)) completedBlocks.foldLeft(Seq[EncryBlock]()) {
         case (applicableBlocks, blockWithHeight) =>
