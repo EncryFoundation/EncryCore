@@ -26,8 +26,7 @@ class ModifiersHolder extends PersistentActor with Logging {
   var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
 
   context.system.scheduler.schedule(10.second, 30.second) {
-    stat = Statistics(headers, payloads, nonCompletedBlocks, completedBlocks)
-    logger.info(stat.toString)
+    logger.info(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
   }
 
   override def preStart(): Unit = logger.info(s"ModifiersHolder actor is started.")
@@ -42,16 +41,15 @@ class ModifiersHolder extends PersistentActor with Logging {
     case block: EncryBlock =>
       updateCompletedBlocks(block)
       logger.debug(s"Block ${block.header.height} is recovered from leveldb")
-    case RecoveryCompleted =>
-      logger.info(stat.toString)
-      self ! ApplyState
+    case RecoveryCompleted => self ! ApplyState
   }
 
   override def receiveCommand: Receive = {
     case SaveSnapshotSuccess(_) => logger.info("Success with snapshot save (stat).")
     case SaveSnapshotFailure(_, _) => logger.info("Failure with snapshot save (stat).")
     case ApplyState =>
-      logger.info("Starting to recover state from Modifiers Holder")
+      logger.info("State recovering state on ModifiersHolder is finished")
+      logger.info(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
       val sortedHeaders: Seq[EncryBlockHeader] = headers.map(_._2._1).toSeq
         .sortWith((firstHeader, secondHeader) => firstHeader.height < secondHeader.height)
       if (sortedHeaders.headOption.exists(_.height == 0)) sortedHeaders.tail.foldLeft(Seq(sortedHeaders.head)) {
@@ -123,13 +121,13 @@ object ModifiersHolder {
                         maxHeight: Int,
                         gaps: Seq[(Int, Int)],
                         duplicates: Seq[(ModifierId, Int)]) {
-    override def toString: String = s"Stats: ${this.receivedHeaders} headers received - " +
-      s"${this.receivedPayloads} payloads received - " +
-      s"${this.notCompletedBlocks} not full blocks - " +
-      s"${this.completedBlocks} full blocks - " +
-      s"max height: ${this.maxHeight} " +
-      s"Gaps: ${this.gaps.foldLeft("") { case (str, gap) => str + s"(${gap._1}, ${gap._2})" }} " +
-      s"Duplicates: ${this.duplicates.foldLeft("") { case (str, duplicate) => str + s"(${Algos.encode(duplicate._1)}, ${duplicate._2})" }}"
+    override def toString: String = s"Stats: ${this.receivedHeaders} headers, " +
+      s"${this.receivedPayloads} payloads, " +
+      s"${this.notCompletedBlocks} incomplete blocks, " +
+      s"${this.completedBlocks} full blocks, " +
+      s"max height: ${this.maxHeight}, " +
+      s"gaps: ${this.gaps.foldLeft("") { case (str, gap) => str + s"(${gap._1}, ${gap._2})" }} " +
+      s"duplicates: ${this.duplicates.foldLeft("") { case (str, duplicate) => str + s"(${Algos.encode(duplicate._1)}, ${duplicate._2})" }}."
   }
 
   case object Statistics {
