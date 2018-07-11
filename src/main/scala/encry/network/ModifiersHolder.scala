@@ -8,10 +8,10 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
 import encry.settings.Algos
-import encry.stats.StatsSender.BlocksStat
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.{ModifierId, ModifierTypeId}
+
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 
@@ -26,9 +26,6 @@ class ModifiersHolder extends PersistentActor with Logging {
   var payloads: Map[String, (EncryBlockPayload, Int)] = Map.empty
   var nonCompletedBlocks: Map[String, String] = Map.empty
   var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
-
-  context.system.scheduler.schedule(10.second, 60.second) {
-  var state: State = State(Modifiers(Map.empty, Map.empty, Map.empty, SortedMap.empty), stat)
 
   context.system.scheduler.schedule(10.second, 10.second) {
     stat = Statistics(
@@ -48,9 +45,15 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   override def receiveRecover: Receive = {
     case SnapshotOffer(_, snapshotAboutStat: Statistics) => stat = snapshotAboutStat
-    case header: EncryBlockHeader => updateHeaders(header); logger.debug(s"Header ${header.height} is recovered from leveldb")
-    case payload: EncryBlockPayload => updatePayloads(payload); logger.debug(s"Payload ${Algos.encode(payload.headerId)} is recovered from leveldb")
-    case block: EncryBlock =>  updateCompletedBlocks(block); logger.debug(s"Block ${block.header.height} is recovered from leveldb")
+    case header: EncryBlockHeader =>
+      updateHeaders(header)
+      logger.debug(s"Header ${header.height} is recovered from leveldb")
+    case payload: EncryBlockPayload =>
+      updatePayloads(payload)
+      logger.debug(s"Payload ${Algos.encode(payload.headerId)} is recovered from leveldb")
+    case block: EncryBlock =>
+      updateCompletedBlocks(block)
+      logger.debug(s"Block ${block.header.height} is recovered from leveldb")
   }
 
   override def receiveCommand: Receive = {
