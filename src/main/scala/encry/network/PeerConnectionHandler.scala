@@ -8,12 +8,11 @@ import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
-import encry.EncryApp
 import encry.EncryApp._
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle, _}
 import encry.network.message.MessageHandler
-import encry.settings.NetworkSettings
+import encry.network.peer.PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
 import encry.utils.Logging
 
 import scala.annotation.tailrec
@@ -27,11 +26,9 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
                             remote: InetSocketAddress) extends Actor with Logging {
 
   import PeerConnectionHandler.ReceivableMessages._
-  import encry.network.peer.PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
 
   context watch connection
 
-  val settings: NetworkSettings = EncryApp.settings.network
   var receivedHandshake: Option[Handshake] = None
   var selfPeer: Option[ConnectedPeer] = None
   var handshakeSent = false
@@ -67,7 +64,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   def startInteraction: Receive = {
     case StartInteraction =>
       log.info(s"Handshake sent to $remote")
-      val hb: Array[Byte] = Handshake(Version(settings.appVersion), settings.nodeName,
+      val hb: Array[Byte] = Handshake(Version(settings.network.appVersion), settings.network.nodeName,
         ownSocketAddress, timeProvider.time()).bytes
       connection ! Tcp.Write(ByteString(hb))
       handshakeSent = true
@@ -112,7 +109,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
         connection ! Write(ByteString(Ints.toByteArray(msg.bytes.length) ++ msg.bytes))
       }
 
-      settings.addedMaxDelay match {
+      settings.network.addedMaxDelay match {
         case Some(delay) => context.system.scheduler.scheduleOnce(Random.nextInt(delay.toMillis.toInt).millis)(sendOutMessage())
         case None => sendOutMessage()
       }
@@ -148,13 +145,16 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   override def preStart: Unit = {
     peerManager ! DoConnecting(remote, direction)
-    handshakeTimeoutCancellableOpt = Some(context.system.scheduler.scheduleOnce(settings.handshakeTimeout)
+    handshakeTimeoutCancellableOpt = Some(context.system.scheduler.scheduleOnce(settings.network.handshakeTimeout)
     (self ! HandshakeTimeout))
     connection ! Register(self, keepOpenOnPeerClosed = false, useResumeWriting = true)
     connection ! ResumeReading
   }
 
-  override def postStop(): Unit = log.info(s"Peer handler to $remote destroyed")
+  override def postStop(): Unit = {
+    log.info(s"Peer handler to $remote is destroyed")
+    networkController ! ConnectTo(remote)
+  }
 
   def getPacket(data: ByteString): (List[ByteString], ByteString) = {
 
@@ -202,7 +202,6 @@ object PeerConnectionHandler {
     override def toString: String = s"ConnectedPeer($socketAddress)"
   }
 
-
   sealed trait CommunicationState
 
   case object AwaitingHandshake extends CommunicationState
@@ -218,6 +217,7 @@ object PeerConnectionHandler {
     case object HandshakeTimeout
 
     case object CloseConnection
+
   }
 
   def props(messagesHandler: MessageHandler, connection: ActorRef, direction: ConnectionType,

@@ -12,22 +12,16 @@ import encry.network.peer.PeerManager.ReceivableMessages._
 import encry.network.{Handshake, SendingStrategy}
 import encry.utils.Logging
 
+import scala.language.postfixOps
 import scala.util.Random
 
 class PeerManager extends Actor with Logging {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
-
   var connectingPeers: Set[InetSocketAddress] = Set.empty
 
   if (PeerDatabase.isEmpty) settings.network.knownPeers.foreach { address =>
     if (!isSelf(address, None)) PeerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), None))
-  }
-
-  def randomPeer: Option[InetSocketAddress] = {
-    val peers: Seq[InetSocketAddress] = PeerDatabase.knownPeers().keys.toSeq
-    if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
-    else None
   }
 
   def isSelf(address: InetSocketAddress, declaredAddress: Option[InetSocketAddress]): Boolean =
@@ -68,14 +62,20 @@ class PeerManager extends Actor with Logging {
       connectingPeers -= remote
       nodeViewSynchronizer ! DisconnectedPeer(remote)
     case CheckPeers =>
-      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections)
+      def randomPeer: Option[InetSocketAddress] = {
+        val peers: Seq[InetSocketAddress] = PeerDatabase.knownPeers().keys.toSeq
+        if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
+        else None
+      }
+
+      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
         randomPeer.foreach { address =>
           if (!connectedPeers.exists(_._1 == address) &&
             !connectingPeers.exists(_.getHostName == address.getHostName)) {
             sender() ! ConnectTo(address)
           }
         }
-
+      }
   }
 }
 
