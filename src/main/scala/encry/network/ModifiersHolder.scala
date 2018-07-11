@@ -26,7 +26,7 @@ class ModifiersHolder extends PersistentActor with Logging {
   var nonCompletedBlocks: Map[String, String] = Map.empty
   var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
 
-  context.system.scheduler.schedule(10.second, 10.second) {
+  context.system.scheduler.schedule(10.second, 50.second) {
     stat = Statistics(
       headers.size,
       payloads.size,
