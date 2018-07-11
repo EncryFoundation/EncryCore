@@ -22,12 +22,16 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
       case Some(header: EncryBlockHeader) =>
         historyStorage.modifierById(header.adProofsId) match {
           case _ if bestBlockIdOpt.isEmpty && !isValidFirstBlock(header) =>
+            logger.debug(s"First case - put - ${payload.headerId}")
             putToHistory(payload)
           case Some(adProof: ADProofs) =>
+            logger.debug(s"Second case - process - ${payload.headerId}")
             processBlock(EncryBlock(header, payload, Some(adProof)), payloadIsNew = true)
           case None if !adState =>
+            logger.debug(s"Third case - process - ${payload.headerId}")
             processBlock(EncryBlock(header, payload, None), payloadIsNew = true)
           case _ =>
+            logger.debug(s"Fourth case - put - ${payload.headerId}")
             putToHistory(payload)
         }
       case _ =>

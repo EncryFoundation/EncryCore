@@ -40,9 +40,15 @@ trait EncryHistory extends EncryHistoryReader {
     log.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Try {
       modifier match {
-        case header: EncryBlockHeader => (this, process(header))
-        case payload: EncryBlockPayload => (this, process(payload))
-        case adProofs: ADProofs => (this, process(adProofs))
+        case header: EncryBlockHeader =>
+          logger.info(s"Appending header")
+          (this, process(header))
+        case payload: EncryBlockPayload =>
+          logger.info(s"Appending payload")
+          (this, process(payload))
+        case adProofs: ADProofs =>
+          logger.info(s"Appending ADPROOF")
+          (this, process(adProofs))
       }
     }
   }
