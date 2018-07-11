@@ -58,7 +58,9 @@ trait BlockHeaderProcessor extends Logging {
     }
   }
 
-  //Checks, whether it's time to download full chain and return toDownload modifiers
+  /**
+    * Checks, whether it's time to download full chain and return toDownload modifiers
+    */
   protected def toDownload(header: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] =
     if (!nodeSettings.verifyTransactions) Seq.empty // Regime that do not download and verify transaction
     else if (header.height >= blockDownloadProcessor.minimalBlockHeight)
@@ -77,7 +79,7 @@ trait BlockHeaderProcessor extends Logging {
     else Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
 
   private def isNewHeader(header: EncryBlockHeader): Boolean =
-    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5 //TODO magic number
+    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5//TODO magic number
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 

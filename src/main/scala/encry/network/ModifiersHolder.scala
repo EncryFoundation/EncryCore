@@ -13,57 +13,47 @@ import encry.stats.StatsSender.BlocksStat
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.{ModifierId, ModifierTypeId}
-
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 
 class ModifiersHolder extends PersistentActor with Logging {
 
-  var modsFromRemote: Mods = Mods(Map.empty, 0)
   var stat: Statistics = Statistics(0, 0, 0, 0, 0, Seq.empty, Seq.empty)
 
   /** Map, which contains not completed blocks
     * Key can be payloadId or also header id. So value depends on key, and can contains: headerId, payloadId */
-  var notCompletedBlocks: Map[String, String] = Map.empty
-  var headerCache: Map[String, (EncryBlockHeader, Int)] = Map.empty
-  var payloadCache: Map[String, (EncryBlockPayload, Int)] = Map.empty
+  var headers: Map[String, (EncryBlockHeader, Int)] = Map.empty
+  var payloads: Map[String, (EncryBlockPayload, Int)] = Map.empty
+  var nonCompletedBlocks: Map[String, String] = Map.empty
   var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
 
-  context.system.scheduler.schedule(10.second, 10.second) {
+  context.system.scheduler.schedule(10.second, 60.second) {
     stat = Statistics(
-      headerCache.size,
-      payloadCache.size,
-      notCompletedBlocks.size,
+      headers.size,
+      payloads.size,
+      nonCompletedBlocks.size,
       completedBlocks.size,
       if (completedBlocks.nonEmpty) completedBlocks.keys.max else 0,
       countGaps(completedBlocks.keys.toSeq),
-      headerCache.values.filter(_._2 > 1).map(headerWithDuplicatesQty => headerWithDuplicatesQty._1.id -> headerWithDuplicatesQty._2).toSeq ++
-        payloadCache.values.filter(_._2 > 1).map(payloadWithDuplicatesQty => payloadWithDuplicatesQty._1.id -> payloadWithDuplicatesQty._2).toSeq
+      headers.values.filter(_._2 > 1).map(headerWithDuplicatesQty => headerWithDuplicatesQty._1.id -> headerWithDuplicatesQty._2).toSeq ++
+        payloads.values.filter(_._2 > 1).map(payloadWithDuplicatesQty => payloadWithDuplicatesQty._1.id -> payloadWithDuplicatesQty._2).toSeq
     )
-    saveSnapshot(stat)
-    logger.info(s"${stat.receivedHeaders} headers received - " +
-      s"${stat.receivedPayloads} payloads received - " +
-      s"${stat.notCompletedBlocks} not full blocks - " +
-      s"${stat.completedBlocks} full blocks - " +
-      s"max height: ${stat.maxHeight} " +
-      s"Gaps: ${stat.gaps.foldLeft("") { case (str, gap) => str + s"(${gap._1}, ${gap._2})" }} " +
-      s"Duplicates: ${stat.duplicates.foldLeft("") { case (str, duplicate) => str + s"(${Algos.encode(duplicate._1)}, ${duplicate._2})" }}")
+    persist(stat) { pieceOfStat => logger.info(pieceOfStat.toString) }
   }
 
   override def preStart(): Unit = logger.info(s"ModifiersHolder actor is started.")
 
   override def receiveRecover: Receive = {
-    case SnapshotOffer(_, snapshot: Mods) => modsFromRemote = snapshot
-    case SnapshotOffer(_, snapshot: Statistics) => stat = snapshot
+    case SnapshotOffer(_, snapshotAboutStat: Statistics) => stat = snapshotAboutStat
+    case header: EncryBlockHeader => updateHeaders(header); logger.debug(s"Header ${header.height} is recovered from leveldb")
+    case payload: EncryBlockPayload => updatePayloads(payload); logger.debug(s"Payload ${Algos.encode(payload.headerId)} is recovered from leveldb")
+    case block: EncryBlock =>  updateCompletedBlocks(block); logger.debug(s"Block ${block.header.height} is recovered from leveldb")
   }
 
   override def receiveCommand: Receive = {
-    case SaveSnapshotSuccess(_) => logger.info("Success with snapshot")
-    case SaveSnapshotFailure(_, _) => logger.info("Failure with snapshot")
-    case RequestedModifiers(modifierTypeId, modifiers) =>
-      updateModifiers(modifierTypeId, modifiers)
-      if (settings.node.sendStat)
-        context.actorSelection("/user/statsSender") ! BlocksStat(notCompletedBlocks.size, headerCache.size, payloadCache.size, completedBlocks.size)
+    case SaveSnapshotSuccess(_) => logger.info("Success with snapshot save.")
+    case SaveSnapshotFailure(_, _) => logger.info("Failure with snapshot save.")
+    case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
     case x: Any => logger.info(s"Strange input: $x")
   }
@@ -75,31 +65,39 @@ class ModifiersHolder extends PersistentActor with Logging {
   override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
 
   def createBlockIfPossible(payloadId: ModifierId): Unit =
-    notCompletedBlocks.get(Algos.encode(payloadId)).foreach(headerId => headerCache.get(headerId).foreach { header =>
-      payloadCache.get(Algos.encode(payloadId)).foreach { payload =>
+    nonCompletedBlocks.get(Algos.encode(payloadId)).foreach(headerId => headers.get(headerId).foreach { header =>
+      payloads.get(Algos.encode(payloadId)).foreach { payload =>
         completedBlocks += header._1.height -> EncryBlock(header._1, payload._1, None)
-        notCompletedBlocks -= Algos.encode(payloadId)
+        nonCompletedBlocks -= Algos.encode(payloadId)
       }
     })
 
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
-    case header: EncryBlockHeader =>
-      val prevValue: (EncryBlockHeader, Int) = headerCache.getOrElse(Algos.encode(header.id), (header, -1))
-      headerCache += Algos.encode(header.id) -> (prevValue._1, prevValue._2 + 1)
-      if (!notCompletedBlocks.contains(Algos.encode(header.payloadId)))
-        notCompletedBlocks += Algos.encode(header.payloadId) -> Algos.encode(header.id)
-      else {
-        notCompletedBlocks = (notCompletedBlocks - Algos.encode(header.payloadId)) + (Algos.encode(header.payloadId) -> Algos.encode(header.id))
-        createBlockIfPossible(header.payloadId)
-      }
-    case payload: EncryBlockPayload =>
-      val prevValue: (EncryBlockPayload, Int) = payloadCache.getOrElse(Algos.encode(payload.id), (payload, -1))
-      payloadCache += Algos.encode(payload.id) -> (prevValue._1, prevValue._2 + 1)
-      if (!notCompletedBlocks.contains(Algos.encode(payload.id))) notCompletedBlocks += Algos.encode(payload.id) -> ""
-      else createBlockIfPossible(payload.id)
-    case block: EncryBlock => completedBlocks += block.header.height -> block
+    case header: EncryBlockHeader => persist(header) { header => updateHeaders(header) }
+    case payload: EncryBlockPayload => persist(payload) { payload => updatePayloads(payload) }
+    case block: EncryBlock => persist(block) { block => updateCompletedBlocks(block) }
     case _ =>
   }
+
+  def updateHeaders(header: EncryBlockHeader): Unit = {
+    val prevValue: (EncryBlockHeader, Int) = headers.getOrElse(Algos.encode(header.id), (header, -1))
+    headers += Algos.encode(header.id) -> (prevValue._1, prevValue._2 + 1)
+    if (!nonCompletedBlocks.contains(Algos.encode(header.payloadId)))
+      nonCompletedBlocks += Algos.encode(header.payloadId) -> Algos.encode(header.id)
+    else {
+      nonCompletedBlocks = (nonCompletedBlocks - Algos.encode(header.payloadId)) + (Algos.encode(header.payloadId) -> Algos.encode(header.id))
+      createBlockIfPossible(header.payloadId)
+    }
+  }
+
+  def updatePayloads(payload: EncryBlockPayload): Unit = {
+    val prevValue: (EncryBlockPayload, Int) = payloads.getOrElse(Algos.encode(payload.id), (payload, -1))
+    payloads += Algos.encode(payload.id) -> (prevValue._1, prevValue._2 + 1)
+    if (!nonCompletedBlocks.contains(Algos.encode(payload.id))) nonCompletedBlocks += Algos.encode(payload.id) -> ""
+    else createBlockIfPossible(payload.id)
+  }
+
+  def updateCompletedBlocks(block: EncryBlock): Unit = completedBlocks += block.header.height -> block
 }
 
 object ModifiersHolder {
@@ -110,7 +108,15 @@ object ModifiersHolder {
                         completedBlocks: Int,
                         maxHeight: Int,
                         gaps: Seq[(Int, Int)],
-                        duplicates: Seq[(ModifierId, Int)])
+                        duplicates: Seq[(ModifierId, Int)]) {
+    override def toString: String = s"Stats: ${this.receivedHeaders} headers received - " +
+      s"${this.receivedPayloads} payloads received - " +
+      s"${this.notCompletedBlocks} not full blocks - " +
+      s"${this.completedBlocks} full blocks - " +
+      s"max height: ${this.maxHeight} " +
+      s"Gaps: ${this.gaps.foldLeft("") { case (str, gap) => str + s"(${gap._1}, ${gap._2})" }} " +
+      s"Duplicates: ${this.duplicates.foldLeft("") { case (str, duplicate) => str + s"(${Algos.encode(duplicate._1)}, ${duplicate._2})" }}"
+  }
 
   case class RequestedModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier])
 

@@ -22,10 +22,10 @@ import encry.stats.StatsSender
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
-
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.io.Source
+import scala.language.postfixOps
 
 object EncryApp extends App with Logging {
 
@@ -85,13 +85,10 @@ object EncryApp extends App with Logging {
     val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
     Http().bindAndHandle(combinedRoute, settings.restApi.bindAddress.getAddress.getHostAddress, settings.restApi.bindAddress.getPort)
   }
+
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.node.mining) miner ! StartMining
-
-  lazy val modifiersHolder: ActorRef = system.actorOf(Props[ModifiersHolder], "modifiersHolder")
-
-  if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
-
+  if (settings.node.leveldb) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
   if (settings.testing.transactionGeneration) system.actorOf(Props[TransactionGenerator], "tx-generator") ! StartGeneration
   if (settings.node.enableCLI) cliListener ! StartListening
 
