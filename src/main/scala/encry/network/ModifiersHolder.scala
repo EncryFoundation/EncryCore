@@ -18,7 +18,6 @@ import scala.concurrent.duration._
 class ModifiersHolder extends PersistentActor with Logging {
 
   var stat: Statistics = Statistics(0, 0, 0, 0, 0, Seq.empty, Seq.empty)
-  var modifiers: Modifiers = Modifiers(Map.empty, Map.empty, Map.empty, SortedMap.empty)
 
   /** Map, which contains not completed blocks
     * Key can be payloadId or also header id. So value depends on key, and can contains: headerId, payloadId */
