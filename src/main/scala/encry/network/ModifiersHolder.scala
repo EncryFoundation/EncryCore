@@ -32,7 +32,15 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   override def preStart(): Unit = logger.info(s"ModifiersHolder actor is started.")
 
-  override def receiveRecover: Receive = {
+  override def receiveRecover: Receive = basicMode
+
+  def recoveryMode: Receive =
+    modifierApplying orElse receiveWithStateRecover
+
+  def basicMode: Receive =
+    modifierApplying orElse receiveWithoutStateRecover
+
+  def modifierApplying: Receive = {
     case header: EncryBlockHeader =>
       updateHeaders(header)
       logger.debug(s"Header ${header.height} is recovered from leveldb")
@@ -42,7 +50,18 @@ class ModifiersHolder extends PersistentActor with Logging {
     case block: EncryBlock =>
       updateCompletedBlocks(block)
       logger.debug(s"Block ${block.header.height} is recovered from leveldb")
+  }
+
+  def receiveWithStateRecover: Receive = {
+
     case RecoveryCompleted => self ! ApplyState
+  }
+
+  def receiveWithoutStateRecover: Receive = {
+
+    case RecoverMode => context.become(recoveryMode)
+
+    case RecoveryCompleted => logger.info("Recovery completed")
   }
 
   override def receiveCommand: Receive = {
@@ -78,13 +97,16 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
     case header: EncryBlockHeader =>
-      if(!headers.contains(Algos.encode(header.id))) persist(header)
+      if(!headers.contains(Algos.encode(header.id)))
+        persist(header) { header => logger.info(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} appended successfully") }
       updateHeaders(header)
     case payload: EncryBlockPayload =>
-      if(!headers.contains(Algos.encode(payload.id))) persist(payload)
+      if(!payloads.contains(Algos.encode(payload.id)))
+        persist(payload) { payload => logger.info(s"Payload with id: ${Algos.encode(payload.id)} appended successfully") }
       updatePayloads(payload)
     case block: EncryBlock =>
-      if(!completedBlocks.values.toSeq.contains(block)) persist(block)
+      if(!completedBlocks.values.toSeq.contains(block))
+        persist(block) { block => logger.info(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} appended successfully") }
       updateCompletedBlocks(block)
     case _ => logger.error("Strange input")
   }
@@ -118,6 +140,8 @@ class ModifiersHolder extends PersistentActor with Logging {
 }
 
 object ModifiersHolder {
+
+  case object RecoverMode
 
   case object ApplyState
 

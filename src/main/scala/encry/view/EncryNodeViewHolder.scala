@@ -13,7 +13,7 @@ import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
-import encry.network.ModifiersHolder.{ApplyState, RequestedModifiers}
+import encry.network.ModifiersHolder.{RecoverMode, RequestedModifiers}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
@@ -245,6 +245,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
     val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
+    if (settings.node.leveldb) context.actorSelection("akka://encry/user/statsSender") ! RecoverMode
     NodeView(history, state, wallet, memPool)
   }
 
