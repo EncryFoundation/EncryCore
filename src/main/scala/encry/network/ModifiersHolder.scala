@@ -11,7 +11,6 @@ import encry.settings.Algos
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.{ModifierId, ModifierTypeId}
-
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 
@@ -26,7 +25,7 @@ class ModifiersHolder extends PersistentActor with Logging {
   var nonCompletedBlocks: Map[String, String] = Map.empty
   var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
 
-  context.system.scheduler.schedule(10.second, 50.second) {
+  context.system.scheduler.schedule(10.second, 30.second) {
     stat = Statistics(
       headers.size,
       payloads.size,
@@ -60,32 +59,22 @@ class ModifiersHolder extends PersistentActor with Logging {
     case SaveSnapshotFailure(_, _) => logger.info("Failure with snapshot save.")
     case RecoverState =>
       logger.info("Starting to recover state from Modifiers Holder")
-
       val sortedHeaders: Seq[EncryBlockHeader] = headers.map(_._2._1).toSeq
-        .sortWith( (firstHeader, secondHeader) => firstHeader.height < secondHeader.height)
-
+        .sortWith((firstHeader, secondHeader) => firstHeader.height < secondHeader.height)
       if (sortedHeaders.head.height == 0) sortedHeaders.tail.foldLeft(Seq(sortedHeaders.head)) {
         case (applicableHeaders, header) =>
           if (applicableHeaders.last.height + 1 == header.height) applicableHeaders :+ header
           else applicableHeaders
       }.foreach(header => nodeViewHolder ! LocallyGeneratedModifier(header))
-
       if (completedBlocks.keys.headOption.contains(0)) completedBlocks.foldLeft(Seq(completedBlocks.head._2)) {
         case (applicableBlocks, blockWithHeight) =>
           if (applicableBlocks.last.header.height + 1 == blockWithHeight._1) applicableBlocks :+ blockWithHeight._2
           else applicableBlocks
       }.foreach(block => nodeViewHolder ! LocallyGeneratedModifier(block.payload))
-
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
     case x: Any => logger.info(s"Strange input: $x")
   }
-
-  override def persistenceId: String = "persistent actor"
-
-  override def journalPluginId: String = "akka.persistence.journal.leveldb"
-
-  override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
 
   def createBlockIfPossible(payloadId: ModifierId): Unit =
     nonCompletedBlocks.get(Algos.encode(payloadId)).foreach(headerId => headers.get(headerId).foreach { header =>
@@ -121,6 +110,13 @@ class ModifiersHolder extends PersistentActor with Logging {
   }
 
   def updateCompletedBlocks(block: EncryBlock): Unit = completedBlocks += block.header.height -> block
+
+  override def persistenceId: String = "persistent actor"
+
+  override def journalPluginId: String = "akka.persistence.journal.leveldb"
+
+  override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
+
 }
 
 object ModifiersHolder {
