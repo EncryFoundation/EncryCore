@@ -78,11 +78,14 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
     case header: EncryBlockHeader =>
-      if(!headers.contains(Algos.encode(header.id))) persist(header) { header => updateHeaders(header) }
+      if(!headers.contains(Algos.encode(header.id))) persist(header)
+      updateHeaders(header)
     case payload: EncryBlockPayload =>
-      if(!headers.contains(Algos.encode(payload.id))) persist(payload) { payload => updatePayloads(payload) }
+      if(!headers.contains(Algos.encode(payload.id))) persist(payload)
+      updatePayloads(payload)
     case block: EncryBlock =>
-      if(!completedBlocks.values.toSeq.contains(block)) persist(block) { block => updateCompletedBlocks(block) }
+      if(!completedBlocks.values.toSeq.contains(block)) persist(block)
+      updateCompletedBlocks(block)
     case _ => logger.error("Strange input")
   }
 
