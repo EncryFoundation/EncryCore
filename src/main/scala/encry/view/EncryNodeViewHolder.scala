@@ -13,7 +13,7 @@ import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
-import encry.network.ModifiersHolder.{RecoverState, RequestedModifiers}
+import encry.network.ModifiersHolder.{ApplyState, RequestedModifiers}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
@@ -245,8 +245,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
     val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
-    if (settings.node.leveldb)
-      context.actorSelection("/user/modifiersHolder") ! RecoverState
     NodeView(history, state, wallet, memPool)
   }
 
@@ -258,10 +256,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       val state: StateType = restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
       Some(NodeView(history, state, wallet, memPool))
     } catch {
-        case ex: Throwable =>
-          logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
-          new File(settings.directory).listFiles.foreach(dir => {FileUtils.cleanDirectory(dir)})
-          Some(genesisState)
+      case ex: Throwable =>
+        logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
+        new File(settings.directory).listFiles.foreach(dir => {
+          FileUtils.cleanDirectory(dir)
+        })
+        Some(genesisState)
     } else None
 
   def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): StateType = {
