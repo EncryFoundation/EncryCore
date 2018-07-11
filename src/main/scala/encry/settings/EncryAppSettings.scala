@@ -1,6 +1,7 @@
 package encry.settings
 
 import java.io.File
+
 import com.typesafe.config.ConfigFactory
 import encry.utils.{Logging, NetworkTimeProviderSettings}
 import net.ceedubs.ficus.Ficus._
@@ -14,7 +15,8 @@ case class EncryAppSettings(directory: String,
                             network: NetworkSettings,
                             restApi: RESTApiSettings,
                             ntp: NetworkTimeProviderSettings,
-                            influxDB: InfluxDBSettings)
+                            influxDB: InfluxDBSettings,
+                            levelDb: LevelDbSettings)
 
 object EncryAppSettings extends Logging with SettingsReaders with NodeSettingsReader {
 

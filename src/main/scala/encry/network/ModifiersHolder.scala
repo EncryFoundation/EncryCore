@@ -1,18 +1,17 @@
 package encry.network
 
-import akka.persistence.{PersistentActor, SaveSnapshotFailure, SaveSnapshotSuccess, SnapshotOffer}
+import akka.persistence._
 import encry.EncryApp._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
-import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
-import encry.stats.StatsSender.BlocksStat
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.{ModifierId, ModifierTypeId}
+
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 
@@ -27,42 +26,47 @@ class ModifiersHolder extends PersistentActor with Logging {
   var nonCompletedBlocks: Map[String, String] = Map.empty
   var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
 
-  context.system.scheduler.schedule(10.second, 60.second) {
-    stat = Statistics(
-      headers.size,
-      payloads.size,
-      nonCompletedBlocks.size,
-      completedBlocks.size,
-      if (completedBlocks.nonEmpty) completedBlocks.keys.max else 0,
-      countGaps(completedBlocks.keys.toSeq),
-      headers.values.filter(_._2 > 1).map(headerWithDuplicatesQty => headerWithDuplicatesQty._1.id -> headerWithDuplicatesQty._2).toSeq ++
-        payloads.values.filter(_._2 > 1).map(payloadWithDuplicatesQty => payloadWithDuplicatesQty._1.id -> payloadWithDuplicatesQty._2).toSeq
-    )
-    persist(stat) { pieceOfStat => logger.info(pieceOfStat.toString) }
+  context.system.scheduler.schedule(10.second, 30.second) {
+    logger.info(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
   }
 
   override def preStart(): Unit = logger.info(s"ModifiersHolder actor is started.")
 
   override def receiveRecover: Receive = {
-    case SnapshotOffer(_, snapshotAboutStat: Statistics) => stat = snapshotAboutStat
-    case header: EncryBlockHeader => updateHeaders(header); logger.debug(s"Header ${header.height} is recovered from leveldb")
-    case payload: EncryBlockPayload => updatePayloads(payload); logger.debug(s"Payload ${Algos.encode(payload.headerId)} is recovered from leveldb")
-    case block: EncryBlock =>  updateCompletedBlocks(block); logger.debug(s"Block ${block.header.height} is recovered from leveldb")
+    case header: EncryBlockHeader =>
+      updateHeaders(header)
+      logger.debug(s"Header ${header.height} is recovered from leveldb")
+    case payload: EncryBlockPayload =>
+      updatePayloads(payload)
+      logger.debug(s"Payload ${Algos.encode(payload.headerId)} is recovered from leveldb")
+    case block: EncryBlock =>
+      updateCompletedBlocks(block)
+      logger.debug(s"Block ${block.header.height} is recovered from leveldb")
+    case RecoveryCompleted => logger.info("Recovery completed")
   }
 
   override def receiveCommand: Receive = {
-    case SaveSnapshotSuccess(_) => logger.info("Success with snapshot save.")
-    case SaveSnapshotFailure(_, _) => logger.info("Failure with snapshot save.")
+    case SaveSnapshotSuccess(_) => logger.info("Success with snapshot save (stat).")
+    case SaveSnapshotFailure(_, _) => logger.info("Failure with snapshot save (stat).")
+    case ApplyState =>
+      logger.info("State recovering state on ModifiersHolder is finished")
+      logger.info(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
+      val sortedHeaders: Seq[EncryBlockHeader] = headers.map(_._2._1).toSeq
+        .sortWith((firstHeader, secondHeader) => firstHeader.height < secondHeader.height)
+      if (sortedHeaders.headOption.exists(_.height == 0)) sortedHeaders.tail.foldLeft(Seq(sortedHeaders.head)) {
+        case (applicableHeaders, header) =>
+          if (applicableHeaders.last.height + 1 == header.height) applicableHeaders :+ header
+          else applicableHeaders
+      }.foreach(header => nodeViewHolder ! LocallyGeneratedModifier(header))
+      if (completedBlocks.keys.headOption.contains(0)) completedBlocks.foldLeft(Seq(completedBlocks.head._2)) {
+        case (applicableBlocks, blockWithHeight) =>
+          if (applicableBlocks.last.header.height + 1 == blockWithHeight._1) applicableBlocks :+ blockWithHeight._2
+          else applicableBlocks
+      }.foreach(block => nodeViewHolder ! LocallyGeneratedModifier(block.payload))
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
     case x: Any => logger.info(s"Strange input: $x")
   }
-
-  override def persistenceId: String = "persistent actor"
-
-  override def journalPluginId: String = "akka.persistence.journal.leveldb"
-
-  override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
 
   def createBlockIfPossible(payloadId: ModifierId): Unit =
     nonCompletedBlocks.get(Algos.encode(payloadId)).foreach(headerId => headers.get(headerId).foreach { header =>
@@ -73,10 +77,19 @@ class ModifiersHolder extends PersistentActor with Logging {
     })
 
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
-    case header: EncryBlockHeader => persist(header) { header => updateHeaders(header) }
-    case payload: EncryBlockPayload => persist(payload) { payload => updatePayloads(payload) }
-    case block: EncryBlock => persist(block) { block => updateCompletedBlocks(block) }
-    case _ =>
+    case header: EncryBlockHeader =>
+      if(!headers.contains(Algos.encode(header.id)))
+        persist(header) { header => logger.info(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} appended successfully") }
+      updateHeaders(header)
+    case payload: EncryBlockPayload =>
+      if(!payloads.contains(Algos.encode(payload.id)))
+        persist(payload) { payload => logger.info(s"Payload with id: ${Algos.encode(payload.id)} appended successfully") }
+      updatePayloads(payload)
+    case block: EncryBlock =>
+      if(!completedBlocks.values.toSeq.contains(block))
+        persist(block) { block => logger.info(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} appended successfully") }
+      updateCompletedBlocks(block)
+    case _ => logger.error("Strange input")
   }
 
   def updateHeaders(header: EncryBlockHeader): Unit = {
@@ -98,9 +111,18 @@ class ModifiersHolder extends PersistentActor with Logging {
   }
 
   def updateCompletedBlocks(block: EncryBlock): Unit = completedBlocks += block.header.height -> block
+
+  override def persistenceId: String = "persistent actor"
+
+  override def journalPluginId: String = "akka.persistence.journal.leveldb"
+
+  override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
+
 }
 
 object ModifiersHolder {
+
+  case object ApplyState
 
   case class Statistics(receivedHeaders: Int,
                         receivedPayloads: Int,
@@ -109,18 +131,35 @@ object ModifiersHolder {
                         maxHeight: Int,
                         gaps: Seq[(Int, Int)],
                         duplicates: Seq[(ModifierId, Int)]) {
-    override def toString: String = s"Stats: ${this.receivedHeaders} headers received - " +
-      s"${this.receivedPayloads} payloads received - " +
-      s"${this.notCompletedBlocks} not full blocks - " +
-      s"${this.completedBlocks} full blocks - " +
-      s"max height: ${this.maxHeight} " +
-      s"Gaps: ${this.gaps.foldLeft("") { case (str, gap) => str + s"(${gap._1}, ${gap._2})" }} " +
-      s"Duplicates: ${this.duplicates.foldLeft("") { case (str, duplicate) => str + s"(${Algos.encode(duplicate._1)}, ${duplicate._2})" }}"
+    override def toString: String = s"Stats: ${this.receivedHeaders} headers, " +
+      s"${this.receivedPayloads} payloads, " +
+      s"${this.notCompletedBlocks} incomplete blocks, " +
+      s"${this.completedBlocks} full blocks, " +
+      s"max height: ${this.maxHeight}, " +
+      s"gaps: ${this.gaps.foldLeft("") { case (str, gap) => str + s"(${gap._1}, ${gap._2})" }} " +
+      s"duplicates: ${this.duplicates.foldLeft("") { case (str, duplicate) => str + s"(${Algos.encode(duplicate._1)}, ${duplicate._2})" }}."
+  }
+
+  case object Statistics {
+    def apply(headers: Map[String, (EncryBlockHeader, Int)],
+              payloads: Map[String, (EncryBlockPayload, Int)],
+              nonCompletedBlocks: Map[String, String],
+              completedBlocks: SortedMap[Int, EncryBlock]): Statistics =
+      Statistics(
+        headers.size,
+        payloads.size,
+        nonCompletedBlocks.size,
+        completedBlocks.size,
+        if (completedBlocks.nonEmpty) completedBlocks.keys.max else 0,
+        countGaps(completedBlocks.keys.toSeq),
+        headers.values.filter(_._2 > 1).map(headerWithDuplicatesQty => headerWithDuplicatesQty._1.id -> headerWithDuplicatesQty._2).toSeq ++
+          payloads.values.filter(_._2 > 1).map(payloadWithDuplicatesQty => payloadWithDuplicatesQty._1.id -> payloadWithDuplicatesQty._2).toSeq
+      )
+
+
   }
 
   case class RequestedModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier])
-
-  case class Mods(numberOfModsByPeerAndModType: Map[(ConnectedPeer, ModifierTypeId), Int], numberOfPacksFromRemotes: Int)
 
   def countGaps(heights: Seq[Int]): Seq[(Int, Int)] = heights.foldLeft(Seq[(Int, Int)](), -1) {
     case ((gaps, prevHeight), blockHeight) =>
