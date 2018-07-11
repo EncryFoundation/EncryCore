@@ -13,6 +13,7 @@ import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
+import encry.network.ModifiersHolder.{RecoverState, RequestedModifiers}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.BestHeaderInChain
@@ -259,7 +260,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         case ex: Throwable =>
           logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
           new File(settings.directory).listFiles.foreach(dir => {FileUtils.cleanDirectory(dir)})
-          modifiersHolder ! RecoverState
+          if (settings.node.leveldb)
+          context.actorSelection("/user/modifiersHolder") ! RecoverState
           Some(genesisState)
     } else None
 

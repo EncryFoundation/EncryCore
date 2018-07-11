@@ -59,6 +59,24 @@ class ModifiersHolder extends PersistentActor with Logging {
   override def receiveCommand: Receive = {
     case SaveSnapshotSuccess(_) => logger.info("Success with snapshot save.")
     case SaveSnapshotFailure(_, _) => logger.info("Failure with snapshot save.")
+    case RecoverState =>
+      logger.info("Starting to recover state from Modifiers Holder")
+
+      val sortedHeaders: Seq[EncryBlockHeader] = headers.map(_._2._1).toSeq
+        .sortWith( (firstHeader, secondHeader) => firstHeader.height < secondHeader.height)
+
+      if (sortedHeaders.head.height == 0) sortedHeaders.tail.foldLeft(Seq(sortedHeaders.head)) {
+        case (applicableHeaders, header) =>
+          if (applicableHeaders.last.height + 1 == header.height) applicableHeaders :+ header
+          else applicableHeaders
+      }
+
+      if (completedBlocks.keys.headOption.contains(0)) completedBlocks.foldLeft(Seq[EncryBlock]()) {
+        case (applicableBlocks, blockWithHeight) =>
+          if (applicableBlocks.last.header.height + 1 == blockWithHeight._1) applicableBlocks :+ blockWithHeight._2
+          else applicableBlocks
+      }.foreach(block => nodeViewHolder ! LocallyGeneratedModifier(block.payload))
+
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
     case x: Any => logger.info(s"Strange input: $x")
