@@ -256,7 +256,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
       val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
       val state: StateType = restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
-      throw new java.nio.file.NoSuchFileException("test")
       Some(NodeView(history, state, wallet, memPool))
     } catch {
         case ex: Throwable =>

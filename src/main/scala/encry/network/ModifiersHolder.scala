@@ -26,7 +26,7 @@ class ModifiersHolder extends PersistentActor with Logging {
   var nonCompletedBlocks: Map[String, String] = Map.empty
   var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
 
-  context.system.scheduler.schedule(10.second, 10.second) {
+  context.system.scheduler.schedule(10.second, 50.second) {
     stat = Statistics(
       headers.size,
       payloads.size,
@@ -70,7 +70,7 @@ class ModifiersHolder extends PersistentActor with Logging {
           else applicableHeaders
       }.foreach(header => nodeViewHolder ! LocallyGeneratedModifier(header))
 
-      if (completedBlocks.keys.headOption.contains(0)) completedBlocks.foldLeft(Seq[EncryBlock]()) {
+      if (completedBlocks.keys.headOption.contains(0)) completedBlocks.foldLeft(Seq(completedBlocks.head._2)) {
         case (applicableBlocks, blockWithHeight) =>
           if (applicableBlocks.last.header.height + 1 == blockWithHeight._1) applicableBlocks :+ blockWithHeight._2
           else applicableBlocks
@@ -142,13 +142,6 @@ object ModifiersHolder {
       s"Gaps: ${this.gaps.foldLeft("") { case (str, gap) => str + s"(${gap._1}, ${gap._2})" }} " +
       s"Duplicates: ${this.duplicates.foldLeft("") { case (str, duplicate) => str + s"(${Algos.encode(duplicate._1)}, ${duplicate._2})" }}"
   }
-
-  case class Modifiers(headerCache: Map[String, (EncryBlockHeader, Int)],
-                       payloadCache: Map[String, (EncryBlockPayload, Int)],
-                       notCompletedBlocks: Map[String, String],
-                       completedBlocks: SortedMap[Int, EncryBlock])
-
-  case class State(modifiers: Modifiers, stat: Statistics)
 
   case class RequestedModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier])
 
