@@ -11,7 +11,6 @@ import encry.settings.Algos
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.{ModifierId, ModifierTypeId}
-
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 
@@ -79,17 +78,17 @@ class ModifiersHolder extends PersistentActor with Logging {
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
     case header: EncryBlockHeader =>
       if(!headers.contains(Algos.encode(header.id)))
-        persist(header) { header => logger.info(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} appended successfully") }
+        persist(header) { header => logger.info(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully") }
       updateHeaders(header)
     case payload: EncryBlockPayload =>
       if(!payloads.contains(Algos.encode(payload.id)))
-        persist(payload) { payload => logger.info(s"Payload with id: ${Algos.encode(payload.id)} appended successfully") }
+        persist(payload) { payload => logger.info(s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully") }
       updatePayloads(payload)
     case block: EncryBlock =>
       if(!completedBlocks.values.toSeq.contains(block))
-        persist(block) { block => logger.info(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} appended successfully") }
+        persist(block) { block => logger.info(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} is persisted successfully") }
       updateCompletedBlocks(block)
-    case _ => logger.error("Strange input")
+    case x: Any => logger.error(s"Strange input $x")
   }
 
   def updateHeaders(header: EncryBlockHeader): Unit = {
@@ -155,8 +154,6 @@ object ModifiersHolder {
         headers.values.filter(_._2 > 1).map(headerWithDuplicatesQty => headerWithDuplicatesQty._1.id -> headerWithDuplicatesQty._2).toSeq ++
           payloads.values.filter(_._2 > 1).map(payloadWithDuplicatesQty => payloadWithDuplicatesQty._1.id -> payloadWithDuplicatesQty._2).toSeq
       )
-
-
   }
 
   case class RequestedModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier])
