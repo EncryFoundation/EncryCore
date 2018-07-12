@@ -8,7 +8,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.view.history.processors.BlockProcessor
 import encry.view.history.storage.HistoryStorage
-
+import encry.EncryApp.settings
 import scala.util.Try
 
 trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcessor {
@@ -21,6 +21,9 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
     historyStorage.modifierById(payload.headerId) match {
       case Some(header: EncryBlockHeader) =>
         historyStorage.modifierById(header.adProofsId) match {
+          case _ if settings.levelDb.enable =>
+            logger.debug(s"Zero case - put - ${payload.headerId}")
+            processBlock(EncryBlock(header, payload, None), payloadIsNew = true)
           case _ if bestBlockIdOpt.isEmpty && !isValidFirstBlock(header) =>
             logger.debug(s"First case - put - ${payload.headerId}")
             putToHistory(payload)

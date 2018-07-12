@@ -4,20 +4,18 @@ import akka.persistence._
 import encry.EncryApp._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
 import encry.settings.Algos
 import encry.utils.Logging
-import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{LocallyGeneratedModifier, ModifiersFromRemote}
 import encry.{ModifierId, ModifierTypeId}
 
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 
 class ModifiersHolder extends PersistentActor with Logging {
-
-  var stat: Statistics = Statistics(0, 0, 0, 0, 0, Seq.empty, Seq.empty)
 
   /** Map, which contains not completed blocks
     * Key can be payloadId or also header id. So value depends on key, and can contains: headerId, payloadId */
@@ -46,8 +44,6 @@ class ModifiersHolder extends PersistentActor with Logging {
   }
 
   override def receiveCommand: Receive = {
-    case SaveSnapshotSuccess(_) => logger.info("Success with snapshot save (stat).")
-    case SaveSnapshotFailure(_, _) => logger.info("Failure with snapshot save (stat).")
     case ApplyState =>
       logger.info("State recovering state on ModifiersHolder is finished")
       logger.info(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
@@ -62,7 +58,10 @@ class ModifiersHolder extends PersistentActor with Logging {
         case (applicableBlocks, blockWithHeight) =>
           if (applicableBlocks.last.header.height + 1 == blockWithHeight._1) applicableBlocks :+ blockWithHeight._2
           else applicableBlocks
-      }.foreach(block => nodeViewHolder ! LocallyGeneratedModifier(block.payload))
+      }.foreach(block => nodeViewHolder !
+        //LocallyGeneratedModifier(block.payload)
+        ModifiersFromRemote(block.payload.modifierTypeId, Seq(EncryBlockPayloadSerializer.toBytes(block.payload)))
+      )
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
     case x: Any => logger.info(s"Strange input: $x")
@@ -78,15 +77,15 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
     case header: EncryBlockHeader =>
-      if(!headers.contains(Algos.encode(header.id)))
+      if (!headers.contains(Algos.encode(header.id)))
         persist(header) { header => logger.info(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} appended successfully") }
       updateHeaders(header)
     case payload: EncryBlockPayload =>
-      if(!payloads.contains(Algos.encode(payload.id)))
+      if (!payloads.contains(Algos.encode(payload.id)))
         persist(payload) { payload => logger.info(s"Payload with id: ${Algos.encode(payload.id)} appended successfully") }
       updatePayloads(payload)
     case block: EncryBlock =>
-      if(!completedBlocks.values.toSeq.contains(block))
+      if (!completedBlocks.values.toSeq.contains(block))
         persist(block) { block => logger.info(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} appended successfully") }
       updateCompletedBlocks(block)
     case _ => logger.error("Strange input")

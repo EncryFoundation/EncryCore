@@ -6,7 +6,6 @@ import encry.modifiers.history.HistoryModifierSerializer
 import encry.modifiers.serialization.Serializer
 import encry.storage.EncryBaseStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
-
 import scala.util.{Failure, Random, Success}
 
 class HistoryStorage(override val store: Store, val objectsStore: Store) extends EncryBaseStorage {

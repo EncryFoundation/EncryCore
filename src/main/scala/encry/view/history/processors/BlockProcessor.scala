@@ -46,9 +46,8 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       processBetterChain orElse
       nonBestBlock
 
-  protected def isValidFirstBlock(header: EncryBlockHeader): Boolean = {
+  protected def isValidFirstBlock(header: EncryBlockHeader): Boolean =
     header.height == blockDownloadProcessor.minimalBlockHeight && bestBlockIdOpt.isEmpty
-  }
 
   private def processValidFirstBlock: BlockProcessing = {
     case ToProcess(fullBlock, newModRow, newBestHeader, newBestChain, _)
