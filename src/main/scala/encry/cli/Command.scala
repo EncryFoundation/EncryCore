@@ -1,13 +1,13 @@
-package encry.cli.commands
+package encry.cli
 
-import encry.cli.{Ast, Response}
+import encry.cli.Commands._
 import encry.settings.EncryAppSettings
+
 import scala.concurrent.Future
 
 trait Command {
-
   def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]]
-
+  def executeRequest(args: Command.Args, settings: EncryAppSettings): Any = LocalCommand
 }
 
 object Command {

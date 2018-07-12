@@ -4,6 +4,7 @@ import java.io.File
 
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
+import encry.cli.CommandReceiver
 import encry.consensus.History.ProgressInfo
 import encry.modifiers._
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
@@ -32,7 +33,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
-class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging {
+class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging with CommandReceiver[StateType] {
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: EncryMempool)
 
@@ -56,10 +57,16 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     nodeView.state.closeStorage()
   }
 
-  override def receive: Receive = {
+  override def receive: Receive =
+    commandReceive orElse
+    mainReceive orElse
+    otherReceive
+
+  def mainReceive: Receive = {
     case ModifiersFromRemote(_, modifierTypeId, remoteObjects) =>
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
+          case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
             if (nodeView.history.contains(pmod.id) || modifiersCache.contains(key(pmod.id)))
@@ -90,11 +97,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       if (state) sender() ! ChangedState(nodeView.state)
       if (mempool) sender() ! ChangedMempool(nodeView.mempool)
     case CompareViews(peer, modifierTypeId, modifierIds) =>
-      val ids: Seq[ModifierId] = modifierTypeId match {
-        case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
-        case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
-      }
+      val ids: Seq[ModifierId] =
+        if( modifierTypeId == Transaction.ModifierTypeId) nodeView.mempool.notIn(modifierIds)
+        else modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
+  }
+
+  def otherReceive: Receive = {
     case a: Any => logError("Strange input: " + a)
   }
 
