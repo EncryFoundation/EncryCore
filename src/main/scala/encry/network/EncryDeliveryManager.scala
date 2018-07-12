@@ -3,6 +3,8 @@ package encry.network
 import akka.actor.{Actor, Cancellable}
 import encry.EncryApp.{networkController, nodeViewHolder, settings, timeProvider}
 import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
+import encry.local.miner.EncryMiner.{DisableMining, StartMining}
+import encry.network.EncryDeliveryManager.FullBlockChainSynced
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToNetwork}
 import encry.network.PeerConnectionHandler._
@@ -33,6 +35,8 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
   var cancellables: Map[ModifierIdAsKey, (ConnectedPeer, (Cancellable, Int))] = Map.empty
   var mempoolReaderOpt: Option[EncryMempool] = None
   var historyReaderOpt: Option[EncryHistory] = None
+  var isBlockChainSynced: Boolean = false
+  var isMining: Boolean = settings.node.mining
   val invSpec: InvSpec = new InvSpec(settings.network.maxInvObjects)
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
   val statusTracker: SyncTracker = SyncTracker(self, context, settings.network, timeProvider)
@@ -80,6 +84,9 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
       if (fm.nonEmpty) nodeViewHolder ! ModifiersFromRemote(remote, typeId, fm.values.toSeq)
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
       requestDownload(modifierTypeId, Seq(modifierId))
+    case FullBlockChainSynced => isBlockChainSynced = true
+    case StartMining => isMining = true
+    case DisableMining => isMining = false
     case SendLocalSyncInfo =>
       if (statusTracker.elapsedTimeSinceLastSync() < (settings.network.syncInterval.toMillis / 2)) log.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
@@ -94,21 +101,23 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
   }
 
   def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mids: Seq[ModifierId]): Unit = tryWithLogging {
-    val notRequestedIds: Seq[ModifierId] = mids.foldLeft(Seq[ModifierId]()) {
-      case (notRequested, modId) =>
-        val modifierKey: ModifierIdAsKey = key(modId)
-        if (historyReaderOpt.forall(history => !history.contains(modId))) {
-          if (!cancellables.contains(modifierKey)) notRequested :+ modId
-          else {
-            peers = peers - modifierKey + (modifierKey -> (peers.getOrElse(modifierKey, Seq()) :+ cp).distinct)
-            notRequested
-          }
-        } else notRequested
-    }
-    if (notRequestedIds.nonEmpty) cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
-    notRequestedIds.foreach { id =>
-      val cancellable: Cancellable = context.system.scheduler.scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
-      cancellables = (cancellables - key(id)) + (key(id) -> (cp, (cancellable, 0)))
+    if ((mtid == 2 && isBlockChainSynced && isMining) || mtid != 2) {
+      val notRequestedIds: Seq[ModifierId] = mids.foldLeft(Seq[ModifierId]()) {
+        case (notRequested, modId) =>
+          val modifierKey: ModifierIdAsKey = key(modId)
+          if (historyReaderOpt.forall(history => !history.contains(modId))) {
+            if (!cancellables.contains(modifierKey)) notRequested :+ modId
+            else {
+              peers = peers - modifierKey + (modifierKey -> (peers.getOrElse(modifierKey, Seq()) :+ cp).distinct)
+              notRequested
+            }
+          } else notRequested
+      }
+      if (notRequestedIds.nonEmpty) cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
+      notRequestedIds.foreach { id =>
+        val cancellable: Cancellable = context.system.scheduler.scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
+        cancellables = (cancellables - key(id)) + (key(id) -> (cp, (cancellable, 0)))
+      }
     }
   }
 
@@ -176,4 +185,9 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
     }
     else deliveredSpam = deliveredSpam - key(mid) + (key(mid) -> cp)
   }
+}
+
+object EncryDeliveryManager {
+
+  case object FullBlockChainSynced
 }

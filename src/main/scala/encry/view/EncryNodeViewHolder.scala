@@ -12,6 +12,7 @@ import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer, Transaction}
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
+import encry.network.EncryDeliveryManager.FullBlockChainSynced
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.RequestedModifiers
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -209,6 +210,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               log.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
               if (settings.node.sendStat)
                 newHistory.bestHeaderOpt.foreach(header => context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
+              if (newHistory.isFullBlockChainSynced)
+                nodeViewSynchronizer ! FullBlockChainSynced
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
               logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
