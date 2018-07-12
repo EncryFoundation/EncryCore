@@ -39,4 +39,5 @@ object EncryMiningWorker {
   case class NextChallenge(candidateBlock: CandidateBlock)
 
   case class MineBlock(candidateBlock: CandidateBlock, nonce: Long)
+
 }
