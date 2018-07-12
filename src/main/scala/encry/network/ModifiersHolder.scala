@@ -3,7 +3,7 @@ package encry.network
 import akka.persistence._
 import encry.EncryApp._
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
@@ -11,7 +11,6 @@ import encry.settings.Algos
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{LocallyGeneratedModifier, ModifiersFromRemote}
 import encry.{ModifierId, ModifierTypeId}
-
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 
@@ -44,11 +43,12 @@ class ModifiersHolder extends PersistentActor with Logging {
   }
 
   override def receiveCommand: Receive = {
-    case ApplyState =>
+    case ApplyState if false =>
       logger.info("State recovering state on ModifiersHolder is finished")
-      logger.info(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
+      //logger.info(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
       val sortedHeaders: Seq[EncryBlockHeader] = headers.map(_._2._1).toSeq
         .sortWith((firstHeader, secondHeader) => firstHeader.height < secondHeader.height)
+      sortedHeaders.foreach(header => logger.debug(header.height.toString))
       if (sortedHeaders.headOption.exists(_.height == 0)) sortedHeaders.tail.foldLeft(Seq(sortedHeaders.head)) {
         case (applicableHeaders, header) =>
           if (applicableHeaders.last.height + 1 == header.height) applicableHeaders :+ header
@@ -58,10 +58,27 @@ class ModifiersHolder extends PersistentActor with Logging {
         case (applicableBlocks, blockWithHeight) =>
           if (applicableBlocks.last.header.height + 1 == blockWithHeight._1) applicableBlocks :+ blockWithHeight._2
           else applicableBlocks
-      }.foreach(block => nodeViewHolder !
+      }.foreach(block => nodeViewHolder ! ModifiersFromRemote(block.payload.modifierTypeId, Seq(EncryBlockPayloadSerializer.toBytes(block.payload)))
         //LocallyGeneratedModifier(block.payload)
-        ModifiersFromRemote(block.payload.modifierTypeId, Seq(EncryBlockPayloadSerializer.toBytes(block.payload)))
       )
+    case ApplyState =>
+      logger.info("State recovering state on ModifiersHolder is finished")
+
+      completedBlocks.foreach(block => logger.debug(block._1 + " " + block._2.encodedId))
+
+      if (completedBlocks.keys.headOption.contains(0)) completedBlocks.foldLeft(Seq(completedBlocks.head._2)) {
+        case (applicableBlocks, blockWithHeight) =>
+          if (applicableBlocks.last.header.height + 1 == blockWithHeight._1) applicableBlocks :+ blockWithHeight._2
+          else applicableBlocks
+      }.foreach(block => {
+        logger.debug(block.header.height.toString)
+        nodeViewHolder ! ModifiersFromRemote(block.header.modifierTypeId, Seq(EncryBlockHeaderSerializer.toBytes(block.header)))
+        nodeViewHolder ! ModifiersFromRemote(block.payload.modifierTypeId, Seq(EncryBlockPayloadSerializer.toBytes(block.payload)))
+        Thread.sleep(10000)
+        //LocallyGeneratedModifier(block.payload)
+      }
+      )
+
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
     case x: Any => logger.info(s"Strange input: $x")
@@ -135,8 +152,7 @@ object ModifiersHolder {
       s"${this.notCompletedBlocks} incomplete blocks, " +
       s"${this.completedBlocks} full blocks, " +
       s"max height: ${this.maxHeight}, " +
-      s"gaps: ${this.gaps.foldLeft("") { case (str, gap) => str + s"(${gap._1}, ${gap._2})" }} " +
-      s"duplicates: ${this.duplicates.foldLeft("") { case (str, duplicate) => str + s"(${Algos.encode(duplicate._1)}, ${duplicate._2})" }}."
+      s"gaps: ${this.gaps.foldLeft("") { case (str, gap) => str + s"(${gap._1}, ${gap._2})" }} "
   }
 
   case object Statistics {
@@ -154,8 +170,6 @@ object ModifiersHolder {
         headers.values.filter(_._2 > 1).map(headerWithDuplicatesQty => headerWithDuplicatesQty._1.id -> headerWithDuplicatesQty._2).toSeq ++
           payloads.values.filter(_._2 > 1).map(payloadWithDuplicatesQty => payloadWithDuplicatesQty._1.id -> payloadWithDuplicatesQty._2).toSeq
       )
-
-
   }
 
   case class RequestedModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier])

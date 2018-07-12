@@ -82,7 +82,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           pmodModify(v)
         }
         log.info(s"Cache after(${modifiersCache.size})")
-        modifiersCache.foreach(modInfo => logger.info(modInfo._2.modifierTypeId + "-" + Algos.encode(modInfo._2.id)))
+        //modifiersCache.foreach(modInfo => logger.info(modInfo._2.modifierTypeId + "-" + Algos.encode(modInfo._2.id)))
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, EncryBaseTransaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
