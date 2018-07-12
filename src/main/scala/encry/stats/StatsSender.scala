@@ -41,12 +41,12 @@ class StatsSender extends Actor with Logging {
         )
       )
 
-    case MiningEnd(blockHeader: EncryBlockHeader, workerNumber: Int, workersQty: Int) =>
+    case MiningEnd(blockHeader: EncryBlockHeader, workerIdx: Int, workersQty: Int) =>
       influxDB.write(
         8189,
         util.Arrays.asList(
-          s"miningEnd,nodeName=${settings.network.nodeName},block=${Algos.encode(blockHeader.id)},height=${blockHeader.height},worker=$workerNumber value=${timeProvider.time() - blockHeader.timestamp}",
-          s"minerIterCount,nodeName=${settings.network.nodeName},block=${Algos.encode(blockHeader.id)},height=${blockHeader.height} value=${blockHeader.nonce - Long.MaxValue / workersQty * workerNumber}"
+          s"miningEnd,nodeName=${settings.network.nodeName},block=${Algos.encode(blockHeader.id)},height=${blockHeader.height},worker=$workerIdx value=${timeProvider.time() - blockHeader.timestamp}",
+          s"minerIterCount,nodeName=${settings.network.nodeName},block=${Algos.encode(blockHeader.id)},height=${blockHeader.height} value=${blockHeader.nonce - Long.MaxValue / workersQty * workerIdx + 1}"
         )
       )
 
@@ -68,7 +68,7 @@ class StatsSender extends Actor with Logging {
 
 object StatsSender {
 
-  case class MiningEnd(blockHeader: EncryBlockHeader, workerNumber: Int, workersQty: Int)
+  case class MiningEnd(blockHeader: EncryBlockHeader, workerIdx: Int, workersQty: Int)
 
   case class BestHeaderInChain(bestHeader: EncryBlockHeader)
 
