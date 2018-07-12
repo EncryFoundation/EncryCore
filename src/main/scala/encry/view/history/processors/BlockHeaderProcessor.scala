@@ -16,6 +16,7 @@ import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import encry.{EncryApp, _}
 import io.iohk.iodb.ByteArrayWrapper
+
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
