@@ -1,6 +1,7 @@
 package encry.view.history
 
 import java.io.File
+
 import encry.ModifierId
 import encry.consensus.History
 import encry.consensus.History.ProgressInfo
@@ -15,6 +16,7 @@ import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockP
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
 import encry.view.history.storage.{FileHistoryObjectsStore, HistoryStorage}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+
 import scala.util.Try
 
 /**
@@ -32,6 +34,8 @@ import scala.util.Try
   *   2. Be ignored by history (verifyTransactions == false)
   */
 trait EncryHistory extends EncryHistoryReader {
+
+  def isFullBlockChainSynced: Boolean = bestHeaderOpt.exists(bestHeader => bestBlockOpt.exists(_.header.id == bestHeader.id))
 
   /** Appends modifier to the history if it is applicable. */
   def append(modifier: EncryPersistentModifier): Try[(EncryHistory, History.ProgressInfo[EncryPersistentModifier])] = {
