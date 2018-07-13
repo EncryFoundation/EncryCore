@@ -77,10 +77,11 @@ class UtxoState(override val version: VersionTag,
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
 
     case block: EncryBlock =>
+      println(s"[Applying] $block to UTXO state.")
       log.info(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
 
-      applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
+      val r = applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] =
           metadata(VersionTag !@@ block.id, block.header.stateRoot, Height @@ block.header.height, block.header.timestamp)
         val proofBytes: SerializedAdProof = persistentProver.generateProofAndUpdateStorage(meta)
@@ -105,6 +106,9 @@ class UtxoState(override val version: VersionTag,
           s" ${Algos.encode(rootHash)}: ", e)
         Failure(e)
       }
+
+      println(s"[Applied ] $block to UTXO state.")
+      r
 
     case header: EncryBlockHeader =>
       Success(new UtxoState(VersionTag !@@ header.id, height, stateStore, lastBlockTimestamp, nodeViewHolderRef))
