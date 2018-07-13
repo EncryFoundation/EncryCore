@@ -96,8 +96,14 @@ class EncryMiner extends Actor with Logging {
   }
 
   def receiveSemanticallySuccessfulModifier: Receive = {
-    case SemanticallySuccessfulModifier(mod: EncryBlock) if context.children.nonEmpty && needNewCandidate(mod) => produceCandidate()
-    case SemanticallySuccessfulModifier(mod: EncryBlock) if shouldStartMine(mod) => self ! StartMining
+    case SemanticallySuccessfulModifier(mod: EncryBlock) if context.children.nonEmpty && needNewCandidate(mod) => {
+      log.info(s"Got new block. Starting to produce candidate on height: ${mod.header.height + 1} in ${sdf.format(new Date(System.currentTimeMillis()))}")
+      produceCandidate()
+    }
+    case SemanticallySuccessfulModifier(mod: EncryBlock) if shouldStartMine(mod) => {
+      log.info(s"Got new block2. Starting to produce candidate on height: ${mod.header.height + 1} in ${sdf.format(new Date(System.currentTimeMillis()))}")
+      self ! StartMining
+    }
     case SemanticallySuccessfulModifier(_) =>
   }
 
