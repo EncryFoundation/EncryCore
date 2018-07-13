@@ -57,7 +57,7 @@ class StatsSender extends Actor with Logging {
 
     case EndOfApplyingModif(modifierId) =>
       modifiersToApply.get(Algos.encode(modifierId)).foreach { modInfo =>
-        influxDB.write(8189, s"sleepTime,nodeName=${settings.network.nodeName},modType=${modInfo._1} time=${System.currentTimeMillis() - modInfo._2}")
+        influxDB.write(8189, s"modifApplying,nodeName=${settings.network.nodeName},modType=${modInfo._1} time=${System.currentTimeMillis() - modInfo._2}")
         modifiersToApply -= Algos.encode(modifierId)
       }
 
