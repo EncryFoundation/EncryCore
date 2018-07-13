@@ -167,6 +167,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
+          println(s"Applying $modToApply to State.")
           if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
             case Success(stateAfterApply) =>
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)

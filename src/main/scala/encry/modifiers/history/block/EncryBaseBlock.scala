@@ -22,6 +22,6 @@ trait EncryBaseBlock
 
   def semanticValidity: Try[Unit]
 
-  override def toString: String = s"<Block timestamp=${header.timestamp} txQty=${payload.transactions.size} id=${header.encodedId}>"
+  override def toString: String = s"<Block height=${header.height} timestamp=${header.timestamp} txQty=${payload.transactions.size} id=${header.encodedId}>"
 }
 

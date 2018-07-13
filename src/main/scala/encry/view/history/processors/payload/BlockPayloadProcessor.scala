@@ -17,23 +17,14 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
 
   protected val adState: Boolean
 
-  override protected def process(payload: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] = {
-    historyStorage.modifierById(payload.headerId) match {
-      case Some(header: EncryBlockHeader) =>
-        historyStorage.modifierById(header.adProofsId) match {
-          case _ if bestBlockIdOpt.isEmpty && !isValidFirstBlock(header) =>
-            putToHistory(payload)
-          case Some(adProof: ADProofs) =>
-            processBlock(EncryBlock(header, payload, Some(adProof)), payloadIsNew = true)
-          case None if !adState =>
-            processBlock(EncryBlock(header, payload, None), payloadIsNew = true)
-          case _ =>
-            putToHistory(payload)
-        }
-      case _ =>
-        throw new Exception(s"Header for modifier $payload is not defined")
+  override protected def process(payload: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] =
+    getBlockByPayload(payload).map(block => processBlock(block, payload)).getOrElse(putToHistory(payload))
+
+  private def getBlockByPayload(payload: EncryBlockPayload): Option[EncryBlock] =
+    typedModifierById[EncryBlockHeader](payload.headerId).flatMap { h =>
+      if (!adState) Some(EncryBlock(h, payload, None))
+      else typedModifierById[ADProofs](h.adProofsId).map(ps => EncryBlock(h, payload, Some(ps)))
     }
-  }
 
   override protected def validate(m: EncryBlockPayload): Try[Unit] =
     modifierValidation(m, typedModifierById[EncryBlockHeader](m.headerId))

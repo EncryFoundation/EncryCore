@@ -31,14 +31,13 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   /** Process full block when we have one.
     *
     * @param fullBlock - block to process
-    * @param payloadIsNew - flag, that transactions where added last
+    * @param modToApply - new part of the block we want to apply
     * @return ProgressInfo required for State to process to be consistent with History
     */
-  protected def processBlock(fullBlock: EncryBlock, payloadIsNew: Boolean): ProgressInfo[EncryPersistentModifier] = {
-    val newModRow: EncryPersistentModifier = calculateNewModRow(fullBlock, payloadIsNew)
+  protected def processBlock(fullBlock: EncryBlock, modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
     val bestFullChain: Seq[EncryBlock] = calculateBestFullChain(fullBlock)
     val newBestAfterThis: EncryBlockHeader = bestFullChain.last.header
-    processing(ToProcess(fullBlock, newModRow, newBestAfterThis, bestFullChain, nodeSettings.blocksToKeep))
+    processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, nodeSettings.blocksToKeep))
   }
 
   private def processing: BlockProcessing =
