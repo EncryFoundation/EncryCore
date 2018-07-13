@@ -15,7 +15,7 @@ import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
-import encry.stats.StatsSender.MiningEnd
+import encry.stats.StatsSender.{MiningEnd, MiningTime, SleepTime}
 import encry.utils.Logging
 import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.CurrentView
@@ -34,6 +34,10 @@ import scala.collection._
 class EncryMiner extends Actor with Logging {
 
   val sdf = new SimpleDateFormat("HH:mm:ss")
+
+  var startTime: Long = System.currentTimeMillis()
+
+  var sleepTime: Long = System.currentTimeMillis()
 
   import EncryMiner._
 
@@ -76,9 +80,13 @@ class EncryMiner extends Actor with Logging {
     case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
       nodeViewHolder ! LocallyGeneratedModifier(block.header)
       nodeViewHolder ! LocallyGeneratedModifier(block.payload)
-      if (settings.node.sendStat) system.actorSelection("user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
+      if (settings.node.sendStat) {
+        system.actorSelection("user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
+        system.actorSelection("user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
+      }
       if (settings.node.stateMode == StateMode.Digest) block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
       candidateOpt = None
+      sleepTime = System.currentTimeMillis()
       context.children.foreach(_ ! DropChallenge)
 
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty, candidateOpt)
@@ -173,6 +181,10 @@ class EncryMiner extends Actor with Logging {
   def produceCandidate(): Unit =
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
       log.info(s"Starting candidate generation in ${sdf.format(new Date(System.currentTimeMillis()))}")
+      startTime = System.currentTimeMillis()
+      if (settings.node.sendStat) {
+        system.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
+      }
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
       if (bestHeaderOpt.isDefined || settings.node.offlineGeneration) CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
       else CandidateEnvelope.empty

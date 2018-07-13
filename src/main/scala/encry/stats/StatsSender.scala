@@ -50,6 +50,15 @@ class StatsSender extends Actor with Logging {
         )
       )
 
+    case SleepTime(time: Long) =>
+      influxDB.write(8189, s"sleepTime,nodeName=${settings.network.nodeName} value=$time")
+
+    case MiningTime(time: Long) =>
+      influxDB.write(8189, s"miningTime,nodeName=${settings.network.nodeName} value=$time")
+
+    case CandidateProducingTime(time: Long) =>
+      influxDB.write(8189, s"candidateProducing,nodeName=${settings.network.nodeName} value=$time")
+
     case SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
       modifiersToDownload = modifiersToDownload ++ modifiers.map(mod => (Algos.encode(mod), (modifierTypeId, System.currentTimeMillis())))
 
@@ -68,7 +77,13 @@ class StatsSender extends Actor with Logging {
 
 object StatsSender {
 
+  case class CandidateProducingTime(time: Long)
+
+  case class SleepTime(time: Long)
+
   case class MiningEnd(blockHeader: EncryBlockHeader, workerIdx: Int, workersQty: Int)
+
+  case class MiningTime(time: Long)
 
   case class BestHeaderInChain(bestHeader: EncryBlockHeader)
 
