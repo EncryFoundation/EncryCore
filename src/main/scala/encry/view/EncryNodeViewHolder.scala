@@ -37,9 +37,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: EncryMempool)
 
-  var journal: Map[ModifierId, Long] = Map.empty
-  var benchResults: Map[ModifierId, Long] = Map.empty
-
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
   var modifiersCache: Map[mutable.WrappedArray.ofByte, EncryPersistentModifier] = Map.empty
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
@@ -69,7 +66,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             if (nodeView.history.contains(pmod.id) || modifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
-              journal = journal.updated(pmod.id, System.currentTimeMillis())
               modifiersCache += (key(pmod.id) -> pmod)
               if (settings.levelDb.enable) context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
             }
@@ -175,13 +171,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
             case Success(stateAfterApply) =>
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
-              modToApply match {
-                case block: EncryBlock =>
-                  val applicationStart: Long = journal.getOrElse(block.payload.id, System.currentTimeMillis())
-                  val payloadApplicationTime: Long = System.currentTimeMillis() - applicationStart
-                  benchResults = benchResults.updated(block.payload.id, payloadApplicationTime)
-                  println(s"( h = ${block.header.height} payloadApplicationTime = $payloadApplicationTime )")
-              }
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Failure(e) =>
