@@ -168,7 +168,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
-          println(s"Applying $modToApply to State.")
           if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
             case Success(stateAfterApply) =>
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
@@ -179,8 +178,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                 history.reportModifierIsInvalid(modToApply, progressInfo)
               nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
-          }
-          else u
+          } else u
         }
         uf.failedMod match {
           case Some(_) => updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
