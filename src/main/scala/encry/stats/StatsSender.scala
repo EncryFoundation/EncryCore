@@ -23,6 +23,8 @@ class StatsSender extends Actor with Logging {
 
   influxDB.setRetentionPolicy("autogen")
 
+  var modifiersToApply: Map[String, (ModifierTypeId, Long)] = Map()
+
   override def preStart(): Unit =
     influxDB.write(8189, s"""nodesStartTime value="${settings.network.nodeName}"""")
 
@@ -49,6 +51,15 @@ class StatsSender extends Actor with Logging {
           s"minerIterCount,nodeName=${settings.network.nodeName},block=${Algos.encode(blockHeader.id)},height=${blockHeader.height} value=${blockHeader.nonce - Long.MaxValue / workersQty * workerIdx + 1}"
         )
       )
+
+    case StartApplyingModif(modifierId: ModifierId, modifierTypeId: ModifierTypeId, startTime: Long) =>
+      modifiersToApply += Algos.encode(modifierId) -> (modifierTypeId, startTime)
+
+    case EndOfApplyingModif(modifierId) =>
+      modifiersToApply.get(Algos.encode(modifierId)).foreach { modInfo =>
+        influxDB.write(8189, s"sleepTime,nodeName=${settings.network.nodeName},modType=${modInfo._1} time=${System.currentTimeMillis() - modInfo._2}")
+        modifiersToApply -= Algos.encode(modifierId)
+      }
 
     case SleepTime(time: Long) =>
       influxDB.write(8189, s"sleepTime,nodeName=${settings.network.nodeName} value=$time")
@@ -80,6 +91,10 @@ object StatsSender {
   case class CandidateProducingTime(time: Long)
 
   case class SleepTime(time: Long)
+
+  case class StartApplyingModif(modifierId: ModifierId, modifierTypeId: ModifierTypeId, startTime: Long)
+
+  case class EndOfApplyingModif(modifierId: ModifierId)
 
   case class MiningEnd(blockHeader: EncryBlockHeader, workerIdx: Int, workersQty: Int)
 
