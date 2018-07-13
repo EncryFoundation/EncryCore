@@ -1,7 +1,6 @@
 package encry.settings
 
 import java.io.File
-
 import com.typesafe.config.ConfigFactory
 import encry.utils.{Logging, NetworkTimeProviderSettings}
 import net.ceedubs.ficus.Ficus._

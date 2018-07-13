@@ -12,6 +12,7 @@ import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer, Transaction}
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
+import encry.network.EncryDeliveryManager.FullBlockChainSynced
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{ApplyState, RequestedModifiers}
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -57,7 +58,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def receive: Receive = {
-    case ModifiersFromRemote(_, modifierTypeId, remoteObjects) =>
+    case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
@@ -211,6 +212,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               log.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
               if (settings.node.sendStat)
                 newHistory.bestHeaderOpt.foreach(header => context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
+              if (newHistory.isFullBlockChainSynced)
+                nodeViewSynchronizer ! FullBlockChainSynced
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
               logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
@@ -326,7 +329,7 @@ object EncryNodeViewHolder {
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    case class ModifiersFromRemote(peer: ConnectedPeer, modTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
+    case class ModifiersFromRemote(modTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
 
     case class LocallyGeneratedTransaction[P <: Proposition, EncryBaseTransaction <: Transaction[P]](tx: EncryBaseTransaction)
 

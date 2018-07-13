@@ -35,6 +35,8 @@ import scala.util.Try
   */
 trait EncryHistory extends EncryHistoryReader {
 
+  def isFullBlockChainSynced: Boolean = bestHeaderOpt.exists(bestHeader => bestBlockOpt.exists(_.header.id == bestHeader.id))
+
   /** Appends modifier to the history if it is applicable. */
   def append(modifier: EncryPersistentModifier): Try[(EncryHistory, History.ProgressInfo[EncryPersistentModifier])] = {
     log.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
