@@ -1,5 +1,8 @@
 package encry.local.miner
 
+import java.text.SimpleDateFormat
+import java.util.Date
+
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus._
@@ -30,6 +33,8 @@ import scala.collection._
 
 class EncryMiner extends Actor with Logging {
 
+  val sdf = new SimpleDateFormat("HH:mm:ss")
+
   import EncryMiner._
 
   var candidateOpt: Option[CandidateBlock] = None
@@ -52,7 +57,9 @@ class EncryMiner extends Actor with Logging {
 
     case StartMining if context.children.nonEmpty =>
       candidateOpt match {
-        case Some(candidateBlock) => context.children.foreach(_ ! NextChallenge(candidateBlock))
+        case Some(candidateBlock) =>
+          log.info(s"Start mining in ${sdf.format(new Date(System.currentTimeMillis()))}")
+          context.children.foreach(_ ! NextChallenge(candidateBlock))
         case None => produceCandidate()
       }
 
@@ -108,7 +115,7 @@ class EncryMiner extends Actor with Logging {
       unknownMessage
 
   def procCandidateBlock(c: CandidateBlock): Unit = {
-    log.info(s"Got candidate block $c")
+    log.info(s"Got candidate block $c in ${sdf.format(new Date(System.currentTimeMillis()))}")
     candidateOpt = Some(c)
     context.system.scheduler.scheduleOnce(settings.node.miningDelay, self, StartMining)
   }
@@ -159,7 +166,7 @@ class EncryMiner extends Actor with Logging {
 
   def produceCandidate(): Unit =
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
-      log.info("Starting candidate generation")
+      log.info(s"Starting candidate generation in ${sdf.format(new Date(System.currentTimeMillis()))}")
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
       if (bestHeaderOpt.isDefined || settings.node.offlineGeneration) CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
       else CandidateEnvelope.empty
