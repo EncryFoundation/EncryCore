@@ -13,9 +13,12 @@ class EncryMiningWorker(myIdx: Int, numberOfWorkers: Int) extends Actor with Log
 
   def miningInProgress: Receive = {
 
-    case MineBlock(candidate: CandidateBlock, nonce: Long) => ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, nonce)
+    case MineBlock(candidate: CandidateBlock, nonce: Long) =>
+      log.info(s"Iter with nonce: $nonce. Start nonce is: ${Long.MaxValue / numberOfWorkers * myIdx}. " +
+        s"Iter qty: ${nonce - (Long.MaxValue / numberOfWorkers * myIdx) + 1} on worker: $myIdx with diff: ${candidate.difficulty}")
+      ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, nonce)
       .fold(self ! MineBlock(candidate, nonce + 1)) { block =>
-        log.info(s"New block is found: $block on worker $self.")
+        log.info(s"New block is found: $block on worker $self. Iter qty: ${nonce - (Long.MaxValue / numberOfWorkers * myIdx) + 1}")
         miner ! MinedBlock(block, myIdx)
       }
 
@@ -26,6 +29,7 @@ class EncryMiningWorker(myIdx: Int, numberOfWorkers: Int) extends Actor with Log
 
     case NextChallenge(candidate: CandidateBlock) =>
       context.become(miningInProgress)
+      log.info(s"Start challenge on worker: $myIdx on height ${candidate.parentOpt.map(_.height + 1).getOrElse("No parent")}")
       self ! MineBlock(candidate, Long.MaxValue / numberOfWorkers * myIdx)
 
     case _ =>
