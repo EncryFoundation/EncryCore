@@ -52,10 +52,8 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       val toRemove: Seq[EncryBlock] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[EncryBlock] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
-      if (toApply.lengthCompare(newChain.length - 1) != 0) {
-        //block have higher score but is not linkable to full chain
-        nonBestBlock(toProcess)
-      } else {
+      if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess) //block have higher score but is not linkable to full chain
+      else {
         //application of this block leads to full chain with higher score
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
