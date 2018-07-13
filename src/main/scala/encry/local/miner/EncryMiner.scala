@@ -12,6 +12,7 @@ import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
+import encry.stats.StatsSender.MiningEnd
 import encry.utils.Logging
 import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.CurrentView
@@ -65,9 +66,10 @@ class EncryMiner extends Actor with Logging {
       killAllWorkers()
       context.become(miningDisabled)
 
-    case MinedBlock(block) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
+    case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
       nodeViewHolder ! LocallyGeneratedModifier(block.header)
       nodeViewHolder ! LocallyGeneratedModifier(block.payload)
+      if (settings.node.sendStat) system.actorSelection("user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
       if (settings.node.stateMode == StateMode.Digest) block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
       candidateOpt = None
       context.children.foreach(_ ! DropChallenge)
@@ -174,7 +176,7 @@ object EncryMiner extends Logging {
 
   case object GetMinerStatus
 
-  case class MinedBlock(block: EncryBlock)
+  case class MinedBlock(block: EncryBlock, workerIdx: Int)
 
   case class MinerStatus(isMining: Boolean, candidateBlock: Option[CandidateBlock]) {
     lazy val json: Json = Map(

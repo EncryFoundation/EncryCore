@@ -7,7 +7,7 @@ import encry.local.miner.EncryMiner.MinedBlock
 import encry.local.miner.EncryMiningWorker.{DropChallenge, MineBlock, NextChallenge}
 import encry.utils.Logging
 
-class EncryMiningWorker(myNumber: Int, numberOfWorkers: Int) extends Actor with Logging {
+class EncryMiningWorker(myIdx: Int, numberOfWorkers: Int) extends Actor with Logging {
 
   override def receive: Receive = miningPaused
 
@@ -16,7 +16,7 @@ class EncryMiningWorker(myNumber: Int, numberOfWorkers: Int) extends Actor with 
     case MineBlock(candidate: CandidateBlock, nonce: Long) => ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, nonce)
       .fold(self ! MineBlock(candidate, nonce + 1)) { block =>
         log.info(s"New block is found: $block on worker $self.")
-        miner ! MinedBlock(block)
+        miner ! MinedBlock(block, myIdx)
       }
 
     case DropChallenge => context.become(miningPaused)
@@ -26,7 +26,7 @@ class EncryMiningWorker(myNumber: Int, numberOfWorkers: Int) extends Actor with 
 
     case NextChallenge(candidate: CandidateBlock) =>
       context.become(miningInProgress)
-      self ! MineBlock(candidate, Long.MaxValue / numberOfWorkers * myNumber)
+      self ! MineBlock(candidate, Long.MaxValue / numberOfWorkers * myIdx)
 
     case _ =>
   }
@@ -39,4 +39,5 @@ object EncryMiningWorker {
   case class NextChallenge(candidateBlock: CandidateBlock)
 
   case class MineBlock(candidateBlock: CandidateBlock, nonce: Long)
+
 }
