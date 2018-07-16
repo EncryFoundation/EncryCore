@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.Actor
 import akka.pattern.ask
 import akka.util.Timeout
@@ -11,7 +10,6 @@ import encry.network.message.{GetPeersSpec, Message, PeersSpec}
 import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
 import encry.utils.Logging
 import shapeless.syntax.typeable._
-
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
