@@ -7,7 +7,7 @@ import encry.consensus.History
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
 import encry.network.PeerConnectionHandler._
 import encry.settings.NetworkSettings
-import encry.utils.{Logging, NetworkTimeProvider}
+import encry.utils.Logging
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -18,8 +18,7 @@ import scala.concurrent.duration._
   */
 case class SyncTracker(deliveryManager: ActorRef,
                        context: ActorContext,
-                       networkSettings: NetworkSettings,
-                       timeProvider: NetworkTimeProvider) extends Logging {
+                       networkSettings: NetworkSettings) extends Logging {
 
   import History._
   import encry.utils.NetworkTime.Time
@@ -65,12 +64,12 @@ case class SyncTracker(deliveryManager: ActorRef,
   }
 
   def updateLastSyncSentTime(peer: ConnectedPeer): Unit = {
-    val currentTime: Time = timeProvider.time()
+    val currentTime: Time = System.currentTimeMillis()
     lastSyncSentTime(peer) = currentTime
     lastSyncInfoSentTime = currentTime
   }
 
-  def elapsedTimeSinceLastSync(): Long = timeProvider.time() - lastSyncInfoSentTime
+  def elapsedTimeSinceLastSync(): Long = System.currentTimeMillis() - lastSyncInfoSentTime
 
   private def outdatedPeers(): Seq[ConnectedPeer] =
     lastSyncSentTime.filter(t => (System.currentTimeMillis() - t._2).millis > networkSettings.syncInterval).keys.toSeq
@@ -88,7 +87,7 @@ case class SyncTracker(deliveryManager: ActorRef,
     lazy val olders = statuses.filter(_._2 == Older).keys.toIndexedSeq
     lazy val nonOutdated = if (olders.nonEmpty) olders(scala.util.Random.nextInt(olders.size)) +: unknowns else unknowns
     val peers: Seq[ConnectedPeer] = if (outdated.nonEmpty) outdated
-    else nonOutdated.filter(p => (timeProvider.time() - lastSyncSentTime.getOrElse(p, 0L)).millis >= networkSettings.syncInterval)
+    else nonOutdated.filter(p => (System.currentTimeMillis() - lastSyncSentTime.getOrElse(p, 0L)).millis >= networkSettings.syncInterval)
     peers.foreach(updateLastSyncSentTime)
     peers
   }
