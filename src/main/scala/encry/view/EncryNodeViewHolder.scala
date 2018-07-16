@@ -71,14 +71,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             }
         }
         log.info(s"Cache before(${modifiersCache.size})")
-        modifiersCache.foreach(modInfo => logger.info(modInfo._2.modifierTypeId + "-" + Algos.encode(modInfo._2.id)))
+        modifiersCache.foreach(modInfo => logger.debug(modInfo._2.modifierTypeId + "-" + Algos.encode(modInfo._2.id)))
         Iterator.continually(modifiersCache.find(x => nodeView.history.applicable(x._2)))
           .takeWhile(_.isDefined).flatten.foreach { case (k, v) =>
           modifiersCache -= k
           pmodModify(v)
         }
         log.info(s"Cache after(${modifiersCache.size})")
-        modifiersCache.foreach(modInfo => logger.info(modInfo._2.modifierTypeId + "-" + Algos.encode(modInfo._2.id)))
+        modifiersCache.foreach(modInfo => logger.debug(modInfo._2.modifierTypeId + "-" + Algos.encode(modInfo._2.id)))
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, EncryBaseTransaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>

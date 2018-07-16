@@ -113,7 +113,10 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
             }
           } else notRequested
       }
-      if (notRequestedIds.nonEmpty) cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
+      if (notRequestedIds.nonEmpty) {
+        log.debug(s"Ask ${cp.socketAddress} for modifiers of type: $mtid with ids: ${notRequestedIds.map(Algos.encode).mkString(",")}")
+        cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
+      }
       notRequestedIds.foreach { id =>
         val cancellable: Cancellable = context.system.scheduler.scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
         cancellables = (cancellables - key(id)) + (key(id) -> (cp, (cancellable, 0)))
