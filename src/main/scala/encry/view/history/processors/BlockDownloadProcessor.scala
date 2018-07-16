@@ -18,6 +18,7 @@ case class BlockDownloadProcessor(nodeSettings: NodeSettings) {
     * @param header - header of new best full block
     * @return minimal height to process best full block */
   def updateBestBlock(header: EncryBlockHeader): Int = {
+    println(s"[DEBUG] [UpdateBestBlock] >> minimalBlockHeightAfter($header) = ${minimalBlockHeightAfter(header)}")
     minimalBlockHeightVar = minimalBlockHeightAfter(header)
     minimalBlockHeightVar
   }

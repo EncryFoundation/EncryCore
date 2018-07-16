@@ -77,7 +77,7 @@ class UtxoState(override val version: VersionTag,
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
 
     case block: EncryBlock =>
-      println(s"[Applying] $block to UTXO state.")
+      println(s"[STATE] [Applying] $block to UTXO state.")
       log.info(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
 
@@ -107,7 +107,7 @@ class UtxoState(override val version: VersionTag,
         Failure(e)
       }
 
-      println(s"[Applied ] $block to UTXO state.")
+      println(s"[STATE] [Applied ] $block to UTXO state.")
       r
 
     case header: EncryBlockHeader =>
@@ -195,9 +195,7 @@ class UtxoState(override val version: VersionTag,
         }
       }
 
-      import io.circe.syntax._
-
-      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in ${tx.asJson}")
+      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
     }
 
   def isValid(tx: EncryBaseTransaction, allowedOutputDelta: Amount = 0L): Boolean = validate(tx, allowedOutputDelta).isSuccess

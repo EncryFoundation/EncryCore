@@ -21,6 +21,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
 
+// scalastyle:off
 trait BlockHeaderProcessor extends Logging {
 
   protected val nodeSettings: NodeSettings
@@ -63,16 +64,24 @@ trait BlockHeaderProcessor extends Logging {
     * Checks, whether it's time to download full chain and return toDownload modifiers
     */
   protected def toDownload(header: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] =
-    if (!nodeSettings.verifyTransactions) Seq.empty // Regime that do not download and verify transaction
-    else if (header.height >= blockDownloadProcessor.minimalBlockHeight)
-      requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
-    else if (!isHeadersChainSynced && isNewHeader(header)) {
-      // Headers chain is synced after this header. Start downloading full blocks
-      log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
-      isHeadersChainSyncedVar = true
-      blockDownloadProcessor.updateBestBlock(header)
-      Seq.empty
-    } else Seq.empty
+    {
+      if (!nodeSettings.verifyTransactions) Seq.empty // Regime that do not download and verify transaction
+      else if (header.height >= blockDownloadProcessor.minimalBlockHeight) {
+          println(s"[DEBUG] [toDownload] <$header> `header.height >= blockDownloadProcessor.minimalBlockHeight`")
+          requiredModifiersForHeader(header)
+        } // Already synced and header is not too far back. Download required modifiers
+      else if (!isHeadersChainSynced) {
+        // Headers chain is synced after this header. Start downloading full blocks
+        println(s"[DEBUG] [toDownload] <$header> `!isHeadersChainSynced && isNewHeader(header)`")
+        log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
+        isHeadersChainSyncedVar = true
+        blockDownloadProcessor.updateBestBlock(header)
+        Seq.empty
+      } else {
+        println(s"[DEBUG] [toDownload] <$header> `else`")
+        Seq.empty
+      }
+    }
 
   private def requiredModifiersForHeader(h: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] =
     if (!nodeSettings.verifyTransactions) Seq.empty
@@ -80,7 +89,7 @@ trait BlockHeaderProcessor extends Logging {
     else Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
 
   private def isNewHeader(header: EncryBlockHeader): Boolean =
-    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5//TODO magic number
+    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 20 //TODO magic number
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
