@@ -70,6 +70,9 @@ class StatsSender extends Actor with Logging {
     case CandidateProducingTime(time: Long) =>
       influxDB.write(8189, s"candidateProducing,nodeName=${settings.network.nodeName} value=$time")
 
+    case StateUpdating(time: Long) =>
+      influxDB.write(8189, s"stateUpdatingTime,nodeName=${settings.network.nodeName} value=$time")
+
     case SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
       modifiersToDownload = modifiersToDownload ++ modifiers.map(mod => (Algos.encode(mod), (modifierTypeId, System.currentTimeMillis())))
 
@@ -108,4 +111,5 @@ object StatsSender {
 
   case class BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int)
 
+  case class StateUpdating(time: Long)
 }
