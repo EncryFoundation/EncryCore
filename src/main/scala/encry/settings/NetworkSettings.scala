@@ -1,6 +1,7 @@
 package encry.settings
 
 import java.net.InetSocketAddress
+
 import scala.concurrent.duration.FiniteDuration
 
 case class NetworkSettings(nodeName: String,
@@ -22,8 +23,5 @@ case class NetworkSettings(nodeName: String,
                            maxInvObjects: Int,
                            modifierDeliverTimeCheck: FiniteDuration,
                            syncInterval: FiniteDuration,
-                           syncStatusRefresh: FiniteDuration,
-                           syncIntervalStable: FiniteDuration,
-                           syncStatusRefreshStable: FiniteDuration,
                            syncTimeout: Option[FiniteDuration]
                           )
