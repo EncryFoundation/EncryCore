@@ -23,6 +23,8 @@ class StatsSender extends Actor with Logging {
 
   influxDB.setRetentionPolicy("autogen")
 
+  var modifiersToApply: Map[String, (ModifierTypeId, Long)] = Map()
+
   override def preStart(): Unit =
     influxDB.write(8189, s"""nodesStartTime value="${settings.network.nodeName}"""")
 
@@ -50,6 +52,27 @@ class StatsSender extends Actor with Logging {
         )
       )
 
+    case StartApplyingModif(modifierId: ModifierId, modifierTypeId: ModifierTypeId, startTime: Long) =>
+      modifiersToApply += Algos.encode(modifierId) -> (modifierTypeId, startTime)
+
+    case EndOfApplyingModif(modifierId) =>
+      modifiersToApply.get(Algos.encode(modifierId)).foreach { modInfo =>
+        influxDB.write(8189, s"modifApplying,nodeName=${settings.network.nodeName},modType=${modInfo._1} value=${System.currentTimeMillis() - modInfo._2}")
+        modifiersToApply -= Algos.encode(modifierId)
+      }
+
+    case SleepTime(time: Long) =>
+      influxDB.write(8189, s"sleepTime,nodeName=${settings.network.nodeName} value=$time")
+
+    case MiningTime(time: Long) =>
+      influxDB.write(8189, s"miningTime,nodeName=${settings.network.nodeName} value=$time")
+
+    case CandidateProducingTime(time: Long) =>
+      influxDB.write(8189, s"candidateProducing,nodeName=${settings.network.nodeName} value=$time")
+
+    case StateUpdating(time: Long) =>
+      influxDB.write(8189, s"stateUpdatingTime,nodeName=${settings.network.nodeName} value=$time")
+
     case SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
       modifiersToDownload = modifiersToDownload ++ modifiers.map(mod => (Algos.encode(mod), (modifierTypeId, System.currentTimeMillis())))
 
@@ -68,7 +91,17 @@ class StatsSender extends Actor with Logging {
 
 object StatsSender {
 
+  case class CandidateProducingTime(time: Long)
+
+  case class SleepTime(time: Long)
+
+  case class StartApplyingModif(modifierId: ModifierId, modifierTypeId: ModifierTypeId, startTime: Long)
+
+  case class EndOfApplyingModif(modifierId: ModifierId)
+
   case class MiningEnd(blockHeader: EncryBlockHeader, workerIdx: Int, workersQty: Int)
+
+  case class MiningTime(time: Long)
 
   case class BestHeaderInChain(bestHeader: EncryBlockHeader)
 
@@ -78,4 +111,5 @@ object StatsSender {
 
   case class BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int)
 
+  case class StateUpdating(time: Long)
 }
