@@ -159,12 +159,10 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
     }
   }
 
-  def tryWithLogging(fn: => Unit): Unit = {
-    Try(fn).recoverWith {
-      case e =>
-        log.info("Unexpected error", e)
-        Failure(e)
-    }
+  def tryWithLogging(fn: => Unit): Unit = Try(fn).recoverWith {
+    case e =>
+      log.info("Unexpected error", e)
+      Failure(e)
   }
 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
@@ -172,7 +170,6 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
     if (settings.node.sendStat) context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
     statusTracker.peersToSyncWith().foreach(peer => {
       expect(peer, modifierTypeId, modifierIds)
-      networkController ! SendToNetwork(msg, SendToPeer(peer))
     })
   }
 
@@ -190,4 +187,5 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
 object EncryDeliveryManager {
 
   case object FullBlockChainSynced
+
 }
