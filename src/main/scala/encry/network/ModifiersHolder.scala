@@ -62,7 +62,7 @@ class ModifiersHolder extends PersistentActor with Logging {
       }.foreach(block => nodeViewHolder ! LocallyGeneratedModifier(block.payload))
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
-    case x: Any => logger.error(s"Strange input: $x")
+    case x: Any => logger.error(s"Strange input: $x.")
   }
 
   def createBlockIfPossible(payloadId: ModifierId): Unit =
@@ -76,17 +76,17 @@ class ModifiersHolder extends PersistentActor with Logging {
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
     case header: EncryBlockHeader =>
       if(!headers.contains(Algos.encode(header.id)))
-        persist(header) { header => logger.debug(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully") }
+        persist(header) { header => logger.debug(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully.") }
       updateHeaders(header)
     case payload: EncryBlockPayload =>
       if(!payloads.contains(Algos.encode(payload.id)))
-        persist(payload) { payload => logger.debug(s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully") }
+        persist(payload) { payload => logger.debug(s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully.") }
       updatePayloads(payload)
     case block: EncryBlock =>
       if(!completedBlocks.values.toSeq.contains(block))
-        persist(block) { block => logger.debug(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} is persisted successfully") }
+        persist(block) { block => logger.debug(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} is persisted successfully.") }
       updateCompletedBlocks(block)
-    case x: Any => logger.error(s"Strange input $x")
+    case x: Any => logger.error(s"Strange input $x.")
   }
 
   def updateHeaders(header: EncryBlockHeader): Unit = {
