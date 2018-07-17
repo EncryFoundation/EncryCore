@@ -12,8 +12,7 @@ import encry.settings.Constants._
 import encry.settings.{Algos, Constants, NodeSettings}
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.validation.{ModifierValidator, ValidationResult}
-import encry.view.history.Height
-import encry.view.history.storage.HistoryStorage
+import encry.view.history.{Height, HistoryStorage}
 import encry.{EncryApp, _}
 import io.iohk.iodb.ByteArrayWrapper
 
@@ -70,7 +69,7 @@ trait BlockHeaderProcessor extends Logging {
           println(s"[DEBUG] [toDownload] <$header> `header.height >= blockDownloadProcessor.minimalBlockHeight`")
           requiredModifiersForHeader(header)
         } // Already synced and header is not too far back. Download required modifiers
-      else if (!isHeadersChainSynced) {
+      else if (isNewHeader(header)) {
         // Headers chain is synced after this header. Start downloading full blocks
         println(s"[DEBUG] [toDownload] <$header> `!isHeadersChainSynced && isNewHeader(header)`")
         log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")

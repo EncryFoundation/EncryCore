@@ -6,8 +6,8 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.view.history.HistoryStorage
 import encry.view.history.processors.BlockProcessor
-import encry.view.history.storage.HistoryStorage
 
 import scala.util.Try
 

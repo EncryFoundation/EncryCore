@@ -76,6 +76,7 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
         removed
       }
     }
+
   def popCandidate(history: H): Option[V] = synchronized {
     findCandidateKey(history).flatMap(k => remove(k))
   }

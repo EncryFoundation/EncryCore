@@ -14,7 +14,6 @@ import encry.settings._
 import encry.utils.NetworkTimeProvider
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
-import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 
 import scala.util.Try

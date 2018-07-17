@@ -1,9 +1,11 @@
-package encry.view.history.storage
+package encry.view.history
 
+import com.google.common.cache.{Cache, CacheBuilder}
 import encry.ModifierId
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.HistoryModifierSerializer
 import encry.modifiers.serialization.Serializer
+import encry.settings.Algos
 import encry.storage.EncryBaseStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 
@@ -11,15 +13,24 @@ import scala.util.{Failure, Random, Success}
 
 class HistoryStorage(override val store: Store, val objectsStore: Store) extends EncryBaseStorage {
 
+  // TODO: Replace with Scala analogue.
+  private val modifiersCache: Cache[String, EncryPersistentModifier] = CacheBuilder.newBuilder()
+    .maximumSize(1000)
+    .build[String, EncryPersistentModifier]
+
   def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
-    objectsStore.get(ByteArrayWrapper(id)).flatMap { res =>
+    getFromCache(id) orElse objectsStore.get(ByteArrayWrapper(id)).flatMap { res =>
       HistoryModifierSerializer.parseBytes(res.data) match {
-        case Success(b) => Some(b)
+        case Success(mod) =>
+          modifiersCache.put(Algos.encode(mod.id), mod)
+          Some(mod)
         case Failure(e) =>
           logWarn(s"Failed to parse block from db: ", e)
           None
       }
     }
+
+  def getFromCache(id: ModifierId): Option[EncryPersistentModifier] = Option(modifiersCache.getIfPresent(Algos.encode(id)))
 
   def insertObjects(objectsToInsert: Seq[EncryPersistentModifier]): Unit =
     objectsStore.update(Random.nextLong(), Seq.empty,
