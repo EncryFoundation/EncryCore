@@ -48,7 +48,7 @@ object EncryApp extends App with Logging {
       ModifiersSpec
     )
   }
-  lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props(), "nodeViewHolder")
+  lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props().withDispatcher("nvh-dispatcher"), "nodeViewHolder")
   val readersHolder: ActorRef = system.actorOf(Props[EncryViewReadersHolder], "readersHolder")
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
     .withDispatcher("network-dispatcher"), "networkController")
