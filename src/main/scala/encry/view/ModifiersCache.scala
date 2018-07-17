@@ -157,8 +157,6 @@ case class EncryModifiersCache(override val maxSize: Int)
 
     val headersHeight = history.bestHeaderHeight
 
-
-    // try to apply block sections from height next to best fullBlock
     history
       .headerIdsAtHeight(history.bestBlockHeight + 1)
       .flatMap(id => history.typedModifierById[EncryBlockHeader](id))

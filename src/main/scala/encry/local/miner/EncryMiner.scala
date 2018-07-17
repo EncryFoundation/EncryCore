@@ -2,7 +2,6 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
-
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus._
@@ -28,12 +27,11 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
-
 import scala.collection._
 
 class EncryMiner extends Actor with Logging {
 
-  val sdf = new SimpleDateFormat("HH:mm:ss")
+  val sdf: SimpleDateFormat = new SimpleDateFormat("HH:mm:ss")
 
   var startTime: Long = System.currentTimeMillis()
 
