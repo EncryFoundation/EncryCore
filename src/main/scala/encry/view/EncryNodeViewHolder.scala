@@ -38,7 +38,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: EncryMempool)
 
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
-  var modifiersCache: EncryModifiersCache = EncryModifiersCache(1000)
+  val modifiersCache: EncryModifiersCache = EncryModifiersCache(1000)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,
@@ -72,16 +72,16 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
         log.info(s"Cache before(${modifiersCache.size})")
 
-        var applied: Boolean = false
-        do {
+        def computeApplications(): Unit = {
           modifiersCache.popCandidate(nodeView.history) match {
             case Some(mod) =>
               pmodModify(mod)
-              applied = true
-            case None =>
-              applied = false
+              computeApplications
+            case None => Unit
           }
-        } while (applied)
+        }
+
+        computeApplications()
 
         log.info(s"Cache after(${modifiersCache.size})")
         //modifiersCache.foreach(modInfo => logger.info(modInfo._2.modifierTypeId + "-" + Algos.encode(modInfo._2.id)))
@@ -349,7 +349,7 @@ object EncryNodeViewHolder {
   }
 
   def props(): Props = settings.node.stateMode match {
-    case StateMode.Digest => Props(classOf[EncryNodeViewHolder[DigestState]])
-    case StateMode.Utxo => Props(classOf[EncryNodeViewHolder[UtxoState]])
+    case StateMode.Digest => Props[EncryNodeViewHolder[DigestState]]
+    case StateMode.Utxo => Props[EncryNodeViewHolder[UtxoState]]
   }
 }

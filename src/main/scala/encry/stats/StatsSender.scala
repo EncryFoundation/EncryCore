@@ -14,6 +14,8 @@ import encry.view.history
 import encry.{ModifierId, ModifierTypeId}
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 
+import scala.collection.mutable
+
 class StatsSender extends Actor with Logging {
 
   val influxDB: InfluxDB =
@@ -23,7 +25,7 @@ class StatsSender extends Actor with Logging {
 
   influxDB.setRetentionPolicy("autogen")
 
-  var modifiersToApply: Map[String, (ModifierTypeId, Long)] = Map()
+  val modifiersToApply: mutable.Map[String, (ModifierTypeId, Long)] = mutable.Map[String, (ModifierTypeId, Long)]()
 
   override def preStart(): Unit =
     influxDB.write(8189, s"""nodesStartTime value="${settings.network.nodeName}"""")
