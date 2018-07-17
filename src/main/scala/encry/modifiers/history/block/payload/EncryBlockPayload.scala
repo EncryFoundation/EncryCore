@@ -26,6 +26,8 @@ case class EncryBlockPayload(override val headerId: ModifierId, txs: Seq[EncryBa
   override lazy val digest: Digest32 = EncryBlockPayload.rootHash(txs.map(_.id))
 
   override def serializer: Serializer[EncryBlockPayload] = EncryBlockPayloadSerializer
+
+  override def toString: String = s"Payload(headerId=${Algos.encode(headerId)}, txsQty=${transactions.size})"
 }
 
 object EncryBlockPayload {

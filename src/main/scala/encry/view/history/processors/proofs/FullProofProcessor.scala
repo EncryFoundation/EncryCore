@@ -14,20 +14,16 @@ trait FullProofProcessor extends BaseADProofProcessor with BlockProcessor {
 
   protected val adState: Boolean
 
-  override protected def process(m: ADProofs): ProgressInfo[EncryPersistentModifier] = {
-    historyStorage.modifierById(m.headerId) match {
-      case Some(header: EncryBlockHeader) =>
-        historyStorage.modifierById(header.payloadId) match {
-          case Some(payload: EncryBlockPayload) if adState =>
-            processBlock(EncryBlock(header, payload, Some(m)), payloadIsNew = false)
-          case _ =>
-            historyStorage.insertObjects(Seq(m))
-            ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
-        }
-      case _ =>
-        throw new Exception(s"Header for modifier $m is no defined")
+  override protected def process(m: ADProofs): ProgressInfo[EncryPersistentModifier] =
+    getBlockByProofs(m).map(block => processBlock(block, m)).getOrElse {
+      historyStorage.insertObjects(Seq(m))
+      ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
     }
-  }
+
+  private def getBlockByProofs(proofs: ADProofs): Option[EncryBlock] =
+    typedModifierById[EncryBlockHeader](proofs.headerId).flatMap { h =>
+      typedModifierById[EncryBlockPayload](h.payloadId).map(p => EncryBlock(h, p, if (adState) Some(proofs) else None))
+    }
 
   override protected def validate(m: ADProofs): Try[Unit] =
     modifierValidation(m, typedModifierById[EncryBlockHeader](m.headerId))
