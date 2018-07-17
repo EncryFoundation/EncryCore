@@ -77,7 +77,6 @@ class UtxoState(override val version: VersionTag,
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
 
     case block: EncryBlock =>
-      println(s"[Applying] $block to UTXO state.")
       log.info(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
 
@@ -106,8 +105,6 @@ class UtxoState(override val version: VersionTag,
           s" ${Algos.encode(rootHash)}: ", e)
         Failure(e)
       }
-
-      println(s"[Applied ] $block to UTXO state.")
       applicationResult
 
     case header: EncryBlockHeader =>

@@ -1,7 +1,6 @@
 package encry.view
 
 import java.io.File
-
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
@@ -28,7 +27,6 @@ import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import org.apache.commons.io.FileUtils
 import scorex.crypto.authds.ADDigest
-
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
@@ -76,15 +74,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           modifiersCache.popCandidate(nodeView.history) match {
             case Some(mod) =>
               pmodModify(mod)
-              computeApplications
+              computeApplications()
             case None => Unit
           }
         }
 
         computeApplications()
-
         log.info(s"Cache after(${modifiersCache.size})")
-        //modifiersCache.foreach(modInfo => logger.info(modInfo._2.modifierTypeId + "-" + Algos.encode(modInfo._2.id)))
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, EncryBaseTransaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>

@@ -25,9 +25,6 @@ object BatchingBenchmark extends App with FileHelper {
   var digest: ADDigest = ADDigest @@ Array[Byte]()
   var numInserts = 0
 
-  println(s"NumInserts = $numInserts")
-  println("Step, In-memory prover time(s.), Persistent prover time(s.), Rollback time(s.)")
-
   bench()
 
   def bench(): Unit = {
@@ -59,12 +56,10 @@ object BatchingBenchmark extends App with FileHelper {
     }
 
     if (scala.util.Random.nextInt(50) == 49) {
-      println("rollback: ")
       val (rollbackTime, _) = time {
         persProver.rollback(digest).get
         persProver.digest
       }
-      println("rollback time: " + rollbackTime)
       converted.foreach(c => persProver.performOneOperation(c))
       persProver.generateProofAndUpdateStorage()
     }
@@ -77,8 +72,6 @@ object BatchingBenchmark extends App with FileHelper {
 
     digest = persProver.digest
     assert(prover.digest sameElements digest)
-
-    println(s"$toPrint, $proverTime, $persProverTime") //, $rollbackTime")
   }
 
   def time[R](block: => R): (Double, R) = {
