@@ -1,12 +1,14 @@
 package encry.view
 
+import java.lang
+import java.util.concurrent.ConcurrentHashMap
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.utils.Logging
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
-
 import scala.annotation.tailrec
+import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
 
@@ -19,7 +21,7 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
   type K = mutable.WrappedArray[Byte]
   type V = PMOD
 
-  protected val cache: mutable.Map[K, V] = mutable.Map[K, V]()
+  protected val cache: TrieMap[K, V] = TrieMap[K, V]()
 
   def size: Int = cache.size
 
@@ -32,7 +34,7 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
     * to have this structure is to avoid repeatedly downloading modifiers
     * which are unquestionably invalid.
     */
-  protected val rememberedKeys: mutable.HashSet[K] = mutable.HashSet[K]()
+  protected val rememberedKeys: ConcurrentHashMap.KeySetView[K, lang.Boolean] = ConcurrentHashMap.newKeySet[K]()
 
   /**
     * Defines a best (and application-specific) candidate to be applied.
@@ -52,7 +54,7 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
 
   def contains(key: K): Boolean = cache.contains(key) || rememberedKeys.contains(key)
 
-  def put(key: K, value: V): Unit = synchronized {
+  def put(key: K, value: V): Unit = {
     if(!contains(key)) {
       onPut(key)
       cache.put(key, value)
@@ -69,12 +71,11 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
     */
   def remove(key: K, rememberKey: Boolean = false): Option[V] = synchronized {
     cache.remove(key).map {removed =>
-      onRemove(key, rememberKey)
-      if (rememberKey) rememberedKeys += key
-      removed
+        onRemove(key, rememberKey)
+        if (rememberKey) rememberedKeys.add(key)
+        removed
+      }
     }
-  }
-
   def popCandidate(history: H): Option[V] = synchronized {
     findCandidateKey(history).flatMap(k => remove(k))
   }
@@ -123,10 +124,9 @@ class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryR
     */
   @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   override def findCandidateKey(history: HR): Option[K] = {
-
     cache.find { case (k, v) =>
       history.testApplicable(v) match {
-        case Failure(e) if e.isInstanceOf[RecoverableModifierError] =>
+        case Failure(_: RecoverableModifierError) =>
           false
         case Failure(e) =>
           log.warn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache", e)
@@ -135,7 +135,7 @@ class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryR
         case Success(_) =>
           true
       }
-    }.map(_._1)
+    }.map { case (k, _) => k }
   }
 }
 
@@ -145,7 +145,7 @@ case class EncryModifiersCache(override val maxSize: Int)
   override def findCandidateKey(history: EncryHistory): Option[K] = {
     def tryToApply(k: K, v: EncryPersistentModifier): Boolean = {
       history.testApplicable(v) match {
-        case Failure(e) if e.isInstanceOf[MalformedModifierError] =>
+        case Failure(e: MalformedModifierError) =>
           log.warn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache", e)
           remove(k, rememberKey = true)
           false
@@ -155,22 +155,20 @@ case class EncryModifiersCache(override val maxSize: Int)
 
     val headersHeight = history.bestHeaderHeight
 
-    {
-      // try to apply block sections from height next to best fullBlock
-      history
-        .headerIdsAtHeight(history.bestBlockHeight + 1)
-        .flatMap(id => history.typedModifierById[EncryBlockHeader](id))
-        .flatMap(_.partsIds.map(id => mutable.WrappedArray.make[Byte](id)))
-        .flatMap(id => cache.get(id).map(v => id -> v))
-        .find(p => tryToApply(p._1, p._2)).map(_._1)
-    } orElse {
+    history
+      .headerIdsAtHeight(history.bestBlockHeight + 1)
+      .flatMap(id => history.typedModifierById[EncryBlockHeader](id))
+      .flatMap(_.partsIds.map(id => mutable.WrappedArray.make[Byte](id)))
+      .flatMap(id => cache.get(id).map(v => id -> v))
+      .find(p => tryToApply(p._1, p._2)).map(_._1)
+      .orElse {
       // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
-      cache.find { case (k, v) =>
-        v match {
-          case h: EncryBlockHeader if h.height > headersHeight + 1 => false
-          case _ => tryToApply(k, v)
-        }
-      }.map(_._1)
+        cache.find { case (k, v) =>
+          v match {
+            case h: EncryBlockHeader if h.height > headersHeight + 1 => false
+            case _ => tryToApply(k, v)
+          }
+        }.map { case (k, _) => k }
     }
   }
 }

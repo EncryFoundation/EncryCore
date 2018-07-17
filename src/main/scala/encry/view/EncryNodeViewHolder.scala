@@ -1,7 +1,6 @@
 package encry.view
 
 import java.io.File
-
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
@@ -17,7 +16,7 @@ import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{ApplyState, RequestedModifiers}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
-import encry.stats.StatsSender.BestHeaderInChain
+import encry.stats.StatsSender.{BestHeaderInChain, EndOfApplyingModif, StartApplyingModif, StateUpdating}
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
@@ -28,7 +27,6 @@ import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import org.apache.commons.io.FileUtils
 import scorex.crypto.authds.ADDigest
-
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
@@ -38,7 +36,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: EncryMempool)
 
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
-  var modifiersCache: EncryModifiersCache = EncryModifiersCache(2000)
+  val modifiersCache: EncryModifiersCache = EncryModifiersCache(1000)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,
@@ -72,19 +70,17 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
         log.info(s"Cache before(${modifiersCache.size})")
 
-        var applied: Boolean = false
-        do {
+        def computeApplications(): Unit = {
           modifiersCache.popCandidate(nodeView.history) match {
             case Some(mod) =>
               pmodModify(mod)
-              applied = true
-            case None =>
-              applied = false
+              computeApplications()
+            case None => Unit
           }
-        } while (applied)
+        }
 
+        computeApplications()
         log.info(s"Cache after(${modifiersCache.size})")
-        //modifiersCache.foreach(modInfo => logger.info(modInfo._2.modifierTypeId + "-" + Algos.encode(modInfo._2.id)))
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, EncryBaseTransaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
@@ -199,13 +195,20 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
     log.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
+    if (settings.node.sendStat)
+      system.actorSelection("user/statsSender") ! StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
+        if (settings.node.sendStat)
+          context.actorSelection("/user/statsSender") ! EndOfApplyingModif(pmod.id)
         log.info(s"Going to apply modifications to the state: $progressInfo")
         nodeViewSynchronizer ! SyntacticallySuccessfulModifier(pmod)
         if (progressInfo.toApply.nonEmpty) {
+          val startPoint: Long = System.currentTimeMillis()
           val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
+          if (settings.node.sendStat)
+            system.actorSelection("user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
           newStateTry match {
             case Success(newMinState) =>
               val newMemPool: EncryMempool = updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)
@@ -342,7 +345,7 @@ object EncryNodeViewHolder {
   }
 
   def props(): Props = settings.node.stateMode match {
-    case StateMode.Digest => Props(classOf[EncryNodeViewHolder[DigestState]])
-    case StateMode.Utxo => Props(classOf[EncryNodeViewHolder[UtxoState]])
+    case StateMode.Digest => Props[EncryNodeViewHolder[DigestState]]
+    case StateMode.Utxo => Props[EncryNodeViewHolder[UtxoState]]
   }
 }

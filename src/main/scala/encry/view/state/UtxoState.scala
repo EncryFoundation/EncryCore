@@ -77,7 +77,10 @@ class UtxoState(override val version: VersionTag,
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
 
     case block: EncryBlock =>
-      val r = applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
+      log.info(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
+        s"root hash ${Algos.encode(rootHash)} at height $height")
+
+      val applicationResult = applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] =
           metadata(VersionTag !@@ block.id, block.header.stateRoot, Height @@ block.header.height, block.header.timestamp)
         val proofBytes: SerializedAdProof = persistentProver.generateProofAndUpdateStorage(meta)
@@ -102,9 +105,7 @@ class UtxoState(override val version: VersionTag,
           s" ${Algos.encode(rootHash)}: ", e)
         Failure(e)
       }
-
-      println(s"[STATE] [Applied] $block to UTXO state.")
-      r
+      applicationResult
 
     case header: EncryBlockHeader =>
       Success(new UtxoState(VersionTag !@@ header.id, height, stateStore, lastBlockTimestamp, nodeViewHolderRef))
@@ -191,7 +192,9 @@ class UtxoState(override val version: VersionTag,
         }
       }
 
-      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
+      import io.circe.syntax._
+
+      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in ${tx.asJson}")
     }
 
   def isValid(tx: EncryBaseTransaction, allowedOutputDelta: Amount = 0L): Boolean = validate(tx, allowedOutputDelta).isSuccess
