@@ -16,7 +16,6 @@ object IODBBenchmark extends App with FileHelper {
   var currentVersion: Option[Long] = None
 
   (0 until(NumMods, Step)) foreach { i =>
-    println(i)
     val mod: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = mods.slice(i, i + Step)
     val nextVersion = ByteArrayWrapper.fromLong(i)
     store.update(nextVersion, Seq(), mod)
