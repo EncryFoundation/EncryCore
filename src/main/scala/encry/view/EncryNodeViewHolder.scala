@@ -36,7 +36,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: EncryMempool)
 
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
-  var modifiersCache: EncryModifiersCache = EncryModifiersCache(2000)
+  val modifiersCache: EncryModifiersCache = EncryModifiersCache(2000)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,

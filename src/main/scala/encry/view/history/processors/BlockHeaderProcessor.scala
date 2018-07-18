@@ -24,8 +24,8 @@ trait BlockHeaderProcessor extends Logging {
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider
-  private val chainParams = Constants.Chain
-  private val difficultyController = PowLinearController
+  private val chainParams: Constants.Chain.type = Constants.Chain
+  private val difficultyController: PowLinearController.type = PowLinearController
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
   protected val BestHeaderKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(EncryBlockHeader.modifierTypeId))
   protected val BestBlockKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(-1))
@@ -42,7 +42,7 @@ trait BlockHeaderProcessor extends Logging {
       else {
         headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[EncryBlockHeader](id)) match {
           case Some(bestHeaderAtThisHeight) =>
-            val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
+            val toDownload: Seq[(ModifierTypeId, ModifierId)] = requiredModifiersForHeader(bestHeaderAtThisHeight)
               .filter(m => !excluding.exists(ex => ex sameElements m._2))
               .filter(m => !contains(m._2))
             continuation(Height @@ (height + 1), acc ++ toDownload)
