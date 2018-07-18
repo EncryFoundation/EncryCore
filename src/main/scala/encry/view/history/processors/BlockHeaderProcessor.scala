@@ -59,28 +59,17 @@ trait BlockHeaderProcessor extends Logging {
     }
   }
 
-  /**
-    * Checks, whether it's time to download full chain and return toDownload modifiers
-    */
+  /** Checks, whether it's time to download full chain and return toDownload modifiers */
   protected def toDownload(header: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] =
-    {
-      if (!nodeSettings.verifyTransactions) Seq.empty // Regime that do not download and verify transaction
-      else if (header.height >= blockDownloadProcessor.minimalBlockHeight) {
-          println(s"[DEBUG] [toDownload] <$header> `header.height >= blockDownloadProcessor.minimalBlockHeight`")
-          requiredModifiersForHeader(header)
-        } // Already synced and header is not too far back. Download required modifiers
-      else if (isNewHeader(header)) {
-        // Headers chain is synced after this header. Start downloading full blocks
-        println(s"[DEBUG] [toDownload] <$header> `!isHeadersChainSynced && isNewHeader(header)`")
-        log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
-        isHeadersChainSyncedVar = true
-        blockDownloadProcessor.updateBestBlock(header)
-        Seq.empty
-      } else {
-        println(s"[DEBUG] [toDownload] <$header> `else`")
-        Seq.empty
-      }
-    }
+    if (!nodeSettings.verifyTransactions) Seq.empty // Regime that do not download and verify transaction
+    else if (header.height >= blockDownloadProcessor.minimalBlockHeight) requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
+    else if (isNewHeader(header)) {
+      // Headers chain is synced after this header. Start downloading full blocks
+      log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
+      isHeadersChainSyncedVar = true
+      blockDownloadProcessor.updateBestBlock(header)
+      Seq.empty
+    } else Seq.empty
 
   private def requiredModifiersForHeader(h: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] =
     if (!nodeSettings.verifyTransactions) Seq.empty
@@ -169,10 +158,8 @@ trait BlockHeaderProcessor extends Logging {
     }
   }
 
-  /**
-    * Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
-    * header ids at this height
-    */
+  /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
+    * header ids at this height */
   private def bestBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty) = {
     val prevHeight = bestHeaderHeight
     log.info(s"New best header ${h.encodedId} with score: $score. New height: ${h.height}, old height: $prevHeight")
@@ -189,9 +176,7 @@ trait BlockHeaderProcessor extends Logging {
     forkIds :+ self
   }
 
-  /**
-    * Row to storage, that put this orphaned block id to the end of header ids at this height
-    */
+  /** Row to storage, that put this orphaned block id to the end of header ids at this height */
   private def orphanedBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty) = {
     log.info(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
     Seq(heightIdsKey(h.height) -> ByteArrayWrapper((headerIdsAtHeight(h.height) :+ h.id).flatten.toArray))

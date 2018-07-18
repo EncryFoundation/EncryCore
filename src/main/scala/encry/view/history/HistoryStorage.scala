@@ -19,7 +19,7 @@ class HistoryStorage(override val store: Store, val objectsStore: Store) extends
     .build[String, EncryPersistentModifier]
 
   def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
-    getFromCache(id).map { r => println(s"Got ${Algos.encode(id)} from cache"); r } orElse objectsStore.get(ByteArrayWrapper(id)).flatMap { res =>
+    getFromCache(id) orElse objectsStore.get(ByteArrayWrapper(id)).flatMap { res =>
       HistoryModifierSerializer.parseBytes(res.data) match {
         case Success(mod) =>
           modifiersCache.put(Algos.encode(mod.id), mod)

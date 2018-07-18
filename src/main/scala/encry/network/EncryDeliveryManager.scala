@@ -56,19 +56,24 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
         case Younger => sendExtension(remote, status, extOpt)
         case _ =>
       }
+
     case HandshakedPeer(remote) => statusTracker.updateStatus(remote, Unknown)
+
     case DisconnectedPeer(remote) => statusTracker.clearStatus(remote)
+
     case CheckDelivery(peer, modifierTypeId, modifierId) =>
       if (peerWhoDelivered(modifierId).contains(peer)) delete(modifierId)
       else reexpect(peer, modifierTypeId, modifierId)
+
     case CheckModifiersToDownload =>
       historyReaderOpt.foreach { h =>
         val currentQueue: Iterable[ModifierId] = cancellables.keys.map(ModifierId @@ _.toArray)
         val newIds: Seq[(ModifierTypeId, ModifierId)] = h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
-        println(s"[NETWORK] >> modifiersToDownload(${newIds.map(i => Algos.encode(i._2))})")
         newIds.groupBy(_._1).foreach(ids => requestDownload(ids._1, ids._2.map(_._2)))
       }
+
     case RequestFromLocal(peer, modifierTypeId, modifierIds) => if (modifierIds.nonEmpty && modifierTypeId != 2) expect(peer, modifierTypeId, modifierIds)
+
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       val typeId: ModifierTypeId = data._1
       val modifiers: Map[ModifierId, Array[Byte]] = data._2
@@ -83,14 +88,28 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
         deleteSpam(spam.keys.toSeq)
       }
       if (fm.nonEmpty) nodeViewHolder ! ModifiersFromRemote(typeId, fm.values.toSeq)
+      historyReaderOpt foreach { h =>
+        if (!h.isHeadersChainSynced && cancellables.isEmpty) {
+          // Headers chain is not synced yet, but our expecting list is empty - ask for more headers
+          sendSync(h.syncInfo)
+        } else if (h.isHeadersChainSynced && cancellables.isEmpty && !h.isFullChainSynced) {
+          // Headers chain is synced - request payloads.
+          self ! CheckModifiersToDownload
+        }
+      }
+
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
       requestDownload(modifierTypeId, Seq(modifierId))
+
     case FullBlockChainSynced => isBlockChainSynced = true
+
     case StartMining => isMining = true
     case DisableMining => isMining = false
+
     case SendLocalSyncInfo =>
       if (statusTracker.elapsedTimeSinceLastSync() < (settings.network.syncInterval.toMillis / 2)) log.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
+
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] => historyReaderOpt = Some(reader)
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
   }
