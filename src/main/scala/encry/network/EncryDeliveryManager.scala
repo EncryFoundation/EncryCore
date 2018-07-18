@@ -94,11 +94,9 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
   }
 
-  def sendSync(syncInfo: EncrySyncInfo): Unit = {
-    val peers: Seq[ConnectedPeer] = statusTracker.peersToSyncWith()
-    if (peers.nonEmpty)
-      networkController ! SendToNetwork(Message(syncInfoSpec, Right(syncInfo), None), SendToPeers(peers))
-  }
+  def sendSync(syncInfo: EncrySyncInfo): Unit = statusTracker.peersToSyncWith().foreach(peer =>
+      peer.handlerRef ! Message(syncInfoSpec, Right(syncInfo), None)
+    )
 
   def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mids: Seq[ModifierId]): Unit = tryWithLogging {
     if ((mtid == 2 && isBlockChainSynced && isMining) || mtid != 2) {
