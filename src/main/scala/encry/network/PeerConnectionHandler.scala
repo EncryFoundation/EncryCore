@@ -38,7 +38,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
       receivedData orElse
       handshakeTimeout orElse
       handshakeDone orElse
-      processErrors(AwaitingHandshake)
+      processErrors(AwaitingHandshake) orElse deadNotIn
 
   def processErrors(stateName: CommunicationState): Receive = {
     case CommandFailed(w: Write) =>
@@ -138,7 +138,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
     workingCycleLocalInterface orElse
       workingCycleRemoteInterface orElse
       processErrors(WorkingCycle) orElse
-      reportStrangeInput
+      reportStrangeInput orElse dead
 
   override def preStart: Unit = {
     peerManager ! DoConnecting(remote, direction)
@@ -146,6 +146,16 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
     (self ! HandshakeTimeout))
     connection ! Register(self, keepOpenOnPeerClosed = false, useResumeWriting = true)
     connection ! ResumeReading
+  }
+
+  def dead: Receive = {
+
+    case message => log.debug(s"Get smth strange: $message")
+  }
+
+  def deadNotIn: Receive = {
+
+    case message => log.debug(s"Get smth node strange: $message")
   }
 
   override def postStop(): Unit = {
