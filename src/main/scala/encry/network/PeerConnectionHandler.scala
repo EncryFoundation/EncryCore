@@ -149,8 +149,12 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   }
 
   override def postStop(): Unit = {
-    log.info(s"Peer handler to $remote is destroyed")
+    log.info(s"Peer handler $self to $remote is destroyed.")
     networkController ! ConnectTo(remote)
+  }
+
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
+    logger.info(s"Reason of restarting actor $self: ${reason.toString}.")
   }
 
   def getPacket(data: ByteString): (List[ByteString], ByteString) = {
