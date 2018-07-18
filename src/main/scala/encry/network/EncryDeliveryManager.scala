@@ -114,7 +114,7 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
           } else notRequested
       }
       if (notRequestedIds.nonEmpty) {
-        log.debug(s"Ask ${cp.socketAddress} for modifiers of type: $mtid with ids: ${notRequestedIds.map(Algos.encode).mkString(",")}")
+        log.debug(s"Ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mtid with ids: ${notRequestedIds.map(id => Algos.encode(id) + "|" + id).mkString(",")}")
         cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
       }
       notRequestedIds.foreach { id =>
@@ -127,11 +127,14 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
   def reexpect(cp: ConnectedPeer, mtid: ModifierTypeId, mid: ModifierId): Unit = tryWithLogging {
     val midAsKey: ModifierIdAsKey = key(mid)
     cancellables.get(midAsKey).foreach(peerInfo =>
-      if (peerInfo._2._2 < settings.network.maxDeliveryChecks) {
-        cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> Seq(mid)), None)
-        val cancellable: Cancellable = context.system.scheduler.scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, mid))
-        peerInfo._2._1.cancel()
-        cancellables = (cancellables - midAsKey) + (midAsKey -> (cp -> (cancellable, peerInfo._2._2 + 1)))
+      if (peerInfo._2._2 < settings.network.maxDeliveryChecks && statusTracker.statuses.exists(peer => peer._1.socketAddress == cp.socketAddress)) {
+        statusTracker.statuses.find(peer => peer._1.socketAddress == cp.socketAddress).foreach { peer =>
+          log.debug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mtid with id: ${Algos.encode(mid)}")
+          peer._1.handlerRef ! Message(requestModifierSpec, Right(mtid -> Seq(mid)), None)
+          val cancellable: Cancellable = context.system.scheduler.scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, mid))
+          peerInfo._2._1.cancel()
+          cancellables = (cancellables - midAsKey) + (midAsKey -> (peer._1 -> (cancellable, peerInfo._2._2 + 1)))
+        }
       } else {
         cancellables -= midAsKey
         peers.get(midAsKey).foreach(downloadPeers =>
