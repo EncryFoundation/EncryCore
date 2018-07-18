@@ -15,9 +15,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
 
   import BlockProcessor._
 
-  /**
-    * Id of header that contains transactions and proofs
-    */
+  /** Id of header that contains transactions and proofs */
   override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
 
   protected def getBlock(h: EncryBlockHeader): Option[EncryBlock]

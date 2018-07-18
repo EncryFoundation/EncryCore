@@ -58,9 +58,7 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
       }
 
     case HandshakedPeer(remote) => statusTracker.updateStatus(remote, Unknown)
-
     case DisconnectedPeer(remote) => statusTracker.clearStatus(remote)
-
     case CheckDelivery(peer, modifierTypeId, modifierId) =>
       if (peerWhoDelivered(modifierId).contains(peer)) delete(modifierId)
       else reexpect(peer, modifierTypeId, modifierId)
@@ -89,13 +87,10 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
       }
       if (fm.nonEmpty) nodeViewHolder ! ModifiersFromRemote(typeId, fm.values.toSeq)
       historyReaderOpt foreach { h =>
-        if (!h.isHeadersChainSynced && cancellables.isEmpty) {
-          // Headers chain is not synced yet, but our expecting list is empty - ask for more headers
-          sendSync(h.syncInfo)
-        } else if (h.isHeadersChainSynced && cancellables.isEmpty && !h.isFullChainSynced) {
-          // Headers chain is synced - request payloads.
-          self ! CheckModifiersToDownload
-        }
+        if (!h.isHeadersChainSynced && cancellables.isEmpty)
+          sendSync(h.syncInfo) // Headers chain is not synced yet, but our expecting list is empty - ask for more headers
+        else if (h.isHeadersChainSynced && cancellables.isEmpty && !h.isFullChainSynced)
+          self ! CheckModifiersToDownload // Headers chain is synced - request payloads.
       }
 
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
