@@ -9,7 +9,7 @@ object ExtUtils extends StrictLogging {
     val t0 = System.nanoTime()
     val result = block
     val t1 = System.nanoTime()
-    println(s"($idx) Elapsed time: " + (t1 - t0).toFloat / 1000000 + "ms")
+    logger.debug(s"($idx) Elapsed time: " + (t1 - t0).toFloat / 1000000 + "ms")
     result
   }
 
