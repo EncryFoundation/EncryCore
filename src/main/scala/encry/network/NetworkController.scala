@@ -41,7 +41,7 @@ class NetworkController extends Actor with Logging {
         val myAddrs: Array[InetAddress] = InetAddress.getAllByName(new URI("http://" + myAddress).getHost)
         NetworkInterface.getNetworkInterfaces.asScala.exists { intf =>
           intf.getInterfaceAddresses.asScala.exists { intfAddr => myAddrs.contains(intfAddr.getAddress) }
-        } || (networkSettings.upnpEnabled && myAddrs.exists(_ == upnp.externalAddress))
+        } || (networkSettings.upnpEnabled && myAddrs.contains(upnp.externalAddress))
       } recover { case t: Throwable =>
         logError("Declared address validation failed: ", t)
       }

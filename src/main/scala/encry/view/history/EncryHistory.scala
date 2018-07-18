@@ -18,8 +18,7 @@ import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 
 import scala.util.Try
 
-/**
-  * History implementation. It is processing persistent modifiers generated locally or received from the network.
+/** History implementation. It is processing persistent modifiers generated locally or received from the network.
   * Depending on chosen node settings, it will process modifiers in a different way, different processors define how to
   * process different types of modifiers.
   *
@@ -30,11 +29,11 @@ import scala.util.Try
   *   3. Be ignored by history in light mode (verifyTransactions == false)
   * BlockPayloadProcessor: Processor of BlockPayload. BlockPayload may
   *   1. Be downloaded from other peers (verifyTransactions == true)
-  *   2. Be ignored by history (verifyTransactions == false)
-  */
+  *   2. Be ignored by history (verifyTransactions == false) */
 trait EncryHistory extends EncryHistoryReader {
 
-  def isFullChainSynced: Boolean = bestHeaderOpt.exists(bestHeader => bestBlockOpt.exists(_.header.id == bestHeader.id))
+  def isFullChainSynced: Boolean = bestHeaderOpt
+    .exists(bestHeader => bestBlockOpt.exists(b => ByteArrayWrapper(b.header.id) == ByteArrayWrapper(bestHeader.id)))
 
   /** Appends modifier to the history if it is applicable. */
   def append(modifier: EncryPersistentModifier): Try[(EncryHistory, History.ProgressInfo[EncryPersistentModifier])] = {
