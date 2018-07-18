@@ -13,7 +13,6 @@ import scala.util.{Failure, Random, Success}
 
 class HistoryStorage(override val store: Store, val objectsStore: Store) extends EncryBaseStorage {
 
-  // TODO: Replace with Scala analogue.
   private val modifiersCache: Cache[String, EncryPersistentModifier] = CacheBuilder.newBuilder()
     .maximumSize(1000)
     .build[String, EncryPersistentModifier]

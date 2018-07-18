@@ -56,22 +56,18 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
         case Younger => sendExtension(remote, status, extOpt)
         case _ =>
       }
-
     case HandshakedPeer(remote) => statusTracker.updateStatus(remote, Unknown)
     case DisconnectedPeer(remote) => statusTracker.clearStatus(remote)
     case CheckDelivery(peer, modifierTypeId, modifierId) =>
       if (peerWhoDelivered(modifierId).contains(peer)) delete(modifierId)
       else reexpect(peer, modifierTypeId, modifierId)
-
     case CheckModifiersToDownload =>
       historyReaderOpt.foreach { h =>
         val currentQueue: Iterable[ModifierId] = cancellables.keys.map(ModifierId @@ _.toArray)
         val newIds: Seq[(ModifierTypeId, ModifierId)] = h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
         newIds.groupBy(_._1).foreach(ids => requestDownload(ids._1, ids._2.map(_._2)))
       }
-
     case RequestFromLocal(peer, modifierTypeId, modifierIds) => if (modifierIds.nonEmpty && modifierTypeId != 2) expect(peer, modifierTypeId, modifierIds)
-
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       val typeId: ModifierTypeId = data._1
       val modifiers: Map[ModifierId, Array[Byte]] = data._2
@@ -92,19 +88,14 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
         else if (h.isHeadersChainSynced && cancellables.isEmpty && !h.isFullChainSynced)
           self ! CheckModifiersToDownload // Headers chain is synced - request payloads.
       }
-
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
       requestDownload(modifierTypeId, Seq(modifierId))
-
     case FullBlockChainSynced => isBlockChainSynced = true
-
     case StartMining => isMining = true
     case DisableMining => isMining = false
-
     case SendLocalSyncInfo =>
       if (statusTracker.elapsedTimeSinceLastSync() < (settings.network.syncInterval.toMillis / 2)) log.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
-
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] => historyReaderOpt = Some(reader)
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
   }
