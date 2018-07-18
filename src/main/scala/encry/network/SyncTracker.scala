@@ -26,7 +26,7 @@ case class SyncTracker(deliveryManager: ActorRef,
 
   private var schedule: Option[Cancellable] = None
 
-  private val statuses: mutable.Map[ConnectedPeer, HistoryComparisonResult] = mutable.Map[ConnectedPeer, HistoryComparisonResult]()
+  var statuses: Map[ConnectedPeer, HistoryComparisonResult] = Map()
   private val lastSyncSentTime: mutable.Map[ConnectedPeer, Time] = mutable.Map[ConnectedPeer, Time]()
 
   private var lastSyncInfoSentTime: Time = 0L

@@ -170,7 +170,7 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     val msg: Message[(ModifierTypeId, Seq[ModifierId])] = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
     if (settings.node.sendStat) context.actorSelection("akka://encry/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
-    statusTracker.peersToSyncWith().foreach(peer => {
+    statusTracker.statuses.keys.foreach(peer => {
       expect(peer, modifierTypeId, modifierIds)
       networkController ! SendToNetwork(msg, SendToPeer(peer))
     })

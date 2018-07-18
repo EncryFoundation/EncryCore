@@ -157,7 +157,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
         .validate(!historyStorage.containsObject(m.id)) {
           fatal(s"Modifier ${m.encodedId} is already in history")
         }
-        .validate(header.height >= minimalHeight) {
+        .validate(header.height < minimalHeight) {
           fatal(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight")
         }
         .validate(header.isRelated(m)) {
