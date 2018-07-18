@@ -19,7 +19,7 @@ import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, ModifiersHolder, NetworkController, UPnP}
 import encry.settings.{Algos, EncryAppSettings}
 import encry.stats.StatsSender
-import encry.utils.{Logging, NetworkTimeProvider}
+import encry.utils.{Logging, NetworkTimeProvider, Zombie}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import scala.concurrent.ExecutionContextExecutor
@@ -48,7 +48,8 @@ object EncryApp extends App with Logging {
       ModifiersSpec
     )
   }
-  lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props(), "nodeViewHolder")
+  lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props()
+    .withDispatcher("nvh-dispatcher").withMailbox("nvh-mailbox"), "nodeViewHolder")
   val readersHolder: ActorRef = system.actorOf(Props[EncryViewReadersHolder], "readersHolder")
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
     .withDispatcher("network-dispatcher"), "networkController")
@@ -91,6 +92,7 @@ object EncryApp extends App with Logging {
   if (settings.levelDb.enable) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
   if (settings.testing.transactionGeneration) system.actorOf(Props[TransactionGenerator], "tx-generator") ! StartGeneration
   if (settings.node.enableCLI) cliListener ! StartListening
+  val zombie: ActorRef = system.actorOf(Props[Zombie], "zombie")
 
   def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
 
