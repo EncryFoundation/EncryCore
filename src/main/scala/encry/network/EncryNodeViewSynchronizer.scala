@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.{Actor, ActorRef, Props}
 import encry.EncryApp._
 import encry.consensus.History._
@@ -74,6 +73,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           log.info(s"Comparison with $remote having starting points ${encry.idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}")
           log.info(s"Extension ids: ${encry.idsToString(ext)}")
+          log.debug(s"Get sync message from ${remote.socketAddress} with headers: ${syncInfo.lastHeaderIds.map(Algos.encode).mkString(",")}")
           if (!(extensionOpt.nonEmpty || comparison != Younger)) logWarn("Extension is empty while comparison is younger")
           self ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
@@ -88,6 +88,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
         }
         log.info(s"Requested ${invData._2.length} modifiers ${encry.idsToString(invData)}, " +
           s"sending ${objs.length} modifiers ${encry.idsToString(invData._1, objs.map(_.id))} ")
+        log.debug(s"Peer: ${remote.socketAddress} requested for modifiers of type ${invData._1} with ids: ${invData._2.map(Algos.encode).mkString(",")}")
         self ! ResponseFromLocal(remote, invData._1, objs)
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
