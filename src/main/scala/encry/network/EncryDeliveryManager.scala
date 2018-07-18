@@ -65,6 +65,7 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
       historyReaderOpt.foreach { h =>
         val currentQueue: Iterable[ModifierId] = cancellables.keys.map(ModifierId @@ _.toArray)
         val newIds: Seq[(ModifierTypeId, ModifierId)] = h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
+        println(s"[NETWORK] >> modifiersToDownload(${newIds.map(i => Algos.encode(i._2))})")
         newIds.groupBy(_._1).foreach(ids => requestDownload(ids._1, ids._2.map(_._2)))
       }
     case RequestFromLocal(peer, modifierTypeId, modifierIds) => if (modifierIds.nonEmpty && modifierTypeId != 2) expect(peer, modifierTypeId, modifierIds)

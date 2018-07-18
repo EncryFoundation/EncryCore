@@ -295,7 +295,7 @@ trait BlockHeaderProcessor extends Logging {
       if (header.isGenesis) validateGenesisBlockHeader(header)
       else typedModifierById[EncryBlockHeader](header.parentId).map { parent =>
         validateChildBlockHeader(header, parent)
-      } getOrElse fatal(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
+      } getOrElse error(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
 
     private def validateGenesisBlockHeader(header: EncryBlockHeader): ValidationResult =
       accumulateErrors

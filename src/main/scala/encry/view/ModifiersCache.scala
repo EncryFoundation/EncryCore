@@ -154,7 +154,7 @@ case class EncryModifiersCache(override val maxSize: Int)
       }
     }
 
-    val headersHeight = history.bestHeaderHeight
+    val headersHeight: Int = history.bestHeaderHeight
 
     history
       .headerIdsAtHeight(history.bestBlockHeight + 1)
