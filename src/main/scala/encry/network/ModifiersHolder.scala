@@ -78,10 +78,14 @@ class ModifiersHolder extends PersistentActor with Logging {
       if(!headers.contains(Algos.encode(header.id)))
         persist(header) { header => logger.debug(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully.") }
       updateHeaders(header)
+      log.debug(s"Get header ${Algos.encode(header.id)} on height ${header.height}")
     case payload: EncryBlockPayload =>
       if(!payloads.contains(Algos.encode(payload.id)))
         persist(payload) { payload => logger.debug(s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully.") }
       updatePayloads(payload)
+      log.debug(s"Get payload with id: ${Algos.encode(payload.id)} " +
+        s"${nonCompletedBlocks.get(Algos.encode(payload.id)).map(headerId =>
+          headers.get(headerId).map(header => s"for header $headerId height: ${header._1.height}"))}")
     case block: EncryBlock =>
       if(!completedBlocks.values.toSeq.contains(block))
         persist(block) { block => logger.debug(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} is persisted successfully.") }
