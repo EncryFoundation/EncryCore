@@ -5,6 +5,14 @@ import org.slf4j._
 
 object ExtUtils extends StrictLogging {
 
+  def span[R](idx: Int)(block: => R): R = {
+    val t0: Long = System.nanoTime()
+    val result: R = block
+    val t1: Long = System.nanoTime()
+    logger.debug(s"($idx) Elapsed time: " + (t1 - t0).toFloat / 1000000 + "ms")
+    result
+  }
+
   implicit class Appliable[T](val obj: T) extends AnyVal {
     def rapply[S](f: T => S ): S = { f(obj)}
     def iapply[S](f: T => S ): T = { f(obj); obj}
@@ -12,7 +20,6 @@ object ExtUtils extends StrictLogging {
 
   val warningColor: String = Console.YELLOW
   val errorColor: String = Console.RED
-
 
   implicit class Loggable[T](val obj: T) extends AnyVal {
 

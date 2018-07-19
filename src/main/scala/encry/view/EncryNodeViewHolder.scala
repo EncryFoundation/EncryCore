@@ -36,7 +36,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: EncryMempool)
 
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
-  val modifiersCache: EncryModifiersCache = EncryModifiersCache(1000)
+  val modifiersCache: EncryModifiersCache = EncryModifiersCache(2000)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,
@@ -70,14 +70,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
         log.info(s"Cache before(${modifiersCache.size})")
 
-        def computeApplications(): Unit = {
+        def computeApplications(): Unit =
           modifiersCache.popCandidate(nodeView.history) match {
             case Some(mod) =>
               pmodModify(mod)
               computeApplications()
             case None => Unit
           }
-        }
 
         computeApplications()
         log.info(s"Cache after(${modifiersCache.size})")
@@ -206,7 +205,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         if (progressInfo.toApply.nonEmpty) {
           val startPoint: Long = System.currentTimeMillis()
           val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
-            updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
+            updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq.empty)
           if (settings.node.sendStat)
             system.actorSelection("user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
           newStateTry match {
@@ -219,8 +218,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               log.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
               if (settings.node.sendStat)
                 newHistory.bestHeaderOpt.foreach(header => context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
-              if (newHistory.isFullBlockChainSynced)
-                nodeViewSynchronizer ! FullBlockChainSynced
+              if (newHistory.isFullChainSynced) nodeViewSynchronizer ! FullBlockChainSynced
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
               logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
@@ -237,12 +235,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     }
   } else logWarn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
 
-  def txModify(tx: EncryBaseTransaction): Unit = nodeView.mempool.put(tx) match {
-    case Success(newPool) =>
-      val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
-      updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
-      nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx)
-    case Failure(e) =>
+  def txModify(tx: EncryBaseTransaction): Unit = nodeView.mempool.put(tx).map { pool =>
+    val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
+    updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(pool))
+    nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx)
   }
 
   def genesisState: NodeView = {

@@ -12,8 +12,7 @@ import encry.settings.Constants._
 import encry.settings.{Algos, Constants, NodeSettings}
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.validation.{ModifierValidator, ValidationResult}
-import encry.view.history.Height
-import encry.view.history.storage.HistoryStorage
+import encry.view.history.{Height, HistoryStorage}
 import encry.{EncryApp, _}
 import io.iohk.iodb.ByteArrayWrapper
 
@@ -25,8 +24,8 @@ trait BlockHeaderProcessor extends Logging {
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider
-  private val chainParams = Constants.Chain
-  private val difficultyController = PowLinearController
+  private val chainParams: Constants.Chain.type = Constants.Chain
+  private val difficultyController: PowLinearController.type = PowLinearController
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
   protected val BestHeaderKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(EncryBlockHeader.modifierTypeId))
   protected val BestBlockKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(-1))
@@ -43,8 +42,8 @@ trait BlockHeaderProcessor extends Logging {
       else {
         headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[EncryBlockHeader](id)) match {
           case Some(bestHeaderAtThisHeight) =>
-            val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
-              .filter(m => !excluding.exists(ex => ex sameElements m._2))
+            val toDownload: Seq[(ModifierTypeId, ModifierId)] = requiredModifiersForHeader(bestHeaderAtThisHeight)
+              .filter(m => !excluding.exists(_ sameElements m._2))
               .filter(m => !contains(m._2))
             continuation(Height @@ (height + 1), acc ++ toDownload)
           case None => acc
@@ -59,14 +58,11 @@ trait BlockHeaderProcessor extends Logging {
     }
   }
 
-  /**
-    * Checks, whether it's time to download full chain and return toDownload modifiers
-    */
+  /** Checks, whether it's time to download full chain and return toDownload modifiers */
   protected def toDownload(header: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] =
     if (!nodeSettings.verifyTransactions) Seq.empty // Regime that do not download and verify transaction
-    else if (header.height >= blockDownloadProcessor.minimalBlockHeight)
-      requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
-    else if (!isHeadersChainSynced && isNewHeader(header)) {
+    else if (header.height >= blockDownloadProcessor.minimalBlockHeight) requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
+    else if (isNewHeader(header)) {
       // Headers chain is synced after this header. Start downloading full blocks
       log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
       isHeadersChainSyncedVar = true
@@ -80,7 +76,7 @@ trait BlockHeaderProcessor extends Logging {
     else Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
 
   private def isNewHeader(header: EncryBlockHeader): Boolean =
-    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5//TODO magic number
+    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 20 //TODO magic number
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
@@ -161,10 +157,8 @@ trait BlockHeaderProcessor extends Logging {
     }
   }
 
-  /**
-    * Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
-    * header ids at this height
-    */
+  /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
+    * header ids at this height */
   private def bestBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty) = {
     val prevHeight = bestHeaderHeight
     log.info(s"New best header ${h.encodedId} with score: $score. New height: ${h.height}, old height: $prevHeight")
@@ -181,9 +175,7 @@ trait BlockHeaderProcessor extends Logging {
     forkIds :+ self
   }
 
-  /**
-    * Row to storage, that put this orphaned block id to the end of header ids at this height
-    */
+  /** Row to storage, that put this orphaned block id to the end of header ids at this height */
   private def orphanedBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty) = {
     log.info(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
     Seq(heightIdsKey(h.height) -> ByteArrayWrapper((headerIdsAtHeight(h.height) :+ h.id).flatten.toArray))
@@ -287,7 +279,7 @@ trait BlockHeaderProcessor extends Logging {
       if (header.isGenesis) validateGenesisBlockHeader(header)
       else typedModifierById[EncryBlockHeader](header.parentId).map { parent =>
         validateChildBlockHeader(header, parent)
-      } getOrElse fatal(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
+      } getOrElse error(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
 
     private def validateGenesisBlockHeader(header: EncryBlockHeader): ValidationResult =
       accumulateErrors

@@ -76,6 +76,7 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
         removed
       }
     }
+
   def popCandidate(history: H): Option[V] = synchronized {
     findCandidateKey(history).flatMap(k => remove(k))
   }
@@ -153,7 +154,7 @@ case class EncryModifiersCache(override val maxSize: Int)
       }
     }
 
-    val headersHeight = history.bestHeaderHeight
+    val headersHeight: Int = history.bestHeaderHeight
 
     history
       .headerIdsAtHeight(history.bestBlockHeight + 1)
