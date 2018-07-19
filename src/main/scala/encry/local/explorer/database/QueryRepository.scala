@@ -1,14 +1,15 @@
 package encry.local.explorer.database
 
 import doobie.free.connection.ConnectionIO
-import doobie.util.fragment.Fragment
 import doobie.util.update.Update
 import encry.ModifierId
+import doobie.implicits._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import scorex.crypto.encode.Base16
 import cats.implicits._
+import encry.local.explorer.database.Tables.{HeadersTable, InputsTable, OutputsTable, TransactionsTable}
 
 protected[database] object QueryRepository {
 
@@ -16,32 +17,33 @@ protected[database] object QueryRepository {
     for {
       blockR <- insertBlockQuery(block)
       txsR   <- insertTransactionsQuery(block.header, block.payload)
-      outsR  <- insertOutputsQuery(block.header, block.payload)
-      insR   <- insertInputsQuery(block.header, block.payload)
+      outsR  <- insertOutputsQuery(block.payload)
+      insR   <- insertInputsQuery(block.payload)
     } yield txsR + blockR + outsR + insR
 
   def insertHeaderQuery(header: EncryBlockHeader): ConnectionIO[Int] =
-    insertQuery(tables.HeadersTable.name, tables.HeadersTable.fieldsString, tables.HeadersTable.dataString(header))
+    insertQuery(HeadersTable.name, HeadersTable.allFields, HeadersTable.dataString(header))
 
-  def markAsRemovedFromMainChainQuery(ids: List[ModifierId]): ConnectionIO[Int] =
-    Update[String](tables.HeadersTable.updateByIdSql("best_chain = FALSE"))
-      .updateMany(ids.map(Base16.encode))
+  def markAsRemovedFromMainChainQuery(ids: List[ModifierId]): ConnectionIO[Int] = {
+    val query = "UPDATE ${HeadersTable.name} SET best_chain = FALSE WHERE id = ?"
+    Update[String](query).updateMany(ids.map(Base16.encode))
+  }
 
   // internal
 
   private def insertQuery(table: String, fieldsString: String, dataString: String): ConnectionIO[Int] =
-    Fragment.const(s"INSERT INTO $table $fieldsString VALUES $dataString;").update.run
+    sql"INSERT INTO $table $fieldsString VALUES $dataString;".update.run
 
   private def insertBlockQuery(block: EncryBlock): ConnectionIO[Int] =
-    insertQuery(tables.HeadersTable.name, tables.HeadersTable.fieldsString, tables.HeadersTable.dataString(block))
+    insertQuery(HeadersTable.name, HeadersTable.allFields, HeadersTable.dataString(block))
 
   private def insertTransactionsQuery(h: EncryBlockHeader, p: EncryBlockPayload): ConnectionIO[Int] =
-    insertQuery(tables.TransactionsTable.name, tables.TransactionsTable.fieldsString, tables.TransactionsTable.dataStrings(h, p))
+    insertQuery(TransactionsTable.name, TransactionsTable.allFields, TransactionsTable.dataStrings(h, p))
 
-  private def insertInputsQuery(h: EncryBlockHeader, p: EncryBlockPayload): ConnectionIO[Int] =
-    insertQuery(tables.InputsTable.name, tables.InputsTable.fieldsString, tables.InputsTable.dataStrings(h, p))
+  private def insertInputsQuery(p: EncryBlockPayload): ConnectionIO[Int] =
+    insertQuery(InputsTable.name, InputsTable.allFields, InputsTable.dataString(p))
 
-  private def insertOutputsQuery(h: EncryBlockHeader, p: EncryBlockPayload): ConnectionIO[Int] =
-    insertQuery(tables.OutputsTable.name, tables.OutputsTable.fieldsString, tables.OutputsTable.dataStrings(h, p))
+  private def insertOutputsQuery(p: EncryBlockPayload): ConnectionIO[Int] =
+    insertQuery(OutputsTable.name, OutputsTable.allFields, OutputsTable.dataString(p))
 
 }

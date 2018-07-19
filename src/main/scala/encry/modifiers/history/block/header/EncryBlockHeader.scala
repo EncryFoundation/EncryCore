@@ -60,6 +60,23 @@ case class EncryBlockHeader(override val version: Version,
   override def serializer: Serializer[M] = EncryBlockHeaderSerializer
 
   override def toString: String = s"Header(id=$encodedId, height=$height)"
+
+  def dataString: String = {
+    val encodedId: String = Base16.encode(id)
+    val encodedParentId: String = Base16.encode(parentId)
+    val proofsRoot: String = Base16.encode(adProofsRoot)
+    val encodedStateRoot: String = Base16.encode(stateRoot)
+    val encodedTransactionsRoot: String = Base16.encode(transactionsRoot)
+    val proofs: String = ""
+    val solution: String = equihashSolution.ints.mkString("{", ", ", "}")
+    val (minerAddress: String, minerReward: Long) = "unknown" -> 0L
+    val feesTotal: Long = 0
+    val txsSize: Int = 0
+
+    s"('$encodedId', '$encodedParentId', '$version', '$height', '$proofsRoot', '$encodedStateRoot', " +
+      s"'$encodedTransactionsRoot', '$timestamp', '$difficulty', '${bytes.length}', '$solution', '$proofs', " +
+      s"'0', '$minerAddress', '$minerReward', '$feesTotal', '$txsSize', TRUE)"
+  }
 }
 
 object EncryBlockHeader {
