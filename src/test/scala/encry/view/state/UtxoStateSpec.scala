@@ -12,6 +12,7 @@ import encry.utils.{EncryGenerator, FileHelper, TestHelper}
 import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
 import encry.modifiers.state.box.Box.Amount
+import encry.settings.Algos.HF
 import encry.view.history.Height
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
@@ -27,12 +28,13 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val stateStore = new LSMStore(dir, keySize = 32, keepVersions = 10)
 
-    new UtxoState(EncryState.genesisStateVersion, Constants.Chain.GenesisHeight, stateStore, 0L, None) {
-      override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Algos.HF] =
-        PersistentBatchAVLProver.create(
-          p, storage, paranoidChecks = true
-        ).get
+    val persistentProver: PersistentBatchAVLProver[Digest32, HF] = {
+      val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
+      val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(stateStore, np)(Algos.hash)
+      PersistentBatchAVLProver.create(p, storage).get
     }
+
+    new UtxoState(persistentProver, EncryState.genesisStateVersion, Constants.Chain.GenesisHeight, stateStore, 0L, None)
   }
 
   property("Proofs for transaction") {
