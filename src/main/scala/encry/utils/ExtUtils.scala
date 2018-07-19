@@ -6,9 +6,9 @@ import org.slf4j._
 object ExtUtils extends StrictLogging {
 
   def span[R](idx: Int)(block: => R): R = {
-    val t0 = System.nanoTime()
-    val result = block
-    val t1 = System.nanoTime()
+    val t0: Long = System.nanoTime()
+    val result: R = block
+    val t1: Long = System.nanoTime()
     logger.debug(s"($idx) Elapsed time: " + (t1 - t0).toFloat / 1000000 + "ms")
     result
   }
