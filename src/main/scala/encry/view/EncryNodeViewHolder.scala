@@ -93,13 +93,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       if (state) sender() ! ChangedState(nodeView.state)
       if (mempool) sender() ! ChangedMempool(nodeView.mempool)
     case CompareViews(peer, modifierTypeId, modifierIds) =>
-      log.debug(s"Get mmods to compare view: $modifierTypeId with ids: ${modifierIds.map(Algos.encode).mkString(",")}")
       val ids: Seq[ModifierId] = modifierTypeId match {
         case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
-        case _ => modifierIds.filterNot(mid => {
-          log.debug(s"Trying to check correctness to download of ${Algos.encode(mid)}: ${nodeView.history.contains(mid)} || ${modifiersCache.contains(key(mid))}")
-          nodeView.history.contains(mid) || modifiersCache.contains(key(mid))
-        })
+        case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       }
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case a: Any => logError("Strange input: " + a)
@@ -140,10 +136,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     }
   }
 
-  def requestDownloads(pi: ProgressInfo[EncryPersistentModifier]): Unit = {
-    println(s"Size: ${pi.toDownload.size}")
+  def requestDownloads(pi: ProgressInfo[EncryPersistentModifier]): Unit =
     pi.toDownload.foreach { case (tid, id) => nodeViewSynchronizer ! DownloadRequest(tid, id) }
-  }
 
   def trimChainSuffix(suffix: IndexedSeq[EncryPersistentModifier], rollbackPoint: ModifierId): IndexedSeq[EncryPersistentModifier] = {
     val idx: Int = suffix.indexWhere(_.id.sameElements(rollbackPoint))

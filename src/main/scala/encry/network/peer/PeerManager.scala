@@ -45,7 +45,6 @@ class PeerManager extends Actor with Logging {
         log.info(s"Connecting to $remote")
         connectingPeers += remote
       }
-      log.debug(s"Send to: ${sender()} StartInteraction")
       sender() ! StartInteraction
     case Handshaked(peer) =>
       if (peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress))
