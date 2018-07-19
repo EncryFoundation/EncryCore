@@ -193,6 +193,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     }
   }
 
+  import encry.utils.ExtUtils.span
+
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
     log.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
     if (settings.node.sendStat)
@@ -206,7 +208,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         if (progressInfo.toApply.nonEmpty) {
           val startPoint: Long = System.currentTimeMillis()
           val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
-            updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
+            span(0)(updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq()))
           if (settings.node.sendStat)
             system.actorSelection("user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
           newStateTry match {

@@ -23,10 +23,7 @@ trait UtxoStateReader extends StateReader with Logging {
 
   protected lazy val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(stateStore, np)
 
-  protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Algos.HF] = {
-    val bp: BatchAVLProver[Digest32, HF] = new BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
-    PersistentBatchAVLProver.create(bp, storage).get
-  }
+  protected val persistentProver: PersistentBatchAVLProver[Digest32, Algos.HF]
 
   def boxById(boxId: ADKey): Option[EncryBaseBox] = persistentProver.unauthenticatedLookup(boxId)
     .map(bytes => StateModifierDeserializer.parseBytes(bytes, boxId.head)).flatMap(_.toOption)

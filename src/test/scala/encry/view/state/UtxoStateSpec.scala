@@ -1,39 +1,17 @@
 package encry.view.state
 
-import java.io.File
-
-import akka.actor.ActorRef
 import encry.account.Address
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
-import encry.settings.{Algos, Constants}
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
-import io.iohk.iodb.LSMStore
-import org.scalatest.{Matchers, PropSpec}
-import encry.modifiers.state.box.Box.Amount
 import encry.view.history.Height
-import scorex.crypto.authds.avltree.batch._
-import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
-import scorex.crypto.hash.Digest32
+import org.scalatest.{Matchers, PropSpec}
+import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
 
 class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
-
-  def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val p = new BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
-    bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
-
-    val stateStore = new LSMStore(dir, keySize = 32, keepVersions = 10)
-
-    new UtxoState(EncryState.genesisStateVersion, Constants.Chain.GenesisHeight, stateStore, 0L, None) {
-      override protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Algos.HF] =
-        PersistentBatchAVLProver.create(
-          p, storage, paranoidChecks = true
-        ).get
-    }
-  }
 
   property("Proofs for transaction") {
 
