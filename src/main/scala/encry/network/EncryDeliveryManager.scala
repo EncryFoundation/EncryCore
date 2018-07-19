@@ -83,7 +83,7 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
         deleteSpam(spam.keys.toSeq)
       }
       if (fm.nonEmpty) nodeViewHolder ! ModifiersFromRemote(typeId, fm.values.toSeq)
-      historyReaderOpt foreach { h =>
+      historyReaderOpt.foreach { h =>
         if (!h.isHeadersChainSynced && cancellables.isEmpty)
           sendSync(h.syncInfo) // Headers chain is not synced yet, but our expecting list is empty - ask for more headers
         else if (h.isHeadersChainSynced && cancellables.isEmpty && !h.isFullChainSynced)
@@ -101,9 +101,8 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
   }
 
-  def sendSync(syncInfo: EncrySyncInfo): Unit = statusTracker.statuses.keys.foreach(peer =>
-      peer.handlerRef ! Message(syncInfoSpec, Right(syncInfo), None)
-    )
+  def sendSync(syncInfo: EncrySyncInfo): Unit = statusTracker.statuses.keys
+    .foreach(_.handlerRef ! Message(syncInfoSpec, Right(syncInfo), None))
 
   def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mids: Seq[ModifierId]): Unit = tryWithLogging {
     if ((mtid == 2 && isBlockChainSynced && isMining) || mtid != 2) {
@@ -119,7 +118,8 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
           } else notRequested
       }
       if (notRequestedIds.nonEmpty) {
-        log.debug(s"Ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mtid with ids: ${notRequestedIds.map(id => Algos.encode(id) + "|" + id).mkString(",")}")
+        log.debug(s"Ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of " +
+          s"type: $mtid with ids: ${notRequestedIds.map(id => Algos.encode(id) + "|" + id).mkString(",")}")
         cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
       }
       notRequestedIds.foreach { id =>
