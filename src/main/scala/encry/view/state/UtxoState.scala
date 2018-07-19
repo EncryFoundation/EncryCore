@@ -80,15 +80,15 @@ class UtxoState(override val version: VersionTag,
       log.info(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
 
-      applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
+      val applicationResult = applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] =
           metadata(VersionTag !@@ block.id, block.header.stateRoot, Height @@ block.header.height, block.header.timestamp)
         val proofBytes: SerializedAdProof = persistentProver.generateProofAndUpdateStorage(meta)
         val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
 
         if (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest) onAdProofGenerated(ADProofs(block.header.id, proofBytes))
-        log.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with " +
-          s"root hash ${Algos.encode(rootHash)}")
+        log.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with" +
+          s" root hash ${Algos.encode(rootHash)}")
 
         if (!stateStore.get(ByteArrayWrapper(block.id)).exists(_.data sameElements block.header.stateRoot))
           throw new Exception("Storage kept roothash is not equal to the declared one.")
@@ -105,6 +105,7 @@ class UtxoState(override val version: VersionTag,
           s" ${Algos.encode(rootHash)}: ", e)
         Failure(e)
       }
+      applicationResult
 
     case header: EncryBlockHeader =>
       Success(new UtxoState(VersionTag !@@ header.id, height, stateStore, lastBlockTimestamp, nodeViewHolderRef))

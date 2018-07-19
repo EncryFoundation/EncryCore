@@ -1,5 +1,6 @@
 package encry.view.history.processors.payload
 
+import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -7,7 +8,6 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.view.history.processors.BlockProcessor
 import encry.view.history.storage.HistoryStorage
-import encry.consensus.History.ProgressInfo
 
 import scala.util.Try
 
@@ -17,23 +17,14 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
 
   protected val adState: Boolean
 
-  override protected def process(txs: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] = {
-    historyStorage.modifierById(txs.headerId) match {
-      case Some(header: EncryBlockHeader) =>
-        historyStorage.modifierById(header.adProofsId) match {
-          case _ if bestBlockIdOpt.isEmpty && !isValidFirstBlock(header) =>
-            putToHistory(txs)
-          case Some(adProof: ADProofs) =>
-            processBlock(EncryBlock(header, txs, Some(adProof)), payloadIsNew = true)
-          case None if !adState =>
-            processBlock(EncryBlock(header, txs, None), payloadIsNew = true)
-          case _ =>
-            putToHistory(txs)
-        }
-      case _ =>
-        throw new Exception(s"Header for modifier $txs is not defined")
+  override protected def process(payload: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] =
+    getBlockByPayload(payload).map(block => processBlock(block, payload)).getOrElse(putToHistory(payload))
+
+  private def getBlockByPayload(payload: EncryBlockPayload): Option[EncryBlock] =
+    typedModifierById[EncryBlockHeader](payload.headerId).flatMap { h =>
+      if (!adState) Some(EncryBlock(h, payload, None))
+      else typedModifierById[ADProofs](h.adProofsId).map(ps => EncryBlock(h, payload, Some(ps)))
     }
-  }
 
   override protected def validate(m: EncryBlockPayload): Try[Unit] =
     modifierValidation(m, typedModifierById[EncryBlockHeader](m.headerId))

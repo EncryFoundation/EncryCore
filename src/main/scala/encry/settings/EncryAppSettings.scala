@@ -15,7 +15,9 @@ case class EncryAppSettings(directory: String,
                             restApi: RESTApiSettings,
                             ntp: NetworkTimeProviderSettings,
                             postgres: PostgresSettings,
-                            influxDB: InfluxDBSettings)
+                            influxDB: InfluxDBSettings,
+                            influxDB: InfluxDBSettings,
+                            levelDb: LevelDbSettings)
 
 object EncryAppSettings extends Logging with SettingsReaders with NodeSettingsReader {
 

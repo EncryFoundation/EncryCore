@@ -5,16 +5,15 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.HistoryModifierSerializer
 import encry.modifiers.serialization.Serializer
 import encry.storage.EncryBaseStorage
-import encry.view.ObjectsStore
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Random, Success}
 
-class HistoryStorage(override val store: Store, val objectsStore: ObjectsStore) extends EncryBaseStorage {
+class HistoryStorage(override val store: Store, val objectsStore: Store) extends EncryBaseStorage {
 
   def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
-    objectsStore.get(id).flatMap { bytes =>
-      HistoryModifierSerializer.parseBytes(bytes) match {
+    objectsStore.get(ByteArrayWrapper(id)).flatMap { res =>
+      HistoryModifierSerializer.parseBytes(res.data) match {
         case Success(b) => Some(b)
         case Failure(e) =>
           logWarn(s"Failed to parse block from db: ", e)
@@ -23,7 +22,8 @@ class HistoryStorage(override val store: Store, val objectsStore: ObjectsStore) 
     }
 
   def insertObjects(objectsToInsert: Seq[EncryPersistentModifier]): Unit =
-    objectsToInsert.foreach(o => objectsStore.put(o))
+    objectsStore.update(Random.nextLong(), Seq.empty,
+      objectsToInsert.map(obj => ByteArrayWrapper(obj.id) -> ByteArrayWrapper(HistoryModifierSerializer.toBytes(obj))))
 
   def bulkInsert(version: ByteArrayWrapper,
                  indexesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)],
@@ -32,9 +32,9 @@ class HistoryStorage(override val store: Store, val objectsStore: ObjectsStore) 
     insert(version, indexesToInsert)
   }
 
-  def containsObject(id: ModifierId): Boolean = objectsStore.get(id).isDefined
+  def containsObject(id: ModifierId): Boolean = objectsStore.get(ByteArrayWrapper(id)).isDefined
 
-  def removeObjects(ids: Seq[ModifierId]): Unit = ids.foreach(id => objectsStore.delete(id))
+  def removeObjects(ids: Seq[ModifierId]): Unit = objectsStore.update(Random.nextLong(), ids.map(ByteArrayWrapper.apply), Seq.empty)
 
   def serializer: Serializer[EncryPersistentModifier] = HistoryModifierSerializer
 }

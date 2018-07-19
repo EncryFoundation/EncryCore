@@ -1,25 +1,27 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.{Actor, ActorRef, Props}
 import encry.EncryApp._
 import encry.consensus.History._
-import encry.consensus.{HistoryReader, SyncInfo}
+import encry.consensus.SyncInfo
+import encry.local.miner.EncryMiner.{DisableMining, StartMining}
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
+import encry.network.EncryDeliveryManager.FullBlockChainSynced
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.message._
+import encry.settings.Algos
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
-import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
+import encry.view.history.{EncryHistory, EncryHistoryReader, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.{EncryMempool, MempoolReader}
 import encry.view.state.{Proposition, StateReader}
 import encry.{ModifierId, ModifierTypeId, VersionTag}
@@ -61,6 +63,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
     case DisconnectedPeer(remote) => deliveryManager ! DisconnectedPeer(remote)
     case DataFromPeer(spec, syncInfo: EncrySyncInfo@unchecked, remote) if spec.messageCode == syncInfoSpec.messageCode =>
+      log.info(s"Get sync message from ${remote.socketAddress} with " +
+        s"${syncInfo.lastHeaderIds.size} headers. Head headerId is ${Algos.encode(syncInfo.lastHeaderIds.headOption.getOrElse(Array.emptyByteArray))}")
       historyReaderOpt match {
         case Some(historyReader) =>
           val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, settings.network.networkChunkSize)
@@ -69,11 +73,14 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           log.info(s"Comparison with $remote having starting points ${encry.idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}")
           log.info(s"Extension ids: ${encry.idsToString(ext)}")
+          log.debug(s"Get sync message from ${remote.socketAddress} with headers: ${syncInfo.lastHeaderIds.map(Algos.encode).mkString(",")}")
           if (!(extensionOpt.nonEmpty || comparison != Younger)) logWarn("Extension is empty while comparison is younger")
           self ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == RequestModifierSpec.MessageCode =>
+      log.info(s"Get requestMsg from ${remote.socketAddress}. TypeID:${invData._1}." +
+        s" Modifiers: ${invData._2.foldLeft("|")((str, id) => str + "|" + Algos.encode(id))}")
       historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
         val objs: Seq[NodeViewModifier] = invData._1 match {
           case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
@@ -81,14 +88,22 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
         }
         log.info(s"Requested ${invData._2.length} modifiers ${encry.idsToString(invData)}, " +
           s"sending ${objs.length} modifiers ${encry.idsToString(invData._1, objs.map(_.id))} ")
+        log.debug(s"Peer: ${remote.socketAddress} requested for modifiers of type ${invData._1} with ids: ${invData._2.map(Algos.encode).mkString(",")}")
         self ! ResponseFromLocal(remote, invData._1, objs)
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
+      log.debug(s"Get inv message from ${remote.socketAddress} with modTypeId: ${invData._1} and modifiers: " +
+        s"${invData._2.foldLeft("|")((str, id) => str + "|" + Algos.encode(id))}")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
+      log.debug(s"Get modifiers from ${remote.socketAddress} with modTypeID: ${data._1} and modifiers: " +
+        s"${data._2.keys.foldLeft("|")((str, id) => str + "|" + Algos.encode(id))}")
       deliveryManager ! DataFromPeer(spec, data: ModifiersData@unchecked, remote)
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       deliveryManager ! RequestFromLocal(peer, modifierTypeId, modifierIds)
+    case StartMining => deliveryManager ! StartMining
+    case DisableMining => deliveryManager ! DisableMining
+    case FullBlockChainSynced => deliveryManager ! FullBlockChainSynced
     case ResponseFromLocal(peer, _, modifiers: Seq[NodeViewModifier]) =>
       if (modifiers.nonEmpty) {
         val m: (ModifierTypeId, Map[ModifierId, Array[Byte]]) = modifiers.head.modifierTypeId -> modifiers.map(m => m.id -> m.bytes).toMap
@@ -131,7 +146,7 @@ object EncryNodeViewSynchronizer {
 
     trait NodeViewChange extends NodeViewHolderEvent
 
-    case class ChangedHistory[HR <: HistoryReader[_ <: PersistentNodeViewModifier, _ <: SyncInfo]](reader: HR) extends NodeViewChange
+    case class ChangedHistory[HR <: EncryHistoryReader](reader: HR) extends NodeViewChange
 
     case class ChangedMempool[MR <: MempoolReader[_ <: Transaction[_]]](mempool: MR) extends NodeViewChange
 
