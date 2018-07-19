@@ -141,7 +141,6 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
       reportStrangeInput orElse dead
 
   override def preStart: Unit = {
-    log.debug(s"Connection to: $remote restarted")
     peerManager ! DoConnecting(remote, direction)
     handshakeTimeoutCancellableOpt = Some(context.system.scheduler.scheduleOnce(settings.network.handshakeTimeout)
     (self ! HandshakeTimeout))
@@ -161,6 +160,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   override def postStop(): Unit = {
     log.info(s"Peer handler $self to $remote is destroyed.")
+    connection ! Close
     networkController ! ConnectTo(remote)
   }
 
