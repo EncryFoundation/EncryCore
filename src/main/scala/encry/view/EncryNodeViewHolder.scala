@@ -70,14 +70,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
         log.info(s"Cache before(${modifiersCache.size})")
 
-        def computeApplications(): Unit = {
+        def computeApplications(): Unit =
           modifiersCache.popCandidate(nodeView.history) match {
             case Some(mod) =>
               pmodModify(mod)
               computeApplications()
             case None => Unit
           }
-        }
 
         computeApplications()
         log.info(s"Cache after(${modifiersCache.size})")
@@ -236,12 +235,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     }
   } else logWarn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
 
-  def txModify(tx: EncryBaseTransaction): Unit = nodeView.mempool.put(tx) match {
-    case Success(newPool) =>
-      val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
-      updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
-      nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx)
-    case Failure(e) =>
+  def txModify(tx: EncryBaseTransaction): Unit = nodeView.mempool.put(tx).map { pool =>
+    val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
+    updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(pool))
+    nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx)
   }
 
   def genesisState: NodeView = {
