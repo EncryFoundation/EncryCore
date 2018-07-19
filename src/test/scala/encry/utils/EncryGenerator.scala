@@ -1,7 +1,6 @@
 package encry.utils
 
 import java.io.File
-
 import akka.actor.ActorRef
 import encry.ModifierId
 import encry.account.{Account, Address}

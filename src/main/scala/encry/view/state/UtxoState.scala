@@ -1,7 +1,6 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import encry.EncryApp.settings
@@ -24,7 +23,6 @@ import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.crypto.authds._
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.hash.Digest32
-
 import scala.util.{Failure, Success, Try}
 
 class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32, HF],
@@ -69,7 +67,6 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
     val coinbaseApplyTry: Try[Unit] = applyTry(Seq(coinbase), totalFees)
 
     regularApplyTry.flatMap(_ => coinbaseApplyTry).map { _ =>
-      // Checks whether the outcoming result is the same as expected.
       if (!expectedDigest.sameElements(persistentProver.digest))
         throw new Exception(s"Digest after txs application is wrong. ${Algos.encode(expectedDigest)} expected, " +
           s"${Algos.encode(persistentProver.digest)} given")
