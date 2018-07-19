@@ -10,6 +10,8 @@ import encry.ModifierId
 import QueryRepository._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.utils.Logging
+import scala.concurrent.ExecutionContext.Implicits.global
 
 import scala.concurrent.Future
 
@@ -19,7 +21,7 @@ trait DBService {
   def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int]
 }
 
-class DBServiceImpl extends DBService {
+class DBServiceImpl extends DBService with Logging {
 
   def processBlock(block: EncryBlock): Future[Int] = runAsync(processBlockQuery(block))
 
@@ -35,5 +37,10 @@ class DBServiceImpl extends DBService {
                            user = settings.postgres.user,
                            pass = settings.postgres.password)
 
-  private def runAsync[T](io: ConnectionIO[T]): Future[T] = io.transact(transactor).unsafeToFuture
+  private def runAsync[T](io: ConnectionIO[T]): Future[T] =
+    io.transact(transactor).unsafeToFuture.recoverWith {
+      case th: RuntimeException =>
+        log.error("Failed to process db request", th)
+        Future.failed(th)
+    }
 }
