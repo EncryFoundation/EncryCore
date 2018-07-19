@@ -93,10 +93,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       if (state) sender() ! ChangedState(nodeView.state)
       if (mempool) sender() ! ChangedMempool(nodeView.mempool)
     case CompareViews(peer, modifierTypeId, modifierIds) =>
+      log.debug(s"Get mmods to compare view: $modifierTypeId with ids: ${modifierIds.map(Algos.encode).mkString(",")}")
       val ids: Seq[ModifierId] = modifierTypeId match {
         case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
         case _ => modifierIds.filterNot(mid => {
-          log.debug(s"Trying to check correctness to download: ${nodeView.history.contains(mid)} || ${modifiersCache.contains(key(mid))}")
+          log.debug(s"Trying to check correctness to download of ${Algos.encode(mid)}: ${nodeView.history.contains(mid)} || ${modifiersCache.contains(key(mid))}")
           nodeView.history.contains(mid) || modifiersCache.contains(key(mid))
         })
       }
