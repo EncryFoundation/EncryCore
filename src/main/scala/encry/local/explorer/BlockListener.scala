@@ -1,26 +1,16 @@
 package encry.local.explorer
 
-import akka.actor.Actor
-import cats.effect.IO
-import doobie.hikari.HikariTransactor
-import encry.EncryApp.settings
+import akka.actor.{Actor, ActorContext}
 import encry.ModifierId
 import encry.local.explorer.BlockListener.{ChainSwitching, NewOrphaned}
+import encry.local.explorer.database.DBService
+import encry.EncryApp.settings
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.utils.Logging
 
-class BlockListener extends Actor with Logging {
-
-  val transactor: HikariTransactor[IO] = HikariTransactor
-    .newHikariTransactor[IO](
-      driverClassName = "org.postgresql.Driver",
-      url = settings.postgres.host,
-      user = settings.postgres.user,
-      pass = settings.postgres.password
-    ).map { ht => ht.configure(_ => IO(())); ht }
-    .unsafeRunSync()
+class BlockListener(dBService: DBService) extends Actor with Logging {
 
   override def preStart(): Unit = {
     logger.info("Start listening to new blocks.")
@@ -28,13 +18,20 @@ class BlockListener extends Actor with Logging {
   }
 
   override def receive: Receive = {
-    case SemanticallySuccessfulModifier(block: EncryBlock) => DBService.processBlock(block, transactor).unsafeRunSync()
-    case NewOrphaned(header: EncryBlockHeader) => DBService.processHeader(header, transactor).unsafeRunSync()
-    case ChainSwitching(ids) => DBService.markAsRemovedFromMainChain(ids.toList, transactor).unsafeRunSync()
+    case SemanticallySuccessfulModifier(block: EncryBlock) => dBService.processBlock(block)
+    case NewOrphaned(header: EncryBlockHeader) => dBService.processHeader(header)
+    case ChainSwitching(ids) => dBService.markAsRemovedFromMainChain(ids.toList)
   }
 }
 
 object BlockListener {
   case class ChainSwitching(switchedIds: Seq[ModifierId])
   case class NewOrphaned(header: EncryBlockHeader)
+
+  val path: String = "user/blockListener"
+  val name: String = "blockListener"
+
+  def sendToDb(msg: Any)(implicit context: ActorContext): Unit =
+    if(settings.postgres.enabled) context.actorSelection(path) ! msg
+
 }

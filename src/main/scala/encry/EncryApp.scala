@@ -13,6 +13,7 @@ import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator
 import encry.local.TransactionGenerator.StartGeneration
 import encry.local.explorer.BlockListener
+import encry.local.explorer.database.{DBService, DBServiceImpl}
 import encry.local.miner.EncryMiner
 import encry.local.miner.EncryMiner.StartMining
 import encry.network.message._
@@ -23,6 +24,7 @@ import encry.stats.StatsSender
 import encry.utils.{Logging, NetworkTimeProvider, Zombie}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
+
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.io.Source
@@ -59,7 +61,8 @@ object EncryApp extends App with Logging {
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
   lazy val miner: ActorRef = system.actorOf(Props[EncryMiner].withDispatcher("mining-dispatcher"), "miner")
 
-  val blockListener: ActorRef = system.actorOf(Props[BlockListener], "blockListener")
+  lazy val dbService: DBService = new DBServiceImpl
+  lazy val blockListener: ActorRef = system.actorOf(Props(new BlockListener(dbService)), BlockListener.name)
 
   val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
 

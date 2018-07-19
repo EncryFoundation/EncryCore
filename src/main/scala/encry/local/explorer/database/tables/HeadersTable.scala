@@ -1,4 +1,4 @@
-package encry.local.explorer.tables
+package encry.local.explorer.database.tables
 
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
