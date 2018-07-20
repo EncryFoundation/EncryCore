@@ -22,8 +22,5 @@ case class NetworkSettings(nodeName: String,
                            maxInvObjects: Int,
                            modifierDeliverTimeCheck: FiniteDuration,
                            syncInterval: FiniteDuration,
-                           syncStatusRefresh: FiniteDuration,
-                           syncIntervalStable: FiniteDuration,
-                           syncStatusRefreshStable: FiniteDuration,
                            syncTimeout: Option[FiniteDuration]
                           )
