@@ -60,23 +60,36 @@ case class EncryBlockHeader(override val version: Version,
   override def serializer: Serializer[M] = EncryBlockHeaderSerializer
 
   override def toString: String = s"Header(id=$encodedId, height=$height)"
+}
 
-  def dataString: String = {
-    val encodedId: String = Base16.encode(id)
-    val encodedParentId: String = Base16.encode(parentId)
-    val proofsRoot: String = Base16.encode(adProofsRoot)
-    val encodedStateRoot: String = Base16.encode(stateRoot)
-    val encodedTransactionsRoot: String = Base16.encode(transactionsRoot)
-    val proofs: String = ""
-    val solution: String = equihashSolution.ints.mkString("{", ", ", "}")
-    val (minerAddress: String, minerReward: Long) = "unknown" -> 0L
-    val feesTotal: Long = 0
-    val txsSize: Int = 0
+case class HeaderDBVersion(id: String,
+                           parentId: String,
+                           proofsRoot: String,
+                           stateRoot: String,
+                           transactionsRoot: String,
+                           proofs: String,
+                           solution: String,
+                           minerAddress: String,
+                           minerReward: Long,
+                           feesTotal: Long,
+                           txsSize: Int,
+                           bestChain: Boolean)
 
-    s"('$encodedId', '$encodedParentId', '$version', '$height', '$proofsRoot', '$encodedStateRoot', " +
-      s"'$encodedTransactionsRoot', '$timestamp', '$difficulty', '${bytes.length}', '$solution', '$proofs', " +
-      s"'0', '$minerAddress', '$minerReward', '$feesTotal', '$txsSize', TRUE)"
-  }
+object HeaderDBVersion {
+  def apply(header: EncryBlockHeader): HeaderDBVersion = HeaderDBVersion(
+    Base16.encode(header.id),
+    Base16.encode(header.parentId),
+    Base16.encode(header.adProofsRoot),
+    Base16.encode(header.stateRoot),
+    Base16.encode(header.transactionsRoot),
+    "",
+    header.equihashSolution.ints.mkString("{", ", ", "}"),
+    "unknown",
+    0L,
+    0,
+    0,
+    bestChain = true
+  )
 }
 
 object EncryBlockHeader {

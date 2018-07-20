@@ -1,10 +1,9 @@
 package encry.local.explorer.database
 
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.{EncryBlockHeader, HeaderDBVersion}
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.mempool.EncryBaseTransaction
-import scorex.crypto.encode.Base16
+import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, TransactionDBVersion}
 
 object Tables {
 
@@ -37,8 +36,7 @@ object Tables {
       "best_chain"
     )
 
-    def dataString(b: EncryBlock): String = b.dataString
-    def dataString(h: EncryBlockHeader): String = h.dataString
+    def header(h: EncryBlockHeader): HeaderDBVersion = HeaderDBVersion(h)
 
   }
 
@@ -46,36 +44,23 @@ object Tables {
     val name: String = "inputs"
     val fieldNames: Seq[String] = Seq("id", "tx_id", "serialized_proofs")
 
-    def dataString(p: EncryBlockPayload): String =
-      p.transactions.map(_.inputsString).mkString(", ")
+    def inputs(p: EncryBlockPayload): Seq[InputDBVersion] =
+      p.transactions.flatMap(InputDBVersion(_))
   }
 
   final case object OutputsTable extends Table {
     val name: String = "outputs"
     val fieldNames: Seq[String] = Seq("id", "tx_id", "monetary_value", "coin_id", "contract_hash", "data")
 
-    def dataString(p: EncryBlockPayload): String =
-      p.transactions.map(_.outputsString).mkString(", ")
+    def outputs(p: EncryBlockPayload): Seq[OutputDBVersion] =
+      p.transactions.flatMap(OutputDBVersion(_))
   }
 
   final case object TransactionsTable extends Table {
     val name: String = "transactions"
     val fieldNames: Seq[String] = Seq("id", "block_id", "is_coinbase", "ts")
 
-    def dataStrings(h: EncryBlockHeader, p: EncryBlockPayload): String = {
-      val coinbase: String = dataString(h, p.transactions.last, isCoinbase = true)
-      val other: List[String] = p.transactions.init.map(t => dataString(h, t, isCoinbase = false)).toList
-      (coinbase :: other).mkString(", ")
-    }
-
-    // internal
-
-    private def dataString(h: EncryBlockHeader, tx: EncryBaseTransaction, isCoinbase: Boolean): String = {
-      val id: String = Base16.encode(tx.id)
-      val blockId: String = Base16.encode(h.id)
-      val isCb: String = if (isCoinbase) "TRUE" else "FALSE"
-      s"('$id', '$blockId', $isCb, ${h.timestamp})"
-    }
+    def txs(block: EncryBlock): Seq[TransactionDBVersion] = TransactionDBVersion(block)
   }
 
 }

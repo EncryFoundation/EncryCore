@@ -2,6 +2,8 @@ package encry.modifiers.mempool
 
 import com.google.common.primitives.Ints
 import encry.ModifierId
+import encry.modifiers.history.block.Block.Timestamp
+import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.directive.Directive
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, DataBox, EncryBaseBox, EncryProposition}
@@ -36,34 +38,6 @@ trait EncryBaseTransaction extends Transaction[EncryProposition] with ModifierWi
     (Constants.StateByteCost * newBoxes.map(_.bytes).foldLeft(Array.empty[Byte])(_ ++ _).length)
 
   override def toString: String = s"<EncryTransaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}>"
-
-  def outputsString: String = {
-    val txId: String = Base16.encode(id)
-    val outputs: IndexedSeq[String] = newBoxes.map { bx =>
-      val id: String = Base16.encode(bx.id)
-      val (monetaryValue: Long, coinId: String, dataOpt: Option[Array[Byte]]) = bx match {
-        case ab: AssetBox => (ab.amount, Base16.encode(ab.tokenIdOpt.getOrElse(Constants.IntrinsicTokenId)), None)
-        case db: DataBox => (0L, Base16.encode(Constants.IntrinsicTokenId), db.data)
-        case _ => (0L, Base16.encode(Constants.IntrinsicTokenId), None)
-      }
-      val data: String = dataOpt.map(Base16.encode).getOrElse("")
-      val contractHash: String = Base16.encode(bx.proposition.contractHash)
-      s"('$id', '$txId', '$monetaryValue', '$coinId', '$contractHash', '$data')"
-    }.toIndexedSeq
-    outputs.mkString(", ")
-  }
-
-  def inputsString: String = {
-    val txId: String = Base16.encode(id)
-    inputs.map { in =>
-      val id: String = Base16.encode(in.boxId)
-      val proofs: String = Base16.encode(in.proofs.map { proof =>
-        val proofBytes: Array[Byte] = proof.bytes
-        Ints.toByteArray(proofBytes.length) ++ proofBytes
-      }.foldLeft(Array.empty[Byte])(_ ++ _))
-      s"('$id', '$txId', '$proofs')"
-    }.mkString(", ")
-  }
 }
 
 object EncryBaseTransaction {
@@ -77,3 +51,54 @@ object EncryBaseTransaction {
     case tx: EncryTransaction => EncryTransaction.jsonEncoder(tx)
   }
 }
+
+case class TransactionDBVersion(id: String, blockId: String, isCoinbase: String, timestamp: Timestamp)
+
+case object TransactionDBVersion {
+  def apply(block: EncryBlock): Seq[TransactionDBVersion] = {
+    assert(block.payload.transactions.nonEmpty)
+    val transactions = block.payload.transactions.map { tx =>
+      val id: String = Base16.encode(tx.id)
+      val blockId: String = Base16.encode(block.header.id)
+      TransactionDBVersion(id, blockId, "FALSE", block.header.timestamp)
+    }.toIndexedSeq
+    transactions.init :+ transactions.last.copy(isCoinbase = "TRUE")
+  }
+}
+
+
+case class InputDBVersion(id: String, txId: String, proofs: String)
+
+case object InputDBVersion {
+  def apply(tx: EncryBaseTransaction): Seq[InputDBVersion] = {
+    val txId: String = Base16.encode(tx.id)
+    tx.inputs.map { in =>
+      val id: String = Base16.encode(in.boxId)
+      val proofs: String = Base16.encode(in.proofs.map { proof =>
+        val proofBytes: Array[Byte] = proof.bytes
+        Ints.toByteArray(proofBytes.length) ++ proofBytes
+      }.foldLeft(Array.empty[Byte])(_ ++ _))
+      InputDBVersion(id, txId, proofs)
+    }
+  }
+}
+
+case class OutputDBVersion(id: String, txId: String, monetaryValue: Long, coinId: String, contractHash: String, data: String)
+
+object OutputDBVersion {
+  def apply(tx: EncryBaseTransaction): Seq[OutputDBVersion] = {
+    val txId: String = Base16.encode(tx.id)
+    tx.newBoxes.map { bx =>
+      val id: String = Base16.encode(bx.id)
+      val (monetaryValue: Long, coinId: String, dataOpt: Option[Array[Byte]]) = bx match {
+        case ab: AssetBox => (ab.amount, Base16.encode(ab.tokenIdOpt.getOrElse(Constants.IntrinsicTokenId)), None)
+        case db: DataBox => (0L, Base16.encode(Constants.IntrinsicTokenId), db.data)
+        case _ => (0L, Base16.encode(Constants.IntrinsicTokenId), None)
+      }
+      val data: String = dataOpt.map(Base16.encode).getOrElse("")
+      val contractHash: String = Base16.encode(bx.proposition.contractHash)
+      OutputDBVersion(id, txId, monetaryValue, coinId, contractHash, data)
+    }.toIndexedSeq
+  }
+}
+

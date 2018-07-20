@@ -3,26 +3,23 @@ package encry.local.explorer.database
 import doobie.free.connection.ConnectionIO
 import doobie.util.update.Update
 import encry.ModifierId
-import doobie.implicits._
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.{EncryBlockHeader, HeaderDBVersion}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import scorex.crypto.encode.Base16
 import cats.implicits._
 import encry.local.explorer.database.Tables.{HeadersTable, InputsTable, OutputsTable, TransactionsTable}
+import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, TransactionDBVersion}
 
 protected[database] object QueryRepository {
 
   def processBlockQuery(block: EncryBlock): ConnectionIO[Int] =
     for {
-      blockR <- insertBlockQuery(block)
-      txsR   <- insertTransactionsQuery(block.header, block.payload)
-      outsR  <- insertOutputsQuery(block.payload)
-      insR   <- insertInputsQuery(block.payload)
-    } yield txsR + blockR + outsR + insR
-
-  def insertHeaderQuery(header: EncryBlockHeader): ConnectionIO[Int] =
-    insertQuery(HeadersTable.name, HeadersTable.allFields, HeadersTable.dataString(header))
+      headerR <- insertHeaderQuery(block.header)
+      txsR    <- insertTransactionsQuery(block)
+      outsR   <- insertOutputsQuery(block.payload)
+      insR    <- insertInputsQuery(block.payload)
+    } yield txsR + headerR + outsR + insR
 
   def markAsRemovedFromMainChainQuery(ids: List[ModifierId]): ConnectionIO[Int] = {
     val query = "UPDATE ${HeadersTable.name} SET best_chain = FALSE WHERE id = ?"
@@ -31,19 +28,44 @@ protected[database] object QueryRepository {
 
   // internal
 
-  private def insertQuery(table: String, fieldsString: String, dataString: String): ConnectionIO[Int] =
-    sql"INSERT INTO $table $fieldsString VALUES $dataString;".update.run
+  def insertHeaderQuery(header: EncryBlockHeader): ConnectionIO[Int] = {
+    val headerDB: HeaderDBVersion = HeadersTable.header(header)
+    val query =
+      """
+        |INSERT INTO public.headers (id, parent_id, version, height, ad_proofs_root, state_root, transactions_root, ts, difficulty,
+        |      block_size, equihash_solution, ad_proofs, tx_qty, miner_address, miner_reward, fees_total, txs_size, best_chain)
+        |VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      """.stripMargin
+    Update[HeaderDBVersion](query).run(headerDB)
+  }
 
-  private def insertBlockQuery(block: EncryBlock): ConnectionIO[Int] =
-    insertQuery(HeadersTable.name, HeadersTable.allFields, HeadersTable.dataString(block))
+  private def insertTransactionsQuery(block: EncryBlock): ConnectionIO[Int] = {
+    val txs: Seq[TransactionDBVersion] = TransactionsTable.txs(block)
+    val query =
+      """
+        |INSERT INTO public.transactions (id, block_id, is_coinbase, ts)
+        |VALUES (?, ?, ?, ?);
+      """.stripMargin
+    Update[TransactionDBVersion](query).updateMany(txs.toList)
+  }
 
-  private def insertTransactionsQuery(h: EncryBlockHeader, p: EncryBlockPayload): ConnectionIO[Int] =
-    insertQuery(TransactionsTable.name, TransactionsTable.allFields, TransactionsTable.dataStrings(h, p))
+  private def insertInputsQuery(p: EncryBlockPayload): ConnectionIO[Int] = {
+    val inputs = InputsTable.inputs(p)
+    val query =
+      """
+        |INSERT INTO public.inputs (id, tx_id, serialized_proofs)
+        |VALUES (?, ?, ?);
+      """.stripMargin
+    Update[InputDBVersion](query).updateMany(inputs.toList)
+  }
 
-  private def insertInputsQuery(p: EncryBlockPayload): ConnectionIO[Int] =
-    insertQuery(InputsTable.name, InputsTable.allFields, InputsTable.dataString(p))
-
-  private def insertOutputsQuery(p: EncryBlockPayload): ConnectionIO[Int] =
-    insertQuery(OutputsTable.name, OutputsTable.allFields, OutputsTable.dataString(p))
-
+  private def insertOutputsQuery(p: EncryBlockPayload): ConnectionIO[Int] = {
+    val outputs: Seq[OutputDBVersion] = OutputsTable.outputs(p)
+    val query =
+      """
+        |INSERT INTO public.outputs (id, tx_id, monetary_value, coin_id, contract_hash, data)
+        |VALUES (?, ?, ?, ?, ?, ?);
+        |""".stripMargin
+    Update[OutputDBVersion](query).updateMany(outputs.toList)
+  }
 }

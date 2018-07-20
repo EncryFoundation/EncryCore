@@ -62,7 +62,7 @@ object EncryApp extends App with Logging {
   lazy val miner: ActorRef = system.actorOf(Props[EncryMiner].withDispatcher("mining-dispatcher"), "miner")
 
   lazy val dbService: DBService = new DBServiceImpl
-  lazy val blockListener: ActorRef = system.actorOf(Props(new BlockListener(dbService)), BlockListener.name)
+  val blockListener: ActorRef = system.actorOf(Props(new BlockListener(dbService)), BlockListener.name)
 
   val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
 

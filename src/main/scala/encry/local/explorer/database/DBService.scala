@@ -3,16 +3,14 @@ package encry.local.explorer.database
 import cats.effect.IO
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
-import doobie.util.transactor.Transactor
-import doobie.util.transactor.Transactor.Aux
 import encry.EncryApp.settings
 import encry.ModifierId
 import QueryRepository._
+import com.zaxxer.hikari.HikariDataSource
+import doobie.hikari.HikariTransactor
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.utils.Logging
-import scala.concurrent.ExecutionContext.Implicits.global
-
 import scala.concurrent.Future
 
 trait DBService {
@@ -31,16 +29,20 @@ class DBServiceImpl extends DBService with Logging {
 
   // internal
 
-  private val transactor: Aux[IO, Unit] = Transactor
-    .fromDriverManager[IO](driver = "org.postgresql.Driver",
-                           url = settings.postgres.host,
-                           user = settings.postgres.user,
-                           pass = settings.postgres.password)
+  private lazy val dataSource = new HikariDataSource
+  if (settings.postgres.enabled) {
+    dataSource.setJdbcUrl(settings.postgres.host)
+    dataSource.setUsername(settings.postgres.user)
+    dataSource.setPassword(settings.postgres.password)
+    dataSource.setMaximumPoolSize(5)
+  }
 
-  private def runAsync[T](io: ConnectionIO[T]): Future[T] =
-    io.transact(transactor).unsafeToFuture.recoverWith {
-      case th: RuntimeException =>
-        log.error("Failed to process db request", th)
-        Future.failed(th)
-    }
+  private lazy val pgTransactor: HikariTransactor[IO] = HikariTransactor[IO](dataSource)
+
+  private def runAsync(io: ConnectionIO[Int]): Future[Int] =
+    if (settings.postgres.enabled) {
+      (for {
+        res <- io.transact(pgTransactor)
+      } yield res).unsafeToFuture()
+    } else Future.successful(0)
 }
