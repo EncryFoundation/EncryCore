@@ -5,11 +5,9 @@ import encry.{ModifierId, ModifierTypeId}
 import scorex.crypto.hash.Blake2b256
 
 abstract class Transaction extends NodeViewModifier {
-  override val modifierTypeId: ModifierTypeId = Transaction.ModifierTypeId
+  //override val modifierTypeId: ModifierTypeId = EncryBaseTransaction.ModifierTypeId
 
-  val messageToSign: Array[Byte]
+  //val messageToSign: Array[Byte]
 
-  override lazy val id: ModifierId = encry.ModifierId !@@ Blake2b256(messageToSign)
+  //override lazy val id: ModifierId = encry.ModifierId !@@ Blake2b256(messageToSign)
 }
-
-object Transaction { val ModifierTypeId: ModifierTypeId = encry.ModifierTypeId @@ 2.toByte }

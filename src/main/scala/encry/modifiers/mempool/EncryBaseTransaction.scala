@@ -1,6 +1,6 @@
 package encry.modifiers.mempool
 
-import encry.ModifierId
+import encry.{ModifierId, ModifierTypeId}
 import encry.modifiers.mempool.directive.Directive
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.EncryBaseBox
@@ -8,10 +8,21 @@ import encry.settings.{Algos, Constants}
 import io.circe.Encoder
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.PConvertible
-import scorex.crypto.hash.Digest32
+import scorex.crypto.hash.{Blake2b256, Digest32}
+
 import scala.util.Try
 
 trait EncryBaseTransaction extends Transaction with PConvertible {
+
+
+
+
+  override val modifierTypeId: ModifierTypeId = EncryBaseTransaction.ModifierTypeId
+
+
+
+
+
 
   override lazy val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
   val fee: Long
@@ -43,4 +54,6 @@ object EncryBaseTransaction {
   implicit val jsonEncoder: Encoder[EncryBaseTransaction] = {
     case tx: EncryTransaction => EncryTransaction.jsonEncoder(tx)
   }
+
+  val ModifierTypeId: ModifierTypeId = encry.ModifierTypeId @@ 2.toByte
 }

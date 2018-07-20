@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.{Actor, ActorRef, Props}
 import encry.EncryApp._
 import encry.consensus.History._
@@ -9,7 +10,7 @@ import encry.local.miner.EncryMiner.{DisableMining, StartMining}
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.mempool.Transaction
+import encry.modifiers.mempool.{EncryBaseTransaction, Transaction}
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.EncryDeliveryManager.FullBlockChainSynced
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
@@ -83,7 +84,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
         s" Modifiers: ${invData._2.foldLeft("|")((str, id) => str + "|" + Algos.encode(id))}")
       historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
         val objs: Seq[NodeViewModifier] = invData._1 match {
-          case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
+          case typeId: ModifierTypeId if typeId == EncryBaseTransaction.ModifierTypeId => readers._2.getAll(invData._2)
           case _: ModifierTypeId => invData._2.flatMap(id => readers._1.modifierById(id))
         }
         log.info(s"Requested ${invData._2.length} modifiers ${encry.idsToString(invData)}, " +
