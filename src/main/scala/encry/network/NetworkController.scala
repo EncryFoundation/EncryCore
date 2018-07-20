@@ -80,7 +80,8 @@ class NetworkController extends Actor with Logging {
   }
 
   def peerLogic: Receive = {
-    case ConnectTo(remote) =>
+    case ConnectTo(remote)
+      if (networkSettings.connectOnlyWithKnownPeers && networkSettings.knownPeers.contains(remote)) || !networkSettings.connectOnlyWithKnownPeers =>
       log.info(s"Connecting to: $remote")
       outgoing += remote
       tcpManager ! Connect(remote,
@@ -88,7 +89,8 @@ class NetworkController extends Actor with Logging {
         options = KeepAlive(true) :: Nil,
         timeout = Some(networkSettings.connectionTimeout),
         pullMode = true)
-    case Connected(remote, local) =>
+    case Connected(remote, local)
+      if (networkSettings.connectOnlyWithKnownPeers && networkSettings.knownPeers.contains(remote)) || !networkSettings.connectOnlyWithKnownPeers =>
       val direction: ConnectionType = if (outgoing.contains(remote)) Outgoing else Incoming
       val logMsg: String = direction match {
         case Incoming => s"New incoming connection from $remote established (bound to local $local)"
