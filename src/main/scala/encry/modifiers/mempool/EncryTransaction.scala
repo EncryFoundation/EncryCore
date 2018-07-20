@@ -11,7 +11,6 @@ import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.prismlang.core.Types
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import scorex.crypto.hash.Digest32
-
 import scala.util.Try
 
 case class EncryTransaction(fee: Amount,
@@ -23,16 +22,14 @@ case class EncryTransaction(fee: Amount,
 
   override type M = EncryTransaction
 
-  override lazy val length: Int = this.bytes.length
-
-  override val maxSize: Int = Constants.TransactionMaxSize
-
   override lazy val serializer: Serializer[M] = EncryTransactionSerializer
 
   override val messageToSign: Array[Byte] =
     UnsignedEncryTransaction.bytesToSign(fee, timestamp, inputs, directives)
 
   override lazy val semanticValidity: Try[Unit] = validateStateless.toTry
+
+  def validSize: Boolean = length <= maxSize
 
   def validateStateless: ValidationResult =
     accumulateErrors

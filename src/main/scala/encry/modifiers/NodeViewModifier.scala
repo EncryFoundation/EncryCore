@@ -6,11 +6,9 @@ import encry.modifiers.serialization.BytesSerializable
 import encry.settings.Algos
 import encry.view.state.Proposition
 import encry.{ModifierId, ModifierTypeId}
-
 import scala.util.Try
 
 trait NodeViewModifier extends BytesSerializable {
-
 
   val modifierTypeId: ModifierTypeId
 
