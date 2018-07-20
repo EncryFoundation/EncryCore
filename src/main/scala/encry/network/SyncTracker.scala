@@ -33,7 +33,7 @@ case class SyncTracker(deliveryManager: ActorRef,
   private var stableSyncRegime: Boolean = false
 
   def scheduleSendSyncInfo(): Unit = {
-    if (schedule.isDefined) schedule.get.cancel()
+    schedule.foreach(_.cancel())
     schedule = Some(context.system.scheduler.schedule(networkSettings.modifierDeliverTimeCheck, networkSettings.syncInterval)(deliveryManager ! SendLocalSyncInfo))
   }
 
