@@ -1,14 +1,13 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.Ints
-import encry.ModifierId
 import encry.modifiers.history.block.Block.Timestamp
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.NodeViewModifier
 import encry.{ModifierId, ModifierTypeId}
 import encry.modifiers.mempool.directive.Directive
 import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.{AssetBox, DataBox, EncryBaseBox, EncryProposition}
+import encry.modifiers.state.box.{AssetBox, DataBox}
 import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.{Algos, Constants}
 import io.circe.Encoder
@@ -73,7 +72,7 @@ case object TransactionDBVersion {
 case class InputDBVersion(id: String, txId: String, proofs: String)
 
 case object InputDBVersion {
-  def apply(tx: EncryBaseTransaction): Seq[InputDBVersion] = {
+  def apply(tx: BaseTransaction): Seq[InputDBVersion] = {
     val txId: String = Base16.encode(tx.id)
     tx.inputs.map { in =>
       val id: String = Base16.encode(in.boxId)
@@ -89,7 +88,7 @@ case object InputDBVersion {
 case class OutputDBVersion(id: String, txId: String, monetaryValue: Long, coinId: String, contractHash: String, data: String)
 
 object OutputDBVersion {
-  def apply(tx: EncryBaseTransaction): Seq[OutputDBVersion] = {
+  def apply(tx: BaseTransaction): Seq[OutputDBVersion] = {
     val txId: String = Base16.encode(tx.id)
     tx.newBoxes.map { bx =>
       val id: String = Base16.encode(bx.id)

@@ -5,7 +5,6 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
-import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.mempool.BaseTransaction
 import encry.modifiers.serialization.Serializer
@@ -59,7 +58,7 @@ case class EncryBlock(override val header: EncryBlockHeader,
       s"'${payload.transactions.size}', '$minerAddress', '$minerReward', '$feesTotal', '$txsSize', TRUE)"
   }
 
-  private def minerInfo(coinbase: EncryBaseTransaction): (String, Long) = coinbase.directives.head match {
+  private def minerInfo(coinbase: BaseTransaction): (String, Long) = coinbase.directives.head match {
     case TransferDirective(address, amount, tokenIdOpt) if tokenIdOpt.isEmpty => address -> amount
     case _ => "unknown" -> 0
   }

@@ -7,7 +7,7 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.Block._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.mempool.EncryBaseTransaction
+import encry.modifiers.mempool.BaseTransaction
 import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
@@ -109,7 +109,7 @@ object HeaderDBVersion {
     )
   }
 
-  private def minerInfo(coinbase: EncryBaseTransaction): (String, Long) = coinbase.directives.head match {
+  private def minerInfo(coinbase: BaseTransaction): (String, Long) = coinbase.directives.head match {
       case TransferDirective(address, amount, tokenIdOpt) if tokenIdOpt.isEmpty => address -> amount
       case _ => "unknown" -> 0
     }
