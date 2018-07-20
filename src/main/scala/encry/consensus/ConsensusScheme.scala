@@ -3,7 +3,7 @@ package encry.consensus
 import encry.ModifierId
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.EncryBaseTransaction
+import encry.modifiers.mempool.BaseTransaction
 import scorex.crypto.authds.SerializedAdProof
 import scorex.crypto.hash.Digest32
 
@@ -21,7 +21,7 @@ trait ConsensusScheme {
   def realDifficulty(header: EncryBlockHeader): BigInt
 
   def getDerivedHeaderFields(parentOpt: Option[EncryBlockHeader], adProofBytes: SerializedAdProof,
-                             transactions: Seq[EncryBaseTransaction]): (Byte, ModifierId, Digest32, Digest32, Int)
+                             transactions: Seq[BaseTransaction]): (Byte, ModifierId, Digest32, Digest32, Int)
 
   def correctWorkDone(realDifficulty: Difficulty, difficulty: BigInt): Boolean = {
     realDifficulty >= difficulty

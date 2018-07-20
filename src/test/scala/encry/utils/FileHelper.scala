@@ -1,7 +1,6 @@
 package encry.utils
 
 import java.io.File
-
 import scala.util.Random
 
 object FileHelper {
