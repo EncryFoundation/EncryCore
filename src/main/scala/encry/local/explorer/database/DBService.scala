@@ -12,6 +12,8 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.utils.Logging
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.control.NonFatal
 
 trait DBService {
   def processBlock(block: EncryBlock): Future[Int]
@@ -43,6 +45,12 @@ class DBServiceImpl extends DBService with Logging {
     if (settings.postgres.enabled) {
       (for {
         res <- io.transact(pgTransactor)
-      } yield res).unsafeToFuture()
+      } yield res)
+        .unsafeToFuture()
+        .recoverWith {
+          case NonFatal(th) =>
+            log.warn("Failed to perform db operation", th)
+            Future.failed(th)
+        }
     } else Future.successful(0)
 }
