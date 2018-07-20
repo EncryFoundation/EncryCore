@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.{ActorContext, ActorRef, Cancellable}
 import encry.consensus.History
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
@@ -11,16 +10,12 @@ import encry.utils.Logging
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import History._
+import encry.utils.NetworkTime.Time
 
-/**
-  * SyncTracker caches the peers' statuses (i.e. whether they are ahead or behind this node)
-  */
 case class SyncTracker(deliveryManager: ActorRef,
                        context: ActorContext,
                        networkSettings: NetworkSettings) extends Logging {
-
-  import History._
-  import encry.utils.NetworkTime.Time
 
   private var schedule: Option[Cancellable] = None
 
@@ -40,9 +35,6 @@ case class SyncTracker(deliveryManager: ActorRef,
     val seniorsBefore: Int = numOfSeniors()
     statuses += peer -> status
     val seniorsAfter: Int = numOfSeniors()
-    /**
-      * Todo: we should also send NoBetterNeighbour signal when all the peers around are not seniors initially
-      */
     if (seniorsBefore > 0 && seniorsAfter == 0) {
       log.info("Syncing is done, switching to stable regime")
       stableSyncRegime = true
@@ -50,7 +42,6 @@ case class SyncTracker(deliveryManager: ActorRef,
     }
   }
 
-  //todo: combine both?
   def clearStatus(remote: InetSocketAddress): Unit = {
     statuses.find(_._1.socketAddress == remote) match {
       case Some((peer, _)) => statuses -= peer
