@@ -16,7 +16,7 @@ trait BaseTransaction extends NodeViewModifier with PConvertible {
 
   val modifierTypeId: ModifierTypeId = BaseTransaction.ModifierTypeId
   val messageToSign: Array[Byte]
-  val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
+  val id: ModifierId
   val fee: Long
   val timestamp: Long
   val inputs: IndexedSeq[Input]

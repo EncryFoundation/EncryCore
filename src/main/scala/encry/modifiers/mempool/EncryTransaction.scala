@@ -1,6 +1,7 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
+import encry.ModifierId
 import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.Box.Amount
@@ -27,6 +28,7 @@ case class EncryTransaction(fee: Amount,
   override val messageToSign: Array[Byte] =
     UnsignedEncryTransaction.bytesToSign(fee, timestamp, inputs, directives)
 
+  val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
   override lazy val semanticValidity: Try[Unit] = validateStateless.toTry
 
   def validSize: Boolean = length <= maxSize
