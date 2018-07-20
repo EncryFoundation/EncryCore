@@ -46,7 +46,6 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
   override def preStart(): Unit = {
     statusTracker.scheduleSendSyncInfo()
     context.system.scheduler.schedule(settings.network.modifierDeliverTimeCheck, settings.network.syncInterval)(self ! CheckModifiersToDownload)
-    context.system.scheduler.schedule(settings.network.syncInterval, statusTracker.minInterval())(self ! SendLocalSyncInfo)
   }
 
   override def receive: Receive = {
