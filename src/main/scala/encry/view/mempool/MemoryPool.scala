@@ -1,10 +1,9 @@
 package encry.view.mempool
 
-import encry.modifiers.mempool.Transaction
-
+import encry.modifiers.mempool.BaseTransaction
 import scala.util.Try
 
-trait MemoryPool[TX <: Transaction[_], M <: MemoryPool[TX, M]] extends MempoolReader[TX] {
+trait MemoryPool[TX <: BaseTransaction, M <: MemoryPool[TX, M]] extends MempoolReader[TX] {
 
   def put(tx: TX): Try[M]
 

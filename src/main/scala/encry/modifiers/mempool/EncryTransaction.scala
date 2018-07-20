@@ -1,17 +1,17 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
+import encry.ModifierId
 import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.Box.Amount
-import encry.settings.{Algos, Constants}
+import encry.settings.Algos
 import encry.validation.{ModifierValidator, ValidationResult}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.prismlang.core.Types
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import scorex.crypto.hash.Digest32
-
 import scala.util.Try
 
 case class EncryTransaction(fee: Amount,
@@ -19,20 +19,19 @@ case class EncryTransaction(fee: Amount,
                             inputs: IndexedSeq[Input],
                             directives: IndexedSeq[Directive],
                             defaultProofOpt: Option[Proof])
-  extends EncryBaseTransaction with ModifierValidator {
+  extends BaseTransaction with ModifierValidator {
 
   override type M = EncryTransaction
-
-  override lazy val length: Int = this.bytes.length
-
-  override val maxSize: Int = Constants.TransactionMaxSize
 
   override lazy val serializer: Serializer[M] = EncryTransactionSerializer
 
   override val messageToSign: Array[Byte] =
     UnsignedEncryTransaction.bytesToSign(fee, timestamp, inputs, directives)
 
+  val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
   override lazy val semanticValidity: Try[Unit] = validateStateless.toTry
+
+  def validSize: Boolean = length <= maxSize
 
   def validateStateless: ValidationResult =
     accumulateErrors
