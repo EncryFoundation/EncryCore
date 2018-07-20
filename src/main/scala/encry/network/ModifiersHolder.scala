@@ -26,7 +26,7 @@ class ModifiersHolder extends PersistentActor with Logging {
   var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
 
   context.system.scheduler.schedule(10.second, 30.second) {
-    logger.info(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
+    logger.debug(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
   }
 
   override def preStart(): Unit = logger.info(s"ModifiersHolder actor is started.")
@@ -34,21 +34,19 @@ class ModifiersHolder extends PersistentActor with Logging {
   override def receiveRecover: Receive = {
     case header: EncryBlockHeader =>
       updateHeaders(header)
-      logger.debug(s"Header ${header.height} is recovered from leveldb")
+      logger.debug(s"Header ${header.height} is recovered from leveldb.")
     case payload: EncryBlockPayload =>
       updatePayloads(payload)
-      logger.debug(s"Payload ${Algos.encode(payload.headerId)} is recovered from leveldb")
+      logger.debug(s"Payload ${Algos.encode(payload.headerId)} is recovered from leveldb.")
     case block: EncryBlock =>
       updateCompletedBlocks(block)
-      logger.debug(s"Block ${block.header.height} is recovered from leveldb")
-    case RecoveryCompleted => logger.info("Recovery completed")
+      logger.debug(s"Block ${block.header.height} is recovered from leveldb.")
+    case RecoveryCompleted => logger.info("Recovery completed.")
   }
 
   override def receiveCommand: Receive = {
-    case SaveSnapshotSuccess(_) => logger.info("Success with snapshot save (stat).")
-    case SaveSnapshotFailure(_, _) => logger.info("Failure with snapshot save (stat).")
     case ApplyState =>
-      logger.info("State recovering state on ModifiersHolder is finished")
+      logger.info("State recovering state on ModifiersHolder is finished.")
       logger.info(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
       val sortedHeaders: Seq[EncryBlockHeader] = headers.map(_._2._1).toSeq
         .sortWith((firstHeader, secondHeader) => firstHeader.height < secondHeader.height)
@@ -64,7 +62,7 @@ class ModifiersHolder extends PersistentActor with Logging {
       }.foreach(block => nodeViewHolder ! LocallyGeneratedModifier(block.payload))
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
-    case x: Any => logger.info(s"Strange input: $x")
+    case x: Any => logger.error(s"Strange input: $x.")
   }
 
   def createBlockIfPossible(payloadId: ModifierId): Unit =
@@ -78,17 +76,21 @@ class ModifiersHolder extends PersistentActor with Logging {
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
     case header: EncryBlockHeader =>
       if(!headers.contains(Algos.encode(header.id)))
-        persist(header) { header => logger.info(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully") }
+        persist(header) { header => logger.debug(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully.") }
       updateHeaders(header)
+      log.debug(s"Get header ${Algos.encode(header.id)} on height ${header.height}")
     case payload: EncryBlockPayload =>
       if(!payloads.contains(Algos.encode(payload.id)))
-        persist(payload) { payload => logger.info(s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully") }
+        persist(payload) { payload => logger.debug(s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully.") }
       updatePayloads(payload)
+      log.debug(s"Get payload with id: ${Algos.encode(payload.id)} " +
+        s"${nonCompletedBlocks.get(Algos.encode(payload.id)).map(headerId =>
+          headers.get(headerId).map(header => s"for header $headerId height: ${header._1.height}"))}")
     case block: EncryBlock =>
       if(!completedBlocks.values.toSeq.contains(block))
-        persist(block) { block => logger.info(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} is persisted successfully") }
+        persist(block) { block => logger.debug(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} is persisted successfully.") }
       updateCompletedBlocks(block)
-    case x: Any => logger.error(s"Strange input $x")
+    case x: Any => logger.error(s"Strange input $x.")
   }
 
   def updateHeaders(header: EncryBlockHeader): Unit = {
@@ -114,8 +116,6 @@ class ModifiersHolder extends PersistentActor with Logging {
   override def persistenceId: String = "persistent actor"
 
   override def journalPluginId: String = "akka.persistence.journal.leveldb"
-
-  override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
 
 }
 

@@ -2,7 +2,6 @@ package encry.network
 
 import java.net.InetSocketAddress
 import java.nio.ByteOrder
-
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import akka.io.Tcp
 import akka.io.Tcp._
@@ -14,7 +13,6 @@ import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationStat
 import encry.network.message.MessageHandler
 import encry.network.peer.PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
 import encry.utils.Logging
-
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
@@ -40,7 +38,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
       receivedData orElse
       handshakeTimeout orElse
       handshakeDone orElse
-      processErrors(AwaitingHandshake)
+      processErrors(AwaitingHandshake) orElse deadNotIn
 
   def processErrors(stateName: CommunicationState): Receive = {
     case CommandFailed(w: Write) =>
@@ -51,7 +49,6 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
     case cc: ConnectionClosed =>
       log.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
       peerManager ! Disconnected(remote)
-      networkController ! ConnectTo(remote)
       context stop self
     case CloseConnection =>
       log.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")
@@ -141,7 +138,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
     workingCycleLocalInterface orElse
       workingCycleRemoteInterface orElse
       processErrors(WorkingCycle) orElse
-      reportStrangeInput
+      reportStrangeInput orElse dead
 
   override def preStart: Unit = {
     peerManager ! DoConnecting(remote, direction)
@@ -151,9 +148,24 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
     connection ! ResumeReading
   }
 
+  def dead: Receive = {
+
+    case message => log.debug(s"Get smth strange: $message")
+  }
+
+  def deadNotIn: Receive = {
+
+    case message => log.debug(s"Get smth node strange: $message")
+  }
+
   override def postStop(): Unit = {
-    log.info(s"Peer handler to $remote is destroyed")
+    log.info(s"Peer handler $self to $remote is destroyed.")
+    connection ! Close
     networkController ! ConnectTo(remote)
+  }
+
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
+    logger.info(s"Reason of restarting actor $self: ${reason.toString}.")
   }
 
   def getPacket(data: ByteString): (List[ByteString], ByteString) = {

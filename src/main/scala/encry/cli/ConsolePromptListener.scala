@@ -24,9 +24,9 @@ class ConsolePromptListener extends Actor with Logging {
                     case Some(x) => print(x.msg + s"\n$prompt")
                     case None =>
                   }
-              case None => println("Unsupported command. Type 'app help' to get commands list")
+              case None =>
             }
-          case Failure(_) => println("Bad input")
+          case Failure(_) =>
         }
       }
   }

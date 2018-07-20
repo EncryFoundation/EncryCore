@@ -25,7 +25,7 @@ case class SyncTracker(deliveryManager: ActorRef,
 
   private var schedule: Option[Cancellable] = None
 
-  private val statuses: mutable.Map[ConnectedPeer, HistoryComparisonResult] = mutable.Map[ConnectedPeer, HistoryComparisonResult]()
+  var statuses: Map[ConnectedPeer, HistoryComparisonResult] = Map()
   private val lastSyncSentTime: mutable.Map[ConnectedPeer, Time] = mutable.Map[ConnectedPeer, Time]()
 
   private var lastSyncInfoSentTime: Time = 0L
@@ -89,6 +89,7 @@ case class SyncTracker(deliveryManager: ActorRef,
     val peers: Seq[ConnectedPeer] = if (outdated.nonEmpty) outdated
     else nonOutdated.filter(p => (System.currentTimeMillis() - lastSyncSentTime.getOrElse(p, 0L)).millis >= networkSettings.syncInterval)
     peers.foreach(updateLastSyncSentTime)
+    log.debug(s"Trying to get nodes to sync and they are: ${peers.map(_.socketAddress).mkString(",")} and handler are: ${peers.map(_.handlerRef).mkString(",")}")
     peers
   }
 }

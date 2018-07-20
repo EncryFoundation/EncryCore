@@ -14,7 +14,6 @@ import io.circe.Json
 import io.circe.syntax._
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
 import encry.settings.RESTApiSettings
-
 import scala.concurrent.Future
 
 case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: ActorRef,

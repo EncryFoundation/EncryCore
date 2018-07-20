@@ -1,7 +1,6 @@
 package encry.network.peer
 
 import java.net.InetSocketAddress
-
 import akka.actor.Actor
 import encry.EncryApp._
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
@@ -11,7 +10,6 @@ import encry.network.PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages._
 import encry.network.{Handshake, SendingStrategy}
 import encry.utils.Logging
-
 import scala.language.postfixOps
 import scala.util.Random
 
