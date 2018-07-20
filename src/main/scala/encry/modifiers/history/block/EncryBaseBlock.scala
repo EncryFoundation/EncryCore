@@ -2,15 +2,14 @@ package encry.modifiers.history.block
 
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBaseBlockPayload
-import encry.modifiers.mempool.EncryBaseTransaction
+import encry.modifiers.mempool.BaseTransaction
 import encry.modifiers.state.box.EncryProposition
 import encry.modifiers.{EncryPersistentModifier, TransactionsCarryingPersistentNodeViewModifier}
 import encry.utils.Logging
-
 import scala.util.Try
 
 trait EncryBaseBlock
-  extends TransactionsCarryingPersistentNodeViewModifier[EncryProposition, EncryBaseTransaction]
+  extends TransactionsCarryingPersistentNodeViewModifier[EncryProposition, BaseTransaction]
     with EncryPersistentModifier
     with Logging {
 

@@ -2,12 +2,11 @@ package encry.view.wallet
 
 import encry.VersionTag
 import encry.modifiers.PersistentNodeViewModifier
-import encry.modifiers.mempool.Transaction
+import encry.modifiers.mempool.BaseTransaction
 import encry.view.state.Proposition
-
 import scala.util.Try
 
-trait Vault[P <: Proposition, TX <: Transaction[P],
+trait Vault[P <: Proposition, TX <: BaseTransaction,
             PMOD <: PersistentNodeViewModifier, V <: Vault[P, TX, PMOD, V]] extends NodeViewComponent {
   self: V =>
 

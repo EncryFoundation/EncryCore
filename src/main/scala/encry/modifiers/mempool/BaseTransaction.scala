@@ -4,34 +4,35 @@ import com.google.common.primitives.Ints
 import encry.ModifierId
 import encry.modifiers.history.block.Block.Timestamp
 import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.NodeViewModifier
+import encry.{ModifierId, ModifierTypeId}
 import encry.modifiers.mempool.directive.Directive
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, DataBox, EncryBaseBox, EncryProposition}
+import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.{Algos, Constants}
 import io.circe.Encoder
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.PConvertible
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
-
 import scala.util.Try
 
-trait EncryBaseTransaction extends Transaction[EncryProposition] with ModifierWithSizeLimit with PConvertible {
+trait BaseTransaction extends NodeViewModifier with PConvertible {
 
-  override lazy val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
-
+  val modifierTypeId: ModifierTypeId = BaseTransaction.ModifierTypeId
+  val messageToSign: Array[Byte]
+  val id: ModifierId
   val fee: Long
   val timestamp: Long
   val inputs: IndexedSeq[Input]
   val directives: IndexedSeq[Directive]
   val defaultProofOpt: Option[Proof]
-
-  val messageToSign: Array[Byte]
   val semanticValidity: Try[Unit]
-
+  val length: Int = this.bytes.length
+  val maxSize: Int = Constants.TransactionMaxSize
   lazy val newBoxes: Traversable[EncryBaseBox] =
     directives.zipWithIndex.flatMap { case (d, idx) => d.boxes(Digest32 !@@ id, idx) }
-
   lazy val costMultiplier: Amount =
     inputs.map(_.contract.fold(cc => cc, rc => rc.contract)).map(CompiledContract.costOf).sum +
     (Constants.PersistentByteCost * length) +
@@ -40,16 +41,18 @@ trait EncryBaseTransaction extends Transaction[EncryProposition] with ModifierWi
   override def toString: String = s"<EncryTransaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}>"
 }
 
-object EncryBaseTransaction {
+object BaseTransaction {
 
   type TxTypeId = Byte
   type Nonce = Long
 
   case class TransactionValidationException(s: String) extends Exception(s)
 
-  implicit val jsonEncoder: Encoder[EncryBaseTransaction] = {
+  implicit val jsonEncoder: Encoder[BaseTransaction] = {
     case tx: EncryTransaction => EncryTransaction.jsonEncoder(tx)
   }
+
+  val ModifierTypeId: ModifierTypeId = encry.ModifierTypeId @@ 2.toByte
 }
 
 case class TransactionDBVersion(id: String, blockId: String, isCoinbase: Boolean, timestamp: Timestamp)

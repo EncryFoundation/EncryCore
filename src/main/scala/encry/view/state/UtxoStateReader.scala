@@ -3,12 +3,11 @@ package encry.view.state
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
 import encry.settings.Algos
-import encry.settings.Algos.HF
 import encry.utils.Logging
 import encry.view.history.Height
 import io.iohk.iodb.Store
 import scorex.crypto.authds.ADKey
-import scorex.crypto.authds.avltree.batch.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
+import scorex.crypto.authds.avltree.batch.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import scorex.crypto.hash.Digest32
 
 trait UtxoStateReader extends StateReader with Logging {
@@ -23,10 +22,7 @@ trait UtxoStateReader extends StateReader with Logging {
 
   protected lazy val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(stateStore, np)
 
-  protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, Algos.HF] = {
-    val bp: BatchAVLProver[Digest32, HF] = new BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
-    PersistentBatchAVLProver.create(bp, storage).get
-  }
+  protected val persistentProver: PersistentBatchAVLProver[Digest32, Algos.HF]
 
   def boxById(boxId: ADKey): Option[EncryBaseBox] = persistentProver.unauthenticatedLookup(boxId)
     .map(bytes => StateModifierDeserializer.parseBytes(bytes, boxId.head)).flatMap(_.toOption)

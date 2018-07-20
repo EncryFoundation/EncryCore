@@ -1,28 +1,21 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.{ActorContext, ActorRef, Cancellable}
 import encry.consensus.History
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
 import encry.network.PeerConnectionHandler._
 import encry.settings.NetworkSettings
-import encry.utils.{Logging, NetworkTimeProvider}
-
+import encry.utils.Logging
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.duration._
+import History._
+import encry.utils.NetworkTime.Time
 
-/**
-  * SyncTracker caches the peers' statuses (i.e. whether they are ahead or behind this node)
-  */
 case class SyncTracker(deliveryManager: ActorRef,
                        context: ActorContext,
-                       networkSettings: NetworkSettings,
-                       timeProvider: NetworkTimeProvider) extends Logging {
-
-  import History._
-  import encry.utils.NetworkTime.Time
+                       networkSettings: NetworkSettings) extends Logging {
 
   private var schedule: Option[Cancellable] = None
 
@@ -33,19 +26,15 @@ case class SyncTracker(deliveryManager: ActorRef,
 
   private var stableSyncRegime: Boolean = false
 
-  def scheduleSendSyncInfo(): Unit = if (schedule.isDefined) schedule.get.cancel()
-
-  def maxInterval(): FiniteDuration = if (stableSyncRegime) networkSettings.syncStatusRefreshStable else networkSettings.syncStatusRefresh
-
-  def minInterval(): FiniteDuration = if (stableSyncRegime) networkSettings.syncIntervalStable else networkSettings.syncInterval
+  def scheduleSendSyncInfo(): Unit = {
+    schedule.foreach(_.cancel())
+    schedule = Some(context.system.scheduler.schedule(networkSettings.modifierDeliverTimeCheck, networkSettings.syncInterval)(deliveryManager ! SendLocalSyncInfo))
+  }
 
   def updateStatus(peer: ConnectedPeer, status: HistoryComparisonResult): Unit = {
     val seniorsBefore: Int = numOfSeniors()
     statuses += peer -> status
     val seniorsAfter: Int = numOfSeniors()
-    /**
-      * Todo: we should also send NoBetterNeighbour signal when all the peers around are not seniors initially
-      */
     if (seniorsBefore > 0 && seniorsAfter == 0) {
       log.info("Syncing is done, switching to stable regime")
       stableSyncRegime = true
@@ -53,7 +42,6 @@ case class SyncTracker(deliveryManager: ActorRef,
     }
   }
 
-  //todo: combine both?
   def clearStatus(remote: InetSocketAddress): Unit = {
     statuses.find(_._1.socketAddress == remote) match {
       case Some((peer, _)) => statuses -= peer
@@ -66,15 +54,15 @@ case class SyncTracker(deliveryManager: ActorRef,
   }
 
   def updateLastSyncSentTime(peer: ConnectedPeer): Unit = {
-    val currentTime: Time = timeProvider.time()
+    val currentTime: Time = System.currentTimeMillis()
     lastSyncSentTime(peer) = currentTime
     lastSyncInfoSentTime = currentTime
   }
 
-  def elapsedTimeSinceLastSync(): Long = timeProvider.time() - lastSyncInfoSentTime
+  def elapsedTimeSinceLastSync(): Long = System.currentTimeMillis() - lastSyncInfoSentTime
 
   private def outdatedPeers(): Seq[ConnectedPeer] =
-    lastSyncSentTime.filter(t => (System.currentTimeMillis() - t._2).millis > maxInterval()).keys.toSeq
+    lastSyncSentTime.filter(t => (System.currentTimeMillis() - t._2).millis > networkSettings.syncInterval).keys.toSeq
 
   private def numOfSeniors(): Int = statuses.count(_._2 == Older)
 
@@ -89,7 +77,7 @@ case class SyncTracker(deliveryManager: ActorRef,
     lazy val olders = statuses.filter(_._2 == Older).keys.toIndexedSeq
     lazy val nonOutdated = if (olders.nonEmpty) olders(scala.util.Random.nextInt(olders.size)) +: unknowns else unknowns
     val peers: Seq[ConnectedPeer] = if (outdated.nonEmpty) outdated
-    else nonOutdated.filter(p => (timeProvider.time() - lastSyncSentTime.getOrElse(p, 0L)).millis >= minInterval)
+    else nonOutdated.filter(p => (System.currentTimeMillis() - lastSyncSentTime.getOrElse(p, 0L)).millis >= networkSettings.syncInterval)
     peers.foreach(updateLastSyncSentTime)
     log.debug(s"Trying to get nodes to sync and they are: ${peers.map(_.socketAddress).mkString(",")} and handler are: ${peers.map(_.handlerRef).mkString(",")}")
     peers

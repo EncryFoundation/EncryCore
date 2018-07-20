@@ -1,16 +1,14 @@
 package encry.modifiers
 
 import com.typesafe.config.ConfigFactory
-import encry.modifiers.mempool.Transaction
+import encry.modifiers.mempool.BaseTransaction
 import encry.modifiers.serialization.BytesSerializable
 import encry.settings.Algos
 import encry.view.state.Proposition
 import encry.{ModifierId, ModifierTypeId}
-
 import scala.util.Try
 
-sealed trait NodeViewModifier extends BytesSerializable {
-  self =>
+trait NodeViewModifier extends BytesSerializable {
 
   val modifierTypeId: ModifierTypeId
 
@@ -24,8 +22,6 @@ sealed trait NodeViewModifier extends BytesSerializable {
   }
 }
 
-trait EphemerealNodeViewModifier extends NodeViewModifier
-
 object NodeViewModifier {
   private val DefaultIdSize = 32
 
@@ -36,7 +32,7 @@ trait PersistentNodeViewModifier extends NodeViewModifier {
   def parentId: ModifierId
 }
 
-trait TransactionsCarryingPersistentNodeViewModifier[P <: Proposition, TX <: Transaction[P]]
+trait TransactionsCarryingPersistentNodeViewModifier[P <: Proposition, TX <: BaseTransaction]
   extends PersistentNodeViewModifier {
 
   def transactions: Seq[TX]

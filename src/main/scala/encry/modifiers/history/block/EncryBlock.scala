@@ -7,6 +7,7 @@ import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPaylo
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.EncryBaseTransaction
 import encry.modifiers.mempool.directive.TransferDirective
+import encry.modifiers.mempool.BaseTransaction
 import encry.modifiers.serialization.Serializer
 import encry.validation.{ModifierValidator, ValidationResult}
 import encry.{ModifierId, ModifierTypeId}
@@ -24,7 +25,7 @@ case class EncryBlock(override val header: EncryBlockHeader,
 
   override val toSeq: Seq[EncryPersistentModifier] = Seq(header, payload) ++ adProofsOpt.toSeq
 
-  override def transactions: Seq[EncryBaseTransaction] = payload.transactions
+  override def transactions: Seq[BaseTransaction] = payload.transactions
 
   override def semanticValidity: Try[Unit] = validateSemantically.toTry
 
