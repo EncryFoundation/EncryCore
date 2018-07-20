@@ -29,14 +29,6 @@ class BlockListenerSpec extends TestKit(ActorSystem("BlockListenerSpec")) with I
     verify(dbServiceMock).processBlock(eq_(sampleBlock))
   }
 
-  it should "process valid headers" in new BlockListenerSpecWiring {
-    when(dbServiceMock.processHeader(sampleHeader)).thenReturn(Future.successful(1))
-
-    actor ! sampleNewOrphaned
-    expectNoMsg(1 second)
-    verify(dbServiceMock).processHeader(eq_(sampleHeader))
-  }
-
   it should "process valid chain switching msg" in new BlockListenerSpecWiring {
     when(dbServiceMock.markAsRemovedFromMainChain(sampleSwitchedIds)).thenReturn(Future.successful(100))
 
