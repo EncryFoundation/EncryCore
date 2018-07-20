@@ -1,7 +1,7 @@
 package encry.view.mempool
 
 import encry.ModifierId
-import encry.modifiers.mempool.EncryBaseTransaction
+import encry.modifiers.mempool.BaseTransaction
 import encry.settings.EncryAppSettings
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.mempool.EncryMempool._
@@ -11,9 +11,9 @@ import monix.execution.{CancelableFuture, Scheduler}
 import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}
 
-class EncryMempool(val unconfirmed: TrieMap[TxKey, EncryBaseTransaction],
+class EncryMempool(val unconfirmed: TrieMap[TxKey, BaseTransaction],
                    settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
-  extends MemoryPool[EncryBaseTransaction, EncryMempool] with EncryMempoolReader with AutoCloseable with Logging {
+  extends MemoryPool[BaseTransaction, EncryMempool] with EncryMempoolReader with AutoCloseable with Logging {
 
   private implicit val cleanupScheduler: Scheduler = Scheduler.singleThread("mempool-cleanup-thread")
 
@@ -25,10 +25,10 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, EncryBaseTransaction],
 
   override def close(): Unit = cleanup.cancel()
 
-  override def put(tx: EncryBaseTransaction): Try[EncryMempool] = put(Seq(tx))
+  override def put(tx: BaseTransaction): Try[EncryMempool] = put(Seq(tx))
 
-  override def put(txs: Iterable[EncryBaseTransaction]): Try[EncryMempool] = {
-    val validTxs: Iterable[EncryBaseTransaction] = txs.filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
+  override def put(txs: Iterable[BaseTransaction]): Try[EncryMempool] = {
+    val validTxs: Iterable[BaseTransaction] = txs.filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
     if (validTxs.nonEmpty) {
       if ((size + validTxs.size) <= settings.node.mempoolMaxCapacity) {
         Success(putWithoutCheck(validTxs))
@@ -39,26 +39,26 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, EncryBaseTransaction],
     } else Failure(new Exception("Failed to put transaction into pool"))
   }
 
-  override def putWithoutCheck(txs: Iterable[EncryBaseTransaction]): EncryMempool = {
+  override def putWithoutCheck(txs: Iterable[BaseTransaction]): EncryMempool = {
     txs.foreach(tx => unconfirmed.put(key(tx.id), tx))
     completeAssembly(txs)
     this
   }
 
-  override def remove(tx: EncryBaseTransaction): EncryMempool = {
+  override def remove(tx: BaseTransaction): EncryMempool = {
     unconfirmed.remove(key(tx.id))
     this
   }
 
-  def removeAsync(txs: Seq[EncryBaseTransaction]): Unit = Task {
+  def removeAsync(txs: Seq[BaseTransaction]): Unit = Task {
     txs.foreach(remove)
   }.runAsync
 
-  override def take(limit: Int): Iterable[EncryBaseTransaction] = unconfirmed.values.toSeq.take(limit)
+  override def take(limit: Int): Iterable[BaseTransaction] = unconfirmed.values.toSeq.take(limit)
 
-  def takeAll: Iterable[EncryBaseTransaction] = unconfirmed.values.toSeq
+  def takeAll: Iterable[BaseTransaction] = unconfirmed.values.toSeq
 
-  override def filter(condition: (EncryBaseTransaction) => Boolean): EncryMempool = {
+  override def filter(condition: (BaseTransaction) => Boolean): EncryMempool = {
     unconfirmed.retain { (_, v) =>
       condition(v)
     }
@@ -72,7 +72,7 @@ object EncryMempool {
 
   type MemPoolRequest = Seq[ModifierId]
 
-  type MemPoolResponse = Seq[EncryBaseTransaction]
+  type MemPoolResponse = Seq[BaseTransaction]
 
   def empty(settings: EncryAppSettings, timeProvider: NetworkTimeProvider): EncryMempool =
     new EncryMempool(TrieMap.empty, settings, timeProvider)

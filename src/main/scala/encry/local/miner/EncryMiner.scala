@@ -9,7 +9,7 @@ import encry.crypto.PrivateKey25519
 import encry.local.miner.EncryMiningWorker.{DropChallenge, NextChallenge}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransaction, TransactionFactory}
+import encry.modifiers.mempool.{BaseTransaction, EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
@@ -139,8 +139,8 @@ class EncryMiner extends Actor with Logging {
 
     // `txsToPut` - valid, non-conflicting txs with respect to their fee amount.
     // `txsToDrop` - invalidated txs to be dropped from mempool.
-    val (txsToPut: Seq[EncryBaseTransaction], txsToDrop: Seq[EncryBaseTransaction], _) = view.pool.takeAll.toSeq.sortBy(_.fee).reverse
-      .foldLeft((Seq[EncryBaseTransaction](), Seq[EncryBaseTransaction](), Set[ByteArrayWrapper]())) {
+    val (txsToPut: Seq[BaseTransaction], txsToDrop: Seq[BaseTransaction], _) = view.pool.takeAll.toSeq.sortBy(_.fee).reverse
+      .foldLeft((Seq[BaseTransaction](), Seq[BaseTransaction](), Set[ByteArrayWrapper]())) {
         case ((validTxs, invalidTxs, bxsAcc), tx) =>
           val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.inputs.map(u => ByteArrayWrapper(u.boxId))
           if ((validTxs.map(_.length).sum + tx.length) <= Constants.BlockMaxSize - 124) {
@@ -160,7 +160,7 @@ class EncryMiner extends Actor with Logging {
     val coinbase: EncryTransaction = TransactionFactory
       .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, IndexedSeq(supplyBox), feesTotal, view.state.height)
 
-    val txs: Seq[EncryBaseTransaction] = txsToPut.sortBy(_.timestamp) :+ coinbase
+    val txs: Seq[BaseTransaction] = txsToPut.sortBy(_.timestamp) :+ coinbase
 
     val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
       .getOrElse(throw new Exception("ADProof generation failed"))

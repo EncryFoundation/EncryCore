@@ -8,7 +8,7 @@ import encry.modifiers._
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
-import encry.modifiers.mempool.{EncryBaseTransaction, EncryTransactionSerializer, Transaction}
+import encry.modifiers.mempool.{BaseTransaction, EncryTransactionSerializer}
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
 import encry.network.EncryDeliveryManager.FullBlockChainSynced
@@ -41,7 +41,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,
     ADProofs.modifierTypeId -> ADProofSerializer,
-    EncryBaseTransaction.ModifierTypeId -> EncryTransactionSerializer
+    BaseTransaction.ModifierTypeId -> EncryTransactionSerializer
   )
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -59,7 +59,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
-          case tx: EncryBaseTransaction@unchecked if tx.modifierTypeId == EncryBaseTransaction.ModifierTypeId => txModify(tx)
+          case tx: BaseTransaction@unchecked if tx.modifierTypeId == BaseTransaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
             if (nodeView.history.contains(pmod.id) || modifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
@@ -82,7 +82,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         computeApplications()
         log.info(s"Cache after(${modifiersCache.size})")
       }
-    case lt: LocallyGeneratedTransaction[EncryProposition, EncryBaseTransaction] => txModify(lt.tx)
+    case lt: LocallyGeneratedTransaction[EncryProposition, BaseTransaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       log.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
@@ -94,7 +94,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       if (mempool) sender() ! ChangedMempool(nodeView.mempool)
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] = modifierTypeId match {
-        case typeId: ModifierTypeId if typeId == EncryBaseTransaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
+        case typeId: ModifierTypeId if typeId == BaseTransaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       }
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
@@ -117,19 +117,19 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     nodeView = newNodeView
   }
 
-  def extractTransactions(mod: EncryPersistentModifier): Seq[EncryBaseTransaction] = mod match {
-    case tcm: TransactionsCarryingPersistentNodeViewModifier[EncryProposition, EncryBaseTransaction] => tcm.transactions
+  def extractTransactions(mod: EncryPersistentModifier): Seq[BaseTransaction] = mod match {
+    case tcm: TransactionsCarryingPersistentNodeViewModifier[EncryProposition, BaseTransaction] => tcm.transactions
     case _ => Seq()
   }
 
   def updateMemPool(blocksRemoved: Seq[EncryPersistentModifier], blocksApplied: Seq[EncryPersistentModifier],
                     memPool: EncryMempool, state: StateType): EncryMempool = {
-    val rolledBackTxs: Seq[EncryBaseTransaction] = blocksRemoved.flatMap(extractTransactions)
-    val appliedTxs: Seq[EncryBaseTransaction] = blocksApplied.flatMap(extractTransactions)
+    val rolledBackTxs: Seq[BaseTransaction] = blocksRemoved.flatMap(extractTransactions)
+    val appliedTxs: Seq[BaseTransaction] = blocksApplied.flatMap(extractTransactions)
     memPool.putWithoutCheck(rolledBackTxs).filter { tx =>
       !appliedTxs.exists(t => t.id sameElements tx.id) && {
         state match {
-          case v: TransactionValidation[EncryProposition, EncryBaseTransaction] => v.validate(tx).isSuccess
+          case v: TransactionValidation[EncryProposition, BaseTransaction] => v.validate(tx).isSuccess
           case _ => true
         }
       }
@@ -237,11 +237,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     }
   } else logWarn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
 
-  def txModify(tx: EncryBaseTransaction): Unit = nodeView.mempool.put(tx) match {
+  def txModify(tx: BaseTransaction): Unit = nodeView.mempool.put(tx) match {
     case Success(newPool) =>
       val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
-      nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, EncryBaseTransaction](tx)
+      nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, BaseTransaction](tx)
     case Failure(e) =>
   }
 
@@ -338,7 +338,7 @@ object EncryNodeViewHolder {
 
     case class ModifiersFromRemote(modTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
 
-    case class LocallyGeneratedTransaction[P <: Proposition, EncryBaseTransaction <: Transaction](tx: EncryBaseTransaction)
+    case class LocallyGeneratedTransaction[P <: Proposition, EncryBaseTransaction](tx: EncryBaseTransaction)
 
     case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentNodeViewModifier](pmod: EncryPersistentModifier)
 

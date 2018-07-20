@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.Box.Amount
-import encry.settings.{Algos, Constants}
+import encry.settings.Algos
 import encry.validation.{ModifierValidator, ValidationResult}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
@@ -18,7 +18,7 @@ case class EncryTransaction(fee: Amount,
                             inputs: IndexedSeq[Input],
                             directives: IndexedSeq[Directive],
                             defaultProofOpt: Option[Proof])
-  extends EncryBaseTransaction with ModifierValidator {
+  extends BaseTransaction with ModifierValidator {
 
   override type M = EncryTransaction
 

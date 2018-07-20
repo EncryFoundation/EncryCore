@@ -1,5 +1,6 @@
 package encry.modifiers.mempool
 
+import encry.modifiers.NodeViewModifier
 import encry.{ModifierId, ModifierTypeId}
 import encry.modifiers.mempool.directive.Directive
 import encry.modifiers.state.box.Box.Amount
@@ -8,29 +9,19 @@ import encry.settings.{Algos, Constants}
 import io.circe.Encoder
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.PConvertible
-import scorex.crypto.hash.{Blake2b256, Digest32}
-
+import scorex.crypto.hash.Digest32
 import scala.util.Try
 
-trait EncryBaseTransaction extends Transaction with PConvertible {
+trait BaseTransaction extends NodeViewModifier with PConvertible {
 
-
-
-
-  override val modifierTypeId: ModifierTypeId = EncryBaseTransaction.ModifierTypeId
-
-
-
-
-
-
-  override lazy val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
+  val modifierTypeId: ModifierTypeId = BaseTransaction.ModifierTypeId
+  val messageToSign: Array[Byte]
+  val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
   val fee: Long
   val timestamp: Long
   val inputs: IndexedSeq[Input]
   val directives: IndexedSeq[Directive]
   val defaultProofOpt: Option[Proof]
-  val messageToSign: Array[Byte]
   val semanticValidity: Try[Unit]
   val length: Int = this.bytes.length
   val maxSize: Int = Constants.TransactionMaxSize
@@ -44,14 +35,14 @@ trait EncryBaseTransaction extends Transaction with PConvertible {
   override def toString: String = s"<EncryTransaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}>"
 }
 
-object EncryBaseTransaction {
+object BaseTransaction {
 
   type TxTypeId = Byte
   type Nonce = Long
 
   case class TransactionValidationException(s: String) extends Exception(s)
 
-  implicit val jsonEncoder: Encoder[EncryBaseTransaction] = {
+  implicit val jsonEncoder: Encoder[BaseTransaction] = {
     case tx: EncryTransaction => EncryTransaction.jsonEncoder(tx)
   }
 
