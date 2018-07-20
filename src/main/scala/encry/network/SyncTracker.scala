@@ -8,7 +8,6 @@ import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SendLocalSyncI
 import encry.network.PeerConnectionHandler._
 import encry.settings.NetworkSettings
 import encry.utils.Logging
-
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
