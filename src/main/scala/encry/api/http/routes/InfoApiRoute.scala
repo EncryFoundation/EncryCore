@@ -11,7 +11,6 @@ import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import io.circe.Json
 import io.circe.syntax._
-
 import scala.concurrent.Future
 
 case class InfoApiRoute(readersHolder: ActorRef,
@@ -27,9 +26,9 @@ case class InfoApiRoute(readersHolder: ActorRef,
   private val launchTime: NetworkTime.Time = timeProvider.time()
 
   override val route: Route = (path("info") & get) {
-    val nodeUptime = timeProvider.time() - launchTime
-    val minerInfoF = getMinerInfo
-    val connectedPeersF = getConnectedPeers
+    val nodeUptime: Long = timeProvider.time() - launchTime
+    val minerInfoF: Future[MinerStatus] = getMinerInfo
+    val connectedPeersF: Future[Int] = getConnectedPeers
     val readersF: Future[Readers] = (readersHolder ? GetReaders).mapTo[Readers]
     (for {
       minerInfo <- minerInfoF

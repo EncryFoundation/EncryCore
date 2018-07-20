@@ -12,6 +12,7 @@ object StopMine extends Command {
 
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     miner ! DisableMining
+    nodeViewSynchronizer ! DisableMining
     Future(Some(Response("Mining is stopped.")))
   }
 }

@@ -19,7 +19,7 @@ object Constants {
   // Maximum transaction size in bytes
   val TransactionMaxSize: Int = BlockMaxSize / 4
 
-  val DefaultKeepVersions: Int = 200  // TODO: Move to `NodeSettings`.
+  val DefaultKeepVersions: Int = 200
 
   val PersistentByteCost: Int = 16
 
@@ -43,10 +43,7 @@ object Constants {
 
     val Version: Version = 0: Byte
 
-    // Number of fractions in one Encry Token.
-    val FractionsInOneCoin: Int = 1000000
-
-    val InitialEmissionAmount: Int = 2 * FractionsInOneCoin
+    val InitialEmissionAmount: Int = 2 * 1000000
 
     val DeflationInterval: Int = 100
 
@@ -67,7 +64,7 @@ object Constants {
     val PreGenesisHeight: Height = Height @@ (GenesisHeight - 1)
 
     // Maximum number of epochs blockchain state can be rolled back
-    val MaxRollbackDepth: Int = (10.days.toMillis / DesiredBlockInterval.toMillis).toInt
+    val MaxRollbackDepth: Int = 100
 
     val MaxTimeDrift: Long = 10 * DesiredBlockInterval.toMillis
 

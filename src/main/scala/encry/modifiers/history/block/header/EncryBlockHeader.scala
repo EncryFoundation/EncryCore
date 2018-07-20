@@ -49,6 +49,8 @@ case class EncryBlockHeader(override val version: Version,
 
   lazy val adProofsId: ModifierId = ModifierWithDigest.computeId(ADProofs.modifierTypeId, id, adProofsRoot)
 
+  lazy val partsIds: Seq[ModifierId] = Seq(adProofsId, payloadId)
+
   def isRelated(mod: EncryPersistentModifier): Boolean = mod match {
     case p: ADProofs => adProofsRoot sameElements p.digest
     case t: EncryBlockPayload => transactionsRoot sameElements t.digest
@@ -56,6 +58,8 @@ case class EncryBlockHeader(override val version: Version,
   }
 
   override def serializer: Serializer[M] = EncryBlockHeaderSerializer
+
+  override def toString: String = s"Header(id=$encodedId, height=$height)"
 }
 
 object EncryBlockHeader {

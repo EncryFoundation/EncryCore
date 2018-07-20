@@ -14,6 +14,7 @@ object StartMine extends Command {
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     miner ! EnableMining
     miner ! StartMining
+    nodeViewSynchronizer ! StartMining
     Future(Some(Response("Mining is started.")))
   }
 }

@@ -1,22 +1,19 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.Actor
 import akka.pattern.ask
 import akka.util.Timeout
 import encry.EncryApp._
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.message.{GetPeersSpec, Message, PeersSpec}
+import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
+import encry.utils.Logging
 import shapeless.syntax.typeable._
-
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import encry.network.NetworkController.ReceivableMessages.{RegisterMessagesHandler, SendToNetwork}
-import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
-import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.utils.ScorexLogging
 
-class PeerSynchronizer extends Actor with ScorexLogging {
+class PeerSynchronizer extends Actor with Logging {
 
   implicit val timeout: Timeout = Timeout(settings.network.syncTimeout.getOrElse(5 seconds))
 
@@ -24,20 +21,21 @@ class PeerSynchronizer extends Actor with ScorexLogging {
     super.preStart()
     networkController ! RegisterMessagesHandler(Seq(GetPeersSpec, PeersSpec), self)
     val msg: Message[Unit] = Message[Unit](GetPeersSpec, Right(Unit), None)
-    context.system.scheduler.schedule(2.seconds, 10.seconds)(networkController ! SendToNetwork(msg, SendToRandom))
+    context.system.scheduler.schedule(2.seconds, settings.network.syncInterval)(networkController ! SendToNetwork(msg, SendToRandom))
   }
 
   override def receive: Receive = {
     case DataFromPeer(spec, peers: Seq[InetSocketAddress]@unchecked, remote)
       if spec.messageCode == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined =>
       peers.foreach(isa => peerManager ! AddOrUpdatePeer(isa, None, Some(remote.direction)))
+      log.debug(s"Get new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
     case DataFromPeer(spec, _, remote) if spec.messageCode == GetPeersSpec.messageCode =>
-      //todo: externalize the number, check on receiving
       (peerManager ? RandomPeers(3))
         .mapTo[Seq[InetSocketAddress]]
-        .foreach { peers =>
-          networkController ! SendToNetwork(Message(PeersSpec, Right(peers), None), SendToPeers(Seq(remote)))
+        .foreach { peer =>
+          networkController ! SendToNetwork(Message(PeersSpec, Right(peer), None), SendToPeer(remote))
+          log.debug(s"Send to ${remote.socketAddress} peers message which contains next peers: ${peer.mkString(",")}")
         }
-    case nonsense: Any => log.warn(s"PeerSynchronizer: got something strange $nonsense")
+    case nonsense: Any => logWarn(s"PeerSynchronizer: got something strange $nonsense")
   }
 }

@@ -7,37 +7,33 @@ import encry.consensus.History
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
 import encry.network.PeerConnectionHandler._
 import encry.settings.NetworkSettings
-import encry.utils.{NetworkTimeProvider, ScorexLogging}
+import encry.utils.{Logging, NetworkTimeProvider}
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.{FiniteDuration, _}
 
-
 /**
   * SyncTracker caches the peers' statuses (i.e. whether they are ahead or behind this node)
   */
-case class SyncTracker(nvsRef: ActorRef,
-                  context: ActorContext,
-                  networkSettings: NetworkSettings,
-                  timeProvider: NetworkTimeProvider) extends ScorexLogging {
+case class SyncTracker(deliveryManager: ActorRef,
+                       context: ActorContext,
+                       networkSettings: NetworkSettings,
+                       timeProvider: NetworkTimeProvider) extends Logging {
 
   import History._
   import encry.utils.NetworkTime.Time
 
   private var schedule: Option[Cancellable] = None
 
-  private val statuses: mutable.Map[ConnectedPeer, HistoryComparisonResult] = mutable.Map[ConnectedPeer, HistoryComparisonResult]()
+  var statuses: Map[ConnectedPeer, HistoryComparisonResult] = Map()
   private val lastSyncSentTime: mutable.Map[ConnectedPeer, Time] = mutable.Map[ConnectedPeer, Time]()
 
   private var lastSyncInfoSentTime: Time = 0L
 
   private var stableSyncRegime: Boolean = false
 
-  def scheduleSendSyncInfo(): Unit = {
-    if (schedule.isDefined) schedule.get.cancel()
-    schedule = Some(context.system.scheduler.schedule(2.seconds, minInterval())(nvsRef ! SendLocalSyncInfo))
-  }
+  def scheduleSendSyncInfo(): Unit = if (schedule.isDefined) schedule.get.cancel()
 
   def maxInterval(): FiniteDuration = if (stableSyncRegime) networkSettings.syncStatusRefreshStable else networkSettings.syncStatusRefresh
 
@@ -61,11 +57,11 @@ case class SyncTracker(nvsRef: ActorRef,
   def clearStatus(remote: InetSocketAddress): Unit = {
     statuses.find(_._1.socketAddress == remote) match {
       case Some((peer, _)) => statuses -= peer
-      case None => log.warn(s"Trying to clear status for $remote, but it is not found")
+      case None => logWarn(s"Trying to clear status for $remote, but it is not found")
     }
     lastSyncSentTime.find(_._1.socketAddress == remote) match {
       case Some((peer, _)) => statuses -= peer
-      case None => log.warn(s"Trying to clear last sync time for $remote, but it is not found")
+      case None => logWarn(s"Trying to clear last sync time for $remote, but it is not found")
     }
   }
 
@@ -95,6 +91,7 @@ case class SyncTracker(nvsRef: ActorRef,
     val peers: Seq[ConnectedPeer] = if (outdated.nonEmpty) outdated
     else nonOutdated.filter(p => (timeProvider.time() - lastSyncSentTime.getOrElse(p, 0L)).millis >= minInterval)
     peers.foreach(updateLastSyncSentTime)
+    log.debug(s"Trying to get nodes to sync and they are: ${peers.map(_.socketAddress).mkString(",")} and handler are: ${peers.map(_.handlerRef).mkString(",")}")
     peers
   }
 }

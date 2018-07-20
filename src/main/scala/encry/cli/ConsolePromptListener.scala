@@ -1,14 +1,14 @@
 package encry.cli
 
 import akka.actor.Actor
+import encry.EncryApp.settings
 import encry.cli.commands._
+import encry.utils.Logging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
-import encry.EncryApp.settings
-import encry.utils.ScorexLogging
 
-class ConsolePromptListener extends Actor with ScorexLogging {
+class ConsolePromptListener extends Actor with Logging {
 
   import ConsolePromptListener._
 
@@ -24,9 +24,9 @@ class ConsolePromptListener extends Actor with ScorexLogging {
                     case Some(x) => print(x.msg + s"\n$prompt")
                     case None =>
                   }
-              case None => println("Unsupported command. Type 'app help' to get commands list")
+              case None =>
             }
-          case Failure(_) => println("Bad input")
+          case Failure(_) =>
         }
       }
   }
