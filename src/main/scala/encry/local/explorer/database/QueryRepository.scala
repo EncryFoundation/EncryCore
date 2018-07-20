@@ -4,10 +4,12 @@ import doobie.free.connection.ConnectionIO
 import doobie.util.update.Update
 import encry.ModifierId
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.{EncryBlockHeader, HeaderDBVersion}
+import encry.modifiers.history.block.header.HeaderDBVersion
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import scorex.crypto.encode.Base16
 import cats.implicits._
+import doobie.postgres.implicits._
+import doobie.util.log.LogHandler
 import encry.local.explorer.database.Tables.{HeadersTable, InputsTable, OutputsTable, TransactionsTable}
 import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, TransactionDBVersion}
 
@@ -15,7 +17,7 @@ protected[database] object QueryRepository {
 
   def processBlockQuery(block: EncryBlock): ConnectionIO[Int] =
     for {
-      headerR <- insertHeaderQuery(block.header)
+      headerR <- insertHeaderQuery(block)
       txsR    <- insertTransactionsQuery(block)
       outsR   <- insertOutputsQuery(block.payload)
       insR    <- insertInputsQuery(block.payload)
@@ -26,10 +28,8 @@ protected[database] object QueryRepository {
     Update[String](query).updateMany(ids.map(Base16.encode))
   }
 
-  // internal
-
-  def insertHeaderQuery(header: EncryBlockHeader): ConnectionIO[Int] = {
-    val headerDB: HeaderDBVersion = HeadersTable.header(header)
+  def insertHeaderQuery(block: EncryBlock): ConnectionIO[Int] = {
+    val headerDB: HeaderDBVersion = HeadersTable.header(block)
     val query =
       """
         |INSERT INTO public.headers (id, parent_id, version, height, ad_proofs_root, state_root, transactions_root, ts, difficulty,
@@ -38,6 +38,10 @@ protected[database] object QueryRepository {
       """.stripMargin
     Update[HeaderDBVersion](query).run(headerDB)
   }
+
+  // internal
+
+  private implicit val han: LogHandler = LogHandler.jdkLogHandler
 
   private def insertTransactionsQuery(block: EncryBlock): ConnectionIO[Int] = {
     val txs: Seq[TransactionDBVersion] = TransactionsTable.txs(block)

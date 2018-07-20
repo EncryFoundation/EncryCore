@@ -36,7 +36,7 @@ object Tables {
       "best_chain"
     )
 
-    def header(h: EncryBlockHeader): HeaderDBVersion = HeaderDBVersion(h)
+    def header(b: EncryBlock): HeaderDBVersion = HeaderDBVersion(b)
 
   }
 

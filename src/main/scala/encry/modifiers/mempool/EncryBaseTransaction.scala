@@ -52,7 +52,7 @@ object EncryBaseTransaction {
   }
 }
 
-case class TransactionDBVersion(id: String, blockId: String, isCoinbase: String, timestamp: Timestamp)
+case class TransactionDBVersion(id: String, blockId: String, isCoinbase: Boolean, timestamp: Timestamp)
 
 case object TransactionDBVersion {
   def apply(block: EncryBlock): Seq[TransactionDBVersion] = {
@@ -60,9 +60,9 @@ case object TransactionDBVersion {
     val transactions = block.payload.transactions.map { tx =>
       val id: String = Base16.encode(tx.id)
       val blockId: String = Base16.encode(block.header.id)
-      TransactionDBVersion(id, blockId, "FALSE", block.header.timestamp)
+      TransactionDBVersion(id, blockId, isCoinbase = false, block.header.timestamp)
     }.toIndexedSeq
-    transactions.init :+ transactions.last.copy(isCoinbase = "TRUE")
+    transactions.init :+ transactions.last.copy(isCoinbase = true)
   }
 }
 
