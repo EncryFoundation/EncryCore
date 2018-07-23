@@ -15,9 +15,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
 
   import BlockProcessor._
 
-  /**
-    * Id of header that contains transactions and proofs
-    */
+  /** Id of header that contains transactions and proofs */
   override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
 
   protected def getBlock(h: EncryBlockHeader): Option[EncryBlock]
@@ -107,7 +105,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
 
   private def calculateBestFullChain(block: EncryBlock): Seq[EncryBlock] = {
     val continuations: Seq[Seq[EncryBlockHeader]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
-    val chains: Seq[Seq[EncryBlock]] = continuations.map(hc => hc.map(getBlock).takeWhile(_.nonEmpty).flatten)
+    val chains: Seq[Seq[EncryBlock]] = continuations.map(_.map(getBlock).takeWhile(_.nonEmpty).flatten)
     chains.map(c => block +: c).maxBy(c => scoreOf(c.last.id).get)
   }
 
@@ -158,7 +156,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
           fatal(s"Modifier ${m.encodedId} is already in history")
         }
         .validate(header.height >= minimalHeight) {
-          fatal(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight")
+          error(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight")
         }
         .validate(header.isRelated(m)) {
           fatal(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}")
