@@ -3,7 +3,7 @@ package encry.modifiers.mempool.regcontract
 import com.google.common.primitives.Ints
 import encry.account.{Account, AccountSerializer}
 import encry.modifiers.serialization.SerializationException
-import org.encryfoundation.prismlang.compiler.{CompiledContract, CostEstimator}
+import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.Ast.{Expr, Ident}
 import org.encryfoundation.prismlang.core.{Ast, Types}
 import org.encryfoundation.prismlang.lib.predefined.signature.CheckSig
