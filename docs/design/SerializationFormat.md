@@ -83,6 +83,29 @@ Field name | Bytes distribution
 `contractHash` | 0 - 32
 
 
+## Input
+
+Bytes total | arbitrary length
+------------|---
+
+Field name | Bytes distribution
+-----------|-------------------
+`boxId[ModifierId]` | 0 - 32
+`contractLen[Short]`| 32 - 34
+`contract` | 34 - `bytes.len`
+
+
+## Proof
+
+Bytes total | arbitrary length
+------------|---
+
+Field name | Bytes distribution
+-----------|-------------------
+`valueLen[Short]`| 0 - 2
+`value[BoxedValue]` | 2 - `bytes.len`
+
+
 ## AssetBox
 
 Box holding any monetary asset
