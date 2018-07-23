@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
@@ -12,6 +13,7 @@ import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPaylo
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{BaseTransaction, EncryTransactionSerializer}
 import encry.modifiers.serialization.Serializer
+import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.EncryDeliveryManager.FullBlockChainSynced
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
@@ -29,6 +31,7 @@ import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import org.apache.commons.io.FileUtils
 import scorex.crypto.authds.ADDigest
+
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
@@ -105,7 +108,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       val availableBoxes: Seq[AssetBox] = wallet
         .walletStorage
         .allBoxes
-        .filter(box => nodeView.state.asInstanceOf[UtxoState].persistentProver.unauthenticatedLookup(box.id).isDefined)
+        .filter(box => {
+          nodeView.state.asInstanceOf[UtxoState].persistentProver.unauthenticatedLookup(box.id).isDefined &&
+            nodeView.state.asInstanceOf[UtxoState]
+              .persistentProver.unauthenticatedLookup(box.id)
+              .forall(bytes => StateModifierDeserializer.parseBytes(bytes, AssetBox.TypeId).isSuccess)
+        })
         .reverse
         .foldLeft(Seq.empty[AssetBox], 0L) {
         case (acc, box: AssetBox) if box.isIntrinsic && acc._2 < limit * (amountD + minimalFeeD) =>
