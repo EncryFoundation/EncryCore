@@ -11,7 +11,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.BaseTransaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
-import encry.network.EncryDeliveryManager.FullBlockChainSynced
+import encry.network.EncryDeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -109,6 +109,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
         val m: (ModifierTypeId, Map[ModifierId, Array[Byte]]) = modifiers.head.modifierTypeId -> modifiers.map(m => m.id -> m.bytes).toMap
         peer.handlerRef ! Message(ModifiersSpec, Right(m), None)
       }
+    case StopSync => deliveryManager ! StopSync
+    case ContinueSync => deliveryManager ! ContinueSync
     case a: Any => logError(s"Strange input (sender: ${sender()}): ${a.getClass}\n" + a)
   }
 

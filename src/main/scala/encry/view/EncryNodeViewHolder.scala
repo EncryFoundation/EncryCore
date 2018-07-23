@@ -11,7 +11,7 @@ import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{BaseTransaction, EncryTransactionSerializer}
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.EncryProposition
-import encry.network.EncryDeliveryManager.FullBlockChainSynced
+import encry.network.EncryDeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{ApplyState, RequestedModifiers}
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -57,6 +57,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   override def receive: Receive = {
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
+      if (modifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: BaseTransaction@unchecked if tx.modifierTypeId == BaseTransaction.ModifierTypeId => txModify(tx)
@@ -69,7 +70,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             }
         }
         log.info(s"Cache before(${modifiersCache.size})")
-
         def computeApplications(): Unit = {
           modifiersCache.popCandidate(nodeView.history) match {
             case Some(mod) =>
@@ -78,8 +78,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             case None => Unit
           }
         }
-
         computeApplications()
+        if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
         log.info(s"Cache after(${modifiersCache.size})")
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, BaseTransaction] => txModify(lt.tx)
