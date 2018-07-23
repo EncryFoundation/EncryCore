@@ -1,7 +1,6 @@
 package encry.view
 
 import java.io.File
-
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
@@ -13,7 +12,6 @@ import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPaylo
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{BaseTransaction, EncryTransactionSerializer}
 import encry.modifiers.serialization.Serializer
-import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.EncryDeliveryManager.FullBlockChainSynced
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
@@ -31,7 +29,6 @@ import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import org.apache.commons.io.FileUtils
 import scorex.crypto.authds.ADDigest
-
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}

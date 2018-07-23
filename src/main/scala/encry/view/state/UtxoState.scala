@@ -168,8 +168,7 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
           (bxOpt, tx.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
             case (Some(bx), _) if input.proofs.nonEmpty => if (bx.proposition.canUnlock(context, input.realContract, input.proofs)) acc :+ bx else acc
-            case (Some(bx), Some(defaultProof)) =>
-              if (bx.proposition.canUnlock(context, input.realContract, Seq(defaultProof))) acc :+ bx else acc
+            case (Some(bx), Some(defaultProof)) => if (bx.proposition.canUnlock(context, input.realContract, Seq(defaultProof))) acc :+ bx else acc
             case (Some(bx), _) => if (bx.proposition.canUnlock(context, input.realContract, Seq.empty)) acc :+ bx else acc
             case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
           }
