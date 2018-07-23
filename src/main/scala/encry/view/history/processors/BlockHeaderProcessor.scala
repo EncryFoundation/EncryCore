@@ -3,6 +3,7 @@ package encry.view.history.processors
 import com.google.common.primitives.Ints
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
+import encry.local.explorer.BlockListener.NewOrphaned
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
@@ -16,7 +17,6 @@ import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import encry.{EncryApp, _}
 import io.iohk.iodb.ByteArrayWrapper
-
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
@@ -25,8 +25,8 @@ trait BlockHeaderProcessor extends Logging {
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider
-  private val chainParams = Constants.Chain
-  private val difficultyController = PowLinearController
+  private val chainParams: Constants.Chain.type = Constants.Chain
+  private val difficultyController: PowLinearController.type = PowLinearController
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
   protected val BestHeaderKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(EncryBlockHeader.modifierTypeId))
   protected val BestBlockKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(-1))
@@ -80,7 +80,7 @@ trait BlockHeaderProcessor extends Logging {
     else Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
 
   private def isNewHeader(header: EncryBlockHeader): Boolean =
-    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5//TODO magic number
+    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5 //TODO magic number
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
@@ -107,9 +107,6 @@ trait BlockHeaderProcessor extends Logging {
 
   def bestBlockIdOpt: Option[ModifierId]
 
-  /**
-    * @return height of best header
-    */
   def bestHeaderHeight: Int = bestHeaderIdOpt.flatMap(id => heightOf(id)).getOrElse(Constants.Chain.PreGenesisHeight)
 
   /**
@@ -150,11 +147,12 @@ trait BlockHeaderProcessor extends Logging {
       val score = Difficulty @@ (scoreOf(h.parentId).get + difficulty)
       val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
         if (score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
-      val scoreRow = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
-      val heightRow = headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
-      val headerIdsRow = if (score > bestHeadersChainScore) {
+      val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
+      val heightRow: (ByteArrayWrapper, ByteArrayWrapper) = headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
+      val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (score > bestHeadersChainScore) {
         bestBlockHeaderIdsRow(h, score)
       } else {
+        EncryApp.system.actorSelection("/user/blockListener") ! NewOrphaned(h) // TODO: Remove direct system import when possible.
         orphanedBlockHeaderIdsRow(h, score)
       }
       (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, h)
@@ -287,7 +285,7 @@ trait BlockHeaderProcessor extends Logging {
       if (header.isGenesis) validateGenesisBlockHeader(header)
       else typedModifierById[EncryBlockHeader](header.parentId).map { parent =>
         validateChildBlockHeader(header, parent)
-      } getOrElse fatal(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
+      } getOrElse error(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
 
     private def validateGenesisBlockHeader(header: EncryBlockHeader): ValidationResult =
       accumulateErrors
