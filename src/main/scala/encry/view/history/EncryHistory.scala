@@ -1,7 +1,6 @@
 package encry.view.history
 
 import java.io.File
-
 import encry.ModifierId
 import encry.consensus.History
 import encry.consensus.History.ProgressInfo
@@ -16,7 +15,6 @@ import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockP
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
-
 import scala.util.Try
 
 /**
