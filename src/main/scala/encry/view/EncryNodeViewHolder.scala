@@ -102,7 +102,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case FetchWalletData(limit: Int, minimalFeeD: Int) =>
       val wallet: EncryWallet = nodeView.wallet
-      val availableBoxes: Seq[AssetBox] = wallet.walletStorage.allBoxes.reverse.foldLeft(Seq.empty[AssetBox], 0L) {
+      val availableBoxes: Seq[AssetBox] = wallet
+        .walletStorage
+        .allBoxes
+        .filter(box => nodeView.state.asInstanceOf[UtxoState].persistentProver.unauthenticatedLookup(box.id).isDefined)
+        .reverse
+        .foldLeft(Seq.empty[AssetBox], 0L) {
         case (acc, box: AssetBox) if box.isIntrinsic && acc._2 < limit * (amountD + minimalFeeD) =>
           (acc._1 :+ box, acc._2 + box.amount)
         case (acc, _) => acc
