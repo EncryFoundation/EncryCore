@@ -102,12 +102,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case FetchWalletData(limit: Int, minimalFeeD: Int) =>
       val wallet: EncryWallet = nodeView.wallet
-      val availableBoxes: Seq[AssetBox] = wallet.walletStorage.allBoxes
-        .foldLeft(Seq.empty[AssetBox], 0L) {
-        case (acc, box: AssetBox) if box.isIntrinsic && acc._2 < limit * (amountD + minimalFeeD) =>
-          (acc._1 :+ box, acc._2 + box.amount)
-        case (acc, _) => acc
-      }._1
+      val availableBoxes: Seq[AssetBox] = wallet.walletStorage.allBoxes.filter(_.isAmountCarrying).map(_.asInstanceOf[AssetBox])
       if (availableBoxes.map(_.amount).sum >= limit * (amountD + minimalFeeD))
         sender() ! GenerateTransaction(WalletData(wallet.keyManager.mainKey, availableBoxes))
     case a: Any => logError("Strange input: " + a)
