@@ -13,7 +13,7 @@ import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator
 import encry.local.TransactionGenerator.StartGeneration
 import encry.local.explorer.BlockListener
-import encry.local.explorer.database.{DBService, DBServiceImpl}
+import encry.local.explorer.database.DBServiceImpl
 import encry.local.miner.EncryMiner
 import encry.local.miner.EncryMiner.StartMining
 import encry.network.message._
@@ -90,14 +90,8 @@ object EncryApp extends App with Logging {
   }
 
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
-
   if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
-
-  if (settings.postgres.enabled) {
-    lazy val dbService: DBService = new DBServiceImpl
-    system.actorOf(Props(new BlockListener(dbService)), "blockListener")
-  }
-
+  if (settings.postgres.enabled) system.actorOf(Props(new BlockListener(new DBServiceImpl)), "blockListener")
   if (settings.node.mining) miner ! StartMining
   if (settings.levelDb.enable) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
   if (settings.testing.transactionGeneration) system.actorOf(Props[TransactionGenerator], "tx-generator") ! StartGeneration
