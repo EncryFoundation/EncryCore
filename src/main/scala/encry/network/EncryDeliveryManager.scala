@@ -67,6 +67,7 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
       historyReaderOpt.foreach { h =>
         val currentQueue: Iterable[ModifierId] = cancellables.keys.map(ModifierId @@ _.toArray)
         val newIds: Seq[(ModifierTypeId, ModifierId)] = h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
+            .filter(modId => !cancellables.keys.toSeq.contains(modId._2))
         if (newIds.nonEmpty) newIds.groupBy(_._1).foreach(ids => requestDownload(ids._1, ids._2.map(_._2)))
         else syncProcessEnable = true
       }
