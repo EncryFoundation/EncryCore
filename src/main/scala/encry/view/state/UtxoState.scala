@@ -168,17 +168,12 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
           (bxOpt, tx.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
             case (Some(bx), _) if input.proofs.nonEmpty => if (bx.proposition.canUnlock(context, input.realContract, input.proofs)) acc :+ bx else acc
-            case (Some(bx), Some(defaultProof)) => if (bx.proposition.canUnlock(context, input.realContract, Seq(defaultProof))) acc :+ bx else acc
+            case (Some(bx), Some(defaultProof)) =>
+              if (bx.proposition.canUnlock(context, input.realContract, Seq(defaultProof))) acc :+ bx else acc
             case (Some(bx), _) => if (bx.proposition.canUnlock(context, input.realContract, Seq.empty)) acc :+ bx else acc
             case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
           }
         }
-
-      log.info(s"Found input boxes: ${bxs.map {
-
-        case assetBox: AssetBox => s"Box: ${Algos.encode(assetBox.id)} : ${assetBox.amount}"
-        case _ => "Not asset"
-      }.mkString(",")}")
 
       val validBalance: Boolean = {
         val debitB: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxs)
@@ -188,13 +183,7 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
           balanceSheet.updated(Constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
         }
         creditB.forall { case (tokenId, amount) =>
-          if (tokenId sameElements Constants.IntrinsicTokenId) {
-            log.info(s"debitB.getOrElse(tokenId, 0L): ${debitB.getOrElse(tokenId, 0L)}")
-            log.info(s"allowedOutputDelta: $allowedOutputDelta")
-            log.info(s"Sum: ${debitB.getOrElse(tokenId, 0L) + allowedOutputDelta}")
-            log.info(s"Amount: $amount")
-            debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
-          }
+          if (tokenId sameElements Constants.IntrinsicTokenId) debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
           else debitB.getOrElse(tokenId, 0L) >= amount
         }
       }
