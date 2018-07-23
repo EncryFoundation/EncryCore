@@ -8,6 +8,7 @@ import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
 import encry.network.PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages._
+import encry.network.peer.PeerManager._
 import encry.network.{Handshake, SendingStrategy}
 import encry.utils.Logging
 import scala.language.postfixOps
@@ -50,8 +51,7 @@ class PeerManager extends Actor with Logging {
       if (peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress))
         peer.handlerRef ! CloseConnection
       else {
-        if ((settings.network.connectOnlyWithKnownPeers && settings.network.knownPeers.contains(peer.socketAddress)) ||
-          !settings.network.connectOnlyWithKnownPeers) {
+        if (checkPossibilityToAddPeer(peer.socketAddress)) {
             if (peer.publicPeer) self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
             else PeerDatabase.remove(peer.socketAddress)
             connectedPeers += (peer.socketAddress -> peer)
@@ -73,8 +73,7 @@ class PeerManager extends Actor with Logging {
         randomPeer.foreach { address =>
           if (!connectedPeers.exists(_._1 == address) &&
               !connectingPeers.exists(_.getHostName == address.getHostName) &&
-              ((settings.network.connectOnlyWithKnownPeers && settings.network.knownPeers.contains(address)) ||
-                !settings.network.connectOnlyWithKnownPeers))
+                checkPossibilityToAddPeer(address))
                   sender() ! ConnectTo(address)
         }
       }
@@ -107,4 +106,7 @@ object PeerManager {
 
   }
 
+  def checkPossibilityToAddPeer(address: InetSocketAddress): Boolean =
+    (settings.network.connectOnlyWithKnownPeers && settings.network.knownPeers.contains(address)) ||
+      !settings.network.connectOnlyWithKnownPeers
 }
