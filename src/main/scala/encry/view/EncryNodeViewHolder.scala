@@ -104,7 +104,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case FetchWalletData(limit: Int, minimalFeeD: Int) =>
       val wallet: EncryWallet = nodeView.wallet
       val availableBoxes: Seq[AssetBox] = wallet.walletStorage.allBoxes.foldLeft(Seq.empty[AssetBox], 0L) {
-        case (acc, box: AssetBox) if box.isIntrinsic && acc._2 < limit * (amountD + minimalFeeD) => (acc._1 :+ box, acc._2 + box.amount)
+        case (acc, box: AssetBox) if box.isIntrinsic && acc._2 < limit * (amountD + minimalFeeD) =>
+          (acc._1 :+ box, acc._2 + box.amount)
         case (acc, _) => acc
       }._1
       if (availableBoxes.map(_.amount).sum >= limit * (amountD + minimalFeeD))

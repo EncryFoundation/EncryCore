@@ -42,15 +42,14 @@ class TransactionGenerator extends Actor with Logging {
 
     case GenerateTransaction(walletData: WalletData) if isActive =>
       if (limit > 0) {
-        log.info("Need to generate txs:")
-        log.info(s"Have ${walletData.boxes.size} with amount: ${walletData.boxes.map(_.amount).mkString(",")}")
         (0 until limit).foldLeft(Seq[EncryTransaction](), walletData) {
-          case ((txs, wd), _) =>
-            val tx: EncryTransaction = createTransaction(walletData)
-            val leftBoxes: Seq[AssetBox] = wd.boxes.filterNot(bx => tx.inputs.map(_.boxId).contains(bx.id))
-            (txs :+ tx) -> walletData.copy(boxes = leftBoxes)
+          case ((txs, wd), i) =>
+            if (wd.boxes.map(_.amount).sum >= (limit - i) * (amountD + minimalFeeD) ) {
+              val tx: EncryTransaction = createTransaction(walletData)
+              val leftBoxes: Seq[AssetBox] = wd.boxes.filterNot(bx => tx.inputs.map(_.boxId).contains(bx.id))
+              (txs :+ tx) -> walletData.copy(boxes = leftBoxes)
+            } else txs -> wd
         }._1.foreach(tx => {
-          log.info(s"Generated tx: ${Algos.encode(tx.id)}")
           nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
         })
       }
@@ -74,7 +73,7 @@ class TransactionGenerator extends Actor with Logging {
 object TransactionGenerator {
 
   val minimalFeeD: Int = 10000
-  val amountD: Int = 100
+  val amountD: Int = 100000
 
   case class WalletData(secret: PrivateKey25519, boxes: Seq[AssetBox])
 
