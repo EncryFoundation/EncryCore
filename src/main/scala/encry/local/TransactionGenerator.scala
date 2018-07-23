@@ -45,9 +45,9 @@ class TransactionGenerator extends Actor with Logging {
         (0 until limit).foldLeft(Seq[EncryTransaction](), walletData) {
           case ((txs, wd), i) =>
             if (wd.boxes.map(_.amount).sum >= (limit - i) * (amountD + minimalFeeD) ) {
-              val tx: EncryTransaction = createTransaction(walletData)
+              val tx: EncryTransaction = createTransaction(wd)
               val leftBoxes: Seq[AssetBox] = wd.boxes.filterNot(bx => tx.inputs.map(_.boxId).contains(bx.id))
-              (txs :+ tx) -> walletData.copy(boxes = leftBoxes)
+              (txs :+ tx) -> wd.copy(boxes = leftBoxes)
             } else txs -> wd
         }._1.foreach(tx => {
           nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
