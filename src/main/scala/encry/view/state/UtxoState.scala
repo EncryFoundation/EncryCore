@@ -182,7 +182,13 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
           balanceSheet.updated(Constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
         }
         creditB.forall { case (tokenId, amount) =>
-          if (tokenId sameElements Constants.IntrinsicTokenId) debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
+          if (tokenId sameElements Constants.IntrinsicTokenId) {
+            log.info(s"debitB.getOrElse(tokenId, 0L): ${debitB.getOrElse(tokenId, 0L)}")
+            log.info(s"allowedOutputDelta: $allowedOutputDelta")
+            log.info(s"Sum: ${debitB.getOrElse(tokenId, 0L) + allowedOutputDelta}")
+            log.info(s"Amount: $amount")
+            debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
+          }
           else debitB.getOrElse(tokenId, 0L) >= amount
         }
       }
