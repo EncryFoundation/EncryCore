@@ -174,6 +174,12 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
           }
         }
 
+      log.info(s"Found input boxes: ${bxs.map {
+
+        case assetBox: AssetBox => s"Box: ${Algos.encode(assetBox.id)} : ${assetBox.amount}"
+        case _ => "Not asset"
+      }.mkString(",")}")
+
       val validBalance: Boolean = {
         val debitB: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxs)
         val creditB: Map[ADKey, Amount] = {
