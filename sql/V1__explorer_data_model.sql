@@ -1,5 +1,5 @@
-CREATE TABLE headers (
-  id VARCHAR(64) NOT NULL PRIMARY KEY,
+CREATE TABLE headers(
+  id VARCHAR(64) PRIMARY KEY,
   parent_id VARCHAR(64) NOT NULL,
   version SMALLINT NOT NULL,
   height INTEGER NOT NULL,
@@ -10,7 +10,7 @@ CREATE TABLE headers (
   difficulty BIGINT NOT NULL,
   block_size BIGINT NOT NULL,
   equihash_solution INTEGER ARRAY NOT NULL,
-  ad_proofs VARCHAR,
+  ad_proofs VARCHAR DEFAULT '',
   tx_qty BIGINT NOT NULL DEFAULT 0,
   miner_address VARCHAR NOT NULL,
   miner_reward BIGINT NOT NULL,
@@ -19,46 +19,24 @@ CREATE TABLE headers (
   best_chain BOOLEAN NOT NULL
 );
 
-ALTER TABLE headers OWNER TO db_admin;
-
-CREATE INDEX "headers__parent_id" ON headers (parent_id);
-
-CREATE INDEX "headers__height" ON headers (height);
-
-CREATE INDEX "headers__ts" ON headers (ts);
-
-CREATE TABLE transactions (
-  id VARCHAR(64) NOT NULL PRIMARY KEY,
-  block_id VARCHAR(64) NOT NULL REFERENCES headers (id),
+CREATE TABLE transactions(
+  id VARCHAR(64) PRIMARY KEY,
+  block_id VARCHAR(64) REFERENCES headers (id),
   is_coinbase BOOLEAN NOT NULL,
   ts BIGINT NOT NULL
 );
 
-ALTER TABLE transactions OWNER to db_admin;
-
-CREATE INDEX "transactions__block_id" on transactions (block_id);
-
-CREATE TABLE outputs (
-  id VARCHAR(64) NOT NULL PRIMARY KEY,
-  tx_id VARCHAR(64) NOT NULL REFERENCES transactions (id),
+CREATE TABLE outputs(
+  id VARCHAR(64) PRIMARY KEY,
+  tx_id VARCHAR(64) REFERENCES transactions (id),
   monetary_value BIGINT NOT NULL,
   coin_id VARCHAR NOT NULL,
   contract_hash VARCHAR NOT NULL,
   data VARCHAR
 );
 
-ALTER TABLE outputs OWNER to db_admin;
-
-CREATE INDEX "outputs__tx_id" on outputs (tx_id);
-
-CREATE INDEX "outputs__contract_hash" on outputs (contract_hash);
-
-CREATE TABLE inputs (
-  id VARCHAR(64) NOT NULL PRIMARY KEY,
-  tx_id VARCHAR(64) NOT NULL REFERENCES transactions (id),
+CREATE TABLE inputs(
+  id VARCHAR(64) PRIMARY KEY,
+  tx_id VARCHAR(64) REFERENCES transactions (id),
   serialized_proofs VARCHAR NOT NULL
 );
-
-ALTER TABLE inputs OWNER to db_admin;
-
-CREATE INDEX "inputs__tx_id" on inputs (tx_id);
