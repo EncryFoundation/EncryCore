@@ -17,7 +17,6 @@ import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import encry.{EncryApp, _}
 import io.iohk.iodb.ByteArrayWrapper
-
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
@@ -26,8 +25,8 @@ trait BlockHeaderProcessor extends Logging {
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider
-  private val chainParams = Constants.Chain
-  private val difficultyController = PowLinearController
+  private val chainParams: Constants.Chain.type = Constants.Chain
+  private val difficultyController: PowLinearController.type = PowLinearController
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
   protected val BestHeaderKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(EncryBlockHeader.modifierTypeId))
   protected val BestBlockKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(-1))
@@ -81,7 +80,7 @@ trait BlockHeaderProcessor extends Logging {
     else Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
 
   private def isNewHeader(header: EncryBlockHeader): Boolean =
-    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5//TODO magic number
+    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5 //TODO magic number
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
@@ -108,9 +107,6 @@ trait BlockHeaderProcessor extends Logging {
 
   def bestBlockIdOpt: Option[ModifierId]
 
-  /**
-    * @return height of best header
-    */
   def bestHeaderHeight: Int = bestHeaderIdOpt.flatMap(id => heightOf(id)).getOrElse(Constants.Chain.PreGenesisHeight)
 
   /**
@@ -289,7 +285,7 @@ trait BlockHeaderProcessor extends Logging {
       if (header.isGenesis) validateGenesisBlockHeader(header)
       else typedModifierById[EncryBlockHeader](header.parentId).map { parent =>
         validateChildBlockHeader(header, parent)
-      } getOrElse fatal(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
+      } getOrElse error(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
 
     private def validateGenesisBlockHeader(header: EncryBlockHeader): ValidationResult =
       accumulateErrors
