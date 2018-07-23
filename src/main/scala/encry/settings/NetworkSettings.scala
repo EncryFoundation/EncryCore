@@ -23,8 +23,5 @@ case class NetworkSettings(nodeName: String,
                            modifierDeliverTimeCheck: FiniteDuration,
                            connectOnlyWithKnownPeers: Boolean,
                            syncInterval: FiniteDuration,
-                           syncStatusRefresh: FiniteDuration,
-                           syncIntervalStable: FiniteDuration,
-                           syncStatusRefreshStable: FiniteDuration,
                            syncTimeout: Option[FiniteDuration]
                           )
