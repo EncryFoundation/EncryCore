@@ -24,7 +24,6 @@ import encry.stats.StatsSender
 import encry.utils.{Logging, NetworkTimeProvider, Zombie}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
-
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.io.Source
@@ -60,10 +59,6 @@ object EncryApp extends App with Logging {
   lazy val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
   lazy val miner: ActorRef = system.actorOf(Props[EncryMiner].withDispatcher("mining-dispatcher"), "miner")
-
-  lazy val dbService: DBService = new DBServiceImpl
-  val blockListener: ActorRef = system.actorOf(Props(new BlockListener(dbService)), BlockListener.name)
-
   val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
 
   lazy val upnp: UPnP = new UPnP(settings.network)
@@ -97,6 +92,11 @@ object EncryApp extends App with Logging {
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
 
   if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
+
+  if (settings.postgres.enabled) {
+    lazy val dbService: DBService = new DBServiceImpl
+    system.actorOf(Props(new BlockListener(dbService)), "blockListener")
+  }
 
   if (settings.node.mining) miner ! StartMining
   if (settings.levelDb.enable) system.actorOf(Props[ModifiersHolder], "modifiersHolder")

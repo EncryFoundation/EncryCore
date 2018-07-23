@@ -26,6 +26,4 @@ class BlockListener(dBService: DBService) extends Actor with Logging {
 object BlockListener {
   case class ChainSwitching(switchedIds: Seq[ModifierId])
   case class NewOrphaned(header: EncryBlockHeader)
-
-  val name: String = "blockListener"
 }
