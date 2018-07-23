@@ -47,7 +47,6 @@ class TransactionGenerator extends Actor with Logging {
             if (wd.boxes.map(_.amount).sum > (limit - i) * (amountD + minimalFeeD) ) {
               val tx: EncryTransaction = createTransaction(wd)
               val leftBoxes: Seq[AssetBox] = wd.boxes.filterNot(bx => tx.inputs.map(_.boxId).contains(bx.id))
-              log.info(s"Inputs: ${tx.inputs.map(input => walletData.boxes.find(_.id == input.boxId).map(box => Algos.encode(box.id) + " : " + box.amount))}")
               (txs :+ tx) -> wd.copy(boxes = leftBoxes)
             } else txs -> wd
         }._1.foreach(tx => {
