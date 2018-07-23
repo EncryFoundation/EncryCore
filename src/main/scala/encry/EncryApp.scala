@@ -90,7 +90,8 @@ object EncryApp extends App with Logging {
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.node.mining) miner ! StartMining
   if (settings.levelDb.enable) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
-  if (settings.testing.transactionGeneration) system.actorOf(Props[TransactionGenerator], "tx-generator") ! StartGeneration
+  if (settings.testing.transactionGeneration)
+    system.actorOf(Props[TransactionGenerator].withDispatcher("transaction-generator-dispatcher"), "tx-generator") ! StartGeneration
   if (settings.node.enableCLI) cliListener ! StartListening
   val zombie: ActorRef = system.actorOf(Props[Zombie], "zombie")
 

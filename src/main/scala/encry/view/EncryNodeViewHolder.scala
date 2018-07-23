@@ -1,16 +1,18 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
+import encry.local.TransactionGenerator.{FetchWalletData, GenerateTransaction, WalletData, amountD}
 import encry.modifiers._
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{BaseTransaction, EncryTransactionSerializer}
 import encry.modifiers.serialization.Serializer
-import encry.modifiers.state.box.EncryProposition
+import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.EncryDeliveryManager.FullBlockChainSynced
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{ApplyState, RequestedModifiers}
@@ -27,6 +29,7 @@ import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import org.apache.commons.io.FileUtils
 import scorex.crypto.authds.ADDigest
+
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
@@ -98,6 +101,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       }
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
+    case FetchWalletData(limit: Int, minimalFeeD: Int) =>
+      val wallet: EncryWallet = nodeView.wallet
+      val availableBoxes: Seq[AssetBox] = wallet.walletStorage.allBoxes.foldLeft(Seq.empty[AssetBox], 0L) {
+        case (acc, box: AssetBox) if box.isIntrinsic && acc._2 < limit * (amountD + minimalFeeD) => (acc._1 :+ box, acc._2 + box.amount)
+        case (acc, _) => acc
+      }._1
+      if (availableBoxes.map(_.amount).sum >= limit * (amountD + minimalFeeD))
+        sender() ! GenerateTransaction(WalletData(wallet.keyManager.mainKey, availableBoxes))
     case a: Any => logError("Strange input: " + a)
   }
 
