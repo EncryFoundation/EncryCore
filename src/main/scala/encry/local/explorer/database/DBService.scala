@@ -28,8 +28,6 @@ class DBServiceImpl extends DBService with Logging {
 
   def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] = runAsync(markAsRemovedFromMainChainQuery(ids))
 
-  // internal
-
   private lazy val dataSource = new HikariDataSource
   if (settings.postgres.enabled) {
     dataSource.setJdbcUrl(settings.postgres.host)

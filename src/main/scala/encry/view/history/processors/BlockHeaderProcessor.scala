@@ -151,9 +151,9 @@ trait BlockHeaderProcessor extends Logging {
       val score = Difficulty @@ (scoreOf(h.parentId).get + difficulty)
       val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
         if (score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
-      val scoreRow = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
-      val heightRow = headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
-      val headerIdsRow = if (score > bestHeadersChainScore) {
+      val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
+      val heightRow: (ByteArrayWrapper, ByteArrayWrapper) = headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
+      val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (score > bestHeadersChainScore) {
         bestBlockHeaderIdsRow(h, score)
       } else {
         EncryApp.system.actorSelection("/user/blockListener") ! NewOrphaned(h) // TODO: Remove direct system import when possible.

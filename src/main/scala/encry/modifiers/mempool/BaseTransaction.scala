@@ -58,13 +58,14 @@ case class TransactionDBVersion(id: String, blockId: String, isCoinbase: Boolean
 
 case object TransactionDBVersion {
   def apply(block: EncryBlock): Seq[TransactionDBVersion] = {
-    assert(block.payload.transactions.nonEmpty)
-    val transactions = block.payload.transactions.map { tx =>
-      val id: String = Base16.encode(tx.id)
-      val blockId: String = Base16.encode(block.header.id)
-      TransactionDBVersion(id, blockId, isCoinbase = false, block.header.timestamp)
-    }.toIndexedSeq
-    transactions.init :+ transactions.last.copy(isCoinbase = true)
+    if (block.payload.transactions.nonEmpty) {
+      val transactions: Seq[TransactionDBVersion] = block.payload.transactions.map { tx =>
+        val id: String = Base16.encode(tx.id)
+        val blockId: String = Base16.encode(block.header.id)
+        TransactionDBVersion(id, blockId, isCoinbase = false, block.header.timestamp)
+      }.toIndexedSeq
+      transactions.init :+ transactions.last.copy(isCoinbase = true)
+    } else Seq.empty
   }
 }
 

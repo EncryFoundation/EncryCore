@@ -24,7 +24,7 @@ protected[database] object QueryRepository {
     } yield txsR + headerR + outsR + insR
 
   def markAsRemovedFromMainChainQuery(ids: List[ModifierId]): ConnectionIO[Int] = {
-    val query = "UPDATE ${HeadersTable.name} SET best_chain = FALSE WHERE id = ?"
+    val query = s"UPDATE public.headers SET best_chain = FALSE WHERE id = ?"
     Update[String](query).updateMany(ids.map(Base16.encode))
   }
 
