@@ -146,6 +146,8 @@ class EncryMiner extends Actor with Logging {
         case ((validTxs, invalidTxs, bxsAcc), tx) =>
           val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.inputs.map(u => ByteArrayWrapper(u.boxId))
           if ((validTxs.map(_.length).sum + tx.length) <= Constants.BlockMaxSize - 124) {
+            log.info(s"view.state.validate(tx).isSuccess: ${view.state.validate(tx).isSuccess}")
+            log.info(s"bxsRaw.forall(k => !bxsAcc.contains(k))): ${bxsRaw.forall(k => !bxsAcc.contains(k))}")
             if (view.state.validate(tx).isSuccess && bxsRaw.forall(k => !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size)
               (validTxs :+ tx, invalidTxs, bxsAcc ++ bxsRaw)
             else (validTxs, invalidTxs :+ tx, bxsAcc)
