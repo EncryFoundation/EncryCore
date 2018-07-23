@@ -50,10 +50,13 @@ class PeerManager extends Actor with Logging {
       if (peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress))
         peer.handlerRef ! CloseConnection
       else {
-        if (peer.publicPeer) self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
-        else PeerDatabase.remove(peer.socketAddress)
-        connectedPeers += (peer.socketAddress -> peer)
-        nodeViewSynchronizer ! HandshakedPeer(peer)
+        if ((settings.network.connectOnlyWithKnownPeers && settings.network.knownPeers.contains(peer.socketAddress)) ||
+          !settings.network.connectOnlyWithKnownPeers) {
+            if (peer.publicPeer) self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
+            else PeerDatabase.remove(peer.socketAddress)
+            connectedPeers += (peer.socketAddress -> peer)
+            nodeViewSynchronizer ! HandshakedPeer(peer)
+        }
       }
     case Disconnected(remote) =>
       connectedPeers -= remote
@@ -69,9 +72,9 @@ class PeerManager extends Actor with Logging {
       if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
         randomPeer.foreach { address =>
           if (!connectedPeers.exists(_._1 == address) &&
-            !connectingPeers.exists(_.getHostName == address.getHostName)) {
+            !connectingPeers.exists(_.getHostName == address.getHostName) &&
+            ((settings.network.connectOnlyWithKnownPeers && settings.network.knownPeers.contains(address)) || !settings.network.connectOnlyWithKnownPeers))
             sender() ! ConnectTo(address)
-          }
         }
       }
   }
