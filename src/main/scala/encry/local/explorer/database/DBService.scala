@@ -15,14 +15,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.control.NonFatal
 
-trait DBService {
-  def processBlock(block: EncryBlock): Future[Int]
-  def processHeader(block: EncryBlock): Future[Int]
-  def processOrphanedHeader(header: EncryBlockHeader): Future[Int]
-  def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int]
-}
-
-class DBServiceImpl extends DBService with Logging {
+class DBService extends Logging {
 
   def processBlock(block: EncryBlock): Future[Int] = runAsync(processBlockQuery(block))
 
@@ -54,4 +47,8 @@ class DBServiceImpl extends DBService with Logging {
             Future.failed(th)
         }
     } else Future.successful(0)
+}
+
+object DBService {
+  def apply(): DBService = new DBService
 }

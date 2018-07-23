@@ -10,7 +10,6 @@ import scorex.crypto.encode.Base16
 import cats.implicits._
 import doobie.postgres.implicits._
 import doobie.util.log.LogHandler
-import encry.local.explorer.database.Tables.{HeadersTable, InputsTable, OutputsTable, TransactionsTable}
 import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, TransactionDBVersion}
 
 protected[database] object QueryRepository {
@@ -29,7 +28,7 @@ protected[database] object QueryRepository {
   }
 
   def insertHeaderQuery(block: EncryBlock): ConnectionIO[Int] = {
-    val headerDB: HeaderDBVersion = HeadersTable.header(block)
+    val headerDB: HeaderDBVersion = HeaderDBVersion(block)
     val query =
       """
         |INSERT INTO public.headers (id, parent_id, version, height, ad_proofs_root, state_root, transactions_root, ts, difficulty,
@@ -40,7 +39,7 @@ protected[database] object QueryRepository {
   }
 
   def insertOrphanedHeaderQuery(header: EncryBlockHeader): ConnectionIO[Int] = {
-    val headerDB: HeaderDBVersion = HeadersTable.orphanedHeader(header)
+    val headerDB: HeaderDBVersion = HeaderDBVersion(header)
     val query =
       """
         |INSERT INTO public.headers (id, parent_id, version, height, ad_proofs_root, state_root, transactions_root, ts, difficulty,
@@ -50,12 +49,10 @@ protected[database] object QueryRepository {
     Update[HeaderDBVersion](query).run(headerDB)
   }
 
-  // internal
-
   private implicit val han: LogHandler = LogHandler.jdkLogHandler
 
   private def insertTransactionsQuery(block: EncryBlock): ConnectionIO[Int] = {
-    val txs: Seq[TransactionDBVersion] = TransactionsTable.txs(block)
+    val txs: Seq[TransactionDBVersion] = TransactionDBVersion(block)
     val query =
       """
         |INSERT INTO public.transactions (id, block_id, is_coinbase, ts)
@@ -65,7 +62,7 @@ protected[database] object QueryRepository {
   }
 
   private def insertInputsQuery(p: EncryBlockPayload): ConnectionIO[Int] = {
-    val inputs = InputsTable.inputs(p)
+    val inputs: Seq[InputDBVersion] = p.transactions.flatMap(InputDBVersion(_))
     val query =
       """
         |INSERT INTO public.inputs (id, tx_id, serialized_proofs)
@@ -75,7 +72,7 @@ protected[database] object QueryRepository {
   }
 
   private def insertOutputsQuery(p: EncryBlockPayload): ConnectionIO[Int] = {
-    val outputs: Seq[OutputDBVersion] = OutputsTable.outputs(p)
+    val outputs: Seq[OutputDBVersion] = p.transactions.flatMap(OutputDBVersion(_))
     val query =
       """
         |INSERT INTO public.outputs (id, tx_id, monetary_value, coin_id, contract_hash, data)
