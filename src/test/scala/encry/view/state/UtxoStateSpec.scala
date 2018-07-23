@@ -100,4 +100,30 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     filteredValidAndInvalidTxs.size shouldEqual validTxs.size
   }
+
+  property("Txs application") {
+
+    val bxs = TestHelper.genAssetBoxes
+
+    val bh = BoxHolder(bxs)
+
+    val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None)
+
+    val factory = TestHelper
+    val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath)
+
+    val fee = factory.Props.txFee
+
+    val validTxs = keys.zip(bxs).map { case (k, bx) =>
+      val useBoxes = IndexedSeq(bx)
+      TransactionFactory.defaultPaymentTransactionScratch(k, fee,
+        timestamp, useBoxes, factory.Props.recipientAddr, factory.Props.boxValue - 4300)
+    }
+
+    val expectedDigest = state.generateProofs(validTxs)
+
+    val applyTry = state.applyBlockTransactions(validTxs, expectedDigest.get._2)
+
+    applyTry.isSuccess shouldBe true
+  }
 }

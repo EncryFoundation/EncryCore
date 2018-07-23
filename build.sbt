@@ -17,10 +17,18 @@ resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repos
 val akkaVersion = "2.5.13"
 val akkaHttpVersion = "10.0.9"
 val circeVersion = "0.9.3"
+val doobieVersion = "0.5.2"
 
 val networkDependencies = Seq(
   "org.bitlet" % "weupnp" % "0.1.+",
   "commons-net" % "commons-net" % "3.+"
+)
+
+val databaseDependencies = Seq(
+  "org.tpolecat" %% "doobie-core"     % doobieVersion,
+  "org.tpolecat" %% "doobie-postgres" % doobieVersion,
+  "org.tpolecat" %% "doobie-specs2"   % doobieVersion,
+  "org.tpolecat" %% "doobie-hikari"   % doobieVersion
 )
 
 val apiDependencies = Seq(
@@ -42,7 +50,8 @@ val testingDependencies = Seq(
   "com.typesafe.akka" %% "akka-testkit" % "2.4.+" % "test",
   "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % "test",
   "org.scalatest" %% "scalatest" % "3.0.3" % "test",
-  "org.scalacheck" %% "scalacheck" % "1.13.+" % "test"
+  "org.scalacheck" %% "scalacheck" % "1.13.+" % "test",
+  "org.mockito" % "mockito-core" % "2.19.1" % Test,
 )
 
 libraryDependencies ++= Seq(
@@ -65,7 +74,7 @@ libraryDependencies ++= Seq(
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
   "org.influxdb" % "influxdb-java" % "2.10",
   "org.apache.commons" % "commons-io" % "1.3.2"
-) ++ networkDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
+) ++ networkDependencies ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
 
 fork := true
 
