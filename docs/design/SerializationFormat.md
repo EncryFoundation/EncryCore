@@ -7,7 +7,7 @@ Note, for encoding\decoding of collections recursive length prefixing technique 
 Block header
 
 ModifierId | 101
------------|----
+-----------|:----
 Bytes total| 154 + `difficultySize` + `equihashSolutionSize`
 
 Field name | Bytes distribution
@@ -29,7 +29,7 @@ Field name | Bytes distribution
 Block payload
 
 ModifierId | 102
------------|----
+-----------|:----
 Bytes total| 36 + (4 + `xLen`) * `xQty`
 
 Field name | Bytes distribution
@@ -43,7 +43,7 @@ Field name | Bytes distribution
 Authenticated dictionary proofs
 
 ModifierId | 104
------------|----
+-----------|:----
 Bytes total| 32 + `proofBytes.len`
 
 Field name | Bytes distribution
@@ -57,7 +57,7 @@ Field name | Bytes distribution
 Transaction
 
 ModifierId | 2
------------|----
+-----------|:----
 Bytes total| 20 + (\[`xLen`: 0 - 2; 2 - `xLen`\] * `xQty`) + (\[`yLen`: 0 - 2; 2 - `yLen`\] * `yQty`) + `proof.len`
 
 Field name | Bytes distribution
@@ -69,3 +69,49 @@ Field name | Bytes distribution
 `inputs[Seq[Input]]` | 20 - (\[`xLen`: 0 - 2; 2 - `xLen`\] * `xQty`)
 `directives[Seq[Directive]]`| 20 + (\[`xLen`: 0 - 2; 2 - `xLen`\] * `xQty`) - 20 + (\[`xLen`: 0 - 2; 2 - `xLen`\] * `xQty`) + (\[`yLen`: 0 - 2; 2 - `yLen`\] * `yQty`)
 `proofOpt[Option[Proof]]`  | ? 20 + (\[`xLen`: 0 - 2; 2 - `xLen`\] * `xQty`) + (\[`yLen`: 0 - 2; 2 - `yLen`\] * `yQty`) - `bytes.len`
+
+
+## EncryProposition
+
+Asset locker
+
+Bytes total | 32
+------------|---
+
+Field name | Bytes distribution
+-----------|-------------------
+`contractHash` | 0 - 32
+
+
+## AssetBox
+
+Box holding any monetary asset
+
+TypeId | 1
+-----------|:----
+Bytes total| 2 + `propositionLen` + 8 + 8 + `x`
+
+Field name | Bytes distribution
+-----------|-------------------
+`propositionLen[Short]` | 0 - 2
+`proposition[EncryProposition]` | 2 - `propositionLen`
+`nonce[Long]` | (2 + `propositionLen`) - (2 + `propositionLen` + 8)
+`amount[Long]`| (2 + `propositionLen` + 8) - (2 + `propositionLen` + 8 + 8)
+`tokenIdOpt[Option[ADKey]]`| ? (2 + `propositionLen` + 8 + 8) - `bytes.len`
+
+
+## DataBox
+
+Box holding arbitrary data
+
+TypeId | 4
+-----------|:----
+Bytes total| 2 + `propositionLen` + 8 + 8 + `x`
+
+Field name | Bytes distribution
+-----------|-------------------
+`propositionLen[Short]` | 0 - 2
+`proposition[EncryProposition]` | 2 - `propositionLen`
+`nonce[Long]` | (2 + `propositionLen`) - (2 + `propositionLen` + 8)
+`dataLen[Short]`| (2 + `propositionLen` + 8) - (2 + `propositionLen` + 8 + 2)
+`data`| (2 + `propositionLen` + 8 + 2) - (2 + `propositionLen` + 8 + 2 + `dataLen`)
