@@ -10,7 +10,6 @@ import encry.network.message.{GetPeersSpec, Message, PeersSpec}
 import encry.network.peer.PeerManager._
 import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
 import encry.utils.Logging
-import shapeless.syntax.typeable._
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -27,7 +26,7 @@ class PeerSynchronizer extends Actor with Logging {
 
   override def receive: Receive = {
     case DataFromPeer(spec, peers: Seq[InetSocketAddress]@unchecked, remote)
-      if spec.messageCode == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined=>
+      if spec.messageCode == PeersSpec.messageCode=>
       peers.filter(checkPossibilityToAddPeer).foreach(isa =>
           peerManager ! AddOrUpdatePeer(isa, None, Some(remote.direction)))
       log.debug(s"Get new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
