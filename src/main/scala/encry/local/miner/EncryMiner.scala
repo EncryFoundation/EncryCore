@@ -2,6 +2,7 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
+
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus._
@@ -13,7 +14,7 @@ import encry.modifiers.mempool.{BaseTransaction, EncryTransaction, TransactionFa
 import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import encry.settings.Constants
+import encry.settings.{Algos, Constants}
 import encry.stats.StatsSender.{CandidateProducingTime, MiningEnd, MiningTime, SleepTime}
 import encry.utils.Logging
 import encry.utils.NetworkTime.Time
@@ -27,6 +28,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
+
 import scala.collection._
 
 class EncryMiner extends Actor with Logging {
@@ -149,7 +151,8 @@ class EncryMiner extends Actor with Logging {
             else (validTxs, invalidTxs :+ tx, bxsAcc)
           } else (validTxs, invalidTxs, bxsAcc)
       }
-
+    log.info(s"Txs to put: ${txsToPut.map(tx => Algos.encode(tx.id)).mkString(",")}")
+    log.info(s"Txs to drop: ${txsToDrop.map(tx => Algos.encode(tx.id)).mkString(",")}")
     // Remove stateful-invalid txs from mempool.
     view.pool.removeAsync(txsToDrop)
 
