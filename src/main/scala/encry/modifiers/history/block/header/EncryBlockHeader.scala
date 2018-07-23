@@ -109,6 +109,29 @@ object HeaderDBVersion {
     )
   }
 
+  def apply(header: EncryBlockHeader): HeaderDBVersion = {
+    HeaderDBVersion(
+      Base16.encode(header.id),
+      Base16.encode(header.parentId),
+      header.version,
+      header.height,
+      Base16.encode(header.adProofsRoot),
+      Base16.encode(header.stateRoot),
+      Base16.encode(header.transactionsRoot),
+      header.timestamp.toLong,
+      header.difficulty.toLong,
+      header.bytes.length,
+      header.equihashSolution.ints.toList,
+      "",
+      0,
+      "unknown",
+      0L,
+      0,
+      0,
+      bestChain = true
+    )
+  }
+
   private def minerInfo(coinbase: BaseTransaction): (String, Long) = coinbase.directives.head match {
       case TransferDirective(address, amount, tokenIdOpt) if tokenIdOpt.isEmpty => address -> amount
       case _ => "unknown" -> 0

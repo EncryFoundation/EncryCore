@@ -4,7 +4,7 @@ import doobie.free.connection.ConnectionIO
 import doobie.util.update.Update
 import encry.ModifierId
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.HeaderDBVersion
+import encry.modifiers.history.block.header.{EncryBlockHeader, HeaderDBVersion}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import scorex.crypto.encode.Base16
 import cats.implicits._
@@ -30,6 +30,17 @@ protected[database] object QueryRepository {
 
   def insertHeaderQuery(block: EncryBlock): ConnectionIO[Int] = {
     val headerDB: HeaderDBVersion = HeadersTable.header(block)
+    val query =
+      """
+        |INSERT INTO public.headers (id, parent_id, version, height, ad_proofs_root, state_root, transactions_root, ts, difficulty,
+        |      block_size, equihash_solution, ad_proofs, tx_qty, miner_address, miner_reward, fees_total, txs_size, best_chain)
+        |VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      """.stripMargin
+    Update[HeaderDBVersion](query).run(headerDB)
+  }
+
+  def insertOrphanedHeaderQuery(header: EncryBlockHeader): ConnectionIO[Int] = {
+    val headerDB: HeaderDBVersion = HeadersTable.orphanedHeader(header)
     val query =
       """
         |INSERT INTO public.headers (id, parent_id, version, height, ad_proofs_root, state_root, transactions_root, ts, difficulty,

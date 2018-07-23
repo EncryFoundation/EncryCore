@@ -9,6 +9,7 @@ import QueryRepository._
 import com.zaxxer.hikari.HikariDataSource
 import doobie.hikari.HikariTransactor
 import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.utils.Logging
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -17,6 +18,7 @@ import scala.util.control.NonFatal
 trait DBService {
   def processBlock(block: EncryBlock): Future[Int]
   def processHeader(block: EncryBlock): Future[Int]
+  def processOrphanedHeader(header: EncryBlockHeader): Future[Int]
   def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int]
 }
 
@@ -27,6 +29,8 @@ class DBServiceImpl extends DBService with Logging {
   def processHeader(block: EncryBlock): Future[Int] = runAsync(insertHeaderQuery(block))
 
   def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] = runAsync(markAsRemovedFromMainChainQuery(ids))
+
+  def processOrphanedHeader(header: EncryBlockHeader): Future[Int] = runAsync(insertOrphanedHeaderQuery(header))
 
   private lazy val dataSource = new HikariDataSource
   if (settings.postgres.enabled) {

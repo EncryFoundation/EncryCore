@@ -15,6 +15,7 @@ import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import org.mockito.Mockito._
 import org.mockito.ArgumentMatchers.{eq => eq_}
+
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -35,6 +36,14 @@ class BlockListenerSpec extends TestKit(ActorSystem("BlockListenerSpec")) with I
     actor ! sampleChainSwitching
     expectNoMsg(1 second)
     verify(dbServiceMock).markAsRemovedFromMainChain(eq_(sampleSwitchedIds))
+  }
+
+  it should "process new orphans" in new BlockListenerSpecWiring {
+    when(dbServiceMock.processOrphanedHeader(sampleHeader)).thenReturn(Future.successful(1))
+
+    actor ! sampleNewOrphaned
+    expectNoMsg(1 second)
+    verify(dbServiceMock).processOrphanedHeader(eq_(sampleHeader))
   }
 
   override def afterAll {

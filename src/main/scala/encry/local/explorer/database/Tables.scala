@@ -37,7 +37,7 @@ object Tables {
     )
 
     def header(b: EncryBlock): HeaderDBVersion = HeaderDBVersion(b)
-
+    def orphanedHeader(h: EncryBlockHeader): HeaderDBVersion = HeaderDBVersion(h)
   }
 
   final case object InputsTable extends Table {
