@@ -50,13 +50,11 @@ class PeerManager extends Actor with Logging {
     case Handshaked(peer) =>
       if (peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress))
         peer.handlerRef ! CloseConnection
-      else {
-        if (checkPossibilityToAddPeer(peer.socketAddress)) {
-            if (peer.publicPeer) self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
-            else PeerDatabase.remove(peer.socketAddress)
-            connectedPeers += (peer.socketAddress -> peer)
-            nodeViewSynchronizer ! HandshakedPeer(peer)
-        }
+      else if (checkPossibilityToAddPeer(peer.socketAddress)) {
+        if (peer.publicPeer) self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
+        else PeerDatabase.remove(peer.socketAddress)
+        connectedPeers += (peer.socketAddress -> peer)
+        nodeViewSynchronizer ! HandshakedPeer(peer)
       }
     case Disconnected(remote) =>
       connectedPeers -= remote
@@ -69,14 +67,12 @@ class PeerManager extends Actor with Logging {
         else None
       }
 
-      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
+      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections)
         randomPeer.foreach { address =>
           if (!connectedPeers.exists(_._1 == address) &&
-              !connectingPeers.exists(_.getHostName == address.getHostName) &&
-                checkPossibilityToAddPeer(address))
-                  sender() ! ConnectTo(address)
+            !connectingPeers.exists(_.getHostName == address.getHostName) && checkPossibilityToAddPeer(address))
+            sender() ! ConnectTo(address)
         }
-      }
   }
 }
 
