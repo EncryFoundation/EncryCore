@@ -11,6 +11,7 @@ import encry.EncryApp._
 import encry.network.NetworkController.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
 import encry.network.message.Message.MessageCode
+import encry.network.peer.PeerManager._
 import encry.network.message.{Message, MessageHandler}
 import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import encry.settings.NetworkSettings
@@ -81,7 +82,7 @@ class NetworkController extends Actor with Logging {
 
   def peerLogic: Receive = {
     case ConnectTo(remote)
-      if (networkSettings.connectOnlyWithKnownPeers && networkSettings.knownPeers.contains(remote)) || !networkSettings.connectOnlyWithKnownPeers =>
+      if checkPossibilityToAddPeer(remote) =>
       log.info(s"Connecting to: $remote")
       outgoing += remote
       tcpManager ! Connect(remote,
@@ -90,7 +91,7 @@ class NetworkController extends Actor with Logging {
         timeout = Some(networkSettings.connectionTimeout),
         pullMode = true)
     case Connected(remote, local)
-      if (networkSettings.connectOnlyWithKnownPeers && networkSettings.knownPeers.contains(remote)) || !networkSettings.connectOnlyWithKnownPeers =>
+      if checkPossibilityToAddPeer(remote) =>
       val direction: ConnectionType = if (outgoing.contains(remote)) Outgoing else Incoming
       val logMsg: String = direction match {
         case Incoming => s"New incoming connection from $remote established (bound to local $local)"
