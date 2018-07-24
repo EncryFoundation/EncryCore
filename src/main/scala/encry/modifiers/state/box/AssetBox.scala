@@ -10,7 +10,6 @@ import io.circe.Encoder
 import io.circe.syntax._
 import org.encryfoundation.prismlang.core.Types
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
-
 import scala.util.Try
 
 /** Represents monetary asset of some type locked with some `proposition`.
