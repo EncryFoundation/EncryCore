@@ -115,7 +115,7 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
       val notRequestedIds: Seq[ModifierId] = mids.foldLeft(Seq[ModifierId]()) {
         case (notRequested, modId) =>
           val modifierKey: ModifierIdAsKey = key(modId)
-          if (historyReaderOpt.forall(history => !history.contains(modId))) {
+          if (historyReaderOpt.forall(history => !history.contains(modId) && !delivered.contains(key(modId)))) {
             if (!cancellables.contains(modifierKey)) notRequested :+ modId
             else {
               peers = peers.updated(modifierKey, (peers.getOrElse(modifierKey, Seq()) :+ cp).distinct)
