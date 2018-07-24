@@ -14,6 +14,7 @@ case class EncryAppSettings(directory: String,
                             network: NetworkSettings,
                             restApi: RESTApiSettings,
                             ntp: NetworkTimeProviderSettings,
+                            postgres: PostgresSettings,
                             influxDB: InfluxDBSettings,
                             levelDb: LevelDbSettings)
 

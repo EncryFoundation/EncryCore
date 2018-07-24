@@ -1,14 +1,19 @@
 package encry.modifiers.mempool
 
+import com.google.common.primitives.Ints
+import encry.modifiers.history.block.Block.Timestamp
+import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.NodeViewModifier
 import encry.{ModifierId, ModifierTypeId}
 import encry.modifiers.mempool.directive.Directive
 import encry.modifiers.state.box.Box.Amount
+import encry.modifiers.state.box.{AssetBox, DataBox}
 import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.{Algos, Constants}
 import io.circe.Encoder
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.PConvertible
+import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
 import scala.util.Try
 
@@ -48,3 +53,55 @@ object BaseTransaction {
 
   val ModifierTypeId: ModifierTypeId = encry.ModifierTypeId @@ 2.toByte
 }
+
+case class TransactionDBVersion(id: String, blockId: String, isCoinbase: Boolean, timestamp: Timestamp)
+
+case object TransactionDBVersion {
+  def apply(block: EncryBlock): Seq[TransactionDBVersion] = {
+    if (block.payload.transactions.nonEmpty) {
+      val transactions: Seq[TransactionDBVersion] = block.payload.transactions.map { tx =>
+        val id: String = Base16.encode(tx.id)
+        val blockId: String = Base16.encode(block.header.id)
+        TransactionDBVersion(id, blockId, isCoinbase = false, block.header.timestamp)
+      }.toIndexedSeq
+      transactions.init :+ transactions.last.copy(isCoinbase = true)
+    } else Seq.empty
+  }
+}
+
+
+case class InputDBVersion(id: String, txId: String, proofs: String)
+
+case object InputDBVersion {
+  def apply(tx: BaseTransaction): Seq[InputDBVersion] = {
+    val txId: String = Base16.encode(tx.id)
+    tx.inputs.map { in =>
+      val id: String = Base16.encode(in.boxId)
+      val proofs: String = Base16.encode(in.proofs.map { proof =>
+        val proofBytes: Array[Byte] = proof.bytes
+        Ints.toByteArray(proofBytes.length) ++ proofBytes
+      }.foldLeft(Array.empty[Byte])(_ ++ _))
+      InputDBVersion(id, txId, proofs)
+    }
+  }
+}
+
+case class OutputDBVersion(id: String, txId: String, monetaryValue: Long, coinId: String, contractHash: String, data: String)
+
+object OutputDBVersion {
+  def apply(tx: BaseTransaction): Seq[OutputDBVersion] = {
+    val txId: String = Base16.encode(tx.id)
+    tx.newBoxes.map { bx =>
+      val id: String = Base16.encode(bx.id)
+      val (monetaryValue: Long, coinId: String, dataOpt: Option[Array[Byte]]) = bx match {
+        case ab: AssetBox => (ab.amount, Base16.encode(ab.tokenIdOpt.getOrElse(Constants.IntrinsicTokenId)), None)
+        case db: DataBox => (0L, Base16.encode(Constants.IntrinsicTokenId), db.data)
+        case _ => (0L, Base16.encode(Constants.IntrinsicTokenId), None)
+      }
+      val data: String = dataOpt.map(Base16.encode).getOrElse("")
+      val contractHash: String = Base16.encode(bx.proposition.contractHash)
+      OutputDBVersion(id, txId, monetaryValue, coinId, contractHash, data)
+    }.toIndexedSeq
+  }
+}
+
