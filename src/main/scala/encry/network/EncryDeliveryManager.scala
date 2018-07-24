@@ -92,8 +92,10 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
     case StartMining => isMining = true
     case DisableMining => isMining = false
     case SendLocalSyncInfo =>
-      if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2) log.info("Trying to send sync info too often")
-      else if (syncProcessEnable) historyReaderOpt.foreach(r => sendSync(r.syncInfo))
+      if (syncProcessEnable) {
+        if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2) log.info("Trying to send sync info too often")
+        else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
+      }
       else log.debug("Trying to send sync, but not all modifiers from modifier cache applied")
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] => historyReaderOpt = Some(reader)
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
