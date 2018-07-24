@@ -2,7 +2,14 @@
 
 Note, for encoding\decoding of collections recursive length prefixing technique is used (example: \[`xLen`: 0-4; 4-`xLen`\], where `xLen ` = `element.bytes`  - means that each `element.bytes` record in collection is prefixed with its encoded length)
 
-## Header
+`bytes.len` - length of the whole byte representation of the object
+`?` - optional length
+
+## Node view modifiers
+
+This category of modifiers affects blockchain state and thus are persisted
+
+### Header
 
 Block header
 
@@ -24,7 +31,7 @@ Field name | Bytes distribution
 `difficulty`          | 154 - (154 + `difficultySize`)
 `equihashSolution`    | (154 + `difficultySize`) - `bytes.len`
 
-## Payload
+### Payload
 
 Block payload
 
@@ -38,7 +45,7 @@ Field name | Bytes distribution
 `txQty[Int]`           | 32 - 36
 `txs[Seq[Transaction]]`| 36 - \[`xLen`: 0 - 4; 4 - `xLen`\] * xQty
 
-## ADProofs
+### ADProofs
 
 Authenticated dictionary proofs
 
@@ -52,9 +59,9 @@ Field name | Bytes distribution
 `proofBytes`           | 32 - `bytes.len`
 
 
-## Transaction
+### Transaction
 
-Transaction
+Atomic state modifier
 
 ModifierId | 2
 -----------|:----
@@ -71,7 +78,7 @@ Field name | Bytes distribution
 `proofOpt[Option[Proof]]`  | ? 20 + (\[`xLen`: 0 - 2; 2 - `xLen`\] * `xQty`) + (\[`yLen`: 0 - 2; 2 - `yLen`\] * `yQty`) - `bytes.len`
 
 
-## EncryProposition
+### EncryProposition
 
 Asset locker
 
@@ -83,30 +90,54 @@ Field name | Bytes distribution
 `contractHash` | 0 - 32
 
 
-## Input
+### Input
 
 Bytes total | arbitrary length
-------------|---
+------------|-----------------
 
 Field name | Bytes distribution
 -----------|-------------------
 `boxId[ModifierId]` | 0 - 32
 `contractLen[Short]`| 32 - 34
-`contract` | 34 - `bytes.len`
+`contract` (*1) | 34 - `bytes.len`
 
+(1) - Contract is encoded with discriminated codec from `scodec`.
 
-## Proof
+### Proof
 
 Bytes total | arbitrary length
-------------|---
+------------|-----------------
 
 Field name | Bytes distribution
 -----------|-------------------
 `valueLen[Short]`| 0 - 2
 `value[BoxedValue]` | 2 - `bytes.len`
 
+### TransaferDirective <- Directive
 
-## AssetBox
+Bytes total | 45 \|\| 77
+------------|-----------
+
+Field name | Bytes distribution
+-----------|-------------------
+`address[Address]`| 0 - 37
+`amount[Long]` | 37 - 45
+`tokenIdOpt[Option[Bytes]]`| 45 - ? 77
+
+
+### DataDirective <- Directive
+
+Bytes total | arbitrary length
+------------|-----------------
+
+Field name | Bytes distribution
+-----------|-------------------
+`contractHash`| 0 - 32
+`dataLen[Int]` | 32 - 36
+`data`| 36 - `bytes.len`
+
+
+### AssetBox <- Box
 
 Box holding any monetary asset
 
@@ -123,7 +154,7 @@ Field name | Bytes distribution
 `tokenIdOpt[Option[ADKey]]`| ? (2 + `propositionLen` + 8 + 8) - `bytes.len`
 
 
-## DataBox
+### DataBox <- Box
 
 Box holding arbitrary data
 
@@ -138,3 +169,18 @@ Field name | Bytes distribution
 `nonce[Long]` | (2 + `propositionLen`) - (2 + `propositionLen` + 8)
 `dataLen[Short]`| (2 + `propositionLen` + 8) - (2 + `propositionLen` + 8 + 2)
 `data`| (2 + `propositionLen` + 8 + 2) - (2 + `propositionLen` + 8 + 2 + `dataLen`)
+
+
+## Network messages
+
+Ephemerial messages used for nodes communication (aren't persisted)
+
+Message code | Name | Description | Length
+-------------|------|-------------|--------
+65           | Sync | Comparison with other node's view | `x` < `MaxBlockIds * ModifierIdSize + 1`
+55           | Inv  | Check whether other node has particular modifier | Arbitrary
+22           | RequestModifier | Particular modifier request | Arbitrary
+33           | Modifier | Response containing modifier | Arbitrary
+1            | GetPeers | Other node's nown peers request | Arbitrary
+2            | Peers    | Response containing list of peers | Arbitrary
+
