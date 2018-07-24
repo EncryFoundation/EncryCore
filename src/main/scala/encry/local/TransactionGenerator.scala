@@ -8,6 +8,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
+import encry.stats.StatsSender.TransactionGeneratorStat
 import encry.utils.Logging
 import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
@@ -41,14 +42,18 @@ class TransactionGenerator extends Actor with Logging {
 
     case GenerateTransaction(walletData: WalletData) if isActive =>
       if (limit > 0) {
-        (0 until limit).foldLeft(Seq[EncryTransaction](), walletData) {
+        val startTime: Long = System.currentTimeMillis()
+        val txs = (0 until limit).foldLeft(Seq[EncryTransaction](), walletData) {
           case ((txs, wd), i) =>
             if (wd.boxes.map(_.amount).sum > (limit - i) * (amountD + minimalFeeD) ) {
               val tx: EncryTransaction = createTransaction(wd)
               val leftBoxes: Seq[AssetBox] = wd.boxes.filterNot(bx => tx.inputs.map(_.boxId).contains(bx.id))
               (txs :+ tx) -> wd.copy(boxes = leftBoxes)
             } else txs -> wd
-        }._1.foreach(tx => {
+        }._1
+        if (settings.node.sendStat)
+          system.actorSelection("user/statsSender") ! TransactionGeneratorStat(txs.size, System.currentTimeMillis() - startTime)
+        txs.foreach(tx => {
           nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
         })
       }

@@ -207,7 +207,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
         if (settings.node.sendStat)
-          context.actorSelection("/user/statsSender") ! EndOfApplyingModif(pmod.id)
+          system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
         log.info(s"Going to apply modifications to the state: $progressInfo")
         nodeViewSynchronizer ! SyntacticallySuccessfulModifier(pmod)
         if (progressInfo.toApply.nonEmpty) {
