@@ -179,7 +179,7 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
       val validBalance: Boolean = {
         val debitB: Map[TokenId, Amount] = BalanceCalculator.balanceSheet(bxs)
         val creditB: Map[TokenId, Amount] = {
-          val balanceSheet: Map[TokenId, Amount] = BalanceCalculator.balanceSheet(tx.newBoxes)
+          val balanceSheet: Map[TokenId, Amount] = BalanceCalculator.balanceSheet(tx.newBoxes, excludeTokenIssuance = true)
           val intrinsicBalance: Amount = balanceSheet.getOrElse(Constants.IntrinsicTokenId, 0L)
           balanceSheet.updated(Constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
         }
