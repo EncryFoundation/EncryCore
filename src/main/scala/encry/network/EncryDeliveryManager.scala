@@ -40,7 +40,6 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
   val invSpec: InvSpec = new InvSpec(settings.network.maxInvObjects)
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
   val statusTracker: SyncTracker = SyncTracker(self, context, settings.network)
-  var syncProcessEnable: Boolean = true
 
   def key(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
@@ -50,7 +49,20 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
     context.system.scheduler.schedule(settings.network.modifierDeliverTimeCheck, settings.network.syncInterval)(self ! CheckModifiersToDownload)
   }
 
-  override def receive: Receive = {
+  override def receive: Receive = syncCycle
+
+  def syncCycle: Receive = syncSending orElse netMessages
+
+  def modifierApplyingCycle: Receive = netMessages
+
+  def syncSending: Receive = {
+    case SendLocalSyncInfo =>
+      if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2) log.info("Trying to send sync info too often")
+      else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
+    case StopSync => context.become(modifierApplyingCycle)
+  }
+
+  def netMessages: Receive = {
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       statusTracker.updateStatus(remote, status)
       status match {
@@ -67,9 +79,9 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
       historyReaderOpt.foreach { h =>
         val currentQueue: Iterable[ModifierId] = cancellables.keys.map(ModifierId @@ _.toArray)
         val newIds: Seq[(ModifierTypeId, ModifierId)] = h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
-            .filter(modId => !cancellables.keys.toSeq.contains(modId._2))
+          .filter(modId => !cancellables.keys.toSet.contains(modId._2))
         if (newIds.nonEmpty) newIds.groupBy(_._1).foreach(ids => requestDownload(ids._1, ids._2.map(_._2)))
-        else syncProcessEnable = true
+        else context.become(syncCycle)
       }
     case RequestFromLocal(peer, modifierTypeId, modifierIds) => if (modifierIds.nonEmpty && modifierTypeId != 2) expect(peer, modifierTypeId, modifierIds)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
@@ -92,17 +104,12 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
     case StartMining => isMining = true
     case DisableMining => isMining = false
     case SendLocalSyncInfo =>
-      if (syncProcessEnable) {
-        if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2) log.info("Trying to send sync info too often")
-        else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
-      }
-      else log.debug("Trying to send sync, but not all modifiers from modifier cache applied")
+      if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2) log.info("Trying to send sync info too often")
+      else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] => historyReaderOpt = Some(reader)
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
-    case StopSync =>
-      syncProcessEnable = false
     case ContinueSync =>
-      syncProcessEnable = true
+      context.become(syncCycle)
       self ! SendLocalSyncInfo
   }
 
