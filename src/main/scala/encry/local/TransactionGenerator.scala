@@ -53,9 +53,9 @@ class TransactionGenerator extends Actor with Logging {
         }._1
         if (settings.node.sendStat)
           system.actorSelection("user/statsSender") ! TransactionGeneratorStat(txs.size, System.currentTimeMillis() - startTime)
-        txs.foreach(tx => {
+        txs.foreach(tx =>
           nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
-        })
+        )
       }
   }
 
