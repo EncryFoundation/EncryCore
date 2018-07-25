@@ -101,10 +101,7 @@ object PeerManager {
 
   }
 
-  def checkPossibilityToAddPeer(address: InetSocketAddress): Boolean = {
-    val result = (settings.network.connectOnlyWithKnownPeers && settings.network.knownPeers.contains(address)) ||
+  def checkPossibilityToAddPeer(address: InetSocketAddress): Boolean =
+    (settings.network.connectOnlyWithKnownPeers && settings.network.knownPeers.contains(address)) ||
       !settings.network.connectOnlyWithKnownPeers
-    log.info(s"Going to check ability to add: $address and it is $result")
-    result
-  }
 }
