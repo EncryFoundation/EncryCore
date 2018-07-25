@@ -32,7 +32,7 @@ class PeerManager extends Actor with Logging {
   override def receive: Receive = {
     case GetConnectedPeers => sender() ! (connectedPeers.values.map(_.handshake).toSeq: Seq[Handshake])
     case GetAllPeers => sender() ! PeerDatabase.knownPeers()
-    case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
+    case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) if checkPossibilityToAddPeer(address) =>
       if (!isSelf(address, None))
         PeerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), peerNameOpt, connTypeOpt))
     case RandomPeers(howMany: Int) => sender() ! Random.shuffle(PeerDatabase.knownPeers().keys.toSeq).take(howMany)
@@ -50,9 +50,8 @@ class PeerManager extends Actor with Logging {
     case Handshaked(peer) =>
       if (peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress))
         peer.handlerRef ! CloseConnection
-      else if (checkPossibilityToAddPeer(peer.socketAddress)) {
-        if (peer.publicPeer) self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
-        else PeerDatabase.remove(peer.socketAddress)
+      else if (checkPossibilityToAddPeer(peer.socketAddress) && !connectedPeers.contains(peer.socketAddress)) {
+        self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
         connectedPeers += (peer.socketAddress -> peer)
         nodeViewSynchronizer ! HandshakedPeer(peer)
       }
@@ -102,7 +101,10 @@ object PeerManager {
 
   }
 
-  def checkPossibilityToAddPeer(address: InetSocketAddress): Boolean =
-    (settings.network.connectOnlyWithKnownPeers && settings.network.knownPeers.contains(address)) ||
+  def checkPossibilityToAddPeer(address: InetSocketAddress): Boolean = {
+    val result = (settings.network.connectOnlyWithKnownPeers && settings.network.knownPeers.contains(address)) ||
       !settings.network.connectOnlyWithKnownPeers
+    log.info(s"Going to check ability to add: $address and it is $result")
+    result
+  }
 }
