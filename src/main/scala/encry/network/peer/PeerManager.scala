@@ -52,7 +52,7 @@ class PeerManager extends Actor with Logging {
       else {
         if (peer.publicPeer) self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
         else PeerDatabase.remove(peer.socketAddress)
-        connectedPeers += (peer.socketAddress -> peer)
+        connectedPeers = connectedPeers.updated(peer.socketAddress, peer)
         nodeViewSynchronizer ! HandshakedPeer(peer)
       }
     case Disconnected(remote) =>

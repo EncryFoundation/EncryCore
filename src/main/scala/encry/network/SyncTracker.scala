@@ -33,7 +33,7 @@ case class SyncTracker(deliveryManager: ActorRef,
 
   def updateStatus(peer: ConnectedPeer, status: HistoryComparisonResult): Unit = {
     val seniorsBefore: Int = numOfSeniors()
-    statuses += peer -> status
+    statuses = statuses.updated(peer, status)
     val seniorsAfter: Int = numOfSeniors()
     if (seniorsBefore > 0 && seniorsAfter == 0) {
       log.info("Syncing is done, switching to stable regime")
@@ -43,12 +43,12 @@ case class SyncTracker(deliveryManager: ActorRef,
   }
 
   def clearStatus(remote: InetSocketAddress): Unit = {
-    statuses.find(_._1.socketAddress == remote) match {
-      case Some((peer, _)) => statuses -= peer
+    statuses.keys.find(_.socketAddress == remote) match {
+      case Some(peer) => statuses -= peer
       case None => logWarn(s"Trying to clear status for $remote, but it is not found")
     }
-    lastSyncSentTime.find(_._1.socketAddress == remote) match {
-      case Some((peer, _)) => statuses -= peer
+    lastSyncSentTime.keys.find(_.socketAddress.getAddress == remote.getAddress) match {
+      case Some(peer) => statuses -= peer
       case None => logWarn(s"Trying to clear last sync time for $remote, but it is not found")
     }
   }
