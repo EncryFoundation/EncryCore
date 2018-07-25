@@ -48,7 +48,7 @@ case class SyncTracker(deliveryManager: ActorRef,
       case None => logWarn(s"Trying to clear status for $remote, but it is not found")
     }
     lastSyncSentTime.keys.find(_.socketAddress.getAddress == remote.getAddress) match {
-      case Some(peer) => statuses -= peer
+      case Some(peer) => lastSyncSentTime -= peer
       case None => logWarn(s"Trying to clear last sync time for $remote, but it is not found")
     }
   }
