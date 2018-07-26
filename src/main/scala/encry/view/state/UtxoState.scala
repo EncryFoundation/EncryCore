@@ -1,7 +1,6 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import encry.EncryApp.settings
