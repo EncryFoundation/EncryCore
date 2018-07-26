@@ -18,7 +18,7 @@ class TransactionGenerator extends Actor with Logging {
   import TransactionGenerator._
 
   var isActive: Boolean = false
-  var limit: Int = settings.testing.limitPerEpoch
+  val limit: Int = settings.testing.limitPerEpoch
   var walletDataOpt: Option[WalletData] = None
 
   val noLimitMode: Boolean = settings.testing.limitPerEpoch < 0
