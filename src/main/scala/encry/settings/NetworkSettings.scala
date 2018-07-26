@@ -20,6 +20,7 @@ case class NetworkSettings(nodeName: String,
                            maxDeliveryChecks: Int,
                            appVersion: String,
                            maxInvObjects: Int,
+                           connectOnlyWithKnownPeers: Boolean,
                            modifierDeliverTimeCheck: FiniteDuration,
                            syncInterval: FiniteDuration,
                            syncTimeout: Option[FiniteDuration]
