@@ -32,7 +32,7 @@ class PeerManager extends Actor with Logging {
   override def receive: Receive = {
     case GetConnectedPeers => sender() ! (connectedPeers.values.map(_.handshake).toSeq: Seq[Handshake])
     case GetAllPeers => sender() ! PeerDatabase.knownPeers()
-    case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) if checkPossibilityToAddPeer(address) =>
+    case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
       if (!isSelf(address, None))
         PeerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), peerNameOpt, connTypeOpt))
     case RandomPeers(howMany: Int) => sender() ! Random.shuffle(PeerDatabase.knownPeers().keys.toSeq).take(howMany)
