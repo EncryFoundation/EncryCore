@@ -10,8 +10,6 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import encry.EncryApp._
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
-import scorex.crypto.encode.Base58
-
 import scala.concurrent.Future
 
 //TODO This cmd is unsafe.
@@ -21,7 +19,7 @@ object PrintPrivKeys extends Command {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (nodeViewHolder ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
-        Some(Response(view.vault.keyManager.keys.foldLeft("")((str, k) => str + Base58.encode(k.privKeyBytes)) + "\n"))
+        Some(Response(view.vault.keyManager.keys.foldLeft("")((str, k) => str + Algos.encode(k.privKeyBytes)) + "\n"))
       }).mapTo[Option[Response]]
   }
 }

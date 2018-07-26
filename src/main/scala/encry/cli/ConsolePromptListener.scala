@@ -55,7 +55,6 @@ object ConsolePromptListener {
     "addKey" -> AddKey,
     "init" -> InitKeyStorage,
     "pubKeys" -> PrintPubKeys,
-    "privKeys" -> PrintPrivKeys,
     "balance" -> GetBalance,
     "transfer" -> Transfer
   ))
