@@ -11,7 +11,6 @@ import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import scorex.crypto.hash.Digest32
-
 import scala.util.Try
 
 case class AssetIssuingDirective(contractHash: ContractHash, amount: Amount) extends Directive {
@@ -45,7 +44,6 @@ object AssetIssuingDirective {
     for {
       contractHash <- c.downField("contractHash").as[String]
       amount <- c.downField("amount").as[Long]
-      symbol <- c.downField("symbol").as[String]
     } yield Algos.decode(contractHash)
       .map(ch => AssetIssuingDirective(ch, amount))
       .getOrElse(throw new Exception("Decoding failed"))
