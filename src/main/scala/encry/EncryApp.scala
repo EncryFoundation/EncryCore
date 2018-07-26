@@ -11,7 +11,6 @@ import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRo
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator
-import encry.local.TransactionGenerator.StartGeneration
 import encry.local.explorer.BlockListener
 import encry.local.explorer.database.DBService
 import encry.local.miner.EncryMiner
@@ -95,7 +94,7 @@ object EncryApp extends App with Logging {
   if (settings.node.mining) miner ! StartMining
   if (settings.levelDb.enable) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
   if (settings.testing.transactionGeneration)
-    system.actorOf(Props[TransactionGenerator].withDispatcher("transaction-generator-dispatcher"), "tx-generator") ! StartGeneration
+    system.actorOf(Props[TransactionGenerator].withDispatcher("transaction-generator-dispatcher"), "tx-generator")
   if (settings.node.enableCLI) cliListener ! StartListening
   val zombie: ActorRef = system.actorOf(Props[Zombie], "zombie")
 
