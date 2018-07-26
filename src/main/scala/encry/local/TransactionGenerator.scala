@@ -52,8 +52,8 @@ class TransactionGenerator extends Actor with Logging {
 
 object TransactionGenerator {
 
-  val minimalFeeD: Int = 100
-  val amountD: Int = 100
+  val minimalFeeD: Int = settings.testing.minimalFee
+  val amountD: Int = settings.testing.amount
 
   case class WalletData(secret: PrivateKey25519, boxes: Seq[AssetBox])
 
