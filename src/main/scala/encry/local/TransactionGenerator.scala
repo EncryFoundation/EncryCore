@@ -40,23 +40,21 @@ class TransactionGenerator extends Actor with Logging {
       log.info("Stopping transaction generation")
       isActive = false
 
-    case GenerateTransaction(walletData: WalletData) if isActive =>
-      if (limit > 0) {
-        val startTime: Long = System.currentTimeMillis()
-        val txs = (0 until limit).foldLeft(Seq[EncryTransaction](), walletData) {
-          case ((txs, wd), i) =>
-            if (wd.boxes.map(_.amount).sum > (limit - i) * (amountD + minimalFeeD) ) {
-              val tx: EncryTransaction = createTransaction(wd)
-              val leftBoxes: Seq[AssetBox] = wd.boxes.filterNot(bx => tx.inputs.map(_.boxId).contains(bx.id))
-              (txs :+ tx) -> wd.copy(boxes = leftBoxes)
-            } else txs -> wd
-        }._1
-        if (settings.node.sendStat)
-          system.actorSelection("user/statsSender") ! TransactionGeneratorStat(txs.size, System.currentTimeMillis() - startTime)
-        txs.foreach(tx =>
-          nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
-        )
-      }
+    case GenerateTransaction(walletData: WalletData) if isActive && limit > 0 =>
+      val startTime: Long = System.currentTimeMillis()
+      val txs = (0 until limit).foldLeft(Seq[EncryTransaction](), walletData) {
+        case ((txs, wd), i) =>
+          if (wd.boxes.map(_.amount).sum > (limit - i) * (amountD + minimalFeeD) ) {
+            val tx: EncryTransaction = createTransaction(wd)
+            val leftBoxes: Seq[AssetBox] = wd.boxes.filterNot(bx => tx.inputs.map(_.boxId).contains(bx.id))
+            (txs :+ tx) -> wd.copy(boxes = leftBoxes)
+          } else txs -> wd
+      }._1
+      if (settings.node.sendStat)
+        context.system.actorSelection("user/statsSender") ! TransactionGeneratorStat(txs.size, System.currentTimeMillis() - startTime)
+      txs.foreach(tx =>
+        nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
+      )
   }
 
   def handleExternalEvents: Receive = {
