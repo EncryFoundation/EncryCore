@@ -160,8 +160,6 @@ class EncryMiner extends Actor with Logging {
 
     val txs: Seq[BaseTransaction] = txsToPut.sortBy(_.timestamp) :+ coinbase
 
-    txs.foreach(tx => println(s"Have tx inputs: ${tx.inputs.map(input => Algos.encode(input.boxId)).mkString(",")}"))
-
     val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
       .getOrElse(throw new Exception("ADProof generation failed"))
 

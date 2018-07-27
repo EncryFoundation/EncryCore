@@ -12,6 +12,5 @@ object EncrySupplyController {
       Constants.Chain.InitialEmissionAmount).toLong
   } else Constants.Chain.InitialEmissionAmount
 
-  def initialStateBoxes: IndexedSeq[AssetBox] =
-    (Constants.Chain.PreGenesisHeight until 0).map(i => AssetBox(EncryProposition.open, i * 9, 0))
+  def initialStateBoxes: IndexedSeq[AssetBox] = IndexedSeq(AssetBox(EncryProposition.open, -1 * 9, 0))
 }
