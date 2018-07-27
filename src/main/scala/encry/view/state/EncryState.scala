@@ -1,7 +1,6 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
 import encry.VersionTag
 import encry.consensus.EncrySupplyController
@@ -54,12 +53,13 @@ object EncryState extends Logging {
   val afterGenesisStateDigest: ADDigest = ADDigest @@ Base16.decode(Constants.AfterGenesisStateDigestHex)
     .getOrElse(throw new Error("Failed to decode genesis state digest"))
 
-  val genesisStateVersion: VersionTag = VersionTag @@ Array.fill(32)(9: Byte)
+  val genesisStateVersion: VersionTag = VersionTag @@ Base16.decode(Constants.GenesisStateVersion)
+    .getOrElse(throw new Error("Failed to decode genesis state digest"))
 
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
   def generateGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val supplyBoxes: List[EncryBaseBox] = EncrySupplyController.totalSupplyBoxes.toList
+    val supplyBoxes: List[EncryBaseBox] = EncrySupplyController.initialStateBoxes.toList
     UtxoState.genesis(supplyBoxes, stateDir, nodeViewHolderRef).ensuring(us => {
       log.info(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
       log.info(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")

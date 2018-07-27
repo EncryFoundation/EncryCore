@@ -117,17 +117,14 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
   }
 
   def generateProofs(txs: Seq[BaseTransaction]): Try[(SerializedAdProof, ADDigest)] = Try {
-    println(s"Generating proof for ${txs.length} transactions ...")
+    log.info(s"Generating proof for ${txs.length} transactions ...")
     val rootHash: ADDigest = persistentProver.digest
-    println("rootHash: " + Algos.encode(rootHash))
-    println("prover: " + persistentProver.unauthenticatedLookup(ADKey @@ Algos.decode("01e22c051b8582e9cf40b04492a07232d0033dfb3d354dd5f630f51969649840").get))
     if (txs.isEmpty) throw new Exception("Got empty transaction sequence")
     else if (!storage.version.exists(_.sameElements(rootHash)))
       throw new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}")
-    println("Going to generate")
     persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
   }.flatten.recoverWith[(SerializedAdProof, ADDigest)] { case e =>
-    println(s"Failed to generate ADProof", e)
+    log.warn(s"Failed to generate ADProof", e)
     Failure(e)
   }
 
