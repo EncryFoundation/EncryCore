@@ -66,6 +66,9 @@ class StatsSender extends Actor with Logging {
         modifiersToApply -= Algos.encode(modifierId)
       }
 
+    case TransactionGeneratorStat(txsQty: Int, generationTime: Long) =>
+      influxDB.write(8189, s"transactionGenerator,nodeName=${settings.network.nodeName} txsQty=$txsQty,generationTime=$generationTime")
+
     case SleepTime(time: Long) =>
       influxDB.write(8189, s"sleepTime,nodeName=${settings.network.nodeName} value=$time")
 
@@ -118,4 +121,6 @@ object StatsSender {
   case class BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int)//Todo no use
 
   case class StateUpdating(time: Long)
+
+  case class TransactionGeneratorStat(txsQty: Int, generationTime: Long)
 }
