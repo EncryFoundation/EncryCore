@@ -5,6 +5,7 @@ import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import encry.EncryApp.settings
 import encry.VersionTag
+import encry.consensus.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -65,7 +66,7 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
     val totalFees: Amount = regularTransactions.map(_.fee).sum
 
     val regularApplyTry: Try[Unit] = applyTry(regularTransactions)
-    val coinbaseApplyTry: Try[Unit] = applyTry(Seq(coinbase), totalFees)
+    val coinbaseApplyTry: Try[Unit] = applyTry(Seq(coinbase), totalFees + EncrySupplyController.supplyAt(height))
 
     regularApplyTry.flatMap(_ => coinbaseApplyTry).map { _ =>
       if (!expectedDigest.sameElements(persistentProver.digest))
@@ -122,7 +123,7 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
       throw new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}")
     persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
   }.flatten.recoverWith[(SerializedAdProof, ADDigest)] { case e =>
-    logWarn(s"Failed to generate ADProof", e)
+    log.warn(s"Failed to generate ADProof", e)
     Failure(e)
   }
 
