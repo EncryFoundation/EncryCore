@@ -1,7 +1,7 @@
 package encry.utils
 
+import encry.settings.Algos
 import scorex.crypto.encode.Base58
-
 import scala.util.Try
 
 case class ByteStr(arr: Array[Byte]) {
@@ -12,9 +12,9 @@ case class ByteStr(arr: Array[Byte]) {
 
   override def hashCode(): Int = java.util.Arrays.hashCode(arr)
 
-  lazy val base58: String = Base58.encode(arr)
+  lazy val encoded: String = Algos.encode(arr)
 
-  override lazy val toString: String = base58
+  override lazy val toString: String = encoded
 }
 
 object ByteStr {

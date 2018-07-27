@@ -67,8 +67,6 @@ object Constants {
     val MaxRollbackDepth: Int = 100
 
     val MaxTimeDrift: Long = 10 * DesiredBlockInterval.toMillis
-
-    val TokenSymbolMaxLength: Int = 10
   }
 
   object Equihash {

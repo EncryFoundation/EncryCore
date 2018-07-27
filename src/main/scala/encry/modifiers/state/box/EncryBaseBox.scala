@@ -37,7 +37,6 @@ object EncryBaseBox {
   implicit val jsonEncoder: Encoder[EncryBaseBox] = {
     case ab: AssetBox => AssetBox.jsonEncoder(ab)
     case db: DataBox => DataBox.jsonEncoder(db)
-    case acb: AssetCreationBox => AssetCreationBox.jsonEncoder(acb)
-    case aib: AssetIssuingBox => AssetIssuingBox.jsonEncoder(aib)
+    case aib: TokenIssuingBox => TokenIssuingBox.jsonEncoder(aib)
   }
 }
