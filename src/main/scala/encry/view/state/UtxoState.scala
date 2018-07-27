@@ -5,6 +5,7 @@ import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import encry.EncryApp.settings
 import encry.VersionTag
+import encry.consensus.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -24,6 +25,7 @@ import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.crypto.authds._
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.hash.Digest32
+
 import scala.util.{Failure, Success, Try}
 
 class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32, HF],
@@ -65,7 +67,7 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
     val totalFees: Amount = regularTransactions.map(_.fee).sum
 
     val regularApplyTry: Try[Unit] = applyTry(regularTransactions)
-    val coinbaseApplyTry: Try[Unit] = applyTry(Seq(coinbase), totalFees)
+    val coinbaseApplyTry: Try[Unit] = applyTry(Seq(coinbase), totalFees + EncrySupplyController.supplyAt(height))
 
     regularApplyTry.flatMap(_ => coinbaseApplyTry).map { _ =>
       if (!expectedDigest.sameElements(persistentProver.digest))
@@ -115,11 +117,14 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
   }
 
   def generateProofs(txs: Seq[BaseTransaction]): Try[(SerializedAdProof, ADDigest)] = Try {
-    log.info(s"Generating proof for ${txs.length} transactions ...")
+    println(s"Generating proof for ${txs.length} transactions ...")
     val rootHash: ADDigest = persistentProver.digest
+    println("rootHash: " + Algos.encode(rootHash))
+    println("prover: " + persistentProver.unauthenticatedLookup(ADKey @@ Algos.decode("01e22c051b8582e9cf40b04492a07232d0033dfb3d354dd5f630f51969649840").get))
     if (txs.isEmpty) throw new Exception("Got empty transaction sequence")
     else if (!storage.version.exists(_.sameElements(rootHash)))
       throw new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}")
+    println("Going to generate")
     persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
   }.flatten.recoverWith[(SerializedAdProof, ADDigest)] { case e =>
     println(s"Failed to generate ADProof", e)

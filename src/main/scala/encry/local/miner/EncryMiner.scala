@@ -154,12 +154,13 @@ class EncryMiner extends Actor with Logging {
 
     val minerSecret: PrivateKey25519 = view.vault.keyManager.mainKey
     val feesTotal: Amount = txsToPut.map(_.fee).sum
-    val supplyBox: AssetBox = EncrySupplyController.supplyBoxAt(view.state.height)
-
+    val supplyTotal = EncrySupplyController.supplyAt(view.state.height)
     val coinbase: EncryTransaction = TransactionFactory
-      .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, IndexedSeq(supplyBox), feesTotal, view.state.height)
+      .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, view.state.height)
 
     val txs: Seq[BaseTransaction] = txsToPut.sortBy(_.timestamp) :+ coinbase
+
+    txs.foreach(tx => println(s"Have tx inputs: ${tx.inputs.map(input => Algos.encode(input.boxId)).mkString(",")}"))
 
     val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
       .getOrElse(throw new Exception("ADProof generation failed"))

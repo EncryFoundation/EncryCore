@@ -34,12 +34,12 @@ object TransactionFactory {
 
   def coinbaseTransactionScratch(pubKey: PublicKey25519,
                                  timestamp: Long,
-                                 useBoxes: IndexedSeq[MonetaryBox],
+                                 supply: Amount,
                                  amount: Amount,
                                  height: Height): EncryTransaction = {
     val directives: IndexedSeq[Directive with Product] =
-      IndexedSeq(TransferDirective(pubKey.address, amount + useBoxes.map(_.amount).sum))
+      IndexedSeq(TransferDirective(pubKey.address, amount + supply))
 
-    EncryTransaction(0, timestamp, useBoxes.map(bx => Input.unsigned(bx.id, HeightLockedContract(height))), directives, None)
+    EncryTransaction(0, timestamp, IndexedSeq.empty, directives, None)
   }
 }

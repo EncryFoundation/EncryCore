@@ -59,8 +59,7 @@ trait InstanceFactory extends Keys {
   }
 
   lazy val coinbaseTransaction: EncryTransaction = {
-    val useBoxes = IndexedSeq(genHelper.genAssetBox(secret.publicImage.address))
-    TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, useBoxes, 0, Height @@ 100)
+    TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, 10L, 0, Height @@ 100)
   }
 
   lazy val AssetBoxI: AssetBox =
