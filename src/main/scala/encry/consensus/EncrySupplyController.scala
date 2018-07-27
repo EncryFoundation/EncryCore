@@ -11,6 +11,4 @@ object EncrySupplyController {
     (scala.math.pow(Constants.Chain.DeflationFactor, (height / Constants.Chain.DeflationInterval).floor) *
       Constants.Chain.InitialEmissionAmount).toLong
   } else Constants.Chain.InitialEmissionAmount
-
-  def initialStateBoxes: IndexedSeq[AssetBox] = IndexedSeq(AssetBox(EncryProposition.open, -9, 0))
 }
