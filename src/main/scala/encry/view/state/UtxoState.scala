@@ -121,7 +121,7 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
       throw new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}")
     persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
   }.flatten.recoverWith[(SerializedAdProof, ADDigest)] { case e =>
-    logWarn(s"Failed to generate ADProof", e)
+    println(s"Failed to generate ADProof", e)
     Failure(e)
   }
 
