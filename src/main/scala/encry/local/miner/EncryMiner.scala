@@ -154,7 +154,7 @@ class EncryMiner extends Actor with Logging {
 
     val minerSecret: PrivateKey25519 = view.vault.keyManager.mainKey
     val feesTotal: Amount = txsToPut.map(_.fee).sum
-    val supplyTotal = EncrySupplyController.supplyAt(view.state.height)
+    val supplyTotal: Amount = EncrySupplyController.supplyAt(view.state.height)
     val coinbase: EncryTransaction = TransactionFactory
       .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, view.state.height)
 
