@@ -13,7 +13,7 @@ import encry.utils.Logging
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
-
+import encry.EncryApp.settings
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
@@ -193,7 +193,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
   }
 
   def syncInfo: EncrySyncInfo = if (isEmpty) EncrySyncInfo(Seq.empty)
-  else EncrySyncInfo(lastHeaders(EncrySyncInfo.MaxBlockIds).headers.map(_.id))
+  else EncrySyncInfo(lastHeaders(settings.network.syncPackageLength).headers.map(_.id))
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
     historyStorage.store.get(validityKey(modifierId)) match {

@@ -21,11 +21,10 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
 
-trait BlockHeaderProcessor extends Logging {
+trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider
-  private val chainParams: Constants.Chain.type = Constants.Chain
   private val difficultyController: PowLinearController.type = PowLinearController
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
   protected val BestHeaderKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(EncryBlockHeader.modifierTypeId))
@@ -80,7 +79,7 @@ trait BlockHeaderProcessor extends Logging {
     else Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
 
   private def isNewHeader(header: EncryBlockHeader): Boolean =
-    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5 //TODO magic number
+    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * Constants.Chain.NewHeaderTimeMultiplier
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
@@ -140,8 +139,8 @@ trait BlockHeaderProcessor extends Logging {
       log.info(s"Initialize header chain with genesis header ${h.encodedId}")
       (Seq(
         BestHeaderKey -> ByteArrayWrapper(h.id),
-        heightIdsKey(chainParams.GenesisHeight) -> ByteArrayWrapper(h.id),
-        headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(chainParams.GenesisHeight)),
+        heightIdsKey(Constants.Chain.GenesisHeight) -> ByteArrayWrapper(h.id),
+        headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(Constants.Chain.GenesisHeight)),
         headerScoreKey(h.id) -> ByteArrayWrapper(difficulty.toByteArray)), h)
     } else {
       val score = Difficulty @@ (scoreOf(h.parentId).get + difficulty)

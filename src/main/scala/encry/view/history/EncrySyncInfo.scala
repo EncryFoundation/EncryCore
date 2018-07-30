@@ -1,13 +1,13 @@
 package encry.view.history
 
 import encry.consensus.SyncInfo
+import encry.EncryApp.settings
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.consensus.History.ModifierIds
 import encry.modifiers.NodeViewModifier
 import encry.network.message.SyncInfoMessageSpec
 import encry.ModifierId
 import encry.modifiers.serialization.Serializer
-
 import scala.util.Try
 
 case class EncrySyncInfo(lastHeaderIds: Seq[ModifierId]) extends SyncInfo {
@@ -17,12 +17,6 @@ case class EncrySyncInfo(lastHeaderIds: Seq[ModifierId]) extends SyncInfo {
   override def startingPoints: ModifierIds = lastHeaderIds.map(id => EncryBlockHeader.modifierTypeId -> id)
 
   override lazy val serializer: Serializer[M] = EncrySyncInfoSerializer
-}
-
-object EncrySyncInfo {
-
-  //Todo magic number: config?
-  val MaxBlockIds = 1000
 }
 
 object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
@@ -45,7 +39,7 @@ object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[EncrySyncInfo] = Try {
-    require(bytes.length <= EncrySyncInfo.MaxBlockIds * NodeViewModifier.ModifierIdSize + 1)
+    require(bytes.length <= settings.network.syncPackageLength * NodeViewModifier.ModifierIdSize + 1)
 
     val ids = ModifierId @@ bytes.grouped(NodeViewModifier.ModifierIdSize).toSeq
 

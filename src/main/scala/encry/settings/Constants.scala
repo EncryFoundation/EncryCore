@@ -56,6 +56,8 @@ object Constants {
     // Desired time interval between blocks
     val DesiredBlockInterval: FiniteDuration = 30.seconds
 
+    val NewHeaderTimeMultiplier: Int = 5
+
     // Number of last epochs for difficulty recalculation
     val RetargetingEpochsQty: Int = 3
 
