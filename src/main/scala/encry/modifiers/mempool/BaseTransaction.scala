@@ -86,7 +86,7 @@ case object InputDBVersion {
   }
 }
 
-case class OutputDBVersion(id: String, txId: String, monetaryValue: Long, coinId: String, contractHash: String, data: String)
+case class OutputDBVersion(id: String, txId: String, monetaryValue: Long, coinId: String, contractHash: String, unspent: Boolean, data: String)
 
 object OutputDBVersion {
   def apply(tx: BaseTransaction): Seq[OutputDBVersion] = {
@@ -100,7 +100,7 @@ object OutputDBVersion {
       }
       val data: String = dataOpt.map(Base16.encode).getOrElse("")
       val contractHash: String = Base16.encode(bx.proposition.contractHash)
-      OutputDBVersion(id, txId, monetaryValue, coinId, contractHash, data)
+      OutputDBVersion(id, txId, monetaryValue, coinId, contractHash, true, data)
     }.toIndexedSeq
   }
 }

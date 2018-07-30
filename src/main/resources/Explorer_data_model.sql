@@ -32,6 +32,7 @@ CREATE TABLE outputs(
   monetary_value BIGINT NOT NULL,
   coin_id VARCHAR NOT NULL,
   contract_hash VARCHAR NOT NULL,
+  unspent BOOLEAN NOT NULL,
   data VARCHAR
 );
 
