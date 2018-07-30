@@ -73,12 +73,12 @@ protected[database] object QueryRepository {
   }
 
   private def deleteOutputQuery(p: EncryBlockPayload): ConnectionIO[Int] = {
-    val inputs: Seq[InputDBVersion] = p.transactions.flatMap(InputDBVersion(_))
+    val inputs: Seq[String] = p.transactions.flatMap(InputDBVersion(_)).map(_.id)
     val query =
       """
         |DELETE FROM public.outputs WHERE id = ?;
       """.stripMargin
-    Update[InputDBVersion](query).updateMany(inputs.toList)
+    Update[String](query).updateMany(inputs.toList)
   }
 
   private def insertOutputsQuery(p: EncryBlockPayload): ConnectionIO[Int] = {
