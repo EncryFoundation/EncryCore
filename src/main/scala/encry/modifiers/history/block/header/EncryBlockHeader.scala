@@ -128,7 +128,7 @@ object HeaderDBVersion {
       0L,
       0,
       0,
-      bestChain = true
+      bestChain = false
     )
   }
 
