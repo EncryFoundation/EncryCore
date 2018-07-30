@@ -91,7 +91,7 @@ object EncryBlockSerializer extends Serializer[EncryBlock] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[EncryBlock] = Try{
-    var pointer = 4
+    var pointer: Int = 4
     val headerSize = Ints.fromByteArray(bytes.slice(0, pointer))
     val header = EncryBlockHeaderSerializer.parseBytes(bytes.slice(pointer, pointer + headerSize))
     pointer += headerSize
