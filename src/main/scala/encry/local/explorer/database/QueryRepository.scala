@@ -19,8 +19,9 @@ protected[database] object QueryRepository {
       headerR <- insertHeaderQuery(block)
       txsR    <- insertTransactionsQuery(block)
       outsR   <- insertOutputsQuery(block.payload)
+      ioR     <- deleteOutputQuery(block.payload)
       insR    <- insertInputsQuery(block.payload)
-    } yield txsR + headerR + outsR + insR
+    } yield txsR + headerR + ioR + outsR + insR
 
   def markAsRemovedFromMainChainQuery(ids: List[ModifierId]): ConnectionIO[Int] = {
     val query = s"UPDATE public.headers SET best_chain = FALSE WHERE id = ?"
@@ -67,6 +68,15 @@ protected[database] object QueryRepository {
       """
         |INSERT INTO public.inputs (id, tx_id, serialized_proofs)
         |VALUES (?, ?, ?);
+      """.stripMargin
+    Update[InputDBVersion](query).updateMany(inputs.toList)
+  }
+
+  private def deleteOutputQuery(p: EncryBlockPayload): ConnectionIO[Int] = {
+    val inputs: Seq[InputDBVersion] = p.transactions.flatMap(InputDBVersion(_))
+    val query =
+      """
+        |DELETE FROM public.outputs WHERE id = ?;
       """.stripMargin
     Update[InputDBVersion](query).updateMany(inputs.toList)
   }
