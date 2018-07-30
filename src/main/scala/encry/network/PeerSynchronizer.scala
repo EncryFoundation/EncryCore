@@ -7,9 +7,9 @@ import akka.util.Timeout
 import encry.EncryApp._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.message.{GetPeersSpec, Message, PeersSpec}
+import encry.network.peer.PeerManager._
 import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
 import encry.utils.Logging
-import shapeless.syntax.typeable._
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -26,15 +26,21 @@ class PeerSynchronizer extends Actor with Logging {
 
   override def receive: Receive = {
     case DataFromPeer(spec, peers: Seq[InetSocketAddress]@unchecked, remote)
-      if spec.messageCode == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined =>
-      peers.foreach(isa => peerManager ! AddOrUpdatePeer(isa, None, Some(remote.direction)))
+      if spec.messageCode == PeersSpec.messageCode =>
+      peers.filter(checkPossibilityToAddPeer).foreach(isa =>
+        peerManager ! AddOrUpdatePeer(isa, None, Some(remote.direction)))
       log.debug(s"Get new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
     case DataFromPeer(spec, _, remote) if spec.messageCode == GetPeersSpec.messageCode =>
       (peerManager ? RandomPeers(3))
         .mapTo[Seq[InetSocketAddress]]
-        .foreach { peer =>
-          networkController ! SendToNetwork(Message(PeersSpec, Right(peer), None), SendToPeer(remote))
-          log.debug(s"Send to ${remote.socketAddress} peers message which contains next peers: ${peer.mkString(",")}")
+        .foreach { peers =>
+          val correctPeers: Seq[InetSocketAddress] = peers.filter(address => {
+            if (remote.socketAddress.getAddress.isSiteLocalAddress) true
+            else !address.getAddress.isSiteLocalAddress && address != remote.socketAddress
+          })
+          log.info(s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
+          networkController ! SendToNetwork(Message(PeersSpec, Right(correctPeers), None), SendToPeer(remote))
+          log.debug(s"Send to ${remote.socketAddress} peers message which contains next peers: ${peers.mkString(",")}")
         }
     case nonsense: Any => logWarn(s"PeerSynchronizer: got something strange $nonsense")
   }

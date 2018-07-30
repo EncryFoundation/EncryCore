@@ -5,6 +5,7 @@ import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import encry.EncryApp.settings
 import encry.VersionTag
+import encry.consensus.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
@@ -12,6 +13,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.BaseTransaction
 import encry.modifiers.mempool.BaseTransaction.TransactionValidationException
 import encry.modifiers.state.StateModifierDeserializer
+import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box._
 import encry.settings.Algos.HF
@@ -64,7 +66,7 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
     val totalFees: Amount = regularTransactions.map(_.fee).sum
 
     val regularApplyTry: Try[Unit] = applyTry(regularTransactions)
-    val coinbaseApplyTry: Try[Unit] = applyTry(Seq(coinbase), totalFees)
+    val coinbaseApplyTry: Try[Unit] = applyTry(Seq(coinbase), totalFees + EncrySupplyController.supplyAt(height))
 
     regularApplyTry.flatMap(_ => coinbaseApplyTry).map { _ =>
       if (!expectedDigest.sameElements(persistentProver.digest))
@@ -121,7 +123,7 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
       throw new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}")
     persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
   }.flatten.recoverWith[(SerializedAdProof, ADDigest)] { case e =>
-    logWarn(s"Failed to generate ADProof", e)
+    log.warn(s"Failed to generate ADProof", e)
     Failure(e)
   }
 
@@ -175,21 +177,20 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
         }
 
       val validBalance: Boolean = {
-        val debitB: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxs)
-        val creditB: Map[ADKey, Amount] = {
-          val balanceSheet: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(tx.newBoxes)
+        val debitB: Map[TokenId, Amount] = BalanceCalculator.balanceSheet(bxs)
+        val creditB: Map[TokenId, Amount] = {
+          val balanceSheet: Map[TokenId, Amount] = BalanceCalculator.balanceSheet(tx.newBoxes, excludeTokenIssuance = true)
           val intrinsicBalance: Amount = balanceSheet.getOrElse(Constants.IntrinsicTokenId, 0L)
           balanceSheet.updated(Constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
         }
         creditB.forall { case (tokenId, amount) =>
-          if (tokenId sameElements Constants.IntrinsicTokenId) debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
+          if (ByteArrayWrapper(tokenId) == ByteArrayWrapper(Constants.IntrinsicTokenId))
+            debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
           else debitB.getOrElse(tokenId, 0L) >= amount
         }
       }
 
-      import io.circe.syntax._
-
-      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in ${tx.asJson}")
+      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
     }
 
   def isValid(tx: BaseTransaction, allowedOutputDelta: Amount = 0L): Boolean = validate(tx, allowedOutputDelta).isSuccess

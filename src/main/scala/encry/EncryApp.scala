@@ -11,7 +11,6 @@ import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRo
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator
-import encry.local.TransactionGenerator.StartGeneration
 import encry.local.explorer.BlockListener
 import encry.local.explorer.database.DBService
 import encry.local.miner.EncryMiner
@@ -58,7 +57,7 @@ object EncryApp extends App with Logging {
   lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
   lazy val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
-  lazy val miner: ActorRef = system.actorOf(Props[EncryMiner].withDispatcher("mining-dispatcher"), "miner")
+  lazy val miner: ActorRef = system.actorOf(Props[EncryMiner], "miner")
   val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
 
   lazy val upnp: UPnP = new UPnP(settings.network)
@@ -94,7 +93,8 @@ object EncryApp extends App with Logging {
   if (settings.postgres.enabled) system.actorOf(Props(classOf[BlockListener], DBService()), "blockListener")
   if (settings.node.mining) miner ! StartMining
   if (settings.levelDb.enable) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
-  if (settings.testing.transactionGeneration) system.actorOf(Props[TransactionGenerator], "tx-generator") ! StartGeneration
+  if (settings.testing.transactionGeneration)
+    system.actorOf(Props[TransactionGenerator].withDispatcher("transaction-generator-dispatcher"), "tx-generator")
   if (settings.node.enableCLI) cliListener ! StartListening
   val zombie: ActorRef = system.actorOf(Props[Zombie], "zombie")
 

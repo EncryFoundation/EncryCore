@@ -3,6 +3,7 @@ package encry.view.wallet.storage
 import com.google.common.primitives.Longs
 import encry.crypto.PublicKey25519
 import encry.modifiers.state.StateModifierDeserializer
+import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box._
 import encry.settings.Algos
@@ -25,9 +26,9 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
 
   def containsBox(id: ADKey): Boolean = getBoxById(id).isDefined
 
-  def getTokenBalanceById(id: ADKey): Option[Amount] = store.get(keyByTokenId(id)).map(v => Longs.fromByteArray(v.data))
+  def getTokenBalanceById(id: TokenId): Option[Amount] = store.get(keyByTokenId(id)).map(v => Longs.fromByteArray(v.data))
 
-  def getTokensId: Seq[ADKey] = readComplexValue(tokensIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
+  def getTokensId: Seq[TokenId] = readComplexValue(tokensIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
 }
 
 object WalletStorage {
@@ -36,5 +37,5 @@ object WalletStorage {
 
   def keyByBoxId(id: ADKey): ByteArrayWrapper = ByteArrayWrapper(id)
 
-  def keyByTokenId(id: ADKey): ByteArrayWrapper = ByteArrayWrapper(id)
+  def keyByTokenId(id: TokenId): ByteArrayWrapper = ByteArrayWrapper(id)
 }

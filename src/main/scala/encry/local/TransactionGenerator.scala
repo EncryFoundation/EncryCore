@@ -8,107 +8,59 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
+import encry.stats.StatsSender.TransactionGeneratorStat
 import encry.utils.Logging
-import encry.utils.NetworkTime.Time
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedTransaction}
-import encry.view.history.EncryHistory
-import encry.view.mempool.EncryMempool
-import encry.view.state.UtxoState
-import encry.view.wallet.EncryWallet
-
-import scala.concurrent.duration._
+import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
 
 class TransactionGenerator extends Actor with Logging {
 
   import TransactionGenerator._
 
-  var isActive: Boolean = false
-  var limit: Int = settings.testing.limitPerEpoch
-  var walletDataOpt: Option[WalletData] = None
-
-  val noLimitMode: Boolean = settings.testing.limitPerEpoch < 0
+  val limit: Int = settings.testing.limitPerEpoch
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
   }
 
-  override def receive: Receive =
-    handleTransactionGeneration orElse
-      handleWalletData orElse
-      handleExternalEvents
-
-  def handleTransactionGeneration: Receive = {
-
-    case StartGeneration if !isActive =>
-      log.info("Starting transaction generation")
-      isActive = true
-      context.system.scheduler.scheduleOnce(500.millis)(self ! FetchWalletData)
-      context.system.scheduler.scheduleOnce(1500.millis)(self ! GenerateTransaction)
-
-    case StopGeneration =>
-      log.info("Stopping transaction generation")
-      isActive = false
-
-    case GenerateTransaction if isActive =>
-      walletDataOpt match {
-        // Generate new transaction if wallet contains enough coins and transaction limit is not exhausted.
-        case Some(walletData) if walletData.boxes.map(_.amount).sum >= (amountD + minimalFeeD) && (limit > 0 || noLimitMode) =>
-          val tx: EncryTransaction = createTransaction(walletData)
-          val leftBoxes: Seq[AssetBox] = walletData.boxes.filterNot(bx => tx.inputs.map(_.boxId).contains(bx.id))
-          walletDataOpt = Some(walletData.copy(boxes = leftBoxes))
-          limit -= 1
-          nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
-          self ! GenerateTransaction
-        // Retry in 5 sec otherwise
-        case _ =>
-          context.system.scheduler.scheduleOnce(5000.millis)(self ! GenerateTransaction)
-      }
+  def receive: Receive = {
+    case GenerateTransaction(walletData: WalletData) if limit > 0 =>
+      val startTime: Long = System.currentTimeMillis()
+      val txs: Seq[EncryTransaction] = (0 until limit).foldLeft(Seq[EncryTransaction](), walletData) {
+        case ((transactions, wd), i) =>
+          if (wd.boxes.map(_.amount).sum > (limit - i) * (amountD + minimalFeeD)) {
+            val tx: EncryTransaction = createTransaction(wd)
+            val leftBoxes: Seq[AssetBox] = wd.boxes.filterNot(bx => tx.inputs.map(_.boxId).contains(bx.id))
+            (transactions :+ tx) -> wd.copy(boxes = leftBoxes)
+          } else transactions -> wd
+      }._1
+      if (settings.node.sendStat)
+        context.system.actorSelection("user/statsSender") ! TransactionGeneratorStat(txs.size, System.currentTimeMillis() - startTime)
+      txs.foreach(tx =>
+        nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
+      )
+    case SemanticallySuccessfulModifier(_: EncryBlock) => nodeViewHolder ! FetchWalletData(settings.testing.limitPerEpoch, minimalFeeD)
   }
-
-  def handleWalletData: Receive = {
-    case FetchWalletData => fetchWalletData()
-    case wd: WalletData => walletDataOpt = Some(wd)
-  }
-
-  def handleExternalEvents: Receive = {
-    // Reset transaction limit counter and fetch latest wallet data
-    case SemanticallySuccessfulModifier(_: EncryBlock) =>
-      self ! FetchWalletData
-      limit = settings.testing.limitPerEpoch
-  }
-
-  def fetchWalletData(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, WalletData] { v =>
-      val wallet: EncryWallet = v.vault
-      val availableBoxes: Seq[AssetBox] = wallet.walletStorage.allBoxes.foldLeft(Seq.empty[AssetBox]) {
-        case (acc, box: AssetBox) if box.isIntrinsic => acc :+ box
-        case (acc, _) => acc
-      }
-      WalletData(wallet.keyManager.mainKey, availableBoxes)
-    }
 
   def createTransaction(wd: WalletData): EncryTransaction = {
-    val timestamp: Time = timeProvider.time()
     val boxes: IndexedSeq[AssetBox] = wd.boxes.foldLeft(Seq.empty[AssetBox]) { case (boxesAcc, box) =>
-      if (boxesAcc.map(_.amount).sum < (amountD + minimalFeeD)) boxesAcc :+ box else boxesAcc
+      if (boxesAcc.map(_.amount).sum <= (amountD + minimalFeeD)) boxesAcc :+ box else boxesAcc
     }.toIndexedSeq
-    TransactionFactory.defaultPaymentTransactionScratch(wd.secret, minimalFeeD, timestamp, boxes,
+    TransactionFactory.defaultPaymentTransactionScratch(wd.secret, minimalFeeD, timeProvider.time(), boxes,
       Address @@ settings.testing.defaultRecipientAddress, amountD)
   }
 }
 
 object TransactionGenerator {
 
-  val minimalFeeD: Int = 10000
-  val amountD: Int = 100
+  val minimalFeeD: Int = settings.testing.minimalFee
+  val amountD: Int = settings.testing.amount
 
   case class WalletData(secret: PrivateKey25519, boxes: Seq[AssetBox])
 
-  case object FetchWalletData
+  case class FetchWalletData(limit: Int, minimalFeeD: Int)
 
   case object StartGeneration
 
-  case object GenerateTransaction
+  case class GenerateTransaction(walletData: WalletData)
 
-  case object StopGeneration
 }
