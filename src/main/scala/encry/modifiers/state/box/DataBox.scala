@@ -25,17 +25,15 @@ case class DataBox(override val proposition: EncryProposition,
 
   override val tpe: Types.Product = Types.DataBox
 
-  override def asVal: PValue = PValue(convert, Types.DataBox)
+  override def asVal: PValue = PValue(asPrism, Types.DataBox)
 
-  override def convert: PObject = {
-    val fields = Map(
+  override def asPrism: PObject =
+    PObject(Map(
       "contractHash" -> PValue(proposition.contractHash, Types.PCollection.ofByte),
-      "typeId" -> PValue(typeId, Types.PInt),
-      "id" -> PValue(id, Types.PInt),
+      "typeId" -> PValue(typeId.toLong, Types.PInt),
+      "id" -> PValue(id, Types.PCollection.ofByte),
       "data" -> PValue(data, Types.PCollection.ofByte)
-    )
-    PObject(fields, tpe)
-  }
+    ), tpe)
 }
 
 object DataBox {

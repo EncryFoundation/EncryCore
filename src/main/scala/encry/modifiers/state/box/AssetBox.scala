@@ -30,18 +30,16 @@ case class AssetBox(override val proposition: EncryProposition,
 
   override val tpe: Types.Product = Types.AssetBox
 
-  override def asVal: PValue = PValue(convert, Types.AssetBox)
+  override def asVal: PValue = PValue(asPrism, Types.AssetBox)
 
-  override def convert: PObject = {
-    val fields = Map(
+  override def asPrism: PObject =
+    PObject(Map(
       "contractHash" -> PValue(proposition.contractHash, Types.PCollection.ofByte),
-      "typeId" -> PValue(typeId, Types.PInt),
-      "id" -> PValue(id, Types.PInt),
+      "typeId" -> PValue(typeId.toLong, Types.PInt),
+      "id" -> PValue(id, Types.PCollection.ofByte),
       "amount" -> PValue(amount, Types.PInt),
       "tokenId" -> PValue(tokenIdOpt.getOrElse(Constants.IntrinsicTokenId), Types.PCollection.ofByte)
-    )
-    PObject(fields, tpe)
-  }
+    ), tpe)
 }
 
 object AssetBox {
