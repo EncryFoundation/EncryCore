@@ -19,8 +19,9 @@ protected[database] object QueryRepository {
       headerR <- insertHeaderQuery(block)
       txsR    <- insertTransactionsQuery(block)
       outsR   <- insertOutputsQuery(block.payload)
+      ioR     <- updateOutputQuery(block.payload)
       insR    <- insertInputsQuery(block.payload)
-    } yield txsR + headerR + outsR + insR
+    } yield txsR + headerR + ioR + outsR + insR
 
   def markAsRemovedFromMainChainQuery(ids: List[ModifierId]): ConnectionIO[Int] = {
     val query = s"UPDATE public.headers SET best_chain = FALSE WHERE id = ?"
@@ -71,12 +72,21 @@ protected[database] object QueryRepository {
     Update[InputDBVersion](query).updateMany(inputs.toList)
   }
 
+  private def updateOutputQuery(p: EncryBlockPayload): ConnectionIO[Int] = {
+    val inputs: Seq[String] = p.transactions.flatMap(InputDBVersion(_)).map(_.id)
+    val query =
+      """
+        |UPDATE public.outputs SET unspent = FALSE WHERE id = ?;
+      """.stripMargin
+    Update[String](query).updateMany(inputs.toList)
+  }
+
   private def insertOutputsQuery(p: EncryBlockPayload): ConnectionIO[Int] = {
     val outputs: Seq[OutputDBVersion] = p.transactions.flatMap(OutputDBVersion(_))
     val query =
       """
-        |INSERT INTO public.outputs (id, tx_id, monetary_value, coin_id, contract_hash, data)
-        |VALUES (?, ?, ?, ?, ?, ?);
+        |INSERT INTO public.outputs (id, tx_id, monetary_value, coin_id, contract_hash, unspent, data)
+        |VALUES (?, ?, ?, ?, ?, ?, ?);
         |""".stripMargin
     Update[OutputDBVersion](query).updateMany(outputs.toList)
   }
