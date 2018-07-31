@@ -219,8 +219,8 @@ case class KeyManager(store: LSMStore,
     store.update(System.currentTimeMillis(),
       Seq(),
       Seq((KeyManager.seedKey, new ByteArrayWrapper(seed)),
-        (KeyManager.ivKey, new ByteArrayWrapper(Random.randomBytes(0))),
-        (KeyManager.saltKey, new ByteArrayWrapper(Random.randomBytes(0))),
+        (KeyManager.ivKey, new ByteArrayWrapper(Array.emptyByteArray)),
+        (KeyManager.saltKey, new ByteArrayWrapper(Array.emptyByteArray)),
         (KeyManager.lockKey, new ByteArrayWrapper(Array(KeyManager.unlockFlag))),
         (KeyManager.countKey, new ByteArrayWrapper(Ints.toByteArray(1)))
       )
