@@ -12,7 +12,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{BaseTransaction, EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.stats.StatsSender.{CandidateProducingTime, MiningEnd, MiningTime, SleepTime}
 import encry.utils.Logging
 import encry.utils.NetworkTime.Time
@@ -97,12 +97,12 @@ class EncryMiner extends Actor with Logging {
 
   def receiveSemanticallySuccessfulModifier: Receive = {
     case SemanticallySuccessfulModifier(mod: EncryBlock) if context.children.nonEmpty && needNewCandidate(mod) =>
-      log.info(s"Got new block. Starting to produce candidate on height: ${mod.header.height + 1} " +
-        s"in ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+      log.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
+        s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       produceCandidate()
     case SemanticallySuccessfulModifier(mod: EncryBlock) if shouldStartMine(mod) =>
-      log.info(s"Got new block2. Starting to produce candidate on height: ${mod.header.height + 1} " +
-        s"in ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+      log.info(s"Got new block2. Starting to produce candidate at height: ${mod.header.height + 1} " +
+        s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       self ! StartMining
     case SemanticallySuccessfulModifier(_) =>
   }
@@ -174,16 +174,15 @@ class EncryMiner extends Actor with Logging {
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
       log.info(s"Starting candidate generation in ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       startTime = System.currentTimeMillis()
-      if (settings.node.sendStat) {
+      if (settings.node.sendStat)
         system.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
-      }
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
-      if ((bestHeaderOpt.isDefined && view.history.isHeadersChainSynced) || settings.node.offlineGeneration)
-        CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
-      else CandidateEnvelope.empty
-      if (settings.node.sendStat) {
+      val candidate: CandidateEnvelope =
+        if ((bestHeaderOpt.isDefined && view.history.isHeadersChainSynced) || settings.node.offlineGeneration)
+          CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
+        else CandidateEnvelope.empty
+      if (settings.node.sendStat)
         system.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - startTime)
-      }
       candidate
     }
 }
