@@ -91,17 +91,17 @@ case class KeyManager(store: LSMStore,
     )
   }
 
-  def isLocked: Boolean = (1: Byte) == store.get(KeyManager.lockKey).map(_.data).getOrElse(Array(0: Byte)).head
+  def updateKey(key: ByteArrayWrapper, newValue: Byte): Unit = updateKey(key, Array(newValue))
+
+  def isLocked: Boolean = store.get(KeyManager.lockKey).exists(_.data.head == KeyManager.lockFlag)
 
   def getKey(key: ByteArrayWrapper): Array[Byte] =
     store.get(key).map(_.data).getOrElse(Array[Byte](0))
 
   def keys: Seq[PrivateKey25519] = {
-    if (!isLocked) {
-      getKeysWithChainCode.foldLeft(Seq[PrivateKey25519]()) {
-        case (seq, elem) => seq :+ elem._1
-      }
-    }else{
+    if (!isLocked) getKeysWithChainCode.foldLeft(Seq[PrivateKey25519]()) {
+      case (seq, elem) => seq :+ elem._1
+    } else {
       unlock()
       val keys: Seq[PrivateKey25519] = getKeysWithChainCode.foldLeft(Seq[PrivateKey25519]()) {
         case (seq, elem) => seq :+ elem._1
@@ -221,7 +221,7 @@ case class KeyManager(store: LSMStore,
       Seq((KeyManager.seedKey, new ByteArrayWrapper(seed)),
         (KeyManager.ivKey, new ByteArrayWrapper(Random.randomBytes(0))),
         (KeyManager.saltKey, new ByteArrayWrapper(Random.randomBytes(0))),
-        (KeyManager.lockKey, new ByteArrayWrapper(Array(0:Byte))),
+        (KeyManager.lockKey, new ByteArrayWrapper(Array(1:Byte))),
         (KeyManager.countKey, new ByteArrayWrapper(Ints.toByteArray(1)))
       )
     )
@@ -230,9 +230,9 @@ case class KeyManager(store: LSMStore,
 
 object KeyManager extends Logging {
 
-  val lockFlag = Array(0: Byte)
+  val lockFlag: Byte = 0
 
-  val unlockFlag = Array(1: Byte)
+  val unlockFlag: Byte = 1
 
   val seedKey = new ByteArrayWrapper(Algos.hash("seed"))
 
@@ -259,7 +259,6 @@ object KeyManager extends Logging {
 
     if (keyManager.keys.isEmpty) keyManager.initStorage(seed)
       if (settings.keyManager.encryption && !keyManager.isLocked) keyManager.lock()
-
 
     keyManager
   }
