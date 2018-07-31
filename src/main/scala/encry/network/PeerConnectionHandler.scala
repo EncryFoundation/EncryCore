@@ -161,7 +161,6 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   override def postStop(): Unit = {
     log.info(s"Peer handler $self to $remote is destroyed.")
     connection ! Close
-    networkController ! ConnectTo(remote)
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
