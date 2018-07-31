@@ -25,6 +25,8 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
 
   def size: Int = cache.size
 
+  def isEmpty: Boolean = size == 0
+
   def maxSize: Int
 
   /**

@@ -8,6 +8,7 @@ import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
 import encry.network.PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages._
+import encry.network.peer.PeerManager._
 import encry.network.{Handshake, SendingStrategy}
 import encry.utils.Logging
 import scala.language.postfixOps
@@ -49,9 +50,8 @@ class PeerManager extends Actor with Logging {
     case Handshaked(peer) =>
       if (peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress))
         peer.handlerRef ! CloseConnection
-      else {
-        if (peer.publicPeer) self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
-        else PeerDatabase.remove(peer.socketAddress)
+      else if (checkPossibilityToAddPeer(peer.socketAddress) && !connectedPeers.contains(peer.socketAddress)) {
+        self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
         connectedPeers += (peer.socketAddress -> peer)
         nodeViewSynchronizer ! HandshakedPeer(peer)
       }
@@ -66,14 +66,11 @@ class PeerManager extends Actor with Logging {
         else None
       }
 
-      if (connectedPeers.size + connectingPeers.size < settings.network.maxConnections) {
-        randomPeer.foreach { address =>
-          if (!connectedPeers.exists(_._1 == address) &&
-            !connectingPeers.exists(_.getHostName == address.getHostName)) {
+      if (connectedPeers.size + connectingPeers.size <= settings.network.maxConnections)
+        randomPeer.filter(address => !connectedPeers.exists(_._1 == address) &&
+          !connectingPeers.exists(_.getHostName == address.getHostName) && checkPossibilityToAddPeer(address)).foreach { address =>
             sender() ! ConnectTo(address)
-          }
         }
-      }
   }
 }
 
@@ -103,4 +100,7 @@ object PeerManager {
 
   }
 
+  def checkPossibilityToAddPeer(address: InetSocketAddress): Boolean =
+    (settings.network.connectOnlyWithKnownPeers && settings.network.knownPeers.contains(address)) ||
+      !settings.network.connectOnlyWithKnownPeers
 }

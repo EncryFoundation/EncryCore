@@ -11,10 +11,4 @@ object EncrySupplyController {
     (scala.math.pow(Constants.Chain.DeflationFactor, (height / Constants.Chain.DeflationInterval).floor) *
       Constants.Chain.InitialEmissionAmount).toLong
   } else Constants.Chain.InitialEmissionAmount
-
-  def supplyBoxAt(height: Height): AssetBox =
-    AssetBox(EncryProposition.heightLocked(height), height * 9, supplyAt(height))
-
-  def totalSupplyBoxes: IndexedSeq[AssetBox] =
-    (Constants.Chain.PreGenesisHeight until Constants.Chain.EmissionEpochLength).map(i => supplyBoxAt(Height @@ i))
 }

@@ -17,38 +17,35 @@ case class SyncTracker(deliveryManager: ActorRef,
                        context: ActorContext,
                        networkSettings: NetworkSettings) extends Logging {
 
+  var statuses: Map[ConnectedPeer, HistoryComparisonResult] = Map.empty
   private var schedule: Option[Cancellable] = None
-
-  var statuses: Map[ConnectedPeer, HistoryComparisonResult] = Map()
   private val lastSyncSentTime: mutable.Map[ConnectedPeer, Time] = mutable.Map[ConnectedPeer, Time]()
-
   private var lastSyncInfoSentTime: Time = 0L
-
-  private var stableSyncRegime: Boolean = false
 
   def scheduleSendSyncInfo(): Unit = {
     schedule.foreach(_.cancel())
-    schedule = Some(context.system.scheduler.schedule(networkSettings.modifierDeliverTimeCheck, networkSettings.syncInterval)(deliveryManager ! SendLocalSyncInfo))
+    schedule = Some(context.system.scheduler.schedule(
+      networkSettings.modifierDeliverTimeCheck, networkSettings.syncInterval)(deliveryManager ! SendLocalSyncInfo)
+    )
   }
 
   def updateStatus(peer: ConnectedPeer, status: HistoryComparisonResult): Unit = {
     val seniorsBefore: Int = numOfSeniors()
-    statuses += peer -> status
+    statuses = statuses.updated(peer, status)
     val seniorsAfter: Int = numOfSeniors()
     if (seniorsBefore > 0 && seniorsAfter == 0) {
       log.info("Syncing is done, switching to stable regime")
-      stableSyncRegime = true
       scheduleSendSyncInfo()
     }
   }
 
   def clearStatus(remote: InetSocketAddress): Unit = {
-    statuses.find(_._1.socketAddress == remote) match {
-      case Some((peer, _)) => statuses -= peer
+    statuses.keys.find(_.socketAddress == remote) match {
+      case Some(peer) => statuses -= peer
       case None => logWarn(s"Trying to clear status for $remote, but it is not found")
     }
-    lastSyncSentTime.find(_._1.socketAddress == remote) match {
-      case Some((peer, _)) => statuses -= peer
+    lastSyncSentTime.keys.find(_.socketAddress.getAddress == remote.getAddress) match {
+      case Some(peer) => lastSyncSentTime -= peer
       case None => logWarn(s"Trying to clear last sync time for $remote, but it is not found")
     }
   }
@@ -77,9 +74,11 @@ case class SyncTracker(deliveryManager: ActorRef,
     lazy val olders = statuses.filter(_._2 == Older).keys.toIndexedSeq
     lazy val nonOutdated = if (olders.nonEmpty) olders(scala.util.Random.nextInt(olders.size)) +: unknowns else unknowns
     val peers: Seq[ConnectedPeer] = if (outdated.nonEmpty) outdated
-    else nonOutdated.filter(p => (System.currentTimeMillis() - lastSyncSentTime.getOrElse(p, 0L)).millis >= networkSettings.syncInterval)
+    else nonOutdated.filter(p => (System.currentTimeMillis() - lastSyncSentTime.getOrElse(p, 0L))
+      .millis >= networkSettings.syncInterval)
     peers.foreach(updateLastSyncSentTime)
-    log.debug(s"Trying to get nodes to sync and they are: ${peers.map(_.socketAddress).mkString(",")} and handler are: ${peers.map(_.handlerRef).mkString(",")}")
+    log.debug(s"Trying to get nodes to sync and they are: ${peers.map(_.socketAddress).mkString(",")} and " +
+      s"handler are: ${peers.map(_.handlerRef).mkString(",")}")
     peers
   }
 }

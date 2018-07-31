@@ -5,14 +5,15 @@ import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
+import encry.local.TransactionGenerator.{FetchWalletData, GenerateTransaction, WalletData, amountD}
 import encry.modifiers._
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{BaseTransaction, EncryTransactionSerializer}
 import encry.modifiers.serialization.Serializer
-import encry.modifiers.state.box.EncryProposition
-import encry.network.EncryDeliveryManager.FullBlockChainSynced
+import encry.modifiers.state.box.{AssetBox, EncryProposition}
+import encry.network.EncryDeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{ApplyState, RequestedModifiers}
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -58,6 +59,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   override def receive: Receive = {
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
+      if (modifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: BaseTransaction@unchecked if tx.modifierTypeId == BaseTransaction.ModifierTypeId => txModify(tx)
@@ -70,7 +72,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             }
         }
         log.info(s"Cache before(${modifiersCache.size})")
-
         def computeApplications(): Unit = {
           modifiersCache.popCandidate(nodeView.history) match {
             case Some(mod) =>
@@ -79,8 +80,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             case None => Unit
           }
         }
-
         computeApplications()
+        if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
         log.info(s"Cache after(${modifiersCache.size})")
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, BaseTransaction] => txModify(lt.tx)
@@ -99,6 +100,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       }
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
+    case FetchWalletData(limit: Int, minimalFeeD: Int) =>
+      val wallet: EncryWallet = nodeView.wallet
+      val availableBoxes: Seq[AssetBox] = wallet.walletStorage.allBoxes.filter(_.isAmountCarrying).map(_.asInstanceOf[AssetBox])
+      if (availableBoxes.map(_.amount).sum >= limit * (amountD + minimalFeeD))
+        sender() ! GenerateTransaction(WalletData(wallet.keyManager.mainKey, availableBoxes))
     case a: Any => logError("Strange input: " + a)
   }
 
@@ -197,11 +203,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
     log.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
     if (settings.node.sendStat)
-      system.actorSelection("user/statsSender") ! StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
+      context.system.actorSelection("user/statsSender") ! StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
         if (settings.node.sendStat)
-          context.actorSelection("/user/statsSender") ! EndOfApplyingModif(pmod.id)
+          context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
         log.info(s"Going to apply modifications to the state: $progressInfo")
         nodeViewSynchronizer ! SyntacticallySuccessfulModifier(pmod)
         if (progressInfo.toApply.nonEmpty) {

@@ -19,7 +19,6 @@ import org.bouncycastle.crypto.digests.Blake2bDigest
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
-
 import scala.util.Try
 
 case class EncryBlockHeader(override val version: Version,
@@ -128,7 +127,7 @@ object HeaderDBVersion {
       0L,
       0,
       0,
-      bestChain = true
+      bestChain = false
     )
   }
 
