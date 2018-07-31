@@ -11,7 +11,7 @@ import scala.util.{Failure, Success}
 case class EncryDeserializationException(th: Throwable) extends RuntimeException(th.getLocalizedMessage)
 
 class EncryTxSerializer extends AkkaSerializer {
-  override def identifier: Int = 11111111
+  override def identifier: Int = 41
 
   override def toBinary(o: AnyRef): Array[Byte] = o match {
     case tx: EncryTransaction => EncryTransactionSerializer.toBytes(tx)
@@ -28,7 +28,7 @@ class EncryTxSerializer extends AkkaSerializer {
 }
 
 class EncryPayloadSerializer extends AkkaSerializer {
-  override def identifier: Int = 11111112
+  override def identifier: Int = 42
 
   override def toBinary(o: AnyRef): Array[Byte] = o match {
     case p: EncryBlockPayload => EncryBlockPayloadSerializer.toBytes(p)
@@ -45,7 +45,7 @@ class EncryPayloadSerializer extends AkkaSerializer {
 }
 
 class EncryProofsSerializer extends AkkaSerializer {
-  override def identifier: Int = 11111113
+  override def identifier: Int = 43
 
   override def toBinary(o: AnyRef): Array[Byte] = o match {
     case ad: ADProofs => ADProofSerializer.toBytes(ad)
@@ -62,7 +62,7 @@ class EncryProofsSerializer extends AkkaSerializer {
 }
 
 class EncryHeaderSerializer extends AkkaSerializer with Logging {
-  override def identifier: Int = 11111114
+  override def identifier: Int = 44
 
   override def toBinary(o: AnyRef): Array[Byte] = o match {
     case h: EncryBlockHeader => EncryBlockHeaderSerializer.toBytes(h)
