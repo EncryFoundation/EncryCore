@@ -58,7 +58,7 @@ class EncryMiner extends Actor with Logging {
     case StartMining if context.children.nonEmpty =>
       candidateOpt match {
         case Some(candidateBlock) =>
-          log.info(s"Start mining in ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+          log.info(s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
           context.children.foreach(_ ! NextChallenge(candidateBlock))
         case None => produceCandidate()
       }
