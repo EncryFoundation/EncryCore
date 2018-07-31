@@ -7,11 +7,12 @@ import encry.account.Account
 import encry.crypto.PublicKey25519
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.mempool.EncryBaseTransaction
+import encry.modifiers.mempool.BaseTransaction
+import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{EncryBaseBox, EncryProposition}
 import encry.settings.{Algos, Constants, EncryAppSettings}
-import encry.utils.{BalanceCalculator, BoxFilter, Logging}
+import encry.utils.{BalanceCalculator, BoxFilter, ByteStr, Logging}
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
 import encry.{ModifierId, VersionTag}
@@ -21,7 +22,7 @@ import scorex.crypto.authds.ADKey
 import scala.util.Try
 
 case class EncryWallet(walletStore: Store, keyManager: KeyManager)
-  extends Vault[EncryProposition, EncryBaseTransaction, EncryPersistentModifier, EncryWallet] with Logging {
+  extends Vault[EncryProposition, BaseTransaction, EncryPersistentModifier, EncryWallet] with Logging {
 
   val propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.accountLock(Account(pk.pubKeyBytes)))
 
@@ -31,15 +32,15 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
     case (set, key) => set :+ PublicKey25519(key.publicKeyBytes)
   }.toSet
 
-  override def scanOffchain(tx: EncryBaseTransaction): EncryWallet = this
+  override def scanOffchain(tx: BaseTransaction): EncryWallet = this
 
-  override def scanOffchain(txs: Seq[EncryBaseTransaction]): EncryWallet = this
+  override def scanOffchain(txs: Seq[BaseTransaction]): EncryWallet = this
 
   override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = modifier match {
 
     case block: EncryBlock =>
       val (newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]) = block.transactions.foldLeft(Seq[EncryBaseBox](), Seq[EncryBaseBox]()) {
-        case ((nBxs, sBxs), tx: EncryBaseTransaction) =>
+        case ((nBxs, sBxs), tx: BaseTransaction) =>
           val newBxsL: Seq[EncryBaseBox] = tx.newBoxes
             .foldLeft(Seq[EncryBaseBox]()) { case (nBxs2, bx) =>
               if (propositions.exists(_.contractHash sameElements bx.proposition.contractHash)) nBxs2 :+ bx else nBxs2
@@ -60,10 +61,10 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
 
   private def calculateNewBalance(bxsToInsert: Seq[EncryBaseBox], bxsToRemove: Seq[EncryBaseBox]): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
     import WalletStorage._
-    val bObj: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxsToInsert)
-    val toRemove: Map[ADKey, Amount] = BalanceCalculator.balanceSheet(bxsToRemove)
-    val prevBoxes: Map[ADKey, Amount] = getBalances.toMap
-    val newBalanceSheet: Map[ADKey, Amount] = {
+    val bObj: Map[TokenId, Amount] = BalanceCalculator.balanceSheet(bxsToInsert)
+    val toRemove: Map[TokenId, Amount] = BalanceCalculator.balanceSheet(bxsToRemove)
+    val prevBoxes: Map[TokenId, Amount] = getBalances.toMap
+    val newBalanceSheet: Map[TokenId, Amount] = {
       (prevBoxes.toSeq ++ bObj.toSeq).map(elem => Algos.encode(elem._1) -> elem._2).groupBy(_._1).foldLeft(Map.empty[String, Amount]) {
         case (balanceMap, tokenInfo) => balanceMap.updated(tokenInfo._1, tokenInfo._2.foldLeft(0L)((tokenSum, token) => tokenSum + token._2))
       }.map(element => ADKey @@ Algos.decode(element._1).getOrElse(Array.emptyByteArray) -> element._2).map(tokenInfo => tokenInfo._1 ->
@@ -89,7 +90,7 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
     walletStorage.update(ByteArrayWrapper(modifierId), toRemoveSummary, toInsertSummary)
   }
 
-  def getBalances: Seq[(ADKey, Long)] = walletStorage.getTokensId.foldLeft(Seq[(ADKey, Long)]()) {
+  def getBalances: Seq[(TokenId, Long)] = walletStorage.getTokensId.foldLeft(Seq[(TokenId, Long)]()) {
     case (seq, tokenId) => walletStorage.getTokenBalanceById(tokenId) match {
       case Some(v) => seq :+ (tokenId, v)
       case None => seq

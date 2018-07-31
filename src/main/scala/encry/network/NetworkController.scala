@@ -11,13 +11,13 @@ import encry.EncryApp._
 import encry.network.NetworkController.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
 import encry.network.message.Message.MessageCode
+import encry.network.peer.PeerManager._
 import encry.network.message.{Message, MessageHandler}
 import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import encry.settings.NetworkSettings
 import encry.utils.Logging
 import encry.view.history.EncrySyncInfoMessageSpec
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
 import scala.util.{Failure, Success, Try}
@@ -29,8 +29,8 @@ class NetworkController extends Actor with Logging {
   val tcpManager: ActorRef = IO(Tcp)
   implicit val timeout: Timeout = Timeout(5 seconds)
   val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
-  val messageHandlers: mutable.Map[Seq[MessageCode], ActorRef] = mutable.Map[Seq[Message.MessageCode], ActorRef]()
-  val outgoing: mutable.Set[InetSocketAddress] = mutable.Set[InetSocketAddress]()
+  var messageHandlers: Map[Seq[MessageCode], ActorRef] = Map.empty
+  var outgoing: Set[InetSocketAddress] = Set.empty
   lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse {
     if (networkSettings.upnpEnabled) upnp.externalAddress.map(a => new InetSocketAddress(a, networkSettings.bindAddress.getPort))
     else None
@@ -66,23 +66,23 @@ class NetworkController extends Actor with Logging {
 
   def businessLogic: Receive = {
     case Message(spec, Left(msgBytes), Some(remote)) =>
-      val msgId: MessageCode = spec.messageCode
       spec.parseBytes(msgBytes) match {
         case Success(content) =>
-          messageHandlers.find(_._1.contains(msgId)).map(_._2) match {
+          messageHandlers.find(_._1.contains(spec.messageCode)).map(_._2) match {
             case Some(handler) => handler ! DataFromPeer(spec, content, remote)
-            case None => logError("No handlers found for message: " + msgId)
+            case None => logError("No handlers found for message: " + spec.messageCode)
           }
         case Failure(e) => logError("Failed to deserialize data: ", e)
       }
     case SendToNetwork(message, sendingStrategy) =>
-      (peerManager ? FilterPeers(sendingStrategy))
+      (peerManager ? FilterPeers(sendingStrategy))(5 seconds)
         .map(_.asInstanceOf[Seq[ConnectedPeer]])
         .foreach(_.foreach(_.handlerRef ! message))
   }
 
   def peerLogic: Receive = {
-    case ConnectTo(remote) =>
+    case ConnectTo(remote)
+      if checkPossibilityToAddPeer(remote) =>
       log.info(s"Connecting to: $remote")
       outgoing += remote
       tcpManager ! Connect(remote,
@@ -90,7 +90,8 @@ class NetworkController extends Actor with Logging {
         options = KeepAlive(true) :: Nil,
         timeout = Some(networkSettings.connectionTimeout),
         pullMode = true)
-    case Connected(remote, local) =>
+    case Connected(remote, local)
+      if checkPossibilityToAddPeer(remote) =>
       val direction: ConnectionType = if (outgoing.contains(remote)) Outgoing else Incoming
       val logMsg: String = direction match {
         case Incoming => s"New incoming connection from $remote established (bound to local $local)"
@@ -130,7 +131,6 @@ object NetworkController {
     case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)
 
     case class ConnectTo(address: InetSocketAddress)
-
   }
 
 }

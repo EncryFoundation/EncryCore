@@ -12,7 +12,7 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-case class EncryBlockPayload(override val headerId: ModifierId, txs: Seq[EncryBaseTransaction])
+case class EncryBlockPayload(override val headerId: ModifierId, txs: Seq[BaseTransaction])
   extends EncryBaseBlockPayload {
 
   assert(txs.nonEmpty, "Block should contain at least 1 coinbase-like transaction")
@@ -21,11 +21,13 @@ case class EncryBlockPayload(override val headerId: ModifierId, txs: Seq[EncryBa
 
   override type M = EncryBlockPayload
 
-  override val transactions: Seq[EncryBaseTransaction] = txs
+  override val transactions: Seq[BaseTransaction] = txs
 
   override lazy val digest: Digest32 = EncryBlockPayload.rootHash(txs.map(_.id))
 
   override def serializer: Serializer[EncryBlockPayload] = EncryBlockPayloadSerializer
+
+  override def toString: String = s"Payload(headerId=${Algos.encode(headerId)}, txsQty=${transactions.size})"
 }
 
 object EncryBlockPayload {
@@ -53,7 +55,7 @@ object EncryBlockPayloadSerializer extends Serializer[EncryBlockPayload] {
     val headerId: Array[Byte] = bytes.slice(0, 32)
     val txQty: Int = Ints.fromByteArray(bytes.slice(32, 36))
     val leftBytes: Array[Byte] = bytes.drop(36)
-    val txs: Seq[EncryBaseTransaction] = (0 until txQty).foldLeft(Seq[EncryBaseTransaction](), 0) { case ((acc, shift), _) =>
+    val txs: Seq[BaseTransaction] = (0 until txQty).foldLeft(Seq[BaseTransaction](), 0) { case ((acc, shift), _) =>
       val len: Int = Ints.fromByteArray(leftBytes.slice(shift, shift + 4))
       EncryTransactionSerializer
         .parseBytes(leftBytes.slice(shift + 4, shift + 4 + len)).map(d => (acc :+ d, shift + 4 + len))

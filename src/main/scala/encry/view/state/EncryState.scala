@@ -1,7 +1,6 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
 import encry.VersionTag
 import encry.consensus.EncrySupplyController
@@ -27,7 +26,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   def closeStorage(): Unit = stateStore.close()
 
   /** Extracts `state changes` from the given sequence of transactions. */
-  def extractStateChanges(txs: Seq[EncryBaseTransaction]): EncryBoxStateChanges = {
+  def extractStateChanges(txs: Seq[BaseTransaction]): EncryBoxStateChanges = {
     EncryBoxStateChanges(
       txs.flatMap { tx =>
         tx.inputs.map(u => Removal(u.boxId)) ++ tx.newBoxes.map(bx => Insertion(bx))
@@ -35,7 +34,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
     )
   }
 
-  def extractStateChanges(tx: EncryBaseTransaction): EncryBoxStateChanges = extractStateChanges(Seq(tx))
+  def extractStateChanges(tx: BaseTransaction): EncryBoxStateChanges = extractStateChanges(Seq(tx))
 
   /** ID of the last applied modifier. */
   override def version: VersionTag
@@ -51,15 +50,18 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 
 object EncryState extends Logging {
 
+  def initialStateBoxes: IndexedSeq[AssetBox] = IndexedSeq(AssetBox(EncryProposition.open, -9, 0))
+
   val afterGenesisStateDigest: ADDigest = ADDigest @@ Base16.decode(Constants.AfterGenesisStateDigestHex)
     .getOrElse(throw new Error("Failed to decode genesis state digest"))
 
-  val genesisStateVersion: VersionTag = VersionTag @@ Array.fill(32)(9: Byte)
+  val genesisStateVersion: VersionTag = VersionTag @@ Base16.decode(Constants.GenesisStateVersion)
+    .getOrElse(throw new Error("Failed to decode genesis state digest"))
 
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
   def generateGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val supplyBoxes: List[EncryBaseBox] = EncrySupplyController.totalSupplyBoxes.toList
+    val supplyBoxes: List[EncryBaseBox] = EncryState.initialStateBoxes.toList
     UtxoState.genesis(supplyBoxes, stateDir, nodeViewHolderRef).ensuring(us => {
       log.info(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
       log.info(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")

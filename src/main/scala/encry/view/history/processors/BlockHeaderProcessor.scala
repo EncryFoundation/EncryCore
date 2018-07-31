@@ -3,8 +3,11 @@ package encry.view.history.processors
 import com.google.common.primitives.Ints
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
+import encry.local.explorer.BlockListener.NewOrphaned
 import encry.modifiers.EncryPersistentModifier
+import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
+import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.history.block.{Block, EncryBlock}
 import encry.settings.Constants._
 import encry.settings.{Algos, Constants, NodeSettings}
@@ -14,29 +17,70 @@ import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import encry.{EncryApp, _}
 import io.iohk.iodb.ByteArrayWrapper
-
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
 
-trait BlockHeaderProcessor extends DownloadProcessor with Logging {
+trait BlockHeaderProcessor extends Logging {
 
   protected val nodeSettings: NodeSettings
-
   protected val timeProvider: NetworkTimeProvider
-
-  private val chainParams = Constants.Chain
-
-  private val difficultyController = PowLinearController
-
+  private val chainParams: Constants.Chain.type = Constants.Chain
+  private val difficultyController: PowLinearController.type = PowLinearController
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
-
-  protected val BestHeaderKey: ByteArrayWrapper =
-    ByteArrayWrapper(Array.fill(DigestLength)(EncryBlockHeader.modifierTypeId))
-
+  protected val BestHeaderKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(EncryBlockHeader.modifierTypeId))
   protected val BestBlockKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(-1))
-
   protected val historyStorage: HistoryStorage
+  lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(nodeSettings)
+  private var isHeadersChainSyncedVar: Boolean = false
+
+  def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
+
+  def modifiersToDownload(howMany: Int, excluding: Iterable[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
+    @tailrec
+    def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] = {
+      if (acc.lengthCompare(howMany) >= 0) acc
+      else {
+        headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[EncryBlockHeader](id)) match {
+          case Some(bestHeaderAtThisHeight) =>
+            val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
+              .filter(m => !excluding.exists(ex => ex sameElements m._2))
+              .filter(m => !contains(m._2))
+            continuation(Height @@ (height + 1), acc ++ toDownload)
+          case None => acc
+        }
+      }
+    }
+
+    bestBlockOpt match {
+      case _ if !isHeadersChainSynced => Seq.empty
+      case Some(fb) => continuation(Height @@ (fb.header.height + 1), Seq.empty)
+      case None => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
+    }
+  }
+
+  /**
+    * Checks, whether it's time to download full chain and return toDownload modifiers
+    */
+  protected def toDownload(header: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] =
+    if (!nodeSettings.verifyTransactions) Seq.empty // Regime that do not download and verify transaction
+    else if (header.height >= blockDownloadProcessor.minimalBlockHeight)
+      requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
+    else if (!isHeadersChainSynced && isNewHeader(header)) {
+      // Headers chain is synced after this header. Start downloading full blocks
+      log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
+      isHeadersChainSyncedVar = true
+      blockDownloadProcessor.updateBestBlock(header)
+      Seq.empty
+    } else Seq.empty
+
+  private def requiredModifiersForHeader(h: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] =
+    if (!nodeSettings.verifyTransactions) Seq.empty
+    else if (nodeSettings.stateMode.isDigest) Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId))
+    else Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
+
+  private def isNewHeader(header: EncryBlockHeader): Boolean =
+    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * 5 //TODO magic number
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
@@ -57,19 +101,12 @@ trait BlockHeaderProcessor extends DownloadProcessor with Logging {
   protected def validityKey(id: Array[Byte]): ByteArrayWrapper =
     ByteArrayWrapper(Algos.hash("validity".getBytes(Algos.charset) ++ id))
 
-  // Defined if `encry.consensus.HistoryReader`.
   def contains(id: ModifierId): Boolean
 
   def bestBlockOpt: Option[EncryBlock]
 
-  /**
-    * Id of best header with transactions and proofs. None in regime that do not process transactions
-    */
   def bestBlockIdOpt: Option[ModifierId]
 
-  /**
-    * @return height of best header
-    */
   def bestHeaderHeight: Int = bestHeaderIdOpt.flatMap(id => heightOf(id)).getOrElse(Constants.Chain.PreGenesisHeight)
 
   /**
@@ -110,11 +147,12 @@ trait BlockHeaderProcessor extends DownloadProcessor with Logging {
       val score = Difficulty @@ (scoreOf(h.parentId).get + difficulty)
       val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
         if (score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
-      val scoreRow = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
-      val heightRow = headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
-      val headerIdsRow = if (score > bestHeadersChainScore) {
+      val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
+      val heightRow: (ByteArrayWrapper, ByteArrayWrapper) = headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
+      val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (score > bestHeadersChainScore) {
         bestBlockHeaderIdsRow(h, score)
       } else {
+        EncryApp.system.actorSelection("/user/blockListener") ! NewOrphaned(h) // TODO: Remove direct system import when possible.
         orphanedBlockHeaderIdsRow(h, score)
       }
       (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, h)
@@ -131,7 +169,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with Logging {
     val self: (ByteArrayWrapper, ByteArrayWrapper) =
       heightIdsKey(h.height) -> ByteArrayWrapper((Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray)
     val parentHeaderOpt: Option[EncryBlockHeader] = typedModifierById[EncryBlockHeader](h.parentId)
-    val forkHeaders = parentHeaderOpt.toSeq
+    val forkHeaders: Seq[EncryBlockHeader] = parentHeaderOpt.toSeq
       .flatMap(parent => headerChainBack(h.height, parent, h => isInBestChain(h)).headers)
       .filter(h => !isInBestChain(h))
     val forkIds: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = forkHeaders.map { header =>
@@ -152,17 +190,15 @@ trait BlockHeaderProcessor extends DownloadProcessor with Logging {
   protected def validate(header: EncryBlockHeader): Try[Unit] = HeaderValidator.validate(header).toTry
 
   protected def reportInvalid(header: EncryBlockHeader): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
-    val modifierId = header.id
-    val payloadModifiers = Seq(header.payloadId, header.adProofsId).filter(id => historyStorage.containsObject(id))
+    val payloadModifiers: Seq[ByteArrayWrapper] = Seq(header.payloadId, header.adProofsId).filter(id => historyStorage.containsObject(id))
       .map(id => ByteArrayWrapper(id))
-
-    val toRemove = Seq(headerScoreKey(modifierId), ByteArrayWrapper(modifierId)) ++ payloadModifiers
-    val bestHeaderKeyUpdate = if (bestHeaderIdOpt.exists(_ sameElements modifierId)) {
-      Seq(BestHeaderKey -> ByteArrayWrapper(header.parentId))
-    } else Seq()
-    val bestFullBlockKeyUpdate = if (bestBlockIdOpt.exists(_ sameElements modifierId)) {
-      Seq(BestBlockKey -> ByteArrayWrapper(header.parentId))
-    } else Seq()
+    val toRemove: Seq[ByteArrayWrapper] = Seq(headerScoreKey(header.id), ByteArrayWrapper(header.id)) ++ payloadModifiers
+    val bestHeaderKeyUpdate: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
+      if (bestHeaderIdOpt.exists(_ sameElements header.id)) Seq(BestHeaderKey -> ByteArrayWrapper(header.parentId))
+      else Seq()
+    val bestFullBlockKeyUpdate: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
+      if (bestBlockIdOpt.exists(_ sameElements header.id)) Seq(BestBlockKey -> ByteArrayWrapper(header.parentId))
+      else Seq()
     (toRemove, bestFullBlockKeyUpdate ++ bestHeaderKeyUpdate)
   }
 
@@ -198,22 +234,14 @@ trait BlockHeaderProcessor extends DownloadProcessor with Logging {
     * @return at most limit header back in history starting from startHeader and when condition until is not satisfied
     *         Note now it includes one header satisfying until condition!
     */
-  protected def headerChainBack(limit: Int,
-                                startHeader: EncryBlockHeader,
-                                until: EncryBlockHeader => Boolean): EncryHeaderChain = {
+  protected def headerChainBack(limit: Int, startHeader: EncryBlockHeader, until: EncryBlockHeader => Boolean): EncryHeaderChain = {
     @tailrec
     def loop(header: EncryBlockHeader, acc: Seq[EncryBlockHeader]): Seq[EncryBlockHeader] = {
-      if (acc.length == limit || until(header)) {
-        acc
-      } else {
-        typedModifierById[EncryBlockHeader](header.parentId) match {
-          case Some(parent: EncryBlockHeader) =>
-            loop(parent, acc :+ parent)
-          case None if acc.contains(header) =>
-            acc
-          case _ =>
-            acc :+ header
-        }
+      if (acc.length == limit || until(header)) acc
+      else typedModifierById[EncryBlockHeader](header.parentId) match {
+        case Some(parent: EncryBlockHeader) => loop(parent, acc :+ parent)
+        case None if acc.contains(header) => acc
+        case _ => acc :+ header
       }
     }
 
@@ -257,7 +285,7 @@ trait BlockHeaderProcessor extends DownloadProcessor with Logging {
       if (header.isGenesis) validateGenesisBlockHeader(header)
       else typedModifierById[EncryBlockHeader](header.parentId).map { parent =>
         validateChildBlockHeader(header, parent)
-      } getOrElse fatal(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
+      } getOrElse error(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
 
     private def validateGenesisBlockHeader(header: EncryBlockHeader): ValidationResult =
       accumulateErrors
@@ -294,8 +322,8 @@ trait BlockHeaderProcessor extends DownloadProcessor with Logging {
         //          fatal(s"Incorrect required difficulty. $detail")
         //        }
         .validate(heightOf(header.parentId).exists(h => bestHeaderHeight - h < Constants.Chain.MaxRollbackDepth)) {
-          fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
-        }
+        fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
+      }
         .validate(powScheme.verify(header)) {
           fatal(s"Wrong proof-of-work solution for $header")
         }
@@ -304,4 +332,5 @@ trait BlockHeaderProcessor extends DownloadProcessor with Logging {
         }.result
     }
   }
+
 }

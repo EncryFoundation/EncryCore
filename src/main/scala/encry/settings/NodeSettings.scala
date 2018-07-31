@@ -14,12 +14,12 @@ case class NodeSettings(stateMode: StateMode,
                         numberOfMiningWorkers: Int,
                         miningDelay: FiniteDuration,
                         offlineGeneration: Boolean,
-                        keepVersions: Int,
                         utxMaxAge: FiniteDuration,
                         mempoolCleanupInterval: FiniteDuration,
                         mempoolMaxCapacity: Int,
                         enableCLI: Boolean,
-                        sendStat: Boolean)
+                        sendStat: Boolean
+                       )
 
 trait NodeSettingsReader {
 
@@ -33,12 +33,12 @@ trait NodeSettingsReader {
       cfg.as[Int](s"$path.numberOfMiningWorkers"),
       cfg.as[FiniteDuration](s"$path.miningDelay"),
       cfg.as[Boolean](s"$path.offlineGeneration"),
-      cfg.as[Int](s"$path.keepVersions"),
       cfg.as[FiniteDuration](s"$path.utxMaxAge"),
       cfg.as[FiniteDuration](s"$path.mempoolCleanupInterval"),
       cfg.as[Int](s"$path.mempoolMaxCapacity"),
       cfg.as[Boolean](s"$path.useCli"),
-      cfg.as[Boolean](s"$path.sendStat"))
+      cfg.as[Boolean](s"$path.sendStat")
+    )
   }
 
   def stateModeFromString(modeName: String, path: String): StateMode = {

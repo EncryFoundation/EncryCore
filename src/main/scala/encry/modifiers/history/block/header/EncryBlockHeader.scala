@@ -5,7 +5,10 @@ import encry.consensus.Difficulty
 import encry.crypto.equihash.{Equihash, EquihashSolution, EquihashSolutionsSerializer}
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.Block._
+import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.mempool.BaseTransaction
+import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
 import encry.settings.{Algos, Constants}
@@ -16,7 +19,6 @@ import org.bouncycastle.crypto.digests.Blake2bDigest
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
-
 import scala.util.Try
 
 case class EncryBlockHeader(override val version: Version,
@@ -49,6 +51,8 @@ case class EncryBlockHeader(override val version: Version,
 
   lazy val adProofsId: ModifierId = ModifierWithDigest.computeId(ADProofs.modifierTypeId, id, adProofsRoot)
 
+  lazy val partsIds: Seq[ModifierId] = Seq(adProofsId, payloadId)
+
   def isRelated(mod: EncryPersistentModifier): Boolean = mod match {
     case p: ADProofs => adProofsRoot sameElements p.digest
     case t: EncryBlockPayload => transactionsRoot sameElements t.digest
@@ -56,6 +60,82 @@ case class EncryBlockHeader(override val version: Version,
   }
 
   override def serializer: Serializer[M] = EncryBlockHeaderSerializer
+
+  override def toString: String = s"Header(id=$encodedId, height=$height)"
+}
+
+case class HeaderDBVersion(id: String,
+                           parentId: String,
+                           version: Version,
+                           height: Int,
+                           proofsRoot: String,
+                           stateRoot: String,
+                           transactionsRoot: String,
+                           ts: Long,
+                           difficulty: Long,
+                           length: Int,
+                           solution: List[Int],
+                           proofs: String,
+                           txCount: Int,
+                           minerAddress: String,
+                           minerReward: Long,
+                           feesTotal: Long,
+                           txsSize: Int,
+                           bestChain: Boolean)
+
+object HeaderDBVersion {
+  def apply(block: EncryBlock): HeaderDBVersion = {
+    val (minerAddress: String, minerReward: Long) = minerInfo(block.payload.transactions.last)
+    HeaderDBVersion(
+      Base16.encode(block.header.id),
+      Base16.encode(block.header.parentId),
+      block.header.version,
+      block.header.height,
+      Base16.encode(block.header.adProofsRoot),
+      Base16.encode(block.header.stateRoot),
+      Base16.encode(block.header.transactionsRoot),
+      block.header.timestamp.toLong,
+      block.header.difficulty.toLong,
+      block.bytes.length,
+      block.header.equihashSolution.ints.toList,
+      block.adProofsOpt.map(p => Base16.encode(p.bytes)).getOrElse(""),
+      block.payload.transactions.size,
+      minerAddress,
+      minerReward,
+      block.payload.transactions.map(_.fee).sum,
+      block.payload.transactions.map(_.bytes.length).sum,
+      bestChain = true
+    )
+  }
+
+  def apply(header: EncryBlockHeader): HeaderDBVersion = {
+    HeaderDBVersion(
+      Base16.encode(header.id),
+      Base16.encode(header.parentId),
+      header.version,
+      header.height,
+      Base16.encode(header.adProofsRoot),
+      Base16.encode(header.stateRoot),
+      Base16.encode(header.transactionsRoot),
+      header.timestamp.toLong,
+      header.difficulty.toLong,
+      header.bytes.length,
+      header.equihashSolution.ints.toList,
+      "",
+      0,
+      "unknown",
+      0L,
+      0,
+      0,
+      bestChain = false
+    )
+  }
+
+  private def minerInfo(coinbase: BaseTransaction): (String, Long) = coinbase.directives.head match {
+      case TransferDirective(address, amount, tokenIdOpt) if tokenIdOpt.isEmpty => address -> amount
+      case _ => "unknown" -> 0
+    }
+
 }
 
 object EncryBlockHeader {

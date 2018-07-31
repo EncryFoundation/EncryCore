@@ -3,12 +3,13 @@ package encry.modifiers
 import encry.account.Account
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
-import encry.modifiers.state.box.{AssetBox, AssetCreationBox, EncryProposition}
+import encry.modifiers.state.box.Box.Amount
+import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.utils.TestHelper
 import encry.view.history.Height
 import org.encryfoundation.prismlang.compiler.CompiledContract
-import org.encryfoundation.prismlang.core.{Ast, Types}
 import org.encryfoundation.prismlang.core.Ast.Expr
+import org.encryfoundation.prismlang.core.{Ast, Types}
 import scorex.crypto.authds.ADKey
 import scorex.utils.Random
 import scala.util.{Random => Scarand}
@@ -28,8 +29,8 @@ trait InstanceFactory extends Keys {
   }
 
   lazy val paymentTransactionValid: EncryTransaction = {
-    val fee = genHelper.Props.txFee
-    val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address),
+    val fee: Amount = genHelper.Props.txFee
+    val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genHelper.genAssetBox(publicKey.address),
       genHelper.genAssetBox(publicKey.address))
 
     TransactionFactory.defaultPaymentTransactionScratch(secret, fee, timestamp, useBoxes,
@@ -58,8 +59,7 @@ trait InstanceFactory extends Keys {
   }
 
   lazy val coinbaseTransaction: EncryTransaction = {
-    val useBoxes = IndexedSeq(genHelper.genAssetBox(secret.publicImage.address))
-    TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, useBoxes, 0, Height @@ 100)
+    TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, 10L, 0, Height @@ 100)
   }
 
   lazy val AssetBoxI: AssetBox =
@@ -67,14 +67,6 @@ trait InstanceFactory extends Keys {
       EncryProposition.accountLock(Account(secret.publicImage.address)),
       999L,
       100000L
-    )
-
-  lazy val AssetCreationBoxI: AssetCreationBox =
-    AssetCreationBox(
-      EncryProposition.accountLock(Account(secret.publicImage.address)),
-      999L,
-      10000L,
-      "SYM"
     )
 
   lazy val OpenAssetBoxI: AssetBox =

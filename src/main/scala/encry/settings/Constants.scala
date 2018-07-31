@@ -19,7 +19,7 @@ object Constants {
   // Maximum transaction size in bytes
   val TransactionMaxSize: Int = BlockMaxSize / 4
 
-  val DefaultKeepVersions: Int = 200  // TODO: Move to `NodeSettings`.
+  val DefaultKeepVersions: Int = 200
 
   val PersistentByteCost: Int = 16
 
@@ -27,7 +27,9 @@ object Constants {
 
   val MaxDataLength: Int = 1000
 
-  val AfterGenesisStateDigestHex: String = "3d8a96b8c629c9e4b2e1b6d3bb4e16731b28b6d927c818d94a733c3ddc2be86610"
+  val AfterGenesisStateDigestHex: String = "39bc0df81fec1ee7b3804eb42084883ce4925aec8393df39806f00e129ade9f101"
+
+  val GenesisStateVersion: String = "0909090909090909090909090909090909090909090909090909090909090909"
 
   val IntrinsicTokenId: ADKey = ADKey !@@ Algos.hash("intrinsic_token")
 
@@ -43,10 +45,7 @@ object Constants {
 
     val Version: Version = 0: Byte
 
-    // Number of fractions in one Encry Token.
-    val FractionsInOneCoin: Int = 1000000
-
-    val InitialEmissionAmount: Int = 2 * FractionsInOneCoin
+    val InitialEmissionAmount: Int = 2 * 1000000
 
     val DeflationInterval: Int = 100
 
@@ -67,11 +66,9 @@ object Constants {
     val PreGenesisHeight: Height = Height @@ (GenesisHeight - 1)
 
     // Maximum number of epochs blockchain state can be rolled back
-    val MaxRollbackDepth: Int = (10.days.toMillis / DesiredBlockInterval.toMillis).toInt
+    val MaxRollbackDepth: Int = 100
 
     val MaxTimeDrift: Long = 10 * DesiredBlockInterval.toMillis
-
-    val TokenSymbolMaxLength: Int = 10
   }
 
   object Equihash {
