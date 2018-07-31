@@ -32,7 +32,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
   var mempoolReaderOpt: Option[EncryMempool] = None
   val invSpec: InvSpec = new InvSpec(settings.network.maxInvObjects)
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
-  val deliveryManager: ActorRef = context.actorOf(Props(classOf[EncryDeliveryManager], syncInfoSpec), "deliveryManager")
+  val deliveryManager: ActorRef =
+    context.actorOf(Props(classOf[EncryDeliveryManager], syncInfoSpec), "deliveryManager")
 
   override def preStart(): Unit = {
     val messageSpecs: Seq[MessageSpec[_]] = Seq(invSpec, requestModifierSpec, ModifiersSpec, syncInfoSpec)
@@ -43,7 +44,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
   }
 
   override def receive: Receive = {
-    case SyntacticallySuccessfulModifier(mod) if (mod.isInstanceOf[EncryBlockHeader] || mod.isInstanceOf[EncryBlockPayload] || mod.isInstanceOf[ADProofs]) &&
+    case SyntacticallySuccessfulModifier(mod)
+      if (mod.isInstanceOf[EncryBlockHeader] || mod.isInstanceOf[EncryBlockPayload] || mod.isInstanceOf[ADProofs]) &&
       historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
     case SyntacticallySuccessfulModifier(mod) =>
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
@@ -64,7 +66,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
     case DisconnectedPeer(remote) => deliveryManager ! DisconnectedPeer(remote)
     case DataFromPeer(spec, syncInfo: EncrySyncInfo@unchecked, remote) if spec.messageCode == syncInfoSpec.messageCode =>
       log.info(s"Get sync message from ${remote.socketAddress} with " +
-        s"${syncInfo.lastHeaderIds.size} headers. Head headerId is ${Algos.encode(syncInfo.lastHeaderIds.headOption.getOrElse(Array.emptyByteArray))}")
+        s"${syncInfo.lastHeaderIds.size} headers. Head headerId is " +
+        s"${Algos.encode(syncInfo.lastHeaderIds.headOption.getOrElse(Array.emptyByteArray))}")
       historyReaderOpt match {
         case Some(historyReader) =>
           val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, settings.network.networkChunkSize)
@@ -73,7 +76,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           log.info(s"Comparison with $remote having starting points ${encry.idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}")
           log.info(s"Extension ids: ${encry.idsToString(ext)}")
-          log.debug(s"Get sync message from ${remote.socketAddress} with headers: ${syncInfo.lastHeaderIds.map(Algos.encode).mkString(",")}")
+          log.debug(s"Get sync message from ${remote.socketAddress} with headers: " +
+            s"${syncInfo.lastHeaderIds.map(Algos.encode).mkString(",")}")
           if (!(extensionOpt.nonEmpty || comparison != Younger)) logWarn("Extension is empty while comparison is younger")
           self ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
@@ -88,7 +92,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
         }
         log.info(s"Requested ${invData._2.length} modifiers ${encry.idsToString(invData)}, " +
           s"sending ${objs.length} modifiers ${encry.idsToString(invData._1, objs.map(_.id))} ")
-        log.debug(s"Peer: ${remote.socketAddress} requested for modifiers of type ${invData._1} with ids: ${invData._2.map(Algos.encode).mkString(",")}")
+        log.debug(s"Peer: ${remote.socketAddress} requested for modifiers of type ${invData._1} with ids: " +
+          s"${invData._2.map(Algos.encode).mkString(",")}")
         self ! ResponseFromLocal(remote, invData._1, objs)
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
@@ -106,7 +111,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
     case FullBlockChainSynced => deliveryManager ! FullBlockChainSynced
     case ResponseFromLocal(peer, _, modifiers: Seq[NodeViewModifier]) =>
       if (modifiers.nonEmpty) {
-        val m: (ModifierTypeId, Map[ModifierId, Array[Byte]]) = modifiers.head.modifierTypeId -> modifiers.map(m => m.id -> m.bytes).toMap
+        val m: (ModifierTypeId, Map[ModifierId, Array[Byte]]) =
+          modifiers.head.modifierTypeId -> modifiers.map(m => m.id -> m.bytes).toMap
         peer.handlerRef ! Message(ModifiersSpec, Right(m), None)
       }
     case StopSync => deliveryManager ! StopSync
@@ -128,7 +134,8 @@ object EncryNodeViewSynchronizer {
 
     case class RequestFromLocal(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    case class ResponseFromLocal[M <: NodeViewModifier](source: ConnectedPeer, modifierTypeId: ModifierTypeId, localObjects: Seq[M])
+    case class ResponseFromLocal[M <: NodeViewModifier]
+    (source: ConnectedPeer, modifierTypeId: ModifierTypeId, localObjects: Seq[M])
 
     case class CheckDelivery(source: ConnectedPeer,
                              modifierTypeId: ModifierTypeId,
@@ -162,9 +169,11 @@ object EncryNodeViewSynchronizer {
 
     case class SuccessfulTransaction[P <: Proposition, TX <: BaseTransaction](transaction: TX) extends ModificationOutcome
 
-    case class SyntacticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable) extends ModificationOutcome
+    case class SyntacticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable)
+      extends ModificationOutcome
 
-    case class SemanticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable) extends ModificationOutcome
+    case class SemanticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable)
+      extends ModificationOutcome
 
     case class SyntacticallySuccessfulModifier[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends ModificationOutcome
 

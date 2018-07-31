@@ -45,20 +45,20 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
   override def preStart(): Unit = {
     statusTracker.scheduleSendSyncInfo()
     self ! SendLocalSyncInfo
-    context.system.scheduler.schedule(settings.network.modifierDeliverTimeCheck, settings.network.syncInterval)(self ! CheckModifiersToDownload)
+    context.system.scheduler
+      .schedule(settings.network.modifierDeliverTimeCheck, settings.network.syncInterval)(self ! CheckModifiersToDownload)
   }
 
   override def receive: Receive = syncCycle
 
   def syncCycle: Receive = syncSending orElse netMessages
 
-  def modifierApplyingCycle: Receive = netMessages
-
   def syncSending: Receive = {
     case SendLocalSyncInfo =>
-      if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2) log.info("Trying to send sync info too often")
+      if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2)
+        log.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
-    case StopSync => context.become(modifierApplyingCycle)
+    case StopSync => context.become(netMessages)
   }
 
   def netMessages: Receive = {
@@ -77,19 +77,22 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
     case CheckModifiersToDownload =>
       historyReaderOpt.foreach { h =>
         val currentQueue: Iterable[ModifierId] = cancellables.keys.map(ModifierId @@ _.toArray)
-        val newIds: Seq[(ModifierTypeId, ModifierId)] = h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
-          .filter(modId => !cancellables.keySet.contains(key(modId._2)))
-        if (newIds.nonEmpty) newIds.groupBy(_._1).foreach{
+        val newIds: Seq[(ModifierTypeId, ModifierId)] =
+          h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
+            .filter(modId => !cancellables.keySet.contains(key(modId._2)))
+        if (newIds.nonEmpty) newIds.groupBy(_._1).foreach {
           case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) => requestDownload(modId, ids.map(_._2))
         } else context.become(syncCycle)
       }
-    case RequestFromLocal(peer, modifierTypeId, modifierIds) => if (modifierIds.nonEmpty && modifierTypeId != 2) expect(peer, modifierTypeId, modifierIds)
+    case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
+      if (modifierIds.nonEmpty && modifierTypeId != 2) expect(peer, modifierTypeId, modifierIds)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       val typeId: ModifierTypeId = data._1
       val modifiers: Map[ModifierId, Array[Byte]] = data._2
       val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
         modifiers partition { case (id, _) => isSpam(id) }
-      if (settings.node.sendStat) context.actorSelection("/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
+      if (settings.node.sendStat)
+        context.actorSelection("/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
       log.info(s"Got modifiers (${modifiers.size}) of type $typeId from remote connected peer: $remote")
       for ((id, _) <- modifiers) receive(typeId, id, remote)
       if (spam.nonEmpty) {
@@ -104,9 +107,11 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
     case StartMining => isMining = true
     case DisableMining => isMining = false
     case SendLocalSyncInfo =>
-      if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2) log.info("Trying to send sync info too often")
+      if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2)
+        log.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
-    case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] => historyReaderOpt = Some(reader)
+    case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
+      historyReaderOpt = Some(reader)
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
     case ContinueSync =>
       context.become(syncCycle)
@@ -114,8 +119,8 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
   }
 
   def sendSync(syncInfo: EncrySyncInfo): Unit = statusTracker.peersToSyncWith().foreach(peer =>
-      peer.handlerRef ! Message(syncInfoSpec, Right(syncInfo), None)
-    )
+    peer.handlerRef ! Message(syncInfoSpec, Right(syncInfo), None)
+  )
 
   def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mids: Seq[ModifierId]): Unit = tryWithLogging {
     if ((mtid == 2 && isBlockChainSynced && isMining) || mtid != 2) {
@@ -131,11 +136,13 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
           } else notRequested
       }
       if (notRequestedIds.nonEmpty) {
-        log.debug(s"Ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mtid with ids: ${notRequestedIds.map(id => Algos.encode(id) + "|" + id).mkString(",")}")
+        log.debug(s"Ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mtid with ids: " +
+          s"${notRequestedIds.map(id => Algos.encode(id) + "|" + id).mkString(",")}")
         cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
       }
       notRequestedIds.foreach { id =>
-        val cancellable: Cancellable = context.system.scheduler.scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
+        val cancellable: Cancellable = context.system.scheduler
+          .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
         cancellables = cancellables.updated(key(id), (cp, (cancellable, 0)))
       }
     }
@@ -144,11 +151,14 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
   def reexpect(cp: ConnectedPeer, mtid: ModifierTypeId, mid: ModifierId): Unit = tryWithLogging {
     val midAsKey: ModifierIdAsKey = key(mid)
     cancellables.get(midAsKey).foreach(peerInfo =>
-      if (peerInfo._2._2 < settings.network.maxDeliveryChecks && statusTracker.statuses.exists(peer => peer._1.socketAddress == cp.socketAddress)) {
+      if (peerInfo._2._2 < settings.network.maxDeliveryChecks && statusTracker.statuses.exists(peer =>
+        peer._1.socketAddress == cp.socketAddress)) {
         statusTracker.statuses.find(peer => peer._1.socketAddress == cp.socketAddress).foreach { peer =>
-          log.debug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mtid with id: ${Algos.encode(mid)}")
+          log.debug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mtid with id: " +
+            s"${Algos.encode(mid)}")
           peer._1.handlerRef ! Message(requestModifierSpec, Right(mtid -> Seq(mid)), None)
-          val cancellable: Cancellable = context.system.scheduler.scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, mid))
+          val cancellable: Cancellable = context.system.scheduler
+            .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, mid))
           peerInfo._2._1.cancel()
           cancellables = cancellables.updated(midAsKey, peer._1 -> (cancellable, peerInfo._2._2 + 1))
         }
@@ -164,7 +174,8 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
     )
   }
 
-  def isExpecting(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Boolean = cancellables.get(key(mid)).exists(_._1 == cp)
+  def isExpecting(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Boolean =
+    cancellables.get(key(mid)).exists(_._1 == cp)
 
   def delete(mid: ModifierId): Unit = tryWithLogging(delivered -= key(mid))
 
@@ -189,8 +200,10 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
   }
 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
-    val msg: Message[(ModifierTypeId, Seq[ModifierId])] = Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
-    if (settings.node.sendStat) context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
+    val msg: Message[(ModifierTypeId, Seq[ModifierId])] =
+      Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
+    if (settings.node.sendStat)
+      context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
     statusTracker.statuses.keys.foreach(peer => {
       expect(peer, modifierTypeId, modifierIds)
     })
@@ -214,4 +227,5 @@ object EncryDeliveryManager {
   case object StopSync
 
   case object ContinueSync
+
 }
