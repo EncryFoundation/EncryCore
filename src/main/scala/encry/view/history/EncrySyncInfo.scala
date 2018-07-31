@@ -39,7 +39,7 @@ object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[EncrySyncInfo] = Try {
-    require(bytes.length <= settings.network.syncPackageLength * NodeViewModifier.ModifierIdSize + 1)
+    require(bytes.length <= settings.network.syncPacketLength * NodeViewModifier.ModifierIdSize + 1)
 
     val ids = ModifierId @@ bytes.grouped(NodeViewModifier.ModifierIdSize).toSeq
 

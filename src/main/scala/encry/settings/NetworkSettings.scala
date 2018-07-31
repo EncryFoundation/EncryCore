@@ -24,5 +24,5 @@ case class NetworkSettings(nodeName: String,
                            modifierDeliverTimeCheck: FiniteDuration,
                            syncInterval: FiniteDuration,
                            syncTimeout: Option[FiniteDuration],
-                           syncPackageLength: Int
+                           syncPacketLength: Int
                           )

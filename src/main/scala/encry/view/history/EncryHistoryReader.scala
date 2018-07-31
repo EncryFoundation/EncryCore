@@ -193,7 +193,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
   }
 
   def syncInfo: EncrySyncInfo = if (isEmpty) EncrySyncInfo(Seq.empty)
-  else EncrySyncInfo(lastHeaders(settings.network.syncPackageLength).headers.map(_.id))
+  else EncrySyncInfo(lastHeaders(settings.network.syncPacketLength).headers.map(_.id))
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
     historyStorage.store.get(validityKey(modifierId)) match {
