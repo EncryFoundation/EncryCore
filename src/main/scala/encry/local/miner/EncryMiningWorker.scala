@@ -4,7 +4,7 @@ import java.util.Date
 import akka.actor.Actor
 import encry.EncryApp.miner
 import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
-import encry.local.miner.EncryMiner.MinedBlock
+import encry.local.miner.Miner.MinedBlock
 import encry.local.miner.EncryMiningWorker.{DropChallenge, MineBlock, NextChallenge}
 import encry.utils.Logging
 import java.text.SimpleDateFormat

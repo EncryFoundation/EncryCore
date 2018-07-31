@@ -13,8 +13,8 @@ import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator
 import encry.local.explorer.BlockListener
 import encry.local.explorer.database.DBService
-import encry.local.miner.EncryMiner
-import encry.local.miner.EncryMiner.StartMining
+import encry.local.miner.Miner
+import encry.local.miner.Miner.StartMining
 import encry.network.message._
 import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, ModifiersHolder, NetworkController, UPnP}
@@ -57,7 +57,7 @@ object EncryApp extends App with Logging {
   lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
   lazy val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
-  lazy val miner: ActorRef = system.actorOf(Props[EncryMiner], "miner")
+  lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
   val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
 
   lazy val upnp: UPnP = new UPnP(settings.network)
