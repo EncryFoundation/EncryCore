@@ -17,7 +17,7 @@ class EncryBlockPayloadSerializerTest extends FunSuite {
 
     val txs = keys.map { k =>
       val useBoxes = IndexedSeq(factory.genAssetBox(k.publicImage.address))
-      TransactionFactory.coinbaseTransactionScratch(k.publicImage, timestamp, useBoxes, 0, Height @@ 100)
+      TransactionFactory.coinbaseTransactionScratch(k.publicImage, timestamp, 10L, 0, Height @@ 100)
     }
 
     val blockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), txs)
