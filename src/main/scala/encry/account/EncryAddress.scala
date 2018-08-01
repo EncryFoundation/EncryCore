@@ -1,10 +1,46 @@
 package encry.account
 
-/** P2PKH - 160-bit hash of the publicKey
-  * P2PK  - serialized (compressed) public key
-  * P2sH  - 160 bit of the script */
+import encry.crypto.encoding.Base58Check
+import encry.modifiers.mempool.regcontract.PubKeyLockedContract
+import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
+import scorex.crypto.signatures.PublicKey
+
+import scala.util.Try
+
 sealed trait EncryAddress {
   val typePrefix: Byte
+  val address: Address
+  lazy val decoded: Try[Array[Byte]] = Base58Check.decode(address)
+  def isValid: Boolean = decoded.isSuccess
+}
+object EncryAddress {
+  case object InvalidAddressException extends Exception("Invalid address")
+
+  def resolveAddress(address: Address): Try[EncryAddress] = Base58Check.decode(address).map {
+    case bytes if bytes.head == Pay2PubKeyAddress.TypePrefix => Pay2PubKeyAddress(address)
+    case bytes if bytes.head == Pay2ScriptHashAddress.TypePrefix => Pay2ScriptHashAddress(address)
+  }
 }
 
-case class Pay2PublicKeyAddress()
+/** P2PK  - public key */
+case class Pay2PubKeyAddress(address: Address) extends EncryAddress {
+  override val typePrefix: Byte = Pay2PubKeyAddress.TypePrefix
+  def pubKey: PublicKey = decoded.map(PublicKey @@ _.tail).getOrElse(throw EncryAddress.InvalidAddressException)
+  def p2sh: Pay2ScriptHashAddress = Pay2ScriptHashAddress(PubKeyLockedContract(pubKey))
+}
+object Pay2PubKeyAddress {
+  val TypePrefix: Byte = 1
+  def apply(publicKey: PublicKey): Pay2PubKeyAddress = new Pay2PubKeyAddress(Address @@ Base58Check.encode(TypePrefix +: publicKey))
+  def extractPubKey(address: Address): Try[PublicKey] = Base58Check.decode(address).map(PublicKey @@ _.tail)
+}
+
+/** P2RSH  - regular script hash */
+case class Pay2ScriptHashAddress(address: Address) extends EncryAddress {
+  override val typePrefix: Byte = Pay2PubKeyAddress.TypePrefix
+  def contractHash: ContractHash = decoded.map(_.tail).getOrElse(throw EncryAddress.InvalidAddressException)
+}
+object Pay2ScriptHashAddress {
+  val TypePrefix: Byte = 2
+  def apply(contract: PubKeyLockedContract): Pay2ScriptHashAddress =
+    new Pay2ScriptHashAddress(Address @@ Base58Check.encode(TypePrefix +: contract.contract.hash))
+}

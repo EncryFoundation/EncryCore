@@ -1,17 +1,15 @@
 package encry.modifiers.mempool.directive
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import encry.account
-import encry.account.{Account, Address}
+import encry.account.{Address, EncryAddress}
 import encry.modifiers.mempool.directive.Directive.DTypeId
-import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.serialization.Serializer
+import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import encry.settings.{Algos, Constants}
 import encry.utils.Utils
-import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
-import encry.modifiers.state.box.Box.Amount
+import io.circe.{Decoder, Encoder, HCursor}
 import scorex.crypto.authds
 import scorex.crypto.authds.ADKey
 import scorex.crypto.encode.Base58
@@ -29,10 +27,10 @@ case class TransferDirective(address: Address,
   override val typeId: DTypeId = TransferDirective.TypeId
 
   override def boxes(digest: Digest32, idx: Int): Seq[EncryBaseBox] =
-    Seq(AssetBox(EncryProposition.accountLock(Account(address)),
+    Seq(AssetBox(EncryProposition.addressLocked(address),
       Utils.nonceFromDigest(digest ++ Ints.toByteArray(idx)), amount, tokenIdOpt))
 
-  override lazy val isValid: Boolean = amount > 0 && Account.validAddress(address)
+  override lazy val isValid: Boolean = amount > 0 && EncryAddress.resolveAddress(address).isSuccess
 
   override def serializer: Serializer[M] = TransferDirectiveSerializer
 
@@ -69,13 +67,13 @@ object TransferDirectiveSerializer extends Serializer[TransferDirective] {
 
   override def toBytes(obj: TransferDirective): Array[Byte] =
     Bytes.concat(
-      Account.decodeAddress(obj.address),
+      obj.address.getBytes(Algos.charset),
       Longs.toByteArray(obj.amount),
       obj.tokenIdOpt.getOrElse(Array.empty)
     )
 
   override def parseBytes(bytes: Array[Byte]): Try[TransferDirective] = Try {
-    val address: @@[String, account.Address.Tag] = Address @@ Base58.encode(bytes.take(Account.AddressLength))
+    val address: Address = Address @@ Base58.encode(bytes.take(Account.AddressLength))
     val amount: Amount = Longs.fromByteArray(bytes.slice(Account.AddressLength, Account.AddressLength + 8))
     val tokenIdOpt: Option[@@[Array[DTypeId], authds.ADKey.Tag]] = if ((bytes.length - (Account.AddressLength + 8)) == Constants.ModifierIdSize) {
       Some(ADKey @@ bytes.takeRight(Constants.ModifierIdSize))

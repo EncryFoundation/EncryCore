@@ -30,7 +30,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val wallet: EncryWallet = EncryWallet(walletStore, keyManager)
 
-    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddr(4, keyManager.keys.head.publicImage.address)
+    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddr(4, keyManager.keys.head.publicImage.address.address)
 
     val useBox: AssetBox = validTxs.head.newBoxes.head.asInstanceOf[AssetBox]
 
@@ -77,7 +77,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val wallet: EncryWallet = EncryWallet(walletStore, keyManager)
 
-    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.keys.head.publicImage.address)
+    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.keys.head.publicImage.address.address)
 
     val blockPayload: EncryBlockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
 

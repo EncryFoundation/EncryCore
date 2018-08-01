@@ -1,9 +1,9 @@
 package encry.crypto
 
-import encry.account.Address
-import encry.crypto.encoding.Base58Check
+import encry.account.{EncryAddress, Pay2PubKeyAddress}
 import encry.modifiers.serialization.{BytesSerializable, Serializer}
 import encry.settings.Algos
+import io.iohk.iodb.ByteArrayWrapper
 import scorex.crypto.signatures.{Curve25519, PublicKey}
 
 import scala.util.Try
@@ -15,12 +15,12 @@ case class PublicKey25519(pubKeyBytes: PublicKey) extends BytesSerializable {
 
   override type M = PublicKey25519
 
-  lazy val address: Address = Address @@ Base58Check.encode(pubKeyBytes)
+  lazy val address: EncryAddress = Pay2PubKeyAddress(pubKeyBytes)
 
   override def serializer: Serializer[M] = PublicKey25519Serializer
 
   override def equals(obj: scala.Any): Boolean = obj match {
-    case p: PublicKey25519 => p.pubKeyBytes sameElements pubKeyBytes
+    case p: PublicKey25519 => ByteArrayWrapper(p.pubKeyBytes) == ByteArrayWrapper(pubKeyBytes)
     case _ => false
   }
 
@@ -36,7 +36,4 @@ object PublicKey25519Serializer extends Serializer[PublicKey25519] {
   override def parseBytes(bytes: Array[Byte]): Try[PublicKey25519] = Try(PublicKey25519(PublicKey @@ bytes))
 }
 
-object PublicKey25519 {
-
-  val Length: Int = 32
-}
+object PublicKey25519 { val Length: Int = 32 }

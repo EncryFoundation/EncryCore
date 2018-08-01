@@ -1,9 +1,9 @@
 package encry.modifiers.mempool
 
-import encry.account.{Account, Address}
+import encry.account.Address
 import encry.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import encry.modifiers.mempool.directive.{Directive, TransferDirective}
-import encry.modifiers.mempool.regcontract.{AccountLockedContract, HeightLockedContract}
+import encry.modifiers.mempool.regcontract.PubKeyLockedContract
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.MonetaryBox
 import encry.view.history.Height
@@ -20,10 +20,10 @@ object TransactionFactory {
                                        amount: Amount,
                                        tokenIdOpt: Option[ADKey] = None): EncryTransaction = {
     val pubKey: PublicKey25519 = privKey.publicImage
-    val uInputs: IndexedSeq[Input] = useBoxes.map(bx => Input.unsigned(bx.id, AccountLockedContract(Account(pubKey.address)))).toIndexedSeq
+    val uInputs: IndexedSeq[Input] = useBoxes.map(bx => Input.unsigned(bx.id, PubKeyLockedContract(pubKey.pubKeyBytes))).toIndexedSeq
     val change: Amount = useBoxes.map(_.amount).sum - (amount + fee)
     val directives: IndexedSeq[TransferDirective] = if (change > 0) {
-      IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt), TransferDirective(pubKey.address, change, tokenIdOpt))
+      IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt), TransferDirective(pubKey.address.address, change, tokenIdOpt))
     } else IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt))
 
     val uTransaction: UnsignedEncryTransaction = UnsignedEncryTransaction(fee, timestamp, uInputs, directives)
@@ -38,7 +38,7 @@ object TransactionFactory {
                                  amount: Amount,
                                  height: Height): EncryTransaction = {
     val directives: IndexedSeq[Directive with Product] =
-      IndexedSeq(TransferDirective(pubKey.address, amount + supply))
+      IndexedSeq(TransferDirective(pubKey.address.address, amount + supply))
 
     EncryTransaction(0, timestamp, IndexedSeq.empty, directives, None)
   }
