@@ -32,7 +32,7 @@ case class Account(address: Address) extends BytesSerializable {
 
 object AccountSerializer extends Serializer[Account] {
 
-  override def toBytes(obj: Account): Array[Byte] = Base58.decode(obj.address).get   // TODO: .get
+  override def toBytes(obj: Account): Array[Byte] = Base58Check.decode(obj.address).get   // TODO: .get
 
   override def parseBytes(bytes: Array[Byte]): Try[Account] = Try(Account(Address @@ Base58.encode(bytes)))
 }
