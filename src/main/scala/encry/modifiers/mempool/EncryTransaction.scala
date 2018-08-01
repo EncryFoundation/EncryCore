@@ -45,9 +45,9 @@ case class EncryTransaction(fee: Amount,
   override val tpe: Types.Product = Types.EncryTransaction
 
   override def asVal: PValue = PValue(PObject(Map(
-    "inputs" -> PValue(inputs.map(_.boxId).toList, Types.PCollection(Types.PCollection.ofByte)),
-    "outputs" -> PValue(newBoxes.map(_.convert).toList, Types.PCollection(Types.EncryBox)),
-    "messageToSign" -> PValue(messageToSign.toList, Types.PCollection.ofByte)
+    "inputs" -> PValue(inputs.map(_.boxId.toList), Types.PCollection(Types.PCollection.ofByte)),
+    "outputs" -> PValue(newBoxes.map(_.asPrism), Types.PCollection(Types.EncryBox)),
+    "messageToSign" -> PValue(messageToSign, Types.PCollection.ofByte)
   ), tpe), tpe)
 }
 

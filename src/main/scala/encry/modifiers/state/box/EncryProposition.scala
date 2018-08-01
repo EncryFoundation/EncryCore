@@ -27,9 +27,12 @@ case class EncryProposition(contractHash: ContractHash) extends Proposition {
     if (sameHash(contractHash, contract.hash)) {
       val env: List[(Option[String], PValue)] =
         if (contract.args.isEmpty) List.empty
-        else List((None, ctx.transaction.asVal), (None, ctx.state.asVal)) ++ proofs.map(proof => (proof.tagOpt, proof.value))
+        else List((None, ctx.transaction.asVal), (None, ctx.state.asVal), (None, ctx.box.asVal)) ++
+          proofs.map(proof => (proof.tagOpt, proof.value))
       val args: List[(String, PValue)] = contract.args.map { case (name, tpe) =>
-        env.find(_._1.contains(name)).orElse(env.find(_._2.tpe == tpe)).map(elt => name -> elt._2)
+        env.find(_._1.contains(name))
+          .orElse(env.find(e => e._2.tpe == tpe || tpe.isSubtypeOf(e._2.tpe)))
+          .map(elt => name -> elt._2)
           .getOrElse(throw new Exception("Not enough arguments for contact")) }
       Evaluator.initializedWith(args).eval[Boolean](contract.script)
     } else false
