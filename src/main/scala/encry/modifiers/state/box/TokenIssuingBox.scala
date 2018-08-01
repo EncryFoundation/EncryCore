@@ -12,7 +12,6 @@ import org.encryfoundation.prismlang.core.Types
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import scala.util.Try
 
-/** Holds the asset emission amount, reference to corresponding `AssetCreationBox` is required. */
 case class TokenIssuingBox(override val proposition: EncryProposition,
                            override val nonce: Long,
                            override val amount: Amount,
@@ -30,10 +29,7 @@ case class TokenIssuingBox(override val proposition: EncryProposition,
   override def asVal: PValue = PValue(asPrism, Types.DataBox)
 
   override def asPrism: PObject =
-    PObject(Map(
-      "contractHash" -> PValue(proposition.contractHash, Types.PCollection.ofByte),
-      "typeId" -> PValue(typeId.toLong, Types.PInt),
-      "id" -> PValue(id, Types.PCollection.ofByte),
+    PObject(baseFields ++ Map(
       "amount" -> PValue(amount, Types.PInt)
     ), tpe)
 }
