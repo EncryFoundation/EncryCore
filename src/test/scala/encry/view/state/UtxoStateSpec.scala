@@ -3,8 +3,8 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
-import encry.account.{Address, Pay2PubKeyAddress}
-import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
+import encry.Address
+import encry.modifiers.mempool.{EncryTransaction, Pay2PubKeyAddress, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
 import encry.settings.Algos.HF

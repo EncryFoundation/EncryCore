@@ -1,12 +1,15 @@
 package encry.utils
 
 import java.io.{File, FileWriter}
-import encry.account.{Address, Pay2PubKeyAddress}
+
+import encry.Address
 import encry.crypto.PrivateKey25519
+import encry.modifiers.mempool.Pay2PubKeyAddress
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import scorex.crypto.authds.ADKey
 import scorex.crypto.signatures.{Curve25519, PublicKey}
+
 import scala.io.Source
 import scala.util.Random
 

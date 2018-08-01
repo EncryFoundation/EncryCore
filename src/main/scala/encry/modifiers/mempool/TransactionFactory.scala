@@ -1,6 +1,6 @@
 package encry.modifiers.mempool
 
-import encry.account.Address
+import encry.Address
 import encry.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import encry.modifiers.mempool.directive.{Directive, TransferDirective}
 import encry.modifiers.mempool.regcontract.PubKeyLockedContract

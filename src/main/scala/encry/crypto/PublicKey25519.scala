@@ -1,11 +1,10 @@
 package encry.crypto
 
-import encry.account.{EncryAddress, Pay2PubKeyAddress}
+import encry.modifiers.mempool.{EncryAddress, Pay2PubKeyAddress}
 import encry.modifiers.serialization.{BytesSerializable, Serializer}
 import encry.settings.Algos
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.crypto.signatures.{Curve25519, PublicKey}
-
 import scala.util.Try
 
 case class PublicKey25519(pubKeyBytes: PublicKey) extends BytesSerializable {

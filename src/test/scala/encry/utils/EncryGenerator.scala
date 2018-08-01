@@ -4,11 +4,11 @@ import java.io.File
 
 import akka.actor.ActorRef
 import encry.ModifierId
-import encry.account.{Address, Pay2PubKeyAddress}
+import encry.Address
 import encry.crypto.equihash.EquihashSolution
 import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
+import encry.modifiers.mempool.{EncryTransaction, Pay2PubKeyAddress, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, MonetaryBox}
 import encry.settings.Algos.HF

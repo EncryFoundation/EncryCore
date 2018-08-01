@@ -1,7 +1,8 @@
 package encry.modifiers.mempool.directive
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import encry.account.{Address, EncryAddress}
+import encry.Address
+import encry.modifiers.mempool.EncryAddress
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.Box.Amount

@@ -1,7 +1,7 @@
 package encry.modifiers.state.box
 
-import encry.account._
-import encry.modifiers.mempool.Proof
+import encry.Address
+import encry.modifiers.mempool.{EncryAddress, Pay2ContractHashAddress, Pay2PubKeyAddress, Proof}
 import encry.modifiers.mempool.regcontract.{HeightLockedContract, OpenContract, PubKeyLockedContract}
 import encry.modifiers.serialization.Serializer
 import encry.settings.{Algos, Constants}
@@ -15,7 +15,6 @@ import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import org.encryfoundation.prismlang.core.wrapped.PValue
 import org.encryfoundation.prismlang.evaluator.Evaluator
 import scorex.crypto.signatures.PublicKey
-
 import scala.util.{Failure, Success, Try}
 
 case class EncryProposition(contractHash: ContractHash) extends Proposition {
@@ -51,7 +50,7 @@ object EncryProposition {
   def pubKeyLocked(pubKey: PublicKey): EncryProposition = EncryProposition(PubKeyLockedContract(pubKey).contract.hash)
   def addressLocked(address: Address): EncryProposition = EncryAddress.resolveAddress(address).map {
     case p2pk: Pay2PubKeyAddress => EncryProposition(PubKeyLockedContract(p2pk.pubKey).contract.hash)
-    case p2sh: Pay2ScriptHashAddress => EncryProposition(p2sh.contractHash)
+    case p2sh: Pay2ContractHashAddress => EncryProposition(p2sh.contractHash)
   }.getOrElse(throw EncryAddress.InvalidAddressException)
 }
 
