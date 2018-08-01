@@ -117,6 +117,8 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   override def journalPluginId: String = "akka.persistence.journal.leveldb"
 
+  override def snapshotPluginId: String = "akka.persistence.snapshot-store.local"
+
 }
 
 object ModifiersHolder {
