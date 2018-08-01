@@ -8,7 +8,6 @@ import encry.local.miner.EncryMiner.MinedBlock
 import encry.local.miner.EncryMiningWorker.{DropChallenge, MineBlock, NextChallenge}
 import encry.utils.Logging
 import java.text.SimpleDateFormat
-
 import encry.settings.Constants
 
 class EncryMiningWorker(myIdx: Int, numberOfWorkers: Int) extends Actor with Logging {
