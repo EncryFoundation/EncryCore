@@ -6,7 +6,6 @@ import akka.io.Tcp.SO.KeepAlive
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
 import akka.pattern.ask
-import akka.util.Timeout
 import encry.EncryApp._
 import encry.network.NetworkController.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
@@ -25,9 +24,7 @@ import scala.util.{Failure, Success, Try}
 class NetworkController extends Actor with Logging {
 
   val networkSettings: NetworkSettings = settings.network
-  val peerSynchronizer: ActorRef = context.actorOf(Props[PeerSynchronizer], "peerSynchronizer")
-  val tcpManager: ActorRef = IO(Tcp)
-  implicit val timeout: Timeout = Timeout(5 seconds)
+  context.actorOf(Props[PeerSynchronizer].withDispatcher("network-dispatcher"), "peerSynchronizer")
   val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
   var messageHandlers: Map[Seq[MessageCode], ActorRef] = Map.empty
   var outgoing: Set[InetSocketAddress] = Set.empty
@@ -51,7 +48,7 @@ class NetworkController extends Actor with Logging {
 
   log.info(s"Declared address: $externalSocketAddress")
 
-  tcpManager ! Bind(self, networkSettings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
+  IO(Tcp) ! Bind(self, networkSettings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
 
   override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
 
@@ -75,7 +72,7 @@ class NetworkController extends Actor with Logging {
         case Failure(e) => logError("Failed to deserialize data: ", e)
       }
     case SendToNetwork(message, sendingStrategy) =>
-      (peerManager ? FilterPeers(sendingStrategy))(5 seconds)
+      (peerManager ? FilterPeers(sendingStrategy)) (5 seconds)
         .map(_.asInstanceOf[Seq[ConnectedPeer]])
         .foreach(_.foreach(_.handlerRef ! message))
   }
@@ -85,7 +82,7 @@ class NetworkController extends Actor with Logging {
       if checkPossibilityToAddPeer(remote) =>
       log.info(s"Connecting to: $remote")
       outgoing += remote
-      tcpManager ! Connect(remote,
+      IO(Tcp) ! Connect(remote,
         localAddress = externalSocketAddress,
         options = KeepAlive(true) :: Nil,
         timeout = Some(networkSettings.connectionTimeout),
@@ -121,7 +118,6 @@ object NetworkController {
   object ReceivableMessages {
 
     import encry.network.message.MessageSpec
-
     import scala.reflect.runtime.universe.TypeTag
 
     case class DataFromPeer[DT: TypeTag](spec: MessageSpec[DT], data: DT, source: ConnectedPeer)
@@ -131,6 +127,7 @@ object NetworkController {
     case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)
 
     case class ConnectTo(address: InetSocketAddress)
+
   }
 
 }
