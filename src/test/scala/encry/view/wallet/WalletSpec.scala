@@ -34,7 +34,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val useBox: AssetBox = validTxs.head.newBoxes.head.asInstanceOf[AssetBox]
 
-    val spentTx: EncryTransaction = genValidPaymentTxToAddrWithSpentBoxes(IndexedSeq(useBox), Address @@ "3jSD9fwHEHJwHq99ARqhnNhqGXeKnkJMyX4FZjHV6L3PjbCmjG")
+    val spentTx: EncryTransaction = genValidPaymentTxToAddrWithSpentBoxes(IndexedSeq(useBox), randomAddress)
 
     val correctBalance: Long = validTxs.foldLeft(0L) {
       case (sum, transaction) => sum + transaction.newBoxes.foldLeft(0L) {

@@ -4,7 +4,7 @@ import java.io.File
 
 import akka.actor.ActorRef
 import encry.ModifierId
-import encry.account.{Account, Address, Pay2PubKeyAddress}
+import encry.account.{Address, Pay2PubKeyAddress}
 import encry.crypto.equihash.EquihashSolution
 import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.modifiers.history.block.header.EncryBlockHeader

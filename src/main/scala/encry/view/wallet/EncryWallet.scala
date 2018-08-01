@@ -3,7 +3,6 @@ package encry.view.wallet
 import java.io.File
 
 import com.google.common.primitives.Longs
-import encry.account.Account
 import encry.crypto.PublicKey25519
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock

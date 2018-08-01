@@ -65,17 +65,20 @@ object TransferDirective {
 
 object TransferDirectiveSerializer extends Serializer[TransferDirective] {
 
-  override def toBytes(obj: TransferDirective): Array[Byte] =
-    Bytes.concat(
-      obj.address.getBytes(Algos.charset),
+  override def toBytes(obj: TransferDirective): Array[Byte] = {
+    val address: Array[Byte] = obj.address.getBytes(Algos.charset)
+    address.length.toByte +: Bytes.concat(
+      address,
       Longs.toByteArray(obj.amount),
       obj.tokenIdOpt.getOrElse(Array.empty)
     )
+  }
 
   override def parseBytes(bytes: Array[Byte]): Try[TransferDirective] = Try {
-    val address: Address = Address @@ Base58.encode(bytes.take(Account.AddressLength))
-    val amount: Amount = Longs.fromByteArray(bytes.slice(Account.AddressLength, Account.AddressLength + 8))
-    val tokenIdOpt: Option[@@[Array[DTypeId], authds.ADKey.Tag]] = if ((bytes.length - (Account.AddressLength + 8)) == Constants.ModifierIdSize) {
+    val addressLen: Int = bytes.head.toInt
+    val address: Address = Address @@ new String(bytes.slice(1, 1 + addressLen), Algos.charset)
+    val amount: Amount = Longs.fromByteArray(bytes.slice(1 + addressLen, 1 + addressLen + 8))
+    val tokenIdOpt: Option[@@[Array[DTypeId], authds.ADKey.Tag]] = if ((bytes.length - (1 + addressLen + 8)) == Constants.ModifierIdSize) {
       Some(ADKey @@ bytes.takeRight(Constants.ModifierIdSize))
     } else None
     TransferDirective(address, amount, tokenIdOpt)
