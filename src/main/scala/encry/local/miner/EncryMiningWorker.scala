@@ -1,7 +1,6 @@
 package encry.local.miner
 
 import java.util.Date
-
 import akka.actor.Actor
 import encry.EncryApp.miner
 import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
