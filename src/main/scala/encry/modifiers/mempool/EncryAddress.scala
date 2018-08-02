@@ -12,7 +12,7 @@ sealed trait EncryAddress {
   val typePrefix: Byte
   val address: Address
   lazy val decoded: Try[Array[Byte]] = Base58Check.decode(address)
-  def isValid: Boolean = decoded.isSuccess
+  def isValid: Boolean = decoded.map(_.head == typePrefix).getOrElse(false)
 }
 object EncryAddress {
   case object InvalidAddressException extends Exception("Invalid address")
