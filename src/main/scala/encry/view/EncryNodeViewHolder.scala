@@ -39,8 +39,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: EncryMempool)
 
-  var nodeView: NodeView = restoreState().getOrElse(genesisState)
-  val modifiersCache: EncryModifiersCache = EncryModifiersCache(1000)
+  private var nodeView: NodeView = restoreState().getOrElse(genesisState)
+  private val modifiersCache: EncryModifiersCache = EncryModifiersCache(1000)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,
@@ -66,6 +66,19 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       pmodModifyRecovery(block) match {
         case Success(_) => log.info(s"Block ${block.encodedId} from recovery applied successfully")
         case Failure(th) => log.warn(s"Failed to apply block ${block.encodedId} from recovery", th)
+      }
+    case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
+      modifierSerializers.get(modifierTypeId).foreach { companion =>
+        remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
+          case tx: BaseTransaction if tx.modifierTypeId == BaseTransaction.ModifierTypeId => txModify(tx)
+          case pmod: EncryPersistentModifier =>
+            if (nodeView.history.contains(pmod.id) || modifiersCache.contains(key(pmod.id)))
+              logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
+            else {
+              modifiersCache.put(key(pmod.id), pmod)
+              if (settings.levelDb.enable) context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
+            }
+        }
       }
     case RecoveryCompleted =>
       log.info("Received RecoveryCompleted message, switching to standard operating mode")
