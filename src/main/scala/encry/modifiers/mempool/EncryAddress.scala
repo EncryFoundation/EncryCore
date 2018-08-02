@@ -30,18 +30,18 @@ case class Pay2PubKeyAddress(address: Address) extends EncryAddress {
   def p2ch: Pay2ContractHashAddress = Pay2ContractHashAddress(PubKeyLockedContract(pubKey))
 }
 object Pay2PubKeyAddress {
-  val TypePrefix: Byte = 1
+  val TypePrefix: Byte = 0x02
   def apply(publicKey: PublicKey): Pay2PubKeyAddress = new Pay2PubKeyAddress(Address @@ Base58Check.encode(TypePrefix +: publicKey))
   def extractPubKey(address: Address): Try[PublicKey] = Base58Check.decode(address).map(PublicKey @@ _.tail)
 }
 
 /** P2CH - regular contract hash */
 case class Pay2ContractHashAddress(address: Address) extends EncryAddress {
-  override val typePrefix: Byte = Pay2PubKeyAddress.TypePrefix
+  override val typePrefix: Byte = Pay2ContractHashAddress.TypePrefix
   def contractHash: ContractHash = decoded.map(_.tail).getOrElse(throw EncryAddress.InvalidAddressException)
 }
 object Pay2ContractHashAddress {
-  val TypePrefix: Byte = 2
+  val TypePrefix: Byte = 0x12
   def apply(contract: PubKeyLockedContract): Pay2ContractHashAddress =
     new Pay2ContractHashAddress(Address @@ Base58Check.encode(TypePrefix +: contract.contract.hash))
 }

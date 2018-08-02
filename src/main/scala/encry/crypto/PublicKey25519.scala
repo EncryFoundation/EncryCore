@@ -1,6 +1,6 @@
 package encry.crypto
 
-import encry.modifiers.mempool.{EncryAddress, Pay2PubKeyAddress}
+import encry.modifiers.mempool.Pay2PubKeyAddress
 import encry.modifiers.serialization.{BytesSerializable, Serializer}
 import encry.settings.Algos
 import io.iohk.iodb.ByteArrayWrapper
@@ -14,7 +14,7 @@ case class PublicKey25519(pubKeyBytes: PublicKey) extends BytesSerializable {
 
   override type M = PublicKey25519
 
-  lazy val address: EncryAddress = Pay2PubKeyAddress(pubKeyBytes)
+  lazy val address: Pay2PubKeyAddress = Pay2PubKeyAddress(pubKeyBytes)
 
   override def serializer: Serializer[M] = PublicKey25519Serializer
 
