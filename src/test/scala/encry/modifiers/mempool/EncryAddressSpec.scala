@@ -1,8 +1,7 @@
-package encry.account
+package encry.modifiers.mempool
 
 import encry.Address
 import encry.crypto.encoding.Base58Check
-import encry.modifiers.mempool.{EncryAddress, Pay2ContractHashAddress, Pay2PubKeyAddress}
 import encry.modifiers.mempool.regcontract.PubKeyLockedContract
 import io.iohk.iodb.ByteArrayWrapper
 import org.scalatest.{Matchers, PropSpec}
@@ -21,7 +20,7 @@ class EncryAddressSpec extends PropSpec with Matchers {
   val invalidP2CHPrefix: Address = Address @@ Base58Check.encode(99.toByte +: Random.randomBytes())
 
   val p2pk: Pay2PubKeyAddress = Pay2PubKeyAddress(validP2PK)
-  val p2sh: Pay2ContractHashAddress = Pay2ContractHashAddress(validP2CH)
+  val p2ch: Pay2ContractHashAddress = Pay2ContractHashAddress(validP2CH)
 
   property("Addresses resolving") {
 
@@ -36,9 +35,9 @@ class EncryAddressSpec extends PropSpec with Matchers {
     EncryAddress.resolveAddress(invalidP2CHPrefix).isSuccess shouldBe false
   }
 
-  property("p2pk to p2sh") {
+  property("p2pk to p2ch") {
 
-    p2pk.p2ch shouldEqual p2sh
+    p2pk.p2ch shouldEqual p2ch
   }
 
   property("PubKey extraction") {
