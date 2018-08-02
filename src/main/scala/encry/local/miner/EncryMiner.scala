@@ -12,7 +12,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{BaseTransaction, EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.stats.StatsSender.{CandidateProducingTime, MiningEnd, MiningTime, SleepTime}
 import encry.utils.Logging
 import encry.utils.NetworkTime.Time

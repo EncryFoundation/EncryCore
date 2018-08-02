@@ -1,20 +1,18 @@
 package encry.utils
 
 import java.io.{File, FileWriter}
-
-import encry.account.{Account, Address}
+import encry.Address
 import encry.crypto.PrivateKey25519
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import encry.modifiers.state.box.Box.Amount
+import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import scorex.crypto.authds.ADKey
 import scorex.crypto.signatures.Curve25519
-
 import scala.io.Source
 import scala.util.Random
 
 object TestHelper {
 
-  lazy val genesisSeed = Long.MaxValue
+  lazy val genesisSeed: Long = Long.MaxValue
   lazy val rndGen = new scala.util.Random(genesisSeed)
 
   object Props {
@@ -24,7 +22,6 @@ object TestHelper {
     lazy val txFee: Amount = 4300
     lazy val testDir = "test-data/"
     lazy val keysFilePath = s"${testDir}seeds"
-    lazy val recipientAddr: Address = Address @@ "3EkkRFTepVFHqWdAqR5WQrvHkKjNJ26V35UthTMqTpGJHxnCYj"
   }
 
   def genKeysFile(qty: Int, filePath: String): Unit = {
@@ -54,12 +51,12 @@ object TestHelper {
   def genAssetBoxes: IndexedSeq[AssetBox] =
     getOrGenerateKeys(Props.keysFilePath).foldLeft(IndexedSeq[AssetBox]()) { case (bxs, pk) =>
       bxs :+ AssetBox(
-        EncryProposition.accountLock(Account(pk.publicKeyBytes)),
+        EncryProposition.pubKeyLocked(pk.publicKeyBytes),
         rndGen.nextLong(), Props.boxValue)
     }
 
   def genAssetBox(address: Address, amount: Amount = 9L): AssetBox =
-    AssetBox(EncryProposition.accountLock(address), amount, Props.boxValue)
+    AssetBox(EncryProposition.addressLocked(address), amount, Props.boxValue)
 
   def genTxOutputs(boxes: Traversable[EncryBaseBox]): IndexedSeq[ADKey] =
     boxes.foldLeft(IndexedSeq[ADKey]()) { case(s, box) =>
