@@ -13,7 +13,6 @@ class EncryTransactionSerializerTest extends FunSuite with InstanceFactory {
 
     val txDeserialized = EncryTransactionSerializer.parseBytes(txSerialized)
 
-    txDeserialized.get
     assert(txDeserialized.isSuccess, "Deserialization failed.")
 
     assert(tx.id sameElements txDeserialized.get.id, "Id mismatch.")

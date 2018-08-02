@@ -11,7 +11,6 @@ import org.encryfoundation.prismlang.core.Ast.Expr
 import org.encryfoundation.prismlang.core.{Ast, Types}
 import scorex.crypto.authds.ADKey
 import scorex.utils.Random
-
 import scala.util.{Random => Scarand}
 
 trait InstanceFactory extends Keys with EncryGenerator {

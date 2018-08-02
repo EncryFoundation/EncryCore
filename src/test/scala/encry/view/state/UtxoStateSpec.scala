@@ -1,9 +1,7 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
-import encry.Address
 import encry.modifiers.mempool.{EncryTransaction, Pay2PubKeyAddress, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
