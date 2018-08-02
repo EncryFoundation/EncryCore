@@ -52,7 +52,7 @@ trait EncryGenerator {
     keys.map { k =>
       val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genAssetBox(k.publicImage.address.address))
       TransactionFactory.defaultPaymentTransactionScratch(k, Props.txFee,
-        scala.util.Random.nextLong(), useBoxes, Props.recipientAddr, Props.boxValue)
+        scala.util.Random.nextLong(), useBoxes, randomAddress, Props.boxValue)
     }
   }
 
@@ -95,7 +95,7 @@ trait EncryGenerator {
       val useBoxes: IndexedSeq[MonetaryBox] = if (seq.isEmpty) IndexedSeq(genAssetBox(key.publicImage.address.address))
         else seq.last.newBoxes.map(_.asInstanceOf[MonetaryBox]).toIndexedSeq
       seq :+ TransactionFactory.defaultPaymentTransactionScratch(key, Props.txFee,
-        timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
+        timestamp, useBoxes, randomAddress, Props.boxValue)
     }
   }
 
@@ -105,7 +105,7 @@ trait EncryGenerator {
 
     keys.map { k =>
       val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genAssetBox(PublicKey25519(PublicKey @@ Random.randomBytes(32)).address.address))
-      TransactionFactory.defaultPaymentTransactionScratch(k, -100, timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
+      TransactionFactory.defaultPaymentTransactionScratch(k, -100, timestamp, useBoxes, randomAddress, Props.boxValue)
     }
   }
 

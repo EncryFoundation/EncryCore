@@ -79,14 +79,14 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
     val validTxs = keys.zip(bxs).map { case (k, bx) =>
       val useBoxes = IndexedSeq(bx)
       TransactionFactory.defaultPaymentTransactionScratch(k, fee,
-        timestamp, useBoxes, factory.Props.recipientAddr, factory.Props.boxValue - 4300)
+        timestamp, useBoxes, randomAddress, factory.Props.boxValue - 4300)
     }
 
     val invalidTxs = keys.map { k =>
       val useBoxes =
         IndexedSeq(factory.genAssetBox(Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address))
       TransactionFactory.defaultPaymentTransactionScratch(k, fee,
-        timestamp, useBoxes, factory.Props.recipientAddr, 3000000L)
+        timestamp, useBoxes, randomAddress, 3000000L)
     }
 
     val filteredValidTxs = state.filterValid(validTxs)
@@ -118,7 +118,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
     val validTxs = keys.zip(bxs).map { case (k, bx) =>
       val useBoxes = IndexedSeq(bx)
       TransactionFactory.defaultPaymentTransactionScratch(k, fee,
-        timestamp, useBoxes, factory.Props.recipientAddr, factory.Props.boxValue - 4300)
+        timestamp, useBoxes, randomAddress, factory.Props.boxValue - 4300)
     }
 
     val expectedDigest = state.generateProofs(validTxs)

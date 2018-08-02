@@ -7,13 +7,13 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.{Algos, Constants}
-import encry.utils.TestHelper
+import encry.utils.{EncryGenerator, TestHelper}
 import org.scalatest.FunSuite
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
 
-class EncryBlockSerializerTest extends FunSuite {
+class EncryBlockSerializerTest extends FunSuite with EncryGenerator {
 
   test("testToBytes $ testFromBytes") {
 
@@ -39,7 +39,7 @@ class EncryBlockSerializerTest extends FunSuite {
     val txs = keys.map { k =>
       val useBoxes = IndexedSeq(factory.genAssetBox(k.publicImage.address.address))
       TransactionFactory.defaultPaymentTransactionScratch(k, fee,
-        timestamp, useBoxes, factory.Props.recipientAddr, factory.Props.boxValue)
+        timestamp, useBoxes, randomAddress, factory.Props.boxValue)
     }
 
     val blockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), txs)

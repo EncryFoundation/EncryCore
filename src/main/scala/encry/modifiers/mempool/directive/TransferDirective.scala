@@ -13,7 +13,6 @@ import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import scorex.crypto.authds
 import scorex.crypto.authds.ADKey
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Digest32
 import supertagged.@@
 

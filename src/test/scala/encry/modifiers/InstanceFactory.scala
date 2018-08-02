@@ -4,19 +4,19 @@ import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
-import encry.utils.TestHelper
+import encry.utils.{EncryGenerator, TestHelper}
 import encry.view.history.Height
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.Ast.Expr
 import org.encryfoundation.prismlang.core.{Ast, Types}
 import scorex.crypto.authds.ADKey
 import scorex.utils.Random
+
 import scala.util.{Random => Scarand}
 
-trait InstanceFactory extends Keys {
+trait InstanceFactory extends Keys with EncryGenerator {
 
   private val genHelper = TestHelper
-  private val timestamp = System.currentTimeMillis()
 
   lazy val fakeTransaction: EncryTransaction = {
     val fee = genHelper.Props.txFee
@@ -54,7 +54,7 @@ trait InstanceFactory extends Keys {
     val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address.address))
 
     TransactionFactory.defaultPaymentTransactionScratch(secret, -100, timestamp, useBoxes,
-      genHelper.Props.recipientAddr, genHelper.Props.txAmount)
+      randomAddress, genHelper.Props.txAmount)
   }
 
   lazy val coinbaseTransaction: EncryTransaction = {

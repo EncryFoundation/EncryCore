@@ -4,11 +4,10 @@ import java.io.{File, FileWriter}
 
 import encry.Address
 import encry.crypto.PrivateKey25519
-import encry.modifiers.mempool.Pay2PubKeyAddress
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import scorex.crypto.authds.ADKey
-import scorex.crypto.signatures.{Curve25519, PublicKey}
+import scorex.crypto.signatures.Curve25519
 
 import scala.io.Source
 import scala.util.Random
@@ -25,7 +24,6 @@ object TestHelper {
     lazy val txFee: Amount = 4300
     lazy val testDir = "test-data/"
     lazy val keysFilePath = s"${testDir}seeds"
-    lazy val recipientAddr: Address = Pay2PubKeyAddress(PublicKey @@ scorex.utils.Random.randomBytes()).address
   }
 
   def genKeysFile(qty: Int, filePath: String): Unit = {
