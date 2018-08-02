@@ -131,7 +131,6 @@ object NetworkController {
     case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)
 
     case class ConnectTo(address: InetSocketAddress)
-
   }
 
 }

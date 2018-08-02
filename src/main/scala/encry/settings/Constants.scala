@@ -45,9 +45,9 @@ object Constants {
 
     val Version: Version = 0: Byte
 
-    val InitialEmissionAmount: Int = 2 * 1000000
+    val InitialEmissionAmount: Int = 2 * 1000000000
 
-    val DeflationInterval: Int = 100
+    val DeflationInterval: Int = 3
 
     val DeflationFactor: Double = 0.9998
 
