@@ -2,7 +2,7 @@ package encry.local
 
 import akka.actor.Actor
 import encry.EncryApp._
-import encry.account.Address
+import encry.Address
 import encry.crypto.PrivateKey25519
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}

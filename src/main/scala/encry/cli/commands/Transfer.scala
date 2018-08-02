@@ -3,7 +3,7 @@ package encry.cli.commands
 import akka.pattern._
 import akka.util.Timeout
 import encry.EncryApp._
-import encry.account.Address
+import encry.Address
 import encry.cli.{Ast, Response}
 import encry.crypto.PrivateKey25519
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
