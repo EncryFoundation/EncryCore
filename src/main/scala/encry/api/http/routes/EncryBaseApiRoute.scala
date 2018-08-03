@@ -3,7 +3,7 @@ package encry.api.http.routes
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.{Directive, Directive1, Route}
 import encry.ModifierId
-import encry.account.Address
+import encry.Address
 import encry.api.http.ApiRoute
 import encry.crypto.encoding.Base58Check
 import encry.settings.Algos

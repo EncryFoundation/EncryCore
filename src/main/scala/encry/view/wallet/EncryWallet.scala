@@ -3,7 +3,6 @@ package encry.view.wallet
 import java.io.File
 
 import com.google.common.primitives.Longs
-import encry.account.Account
 import encry.crypto.PublicKey25519
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
@@ -24,7 +23,7 @@ import scala.util.Try
 case class EncryWallet(walletStore: Store, keyManager: KeyManager)
   extends Vault[EncryProposition, BaseTransaction, EncryPersistentModifier, EncryWallet] with Logging {
 
-  val propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.accountLock(Account(pk.pubKeyBytes)))
+  val propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes))
 
   val walletStorage: WalletStorage = WalletStorage(walletStore, publicKeys)
 
