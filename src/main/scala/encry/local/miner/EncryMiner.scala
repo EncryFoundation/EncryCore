@@ -145,7 +145,7 @@ class EncryMiner extends Actor with Logging {
     // Remove stateful-invalid txs from mempool.
     view.pool.removeAsync(txsToDrop)
 
-    val minerSecret: PrivateKey25519 = view.vault.keyManager.mainKey
+    val minerSecret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
     val feesTotal: Amount = txsToPut.map(_.fee).sum
     val supplyTotal: Amount = EncrySupplyController.supplyAt(view.state.height)
     val coinbase: EncryTransaction = TransactionFactory

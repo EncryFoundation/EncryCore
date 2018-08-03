@@ -104,7 +104,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       val wallet: EncryWallet = nodeView.wallet
       val availableBoxes: Seq[AssetBox] = wallet.walletStorage.allBoxes.filter(_.isAmountCarrying).map(_.asInstanceOf[AssetBox])
       if (availableBoxes.map(_.amount).sum >= limit * (amountD + minimalFeeD))
-        sender() ! GenerateTransaction(WalletData(wallet.keyManager.mainKey, availableBoxes))
+        sender() ! GenerateTransaction(WalletData(wallet.accountManager.mandatoryAccount, availableBoxes))
     case a: Any => logError("Strange input: " + a)
   }
 

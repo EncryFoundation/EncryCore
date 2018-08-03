@@ -2,6 +2,7 @@ package encry.view.wallet.storage
 
 import encry.crypto.PublicKey25519
 import encry.utils.FileHelper
+import encry.view.wallet.WalletStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.utils.{Random => ScRand}

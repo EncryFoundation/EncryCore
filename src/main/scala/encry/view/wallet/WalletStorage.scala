@@ -1,10 +1,10 @@
-package encry.view.wallet.storage
+package encry.view.wallet
 
 import com.google.common.primitives.Longs
 import encry.crypto.PublicKey25519
 import encry.modifiers.state.StateModifierDeserializer
-import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.Box.Amount
+import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box._
 import encry.settings.Algos
 import encry.storage.EncryBaseStorage

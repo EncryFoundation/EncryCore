@@ -18,7 +18,7 @@ object PrintPubKeys extends Command {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (nodeViewHolder ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
-        Some(Response(view.vault.keyManager.keys.foldLeft("")((str, k) => str + Algos.encode(k.publicKeyBytes)) + "\n"))
+        Some(Response(view.vault.publicKeys.foldLeft("")((str, k) => str + Algos.encode(k.pubKeyBytes)) + "\n"))
       }).mapTo[Option[Response]]
   }
 }
