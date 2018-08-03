@@ -5,7 +5,7 @@ import java.security.{AlgorithmParameters, SecureRandom}
 
 import com.google.common.primitives.{Ints, Longs}
 import encry.crypto.PrivateKey25519
-import encry.settings.{Algos, EncryAppSettings, KeyManagerSettings}
+import encry.settings.{Algos, EncryAppSettings, WalletSettings}
 import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import javax.crypto._
@@ -14,19 +14,8 @@ import scorex.crypto.hash.{Blake2b512, Digest32, Digest64}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
 
-import scala.language.postfixOps
-import scala.util.Try
-
-
-/**
-  * KeyKeeperStorage manages LMStore with private keys (Only Pk25519)
- *
-  * @param store - KeyKeeperStorage storage
-  * @param passwdBytes - password to unlock storage
-  */
-
 case class KeyManager(store: LSMStore,
-                      storageSettings: KeyManagerSettings,
+                      storageSettings: WalletSettings,
                       passwdBytes: Option[Array[Byte]]) extends Logging {
   /**
     * Generate private key from some string bytes
@@ -77,7 +66,6 @@ case class KeyManager(store: LSMStore,
     }
   }
 
-  // TODO: Add the ability to select the key.
   def mainKey: PrivateKey25519 = keys.last
 
   def updateKey(key: ByteArrayWrapper, newValue: Array[Byte]): Unit = {
@@ -95,8 +83,7 @@ case class KeyManager(store: LSMStore,
 
   def isLocked: Boolean = store.get(KeyManager.lockKey).exists(_.data.head == KeyManager.lockFlag)
 
-  def getKey(key: ByteArrayWrapper): Array[Byte] =
-    store.get(key).map(_.data).getOrElse(Array[Byte](0))
+  def getKey(key: ByteArrayWrapper): Array[Byte] = store.get(key).map(_.data).getOrElse(Array[Byte](0))
 
   def keys: Seq[PrivateKey25519] = {
     if (!isLocked) getKeysWithChainCode.foldLeft(Seq[PrivateKey25519]()) {
@@ -209,11 +196,6 @@ case class KeyManager(store: LSMStore,
     decryptedTextBytes
   }
 
-  /**
-    * delete key from store
-    */
-  def delKey(): Try[Unit] = ???
-
   def initStorage(seed: Array[Byte]): Unit = {
 
     store.update(System.currentTimeMillis(),
@@ -246,19 +228,18 @@ object KeyManager extends Logging {
 
   def getKeysDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/keys")
 
-  def readOrGenerate(settings: EncryAppSettings,
-                     password: Option[Array[Byte]] = Option(Array[Byte]()),
-                     seed: Array[Byte] = Random.randomBytes()): KeyManager = {
+  def readOrGenerate(settings: EncryAppSettings): KeyManager = {
 
-    val dir = getKeysDir(settings)
+    val dir: File = getKeysDir(settings)
     dir.mkdirs()
 
-    val keysStore = new LSMStore(dir, keepVersions = 0)
+    val keysStore: LSMStore = new LSMStore(dir, keepVersions = 0)
 
-    val keyManager = KeyManager(keysStore, settings.keyManager, password)
+    val keyManager: KeyManager = KeyManager(keysStore, settings.wallet, None)
 
-    if (keyManager.keys.isEmpty) keyManager.initStorage(seed)
-      if (settings.keyManager.encryption && !keyManager.isLocked) keyManager.lock()
+    if (keyManager.keys.isEmpty)
+      keyManager.initStorage(settings.wallet.seed.map(_.getBytes(Algos.charset)).getOrElse(Random.randomBytes()))
+    if (!keyManager.isLocked) keyManager.lock()
 
     keyManager
   }
