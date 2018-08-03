@@ -1,7 +1,7 @@
 package encry.view.wallet
 
 import encry.ModifierId
-import encry.account.Address
+import encry.Address
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
@@ -30,11 +30,11 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val wallet: EncryWallet = EncryWallet(walletStore, keyManager)
 
-    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddr(4, keyManager.keys.head.publicImage.address)
+    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddr(4, keyManager.keys.head.publicImage.address.address)
 
     val useBox: AssetBox = validTxs.head.newBoxes.head.asInstanceOf[AssetBox]
 
-    val spentTx: EncryTransaction = genValidPaymentTxToAddrWithSpentBoxes(IndexedSeq(useBox), Address @@ "3jSD9fwHEHJwHq99ARqhnNhqGXeKnkJMyX4FZjHV6L3PjbCmjG")
+    val spentTx: EncryTransaction = genValidPaymentTxToAddrWithSpentBoxes(IndexedSeq(useBox), randomAddress)
 
     val correctBalance: Long = validTxs.foldLeft(0L) {
       case (sum, transaction) => sum + transaction.newBoxes.foldLeft(0L) {
@@ -77,7 +77,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val wallet: EncryWallet = EncryWallet(walletStore, keyManager)
 
-    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.keys.head.publicImage.address)
+    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.keys.head.publicImage.address.address)
 
     val blockPayload: EncryBlockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
 

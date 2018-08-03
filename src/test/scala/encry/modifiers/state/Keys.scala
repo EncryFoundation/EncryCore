@@ -1,6 +1,5 @@
 package encry.modifiers.state
 
-import encry.account.Account
 import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.utils.TestHelper
 
@@ -10,5 +9,4 @@ trait Keys {
 
   val secret: PrivateKey25519 = secrets.head
   val publicKey: PublicKey25519 = secret.publicImage
-  val account: Account = Account(publicKey.pubKeyBytes)
 }
