@@ -5,7 +5,7 @@ import java.security.{AlgorithmParameters, SecureRandom}
 
 import com.google.common.primitives.{Ints, Longs}
 import encry.crypto.PrivateKey25519
-import encry.settings.{Algos, EncryAppSettings, KeyManagerSettings}
+import encry.settings.{Algos, EncryAppSettings, WalletSettings}
 import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import javax.crypto._
@@ -26,7 +26,7 @@ import scala.util.Try
   */
 
 case class KeyManager(store: LSMStore,
-                      storageSettings: KeyManagerSettings,
+                      storageSettings: WalletSettings,
                       passwdBytes: Option[Array[Byte]]) extends Logging {
   /**
     * Generate private key from some string bytes
@@ -255,10 +255,10 @@ object KeyManager extends Logging {
 
     val keysStore = new LSMStore(dir, keepVersions = 0)
 
-    val keyManager = KeyManager(keysStore, settings.keyManager, password)
+    val keyManager = KeyManager(keysStore, settings.wallet, password)
 
     if (keyManager.keys.isEmpty) keyManager.initStorage(seed)
-      if (settings.keyManager.encryption && !keyManager.isLocked) keyManager.lock()
+      if (!keyManager.isLocked) keyManager.lock()
 
     keyManager
   }

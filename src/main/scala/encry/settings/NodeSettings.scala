@@ -18,8 +18,7 @@ case class NodeSettings(stateMode: StateMode,
                         mempoolCleanupInterval: FiniteDuration,
                         mempoolMaxCapacity: Int,
                         enableCLI: Boolean,
-                        sendStat: Boolean
-                       )
+                        sendStat: Boolean)
 
 trait NodeSettingsReader {
 
