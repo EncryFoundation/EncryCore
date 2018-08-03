@@ -24,7 +24,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val walletStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions)
 
-    val keyManager: KeyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), settings.keyManager, None)
+    val keyManager: KeyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), settings.wallet, None)
 
     keyManager.initStorage(Random.randomBytes())
 
@@ -71,7 +71,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val walletStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions)
 
-    val keyManager: KeyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), settings.keyManager, None)
+    val keyManager: KeyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), settings.wallet, None)
 
     keyManager.initStorage(Random.randomBytes())
 
