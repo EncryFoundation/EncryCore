@@ -7,11 +7,11 @@ import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box._
 import encry.settings.Algos
-import encry.storage.EncryBaseStorage
+import encry.storage.EncryStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.crypto.authds.ADKey
 
-case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends EncryBaseStorage {
+case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends EncryStorage {
 
   import WalletStorage._
 

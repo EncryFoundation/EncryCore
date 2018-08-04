@@ -94,11 +94,13 @@ case class EncryWallet(walletStore: Store, accountManager: AccountManager)
 object EncryWallet {
 
   def getWalletDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/wallet")
+  def getKeysDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/keys")
 
   def readOrGenerate(settings: EncryAppSettings): EncryWallet = {
     val walletDir: File = getWalletDir(settings); walletDir.mkdirs()
+    val keysDir: File = getKeysDir(settings); keysDir.mkdirs()
     val walletStore: LSMStore = new LSMStore(walletDir, keepVersions = 0)
-    val accountManagerStore: LSMStore = new LSMStore(walletDir, keepVersions = 0, keySize = 33)
+    val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 33)
     EncryWallet(walletStore, AccountManager(accountManagerStore, settings.wallet))
   }
 }

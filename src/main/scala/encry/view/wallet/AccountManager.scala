@@ -1,21 +1,23 @@
 package encry.view.wallet
 
-import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.crypto.encryption.AES
+import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.settings.{Algos, WalletSettings}
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import io.iohk.iodb.{ByteArrayWrapper, Store}
+import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Blake2b256
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
 
-case class AccountManager(store: LSMStore, settings: WalletSettings) {
+case class AccountManager(store: Store, settings: WalletSettings) {
 
-  def mandatoryAccount: PrivateKey25519 = store.get(AccountManager.MandatoryAccountKey) match {
-    case Some(res) => store.get(ByteArrayWrapper(AccountManager.AccountPrefix +: res.data)).map { secretRes =>
+  import encry.storage.EncryStorage._
+
+  def mandatoryAccount: PrivateKey25519 = store.get(AccountManager.MandatoryAccountKey).flatMap { res =>
+    store.get(AccountManager.AccountPrefix +: res.data).map { secretRes =>
       PrivateKey25519(PrivateKey @@ AES.decrypt(secretRes.data, settings.password), PublicKey @@ res.data)
-    }.getOrElse(throw new Exception("Mandatory account not found"))
-    case None => createMandatory(settings.seed)
-  }
+    }
+  } getOrElse createMandatory(settings.seed)
 
   def accounts: Seq[PrivateKey25519] = store.getAll().foldLeft(Seq.empty[PrivateKey25519]) { case (acc, (k, v)) =>
     if (k.data.head == AccountManager.AccountPrefix)
@@ -35,9 +37,12 @@ case class AccountManager(store: LSMStore, settings: WalletSettings) {
   }
 
   def createMandatory(seedOpt: Option[String]): PrivateKey25519 = {
-    val acc: PrivateKey25519 = seedOpt.map(seed => createAccount(seed.getBytes(Algos.charset))).getOrElse(createAccount())
+    val acc: PrivateKey25519 = seedOpt
+      .flatMap(seed => Base58.decode(seed).toOption)
+      .map(createAccount)
+      .getOrElse(createAccount())
     store.update(
-      ByteArrayWrapper(Random.randomBytes(32)),
+      scala.util.Random.nextLong(),
       Seq.empty,
       Seq((AccountManager.MandatoryAccountKey, ByteArrayWrapper(acc.publicKeyBytes)))
     )
@@ -46,7 +51,7 @@ case class AccountManager(store: LSMStore, settings: WalletSettings) {
 
   private def saveAccount(privateKey: PrivateKey, publicKey: PublicKey): Unit =
     store.update(
-      ByteArrayWrapper(Algos.hash(publicKey)),
+      scala.util.Random.nextLong(),
       Seq.empty,
       Seq((ByteArrayWrapper(AccountManager.AccountPrefix +: publicKey), ByteArrayWrapper(AES.encrypt(privateKey, settings.password))))
     )
