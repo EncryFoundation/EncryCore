@@ -21,11 +21,13 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val walletStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
 
-    val keyManager: AccountManager = AccountManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0, keySize = 33), settings.wallet)
+    val accountManagerStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0, keySize = 33)
 
-    val wallet: EncryWallet = EncryWallet(walletStore, keyManager)
+    val accountManager: AccountManager = AccountManager(accountManagerStore, settings.wallet)
 
-    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddr(4, keyManager.mandatoryAccount.publicImage.address.address)
+    val wallet: EncryWallet = EncryWallet(walletStore, accountManager)
+
+    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddr(4, accountManager.mandatoryAccount.publicImage.address.address)
 
     val useBox: AssetBox = validTxs.head.newBoxes.head.asInstanceOf[AssetBox]
 
@@ -66,7 +68,9 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val walletStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
 
-    val keyManager: AccountManager = AccountManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0, keySize = 33), settings.wallet)
+    val accountManagerStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0, keySize = 33)
+
+    val keyManager: AccountManager = AccountManager(accountManagerStore, settings.wallet)
 
     val wallet: EncryWallet = EncryWallet(walletStore, keyManager)
 
@@ -78,8 +82,6 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     wallet.scanPersistent(block)
 
-    wallet.getBalances.foldLeft(0L) {
-      _ + _._2
-    } shouldEqual txsQty * Props.boxValue
+    wallet.getBalances.foldLeft(0L)(_ + _._2) shouldEqual txsQty * Props.boxValue
   }
 }

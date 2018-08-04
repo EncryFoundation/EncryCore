@@ -19,11 +19,11 @@ import scala.util.Try
 case class EncryWallet(walletStore: Store, accountManager: AccountManager)
   extends Vault[EncryProposition, BaseTransaction, EncryPersistentModifier, EncryWallet] with Logging {
 
-  val propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes))
-
   val walletStorage: WalletStorage = WalletStorage(walletStore, publicKeys)
 
   def publicKeys: Set[PublicKey25519] = accountManager.publicAccounts.toSet
+
+  def propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes))
 
   override def scanOffchain(tx: BaseTransaction): EncryWallet = this
 
