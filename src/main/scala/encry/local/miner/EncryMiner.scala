@@ -172,11 +172,11 @@ class EncryMiner extends Actor with Logging {
 
   def produceCandidate(): Unit =
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
-      log.info(s"Starting candidate generation in ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       startTime = System.currentTimeMillis()
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
       val candidate: CandidateEnvelope =
         if ((bestHeaderOpt.isDefined && view.history.isFullChainSynced) || settings.node.offlineGeneration) {
+          log.info(s"Starting candidate generation in ${dateFormat.format(new Date(System.currentTimeMillis()))}")
           if (settings.node.sendStat) context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
           val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
           if (settings.node.sendStat) context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - startTime)
