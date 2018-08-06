@@ -13,8 +13,8 @@ import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator
 import encry.local.explorer.BlockListener
 import encry.local.explorer.database.DBService
-import encry.local.miner.EncryMiner
-import encry.local.miner.EncryMiner.StartMining
+import encry.local.miner.Miner
+import encry.local.miner.Miner.StartMining
 import encry.network.message._
 import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, ModifiersHolder, NetworkController, UPnP}
@@ -49,6 +49,8 @@ object EncryApp extends App with Logging {
       ModifiersSpec
     )
   }
+  lazy val upnp: UPnP = new UPnP(settings.network)
+
   lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props()
     .withDispatcher("nvh-dispatcher"), "nodeViewHolder")
   val readersHolder: ActorRef = system.actorOf(Props[EncryViewReadersHolder], "readersHolder")
@@ -57,16 +59,21 @@ object EncryApp extends App with Logging {
   lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
   lazy val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
-  lazy val miner: ActorRef = system.actorOf(Props[EncryMiner], "miner")
+  lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
   val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
-
-  lazy val upnp: UPnP = new UPnP(settings.network)
+  if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
+  if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
+  if (settings.postgres.enabled) system.actorOf(Props(classOf[BlockListener], DBService()), "blockListener")
+  if (settings.node.mining) miner ! StartMining
+  if (settings.levelDb.enable) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
+  if (settings.testing.transactionGeneration)
+    system.actorOf(Props[TransactionGenerator].withDispatcher("transaction-generator-dispatcher"), "tx-generator")
+  if (settings.node.enableCLI) cliListener ! StartListening
+  system.actorOf(Props[Zombie], "zombie")
 
   if (settings.restApi.enabled) {
-
     import akka.http.scaladsl.model.StatusCodes._
     import akka.http.scaladsl.server.Directives._
-
     implicit def apiExceptionHandler: ExceptionHandler =
       ExceptionHandler {
         case e: Exception =>
@@ -87,16 +94,6 @@ object EncryApp extends App with Logging {
     val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
     Http().bindAndHandle(combinedRoute, settings.restApi.bindAddress.getAddress.getHostAddress, settings.restApi.bindAddress.getPort)
   }
-
-  if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
-  if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
-  if (settings.postgres.enabled) system.actorOf(Props(classOf[BlockListener], DBService()), "blockListener")
-  if (settings.node.mining) miner ! StartMining
-  if (settings.levelDb.enable) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
-  if (settings.testing.transactionGeneration)
-    system.actorOf(Props[TransactionGenerator].withDispatcher("transaction-generator-dispatcher"), "tx-generator")
-  if (settings.node.enableCLI) cliListener ! StartListening
-  val zombie: ActorRef = system.actorOf(Props[Zombie], "zombie")
 
   def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
 

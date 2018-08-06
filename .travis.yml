@@ -1,20 +1,18 @@
 language: scala
-# Use container-based infrastructure
 sudo: false
 branches:
   only:
     - master
+    - release
     - /^\d\.\d+$/
 jdk:
-- oraclejdk8
+- oraclejdk10
 scala:
-- 2.12.4
+- 2.12.6
 script:
   - sbt test
-# These directories are cached to S3 at the end of the build
 cache:
   directories:
     - $HOME/.sbt
 before_cache:
-  # Cleanup the cached directories to avoid unnecessary cache updates
   - find $HOME/.sbt        -name "*.lock"               -print -delete
