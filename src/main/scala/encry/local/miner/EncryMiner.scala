@@ -58,7 +58,7 @@ class EncryMiner extends Actor with Logging {
     case StartMining if context.children.nonEmpty =>
       candidateOpt match {
         case Some(candidateBlock) =>
-          log.info(s"Start mining in ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+          log.info(s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
           context.children.foreach(_ ! NextChallenge(candidateBlock))
         case None => produceCandidate()
       }
@@ -74,15 +74,17 @@ class EncryMiner extends Actor with Logging {
       nodeViewHolder ! LocallyGeneratedModifier(block.header)
       nodeViewHolder ! LocallyGeneratedModifier(block.payload)
       if (settings.node.sendStat) {
-        system.actorSelection("user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
-        system.actorSelection("user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
+        context.actorSelection("user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
+        context.actorSelection("user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
       }
       if (settings.node.stateMode == StateMode.Digest)
         block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
       context.children.foreach(_ ! DropChallenge)
-    case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty, candidateOpt)
+
+    case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
+
     case _ =>
   }
 
@@ -95,12 +97,12 @@ class EncryMiner extends Actor with Logging {
 
   def receiveSemanticallySuccessfulModifier: Receive = {
     case SemanticallySuccessfulModifier(mod: EncryBlock) if context.children.nonEmpty && needNewCandidate(mod) =>
-      log.info(s"Got new block. Starting to produce candidate on height: ${mod.header.height + 1} " +
-        s"in ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+      log.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
+        s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       produceCandidate()
     case SemanticallySuccessfulModifier(mod: EncryBlock) if shouldStartMine(mod) =>
-      log.info(s"Got new block2. Starting to produce candidate on height: ${mod.header.height + 1} " +
-        s"in ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+      log.info(s"Got new block2. Starting to produce candidate at height: ${mod.header.height + 1} " +
+        s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       self ! StartMining
     case SemanticallySuccessfulModifier(_) =>
   }
@@ -170,18 +172,17 @@ class EncryMiner extends Actor with Logging {
 
   def produceCandidate(): Unit =
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
-      log.info(s"Starting candidate generation in ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       startTime = System.currentTimeMillis()
-      if (settings.node.sendStat) {
-        system.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
-      }
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
-      val candidate = if (bestHeaderOpt.isDefined || settings.node.offlineGeneration)
-        CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
-      else CandidateEnvelope.empty
-      if (settings.node.sendStat) {
-        system.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - startTime)
-      }
+      val candidate: CandidateEnvelope =
+        if ((bestHeaderOpt.isDefined && view.history.isFullChainSynced) || settings.node.offlineGeneration) {
+          log.info(s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+          if (settings.node.sendStat) context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
+          val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
+          if (settings.node.sendStat) context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - startTime)
+          envelope
+        }
+        else CandidateEnvelope.empty
       candidate
     }
 }
@@ -215,8 +216,6 @@ object EncryMiner extends Logging {
   }
 
   implicit val jsonEncoder: Encoder[MinerStatus] = (r: MinerStatus) =>
-    Map(
-      "isMining" -> r.isMining.asJson,
-      "candidateBlock" -> r.candidateBlock.map(_.asJson).getOrElse("None".asJson)
-    ).asJson
+    Map("isMining" -> r.isMining.asJson,
+       "candidateBlock" -> r.candidateBlock.map(_.asJson).getOrElse("None".asJson)).asJson
 }
