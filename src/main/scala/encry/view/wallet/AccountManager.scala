@@ -17,7 +17,7 @@ case class AccountManager(store: Store, settings: WalletSettings) {
     store.get(AccountManager.AccountPrefix +: res.data).map { secretRes =>
       PrivateKey25519(PrivateKey @@ AES.decrypt(secretRes.data, settings.password), PublicKey @@ res.data)
     }
-  } getOrElse createMandatory(settings.seed)
+  } getOrElse createMandatory(settings.seed.flatMap(seed => Base58.decode(seed).toOption))
 
   def accounts: Seq[PrivateKey25519] = store.getAll().foldLeft(Seq.empty[PrivateKey25519]) { case (acc, (k, v)) =>
     if (k.data.head == AccountManager.AccountPrefix)
@@ -36,9 +36,8 @@ case class AccountManager(store: Store, settings: WalletSettings) {
     PrivateKey25519(privateKey, publicKey)
   }
 
-  def createMandatory(seedOpt: Option[String]): PrivateKey25519 = {
+  def createMandatory(seedOpt: Option[Array[Byte]]): PrivateKey25519 = {
     val acc: PrivateKey25519 = seedOpt
-      .flatMap(seed => Base58.decode(seed).toOption)
       .map(createAccount)
       .getOrElse(createAccount())
     store.update(
