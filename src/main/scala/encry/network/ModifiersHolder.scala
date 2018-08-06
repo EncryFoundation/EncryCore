@@ -9,7 +9,7 @@ import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
 import encry.settings.Algos
 import encry.utils.Logging
-import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlockFromLocalPersistence, LocallyGeneratedModifier}
 import encry.{ModifierId, ModifierTypeId}
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
@@ -20,18 +20,25 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   /** Map, which contains not completed blocks
     * Key can be payloadId or also header id. So value depends on key, and can contains: headerId, payloadId */
-  var headers: Map[String, (EncryBlockHeader, Int)] = Map.empty
-  var payloads: Map[String, (EncryBlockPayload, Int)] = Map.empty
-  var nonCompletedBlocks: Map[String, String] = Map.empty
-  var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
+  private var headers: Map[String, (EncryBlockHeader, Int)] = Map.empty
+  private var payloads: Map[String, (EncryBlockPayload, Int)] = Map.empty
+  private var nonCompletedBlocks: Map[String, String] = Map.empty
+  private var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
+  private val batchSize: Int = 400
 
   context.system.scheduler.schedule(10.second, 30.second) {
     logger.debug(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
   }
 
+  context.system.scheduler.schedule(10 seconds, 5 seconds) {
+    if (completedBlocks.nonEmpty) self ! TryToSendBlocks
+  }
+
   override def preStart(): Unit = logger.info(s"ModifiersHolder actor is started.")
 
-  override def receiveRecover: Receive = {
+  override def receiveRecover: Receive = if (settings.levelDb.recoverMode) receiveRecoverEnabled else receiveRecoverDisabled
+
+  def receiveRecoverEnabled: Receive = {
     case header: EncryBlockHeader =>
       updateHeaders(header)
       logger.debug(s"Header ${header.height} is recovered from leveldb.")
@@ -41,25 +48,21 @@ class ModifiersHolder extends PersistentActor with Logging {
     case block: EncryBlock =>
       updateCompletedBlocks(block)
       logger.debug(s"Block ${block.header.height} is recovered from leveldb.")
-    case RecoveryCompleted => logger.info("Recovery completed.")
+    case RecoveryCompleted =>
+      logger.info("Recovery completed.")
+  }
+
+  def receiveRecoverDisabled: Receive = {
+    case _ =>
   }
 
   override def receiveCommand: Receive = {
-    case ApplyState =>
-      logger.info("State recovering state on ModifiersHolder is finished.")
-      logger.info(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
-      val sortedHeaders: Seq[EncryBlockHeader] = headers.map(_._2._1).toSeq
-        .sortWith((firstHeader, secondHeader) => firstHeader.height < secondHeader.height)
-      if (sortedHeaders.headOption.exists(_.height == 0)) sortedHeaders.tail.foldLeft(Seq(sortedHeaders.head)) {
-        case (applicableHeaders, header) =>
-          if (applicableHeaders.last.height + 1 == header.height) applicableHeaders :+ header
-          else applicableHeaders
-      }.foreach(header => nodeViewHolder ! LocallyGeneratedModifier(header))
-      if (completedBlocks.keys.headOption.contains(0)) completedBlocks.foldLeft(Seq(completedBlocks.head._2)) {
-        case (applicableBlocks, blockWithHeight) =>
-          if (applicableBlocks.last.header.height + 1 == blockWithHeight._1) applicableBlocks :+ blockWithHeight._2
-          else applicableBlocks
-      }.foreach(block => nodeViewHolder ! LocallyGeneratedModifier(block.payload))
+    case TryToSendBlocks =>
+      val blocksToSend: Map[Int, EncryBlock] = completedBlocks.take(batchSize)
+      completedBlocks = completedBlocks.drop(batchSize)
+      blocksToSend.values.foreach {
+        nodeViewHolder ! BlockFromLocalPersistence(_)
+      }
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
     case x: Any => logger.error(s"Strange input: $x.")
@@ -123,7 +126,7 @@ class ModifiersHolder extends PersistentActor with Logging {
 
 object ModifiersHolder {
 
-  case object ApplyState
+  case object TryToSendBlocks
 
   case class Statistics(receivedHeaders: Int,
                         receivedPayloads: Int,

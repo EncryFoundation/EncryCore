@@ -21,7 +21,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
 
-trait BlockHeaderProcessor extends Logging {
+trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider
@@ -117,44 +117,51 @@ trait BlockHeaderProcessor extends Logging {
     * @return ProgressInfo - info required for State to be consistent with History
     */
   protected def process(h: EncryBlockHeader): ProgressInfo[EncryPersistentModifier] = {
-    val dataToUpdate: (Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier) = getHeaderInfoUpdate(h)
+    val dataToUpdateOpt: Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier)] = getHeaderInfoUpdate(h)
 
-    historyStorage.bulkInsert(ByteArrayWrapper(h.id), dataToUpdate._1, Seq(dataToUpdate._2))
+    dataToUpdateOpt match {
+      case Some(dataToUpdate) =>
+        historyStorage.bulkInsert(ByteArrayWrapper(h.id), dataToUpdate._1, Seq(dataToUpdate._2))
 
-    bestHeaderIdOpt match {
-      case Some(bestHeaderId) =>
-        // If we verify transactions, we don't need to send this header to state.
-        // If we don't and this is the best header, we should send this header to state to update state root hash
-        val toProcess: Seq[EncryBlockHeader] = if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
-        ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
-      case None =>
-        logError("Should always have best header after header application")
-        EncryApp.forceStopApplication()
+        bestHeaderIdOpt match {
+          case Some(bestHeaderId) =>
+            // If we verify transactions, we don't need to send this header to state.
+            // If we don't and this is the best header, we should send this header to state to update state root hash
+            val toProcess: Seq[EncryBlockHeader] = if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
+            ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
+          case None =>
+            logError("Should always have best header after header application")
+            EncryApp.forceStopApplication()
+        }
+      case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
     }
+
   }
 
-  private def getHeaderInfoUpdate(h: EncryBlockHeader): (Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier) = {
+  private def getHeaderInfoUpdate(h: EncryBlockHeader): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier)] = {
     val difficulty: Difficulty = h.difficulty
     if (h.isGenesis) {
       log.info(s"Initialize header chain with genesis header ${h.encodedId}")
-      (Seq(
+      Option(Seq(
         BestHeaderKey -> ByteArrayWrapper(h.id),
         heightIdsKey(Constants.Chain.GenesisHeight) -> ByteArrayWrapper(h.id),
         headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(Constants.Chain.GenesisHeight)),
         headerScoreKey(h.id) -> ByteArrayWrapper(difficulty.toByteArray)), h)
     } else {
-      val score = Difficulty @@ (scoreOf(h.parentId).get + difficulty)
-      val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-        if (score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
-      val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
-      val heightRow: (ByteArrayWrapper, ByteArrayWrapper) = headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
-      val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (score > bestHeadersChainScore) {
-        bestBlockHeaderIdsRow(h, score)
-      } else {
-        EncryApp.system.actorSelection("/user/blockListener") ! NewOrphaned(h) // TODO: Remove direct system import when possible.
-        orphanedBlockHeaderIdsRow(h, score)
+      scoreOf(h.parentId).map { parentScore =>
+        val score = Difficulty @@ (parentScore + difficulty)
+        val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
+          if (score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
+        val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
+        val heightRow: (ByteArrayWrapper, ByteArrayWrapper) = headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
+        val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (score > bestHeadersChainScore) {
+          bestBlockHeaderIdsRow(h, score)
+        } else {
+          EncryApp.system.actorSelection("/user/blockListener") ! NewOrphaned(h) // TODO: Remove direct system import when possible.
+          orphanedBlockHeaderIdsRow(h, score)
+        }
+        (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, h)
       }
-      (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, h)
     }
   }
 
