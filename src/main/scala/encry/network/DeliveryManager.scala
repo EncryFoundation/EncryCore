@@ -3,8 +3,8 @@ package encry.network
 import akka.actor.{Actor, Cancellable}
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
 import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
-import encry.local.miner.EncryMiner.{DisableMining, StartMining}
-import encry.network.EncryDeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
+import encry.local.miner.Miner.{DisableMining, StartMining}
+import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToNetwork}
 import encry.network.PeerConnectionHandler._
@@ -22,11 +22,9 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Try}
 
-class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with Logging {
+class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with Logging {
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
-
-  case class ToDownloadStatus(modTypeId: ModifierTypeId, firstViewed: Long, lastTry: Long)
 
   var delivered: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty
   var deliveredSpam: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty
@@ -220,7 +218,7 @@ class EncryDeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends 
   }
 }
 
-object EncryDeliveryManager {
+object DeliveryManager {
 
   case object FullBlockChainSynced
 
