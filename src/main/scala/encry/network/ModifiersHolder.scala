@@ -50,6 +50,7 @@ class ModifiersHolder extends PersistentActor with Logging {
       logger.debug(s"Block ${block.header.height} is recovered from leveldb.")
     case RecoveryCompleted =>
       logger.info("Recovery completed.")
+      peerManager ! RecoveryCompleted
   }
 
   def receiveRecoverDisabled: Receive = {

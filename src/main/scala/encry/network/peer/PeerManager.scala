@@ -2,6 +2,7 @@ package encry.network.peer
 
 import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.Actor
+import akka.persistence.RecoveryCompleted
 import encry.EncryApp._
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
@@ -16,8 +17,9 @@ import scala.util.Random
 
 class PeerManager extends Actor with Logging {
 
-  var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
-  var connectingPeers: Set[InetSocketAddress] = Set.empty
+  private var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
+  private var connectingPeers: Set[InetSocketAddress] = Set.empty
+  private var recoveryCompleted: Boolean = !settings.levelDb.recoverMode
 
   if (PeerDatabase.isEmpty) settings.network.knownPeers.foreach { address =>
     if (!isSelf(address, None)) PeerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), None))
@@ -52,7 +54,7 @@ class PeerManager extends Actor with Logging {
     case Handshaked(peer) =>
       if (peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress))
         peer.handlerRef ! CloseConnection
-      else if (checkPossibilityToAddPeer(peer.socketAddress) && !connectedPeers.contains(peer.socketAddress)) {
+      else if (checkPossibilityToAddPeerWRecovery(peer.socketAddress) && !connectedPeers.contains(peer.socketAddress)) {
         self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
         connectedPeers += (peer.socketAddress -> peer)
         nodeViewSynchronizer ! HandshakedPeer(peer)
@@ -70,10 +72,14 @@ class PeerManager extends Actor with Logging {
 
       if (connectedPeers.size + connectingPeers.size <= settings.network.maxConnections)
         randomPeer.filter(address => !connectedPeers.exists(_._1 == address) &&
-          !connectingPeers.exists(_.getHostName == address.getHostName) && checkPossibilityToAddPeer(address)).foreach { address =>
+          !connectingPeers.exists(_.getHostName == address.getHostName) && checkPossibilityToAddPeerWRecovery(address)).foreach { address =>
             sender() ! ConnectTo(address)
         }
+    case RecoveryCompleted => recoveryCompleted = true
   }
+
+  private def checkPossibilityToAddPeerWRecovery(address: InetSocketAddress): Boolean =
+    checkPossibilityToAddPeer(address) && recoveryCompleted
 }
 
 object PeerManager {
