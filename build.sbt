@@ -2,7 +2,7 @@ import sbt.Keys._
 import sbt._
 
 name := "EncryCore"
-version := "0.3.2"
+version := "0.9.0"
 organization := "org.encryfoundation"
 scalaVersion := "2.12.6"
 
