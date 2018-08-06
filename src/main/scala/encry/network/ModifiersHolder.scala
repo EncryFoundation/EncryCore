@@ -36,7 +36,9 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   override def preStart(): Unit = logger.info(s"ModifiersHolder actor is started.")
 
-  override def receiveRecover: Receive = {
+  override def receiveRecover: Receive = if (settings.levelDb.recoverMode) receiveRecoverEnabled else receiveRecoverDisabled
+
+  def receiveRecoverEnabled: Receive = {
     case header: EncryBlockHeader =>
       updateHeaders(header)
       logger.debug(s"Header ${header.height} is recovered from leveldb.")
@@ -48,6 +50,10 @@ class ModifiersHolder extends PersistentActor with Logging {
       logger.debug(s"Block ${block.header.height} is recovered from leveldb.")
     case RecoveryCompleted =>
       logger.info("Recovery completed.")
+  }
+
+  def receiveRecoverDisabled: Receive = {
+    case _ =>
   }
 
   override def receiveCommand: Receive = {
