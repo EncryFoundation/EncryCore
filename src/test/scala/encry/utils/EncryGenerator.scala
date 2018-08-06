@@ -3,11 +3,11 @@ package encry.utils
 import java.io.File
 import akka.actor.ActorRef
 import encry.ModifierId
-import encry.account.{Account, Address}
+import encry.Address
 import encry.crypto.equihash.EquihashSolution
 import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
+import encry.modifiers.mempool.{EncryTransaction, Pay2PubKeyAddress, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, MonetaryBox}
 import encry.settings.Algos.HF
@@ -25,10 +25,10 @@ trait EncryGenerator {
 
   def timestamp: Long = System.currentTimeMillis()
 
-  def randomAddress: Address = Account(PublicKey @@ Random.randomBytes()).address
+  def randomAddress: Address = Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address
 
   def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None): AssetBox =
-    AssetBox(EncryProposition.accountLock(Account(address)), rndGen.nextLong(), amount, tokenIdOpt)
+    AssetBox(EncryProposition.addressLocked(address), rndGen.nextLong(), amount, tokenIdOpt)
 
   def genTxOutputs(boxes: Traversable[EncryBaseBox]): IndexedSeq[ADKey] =
     boxes.foldLeft(IndexedSeq[ADKey]()) { case (s, box) =>
@@ -37,7 +37,7 @@ trait EncryGenerator {
 
   def genValidAssetBoxes(secret: PrivateKey25519, amount: Amount, qty: Int): Seq[AssetBox] =
     (0 to qty).foldLeft(IndexedSeq[AssetBox]()) { case (bxs, _) =>
-      bxs :+ AssetBox(EncryProposition.accountLock(Account(secret.publicKeyBytes)), rndGen.nextLong(), amount)
+      bxs :+ AssetBox(EncryProposition.pubKeyLocked(secret.publicKeyBytes), rndGen.nextLong(), amount)
     }
 
   def genPrivKeys(qty: Int): Seq[PrivateKey25519] = (0 until qty).map { _ =>
@@ -49,9 +49,9 @@ trait EncryGenerator {
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
 
     keys.map { k =>
-      val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genAssetBox(k.publicImage.address))
+      val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genAssetBox(k.publicImage.address.address))
       TransactionFactory.defaultPaymentTransactionScratch(k, Props.txFee,
-        scala.util.Random.nextLong(), useBoxes, Props.recipientAddr, Props.boxValue)
+        scala.util.Random.nextLong(), useBoxes, randomAddress, Props.boxValue)
     }
   }
 
@@ -91,10 +91,10 @@ trait EncryGenerator {
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
     val timestamp: Amount = System.currentTimeMillis()
     keys.foldLeft(Seq[EncryTransaction]()) { (seq, key) =>
-      val useBoxes: IndexedSeq[MonetaryBox] = if (seq.isEmpty) IndexedSeq(genAssetBox(key.publicImage.address))
+      val useBoxes: IndexedSeq[MonetaryBox] = if (seq.isEmpty) IndexedSeq(genAssetBox(key.publicImage.address.address))
         else seq.last.newBoxes.map(_.asInstanceOf[MonetaryBox]).toIndexedSeq
       seq :+ TransactionFactory.defaultPaymentTransactionScratch(key, Props.txFee,
-        timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
+        timestamp, useBoxes, randomAddress, Props.boxValue)
     }
   }
 
@@ -103,8 +103,8 @@ trait EncryGenerator {
     val timestamp: Amount = System.currentTimeMillis()
 
     keys.map { k =>
-      val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genAssetBox(PublicKey25519(PublicKey @@ Random.randomBytes(32)).address))
-      TransactionFactory.defaultPaymentTransactionScratch(k, -100, timestamp, useBoxes, Props.recipientAddr, Props.boxValue)
+      val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genAssetBox(PublicKey25519(PublicKey @@ Random.randomBytes(32)).address.address))
+      TransactionFactory.defaultPaymentTransactionScratch(k, -100, timestamp, useBoxes, randomAddress, Props.boxValue)
     }
   }
 

@@ -1,11 +1,10 @@
 package encry.modifiers
 
-import encry.account.Account
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
-import encry.utils.TestHelper
+import encry.utils.{EncryGenerator, TestHelper}
 import encry.view.history.Height
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.Ast.Expr
@@ -14,48 +13,47 @@ import scorex.crypto.authds.ADKey
 import scorex.utils.Random
 import scala.util.{Random => Scarand}
 
-trait InstanceFactory extends Keys {
+trait InstanceFactory extends Keys with EncryGenerator {
 
   private val genHelper = TestHelper
-  private val timestamp = System.currentTimeMillis()
 
   lazy val fakeTransaction: EncryTransaction = {
     val fee = genHelper.Props.txFee
-    val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address),
-      genHelper.genAssetBox(publicKey.address))
+    val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address.address),
+      genHelper.genAssetBox(publicKey.address.address))
 
     TransactionFactory.defaultPaymentTransactionScratch(secret, fee, timestamp, useBoxes,
-      publicKey.address, 12345678L)
+      publicKey.address.address, 12345678L)
   }
 
   lazy val paymentTransactionValid: EncryTransaction = {
     val fee: Amount = genHelper.Props.txFee
-    val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genHelper.genAssetBox(publicKey.address),
-      genHelper.genAssetBox(publicKey.address))
+    val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genHelper.genAssetBox(publicKey.address.address),
+      genHelper.genAssetBox(publicKey.address.address))
 
     TransactionFactory.defaultPaymentTransactionScratch(secret, fee, timestamp, useBoxes,
-      publicKey.address, genHelper.Props.txAmount)
+      publicKey.address.address, genHelper.Props.txAmount)
   }
 
   def paymentTransactionDynamic: EncryTransaction = {
     val fee = genHelper.Props.txFee
     val useBoxes = (0 to 5).map(_ => {
       AssetBox(
-        EncryProposition.accountLock(Account(secret.publicImage.address)),
+        EncryProposition.pubKeyLocked(secret.publicImage.pubKeyBytes),
         Scarand.nextLong(),
         999L
       )
     })
 
     TransactionFactory.defaultPaymentTransactionScratch(secret, fee, Scarand.nextLong(), useBoxes,
-      publicKey.address, genHelper.Props.txAmount)
+      publicKey.address.address, genHelper.Props.txAmount)
   }
 
   lazy val paymentTransactionInvalid: EncryTransaction = {
-    val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address))
+    val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address.address))
 
     TransactionFactory.defaultPaymentTransactionScratch(secret, -100, timestamp, useBoxes,
-      genHelper.Props.recipientAddr, genHelper.Props.txAmount)
+      randomAddress, genHelper.Props.txAmount)
   }
 
   lazy val coinbaseTransaction: EncryTransaction = {
@@ -64,7 +62,7 @@ trait InstanceFactory extends Keys {
 
   lazy val AssetBoxI: AssetBox =
     AssetBox(
-      EncryProposition.accountLock(Account(secret.publicImage.address)),
+      EncryProposition.pubKeyLocked(secret.publicImage.pubKeyBytes),
       999L,
       100000L
     )

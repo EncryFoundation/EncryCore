@@ -2,8 +2,7 @@ package encry.view.state
 
 import java.io.File
 import akka.actor.ActorRef
-import encry.account.Address
-import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
+import encry.modifiers.mempool.{EncryTransaction, Pay2PubKeyAddress, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
 import encry.settings.Algos.HF
@@ -78,14 +77,14 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
     val validTxs = keys.zip(bxs).map { case (k, bx) =>
       val useBoxes = IndexedSeq(bx)
       TransactionFactory.defaultPaymentTransactionScratch(k, fee,
-        timestamp, useBoxes, factory.Props.recipientAddr, factory.Props.boxValue - 4300)
+        timestamp, useBoxes, randomAddress, factory.Props.boxValue - 4300)
     }
 
     val invalidTxs = keys.map { k =>
       val useBoxes =
-        IndexedSeq(factory.genAssetBox(Address @@ "4iGUxZy1uy9m1xsEL26VuUZ8Q23W961PPvDTPW3t2jXuCJCPuy"))
+        IndexedSeq(factory.genAssetBox(Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address))
       TransactionFactory.defaultPaymentTransactionScratch(k, fee,
-        timestamp, useBoxes, factory.Props.recipientAddr, 3000000L)
+        timestamp, useBoxes, randomAddress, 3000000L)
     }
 
     val filteredValidTxs = state.filterValid(validTxs)
@@ -117,7 +116,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
     val validTxs = keys.zip(bxs).map { case (k, bx) =>
       val useBoxes = IndexedSeq(bx)
       TransactionFactory.defaultPaymentTransactionScratch(k, fee,
-        timestamp, useBoxes, factory.Props.recipientAddr, factory.Props.boxValue - 4300)
+        timestamp, useBoxes, randomAddress, factory.Props.boxValue - 4300)
     }
 
     val expectedDigest = state.generateProofs(validTxs)

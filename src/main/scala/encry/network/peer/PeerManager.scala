@@ -1,6 +1,6 @@
 package encry.network.peer
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.Actor
 import encry.EncryApp._
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
@@ -27,7 +27,9 @@ class PeerManager extends Actor with Logging {
     settings.network.bindAddress == address ||
       settings.network.declaredAddress.exists(da => declaredAddress.contains(da)) ||
       declaredAddress.contains(settings.network.bindAddress) ||
-      settings.network.declaredAddress.contains(address)
+      settings.network.declaredAddress.contains(address) ||
+      (InetAddress.getLocalHost.getAddress sameElements address.getAddress.getAddress) ||
+      (InetAddress.getLoopbackAddress.getAddress sameElements address.getAddress.getAddress)
 
   override def receive: Receive = {
     case GetConnectedPeers => sender() ! (connectedPeers.values.map(_.handshake).toSeq: Seq[Handshake])

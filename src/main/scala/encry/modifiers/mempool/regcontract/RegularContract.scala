@@ -1,14 +1,14 @@
 package encry.modifiers.mempool.regcontract
 
 import com.google.common.primitives.Ints
-import encry.account.{Account, AccountSerializer}
+import encry.crypto.PublicKey25519
 import encry.modifiers.serialization.SerializationException
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.Ast.{Expr, Ident}
 import org.encryfoundation.prismlang.core.{Ast, Types}
 import org.encryfoundation.prismlang.lib.predefined.signature.CheckSig
 import scorex.crypto.encode.Base16
-
+import scorex.crypto.signatures.PublicKey
 import scala.util.{Failure, Success, Try}
 
 sealed trait RegularContract {
@@ -21,15 +21,15 @@ object RegularContract {
     def toBytes(obj: RegularContract): Array[Byte] = obj match {
       case OpenContract => Array(OpenContract.typeId)
       case HeightLockedContract(h) => HeightLockedContract.TypeId +: Ints.toByteArray(h)
-      case AccountLockedContract(acc) => AccountLockedContract.TypeId +: acc.bytes
+      case PubKeyLockedContract(pk) => PubKeyLockedContract.TypeId +: pk
     }
     def parseBytes(bytes: Array[Byte]): Try[RegularContract] = bytes.head match {
       case OpenContract.typeId => Success(OpenContract)
       case HeightLockedContract.TypeId =>
         if (bytes.lengthCompare(5) == 0) Success(HeightLockedContract(Ints.fromByteArray(bytes.tail)))
         else Failure(SerializationException(s"`HeightLockedContract` deserialization failed"))
-      case AccountLockedContract.TypeId =>
-        if (bytes.lengthCompare(Account.AddressLength + 1) == 0) AccountSerializer.parseBytes(bytes.tail).map(AccountLockedContract.apply)
+      case PubKeyLockedContract.TypeId =>
+        if (bytes.lengthCompare(PublicKey25519.Length + 1) == 0) Success(PubKeyLockedContract(PublicKey @@ bytes.tail))
         else Failure(SerializationException(s"`AccountLockedContract` deserialization failed"))
     }
   }
@@ -65,8 +65,8 @@ case class HeightLockedContract(height: Int) extends RegularContract {
 }
 object HeightLockedContract { val TypeId: Byte = 1 }
 
-case class AccountLockedContract(account: Account) extends RegularContract {
-  val typeId: Byte = AccountLockedContract.TypeId
+case class PubKeyLockedContract(pubKey: PublicKey) extends RegularContract {
+  val typeId: Byte = PubKeyLockedContract.TypeId
   val contract: CompiledContract = CompiledContract(
     List("tx" -> Types.EncryTransaction, "sig" -> Types.Signature25519),
     Expr.Call(
@@ -78,10 +78,10 @@ case class AccountLockedContract(account: Account) extends RegularContract {
           Ident("messageToSign"),
           Types.PCollection.ofByte
         ),
-        Expr.Base16Str(Base16.encode(account.pubKey))
+        Expr.Base16Str(Base16.encode(pubKey))
       ),
       Types.PBoolean
     )
   )
 }
-object AccountLockedContract { val TypeId: Byte = 2 }
+object PubKeyLockedContract { val TypeId: Byte = 2 }

@@ -162,16 +162,19 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
   def validate(tx: BaseTransaction, allowedOutputDelta: Amount = 0L): Try[Unit] =
     tx.semanticValidity.map { _: Unit =>
 
-      val context: Context = Context(tx, EncryStateView(height, lastBlockTimestamp, rootHash))
+      val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, rootHash)
 
       val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => persistentProver.unauthenticatedLookup(input.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, input.boxId.head))
         .map(_.toOption -> input)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
           (bxOpt, tx.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
-            case (Some(bx), _) if input.proofs.nonEmpty => if (bx.proposition.canUnlock(context, input.realContract, input.proofs)) acc :+ bx else acc
-            case (Some(bx), Some(defaultProof)) => if (bx.proposition.canUnlock(context, input.realContract, Seq(defaultProof))) acc :+ bx else acc
-            case (Some(bx), _) => if (bx.proposition.canUnlock(context, input.realContract, Seq.empty)) acc :+ bx else acc
+            case (Some(bx), _) if input.proofs.nonEmpty =>
+              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, input.proofs)) acc :+ bx else acc
+            case (Some(bx), Some(defaultProof)) =>
+              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, Seq(defaultProof))) acc :+ bx else acc
+            case (Some(bx), _) =>
+              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, Seq.empty)) acc :+ bx else acc
             case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
           }
         }
