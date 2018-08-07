@@ -1,7 +1,6 @@
 package encry.crypto.encryption
 
 import org.scalatest.{Matchers, PropSpec}
-
 import scala.util.Try
 
 class AESSpec extends PropSpec with Matchers {

@@ -5,7 +5,6 @@ import encry.modifiers.PersistentNodeViewModifier
 import encry.modifiers.mempool.BaseTransaction
 import encry.view.NodeViewComponent
 import encry.view.state.Proposition
-
 import scala.util.Try
 
 trait Vault[P <: Proposition, TX <: BaseTransaction,
