@@ -13,7 +13,7 @@ import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{BaseTransaction, EncryTransactionSerializer}
 import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
-import encry.network.EncryDeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
+import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{ApplyState, RequestedModifiers}
 import encry.network.PeerConnectionHandler.ConnectedPeer

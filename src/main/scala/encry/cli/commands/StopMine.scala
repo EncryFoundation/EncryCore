@@ -8,7 +8,7 @@ import scala.concurrent.Future
 
 object StopMine extends Command {
 
-  import encry.local.miner.EncryMiner.DisableMining
+  import encry.local.miner.Miner.DisableMining
 
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     miner ! DisableMining

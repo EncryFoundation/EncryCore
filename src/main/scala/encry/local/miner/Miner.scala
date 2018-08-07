@@ -28,9 +28,9 @@ import io.iohk.iodb.ByteArrayWrapper
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scala.collection._
 
-class EncryMiner extends Actor with Logging {
+class Miner extends Actor with Logging {
 
-  import EncryMiner._
+  import Miner._
 
   val dateFormat: SimpleDateFormat = new SimpleDateFormat("HH:mm:ss")
   var startTime: Long = System.currentTimeMillis()
@@ -54,7 +54,6 @@ class EncryMiner extends Actor with Logging {
   }
 
   def mining: Receive = {
-
     case StartMining if context.children.nonEmpty =>
       candidateOpt match {
         case Some(candidateBlock) =>
@@ -187,7 +186,7 @@ class EncryMiner extends Actor with Logging {
     }
 }
 
-object EncryMiner extends Logging {
+object Miner extends Logging {
 
   case object DisableMining
 

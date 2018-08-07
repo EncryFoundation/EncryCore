@@ -5,13 +5,13 @@ import akka.actor.{Actor, ActorRef, Props}
 import encry.EncryApp._
 import encry.consensus.History._
 import encry.consensus.SyncInfo
-import encry.local.miner.EncryMiner.{DisableMining, StartMining}
+import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.BaseTransaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
-import encry.network.EncryDeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
+import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -33,7 +33,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
   val invSpec: InvSpec = new InvSpec(settings.network.maxInvObjects)
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
   val deliveryManager: ActorRef =
-    context.actorOf(Props(classOf[EncryDeliveryManager], syncInfoSpec), "deliveryManager")
+    context.actorOf(Props(classOf[DeliveryManager], syncInfoSpec), "deliveryManager")
 
   override def preStart(): Unit = {
     val messageSpecs: Seq[MessageSpec[_]] = Seq(invSpec, requestModifierSpec, ModifiersSpec, syncInfoSpec)
