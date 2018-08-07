@@ -52,7 +52,7 @@ class ModifiersHolder extends PersistentActor with Logging {
       logger.info("Recovery completed.")
       peerManager ! RecoveryCompleted
     case RecoveryCompleted =>
-      context.system.scheduler.scheduleOnce(5 seconds)(self ! RecoveryCompleted)
+      context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
   }
 
   def receiveRecoverDisabled: Receive = {
@@ -60,6 +60,12 @@ class ModifiersHolder extends PersistentActor with Logging {
   }
 
   override def receiveCommand: Receive = {
+    case CheckAllBlocksSent =>
+      if (completedBlocks.isEmpty) {
+        logger.info("Recovery completed.")
+        peerManager ! RecoveryCompleted
+      }
+      else context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
     case TryToSendBlocks =>
       val blocksToSend: Map[Int, EncryBlock] = completedBlocks.take(batchSize)
       completedBlocks = completedBlocks.drop(batchSize)
@@ -130,6 +136,8 @@ class ModifiersHolder extends PersistentActor with Logging {
 object ModifiersHolder {
 
   case object TryToSendBlocks
+
+  case object CheckAllBlocksSent
 
   case class Statistics(receivedHeaders: Int,
                         receivedPayloads: Int,

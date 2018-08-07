@@ -21,9 +21,12 @@ class PeerManager extends Actor with Logging {
   private var connectingPeers: Set[InetSocketAddress] = Set.empty
   private var recoveryCompleted: Boolean = !settings.levelDb.recoverMode
 
-  if (PeerDatabase.isEmpty) settings.network.knownPeers.foreach { address =>
-    if (!isSelf(address, None)) PeerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), None))
-  }
+  private def addKnownPeersToPeersDatabase(): Unit = if (PeerDatabase.isEmpty)
+    settings.network.knownPeers
+      .filterNot(isSelf(_, None))
+      .foreach(PeerDatabase.addOrUpdateKnownPeer(_, PeerInfo(timeProvider.time(), None)))
+
+  addKnownPeersToPeersDatabase()
 
   def isSelf(address: InetSocketAddress, declaredAddress: Option[InetSocketAddress]): Boolean =
     settings.network.bindAddress == address ||
@@ -75,7 +78,10 @@ class PeerManager extends Actor with Logging {
           !connectingPeers.exists(_.getHostName == address.getHostName) && checkPossibilityToAddPeerWRecovery(address)).foreach { address =>
             sender() ! ConnectTo(address)
         }
-    case RecoveryCompleted => recoveryCompleted = true
+    case RecoveryCompleted =>
+      log.info("Received RecoveryCompleted")
+      recoveryCompleted = true
+      addKnownPeersToPeersDatabase()
   }
 
   private def checkPossibilityToAddPeerWRecovery(address: InetSocketAddress): Boolean =
