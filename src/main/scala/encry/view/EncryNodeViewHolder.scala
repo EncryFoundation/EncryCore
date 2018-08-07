@@ -2,6 +2,7 @@ package encry.view
 
 import java.io.File
 import akka.actor.{Actor, Props}
+import akka.persistence.RecoveryCompleted
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
@@ -16,7 +17,7 @@ import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
-import encry.network.ModifiersHolder.RequestedModifiers
+import encry.network.ModifiersHolder.{RequestedModifiers, TryToSendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.{BestHeaderInChain, EndOfApplyingModif, StartApplyingModif, StateUpdating}
@@ -38,8 +39,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: EncryMempool)
 
-  private var nodeView: NodeView = restoreState().getOrElse(genesisState)
-  private val modifiersCache: EncryModifiersCache = EncryModifiersCache(1000)
+  var applicationsSuccessful: Boolean = true
+  var nodeView: NodeView = restoreState().getOrElse(genesisState)
+  val modifiersCache: EncryModifiersCache = EncryModifiersCache(1000)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,
@@ -59,11 +61,17 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def receive: Receive = {
-    case BlockFromLocalPersistence(block) if settings.levelDb.recoverMode =>
-      pmodModifyRecovery(block) match {
-        case Success(_) => log.info(s"Block ${block.encodedId} from recovery applied successfully")
-        case Failure(th) => log.warn(s"Failed to apply block ${block.encodedId} from recovery", th)
+    case BlocksFromLocalPersistence(blocks) if settings.levelDb.recoverMode =>
+      blocks.foreach { block =>
+        pmodModifyRecovery(block) match {
+          case Success(_) => log.info(s"Block ${block.encodedId} from recovery applied successfully")
+          case Failure(th) =>
+            log.warn(s"Failed to apply block ${block.encodedId} from recovery", th)
+            applicationsSuccessful = false
+            peerManager ! RecoveryCompleted
+        }
       }
+      if (applicationsSuccessful) sender ! TryToSendBlocks
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
       if (modifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
       modifierSerializers.get(modifierTypeId).foreach { companion =>
@@ -106,14 +114,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case a: Any => logError("Strange input: " + a)
   }
 
-  private def computeApplications(): Unit = {
+  private def computeApplications(): Unit =
     modifiersCache.popCandidate(nodeView.history) match {
       case Some(mod) =>
         pmodModify(mod)
         computeApplications()
       case None => Unit
     }
-  }
+
 
   def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
@@ -358,7 +366,7 @@ object EncryNodeViewHolder {
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    case class BlockFromLocalPersistence(block: EncryBlock)
+    case class BlocksFromLocalPersistence(blocks: Seq[EncryBlock])
 
     case class ModifiersFromRemote(modTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
 

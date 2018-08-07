@@ -17,9 +17,9 @@ import scala.util.Random
 
 class PeerManager extends Actor with Logging {
 
-  private var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
-  private var connectingPeers: Set[InetSocketAddress] = Set.empty
-  private var recoveryCompleted: Boolean = !settings.levelDb.recoverMode
+  var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
+  var connectingPeers: Set[InetSocketAddress] = Set.empty
+  var recoveryCompleted: Boolean = !settings.levelDb.recoverMode
 
   private def addKnownPeersToPeersDatabase(): Unit = if (PeerDatabase.isEmpty)
     settings.network.knownPeers

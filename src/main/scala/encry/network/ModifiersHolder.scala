@@ -9,7 +9,7 @@ import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
 import encry.settings.Algos
 import encry.utils.Logging
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlockFromLocalPersistence, LocallyGeneratedModifier}
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, LocallyGeneratedModifier}
 import encry.{ModifierId, ModifierTypeId}
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
@@ -20,17 +20,17 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   /** Map, which contains not completed blocks
     * Key can be payloadId or also header id. So value depends on key, and can contains: headerId, payloadId */
-  private var headers: Map[String, (EncryBlockHeader, Int)] = Map.empty
-  private var payloads: Map[String, (EncryBlockPayload, Int)] = Map.empty
-  private var nonCompletedBlocks: Map[String, String] = Map.empty
-  private var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
-  private val batchSize: Int = 400
+  var headers: Map[String, (EncryBlockHeader, Int)] = Map.empty
+  var payloads: Map[String, (EncryBlockPayload, Int)] = Map.empty
+  var nonCompletedBlocks: Map[String, String] = Map.empty
+  var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
+  val batchSize: Int = settings.levelDb.batchSize
 
   context.system.scheduler.schedule(10.second, 30.second) {
     logger.debug(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
   }
 
-  context.system.scheduler.schedule(10 seconds, 5 seconds) {
+  context.system.scheduler.scheduleOnce(5 seconds) {
     if (completedBlocks.nonEmpty) self ! TryToSendBlocks
   }
 
@@ -67,11 +67,10 @@ class ModifiersHolder extends PersistentActor with Logging {
       }
       else context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
     case TryToSendBlocks =>
-      val blocksToSend: Map[Int, EncryBlock] = completedBlocks.take(batchSize)
+      val blocksToSend: Seq[EncryBlock] = completedBlocks.take(batchSize).values.toSeq
       completedBlocks = completedBlocks.drop(batchSize)
-      blocksToSend.values.foreach {
-        nodeViewHolder ! BlockFromLocalPersistence(_)
-      }
+      nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend)
+
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
     case x: Any => logger.error(s"Strange input: $x.")

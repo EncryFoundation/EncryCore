@@ -21,7 +21,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
 
-trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
+trait BlockHeaderProcessor extends Logging {
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider
@@ -117,7 +117,8 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
     * @return ProgressInfo - info required for State to be consistent with History
     */
   protected def process(h: EncryBlockHeader): ProgressInfo[EncryPersistentModifier] = {
-    val dataToUpdateOpt: Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier)] = getHeaderInfoUpdate(h)
+    val dataToUpdateOpt: Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier)] =
+      getHeaderInfoUpdate(h)
 
     dataToUpdateOpt match {
       case Some(dataToUpdate) =>
