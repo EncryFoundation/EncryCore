@@ -48,9 +48,11 @@ class ModifiersHolder extends PersistentActor with Logging {
     case block: EncryBlock =>
       updateCompletedBlocks(block)
       logger.debug(s"Block ${block.header.height} is recovered from leveldb.")
-    case RecoveryCompleted =>
+    case RecoveryCompleted if completedBlocks.isEmpty  =>
       logger.info("Recovery completed.")
       peerManager ! RecoveryCompleted
+    case RecoveryCompleted =>
+      context.system.scheduler.scheduleOnce(5 seconds)(self ! RecoveryCompleted)
   }
 
   def receiveRecoverDisabled: Receive = {
