@@ -37,8 +37,8 @@ object PrivateKey25519 {
     Curve25519.verify(proof.signature, message, publicImage.pubKeyBytes)
 
   def generateKeys(randomSeed: Array[Byte]): (PrivateKey25519, PublicKey25519) = {
-    val pair = Curve25519.createKeyPair(randomSeed)
-    val secret: PrivateKey25519 = PrivateKey25519(pair._1, pair._2)
+    val (secretKey: PrivateKey, pubKey) = Curve25519.createKeyPair(randomSeed)
+    val secret: PrivateKey25519 = PrivateKey25519(secretKey, pubKey)
     secret -> secret.publicImage
   }
 }
