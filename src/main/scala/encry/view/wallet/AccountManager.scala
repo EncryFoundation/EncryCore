@@ -1,27 +1,34 @@
 package encry.view.wallet
 
+import encry.EncryApp
+import encry.EncryApp.settings
 import encry.crypto.encryption.AES
 import encry.crypto.{PrivateKey25519, PublicKey25519}
-import encry.settings.{Algos, WalletSettings}
+import encry.settings.Algos
+import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Blake2b256
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
+import scala.util.Try
 
-case class AccountManager(store: Store, settings: WalletSettings) {
+case class AccountManager(store: Store) extends Logging {
 
   import encry.storage.EncryStorage._
 
+  private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, settings.wallet.password))
+    .fold(e => { logError("AccountManager: decryption failed", e.getCause); EncryApp.forceStopApplication(500) }, r => r)
+
   def mandatoryAccount: PrivateKey25519 = store.get(AccountManager.MandatoryAccountKey).flatMap { res =>
     store.get(AccountManager.AccountPrefix +: res.data).map { secretRes =>
-      PrivateKey25519(PrivateKey @@ AES.decrypt(secretRes.data, settings.password), PublicKey @@ res.data)
+      PrivateKey25519(PrivateKey @@ decrypt(secretRes.data), PublicKey @@ res.data)
     }
-  } getOrElse createMandatory(settings.seed.flatMap(seed => Base58.decode(seed).toOption))
+  } getOrElse createMandatory(settings.wallet.seed.flatMap(seed => Base58.decode(seed).toOption))
 
   def accounts: Seq[PrivateKey25519] = store.getAll().foldLeft(Seq.empty[PrivateKey25519]) { case (acc, (k, v)) =>
     if (k.data.head == AccountManager.AccountPrefix)
-      acc :+ PrivateKey25519(PrivateKey @@ AES.decrypt(v.data, settings.password), PublicKey @@ k.data)
+      acc :+ PrivateKey25519(PrivateKey @@ decrypt(v.data), PublicKey @@ k.data)
     else acc
   }
 
@@ -52,7 +59,7 @@ case class AccountManager(store: Store, settings: WalletSettings) {
     store.update(
       scala.util.Random.nextLong(),
       Seq.empty,
-      Seq((ByteArrayWrapper(AccountManager.AccountPrefix +: publicKey), ByteArrayWrapper(AES.encrypt(privateKey, settings.password))))
+      Seq((ByteArrayWrapper(AccountManager.AccountPrefix +: publicKey), ByteArrayWrapper(AES.encrypt(privateKey, settings.wallet.password))))
     )
 }
 
