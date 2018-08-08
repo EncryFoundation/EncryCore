@@ -169,12 +169,14 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
         .map(_.toOption -> input)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
           (bxOpt, tx.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
-            case (Some(bx), _) if input.proofs.nonEmpty =>
-              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, input.proofs)) acc :+ bx else acc
+            case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
+              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
+                defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc :+ bx else acc
             case (Some(bx), Some(defaultProof)) =>
               if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, Seq(defaultProof))) acc :+ bx else acc
-            case (Some(bx), _) =>
-              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, Seq.empty)) acc :+ bx else acc
+            case (Some(bx), defaultProofOpt) =>
+              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
+                defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
             case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
           }
         }
