@@ -19,7 +19,8 @@ object AddKey extends Command {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     nodeViewHolder ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Unit] { view =>
-        view.vault.accountManager.createAccount(None)
+        if (view.vault.accountManager.accounts.isEmpty) view.vault.accountManager.mandatoryAccount
+        else view.vault.accountManager.createAccount(None)
       }
   }.map(_ => Future(Some(Response("OK")))).getOrElse(Future(Some(Response("Operation failed"))))
 }
