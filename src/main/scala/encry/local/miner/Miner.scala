@@ -74,8 +74,8 @@ class Miner extends Actor with Logging {
       nodeViewHolder ! LocallyGeneratedModifier(block.header)
       nodeViewHolder ! LocallyGeneratedModifier(block.payload)
       if (settings.node.sendStat) {
-        context.actorSelection("user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
-        context.actorSelection("user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
+        context.actorSelection("/user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
+        context.actorSelection("/user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
       }
       if (settings.node.stateMode == StateMode.Digest)
         block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
