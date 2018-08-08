@@ -5,12 +5,10 @@ import encry.EncryApp.settings
 import encry.crypto.encryption.AES
 import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.settings.Algos
-import encry.utils.Logging
+import encry.utils.{Logging, Mnemonic}
 import io.iohk.iodb.{ByteArrayWrapper, Store}
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Blake2b256
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
-import scorex.utils.Random
 import scala.util.Try
 
 case class AccountManager(store: Store) extends Logging {
@@ -21,7 +19,7 @@ case class AccountManager(store: Store) extends Logging {
     store.get(AccountManager.AccountPrefix +: res.data).map { secretRes =>
       PrivateKey25519(PrivateKey @@ decrypt(secretRes.data), PublicKey @@ res.data)
     }
-  } getOrElse createMandatory(settings.wallet.seed.flatMap(seed => Base58.decode(seed).toOption))
+  } getOrElse createMandatory(settings.wallet.seed)
 
   def accounts: Seq[PrivateKey25519] = store.getAll().foldLeft(Seq.empty[PrivateKey25519]) { case (acc, (k, v)) =>
     if (k.data.head == AccountManager.AccountPrefix)
@@ -34,16 +32,24 @@ case class AccountManager(store: Store) extends Logging {
     else acc
   }
 
-  def createAccount(seed: Array[Byte] = Random.randomBytes(32)): PrivateKey25519 = {
-    val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(Blake2b256.hash(seed))
+  def createAccount(seedOpt: Option[String]): PrivateKey25519 = {
+    val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
+      Blake2b256.hash(
+        seedOpt
+          .map { Mnemonic.seedFromMnemonic(_) }
+          .getOrElse {
+            val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
+            println(s"\nMnemonic code is: \n$phrase")
+            Mnemonic.seedFromMnemonic(phrase)
+          }
+      )
+    )
     saveAccount(privateKey, publicKey)
     PrivateKey25519(privateKey, publicKey)
   }
 
-  def createMandatory(seedOpt: Option[Array[Byte]]): PrivateKey25519 = {
-    val acc: PrivateKey25519 = seedOpt
-      .map(createAccount)
-      .getOrElse(createAccount())
+  def createMandatory(seedOpt: Option[String]): PrivateKey25519 = {
+    val acc: PrivateKey25519 = createAccount(seedOpt)
     store.update(
       scala.util.Random.nextLong(),
       Seq.empty,
