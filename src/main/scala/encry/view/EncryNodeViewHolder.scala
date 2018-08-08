@@ -114,14 +114,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case a: Any => logError("Strange input: " + a)
   }
 
-  private def computeApplications(): Unit =
-    modifiersCache.popCandidate(nodeView.history) match {
-      case Some(mod) =>
-        pmodModify(mod)
-        computeApplications()
-      case None => Unit
-    }
-
+  def computeApplications(): Unit = modifiersCache.popCandidate(nodeView.history) match {
+    case Some(mod) =>
+      pmodModify(mod)
+      computeApplications()
+    case None => Unit
+  }
 
   def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
