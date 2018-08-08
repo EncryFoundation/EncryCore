@@ -17,9 +17,6 @@ case class AccountManager(store: Store) extends Logging {
 
   import encry.storage.EncryStorage._
 
-  private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, settings.wallet.password))
-    .fold(e => { logError("AccountManager: decryption failed", e.getCause); EncryApp.forceStopApplication(500) }, r => r)
-
   def mandatoryAccount: PrivateKey25519 = store.get(AccountManager.MandatoryAccountKey).flatMap { res =>
     store.get(AccountManager.AccountPrefix +: res.data).map { secretRes =>
       PrivateKey25519(PrivateKey @@ decrypt(secretRes.data), PublicKey @@ res.data)
@@ -54,6 +51,9 @@ case class AccountManager(store: Store) extends Logging {
     )
     acc
   }
+
+  private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, settings.wallet.password))
+    .fold(e => { logError("AccountManager: decryption failed", e.getCause); EncryApp.forceStopApplication(500) }, r => r)
 
   private def saveAccount(privateKey: PrivateKey, publicKey: PublicKey): Unit =
     store.update(
