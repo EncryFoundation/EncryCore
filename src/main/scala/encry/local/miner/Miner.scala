@@ -64,12 +64,13 @@ class Miner extends Actor with Logging {
     case StartMining =>
       val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
       for (i <- 0 until numberOfWorkers) yield context.actorOf(
-        Props(classOf[EncryMiningWorker], i, numberOfWorkers).withDispatcher("mining-dispatcher"), s"worker$i")
+        Props(classOf[EncryMiningWorker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
       self ! StartMining
     case DisableMining if context.children.nonEmpty =>
       killAllWorkers()
       context.become(miningDisabled)
     case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
+      log.info(s"Going to propagate new block $block from worker $workerIdx")
       nodeViewHolder ! LocallyGeneratedModifier(block.header)
       nodeViewHolder ! LocallyGeneratedModifier(block.payload)
       if (settings.node.sendStat) {
@@ -83,7 +84,6 @@ class Miner extends Actor with Logging {
       context.children.foreach(_ ! DropChallenge)
 
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
-
     case _ =>
   }
 
@@ -122,7 +122,7 @@ class Miner extends Actor with Logging {
   def procCandidateBlock(c: CandidateBlock): Unit = {
     log.info(s"Got candidate block $c in ${dateFormat.format(new Date(System.currentTimeMillis()))}")
     candidateOpt = Some(c)
-    context.system.scheduler.scheduleOnce(settings.node.miningDelay, self, StartMining)
+    self ! StartMining
   }
 
   def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool],
