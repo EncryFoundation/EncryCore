@@ -116,27 +116,20 @@ trait BlockHeaderProcessor extends Logging {
   /**
     * @return ProgressInfo - info required for State to be consistent with History
     */
-  protected def process(h: EncryBlockHeader): ProgressInfo[EncryPersistentModifier] = {
-    val dataToUpdateOpt: Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier)] =
-      getHeaderInfoUpdate(h)
-
-    dataToUpdateOpt match {
-      case Some(dataToUpdate) =>
-        historyStorage.bulkInsert(ByteArrayWrapper(h.id), dataToUpdate._1, Seq(dataToUpdate._2))
-
-        bestHeaderIdOpt match {
-          case Some(bestHeaderId) =>
-            // If we verify transactions, we don't need to send this header to state.
-            // If we don't and this is the best header, we should send this header to state to update state root hash
-            val toProcess: Seq[EncryBlockHeader] = if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
-            ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
-          case None =>
-            logError("Should always have best header after header application")
-            EncryApp.forceStopApplication()
-        }
-      case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
-    }
-
+  protected def process(h: EncryBlockHeader): ProgressInfo[EncryPersistentModifier] = getHeaderInfoUpdate(h) match {
+    case Some(dataToUpdate) =>
+      historyStorage.bulkInsert(ByteArrayWrapper(h.id), dataToUpdate._1, Seq(dataToUpdate._2))
+      bestHeaderIdOpt match {
+        case Some(bestHeaderId) =>
+          // If we verify transactions, we don't need to send this header to state.
+          // If we don't and this is the best header, we should send this header to state to update state root hash
+          val toProcess: Seq[EncryBlockHeader] = if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
+          ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
+        case None =>
+          logError("Should always have best header after header application")
+          EncryApp.forceStopApplication()
+      }
+    case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
 
   private def getHeaderInfoUpdate(h: EncryBlockHeader): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier)] = {

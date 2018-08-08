@@ -82,7 +82,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
               modifiersCache.put(key(pmod.id), pmod)
-              if (settings.levelDb.enable) context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
+              if (settings.levelDb.enable)
+                context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
             }
         }
         log.info(s"Cache before(${modifiersCache.size})")
@@ -159,7 +160,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   def requestDownloads(pi: ProgressInfo[EncryPersistentModifier]): Unit =
     pi.toDownload.foreach { case (tid, id) => nodeViewSynchronizer ! DownloadRequest(tid, id) }
 
-  def trimChainSuffix(suffix: IndexedSeq[EncryPersistentModifier], rollbackPoint: ModifierId): IndexedSeq[EncryPersistentModifier] = {
+  def trimChainSuffix(suffix: IndexedSeq[EncryPersistentModifier], rollbackPoint: ModifierId):
+  IndexedSeq[EncryPersistentModifier] = {
     val idx: Int = suffix.indexWhere(_.id.sameElements(rollbackPoint))
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
@@ -168,7 +170,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   private def updateState(history: EncryHistory,
                           state: StateType,
                           progressInfo: ProgressInfo[EncryPersistentModifier],
-                          suffixApplied: IndexedSeq[EncryPersistentModifier]): (EncryHistory, Try[StateType], Seq[EncryPersistentModifier]) = {
+                          suffixApplied: IndexedSeq[EncryPersistentModifier]):
+  (EncryHistory, Try[StateType], Seq[EncryPersistentModifier]) = {
     case class UpdateInformation(history: EncryHistory,
                                  state: StateType,
                                  failedMod: Option[EncryPersistentModifier],
@@ -177,13 +180,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
     requestDownloads(progressInfo)
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
-    val (stateToApplyTry: Try[StateType], suffixTrimmed: IndexedSeq[EncryPersistentModifier]) = if (progressInfo.chainSwitchingNeeded) {
-      branchingPointOpt.map { branchPoint =>
-        if (!state.version.sameElements(branchPoint))
-          state.rollbackTo(branchPoint) -> trimChainSuffix(suffixApplied, ModifierId !@@ branchPoint)
-        else Success(state) -> IndexedSeq()
-      }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty")))
-    } else Success(state) -> suffixApplied
+    val (stateToApplyTry: Try[StateType], suffixTrimmed: IndexedSeq[EncryPersistentModifier]) =
+      if (progressInfo.chainSwitchingNeeded) {
+        branchingPointOpt.map { branchPoint =>
+          if (!state.version.sameElements(branchPoint))
+            state.rollbackTo(branchPoint) -> trimChainSuffix(suffixApplied, ModifierId !@@ branchPoint)
+          else Success(state) -> IndexedSeq()
+        }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty")))
+      } else Success(state) -> suffixApplied
 
     stateToApplyTry match {
       case Success(stateToApply) =>
@@ -222,8 +226,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
     log.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
-    if (settings.node.sendStat)
-      context.system.actorSelection("user/statsSender") ! StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
+    if (settings.node.sendStat) context.system
+      .actorSelection("user/statsSender") ! StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
         if (settings.node.sendStat)
@@ -247,7 +251,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               if (progressInfo.chainSwitchingNeeded)
                 context.actorSelection("/user/blockListener") ! ChainSwitching(progressInfo.toRemove.map(_.id))
               if (settings.node.sendStat)
-                newHistory.bestHeaderOpt.foreach(header => context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
+                newHistory.bestHeaderOpt.foreach(header =>
+                  context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
               if (newHistory.isFullChainSynced)
                 nodeViewSynchronizer ! FullBlockChainSynced
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
