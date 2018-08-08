@@ -21,20 +21,7 @@ class PeerManager extends Actor with Logging {
   var connectingPeers: Set[InetSocketAddress] = Set.empty
   var recoveryCompleted: Boolean = !settings.levelDb.recoverMode
 
-  private def addKnownPeersToPeersDatabase(): Unit = if (PeerDatabase.isEmpty)
-    settings.network.knownPeers
-      .filterNot(isSelf(_, None))
-      .foreach(PeerDatabase.addOrUpdateKnownPeer(_, PeerInfo(timeProvider.time(), None)))
-
   addKnownPeersToPeersDatabase()
-
-  def isSelf(address: InetSocketAddress, declaredAddress: Option[InetSocketAddress]): Boolean =
-    settings.network.bindAddress == address ||
-      settings.network.declaredAddress.exists(da => declaredAddress.contains(da)) ||
-      declaredAddress.contains(settings.network.bindAddress) ||
-      settings.network.declaredAddress.contains(address) ||
-      (InetAddress.getLocalHost.getAddress sameElements address.getAddress.getAddress) ||
-      (InetAddress.getLoopbackAddress.getAddress sameElements address.getAddress.getAddress)
 
   override def receive: Receive = {
     case GetConnectedPeers => sender() ! (connectedPeers.values.map(_.handshake).toSeq: Seq[Handshake])
@@ -75,16 +62,29 @@ class PeerManager extends Actor with Logging {
 
       if (connectedPeers.size + connectingPeers.size <= settings.network.maxConnections)
         randomPeer.filter(address => !connectedPeers.exists(_._1 == address) &&
-          !connectingPeers.exists(_.getHostName == address.getHostName) && checkPossibilityToAddPeerWRecovery(address)).foreach { address =>
-            sender() ! ConnectTo(address)
-        }
+          !connectingPeers.exists(_.getHostName == address.getHostName) && checkPossibilityToAddPeerWRecovery(address))
+          .foreach { address => sender() ! ConnectTo(address)
+          }
     case RecoveryCompleted =>
       log.info("Received RecoveryCompleted")
       recoveryCompleted = true
       addKnownPeersToPeersDatabase()
   }
 
-  private def checkPossibilityToAddPeerWRecovery(address: InetSocketAddress): Boolean =
+  def isSelf(address: InetSocketAddress, declaredAddress: Option[InetSocketAddress]): Boolean =
+    settings.network.bindAddress == address ||
+      settings.network.declaredAddress.exists(da => declaredAddress.contains(da)) ||
+      declaredAddress.contains(settings.network.bindAddress) ||
+      settings.network.declaredAddress.contains(address) ||
+      (InetAddress.getLocalHost.getAddress sameElements address.getAddress.getAddress) ||
+      (InetAddress.getLoopbackAddress.getAddress sameElements address.getAddress.getAddress)
+
+  def addKnownPeersToPeersDatabase(): Unit = if (PeerDatabase.isEmpty)
+    settings.network.knownPeers
+      .filterNot(isSelf(_, None))
+      .foreach(PeerDatabase.addOrUpdateKnownPeer(_, PeerInfo(timeProvider.time(), None)))
+
+  def checkPossibilityToAddPeerWRecovery(address: InetSocketAddress): Boolean =
     checkPossibilityToAddPeer(address) && recoveryCompleted
 }
 
@@ -103,8 +103,6 @@ object PeerManager {
     case object GetConnectedPeers
 
     case object GetAllPeers
-
-    case object GetBlacklistedPeers
 
     case class DoConnecting(remote: InetSocketAddress, direction: ConnectionType)
 

@@ -17,7 +17,7 @@ import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
-import encry.network.ModifiersHolder.{RequestedModifiers, TryToSendBlocks}
+import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
 import encry.stats.StatsSender.{BestHeaderInChain, EndOfApplyingModif, StartApplyingModif, StateUpdating}
@@ -71,7 +71,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             peerManager ! RecoveryCompleted
         }
       }
-      if (applicationsSuccessful) sender ! TryToSendBlocks
+      if (applicationsSuccessful) sender ! SendBlocks
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
       if (modifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
       modifierSerializers.get(modifierTypeId).foreach { companion =>
