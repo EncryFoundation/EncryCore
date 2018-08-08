@@ -1,23 +1,21 @@
 package encry.view.wallet
 
 import java.io.File
-
 import com.google.common.primitives.Longs
-import encry.crypto.PublicKey25519
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.BaseTransaction
-import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.Box.Amount
+import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.{EncryBaseBox, EncryProposition}
 import encry.settings.{Algos, Constants, EncryAppSettings}
-import encry.utils.{BalanceCalculator, BoxFilter, ByteStr, Logging}
+import encry.utils.{BalanceCalculator, BoxFilter, Logging}
 import encry.view.wallet.keys.KeyManager
 import encry.view.wallet.storage.WalletStorage
 import encry.{ModifierId, VersionTag}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
+import org.encryfoundation.common.crypto.PublicKey25519
 import scorex.crypto.authds.ADKey
-
 import scala.util.Try
 
 case class EncryWallet(walletStore: Store, keyManager: KeyManager)

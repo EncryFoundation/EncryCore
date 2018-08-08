@@ -1,7 +1,6 @@
 package encry.view.wallet
 
 import encry.ModifierId
-import encry.Address
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader

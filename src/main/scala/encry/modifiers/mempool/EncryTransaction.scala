@@ -9,9 +9,11 @@ import encry.settings.Algos
 import encry.validation.{ModifierValidator, ValidationResult}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
+import org.encryfoundation.common.transaction.{Input, InputSerializer, Proof, ProofSerializer}
 import org.encryfoundation.prismlang.core.Types
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import scorex.crypto.hash.Digest32
+
 import scala.util.Try
 
 case class EncryTransaction(fee: Amount,

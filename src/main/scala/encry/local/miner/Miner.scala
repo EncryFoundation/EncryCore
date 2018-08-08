@@ -2,10 +2,10 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
+
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus._
-import encry.crypto.PrivateKey25519
 import encry.local.miner.EncryMiningWorker.{DropChallenge, NextChallenge}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
@@ -25,7 +25,9 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.crypto.PrivateKey25519
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
+
 import scala.collection._
 
 class Miner extends Actor with Logging {

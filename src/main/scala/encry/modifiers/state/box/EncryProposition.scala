@@ -1,8 +1,5 @@
 package encry.modifiers.state.box
 
-import encry.Address
-import encry.modifiers.mempool.{EncryAddress, Pay2ContractHashAddress, Pay2PubKeyAddress, Proof}
-import encry.modifiers.mempool.regcontract.{HeightLockedContract, OpenContract, PubKeyLockedContract}
 import encry.modifiers.serialization.Serializer
 import encry.settings.{Algos, Constants}
 import encry.view.history.Height
@@ -10,11 +7,14 @@ import encry.view.state.Proposition
 import io.circe.Encoder
 import io.circe.syntax._
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.transaction.EncryAddress.Address
+import org.encryfoundation.common.transaction._
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import org.encryfoundation.prismlang.core.wrapped.PValue
 import org.encryfoundation.prismlang.evaluator.Evaluator
 import scorex.crypto.signatures.PublicKey
+
 import scala.util.{Failure, Success, Try}
 
 case class EncryProposition(contractHash: ContractHash) extends Proposition {

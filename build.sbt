@@ -13,7 +13,6 @@ resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repos
 
 val akkaVersion = "2.5.13"
 val akkaHttpVersion = "10.0.9"
-val circeVersion = "0.9.3"
 val doobieVersion = "0.5.2"
 
 val networkDependencies = Seq(
@@ -29,9 +28,6 @@ val databaseDependencies = Seq(
 )
 
 val apiDependencies = Seq(
-  "io.circe" %% "circe-core" % circeVersion,
-  "io.circe" %% "circe-generic" % circeVersion,
-  "io.circe" %% "circe-parser" % circeVersion,
   "io.swagger" %% "swagger-scala-module" % "1.0.3",
   "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.10.0",
   "com.typesafe.akka" %% "akka-http" % akkaHttpVersion
@@ -56,18 +52,15 @@ libraryDependencies ++= Seq(
   "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8",
   "org.iq80.leveldb" % "leveldb" % "0.7",
   "javax.xml.bind" % "jaxb-api" % "2.+",
-  "com.lihaoyi" %% "fastparse" % "1.0.0",
   "com.iheart" %% "ficus" % "1.4.2",
-  "com.google.guava" % "guava" % "21.+",
   "org.slf4j" % "slf4j-api" % "1.7.+",
   "org.bouncycastle" % "bcprov-jdk15on" % "1.58",
   "org.whispersystems" % "curve25519-java" % "+",
   "org.rudogma" %% "supertagged" % "1.+",
-  "org.scorexfoundation" %% "scrypto" % "2.1.1",
   "org.scorexfoundation" %% "iodb" % "0.3.2",
   "io.spray" %% "spray-json" % "1.3.3",
   "io.monix" %% "monix" % "2.3.3",
-  "org.encry" %% "prism" % "0.2.7",
+  "org.encry" %% "encry-common" % "0.1.2",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
   "org.influxdb" % "influxdb-java" % "2.10",
   "org.apache.commons" % "commons-io" % "1.3.2"

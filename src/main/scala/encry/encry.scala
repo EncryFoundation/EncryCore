@@ -10,10 +10,6 @@ package object encry {
 
   object VersionTag extends TaggedType[Array[Byte]]
 
-  object Address extends TaggedType[String]
-
-  type Address = Address.Type
-
   type ModifierTypeId = ModifierTypeId.Type
 
   type ModifierId = ModifierId.Type
@@ -31,5 +27,4 @@ package object encry {
   }
 
   def idsToString(invData: InvData): String = idsToString(invData._1, invData._2)
-
 }
