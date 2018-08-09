@@ -10,14 +10,12 @@ import encry.consensus.History.ProgressInfo
 import encry.crypto.PrivateKey25519
 import encry.local.explorer.BlockListener.ChainSwitching
 import encry.local.TransactionGenerator.{FetchWalletData, GenerateTransaction, WalletData, amountD}
-import encry.local.miner.Miner.CandidateEnvelope
 import encry.modifiers._
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{BaseTransaction, EncryTransaction, EncryTransactionSerializer, TransactionFactory}
 import encry.modifiers.serialization.Serializer
-import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
@@ -26,7 +24,6 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.{Algos, Constants}
 import encry.stats.StatsSender._
 import encry.utils.Logging
-import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.{EncryHistory, Height}
@@ -34,7 +31,6 @@ import encry.view.mempool.EncryMempool
 import encry.view.state.{Proposition, _}
 import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
-import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.io.FileUtils
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scala.annotation.tailrec

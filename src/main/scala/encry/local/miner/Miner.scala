@@ -173,6 +173,10 @@ class Miner extends Actor with Logging {
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
       startTime = System.currentTimeMillis()
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
+      bestHeaderOpt match {
+        case Some(h) => log.info(s"Best header at height ${h.height}")
+        case None => log.info("No best header opt")
+      }
       val candidate: CandidateEnvelope =
         if ((bestHeaderOpt.isDefined && view.history.isFullChainSynced) || settings.node.offlineGeneration) {
           log.info(s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
