@@ -1,7 +1,7 @@
 package encry.modifiers
 
 import com.typesafe.config.ConfigFactory
-import encry.modifiers.mempool.BaseTransaction
+import encry.modifiers.mempool.Transaction
 import encry.modifiers.serialization.BytesSerializable
 import encry.settings.Algos
 import encry.view.state.Proposition
@@ -32,7 +32,7 @@ trait PersistentNodeViewModifier extends NodeViewModifier {
   def parentId: ModifierId
 }
 
-trait TransactionsCarryingPersistentNodeViewModifier[P <: Proposition, TX <: BaseTransaction]
+trait TransactionsCarryingPersistentNodeViewModifier[P <: Proposition, TX <: Transaction]
   extends PersistentNodeViewModifier {
 
   def transactions: Seq[TX]

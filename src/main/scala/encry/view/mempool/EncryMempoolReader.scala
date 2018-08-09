@@ -1,7 +1,7 @@
 package encry.view.mempool
 
 import encry.ModifierId
-import encry.modifiers.mempool.BaseTransaction
+import encry.modifiers.mempool.Transaction
 import encry.view.mempool.EncryMempool.{MemPoolRequest, MemPoolResponse, TxKey}
 
 import scala.collection.concurrent.TrieMap
@@ -9,7 +9,7 @@ import scala.collection.mutable
 import scala.concurrent.{Future, Promise}
 import scala.util.Success
 
-trait EncryMempoolReader extends MempoolReader[BaseTransaction] {
+trait EncryMempoolReader extends MempoolReader[Transaction] {
 
   /**
     * Map stores current state of waiting for query building
@@ -18,19 +18,19 @@ trait EncryMempoolReader extends MempoolReader[BaseTransaction] {
     */
   protected[mempool] var waitedForAssembly: Map[Set[TxKey], (Promise[MemPoolResponse], Seq[ModifierId])] = Map.empty
 
-  val unconfirmed: TrieMap[TxKey, BaseTransaction]
+  val unconfirmed: TrieMap[TxKey, Transaction]
 
   protected def key(id: ModifierId): TxKey = new mutable.WrappedArray.ofByte(id)
 
-  override def getById(id: ModifierId): Option[BaseTransaction] = unconfirmed.get(key(id))
+  override def getById(id: ModifierId): Option[Transaction] = unconfirmed.get(key(id))
 
-  override def getAll(ids: Seq[ModifierId]): Seq[BaseTransaction] = ids.flatMap(getById)
+  override def getAll(ids: Seq[ModifierId]): Seq[Transaction] = ids.flatMap(getById)
 
   override def contains(id: ModifierId): Boolean = unconfirmed.contains(key(id))
 
   override def size: Int = unconfirmed.size
 
-  protected def completeAssembly(txs: Iterable[BaseTransaction]): Unit = synchronized {
+  protected def completeAssembly(txs: Iterable[Transaction]): Unit = synchronized {
     val txsIds: Iterable[TxKey] = txs.map(tx => key(tx.id))
     val newMap: Map[Set[TxKey], (Promise[MemPoolResponse], Seq[ModifierId])] = waitedForAssembly.flatMap(p => {
       val ids: Set[TxKey] = p._1
@@ -48,7 +48,7 @@ trait EncryMempoolReader extends MempoolReader[BaseTransaction] {
   }
 
   def waitForAll(ids: MemPoolRequest): Future[MemPoolResponse] = synchronized {
-    val promise: Promise[Seq[BaseTransaction]] = Promise[Seq[BaseTransaction]]
+    val promise: Promise[Seq[Transaction]] = Promise[Seq[Transaction]]
     waitedForAssembly = waitedForAssembly.updated(ids.map(id => key(id)).toSet, (promise, ids))
     promise.future
   }

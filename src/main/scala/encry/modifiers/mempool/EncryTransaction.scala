@@ -13,7 +13,6 @@ import org.encryfoundation.common.transaction.{Input, InputSerializer, Proof, Pr
 import org.encryfoundation.prismlang.core.Types
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import scorex.crypto.hash.Digest32
-
 import scala.util.Try
 
 case class EncryTransaction(fee: Amount,
@@ -21,7 +20,7 @@ case class EncryTransaction(fee: Amount,
                             inputs: IndexedSeq[Input],
                             directives: IndexedSeq[Directive],
                             defaultProofOpt: Option[Proof])
-  extends BaseTransaction with ModifierValidator {
+  extends Transaction with ModifierValidator {
 
   override type M = EncryTransaction
 

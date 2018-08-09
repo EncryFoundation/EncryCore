@@ -4,7 +4,7 @@ import java.io.File
 import com.google.common.primitives.Longs
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.mempool.BaseTransaction
+import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.{EncryBaseBox, EncryProposition}
@@ -19,7 +19,7 @@ import scorex.crypto.authds.ADKey
 import scala.util.Try
 
 case class EncryWallet(walletStore: Store, keyManager: KeyManager)
-  extends Vault[EncryProposition, BaseTransaction, EncryPersistentModifier, EncryWallet] with Logging {
+  extends Vault[EncryProposition, Transaction, EncryPersistentModifier, EncryWallet] with Logging {
 
   val propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes))
 
@@ -29,15 +29,15 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
     case (set, key) => set :+ PublicKey25519(key.publicKeyBytes)
   }.toSet
 
-  override def scanOffchain(tx: BaseTransaction): EncryWallet = this
+  override def scanOffchain(tx: Transaction): EncryWallet = this
 
-  override def scanOffchain(txs: Seq[BaseTransaction]): EncryWallet = this
+  override def scanOffchain(txs: Seq[Transaction]): EncryWallet = this
 
   override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = modifier match {
 
     case block: EncryBlock =>
       val (newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]) = block.transactions.foldLeft(Seq[EncryBaseBox](), Seq[EncryBaseBox]()) {
-        case ((nBxs, sBxs), tx: BaseTransaction) =>
+        case ((nBxs, sBxs), tx: Transaction) =>
           val newBxsL: Seq[EncryBaseBox] = tx.newBoxes
             .foldLeft(Seq[EncryBaseBox]()) { case (nBxs2, bx) =>
               if (propositions.exists(_.contractHash sameElements bx.proposition.contractHash)) nBxs2 :+ bx else nBxs2

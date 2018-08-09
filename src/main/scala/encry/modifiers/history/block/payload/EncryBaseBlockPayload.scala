@@ -1,12 +1,12 @@
 package encry.modifiers.history.block.payload
 
-import encry.modifiers.mempool.BaseTransaction
+import encry.modifiers.mempool.Transaction
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest, TransactionsCarryingPersistentNodeViewModifier}
 import encry.ModifierId
 import encry.modifiers.state.box.EncryProposition
 
 trait EncryBaseBlockPayload
-  extends TransactionsCarryingPersistentNodeViewModifier[EncryProposition, BaseTransaction]
+  extends TransactionsCarryingPersistentNodeViewModifier[EncryProposition, Transaction]
     with EncryPersistentModifier
     with ModifierWithDigest {
 

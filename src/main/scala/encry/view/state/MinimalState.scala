@@ -2,7 +2,7 @@ package encry.view.state
 
 import encry.VersionTag
 import encry.modifiers.PersistentNodeViewModifier
-import encry.modifiers.mempool.BaseTransaction
+import encry.modifiers.mempool.Transaction
 import scala.util.Try
 
 trait MinimalState[M <: PersistentNodeViewModifier, MS <: MinimalState[M, MS]] extends StateReader {
@@ -18,7 +18,7 @@ trait MinimalState[M <: PersistentNodeViewModifier, MS <: MinimalState[M, MS]] e
 
 trait StateFeature
 
-trait TransactionValidation[P <: Proposition, TX <: BaseTransaction] extends StateFeature {
+trait TransactionValidation[P <: Proposition, TX <: Transaction] extends StateFeature {
   def isValid(tx: TX): Boolean = validate(tx).isSuccess
 
   def filterValid(txs: Seq[TX]): Seq[TX] = txs.filter(isValid)

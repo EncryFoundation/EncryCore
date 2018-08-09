@@ -26,7 +26,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   def closeStorage(): Unit = stateStore.close()
 
   /** Extracts `state changes` from the given sequence of transactions. */
-  def extractStateChanges(txs: Seq[BaseTransaction]): EncryBoxStateChanges = {
+  def extractStateChanges(txs: Seq[Transaction]): EncryBoxStateChanges = {
     EncryBoxStateChanges(
       txs.flatMap { tx =>
         tx.inputs.map(u => Removal(u.boxId)) ++ tx.newBoxes.map(bx => Insertion(bx))
@@ -34,7 +34,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
     )
   }
 
-  def extractStateChanges(tx: BaseTransaction): EncryBoxStateChanges = extractStateChanges(Seq(tx))
+  def extractStateChanges(tx: Transaction): EncryBoxStateChanges = extractStateChanges(Seq(tx))
 
   /** ID of the last applied modifier. */
   override def version: VersionTag

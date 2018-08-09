@@ -16,12 +16,11 @@ import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.PConvertible
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
-
 import scala.util.Try
 
-trait BaseTransaction extends NodeViewModifier with PConvertible {
+trait Transaction extends NodeViewModifier with PConvertible {
 
-  val modifierTypeId: ModifierTypeId = BaseTransaction.ModifierTypeId
+  val modifierTypeId: ModifierTypeId = Transaction.ModifierTypeId
   val messageToSign: Array[Byte]
   val id: ModifierId
   val fee: Long
@@ -42,14 +41,14 @@ trait BaseTransaction extends NodeViewModifier with PConvertible {
   override def toString: String = s"<EncryTransaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}>"
 }
 
-object BaseTransaction {
+object Transaction {
 
   type TxTypeId = Byte
   type Nonce = Long
 
   case class TransactionValidationException(s: String) extends Exception(s)
 
-  implicit val jsonEncoder: Encoder[BaseTransaction] = {
+  implicit val jsonEncoder: Encoder[Transaction] = {
     case tx: EncryTransaction => EncryTransaction.jsonEncoder(tx)
   }
 
@@ -75,7 +74,7 @@ case object TransactionDBVersion {
 case class InputDBVersion(id: String, txId: String, proofs: String)
 
 case object InputDBVersion {
-  def apply(tx: BaseTransaction): Seq[InputDBVersion] = {
+  def apply(tx: Transaction): Seq[InputDBVersion] = {
     val txId: String = Base16.encode(tx.id)
     tx.inputs.map { in =>
       val id: String = Base16.encode(in.boxId)
@@ -91,7 +90,7 @@ case object InputDBVersion {
 case class OutputDBVersion(id: String, txId: String, monetaryValue: Long, coinId: String, contractHash: String, data: String)
 
 object OutputDBVersion {
-  def apply(tx: BaseTransaction): Seq[OutputDBVersion] = {
+  def apply(tx: Transaction): Seq[OutputDBVersion] = {
     val txId: String = Base16.encode(tx.id)
     tx.newBoxes.map { bx =>
       val id: String = Base16.encode(bx.id)
