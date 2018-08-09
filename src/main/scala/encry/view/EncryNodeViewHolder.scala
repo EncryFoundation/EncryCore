@@ -237,10 +237,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               if (settings.node.sendStat)
                 newHistory.bestHeaderOpt.foreach(header => context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
-              if (newHistory.isFullChainSynced) {
+              if (newHistory.isFullChainSynced)
                 nodeViewSynchronizer ! FullBlockChainSynced
-                sendCandidate()
-              }
             case Failure(e) =>
               logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
               updateNodeView(updatedHistory = Some(newHistory))
@@ -262,65 +260,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, BaseTransaction](tx)
     case Failure(e) =>
-  }
-
-  val dateFormat: SimpleDateFormat = new SimpleDateFormat("HH:mm:ss")
-
-  def sendCandidate(): Unit = {
-    val view: CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool] =
-      CurrentView(nodeView.history, nodeView.state.asInstanceOf[UtxoState], nodeView.wallet, nodeView.mempool)
-    val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
-    if (bestHeaderOpt.isDefined|| settings.node.offlineGeneration) {
-      log.info(s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
-      //if (settings.node.sendStat) context.actorSelection("/user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
-      val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
-      //if (settings.node.sendStat) context.actorSelection("/user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - startTime)
-      miner ! envelope
-    }
-  }
-
-  def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool],
-                      bestHeaderOpt: Option[EncryBlockHeader]): CandidateBlock = {
-    val timestamp: Time = timeProvider.time()
-    val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
-
-    // `txsToPut` - valid, non-conflicting txs with respect to their fee amount.
-    // `txsToDrop` - invalidated txs to be dropped from mempool.
-    val (txsToPut: Seq[BaseTransaction], txsToDrop: Seq[BaseTransaction], _) = view.pool.takeAll.toSeq.sortBy(_.fee).reverse
-      .foldLeft((Seq[BaseTransaction](), Seq[BaseTransaction](), Set[ByteArrayWrapper]())) {
-        case ((validTxs, invalidTxs, bxsAcc), tx) =>
-          val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.inputs.map(u => ByteArrayWrapper(u.boxId))
-          if ((validTxs.map(_.length).sum + tx.length) <= Constants.BlockMaxSize - 124) {
-            if (view.state.validate(tx).isSuccess && bxsRaw.forall(k =>
-              !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size)
-              (validTxs :+ tx, invalidTxs, bxsAcc ++ bxsRaw)
-            else (validTxs, invalidTxs :+ tx, bxsAcc)
-          } else (validTxs, invalidTxs, bxsAcc)
-      }
-    // Remove stateful-invalid txs from mempool.
-    view.pool.removeAsync(txsToDrop)
-
-    val minerSecret: PrivateKey25519 = view.vault.keyManager.mainKey
-    val feesTotal: Amount = txsToPut.map(_.fee).sum
-    val supplyTotal: Amount = EncrySupplyController.supplyAt(view.state.height)
-    val coinbase: EncryTransaction = TransactionFactory
-      .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, view.state.height)
-
-    val txs: Seq[BaseTransaction] = txsToPut.sortBy(_.timestamp) :+ coinbase
-
-    val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
-      .getOrElse(throw new Exception("ADProof generation failed"))
-
-    val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
-      .getOrElse(Constants.Chain.InitialDifficulty)
-
-    val candidate: CandidateBlock =
-      CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
-
-    log.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
-      s"and 1 coinbase for height $height")
-
-    candidate
   }
 
   def genesisState: NodeView = {

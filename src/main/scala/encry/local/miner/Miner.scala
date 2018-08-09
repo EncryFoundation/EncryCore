@@ -47,7 +47,7 @@ class Miner extends Actor with Logging {
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
 
   def shouldStartMine(b: EncryBlock): Boolean =
-    settings.node.mining && b.header.timestamp >= timeProvider.time() && context.children.nonEmpty
+    settings.node.mining && candidateOpt.forall(_.timestamp <= b.header.timestamp)
 
   def unknownMessage: Receive = {
     case m => logWarn(s"Unexpected message $m")
