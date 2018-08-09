@@ -10,8 +10,7 @@ import encry.modifiers._
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
-import encry.modifiers.mempool.{Transaction, EncryTransactionSerializer}
-import encry.modifiers.serialization.Serializer
+import encry.modifiers.mempool.{EncryTransactionSerializer, Transaction}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
@@ -24,10 +23,12 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
-import encry.view.state.{Proposition, _}
+import encry.view.state._
 import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import org.apache.commons.io.FileUtils
+import org.encryfoundation.common.serialization.Serializer
+import org.encryfoundation.common.transaction.Proposition
 import scorex.crypto.authds.ADDigest
 import scala.annotation.tailrec
 import scala.collection.mutable

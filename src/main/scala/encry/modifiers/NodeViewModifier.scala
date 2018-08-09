@@ -2,10 +2,10 @@ package encry.modifiers
 
 import com.typesafe.config.ConfigFactory
 import encry.modifiers.mempool.Transaction
-import encry.modifiers.serialization.BytesSerializable
 import encry.settings.Algos
-import encry.view.state.Proposition
 import encry.{ModifierId, ModifierTypeId}
+import org.encryfoundation.common.serialization.BytesSerializable
+import org.encryfoundation.common.transaction.Proposition
 import scala.util.Try
 
 trait NodeViewModifier extends BytesSerializable {
@@ -23,7 +23,8 @@ trait NodeViewModifier extends BytesSerializable {
 }
 
 object NodeViewModifier {
-  private val DefaultIdSize = 32
+
+  private val DefaultIdSize: Int = 32
 
   val ModifierIdSize: Int = Try(ConfigFactory.load().getConfig("app").getInt("modifierIdSize")).getOrElse(DefaultIdSize)
 }

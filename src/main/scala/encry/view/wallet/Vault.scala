@@ -3,7 +3,7 @@ package encry.view.wallet
 import encry.VersionTag
 import encry.modifiers.PersistentNodeViewModifier
 import encry.modifiers.mempool.Transaction
-import encry.view.state.Proposition
+import org.encryfoundation.common.transaction.Proposition
 import scala.util.Try
 
 trait Vault[P <: Proposition, TX <: Transaction,

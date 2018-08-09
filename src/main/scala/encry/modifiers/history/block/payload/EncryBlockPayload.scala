@@ -2,14 +2,13 @@ package encry.modifiers.history.block.payload
 
 import com.google.common.primitives.{Bytes, Ints}
 import encry.modifiers.mempool._
-import encry.modifiers.serialization.Serializer
 import encry.settings.Algos
 import encry.{ModifierId, ModifierTypeId}
 import io.circe.Encoder
 import io.circe.syntax._
+import org.encryfoundation.common.serialization.Serializer
 import scorex.crypto.authds.LeafData
 import scorex.crypto.hash.Digest32
-
 import scala.util.Try
 
 case class EncryBlockPayload(override val headerId: ModifierId, txs: Seq[Transaction])

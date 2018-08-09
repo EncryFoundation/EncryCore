@@ -3,6 +3,7 @@ package encry.view.state
 import encry.VersionTag
 import encry.modifiers.PersistentNodeViewModifier
 import encry.modifiers.mempool.Transaction
+import org.encryfoundation.common.transaction.Proposition
 import scala.util.Try
 
 trait MinimalState[M <: PersistentNodeViewModifier, MS <: MinimalState[M, MS]] extends StateReader {

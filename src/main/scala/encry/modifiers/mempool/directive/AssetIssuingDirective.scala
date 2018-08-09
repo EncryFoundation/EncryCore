@@ -2,13 +2,13 @@ package encry.modifiers.mempool.directive
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.modifiers.mempool.directive.Directive.DTypeId
-import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.{TokenIssuingBox, EncryBaseBox, EncryProposition}
+import encry.modifiers.state.box.{EncryBaseBox, EncryProposition, TokenIssuingBox}
 import encry.settings.{Algos, Constants}
 import encry.utils.Utils
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
+import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import scorex.crypto.hash.Digest32
 import scala.util.Try

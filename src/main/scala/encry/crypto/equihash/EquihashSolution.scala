@@ -1,10 +1,9 @@
 package encry.crypto.equihash
 
 import com.google.common.primitives.Ints
-import encry.modifiers.serialization.{BytesSerializable, Serializer}
 import encry.settings.Constants
 import io.circe.Encoder
-
+import org.encryfoundation.common.serialization.{BytesSerializable, Serializer}
 import scala.util.Try
 
 case class EquihashSolution(ints: Seq[Int]) extends BytesSerializable {

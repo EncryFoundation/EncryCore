@@ -1,13 +1,9 @@
 package encry.consensus
 
-import encry.modifiers.serialization.BytesSerializable
+import org.encryfoundation.common.serialization.BytesSerializable
 
-/**
-  * Syncing info provides information about starting points this node recommends another to start
-  * synchronization from
-  */
+/** Syncing info provides information about starting points this node recommends another to start
+  * synchronization from */
 trait SyncInfo extends BytesSerializable {
   def startingPoints: History.ModifierIds
 }
-
-

@@ -23,8 +23,9 @@ import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.history.{EncryHistory, EncryHistoryReader, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.{EncryMempool, MempoolReader}
-import encry.view.state.{Proposition, StateReader}
+import encry.view.state.StateReader
 import encry.{ModifierId, ModifierTypeId, VersionTag}
+import org.encryfoundation.common.transaction.Proposition
 
 class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with Logging {
 
