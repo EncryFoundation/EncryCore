@@ -3,7 +3,6 @@ package encry.view.history.storage
 import encry.ModifierId
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.HistoryModifierSerializer
-import encry.modifiers.serialization.Serializer
 import encry.storage.EncryStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.serialization.Serializer

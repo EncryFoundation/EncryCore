@@ -31,7 +31,7 @@ object Transfer extends Command {
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
         Try {
           lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
-          val secret: PrivateKey25519 = view.vault.keyManager.keys.head
+          val secret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
           val recipient: Address = args.requireArg[Ast.Str]("addr").s
           val fee: Long = args.requireArg[Ast.Num]("fee").i
           val amount: Long = args.requireArg[Ast.Num]("amount").i

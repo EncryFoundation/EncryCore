@@ -17,7 +17,7 @@ import scorex.crypto.authds.ADKey
 import scala.util.Try
 
 case class EncryWallet(walletStore: Store, accountManager: AccountManager)
-  extends Vault[EncryProposition, BaseTransaction, EncryPersistentModifier, EncryWallet] with Logging {
+  extends Vault[EncryProposition, Transaction, EncryPersistentModifier, EncryWallet] with Logging {
 
   val walletStorage: WalletStorage = WalletStorage(walletStore, publicKeys)
 
