@@ -96,9 +96,9 @@ class Miner extends Actor with Logging {
 
   def receiveSemanticallySuccessfulModifier: Receive = {
     case SemanticallySuccessfulModifier(mod: EncryBlock) if context.children.nonEmpty && needNewCandidate(mod) =>
-      log.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
-        s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
-      produceCandidate()
+      //log.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
+      //  s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+      //produceCandidate()
     case SemanticallySuccessfulModifier(mod: EncryBlock) if shouldStartMine(mod) =>
       log.info(s"Got new block2. Starting to produce candidate at height: ${mod.header.height + 1} " +
         s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
@@ -176,9 +176,9 @@ class Miner extends Actor with Logging {
       val candidate: CandidateEnvelope =
         if ((bestHeaderOpt.isDefined && view.history.isFullChainSynced) || settings.node.offlineGeneration) {
           log.info(s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
-          if (settings.node.sendStat) context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
+          if (settings.node.sendStat) context.actorSelection("/user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
           val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
-          if (settings.node.sendStat) context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - startTime)
+          if (settings.node.sendStat) context.actorSelection("/user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - startTime)
           envelope
         }
         else CandidateEnvelope.empty
