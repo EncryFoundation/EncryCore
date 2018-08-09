@@ -1,4 +1,4 @@
-package encry.view.wallet
+package encry.view
 
 trait NodeViewComponent {
   self =>

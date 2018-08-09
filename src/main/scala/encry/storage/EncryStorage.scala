@@ -5,10 +5,9 @@ import encry.settings.Algos
 import encry.storage.codec.FixLenComplexValueCodec
 import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, Store}
-
 import scala.util.{Failure, Success, Try}
 
-trait EncryBaseStorage extends AutoCloseable with Logging {
+trait EncryStorage extends AutoCloseable with Logging {
 
   val store: Store
 
@@ -46,4 +45,9 @@ trait EncryBaseStorage extends AutoCloseable with Logging {
     log.info("Closing storage")
     store.close()
   }
+}
+
+object EncryStorage {
+
+  implicit def liftByteArray(array: Array[Byte]): ByteArrayWrapper = ByteArrayWrapper(array)
 }

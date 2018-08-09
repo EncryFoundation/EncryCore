@@ -3,12 +3,12 @@ package encry.view.history.storage
 import encry.ModifierId
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.HistoryModifierSerializer
-import encry.storage.EncryBaseStorage
+import encry.storage.EncryStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.serialization.Serializer
 import scala.util.{Failure, Random, Success}
 
-class HistoryStorage(override val store: Store, val objectsStore: Store) extends EncryBaseStorage {
+class HistoryStorage(override val store: Store, val objectsStore: Store) extends EncryStorage {
 
   def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
     objectsStore.get(ByteArrayWrapper(id)).flatMap { res =>

@@ -112,7 +112,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       val wallet: EncryWallet = nodeView.wallet
       val availableBoxes: Seq[AssetBox] = wallet.walletStorage.allBoxes.filter(_.isAmountCarrying).map(_.asInstanceOf[AssetBox])
       if (availableBoxes.map(_.amount).sum >= limit * (amountD + minimalFeeD))
-        sender() ! GenerateTransaction(WalletData(wallet.keyManager.mainKey, availableBoxes))
+        sender() ! GenerateTransaction(WalletData(wallet.accountManager.mandatoryAccount, availableBoxes))
     case a: Any => logError("Strange input: " + a)
   }
 
@@ -240,7 +240,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
           if (settings.node.sendStat)
-            system.actorSelection("user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
+            context.actorSelection("user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
           newStateTry match {
             case Success(newMinState) =>
               val newMemPool: EncryMempool = updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)

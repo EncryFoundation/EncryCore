@@ -8,26 +8,22 @@ import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.{EncryBaseBox, EncryProposition}
-import encry.settings.{Algos, Constants, EncryAppSettings}
+import encry.settings.{Algos, EncryAppSettings}
 import encry.utils.{BalanceCalculator, BoxFilter, Logging}
-import encry.view.wallet.keys.KeyManager
-import encry.view.wallet.storage.WalletStorage
 import encry.{ModifierId, VersionTag}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.crypto.PublicKey25519
 import scorex.crypto.authds.ADKey
 import scala.util.Try
 
-case class EncryWallet(walletStore: Store, keyManager: KeyManager)
+case class EncryWallet(walletStore: Store, accountManager: AccountManager)
   extends Vault[EncryProposition, Transaction, EncryPersistentModifier, EncryWallet] with Logging {
-
-  val propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes))
 
   val walletStorage: WalletStorage = WalletStorage(walletStore, publicKeys)
 
-  def publicKeys: Set[PublicKey25519] = keyManager.keys.foldLeft(Seq[PublicKey25519]()) {
-    case (set, key) => set :+ PublicKey25519(key.publicKeyBytes)
-  }.toSet
+  def publicKeys: Set[PublicKey25519] = accountManager.publicAccounts.toSet
+
+  def propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes))
 
   override def scanOffchain(tx: Transaction): EncryWallet = this
 
@@ -98,11 +94,13 @@ case class EncryWallet(walletStore: Store, keyManager: KeyManager)
 object EncryWallet {
 
   def getWalletDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/wallet")
+  def getKeysDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/keys")
 
   def readOrGenerate(settings: EncryAppSettings): EncryWallet = {
-    val walletDir: File = getWalletDir(settings)
-    walletDir.mkdirs()
-    val walletStore: LSMStore = new LSMStore(walletDir, keepVersions = Constants.DefaultKeepVersions)
-    EncryWallet(walletStore, keyManager = KeyManager.readOrGenerate(settings))
+    val walletDir: File = getWalletDir(settings); walletDir.mkdirs()
+    val keysDir: File = getKeysDir(settings); keysDir.mkdirs()
+    val walletStore: LSMStore = new LSMStore(walletDir, keepVersions = 0)
+    val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 33)
+    EncryWallet(walletStore, AccountManager(accountManagerStore))
   }
 }

@@ -13,13 +13,14 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import scala.concurrent.Future
 import scala.util.Try
 
-object AddKey extends Command {
+object CreateKey extends Command {
 
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = Try {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     nodeViewHolder ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Unit] { view =>
-        view.vault.keyManager.createNewKey()
+        if (view.vault.accountManager.accounts.isEmpty) view.vault.accountManager.mandatoryAccount
+        else view.vault.accountManager.createAccount(None)
       }
   }.map(_ => Future(Some(Response("OK")))).getOrElse(Future(Some(Response("Operation failed"))))
 }
