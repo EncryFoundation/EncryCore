@@ -10,8 +10,8 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.BaseTransaction
-import encry.modifiers.mempool.BaseTransaction.TransactionValidationException
+import encry.modifiers.mempool.Transaction
+import encry.modifiers.mempool.Transaction.TransactionValidationException
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.Box.Amount
@@ -46,9 +46,9 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
     nodeViewHolderRef.foreach(_ ! LocallyGeneratedModifier(proof))
   }
 
-  def applyBlockTransactions(blockTransactions: Seq[BaseTransaction],
+  def applyBlockTransactions(blockTransactions: Seq[Transaction],
                              expectedDigest: ADDigest): Try[Unit] = {
-    def applyTry(txs: Seq[BaseTransaction], allowedOutputDelta: Amount = 0L): Try[Unit] =
+    def applyTry(txs: Seq[Transaction], allowedOutputDelta: Amount = 0L): Try[Unit] =
       txs.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, tx) =>
         t.flatMap { _ =>
           validate(tx, allowedOutputDelta).flatMap { _ =>
@@ -60,8 +60,8 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
         }
       }.map(_ => Unit)
 
-    val coinbase: BaseTransaction = blockTransactions.last
-    val regularTransactions: Seq[BaseTransaction] = blockTransactions.init
+    val coinbase: Transaction = blockTransactions.last
+    val regularTransactions: Seq[Transaction] = blockTransactions.init
 
     val totalFees: Amount = regularTransactions.map(_.fee).sum
 
@@ -114,7 +114,7 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
     case _ => Failure(new Exception("Got Modifier of unknown type."))
   }
 
-  def generateProofs(txs: Seq[BaseTransaction]): Try[(SerializedAdProof, ADDigest)] = Try {
+  def generateProofs(txs: Seq[Transaction]): Try[(SerializedAdProof, ADDigest)] = Try {
     log.info(s"Generating proof for ${txs.length} transactions ...")
     val rootHash: ADDigest = persistentProver.digest
     if (txs.isEmpty) throw new Exception("Got empty transaction sequence")
@@ -158,7 +158,7 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
     * For all asset types:
     * 4. Make sure inputs.sum >= outputs.sum
     */
-  def validate(tx: BaseTransaction, allowedOutputDelta: Amount = 0L): Try[Unit] =
+  def validate(tx: Transaction, allowedOutputDelta: Amount = 0L): Try[Unit] =
     tx.semanticValidity.map { _: Unit =>
 
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, rootHash)
@@ -168,12 +168,14 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
         .map(_.toOption -> input)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
           (bxOpt, tx.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
-            case (Some(bx), _) if input.proofs.nonEmpty =>
-              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, input.proofs)) acc :+ bx else acc
+            case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
+              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
+                defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc :+ bx else acc
             case (Some(bx), Some(defaultProof)) =>
               if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, Seq(defaultProof))) acc :+ bx else acc
-            case (Some(bx), _) =>
-              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, Seq.empty)) acc :+ bx else acc
+            case (Some(bx), defaultProofOpt) =>
+              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
+                defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
             case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
           }
         }
@@ -195,9 +197,9 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
       if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
     }
 
-  def isValid(tx: BaseTransaction, allowedOutputDelta: Amount = 0L): Boolean = validate(tx, allowedOutputDelta).isSuccess
+  def isValid(tx: Transaction, allowedOutputDelta: Amount = 0L): Boolean = validate(tx, allowedOutputDelta).isSuccess
 
-  def filterValid(txs: Seq[BaseTransaction]): Seq[BaseTransaction] = txs.filter(tx => isValid(tx))
+  def filterValid(txs: Seq[Transaction]): Seq[Transaction] = txs.filter(tx => isValid(tx))
 }
 
 object UtxoState extends Logging {

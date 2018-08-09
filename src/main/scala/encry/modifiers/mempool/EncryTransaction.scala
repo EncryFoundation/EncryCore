@@ -3,12 +3,13 @@ package encry.modifiers.mempool
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.ModifierId
 import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
-import encry.modifiers.serialization.Serializer
 import encry.modifiers.state.box.Box.Amount
 import encry.settings.Algos
 import encry.validation.{ModifierValidator, ValidationResult}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
+import org.encryfoundation.common.serialization.Serializer
+import org.encryfoundation.common.transaction.{Input, InputSerializer, Proof, ProofSerializer}
 import org.encryfoundation.prismlang.core.Types
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import scorex.crypto.hash.Digest32
@@ -19,7 +20,7 @@ case class EncryTransaction(fee: Amount,
                             inputs: IndexedSeq[Input],
                             directives: IndexedSeq[Directive],
                             defaultProofOpt: Option[Proof])
-  extends BaseTransaction with ModifierValidator {
+  extends Transaction with ModifierValidator {
 
   override type M = EncryTransaction
 

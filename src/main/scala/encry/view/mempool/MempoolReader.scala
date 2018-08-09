@@ -1,15 +1,16 @@
 package encry.view.mempool
 
 import encry.ModifierId
-import encry.modifiers.mempool.BaseTransaction
 import encry.view.NodeViewComponent
+import encry.modifiers.mempool.Transaction
+import encry.view.wallet.NodeViewComponent
 
 /**
   * Unconfirmed transactions pool
   *
   * @tparam TX -type of transaction the pool contains
   */
-trait MempoolReader[TX <: BaseTransaction] extends NodeViewComponent {
+trait MempoolReader[TX <: Transaction] extends NodeViewComponent {
 
   //getters
   def getById(id: ModifierId): Option[TX]

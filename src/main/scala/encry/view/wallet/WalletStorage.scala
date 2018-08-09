@@ -1,7 +1,6 @@
 package encry.view.wallet
 
 import com.google.common.primitives.Longs
-import encry.crypto.PublicKey25519
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
@@ -9,6 +8,7 @@ import encry.modifiers.state.box._
 import encry.settings.Algos
 import encry.storage.EncryStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
+import org.encryfoundation.common.crypto.PublicKey25519
 import scorex.crypto.authds.ADKey
 
 case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends EncryStorage {

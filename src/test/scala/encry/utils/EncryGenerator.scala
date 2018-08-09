@@ -3,11 +3,9 @@ package encry.utils
 import java.io.File
 import akka.actor.ActorRef
 import encry.ModifierId
-import encry.Address
 import encry.crypto.equihash.EquihashSolution
-import encry.crypto.{PrivateKey25519, PublicKey25519}
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{EncryTransaction, Pay2PubKeyAddress, TransactionFactory}
+import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, MonetaryBox}
 import encry.settings.Algos.HF
@@ -15,6 +13,9 @@ import encry.settings.{Algos, Constants}
 import encry.utils.TestHelper.{Props, rndGen}
 import encry.view.state.{BoxHolder, EncryState, UtxoState}
 import io.iohk.iodb.LSMStore
+import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
+import org.encryfoundation.common.transaction.EncryAddress.Address
+import org.encryfoundation.common.transaction.Pay2PubKeyAddress
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue}
 import scorex.crypto.hash.Digest32

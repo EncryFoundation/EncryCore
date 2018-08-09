@@ -1,7 +1,7 @@
 package encry.modifiers.state.box
 
-import encry.modifiers.serialization.BytesSerializable
-import encry.view.state.Proposition
+import org.encryfoundation.common.serialization.BytesSerializable
+import org.encryfoundation.common.transaction.Proposition
 import scorex.crypto.authds._
 
 trait Box[P <: Proposition] extends BytesSerializable {
