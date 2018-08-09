@@ -12,7 +12,7 @@ import encry.{ModifierId, ModifierTypeId}
 import io.circe.Encoder
 import io.circe.syntax._
 import org.encryfoundation.common.serialization.Serializer
-import scorex.crypto.encode.Base16
+import scorex.util.encode.Base16
 import scala.util.Try
 
 case class EncryBlock(override val header: EncryBlockHeader,

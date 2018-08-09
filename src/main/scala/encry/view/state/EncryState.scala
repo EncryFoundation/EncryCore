@@ -11,7 +11,7 @@ import encry.settings.{Constants, EncryAppSettings, NodeSettings}
 import encry.utils.Logging
 import io.iohk.iodb.Store
 import scorex.crypto.authds.ADDigest
-import scorex.crypto.encode.Base16
+import scorex.util.encode.Base16
 import scala.util.Try
 
 trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]

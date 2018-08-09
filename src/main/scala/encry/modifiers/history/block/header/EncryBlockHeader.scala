@@ -17,7 +17,7 @@ import io.circe.syntax._
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import org.encryfoundation.common.serialization.Serializer
 import scorex.crypto.authds.ADDigest
-import scorex.crypto.encode.Base16
+import scorex.util.encode.Base16
 import scorex.crypto.hash.Digest32
 
 import scala.util.Try
