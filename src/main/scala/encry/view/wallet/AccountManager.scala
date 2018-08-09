@@ -39,7 +39,7 @@ case class AccountManager(store: Store) extends Logging {
           .map { Mnemonic.seedFromMnemonic(_) }
           .getOrElse {
             val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
-            println(s"\nMnemonic code is: \n$phrase")
+            println(s"\nMnemonic key is: \n$phrase")
             Mnemonic.seedFromMnemonic(phrase)
           }
       )
