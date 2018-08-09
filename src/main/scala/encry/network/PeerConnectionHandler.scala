@@ -8,7 +8,6 @@ import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
 import encry.EncryApp._
-import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle, _}
 import encry.network.message.MessageHandler
 import encry.network.peer.PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}

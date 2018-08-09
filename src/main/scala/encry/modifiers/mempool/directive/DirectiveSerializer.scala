@@ -1,7 +1,6 @@
 package encry.modifiers.mempool.directive
 
-import encry.modifiers.serialization.Serializer
-
+import org.encryfoundation.common.serialization.Serializer
 import scala.util.{Failure, Try}
 
 object DirectiveSerializer extends Serializer[Directive] {

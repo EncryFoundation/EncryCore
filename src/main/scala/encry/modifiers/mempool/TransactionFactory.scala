@@ -1,12 +1,12 @@
 package encry.modifiers.mempool
 
-import encry.Address
-import encry.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import encry.modifiers.mempool.directive.{Directive, TransferDirective}
-import encry.modifiers.mempool.regcontract.PubKeyLockedContract
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.MonetaryBox
 import encry.view.history.Height
+import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
+import org.encryfoundation.common.transaction.EncryAddress.Address
+import org.encryfoundation.common.transaction.{Input, Proof, PubKeyLockedContract}
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import scorex.crypto.authds.ADKey
 
@@ -20,7 +20,7 @@ object TransactionFactory {
                                        amount: Amount,
                                        tokenIdOpt: Option[ADKey] = None): EncryTransaction = {
     val pubKey: PublicKey25519 = privKey.publicImage
-    val uInputs: IndexedSeq[Input] = useBoxes.map(bx => Input.unsigned(bx.id, PubKeyLockedContract(pubKey.pubKeyBytes))).toIndexedSeq
+    val uInputs: IndexedSeq[Input] = useBoxes.map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes)))).toIndexedSeq
     val change: Amount = useBoxes.map(_.amount).sum - (amount + fee)
     val directives: IndexedSeq[TransferDirective] =
       if (change > 0) IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt), TransferDirective(pubKey.address.address, change, tokenIdOpt))

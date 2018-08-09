@@ -7,7 +7,7 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.mempool.BaseTransaction
+import encry.modifiers.mempool.Transaction
 import encry.settings.{Algos, Constants}
 import encry.utils.Logging
 import org.bouncycastle.crypto.digests.Blake2bDigest
@@ -86,7 +86,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Logg
 
   override def getDerivedHeaderFields(parentOpt: Option[EncryBlockHeader],
                                       adProofBytes: SerializedAdProof,
-                                      transactions: Seq[BaseTransaction]): (Byte, ModifierId, Digest32, Digest32, Int) = {
+                                      transactions: Seq[Transaction]): (Byte, ModifierId, Digest32, Digest32, Int) = {
       val version = Constants.Chain.Version
       val parentId: ModifierId = parentOpt.map(_.id).getOrElse(EncryBlockHeader.GenesisParentId)
       val adProofsRoot = ADProofs.proofDigest(adProofBytes)

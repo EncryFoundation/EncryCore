@@ -9,7 +9,7 @@ import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.mempool.BaseTransaction
+import encry.modifiers.mempool.Transaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
@@ -23,8 +23,9 @@ import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.history.{EncryHistory, EncryHistoryReader, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.{EncryMempool, MempoolReader}
-import encry.view.state.{Proposition, StateReader}
+import encry.view.state.StateReader
 import encry.{ModifierId, ModifierTypeId, VersionTag}
+import org.encryfoundation.common.transaction.Proposition
 
 class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with Logging {
 
@@ -87,7 +88,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
         s" Modifiers: ${invData._2.foldLeft("|")((str, id) => str + "|" + Algos.encode(id))}")
       historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
         val objs: Seq[NodeViewModifier] = invData._1 match {
-          case typeId: ModifierTypeId if typeId == BaseTransaction.ModifierTypeId => readers._2.getAll(invData._2)
+          case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
           case _: ModifierTypeId => invData._2.flatMap(id => readers._1.modifierById(id))
         }
         log.info(s"Requested ${invData._2.length} modifiers ${encry.idsToString(invData)}, " +
@@ -157,7 +158,7 @@ object EncryNodeViewSynchronizer {
 
     case class ChangedHistory[HR <: EncryHistoryReader](reader: HR) extends NodeViewChange
 
-    case class ChangedMempool[MR <: MempoolReader[BaseTransaction]](mempool: MR) extends NodeViewChange
+    case class ChangedMempool[MR <: MempoolReader[Transaction]](mempool: MR) extends NodeViewChange
 
     case class ChangedState[SR <: StateReader](reader: SR) extends NodeViewChange
 
@@ -167,7 +168,7 @@ object EncryNodeViewSynchronizer {
 
     trait ModificationOutcome extends NodeViewHolderEvent
 
-    case class SuccessfulTransaction[P <: Proposition, TX <: BaseTransaction](transaction: TX) extends ModificationOutcome
+    case class SuccessfulTransaction[P <: Proposition, TX <: Transaction](transaction: TX) extends ModificationOutcome
 
     case class SyntacticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable)
       extends ModificationOutcome

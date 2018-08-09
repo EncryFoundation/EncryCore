@@ -4,16 +4,15 @@ import java.io.File
 import java.security.{AlgorithmParameters, SecureRandom}
 
 import com.google.common.primitives.{Ints, Longs}
-import encry.crypto.PrivateKey25519
 import encry.settings.{Algos, EncryAppSettings, KeyManagerSettings}
 import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import javax.crypto._
 import javax.crypto.spec.{IvParameterSpec, PBEKeySpec, SecretKeySpec}
+import org.encryfoundation.common.crypto.PrivateKey25519
 import scorex.crypto.hash.{Blake2b512, Digest32, Digest64}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
-
 import scala.language.postfixOps
 import scala.util.Try
 

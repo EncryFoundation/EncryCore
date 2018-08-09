@@ -6,7 +6,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.BaseTransaction
+import encry.modifiers.mempool.Transaction
 import encry.settings.{Algos, Constants, NodeSettings}
 import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
@@ -33,7 +33,7 @@ class DigestState protected(override val version: VersionTag,
         if (!ADProofs.proofDigest(block.adProofsOpt.get.proofBytes).sameElements(block.header.adProofsRoot))
           Failure(new Exception(s"Got invalid Proof for block: $block"))
 
-        val txs: Seq[BaseTransaction] = block.payload.transactions
+        val txs: Seq[Transaction] = block.payload.transactions
         val declaredHash: ADDigest = block.header.stateRoot
 
         txs.foldLeft(Success(): Try[Unit]) { case (status, tx) =>

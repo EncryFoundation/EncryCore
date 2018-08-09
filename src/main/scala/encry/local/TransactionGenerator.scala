@@ -2,8 +2,6 @@ package encry.local
 
 import akka.actor.Actor
 import encry.EncryApp._
-import encry.Address
-import encry.crypto.PrivateKey25519
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
@@ -11,6 +9,7 @@ import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySu
 import encry.stats.StatsSender.TransactionGeneratorStat
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
+import org.encryfoundation.common.crypto.PrivateKey25519
 
 class TransactionGenerator extends Actor with Logging {
 
@@ -46,7 +45,7 @@ class TransactionGenerator extends Actor with Logging {
       if (boxesAcc.map(_.amount).sum <= (amountD + minimalFeeD)) boxesAcc :+ box else boxesAcc
     }.toIndexedSeq
     TransactionFactory.defaultPaymentTransactionScratch(wd.secret, minimalFeeD, timeProvider.time(), boxes,
-      Address @@ settings.testing.defaultRecipientAddress, amountD)
+      settings.testing.defaultRecipientAddress, amountD)
   }
 }
 

@@ -2,7 +2,7 @@ package encry.consensus
 
 import encry.modifiers.history.block.Block.{Timestamp, Version}
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.BaseTransaction
+import encry.modifiers.mempool.Transaction
 import encry.settings.Algos
 import io.circe.Encoder
 import io.circe.syntax._
@@ -12,7 +12,7 @@ case class CandidateBlock(parentOpt: Option[EncryBlockHeader],
                           adProofBytes: SerializedAdProof,
                           stateRoot: ADDigest,
                           version: Version,
-                          transactions: Seq[BaseTransaction],
+                          transactions: Seq[Transaction],
                           timestamp: Timestamp,
                           difficulty: Difficulty) {
 
