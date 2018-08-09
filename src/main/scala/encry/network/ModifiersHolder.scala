@@ -9,17 +9,15 @@ import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
 import encry.settings.Algos
 import encry.utils.Logging
-import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, LocallyGeneratedModifier}
 import encry.{ModifierId, ModifierTypeId}
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class ModifiersHolder extends PersistentActor with Logging {
 
   var stat: Statistics = Statistics(0, 0, 0, 0, 0, Seq.empty, Seq.empty)
-
-  /** Map, which contains not completed blocks
-    * Key can be payloadId or also header id. So value depends on key, and can contains: headerId, payloadId */
   var headers: Map[String, (EncryBlockHeader, Int)] = Map.empty
   var payloads: Map[String, (EncryBlockPayload, Int)] = Map.empty
   var nonCompletedBlocks: Map[String, String] = Map.empty
@@ -29,9 +27,15 @@ class ModifiersHolder extends PersistentActor with Logging {
     logger.debug(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
   }
 
+  context.system.scheduler.scheduleOnce(5 seconds) {
+    if (completedBlocks.nonEmpty) self ! SendBlocks
+  }
+
   override def preStart(): Unit = logger.info(s"ModifiersHolder actor is started.")
 
-  override def receiveRecover: Receive = {
+  override def receiveRecover: Receive = if (settings.levelDb.recoverMode) receiveRecoverEnabled else receiveRecoverDisabled
+
+  def receiveRecoverEnabled: Receive = {
     case header: EncryBlockHeader =>
       updateHeaders(header)
       logger.debug(s"Header ${header.height} is recovered from leveldb.")
@@ -41,25 +45,29 @@ class ModifiersHolder extends PersistentActor with Logging {
     case block: EncryBlock =>
       updateCompletedBlocks(block)
       logger.debug(s"Block ${block.header.height} is recovered from leveldb.")
-    case RecoveryCompleted => logger.info("Recovery completed.")
+    case RecoveryCompleted if completedBlocks.isEmpty =>
+      logger.info("Recovery completed.")
+      peerManager ! RecoveryCompleted
+    case RecoveryCompleted =>
+      context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
+  }
+
+  def receiveRecoverDisabled: Receive = {
+    case _ =>
   }
 
   override def receiveCommand: Receive = {
-    case ApplyState =>
-      logger.info("State recovering state on ModifiersHolder is finished.")
-      logger.info(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
-      val sortedHeaders: Seq[EncryBlockHeader] = headers.map(_._2._1).toSeq
-        .sortWith((firstHeader, secondHeader) => firstHeader.height < secondHeader.height)
-      if (sortedHeaders.headOption.exists(_.height == 0)) sortedHeaders.tail.foldLeft(Seq(sortedHeaders.head)) {
-        case (applicableHeaders, header) =>
-          if (applicableHeaders.last.height + 1 == header.height) applicableHeaders :+ header
-          else applicableHeaders
-      }.foreach(header => nodeViewHolder ! LocallyGeneratedModifier(header))
-      if (completedBlocks.keys.headOption.contains(0)) completedBlocks.foldLeft(Seq(completedBlocks.head._2)) {
-        case (applicableBlocks, blockWithHeight) =>
-          if (applicableBlocks.last.header.height + 1 == blockWithHeight._1) applicableBlocks :+ blockWithHeight._2
-          else applicableBlocks
-      }.foreach(block => nodeViewHolder ! LocallyGeneratedModifier(block.payload))
+    case CheckAllBlocksSent =>
+      if (completedBlocks.isEmpty) {
+        logger.info("Recovery completed.")
+        peerManager ! RecoveryCompleted
+      }
+      else context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
+    case SendBlocks =>
+      val blocksToSend: Seq[EncryBlock] = completedBlocks.take(settings.levelDb.batchSize).values.toSeq
+      completedBlocks = completedBlocks.drop(settings.levelDb.batchSize)
+      nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend)
+
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
     case x: Any => logger.error(s"Strange input: $x.")
@@ -75,20 +83,26 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
     case header: EncryBlockHeader =>
-      if(!headers.contains(Algos.encode(header.id)))
-        persist(header) { header => logger.debug(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully.") }
+      if (!headers.contains(Algos.encode(header.id)))
+        persist(header) { header =>
+          logger.debug(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully.")
+        }
       updateHeaders(header)
       log.debug(s"Get header ${Algos.encode(header.id)} on height ${header.height}")
     case payload: EncryBlockPayload =>
-      if(!payloads.contains(Algos.encode(payload.id)))
+      if (!payloads.contains(Algos.encode(payload.id)))
         persist(payload) { payload => logger.debug(s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully.") }
       updatePayloads(payload)
       log.debug(s"Get payload with id: ${Algos.encode(payload.id)} " +
-        s"${nonCompletedBlocks.get(Algos.encode(payload.id)).map(headerId =>
-          headers.get(headerId).map(header => s"for header $headerId height: ${header._1.height}"))}")
+        s"${
+          nonCompletedBlocks.get(Algos.encode(payload.id)).map(headerId =>
+            headers.get(headerId).map(header => s"for header $headerId height: ${header._1.height}"))
+        }")
     case block: EncryBlock =>
-      if(!completedBlocks.values.toSeq.contains(block))
-        persist(block) { block => logger.debug(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} is persisted successfully.") }
+      if (!completedBlocks.values.toSeq.contains(block))
+        persist(block) { block =>
+          logger.debug(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} is persisted successfully.")
+        }
       updateCompletedBlocks(block)
     case x: Any => logger.error(s"Strange input $x.")
   }
@@ -99,7 +113,8 @@ class ModifiersHolder extends PersistentActor with Logging {
     if (!nonCompletedBlocks.contains(Algos.encode(header.payloadId)))
       nonCompletedBlocks += Algos.encode(header.payloadId) -> Algos.encode(header.id)
     else {
-      nonCompletedBlocks = (nonCompletedBlocks - Algos.encode(header.payloadId)) + (Algos.encode(header.payloadId) -> Algos.encode(header.id))
+      nonCompletedBlocks = (nonCompletedBlocks - Algos.encode(header.payloadId)) +
+        (Algos.encode(header.payloadId) -> Algos.encode(header.id))
       createBlockIfPossible(header.payloadId)
     }
   }
@@ -123,7 +138,9 @@ class ModifiersHolder extends PersistentActor with Logging {
 
 object ModifiersHolder {
 
-  case object ApplyState
+  case object SendBlocks
+
+  case object CheckAllBlocksSent
 
   case class Statistics(receivedHeaders: Int,
                         receivedPayloads: Int,
@@ -138,7 +155,11 @@ object ModifiersHolder {
       s"${this.completedBlocks} full blocks, " +
       s"max height: ${this.maxHeight}, " +
       s"gaps: ${this.gaps.foldLeft("") { case (str, gap) => str + s"(${gap._1}, ${gap._2})" }} " +
-      s"duplicates: ${this.duplicates.foldLeft("") { case (str, duplicate) => str + s"(${Algos.encode(duplicate._1)}, ${duplicate._2})" }}."
+      s"duplicates: ${
+        this.duplicates.foldLeft("") { case (str, duplicate) =>
+          str + s"(${Algos.encode(duplicate._1)}, ${duplicate._2})"
+        }
+      }."
   }
 
   case object Statistics {
@@ -153,8 +174,10 @@ object ModifiersHolder {
         completedBlocks.size,
         if (completedBlocks.nonEmpty) completedBlocks.keys.max else 0,
         countGaps(completedBlocks.keys.toSeq),
-        headers.values.filter(_._2 > 1).map(headerWithDuplicatesQty => headerWithDuplicatesQty._1.id -> headerWithDuplicatesQty._2).toSeq ++
-          payloads.values.filter(_._2 > 1).map(payloadWithDuplicatesQty => payloadWithDuplicatesQty._1.id -> payloadWithDuplicatesQty._2).toSeq
+        headers.values.filter(_._2 > 1).map(headerWithDuplicatesQty =>
+          headerWithDuplicatesQty._1.id -> headerWithDuplicatesQty._2).toSeq ++
+          payloads.values.filter(_._2 > 1).map(payloadWithDuplicatesQty =>
+            payloadWithDuplicatesQty._1.id -> payloadWithDuplicatesQty._2).toSeq
       )
   }
 
