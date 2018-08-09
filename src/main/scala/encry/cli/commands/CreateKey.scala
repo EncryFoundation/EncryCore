@@ -13,7 +13,7 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import scala.concurrent.Future
 import scala.util.Try
 
-object AddKey extends Command {
+object CreateKey extends Command {
 
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = Try {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)

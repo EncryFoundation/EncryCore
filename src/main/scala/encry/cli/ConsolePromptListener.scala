@@ -52,7 +52,7 @@ object ConsolePromptListener {
 
   private val walletCmds = Map("wallet" -> Map(
     "addrs" -> PrintAddresses,
-    "addKey" -> AddKey,
+    "createKey" -> CreateKey,
     "pubKeys" -> PrintPubKeys,
     "balance" -> GetBalance,
     "transfer" -> Transfer,
