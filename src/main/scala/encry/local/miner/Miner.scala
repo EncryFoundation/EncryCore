@@ -6,7 +6,7 @@ import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus._
 import encry.crypto.PrivateKey25519
-import encry.local.miner.EncryMiningWorker.{DropChallenge, NextChallenge}
+import encry.local.miner.EncryMiningWorker.NextChallenge
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{BaseTransaction, EncryTransaction, TransactionFactory}
@@ -36,12 +36,14 @@ class Miner extends Actor with Logging {
   var startTime: Long = System.currentTimeMillis()
   var sleepTime: Long = System.currentTimeMillis()
   var candidateOpt: Option[CandidateBlock] = None
+  val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
 
   override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
 
   override def postStop(): Unit = killAllWorkers()
 
   def killAllWorkers(): Unit = context.children.foreach(context.stop)
+
 
   def needNewCandidate(b: EncryBlock): Boolean =
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
@@ -55,23 +57,25 @@ class Miner extends Actor with Logging {
 
   def mining: Receive = {
     case StartMining if context.children.nonEmpty =>
+      killAllWorkers()
+      self ! StartMining
+    case StartMining =>
+      for (i <- 0 until numberOfWorkers) yield context.actorOf(
+        Props(classOf[EncryMiningWorker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
       candidateOpt match {
         case Some(candidateBlock) =>
           log.info(s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
           context.children.foreach(_ ! NextChallenge(candidateBlock))
         case None => produceCandidate()
       }
-    case StartMining =>
-      val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
-      for (i <- 0 until numberOfWorkers) yield context.actorOf(
-        Props(classOf[EncryMiningWorker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
-      self ! StartMining
     case DisableMining if context.children.nonEmpty =>
+      log.info("Received DisableMining msg")
       killAllWorkers()
       candidateOpt = None
       context.become(miningDisabled)
     case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
       log.info(s"Going to propagate new block $block from worker $workerIdx")
+      killAllWorkers()
       nodeViewHolder ! LocallyGeneratedModifier(block.header)
       nodeViewHolder ! LocallyGeneratedModifier(block.payload)
       if (settings.node.sendStat) {
@@ -82,8 +86,11 @@ class Miner extends Actor with Logging {
         block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
-      context.children.foreach(_ ! DropChallenge)
-
+    case MinedBlock(block, _) =>
+      log.warn(s"Mined block with state root ${block.header.stateRoot} while candidateOpt stateRoot is ${candidateOpt.map(_.stateRoot)}")
+      killAllWorkers()
+      candidateOpt = None
+      self ! StartMining
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
     case _ =>
   }
@@ -96,7 +103,7 @@ class Miner extends Actor with Logging {
   }
 
   def receiveSemanticallySuccessfulModifier: Receive = {
-    case SemanticallySuccessfulModifier(mod: EncryBlock) if context.children.nonEmpty && needNewCandidate(mod) =>
+    case SemanticallySuccessfulModifier(mod: EncryBlock) if needNewCandidate(mod) =>
       log.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
         s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       produceCandidate()
@@ -110,6 +117,9 @@ class Miner extends Actor with Logging {
   def receiverCandidateBlock: Receive = {
     case c: CandidateBlock => procCandidateBlock(c)
     case cEnv: CandidateEnvelope if cEnv.c.nonEmpty => procCandidateBlock(cEnv.c.get)
+    case _: CandidateBlock =>
+      log.info("Received empty CandidateEnvelope, going to suspend mining for a while")
+      self ! DisableMining
   }
 
   override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled

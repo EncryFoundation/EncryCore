@@ -1,6 +1,5 @@
 package encry.utils
 
-import encry.EncryApp._
 import akka.actor.{Actor, DeadLetter, UnhandledMessage}
 
 class Zombie extends Actor with Logging {
@@ -12,7 +11,7 @@ class Zombie extends Actor with Logging {
 
   override def receive: Receive = {
     case deadMessage: DeadLetter => logger.debug(s"Dead letter: ${deadMessage.toString}.")
-    case unhandled: UnhandledMessage => logger.debug(s"Dead letter: ${unhandled.toString}.")
+    case unhandled: UnhandledMessage => logger.debug(s"Unhandled letter: ${unhandled.toString}.")
   }
 
 }
