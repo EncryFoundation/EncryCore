@@ -19,8 +19,9 @@ object GetBalance extends Command {
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
         Option(Response(
           {
-            val r = view.vault.getBalances.foldLeft("")((str, tokenInfo) => str.concat(s"TokenID(${Algos.encode(tokenInfo._1)}) : ${tokenInfo._2}\n"))
-            if (r.length == 0) "0" else r
+            val balance: String =
+              view.vault.getBalances.foldLeft("")((str, tokenInfo) => str.concat(s"TokenID(${Algos.encode(tokenInfo._1)}) : ${tokenInfo._2}\n"))
+            if (balance.length == 0) "0" else balance
           }
         ))
       }).mapTo[Option[Response]]
