@@ -1,6 +1,6 @@
 package encry.modifiers.state.box
 
-import encry.settings.Algos
+import org.encryfoundation.common.Algos
 import scorex.crypto.authds._
 
 abstract class EncryBoxStateChangeOperation

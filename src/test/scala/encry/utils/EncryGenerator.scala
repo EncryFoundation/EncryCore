@@ -8,11 +8,12 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, MonetaryBox}
-import encry.settings.Algos.HF
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.utils.TestHelper.{Props, rndGen}
 import encry.view.state.{BoxHolder, EncryState, UtxoState}
 import io.iohk.iodb.LSMStore
+import org.encryfoundation.common.Algos
+import org.encryfoundation.common.Algos.HF
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.transaction.EncryAddress.Address
 import org.encryfoundation.common.transaction.Pay2PubKeyAddress

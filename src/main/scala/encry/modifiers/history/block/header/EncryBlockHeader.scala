@@ -10,16 +10,16 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.{ModifierId, ModifierTypeId}
 import io.circe.Encoder
 import io.circe.syntax._
 import org.bouncycastle.crypto.digests.Blake2bDigest
+import org.encryfoundation.common.Algos
+import org.encryfoundation.common.crypto.encoding.Base16
 import org.encryfoundation.common.serialization.Serializer
 import scorex.crypto.authds.ADDigest
-import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
-
 import scala.util.Try
 
 case class EncryBlockHeader(override val version: Version,
@@ -147,7 +147,7 @@ object EncryBlockHeader {
 
   implicit val jsonEncoder: Encoder[EncryBlockHeader] = (h: EncryBlockHeader) => Map(
     "id" -> Algos.encode(h.id).asJson,
-    "hash" -> Base16.encode(h.id).asJson,
+    "hash" -> Algos.encode(h.id).asJson,
     "parentId" -> Algos.encode(h.parentId).asJson,
     "payloadId" -> Algos.encode(h.payloadId).asJson,
     "stateRoot" -> Algos.encode(h.stateRoot).asJson,

@@ -1,5 +1,5 @@
 import encry.network.message.BasicMsgDataTypes.InvData
-import encry.settings.Algos
+import org.encryfoundation.common.Algos
 import supertagged.TaggedType
 
 package object encry {

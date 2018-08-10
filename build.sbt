@@ -60,7 +60,7 @@ libraryDependencies ++= Seq(
   "org.scorexfoundation" %% "iodb" % "0.3.2",
   "io.spray" %% "spray-json" % "1.3.3",
   "io.monix" %% "monix" % "2.3.3",
-  "org.encry" %% "encry-common" % "0.1.5",
+  "org.encry" %% "encry-common" % "0.2.0",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
   "org.influxdb" % "influxdb-java" % "2.10",
   "org.apache.commons" % "commons-io" % "1.3.2"

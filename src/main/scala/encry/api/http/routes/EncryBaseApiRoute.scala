@@ -4,8 +4,8 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.{Directive, Directive1, Route}
 import encry.ModifierId
 import encry.api.http.ApiRoute
-import encry.settings.Algos
 import io.circe.Json
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.encoding.Base58Check
 import org.encryfoundation.common.transaction.EncryAddress.Address
 import scorex.crypto.authds.ADKey

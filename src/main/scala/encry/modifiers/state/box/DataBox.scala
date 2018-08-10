@@ -2,12 +2,13 @@ package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import encry.settings.Algos
 import io.circe.Encoder
 import io.circe.syntax._
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.prismlang.core.Types
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
+
 import scala.util.Try
 
 /** Stores arbitrary data in EncryTL binary format. */

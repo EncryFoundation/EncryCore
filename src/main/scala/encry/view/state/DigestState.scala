@@ -7,9 +7,10 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.Transaction
-import encry.settings.{Algos, Constants, NodeSettings}
+import encry.settings.{Constants, NodeSettings}
 import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
+import org.encryfoundation.common.Algos
 import scorex.crypto.authds.ADDigest
 import scala.util.{Failure, Success, Try}
 

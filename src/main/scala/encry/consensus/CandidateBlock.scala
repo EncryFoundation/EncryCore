@@ -3,9 +3,9 @@ package encry.consensus
 import encry.modifiers.history.block.Block.{Timestamp, Version}
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.Transaction
-import encry.settings.Algos
 import io.circe.Encoder
 import io.circe.syntax._
+import org.encryfoundation.common.Algos
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 
 case class CandidateBlock(parentOpt: Option[EncryBlockHeader],
