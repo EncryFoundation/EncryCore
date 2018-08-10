@@ -20,7 +20,7 @@ object GetBalance extends Command {
         Option(Response(
           {
             val r = view.vault.getBalances.foldLeft("")((str, tokenInfo) => str.concat(s"TokenID(${Algos.encode(tokenInfo._1)}) : ${tokenInfo._2}\n"))
-            if (r.length == 0) "<empty>" else r
+            if (r.length == 0) "0" else r
           }
         ))
       }).mapTo[Option[Response]]
