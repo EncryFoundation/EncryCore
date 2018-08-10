@@ -68,6 +68,7 @@ class Miner extends Actor with Logging {
       self ! StartMining
     case DisableMining if context.children.nonEmpty =>
       killAllWorkers()
+      candidateOpt = None
       context.become(miningDisabled)
     case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
       log.info(s"Going to propagate new block $block from worker $workerIdx")
