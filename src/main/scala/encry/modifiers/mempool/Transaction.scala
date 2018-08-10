@@ -12,10 +12,10 @@ import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.Constants
 import io.circe.Encoder
 import org.encryfoundation.common.Algos
-import org.encryfoundation.common.crypto.encoding.Base16
 import org.encryfoundation.common.transaction.{Input, Proof}
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.PConvertible
+import org.encryfoundation.utils.encoding.Base16
 import scorex.crypto.hash.Digest32
 import scala.util.Try
 

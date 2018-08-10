@@ -1,7 +1,7 @@
 package encry.utils
 
 import org.encryfoundation.common.Algos
-import org.encryfoundation.common.crypto.encoding.Base58
+import org.encryfoundation.utils.encoding.Base58
 import scala.util.Try
 
 case class ByteStr(arr: Array[Byte]) {

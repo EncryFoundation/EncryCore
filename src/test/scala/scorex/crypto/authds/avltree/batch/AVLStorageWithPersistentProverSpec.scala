@@ -61,8 +61,6 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
 
     persistentProver.generateProofAndUpdateStorage()
 
-    lazy val afterGenesisDigest = persistentProver.digest
-
     val proof = getProof(mods128)
 
     // Applying mods with greater values.
