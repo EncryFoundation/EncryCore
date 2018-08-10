@@ -8,19 +8,17 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, SemanticallySuccessfulModifier}
 import encry.network.Handshake
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
-import encry.settings.{Algos, Constants, EncryAppSettings}
+import encry.settings.{Constants, EncryAppSettings}
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.history.EncryHistory
 import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
-
+import org.encryfoundation.common.Algos
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-/**
-  * Class that subscribes to NodeViewHolderEvents and collects them to provide fast response to API requests.
-  */
+/** Class that subscribes to NodeViewHolderEvents and collects them to provide fast response to API requests. */
 class EncryLocalInterface(viewHolderRef: ActorRef,
                           peerManager: ActorRef,
                           settings: EncryAppSettings,

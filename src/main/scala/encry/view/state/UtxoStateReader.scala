@@ -2,10 +2,10 @@ package encry.view.state
 
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
-import encry.settings.Algos
 import encry.utils.Logging
 import encry.view.history.Height
 import io.iohk.iodb.Store
+import org.encryfoundation.common.Algos
 import scorex.crypto.authds.ADKey
 import scorex.crypto.authds.avltree.batch.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import scorex.crypto.hash.Digest32

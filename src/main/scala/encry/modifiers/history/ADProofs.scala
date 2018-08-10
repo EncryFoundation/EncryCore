@@ -3,15 +3,15 @@ package encry.modifiers.history
 import com.google.common.primitives.Bytes
 import encry.modifiers.state.box._
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.{ModifierId, ModifierTypeId}
 import io.circe.Encoder
 import io.circe.syntax._
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import scorex.crypto.authds.avltree.batch.{BatchAVLVerifier, Insert, Modification, Remove}
 import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
-
 import scala.util.{Failure, Success, Try}
 
 case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
@@ -69,7 +69,7 @@ object ADProofs {
 
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (104: Byte)
 
-  val KeyLength = 32
+  val KeyLength: Int = 32
 
   implicit val jsonEncoder: Encoder[ADProofs] = (p: ADProofs) => Map(
     "headerId" -> Algos.encode(p.headerId).asJson,

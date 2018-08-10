@@ -1,20 +1,19 @@
 package scorex.crypto.authds.avltree.batch
 
 import com.google.common.primitives.Ints
-import encry.settings.Algos
+import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, Store}
+import org.encryfoundation.common.Algos
 import scorex.crypto.authds.avltree.batch.VersionedIODBAVLStorage.{InternalNodePrefix, LeafPrefix}
 import scorex.crypto.authds.{ADDigest, ADKey, ADValue, Balance}
 import scorex.crypto.hash
 import scorex.crypto.hash.{CryptographicHash, Digest}
-import scorex.utils.ScryptoLogging
-
 import scala.util.{Failure, Try}
 
 case class NodeParameters(keySize: Int, valueSize: Option[Int], labelSize: Int)
 
 class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodeParameters)(implicit val hf: CryptographicHash[D])
-  extends VersionedAVLStorage[D] with ScryptoLogging {
+  extends VersionedAVLStorage[D] with Logging {
 
   val TopNodeKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(nodeParameters.labelSize)(123: Byte))
   val TopNodeHeight: ByteArrayWrapper = ByteArrayWrapper(Array.fill(nodeParameters.labelSize)(124: Byte))

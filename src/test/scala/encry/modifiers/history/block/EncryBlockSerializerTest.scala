@@ -6,8 +6,9 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.utils.{EncryGenerator, TestHelper}
+import org.encryfoundation.common.Algos
 import org.scalatest.FunSuite
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scorex.crypto.hash.Digest32

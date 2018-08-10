@@ -3,8 +3,8 @@ package encry.settings
 import encry.consensus.Difficulty
 import encry.modifiers.history.block.Block.Version
 import encry.view.history.Height
+import org.encryfoundation.common.Algos
 import scorex.crypto.authds.ADKey
-
 import scala.concurrent.duration._
 
 object Constants {

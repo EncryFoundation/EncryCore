@@ -5,12 +5,12 @@ import akka.actor.ActorRef
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
-import encry.settings.Algos.HF
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
 import encry.view.history.Height
 import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.crypto
+import org.encryfoundation.common.Algos.HF
+import org.encryfoundation.common.{Algos, crypto}
 import org.encryfoundation.common.transaction.Pay2PubKeyAddress
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.authds.avltree.batch._

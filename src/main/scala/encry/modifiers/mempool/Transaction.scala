@@ -9,12 +9,13 @@ import encry.modifiers.mempool.directive.Directive
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, DataBox}
 import encry.modifiers.state.box.EncryBaseBox
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import io.circe.Encoder
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.{Input, Proof}
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.PConvertible
-import scorex.crypto.encode.Base16
+import org.encryfoundation.utils.encoding.Base16
 import scorex.crypto.hash.Digest32
 import scala.util.Try
 

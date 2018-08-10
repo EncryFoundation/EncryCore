@@ -16,12 +16,13 @@ import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box._
-import encry.settings.Algos.HF
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.utils.{BalanceCalculator, Logging}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
+import org.encryfoundation.common.Algos
+import org.encryfoundation.common.Algos.HF
 import scorex.crypto.authds._
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.hash.Digest32
