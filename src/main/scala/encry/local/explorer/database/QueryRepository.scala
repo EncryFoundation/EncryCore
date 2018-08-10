@@ -6,7 +6,7 @@ import encry.ModifierId
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, HeaderDBVersion}
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import scorex.util.encode.Base16
+import scorex.crypto.encode.Base16
 import cats.implicits._
 import doobie.postgres.implicits._
 import doobie.util.log.LogHandler

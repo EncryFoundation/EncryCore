@@ -3,7 +3,7 @@ package scorex.crypto.authds.avltree.batch.helpers
 import io.iohk.iodb.{LSMStore, QuickStore, Store}
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
-import scorex.util.encode.Base58
+import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.utils.ScryptoLogging
 

@@ -3,7 +3,7 @@ package encry.settings
 import java.nio.charset.Charset
 import scorex.crypto.authds.LeafData
 import scorex.crypto.authds.merkle.MerkleTree
-import scorex.util.encode.Base16
+import scorex.crypto.encode.Base16
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scala.util.Try
 
