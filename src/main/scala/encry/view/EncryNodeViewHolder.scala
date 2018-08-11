@@ -50,6 +50,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     Transaction.ModifierTypeId -> EncryTransactionSerializer
   )
 
+  override def preStart(): Unit =
+    if (settings.wallet.seed.isDefined && nodeView.wallet.accountManager.accounts.isEmpty)
+      nodeView.wallet.accountManager.mandatoryAccount
+
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     reason.printStackTrace()
     System.exit(100)
