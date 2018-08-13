@@ -1,12 +1,11 @@
 package encry.network
 
-import encry.modifiers.serialization.{BytesSerializable, Serializer}
-
+import org.encryfoundation.common.serialization.{BytesSerializable, Serializer}
 import scala.util.Try
 
 object Version {
   def apply(v: String): Version = {
-    val splitted = v.split("\\.")
+    val splitted: Array[String] = v.split("\\.")
     Version(splitted(0).toByte, splitted(1).toByte, splitted(2).toByte)
   }
 }

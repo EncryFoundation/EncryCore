@@ -1,7 +1,6 @@
 package encry.view.wallet
 
 import encry.ModifierId
-import encry.Address
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
@@ -11,10 +10,8 @@ import encry.modifiers.state.box.{AssetBox, MonetaryBox}
 import encry.settings.{Constants, EncryAppSettings}
 import encry.utils.TestHelper.Props
 import encry.utils.{EncryGenerator, FileHelper}
-import encry.view.wallet.keys.KeyManager
 import io.iohk.iodb.LSMStore
 import org.scalatest.{Matchers, PropSpec}
-import scorex.utils.Random
 
 class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator {
 
@@ -22,15 +19,15 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
   property("Balance count (intrinsic coins only)") {
 
-    val walletStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions)
+    val walletStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
 
-    val keyManager: KeyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), settings.keyManager, None)
+    val accountManagerStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0, keySize = 33)
 
-    keyManager.initStorage(Random.randomBytes())
+    val accountManager: AccountManager = AccountManager(accountManagerStore)
 
-    val wallet: EncryWallet = EncryWallet(walletStore, keyManager)
+    val wallet: EncryWallet = EncryWallet(walletStore, accountManager)
 
-    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddr(4, keyManager.keys.head.publicImage.address.address)
+    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddr(4, accountManager.mandatoryAccount.publicImage.address.address)
 
     val useBox: AssetBox = validTxs.head.newBoxes.head.asInstanceOf[AssetBox]
 
@@ -69,15 +66,15 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val blockHeader: EncryBlockHeader = genHeader
 
-    val walletStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions)
+    val walletStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
 
-    val keyManager: KeyManager = KeyManager(new LSMStore(FileHelper.getRandomTempDir, keepVersions = Constants.DefaultKeepVersions), settings.keyManager, None)
+    val accountManagerStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0, keySize = 33)
 
-    keyManager.initStorage(Random.randomBytes())
+    val keyManager: AccountManager = AccountManager(accountManagerStore)
 
     val wallet: EncryWallet = EncryWallet(walletStore, keyManager)
 
-    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.keys.head.publicImage.address.address)
+    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.mandatoryAccount.publicImage.address.address)
 
     val blockPayload: EncryBlockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
 
@@ -85,8 +82,6 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     wallet.scanPersistent(block)
 
-    wallet.getBalances.foldLeft(0L) {
-      _ + _._2
-    } shouldEqual txsQty * Props.boxValue
+    wallet.getBalances.foldLeft(0L)(_ + _._2) shouldEqual txsQty * Props.boxValue
   }
 }

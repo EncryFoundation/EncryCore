@@ -7,7 +7,7 @@ import encry.consensus.History.ModifierIds
 import encry.modifiers.NodeViewModifier
 import encry.network.message.SyncInfoMessageSpec
 import encry.ModifierId
-import encry.modifiers.serialization.Serializer
+import org.encryfoundation.common.serialization.Serializer
 import scala.util.Try
 
 case class EncrySyncInfo(lastHeaderIds: Seq[ModifierId]) extends SyncInfo {

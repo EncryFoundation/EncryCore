@@ -9,7 +9,7 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 case class EncryAppSettings(directory: String,
                             testing: TestingSettings,
                             node: NodeSettings,
-                            keyManager: KeyManagerSettings,
+                            wallet: WalletSettings,
                             dataDir: File,
                             network: NetworkSettings,
                             restApi: RESTApiSettings,

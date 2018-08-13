@@ -7,18 +7,19 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.Block._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.mempool.BaseTransaction
+import encry.modifiers.mempool.Transaction
 import encry.modifiers.mempool.directive.TransferDirective
-import encry.modifiers.serialization.Serializer
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
 import encry.settings.{Algos, Constants}
 import encry.{ModifierId, ModifierTypeId}
 import io.circe.Encoder
 import io.circe.syntax._
 import org.bouncycastle.crypto.digests.Blake2bDigest
+import org.encryfoundation.common.serialization.Serializer
 import scorex.crypto.authds.ADDigest
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
+
 import scala.util.Try
 
 case class EncryBlockHeader(override val version: Version,
@@ -131,7 +132,7 @@ object HeaderDBVersion {
     )
   }
 
-  private def minerInfo(coinbase: BaseTransaction): (String, Long) = coinbase.directives.head match {
+  private def minerInfo(coinbase: Transaction): (String, Long) = coinbase.directives.head match {
       case TransferDirective(address, amount, tokenIdOpt) if tokenIdOpt.isEmpty => address -> amount
       case _ => "unknown" -> 0
     }

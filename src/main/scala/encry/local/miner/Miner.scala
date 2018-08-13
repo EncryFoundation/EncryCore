@@ -7,9 +7,10 @@ import encry.EncryApp._
 import encry.consensus._
 import encry.crypto.PrivateKey25519
 import encry.local.miner.EncryMiningWorker.NextChallenge
+import encry.local.miner.EncryMiningWorker.{DropChallenge, NextChallenge}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{BaseTransaction, EncryTransaction, TransactionFactory}
+import encry.modifiers.mempool.{Transaction, EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
@@ -25,6 +26,7 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.crypto.PrivateKey25519
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scala.collection._
 
@@ -43,7 +45,6 @@ class Miner extends Actor with Logging {
   override def postStop(): Unit = killAllWorkers()
 
   def killAllWorkers(): Unit = context.children.foreach(context.stop)
-
 
   def needNewCandidate(b: EncryBlock): Boolean =
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
@@ -143,8 +144,8 @@ class Miner extends Actor with Logging {
 
     // `txsToPut` - valid, non-conflicting txs with respect to their fee amount.
     // `txsToDrop` - invalidated txs to be dropped from mempool.
-    val (txsToPut: Seq[BaseTransaction], txsToDrop: Seq[BaseTransaction], _) = view.pool.takeAll.toSeq.sortBy(_.fee).reverse
-      .foldLeft((Seq[BaseTransaction](), Seq[BaseTransaction](), Set[ByteArrayWrapper]())) {
+    val (txsToPut: Seq[Transaction], txsToDrop: Seq[Transaction], _) = view.pool.takeAll.toSeq.sortBy(_.fee).reverse
+      .foldLeft((Seq[Transaction](), Seq[Transaction](), Set[ByteArrayWrapper]())) {
         case ((validTxs, invalidTxs, bxsAcc), tx) =>
           val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.inputs.map(u => ByteArrayWrapper(u.boxId))
           if ((validTxs.map(_.length).sum + tx.length) <= Constants.BlockMaxSize - 124) {
@@ -157,13 +158,13 @@ class Miner extends Actor with Logging {
     // Remove stateful-invalid txs from mempool.
     view.pool.removeAsync(txsToDrop)
 
-    val minerSecret: PrivateKey25519 = view.vault.keyManager.mainKey
+    val minerSecret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
     val feesTotal: Amount = txsToPut.map(_.fee).sum
     val supplyTotal: Amount = EncrySupplyController.supplyAt(view.state.height)
     val coinbase: EncryTransaction = TransactionFactory
       .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, view.state.height)
 
-    val txs: Seq[BaseTransaction] = txsToPut.sortBy(_.timestamp) :+ coinbase
+    val txs: Seq[Transaction] = txsToPut.sortBy(_.timestamp) :+ coinbase
 
     val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
       .getOrElse(throw new Exception("ADProof generation failed"))

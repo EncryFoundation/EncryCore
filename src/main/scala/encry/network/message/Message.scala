@@ -1,10 +1,9 @@
 package encry.network.message
 
 import com.google.common.primitives.{Bytes, Ints}
-import encry.modifiers.serialization.{BytesSerializable, Serializer}
 import encry.network.PeerConnectionHandler._
+import org.encryfoundation.common.serialization.{BytesSerializable, Serializer}
 import scorex.crypto.hash.Blake2b256
-
 import scala.util.Try
 
 case class Message[Content](spec: MessageSpec[Content],

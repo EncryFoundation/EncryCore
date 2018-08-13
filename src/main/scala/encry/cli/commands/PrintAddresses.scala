@@ -18,8 +18,8 @@ object PrintAddresses extends Command {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (nodeViewHolder ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
-        Some(Response(view.vault.keyManager.keys.foldLeft("") { (str, k) =>
-          str + s"Pay2PubKeyAddress : ${k.publicImage.address.address} , Pay2ContractHashAddress : ${k.publicImage.address.p2ch.address}" + "\n"
+        Some(Response(view.vault.publicKeys.foldLeft("") { (str, k) =>
+          str + s"Pay2PubKeyAddress : ${k.address.address} , Pay2ContractHashAddress : ${k.address.p2ch.address}" + "\n"
         }))
       }).mapTo[Option[Response]]
   }

@@ -1,10 +1,10 @@
 package encry.utils
 
 import java.io.{File, FileWriter}
-import encry.Address
-import encry.crypto.PrivateKey25519
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
+import org.encryfoundation.common.crypto.PrivateKey25519
+import org.encryfoundation.common.transaction.EncryAddress
 import scorex.crypto.authds.ADKey
 import scorex.crypto.signatures.Curve25519
 import scala.io.Source
@@ -55,7 +55,7 @@ object TestHelper {
         rndGen.nextLong(), Props.boxValue)
     }
 
-  def genAssetBox(address: Address, amount: Amount = 9L): AssetBox =
+  def genAssetBox(address: EncryAddress.Address, amount: Amount = 9L): AssetBox =
     AssetBox(EncryProposition.addressLocked(address), amount, Props.boxValue)
 
   def genTxOutputs(boxes: Traversable[EncryBaseBox]): IndexedSeq[ADKey] =
