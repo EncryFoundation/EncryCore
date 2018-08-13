@@ -25,7 +25,7 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   context.system.scheduler.schedule(10.second, 30.second) {
     logger.debug(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
-  }
+   }
 
   context.system.scheduler.scheduleOnce(5 seconds) {
     if (completedBlocks.nonEmpty) self ! SendBlocks
