@@ -5,9 +5,7 @@ import java.util.Date
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus._
-import encry.crypto.PrivateKey25519
 import encry.local.miner.EncryMiningWorker.NextChallenge
-import encry.local.miner.EncryMiningWorker.{DropChallenge, NextChallenge}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{Transaction, EncryTransaction, TransactionFactory}
@@ -118,7 +116,7 @@ class Miner extends Actor with Logging {
   def receiverCandidateBlock: Receive = {
     case c: CandidateBlock => procCandidateBlock(c)
     case cEnv: CandidateEnvelope if cEnv.c.nonEmpty => procCandidateBlock(cEnv.c.get)
-    case _: CandidateBlock =>
+    case _: CandidateEnvelope =>
       log.debug("Received empty CandidateEnvelope, going to suspend mining for a while")
       self ! DisableMining
   }
