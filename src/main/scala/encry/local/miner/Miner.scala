@@ -118,7 +118,7 @@ class Miner extends Actor with Logging {
     case c: CandidateBlock => procCandidateBlock(c)
     case cEnv: CandidateEnvelope if cEnv.c.nonEmpty => procCandidateBlock(cEnv.c.get)
     case _: CandidateBlock =>
-      log.info("Received empty CandidateEnvelope, going to suspend mining for a while")
+      log.debug("Received empty CandidateEnvelope, going to suspend mining for a while")
       self ! DisableMining
   }
 
