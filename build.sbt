@@ -6,18 +6,9 @@ version := "0.9.0"
 organization := "org.encryfoundation"
 scalaVersion := "2.12.6"
 
-resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
-  "SonaType" at "https://oss.sonatype.org/content/groups/public",
-  "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/",
-  "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/")
-
 val akkaVersion = "2.5.13"
 val akkaHttpVersion = "10.0.9"
 val doobieVersion = "0.5.2"
-
-val networkDependencies = Seq(
-  "commons-net" % "commons-net" % "3.+"
-)
 
 val databaseDependencies = Seq(
   "org.tpolecat" %% "doobie-core" % doobieVersion,
@@ -62,8 +53,14 @@ libraryDependencies ++= Seq(
   "org.encry" %% "encry-common" % "0.8.0",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
   "org.influxdb" % "influxdb-java" % "2.10",
-  "org.apache.commons" % "commons-io" % "1.3.2"
-) ++ networkDependencies ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
+  "org.apache.commons" % "commons-io" % "1.3.2",
+  "commons-net" % "commons-net" % "3.6"
+) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
+
+resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
+  "SonaType" at "https://oss.sonatype.org/content/groups/public",
+  "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/",
+  "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/")
 
 fork := true
 
@@ -87,11 +84,9 @@ val opts = Seq(
   "-XX:+ExitOnOutOfMemoryError",
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
-
   "-XX:+UseG1GC",
   "-XX:+UseNUMA",
   "-XX:+AlwaysPreTouch",
-
   "-XX:+PerfDisableSharedMem",
   "-XX:+ParallelRefProcEnabled",
   "-XX:+UseStringDeduplication")
