@@ -16,7 +16,6 @@ val akkaHttpVersion = "10.0.9"
 val doobieVersion = "0.5.2"
 
 val networkDependencies = Seq(
-  "org.bitlet" % "weupnp" % "0.1.+",
   "commons-net" % "commons-net" % "3.+"
 )
 
