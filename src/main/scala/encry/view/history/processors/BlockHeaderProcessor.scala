@@ -21,6 +21,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
 
+// scalastyle:off
 trait BlockHeaderProcessor extends Logging {
 
   protected val nodeSettings: NodeSettings

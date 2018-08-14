@@ -99,10 +99,10 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
         .flatMap { h => headerIdsAtHeight(h + 1) }
         .flatMap { id => typedModifierById[EncryBlockHeader](id) }
         .filter(filterCond)
-      if (nextLevelHeaders.isEmpty) acc.map(chain => chain.reverse)
+      if (nextLevelHeaders.isEmpty) acc.map(_.reverse)
       else {
         val updatedChains: Seq[Seq[EncryBlockHeader]] = nextLevelHeaders.flatMap { h =>
-          acc.find(chain => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(c => h +: c)
+          acc.find(chain => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(h +: _)
         }
         val nonUpdatedChains: Seq[Seq[EncryBlockHeader]] = acc.filter(chain => !nextLevelHeaders.exists(_.parentId sameElements chain.head.id))
         loop(currentHeight.map(_ + 1), updatedChains ++ nonUpdatedChains)
@@ -142,6 +142,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
       case _ => None
     }
 
+  // TODO: Unused method.
   def missedModifiersForFullChain: Seq[(ModifierTypeId, ModifierId)] = if (nodeSettings.verifyTransactions) {
     bestHeaderOpt.toSeq
       .flatMap(h => headerChainBack(bestHeaderHeight + 1, h, _ => false).headers)

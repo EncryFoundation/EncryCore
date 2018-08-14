@@ -62,9 +62,9 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] =>
       mempoolReaderOpt = Some(reader)
     case SendLocalSyncInfo => deliveryManager ! SendLocalSyncInfo
-    case OtherNodeSyncingStatus(remote, status, extOpt) => deliveryManager ! OtherNodeSyncingStatus(remote, status, extOpt)
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
     case DisconnectedPeer(remote) => deliveryManager ! DisconnectedPeer(remote)
+
     case DataFromPeer(spec, syncInfo: EncrySyncInfo@unchecked, remote) if spec.messageCode == syncInfoSpec.messageCode =>
       log.info(s"Get sync message from ${remote.socketAddress} with " +
         s"${syncInfo.lastHeaderIds.size} headers. Head headerId is " +
@@ -80,9 +80,10 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           log.debug(s"Get sync message from ${remote.socketAddress} with headers: " +
             s"${syncInfo.lastHeaderIds.map(Algos.encode).mkString(",")}")
           if (!(extensionOpt.nonEmpty || comparison != Younger)) logWarn("Extension is empty while comparison is younger")
-          self ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
+          deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
       }
+
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == RequestModifierSpec.MessageCode =>
       log.info(s"Get requestMsg from ${remote.socketAddress}. TypeID:${invData._1}." +
         s" Modifiers: ${invData._2.foldLeft("|")((str, id) => str + "|" + Algos.encode(id))}")
@@ -99,12 +100,14 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
       log.debug(s"Get inv message from ${remote.socketAddress} with modTypeId: ${invData._1} and modifiers: " +
-        s"${invData._2.foldLeft("|")((str, id) => str + "|" + Algos.encode(id))}")
+        s"${invData._2.foldLeft("|") { case (str, id) => str + "|" + Algos.encode(id) }}")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
+
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       log.debug(s"Get modifiers from ${remote.socketAddress} with modTypeID: ${data._1} and modifiers: " +
-        s"${data._2.keys.foldLeft("|")((str, id) => str + "|" + Algos.encode(id))}")
+        s"${data._2.keys.foldLeft("|") { case (str, id) => str + "|" + Algos.encode(id) }}")
       deliveryManager ! DataFromPeer(spec, data: ModifiersData@unchecked, remote)
+
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       deliveryManager ! RequestFromLocal(peer, modifierTypeId, modifierIds)
     case StartMining => deliveryManager ! StartMining
