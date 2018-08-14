@@ -177,7 +177,7 @@ class Miner extends Actor with Logging {
 
   def produceCandidate(): Unit =
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Future[CandidateEnvelope]] { view =>
-      val producingStartTime = System.currentTimeMillis()
+      val producingStartTime: Time = System.currentTimeMillis()
       startTime = producingStartTime
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
       val candidate: Future[CandidateEnvelope] =
