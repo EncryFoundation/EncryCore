@@ -8,7 +8,7 @@ import encry.consensus._
 import encry.local.miner.EncryMiningWorker.{DropChallenge, NextChallenge}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{Transaction, EncryTransaction, TransactionFactory}
+import encry.modifiers.mempool.{EncryTransaction, Transaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
@@ -27,6 +27,7 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.crypto.PrivateKey25519
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scala.collection._
+import scala.concurrent.Future
 
 class Miner extends Actor with Logging {
 
@@ -46,8 +47,10 @@ class Miner extends Actor with Logging {
   def needNewCandidate(b: EncryBlock): Boolean =
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
 
-  def shouldStartMine(b: EncryBlock): Boolean =
-    settings.node.mining && b.header.timestamp >= timeProvider.time() && context.children.nonEmpty
+  def shouldStartMine(b: EncryBlock): Future[Boolean] =
+    timeProvider.time().map { time =>
+      settings.node.mining && b.header.timestamp >= time && context.children.nonEmpty
+    }
 
   def unknownMessage: Receive = {
     case m => logWarn(s"Unexpected message $m")
@@ -99,10 +102,13 @@ class Miner extends Actor with Logging {
       log.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
         s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       produceCandidate()
-    case SemanticallySuccessfulModifier(mod: EncryBlock) if shouldStartMine(mod) =>
-      log.info(s"Got new block2. Starting to produce candidate at height: ${mod.header.height + 1} " +
-        s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
-      self ! StartMining
+    case SemanticallySuccessfulModifier(mod: EncryBlock) =>
+      shouldStartMine(mod).foreach { if (_) {
+        log.info(s"Got new block2. Starting to produce candidate at height: ${mod.header.height + 1} " +
+          s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+        self ! StartMining
+        }
+      }
     case SemanticallySuccessfulModifier(_) =>
   }
 
@@ -126,8 +132,8 @@ class Miner extends Actor with Logging {
   }
 
   def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool],
-                      bestHeaderOpt: Option[EncryBlockHeader]): CandidateBlock = {
-    val timestamp: Time = timeProvider.time()
+                      bestHeaderOpt: Option[EncryBlockHeader]): Future[CandidateBlock] =
+  timeProvider.time().map { timestamp =>
     val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
 
     // `txsToPut` - valid, non-conflicting txs with respect to their fee amount.
@@ -170,18 +176,20 @@ class Miner extends Actor with Logging {
   }
 
   def produceCandidate(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
-      startTime = System.currentTimeMillis()
+    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Future[CandidateEnvelope]] { view =>
+      val producingStartTime = System.currentTimeMillis()
+      startTime = producingStartTime
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
-      val candidate: CandidateEnvelope =
+      val candidate: Future[CandidateEnvelope] =
         if ((bestHeaderOpt.isDefined && view.history.isFullChainSynced) || settings.node.offlineGeneration) {
           log.info(s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
           if (settings.node.sendStat) context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
-          val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
-          if (settings.node.sendStat) context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - startTime)
-          envelope
+          createCandidate(view, bestHeaderOpt).map { candidate =>
+            if (settings.node.sendStat) context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
+            CandidateEnvelope.fromCandidate(candidate)
+          }
         }
-        else CandidateEnvelope.empty
+        else Future.successful(CandidateEnvelope.empty)
       candidate
     }
 }

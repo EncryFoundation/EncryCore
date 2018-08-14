@@ -28,25 +28,30 @@ object Transfer extends Command {
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (nodeViewHolder ?
-      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Response]] { view =>
+      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[EncryTransaction]] { view =>
         Try {
           lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
           val secret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
           val recipient: Address = args.requireArg[Ast.Str]("addr").s
           val fee: Long = args.requireArg[Ast.Num]("fee").i
           val amount: Long = args.requireArg[Ast.Num]("amount").i
-          val timestamp: Time = timeProvider.time()
           val boxes: IndexedSeq[AssetBox] = view.vault.walletStorage.allBoxes.filter(_.isInstanceOf[AssetBox])
             .map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) { case (seq, box) =>
             if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
           }.toIndexedSeq
-
-          val tx: EncryTransaction = TransactionFactory.defaultPaymentTransactionScratch(secret, fee, timestamp, boxes, recipient, amount)
-
-          nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
-
-          tx
-        }.toOption.map(tx => Some(Response(tx.toString))).getOrElse(Some(Response("Operation failed. Malformed data.")))
-      }).mapTo[Option[Response]]
+          TransactionFactory.defaultPaymentTransactionScratch(secret, fee, 0L, boxes, recipient, amount)
+        }.toOption
+      }).flatMap {
+        case Some(tx: EncryTransaction) =>
+          Future.sequence(
+            Seq(Future.successful(tx), timeProvider.time())
+          ).map {
+            case Seq(tx: EncryTransaction, time: Time) =>
+              val txWithTimestamp = tx.copy(timestamp = time)
+              nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](txWithTimestamp)
+              Some(Response(txWithTimestamp.toString))
+          }
+        case None => Future.successful(Some(Response("Operation failed. Malformed data.")))
+      }
   }
 }
