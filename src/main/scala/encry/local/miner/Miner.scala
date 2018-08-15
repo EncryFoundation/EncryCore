@@ -37,7 +37,7 @@ class Miner extends Actor with Logging {
   var startTime: Long = System.currentTimeMillis()
   var sleepTime: Long = System.currentTimeMillis()
   var candidateOpt: Option[CandidateBlock] = None
-  var chainSynced: Boolean = false
+  var syncingDone: Boolean = false
 
   override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
 
@@ -56,7 +56,7 @@ class Miner extends Actor with Logging {
   }
 
   def chainEvents: Receive = {
-    case FullBlockChainSynced => chainSynced = true
+    case FullBlockChainSynced => syncingDone = true
   }
 
   def mining: Receive = {
@@ -183,7 +183,7 @@ class Miner extends Actor with Logging {
       println(s"isFullChainSynced = ${view.history.isFullChainSynced}")
       println(s"bestHeaderOpt.isDefined = ${bestHeaderOpt.isDefined}")
       val candidate: CandidateEnvelope =
-        if ((bestHeaderOpt.isDefined && chainSynced) || settings.node.offlineGeneration) {
+        if ((bestHeaderOpt.isDefined && syncingDone) || settings.node.offlineGeneration) {
           log.info(s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
           if (settings.node.sendStat) context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
           val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))

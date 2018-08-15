@@ -21,7 +21,6 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
 
-// scalastyle:off
 trait BlockHeaderProcessor extends Logging {
 
   protected val nodeSettings: NodeSettings
@@ -64,7 +63,7 @@ trait BlockHeaderProcessor extends Logging {
     if (!nodeSettings.verifyTransactions) Seq.empty // Regime that do not download and verify transaction
     else if (header.height >= blockDownloadProcessor.minimalBlockHeight)
       requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
-    else if (!isHeadersChainSynced && (isNewHeader(header) || header.height >= 10684)) {
+    else if (!isHeadersChainSynced && isNewHeader(header)) {
       // Headers chain is synced after this header. Start downloading full blocks
       log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
       isHeadersChainSyncedVar = true

@@ -99,10 +99,6 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
 
-  private def calculateNewModRow(fullBlock: EncryBlock, txsAreNew: Boolean): EncryPersistentModifier =
-    if (txsAreNew) fullBlock.payload
-    else fullBlock.adProofsOpt.getOrElse(throw new NoSuchElementException("Only transactions can be new when proofs are empty"))
-
   private def calculateBestFullChain(block: EncryBlock): Seq[EncryBlock] = {
     val continuations: Seq[Seq[EncryBlockHeader]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
     val chains: Seq[Seq[EncryBlock]] = continuations.map(_.map(getBlock).takeWhile(_.nonEmpty).flatten)
@@ -118,13 +114,13 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   }
 
   private def updateStorage(newModRow: EncryPersistentModifier, bestFullHeaderId: ModifierId, updateHeaderInfo: Boolean = false): Unit = {
-    val bestFullHeaderIdWrapped = ByteArrayWrapper(bestFullHeaderId)
+    val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeaderId)
     val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
       if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)
       else Seq(BestBlockKey -> bestFullHeaderIdWrapped)
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
-//      .ensuring(bestHeaderHeight >= bestBlockHeight, s"Headers height $bestHeaderHeight should be >= " +
-//        s"full height $bestBlockHeight")
+      .ensuring(bestHeaderHeight >= bestBlockHeight, s"Headers height $bestHeaderHeight should be >= " +
+        s"full height $bestBlockHeight")
   }
 
   private def storageVersion(newModRow: EncryPersistentModifier) = ByteArrayWrapper(newModRow.id)
