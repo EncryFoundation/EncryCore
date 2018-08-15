@@ -65,7 +65,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
 
-        updateStorage(newModRow, newBestHeader.id)
+        updateStorage(newModRow, newBestHeader.id, !isInBestChain(fullBlock.id))
 
         if (blocksToKeep >= 0) {
           val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)
@@ -117,11 +117,14 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     historyStorage.removeObjects(toRemove)
   }
 
-  private def updateStorage(newModRow: EncryPersistentModifier, bestFullHeaderId: ModifierId): Unit = {
-    val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = Seq(BestBlockKey -> ByteArrayWrapper(bestFullHeaderId))
+  private def updateStorage(newModRow: EncryPersistentModifier, bestFullHeaderId: ModifierId, updateHeaderInfo: Boolean = false): Unit = {
+    val bestFullHeaderIdWrapped = ByteArrayWrapper(bestFullHeaderId)
+    val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
+      if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)
+      else Seq(BestBlockKey -> bestFullHeaderIdWrapped)
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
-      .ensuring(bestHeaderHeight >= bestBlockHeight, s"Headers height $bestHeaderHeight should be >= " +
-        s"full height $bestBlockHeight")
+//      .ensuring(bestHeaderHeight >= bestBlockHeight, s"Headers height $bestHeaderHeight should be >= " +
+//        s"full height $bestBlockHeight")
   }
 
   private def storageVersion(newModRow: EncryPersistentModifier) = ByteArrayWrapper(newModRow.id)

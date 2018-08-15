@@ -64,7 +64,7 @@ trait BlockHeaderProcessor extends Logging {
     if (!nodeSettings.verifyTransactions) Seq.empty // Regime that do not download and verify transaction
     else if (header.height >= blockDownloadProcessor.minimalBlockHeight)
       requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
-    else if (!isHeadersChainSynced && isNewHeader(header)) {
+    else if (!isHeadersChainSynced && (isNewHeader(header) || header.height >= 10684)) {
       // Headers chain is synced after this header. Start downloading full blocks
       log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
       isHeadersChainSyncedVar = true

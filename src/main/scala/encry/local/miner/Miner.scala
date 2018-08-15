@@ -39,10 +39,7 @@ class Miner extends Actor with Logging {
   var candidateOpt: Option[CandidateBlock] = None
   var chainSynced: Boolean = false
 
-  override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
-    context.system.eventStream.subscribe(self, classOf[FullBlockChainSynced.type])
-  }
+  override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
 
   override def postStop(): Unit = killAllWorkers()
 
@@ -192,8 +189,7 @@ class Miner extends Actor with Logging {
           val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
           if (settings.node.sendStat) context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - startTime)
           envelope
-        }
-        else CandidateEnvelope.empty
+        } else CandidateEnvelope.empty
       candidate
     }
 }
