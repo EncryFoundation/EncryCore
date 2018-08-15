@@ -9,6 +9,7 @@ scalaVersion := "2.12.6"
 val akkaVersion = "2.5.13"
 val akkaHttpVersion = "10.0.9"
 val doobieVersion = "0.5.2"
+val logbackVersion = "1.2.3"
 
 val databaseDependencies = Seq(
   "org.tpolecat" %% "doobie-core" % doobieVersion,
@@ -24,20 +25,22 @@ val apiDependencies = Seq(
 )
 
 val loggingDependencies = Seq(
-  "com.typesafe.scala-logging" %% "scala-logging" % "3.+",
-  "ch.qos.logback" % "logback-classic" % "1.+",
-  "ch.qos.logback" % "logback-core" % "1.+"
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
+  "ch.qos.logback" % "logback-classic" % logbackVersion,
+  "ch.qos.logback" % "logback-core" % logbackVersion
 )
 
 val testingDependencies = Seq(
-  "com.typesafe.akka" %% "akka-testkit" % "2.4.+" % "test",
-  "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % "test",
-  "org.scalatest" %% "scalatest" % "3.0.3" % "test",
-  "org.scalacheck" %% "scalacheck" % "1.13.+" % "test",
-  "org.mockito" % "mockito-core" % "2.19.1" % Test,
+  "com.typesafe.akka" %% "akka-testkit" % "2.4.+" % Test,
+  "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % Test,
+  "org.scalatest" %% "scalatest" % "3.0.3" % Test,
+  "org.scalacheck" %% "scalacheck" % "1.13.+" % Test,
+  "org.mockito" % "mockito-core" % "2.19.1" % Test
 )
 
 libraryDependencies ++= Seq(
+  "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+  "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
   "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8",
   "org.iq80.leveldb" % "leveldb" % "0.7",
