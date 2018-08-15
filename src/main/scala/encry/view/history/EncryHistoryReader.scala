@@ -60,8 +60,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
         Younger //Other history is empty, our contain some headers
       case Some(_) =>
         //We are on different forks now.
-        if (si.lastHeaderIds.view.reverse.exists(m => contains(m)))
-          Younger //Return Younger, because we can send blocks from our fork that other node can download.
+        if (si.lastHeaderIds.view.reverse.exists(m => contains(m))) Younger //Return Younger, because we can send blocks from our fork that other node can download.
         else Unknown //We don't have any of id's from other's node sync info in history.
       //We don't know whether we can sync with it and what blocks to send in Inv message.
       case None if si.lastHeaderIds.isEmpty => Equal //Both nodes do not keep any blocks
@@ -94,8 +93,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
   protected[history] def continuationHeaderChains(header: EncryBlockHeader,
                                                   filterCond: EncryBlockHeader => Boolean): Seq[Seq[EncryBlockHeader]] = {
     @tailrec
-    def loop(currentHeight: Option[Int], acc: Seq[Seq[EncryBlockHeader]]): Seq[Seq[EncryBlockHeader]] = {
-      val nextLevelHeaders: Seq[EncryBlockHeader] = currentHeight.toList
+    def loop(currentHeight: Int, acc: Seq[Seq[EncryBlockHeader]]): Seq[Seq[EncryBlockHeader]] = {
+      val nextLevelHeaders: Seq[EncryBlockHeader] = Seq(currentHeight)
         .flatMap { h => headerIdsAtHeight(h + 1) }
         .flatMap { id => typedModifierById[EncryBlockHeader](id) }
         .filter(filterCond)
@@ -105,12 +104,11 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
           acc.find(chain => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(h +: _)
         }
         val nonUpdatedChains: Seq[Seq[EncryBlockHeader]] = acc.filter(chain => !nextLevelHeaders.exists(_.parentId sameElements chain.head.id))
-        loop(currentHeight.map(_ + 1), updatedChains ++ nonUpdatedChains)
+        loop(currentHeight + 1, updatedChains ++ nonUpdatedChains)
       }
     }
 
-    //TODO: Remove Some
-    loop(Some(header.height), Seq(Seq(header)))
+    loop(header.height, Seq(Seq(header)))
   }
 
   def testApplicable(modifier: EncryPersistentModifier): Try[Unit] = modifier match {
@@ -141,14 +139,6 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
       case (Some(txs), None) if !nodeSettings.stateMode.isDigest => Some(EncryBlock(header, txs, None))
       case _ => None
     }
-
-  // TODO: Unused method.
-  def missedModifiersForFullChain: Seq[(ModifierTypeId, ModifierId)] = if (nodeSettings.verifyTransactions) {
-    bestHeaderOpt.toSeq
-      .flatMap(h => headerChainBack(bestHeaderHeight + 1, h, _ => false).headers)
-      .flatMap(h => Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId)))
-      .filter(id => !contains(id._2))
-  } else Seq.empty
 
   /**
     * Return headers, required to apply to reach header2 if you are at header1 position.

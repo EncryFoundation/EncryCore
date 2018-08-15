@@ -8,8 +8,9 @@ import encry.consensus._
 import encry.local.miner.EncryMiningWorker.{DropChallenge, NextChallenge}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{Transaction, EncryTransaction, TransactionFactory}
+import encry.modifiers.mempool.{EncryTransaction, Transaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
+import encry.network.DeliveryManager.FullBlockChainSynced
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
 import encry.stats.StatsSender.{CandidateProducingTime, MiningEnd, MiningTime, SleepTime}
@@ -36,8 +37,12 @@ class Miner extends Actor with Logging {
   var startTime: Long = System.currentTimeMillis()
   var sleepTime: Long = System.currentTimeMillis()
   var candidateOpt: Option[CandidateBlock] = None
+  var chainSynced: Boolean = false
 
-  override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
+  override def preStart(): Unit = {
+    context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
+    context.system.eventStream.subscribe(self, classOf[FullBlockChainSynced.type])
+  }
 
   override def postStop(): Unit = killAllWorkers()
 
@@ -51,6 +56,10 @@ class Miner extends Actor with Logging {
 
   def unknownMessage: Receive = {
     case m => logWarn(s"Unexpected message $m")
+  }
+
+  def chainEvents: Receive = {
+    case FullBlockChainSynced => chainSynced = true
   }
 
   def mining: Receive = {
@@ -117,6 +126,7 @@ class Miner extends Actor with Logging {
     receiveSemanticallySuccessfulModifier orElse
       receiverCandidateBlock orElse
       mining orElse
+      chainEvents orElse
       unknownMessage
 
   def procCandidateBlock(c: CandidateBlock): Unit = {
@@ -173,8 +183,10 @@ class Miner extends Actor with Logging {
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
       startTime = System.currentTimeMillis()
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
+      println(s"isFullChainSynced = ${view.history.isFullChainSynced}")
+      println(s"bestHeaderOpt.isDefined = ${bestHeaderOpt.isDefined}")
       val candidate: CandidateEnvelope =
-        if ((bestHeaderOpt.isDefined && view.history.isFullChainSynced) || settings.node.offlineGeneration) {
+        if ((bestHeaderOpt.isDefined && chainSynced) || settings.node.offlineGeneration) {
           log.info(s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
           if (settings.node.sendStat) context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
           val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))

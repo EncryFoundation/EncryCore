@@ -44,7 +44,7 @@ trait BlockHeaderProcessor extends Logging {
         headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[EncryBlockHeader](id)) match {
           case Some(bestHeaderAtThisHeight) =>
             val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
-              .filter(m => !excluding.exists(ex => ex sameElements m._2))
+              .filter(m => !excluding.exists(_ sameElements m._2))
               .filter(m => !contains(m._2))
             continuation(Height @@ (height + 1), acc ++ toDownload)
           case None => acc
@@ -59,9 +59,7 @@ trait BlockHeaderProcessor extends Logging {
     }
   }
 
-  /**
-    * Checks, whether it's time to download full chain and return toDownload modifiers
-    */
+  /** Checks, whether it's time to download full chain and return toDownload modifiers */
   protected def toDownload(header: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] =
     if (!nodeSettings.verifyTransactions) Seq.empty // Regime that do not download and verify transaction
     else if (header.height >= blockDownloadProcessor.minimalBlockHeight)
@@ -160,11 +158,9 @@ trait BlockHeaderProcessor extends Logging {
     }
   }
 
-  /**
-    * Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
-    * header ids at this height
-    */
-  private def bestBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty) = {
+  /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
+    * header ids at this height */
+  private def bestBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
     val prevHeight = bestHeaderHeight
     log.info(s"New best header ${h.encodedId} with score: $score. New height: ${h.height}, old height: $prevHeight")
     val self: (ByteArrayWrapper, ByteArrayWrapper) =
@@ -174,16 +170,14 @@ trait BlockHeaderProcessor extends Logging {
       .flatMap(parent => headerChainBack(h.height, parent, h => isInBestChain(h)).headers)
       .filter(h => !isInBestChain(h))
     val forkIds: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = forkHeaders.map { header =>
-      val otherIds = headerIdsAtHeight(header.height).filter(id => !(id sameElements header.id))
+      val otherIds: Seq[ModifierId] = headerIdsAtHeight(header.height).filterNot(_ sameElements header.id)
       heightIdsKey(header.height) -> ByteArrayWrapper((Seq(header.id) ++ otherIds).flatten.toArray)
     }
     forkIds :+ self
   }
 
-  /**
-    * Row to storage, that put this orphaned block id to the end of header ids at this height
-    */
-  private def orphanedBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty) = {
+  /** Row to storage, that put this orphaned block id to the end of header ids at this height */
+  private def orphanedBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
     log.info(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
     Seq(heightIdsKey(h.height) -> ByteArrayWrapper((headerIdsAtHeight(h.height) :+ h.id).flatten.toArray))
   }
