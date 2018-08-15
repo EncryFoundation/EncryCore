@@ -99,6 +99,8 @@ val opts = Seq(
 
 javaOptions in run ++= opts
 
+assemblyJarName in assembly := "core.jar"
+
 mainClass in assembly := Some("encry.EncryApp")
 
 test in assembly := {}
@@ -110,6 +112,8 @@ assemblyMergeStrategy in assembly := {
   case "META-INF/*.DSA" => MergeStrategy.discard
   case "META-INF/*.RSA" => MergeStrategy.discard
   case "META-INF/*.SF" => MergeStrategy.discard
+  case "META-INF/BC1024KE.SF" => MergeStrategy.discard
+  case "META-INF/BC2048KE.SF" => MergeStrategy.discard
   case PathList("reference.conf") => MergeStrategy.concat
   case _ => MergeStrategy.first
 }
