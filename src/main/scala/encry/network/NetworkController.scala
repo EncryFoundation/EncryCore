@@ -28,10 +28,7 @@ class NetworkController extends Actor with Logging {
   val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
   var messageHandlers: Map[Seq[MessageCode], ActorRef] = Map.empty
   var outgoing: Set[InetSocketAddress] = Set.empty
-  lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse {
-    if (networkSettings.upnpEnabled) upnp.externalAddress.map(a => new InetSocketAddress(a, networkSettings.bindAddress.getPort))
-    else None
-  }
+  lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse None
 
   if (!networkSettings.localOnly) {
     networkSettings.declaredAddress.foreach { myAddress =>
@@ -39,7 +36,7 @@ class NetworkController extends Actor with Logging {
         val myAddrs: Array[InetAddress] = InetAddress.getAllByName(new URI("http://" + myAddress).getHost)
         NetworkInterface.getNetworkInterfaces.asScala.exists { intf =>
           intf.getInterfaceAddresses.asScala.exists { intfAddr => myAddrs.contains(intfAddr.getAddress) }
-        } || (networkSettings.upnpEnabled && myAddrs.exists(_ == upnp.externalAddress))
+        }
       } recover { case t: Throwable =>
         logError("Declared address validation failed: ", t)
       }
