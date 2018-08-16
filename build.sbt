@@ -63,7 +63,8 @@ libraryDependencies ++= Seq(
   "org.encry" %% "encry-common" % "0.8.0",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
   "org.influxdb" % "influxdb-java" % "2.10",
-  "org.apache.commons" % "commons-io" % "1.3.2"
+  "org.apache.commons" % "commons-io" % "1.3.2",
+  "org.apache.kafka" % "kafka-clients" % "2.0.0"
 ) ++ networkDependencies ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
 
 fork := true

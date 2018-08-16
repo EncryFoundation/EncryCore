@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, Props}
 import akka.persistence.RecoveryCompleted
 import encry.EncryApp._
@@ -19,6 +20,7 @@ import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.Algos
+import encry.stats.KafkaAgent
 import encry.stats.StatsSender.{BestHeaderInChain, EndOfApplyingModif, StartApplyingModif, StateUpdating}
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
@@ -32,6 +34,7 @@ import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import scorex.crypto.authds.ADDigest
+
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
@@ -227,6 +230,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
     log.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
+    KafkaAgent.sendEvent(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
     if (settings.node.sendStat) context.system
       .actorSelection("user/statsSender") ! StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
     nodeView.history.append(pmod) match {
