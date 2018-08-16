@@ -1,6 +1,3 @@
-import sbt.Keys._
-import sbt._
-
 name := "EncryCore"
 version := "0.9.0"
 organization := "org.encryfoundation"
@@ -109,9 +106,6 @@ assemblyMergeStrategy in assembly := {
   case "logback.xml" => MergeStrategy.first
   case "module-info.class" => MergeStrategy.discard
   case "META-INF/MANIFEST.MF" => MergeStrategy.discard
-  case "META-INF/*.DSA" => MergeStrategy.discard
-  case "META-INF/*.RSA" => MergeStrategy.discard
-  case "META-INF/*.SF" => MergeStrategy.discard
   case "META-INF/BC1024KE.SF" => MergeStrategy.discard
   case "META-INF/BC2048KE.SF" => MergeStrategy.discard
   case PathList("reference.conf") => MergeStrategy.concat
