@@ -85,7 +85,6 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       bestFullBlockId <- bestBlockIdOpt
       prevBestScore <- scoreOf(bestFullBlockId)
       score <- scoreOf(id)
-      //TODO currentScore == prevBestScore
     } yield score > prevBestScore
 
     isBetter getOrElse false
@@ -119,8 +118,6 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)
       else Seq(BestBlockKey -> bestFullHeaderIdWrapped)
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
-      .ensuring(bestHeaderHeight >= bestBlockHeight, s"Headers height $bestHeaderHeight should be >= " +
-        s"full height $bestBlockHeight")
   }
 
   private def storageVersion(newModRow: EncryPersistentModifier) = ByteArrayWrapper(newModRow.id)
