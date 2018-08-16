@@ -5,13 +5,13 @@ import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.serialization.StringSerializer
 
 object KafkaAgent {
-  val kafkaBrokers = "localhost:9092"
+  val kafkaBrokers = "172.16.10.55:9092"
   val topicName = "Logs"
 
   val kafkaParams = new Properties()
 
   kafkaParams.put("bootstrap.servers", kafkaBrokers)
-  kafkaParams.put( "key.serializer", classOf[StringSerializer])
+  kafkaParams.put("key.serializer", classOf[StringSerializer])
   kafkaParams.put("value.serializer", classOf[StringSerializer])
   kafkaParams.put("group.id", "encry")
 
