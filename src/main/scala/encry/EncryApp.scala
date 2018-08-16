@@ -17,7 +17,7 @@ import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network.message._
 import encry.network.peer.PeerManager
-import encry.network.{EncryNodeViewSynchronizer, ModifiersHolder, NetworkController, UPnP}
+import encry.network.{EncryNodeViewSynchronizer, ModifiersHolder, NetworkController}
 import encry.settings.{Algos, EncryAppSettings}
 import encry.stats.StatsSender
 import encry.utils.{Logging, NetworkTimeProvider, Zombie}
@@ -49,7 +49,6 @@ object EncryApp extends App with Logging {
       ModifiersSpec
     )
   }
-  lazy val upnp: UPnP = new UPnP(settings.network)
 
   lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props()
     .withDispatcher("nvh-dispatcher").withMailbox("nvh-mailbox"), "nodeViewHolder")
