@@ -97,7 +97,7 @@ assemblyJarName in assembly := "core.jar"
 
 mainClass in assembly := Some("encry.EncryApp")
 
-test in assembly := {}
+test in assembly := { }
 
 assemblyMergeStrategy in assembly := {
   case "logback.xml" => MergeStrategy.first
