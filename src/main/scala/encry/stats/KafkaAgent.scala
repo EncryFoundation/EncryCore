@@ -13,7 +13,7 @@ object KafkaAgent {
   kafkaParams.put("bootstrap.servers", kafkaBrokers)
   kafkaParams.put( "key.serializer", classOf[StringSerializer])
   kafkaParams.put("value.serializer", classOf[StringSerializer])
-  kafkaParams.put("group.id", "george")
+  kafkaParams.put("group.id", "encry")
 
   val producer = new KafkaProducer[String,String](kafkaParams)
 

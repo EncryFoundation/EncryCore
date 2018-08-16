@@ -1,7 +1,6 @@
 package encry.view
 
 import java.io.File
-
 import akka.actor.{Actor, Props}
 import akka.persistence.RecoveryCompleted
 import encry.EncryApp._
@@ -34,7 +33,6 @@ import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import scorex.crypto.authds.ADDigest
-
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
