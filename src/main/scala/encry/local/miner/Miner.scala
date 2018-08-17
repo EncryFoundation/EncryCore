@@ -51,14 +51,6 @@ class Miner extends Actor with Logging {
 
   override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
 
-  def unknownMessage: Receive = {
-    case m => logWarn(s"Unexpected message $m")
-  }
-
-  def chainEvents: Receive = {
-    case FullBlockChainSynced => syncingDone = true
-  }
-
   def mining: Receive = {
     case StartMining if context.children.nonEmpty =>
       killAllWorkers()
@@ -94,11 +86,21 @@ class Miner extends Actor with Logging {
     case _ =>
   }
 
+  def miningEnabled: Receive =
+    receiveSemanticallySuccessfulModifier orElse
+      receiverCandidateBlock orElse
+      mining orElse
+      chainEvents orElse
+      unknownMessage
+
   def miningDisabled: Receive = {
     case EnableMining =>
       context.become(miningEnabled)
       self ! StartMining
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty, candidateOpt)
+    case FullBlockChainSynced =>
+      self ! EnableMining
+      syncingDone = true
   }
 
   def receiveSemanticallySuccessfulModifier: Receive = {
@@ -117,12 +119,13 @@ class Miner extends Actor with Logging {
       self ! DisableMining
   }
 
-  def miningEnabled: Receive =
-    receiveSemanticallySuccessfulModifier orElse
-      receiverCandidateBlock orElse
-      mining orElse
-      chainEvents orElse
-      unknownMessage
+  def unknownMessage: Receive = {
+    case m => logWarn(s"Unexpected message $m")
+  }
+
+  def chainEvents: Receive = {
+    case FullBlockChainSynced => syncingDone = true
+  }
 
   def procCandidateBlock(c: CandidateBlock): Unit = {
     log.info(s"Got candidate block $c in ${dateFormat.format(new Date(System.currentTimeMillis()))}")
