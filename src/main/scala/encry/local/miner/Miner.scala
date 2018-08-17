@@ -47,9 +47,6 @@ class Miner extends Actor with Logging {
   def needNewCandidate(b: EncryBlock): Boolean =
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
 
-  def shouldStartMine(b: EncryBlock): Boolean =
-    settings.node.mining && candidateOpt.forall(_.timestamp <= b.header.timestamp)
-
   def unknownMessage: Receive = {
     case m => logWarn(s"Unexpected message $m")
   }
@@ -85,11 +82,6 @@ class Miner extends Actor with Logging {
         block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
-    case MinedBlock(block, _) =>
-      log.warn(s"Mined block with state root ${block.header.stateRoot} while candidateOpt stateRoot is ${candidateOpt.map(_.stateRoot)}")
-      killAllWorkers()
-      candidateOpt = None
-      self ! StartMining
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
     case _ =>
   }
@@ -106,10 +98,6 @@ class Miner extends Actor with Logging {
       log.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
         s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       produceCandidate()
-    case SemanticallySuccessfulModifier(mod: EncryBlock) if shouldStartMine(mod) =>
-      log.info(s"Got new block2. Starting to produce candidate at height: ${mod.header.height + 1} " +
-        s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
-      self ! StartMining
     case SemanticallySuccessfulModifier(_) =>
   }
 
