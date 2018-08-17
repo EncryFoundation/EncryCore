@@ -47,6 +47,8 @@ class Miner extends Actor with Logging {
   def needNewCandidate(b: EncryBlock): Boolean =
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
 
+  override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
+
   def unknownMessage: Receive = {
     case m => logWarn(s"Unexpected message $m")
   }
@@ -108,8 +110,6 @@ class Miner extends Actor with Logging {
       log.debug("Received empty CandidateEnvelope, going to suspend mining for a while")
       self ! DisableMining
   }
-
-  override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
 
   def miningEnabled: Receive =
     receiveSemanticallySuccessfulModifier orElse

@@ -20,7 +20,7 @@ case class EncryAppSettings(directory: String,
 
 object EncryAppSettings extends Logging with SettingsReaders with NodeSettingsReader {
 
-  val read: EncryAppSettings = ConfigFactory.load("local.conf")
+  val read: EncryAppSettings = ConfigFactory.load("local-2.conf")
     .withFallback(ConfigFactory.load).as[EncryAppSettings]("encry")
 
 }
