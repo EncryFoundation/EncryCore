@@ -19,7 +19,7 @@ import encry.network.message._
 import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, ModifiersHolder, NetworkController}
 import encry.settings.{Algos, EncryAppSettings}
-import encry.stats.StatsSender
+import encry.stats.{KafkaActor, StatsSender}
 import encry.utils.{Logging, NetworkTimeProvider, Zombie}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
@@ -61,6 +61,7 @@ object EncryApp extends App with Logging {
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
   val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
+  if (settings.node.sendToKafka) system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
   if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
   if (settings.postgres.enabled) system.actorOf(Props(classOf[BlockListener], DBService()), "blockListener")
   if (settings.node.mining) miner ! StartMining

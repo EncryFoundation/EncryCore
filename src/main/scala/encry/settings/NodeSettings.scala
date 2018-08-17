@@ -4,7 +4,6 @@ import com.typesafe.config.ConfigException
 import encry.view.state.StateMode
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
-
 import scala.concurrent.duration.FiniteDuration
 
 case class NodeSettings(stateMode: StateMode,
@@ -18,7 +17,9 @@ case class NodeSettings(stateMode: StateMode,
                         mempoolCleanupInterval: FiniteDuration,
                         mempoolMaxCapacity: Int,
                         enableCLI: Boolean,
-                        sendStat: Boolean)
+                        sendStat: Boolean,
+                        sendToKafka: Boolean,
+                        kafkaBrokers: String)
 
 trait NodeSettingsReader {
 
@@ -36,7 +37,9 @@ trait NodeSettingsReader {
       cfg.as[FiniteDuration](s"$path.mempoolCleanupInterval"),
       cfg.as[Int](s"$path.mempoolMaxCapacity"),
       cfg.as[Boolean](s"$path.useCli"),
-      cfg.as[Boolean](s"$path.sendStat")
+      cfg.as[Boolean](s"$path.sendStat"),
+      cfg.as[Boolean](s"$path.sendToKafka"),
+      cfg.as[String](s"$path.kafkaBrokers")
     )
   }
 
