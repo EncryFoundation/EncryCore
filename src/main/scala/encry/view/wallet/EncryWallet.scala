@@ -8,12 +8,11 @@ import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.{EncryBaseBox, EncryProposition}
-import encry.settings.{Algos, EncryAppSettings}
+import encry.settings.EncryAppSettings
 import encry.utils.{BalanceCalculator, BoxFilter, Logging}
 import encry.{ModifierId, VersionTag}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.crypto.PublicKey25519
-import scorex.crypto.authds.ADKey
 import scala.util.Try
 
 case class EncryWallet(walletStore: Store, accountManager: AccountManager)
@@ -33,19 +32,20 @@ case class EncryWallet(walletStore: Store, accountManager: AccountManager)
 
   override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = modifier match {
     case block: EncryBlock =>
-      val (newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]) = block.transactions.foldLeft(Seq[EncryBaseBox](), Seq[EncryBaseBox]()) {
-        case ((nBxs, sBxs), tx: Transaction) =>
-          val newBxsL: Seq[EncryBaseBox] = tx.newBoxes
-            .foldLeft(Seq[EncryBaseBox]()) { case (nBxs2, bx) =>
-              if (propositions.exists(_.contractHash sameElements bx.proposition.contractHash)) nBxs2 :+ bx else nBxs2
-            }
-          val spendBxsIdsL: Seq[EncryBaseBox] = tx.inputs
-            .filter(input => walletStorage.containsBox(input.boxId))
-            .foldLeft(Seq.empty[EncryBaseBox]) { case (boxes, input) =>
-              walletStorage.getBoxById(input.boxId).map(bx => boxes :+ bx).getOrElse(boxes)
-            }
-          (nBxs ++ newBxsL) -> (sBxs ++ spendBxsIdsL)
-      }
+      val (newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]) =
+        block.transactions.foldLeft(Seq[EncryBaseBox](), Seq[EncryBaseBox]()) {
+          case ((nBxs, sBxs), tx: Transaction) =>
+            val newBxsL: Seq[EncryBaseBox] = tx.newBoxes
+              .foldLeft(Seq[EncryBaseBox]()) { case (nBxs2, bx) =>
+                if (propositions.exists(_.contractHash sameElements bx.proposition.contractHash)) nBxs2 :+ bx else nBxs2
+              }
+            val spendBxsIdsL: Seq[EncryBaseBox] = tx.inputs
+              .filter(input => walletStorage.containsBox(input.boxId))
+              .foldLeft(Seq.empty[EncryBaseBox]) { case (boxes, input) =>
+                walletStorage.getBoxById(input.boxId).map(bx => boxes :+ bx).getOrElse(boxes)
+              }
+            (nBxs ++ newBxsL) -> (sBxs ++ spendBxsIdsL)
+        }
 
       updateWallet(modifier.id, newBxs, spentBxs)
       this
@@ -94,11 +94,14 @@ case class EncryWallet(walletStore: Store, accountManager: AccountManager)
 object EncryWallet {
 
   def getWalletDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/wallet")
+
   def getKeysDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/keys")
 
   def readOrGenerate(settings: EncryAppSettings): EncryWallet = {
-    val walletDir: File = getWalletDir(settings); walletDir.mkdirs()
-    val keysDir: File = getKeysDir(settings); keysDir.mkdirs()
+    val walletDir: File = getWalletDir(settings)
+    walletDir.mkdirs()
+    val keysDir: File = getKeysDir(settings)
+    keysDir.mkdirs()
     val walletStore: LSMStore = new LSMStore(walletDir, keepVersions = 0)
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 33)
     EncryWallet(walletStore, AccountManager(accountManagerStore))
