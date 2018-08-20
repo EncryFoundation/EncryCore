@@ -190,12 +190,11 @@ class Miner extends Actor with Logging {
       val producingStartTime: Time = System.currentTimeMillis()
       startTime = producingStartTime
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
-      val candidate: Future[CandidateEnvelope] =
       bestHeaderOpt match {
         case Some(h) => log.info(s"Best header at height ${h.height}")
         case None => log.info("No best header opt")
       }
-      val candidate: CandidateEnvelope =
+      val candidate: Future[CandidateEnvelope] =
         if ((bestHeaderOpt.isDefined && view.history.isFullChainSynced) || settings.node.offlineGeneration) {
           log.info(s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
           if (settings.node.sendStat) context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
