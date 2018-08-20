@@ -60,7 +60,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
         Younger //Other history is empty, our contain some headers
       case Some(_) =>
         //We are on different forks now.
-        if (si.lastHeaderIds.view.reverse.exists(m => contains(m))) Younger //Return Younger, because we can send blocks from our fork that other node can download.
+        //Return Younger, because we can send blocks from our fork that other node can download.
+        if (si.lastHeaderIds.view.exists(contains)) Younger
         else Unknown //We don't have any of id's from other's node sync info in history.
       //We don't know whether we can sync with it and what blocks to send in Inv message.
       case None if si.lastHeaderIds.isEmpty => Equal //Both nodes do not keep any blocks
