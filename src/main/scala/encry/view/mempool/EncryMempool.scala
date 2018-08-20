@@ -7,7 +7,6 @@ import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.mempool.EncryMempool._
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
-
 import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}
 
@@ -17,11 +16,13 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
 
   private implicit val cleanupScheduler: Scheduler = Scheduler.singleThread("mempool-cleanup-thread")
 
-  private val removeExpired: Task[EncryMempool] = Task {
-    filter(tx => (timeProvider.time() - tx.timestamp) > settings.node.utxMaxAge.toMillis)
-  }.delayExecution(settings.node.mempoolCleanupInterval)
+  private val removeExpiredFuture: Task[EncryMempool] = Task.fromFuture(timeProvider.time()).flatMap { time =>
+    Task {
+      filter(tx => (time - tx.timestamp) > settings.node.utxMaxAge.toMillis)
+    }.delayExecution(settings.node.mempoolCleanupInterval)
+  }
 
-  private val cleanup: CancelableFuture[EncryMempool] = removeExpired.runAsync
+  private val cleanup: CancelableFuture[EncryMempool] = removeExpiredFuture.runAsync
 
   override def close(): Unit = cleanup.cancel()
 

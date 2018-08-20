@@ -19,6 +19,7 @@ import encry.{EncryApp, _}
 import io.iohk.iodb.ByteArrayWrapper
 import scala.annotation.tailrec
 import scala.collection.immutable
+import scala.concurrent.Future
 import scala.util.Try
 
 trait BlockHeaderProcessor extends Logging {
@@ -77,7 +78,8 @@ trait BlockHeaderProcessor extends Logging {
     else Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
 
   private def isNewHeader(header: EncryBlockHeader): Boolean =
-    timeProvider.time() - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * Constants.Chain.NewHeaderTimeMultiplier
+    timeProvider.estimatedTime - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * Constants.Chain.NewHeaderTimeMultiplier
+
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
@@ -296,7 +298,7 @@ trait BlockHeaderProcessor extends Logging {
 
     private def validateChildBlockHeader(header: EncryBlockHeader, parent: EncryBlockHeader): ValidationResult = {
       failFast
-        .validate(header.timestamp - timeProvider.time() <= Constants.Chain.MaxTimeDrift) {
+        .validate(header.timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift) {
           error(s"Header timestamp ${header.timestamp} is too far in future from now ${timeProvider.time()}")
         }
         .validate(header.timestamp > parent.timestamp) {
