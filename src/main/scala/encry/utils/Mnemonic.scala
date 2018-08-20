@@ -6,14 +6,14 @@ import scala.io.Source
 
 object Mnemonic {
 
-  private def getWords(language: String = "english"): Array[String] = Source
-    .fromFile("src/main/resources/languages/" + language + "/words.txt").getLines.toArray
+  private def getWords: Array[String] = Source
+    .fromFile(getClass.getResource("/languages/english/words.txt").toString).getLines.toArray
 
   def seedFromMnemonic(mnemonicCode: String, passPhrase: String = ""): Array[Byte] =
     Algos.hash(mnemonicCode + "mnemonic=" + passPhrase)
 
   def entropyToMnemonicCode(entropy: Array[Byte]): String = {
-    val words: Array[String] = getWords()
+    val words: Array[String] = getWords
     val checkSum: BitVector = BitVector(Algos.hash(entropy))
     val entropyWithCheckSum: BitVector = BitVector(entropy) ++ checkSum.take(4)
 
