@@ -1,24 +1,12 @@
-import sbt.Keys._
-import sbt._
-
 name := "EncryCore"
 version := "0.9.0"
 organization := "org.encryfoundation"
 scalaVersion := "2.12.6"
 
-resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
-  "SonaType" at "https://oss.sonatype.org/content/groups/public",
-  "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/",
-  "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/")
-
 val akkaVersion = "2.5.13"
 val akkaHttpVersion = "10.0.9"
 val doobieVersion = "0.5.2"
-
-val networkDependencies = Seq(
-  "org.bitlet" % "weupnp" % "0.1.+",
-  "commons-net" % "commons-net" % "3.+"
-)
+val logbackVersion = "1.2.3"
 
 val databaseDependencies = Seq(
   "org.tpolecat" %% "doobie-core" % doobieVersion,
@@ -34,37 +22,45 @@ val apiDependencies = Seq(
 )
 
 val loggingDependencies = Seq(
-  "com.typesafe.scala-logging" %% "scala-logging" % "3.+",
-  "ch.qos.logback" % "logback-classic" % "1.+",
-  "ch.qos.logback" % "logback-core" % "1.+"
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
+  "ch.qos.logback" % "logback-classic" % logbackVersion,
+  "ch.qos.logback" % "logback-core" % logbackVersion
 )
 
 val testingDependencies = Seq(
-  "com.typesafe.akka" %% "akka-testkit" % "2.4.+" % "test",
-  "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % "test",
-  "org.scalatest" %% "scalatest" % "3.0.3" % "test",
-  "org.scalacheck" %% "scalacheck" % "1.13.+" % "test",
-  "org.mockito" % "mockito-core" % "2.19.1" % Test,
+  "com.typesafe.akka" %% "akka-testkit" % "2.4.+" % Test,
+  "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % Test,
+  "org.scalatest" %% "scalatest" % "3.0.3" % Test,
+  "org.scalacheck" %% "scalacheck" % "1.13.+" % Test,
+  "org.mockito" % "mockito-core" % "2.19.1" % Test
 )
 
 libraryDependencies ++= Seq(
+  "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+  "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
   "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8",
   "org.iq80.leveldb" % "leveldb" % "0.7",
-  "javax.xml.bind" % "jaxb-api" % "2.+",
+  "javax.xml.bind" % "jaxb-api" % "2.3.0",
   "com.iheart" %% "ficus" % "1.4.2",
-  "org.slf4j" % "slf4j-api" % "1.7.+",
+  "org.slf4j" % "slf4j-api" % "1.7.25",
   "org.bouncycastle" % "bcprov-jdk15on" % "1.58",
-  "org.whispersystems" % "curve25519-java" % "+",
-  "org.rudogma" %% "supertagged" % "1.+",
+  "org.whispersystems" % "curve25519-java" % "0.5.0",
+  "org.rudogma" %% "supertagged" % "1.4",
   "org.scorexfoundation" %% "iodb" % "0.3.2",
   "io.spray" %% "spray-json" % "1.3.3",
   "io.monix" %% "monix" % "2.3.3",
   "org.encry" %% "encry-common" % "0.8.0",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
   "org.influxdb" % "influxdb-java" % "2.10",
-  "org.apache.commons" % "commons-io" % "1.3.2"
-) ++ networkDependencies ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
+  "org.apache.commons" % "commons-io" % "1.3.2",
+  "commons-net" % "commons-net" % "3.6"
+) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
+
+resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
+  "SonaType" at "https://oss.sonatype.org/content/groups/public",
+  "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/",
+  "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/")
 
 fork := true
 
@@ -88,28 +84,27 @@ val opts = Seq(
   "-XX:+ExitOnOutOfMemoryError",
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
-
   "-XX:+UseG1GC",
   "-XX:+UseNUMA",
   "-XX:+AlwaysPreTouch",
-
   "-XX:+PerfDisableSharedMem",
   "-XX:+ParallelRefProcEnabled",
   "-XX:+UseStringDeduplication")
 
 javaOptions in run ++= opts
 
+assemblyJarName in assembly := "core.jar"
+
 mainClass in assembly := Some("encry.EncryApp")
 
-test in assembly := {}
+test in assembly := { }
 
 assemblyMergeStrategy in assembly := {
   case "logback.xml" => MergeStrategy.first
   case "module-info.class" => MergeStrategy.discard
   case "META-INF/MANIFEST.MF" => MergeStrategy.discard
-  case "META-INF/*.DSA" => MergeStrategy.discard
-  case "META-INF/*.RSA" => MergeStrategy.discard
-  case "META-INF/*.SF" => MergeStrategy.discard
+  case "META-INF/BC1024KE.SF" => MergeStrategy.discard
+  case "META-INF/BC2048KE.SF" => MergeStrategy.discard
   case PathList("reference.conf") => MergeStrategy.concat
   case _ => MergeStrategy.first
 }
