@@ -91,7 +91,7 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
       val blocks: Seq[Seq[Insert]] = (0 until 10).map(_ => (0 until 10).flatMap(_ => kvGen.sample)
         .map(kv => Insert(kv._1, kv._2)))
 
-      val parallelReadsFuture = startParallelReads(prover)
+      val parallelReadsFuture: Future[Unit] = startParallelReads(prover)
       // apply blocks
       blocks.foldLeft(prover.digest) { (startRoot, block) =>
         prover.digest shouldEqual startRoot
@@ -104,7 +104,6 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
 
         prover.digest
       }
-      Try(Await.result(parallelReadsFuture, 0.millis))
   }
 
 

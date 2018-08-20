@@ -13,6 +13,7 @@ import encry.view.history
 import encry.{ModifierId, ModifierTypeId}
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class StatsSender extends Actor with Logging {
 
@@ -46,15 +47,19 @@ class StatsSender extends Actor with Logging {
       )
 
     case MiningEnd(blockHeader: EncryBlockHeader, workerIdx: Int, workersQty: Int) =>
-      influxDB.write(
-        8189,
-        util.Arrays.asList(
-          s"miningEnd,nodeName=${settings.network.nodeName},block=${Algos.encode(blockHeader.id)}," +
-            s"height=${blockHeader.height},worker=$workerIdx value=${timeProvider.time() - blockHeader.timestamp}",
-          s"minerIterCount,nodeName=${settings.network.nodeName},block=${Algos.encode(blockHeader.id)}," +
-            s"height=${blockHeader.height} value=${blockHeader.nonce - Long.MaxValue / workersQty * workerIdx + 1}"
-        )
-      )
+      timeProvider
+        .time()
+        .map { time =>
+          influxDB.write(
+            8189,
+            util.Arrays.asList(
+              s"miningEnd,nodeName=${settings.network.nodeName},block=${Algos.encode(blockHeader.id)}," +
+                s"height=${blockHeader.height},worker=$workerIdx value=${time - blockHeader.timestamp}",
+              s"minerIterCount,nodeName=${settings.network.nodeName},block=${Algos.encode(blockHeader.id)}," +
+                s"height=${blockHeader.height} value=${blockHeader.nonce - Long.MaxValue / workersQty * workerIdx + 1}"
+            )
+          )
+        }
 
     case StartApplyingModif(modifierId: ModifierId, modifierTypeId: ModifierTypeId, startTime: Long) =>
       modifiersToApply += Algos.encode(modifierId) -> (modifierTypeId, startTime)

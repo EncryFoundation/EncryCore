@@ -59,12 +59,16 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   def startInteraction: Receive = {
     case StartInteraction =>
-      log.info(s"Handshake sent to $remote")
-      val hb: Array[Byte] = Handshake(Version(settings.network.appVersion), settings.network.nodeName,
-        ownSocketAddress, timeProvider.time()).bytes
-      connection ! Tcp.Write(ByteString(hb))
-      handshakeSent = true
-      if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
+      timeProvider
+        .time()
+        .map { time =>
+          val hb: Array[Byte] = Handshake(Version(settings.network.appVersion), settings.network.nodeName,
+            ownSocketAddress, time).bytes
+          connection ! Tcp.Write(ByteString(hb))
+          log.info(s"Handshake sent to $remote")
+          handshakeSent = true
+          if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
+        }
   }
 
   def receivedData: Receive = {
