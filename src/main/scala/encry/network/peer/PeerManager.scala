@@ -12,6 +12,7 @@ import encry.network.peer.PeerManager.ReceivableMessages._
 import encry.network.peer.PeerManager._
 import encry.network.{Handshake, SendingStrategy}
 import encry.utils.Logging
+import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.util.Random
 
@@ -27,8 +28,11 @@ class PeerManager extends Actor with Logging {
     case GetConnectedPeers => sender() ! (connectedPeers.values.map(_.handshake).toSeq: Seq[Handshake])
     case GetAllPeers => sender() ! PeerDatabase.knownPeers()
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
-      if (!isSelf(address, None))
-        PeerDatabase.addOrUpdateKnownPeer(address, PeerInfo(timeProvider.time(), peerNameOpt, connTypeOpt))
+      if (!isSelf(address, None)) timeProvider
+        .time()
+        .map { time =>
+          PeerDatabase.addOrUpdateKnownPeer(address, PeerInfo(time, peerNameOpt, connTypeOpt))
+        }
     case RandomPeers(howMany: Int) => sender() ! Random.shuffle(PeerDatabase.knownPeers().keys.toSeq).take(howMany)
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
     case DoConnecting(remote, direction) =>
@@ -79,10 +83,16 @@ class PeerManager extends Actor with Logging {
       (InetAddress.getLocalHost.getAddress sameElements address.getAddress.getAddress) ||
       (InetAddress.getLoopbackAddress.getAddress sameElements address.getAddress.getAddress)
 
-  def addKnownPeersToPeersDatabase(): Unit = if (PeerDatabase.isEmpty)
-    settings.network.knownPeers
-      .filterNot(isSelf(_, None))
-      .foreach(PeerDatabase.addOrUpdateKnownPeer(_, PeerInfo(timeProvider.time(), None)))
+  def addKnownPeersToPeersDatabase(): Future[Unit] = if (PeerDatabase.isEmpty) {
+    timeProvider
+      .time()
+      .map { time =>
+        settings.network.knownPeers
+          .filterNot(isSelf(_, None))
+          .foreach(PeerDatabase.addOrUpdateKnownPeer(_, PeerInfo(time, None)))
+        Unit
+      }
+  } else Future.successful(Unit)
 
   def checkPossibilityToAddPeerWRecovery(address: InetSocketAddress): Boolean =
     checkPossibilityToAddPeer(address) && recoveryCompleted

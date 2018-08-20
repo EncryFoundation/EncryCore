@@ -1,14 +1,13 @@
 package encry.utils
 
 import java.net.InetAddress
-
 import encry.utils.NetworkTime.Time
 import org.apache.commons.net.ntp.{NTPUDPClient, TimeInfo}
-
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Left
+import scala.util.control.NonFatal
 
 object NetworkTime {
   def localWithOffset(offset: Long): Long = System.currentTimeMillis() + offset
@@ -41,7 +40,7 @@ class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) extends Logg
     }
   }
 
-  private def timeAndState(currentState: State): (NetworkTime.Time, State) = {
+  private def timeAndState(currentState: State): Future[(NetworkTime.Time, State)] =
     currentState match {
       case Right(nt) =>
         val time: Long = NetworkTime.localWithOffset(nt.offset)
@@ -53,20 +52,31 @@ class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) extends Logg
               NetworkTime(offset, NetworkTime.localWithOffset(offset))
             })
           } else Right(nt)
-        (time, state)
-      case Left((nt, f)) =>
-        if (f.isCompleted) {
-          val nnt = Await.result(f, 10.seconds)
-          NetworkTime.localWithOffset(nnt.offset) -> Right(nnt)
-        } else NetworkTime.localWithOffset(nt.offset) -> Left(nt -> f)
+        Future.successful((time, state))
+      case Left((nt, networkTimeFuture)) =>
+        networkTimeFuture
+          .map(networkTime => NetworkTime.localWithOffset(networkTime.offset) -> Right(networkTime))
+          .recover {
+            case NonFatal(th) =>
+              log.warn("Failed to evaluate networkTimeFuture", th)
+              NetworkTime.localWithOffset(nt.offset) -> Left(nt -> networkTimeFuture)
+          }
     }
-  }
 
   private var state: State = Right(NetworkTime(0L, 0L))
+  private var delta: Time = 0L
 
-  def time(): NetworkTime.Time = {
-    val t: (Time, State) = timeAndState(state)
-    state = t._2
-    t._1
+  def estimatedTime: Time = state match {
+    case Right(nt) if NetworkTime.localWithOffset(nt.offset) <= nt.lastUpdate + ntpSettings.updateEvery.toMillis => NetworkTime.localWithOffset(nt.offset)
+    case _ => System.currentTimeMillis() + delta
   }
+
+  def time(): Future[NetworkTime.Time] =
+    timeAndState(state)
+      .map { case (timeFutureResult, stateFutureResult) =>
+        state = stateFutureResult
+        delta = timeFutureResult - System.currentTimeMillis()
+        timeFutureResult
+    }
+
 }
