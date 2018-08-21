@@ -1,13 +1,13 @@
 package scorex.crypto.authds.avltree.batch.helpers
 
+import encry.utils.Logging
 import io.iohk.iodb.{LSMStore, QuickStore, Store}
 import scorex.crypto.authds.avltree.batch._
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256, Digest32}
-import scorex.utils.ScryptoLogging
 
-trait TestHelper extends FileHelper with ScryptoLogging {
+trait TestHelper extends FileHelper with Logging {
 
   val enableQuickStore: Boolean = System.getProperty("java.specification.version").startsWith("8")
 
