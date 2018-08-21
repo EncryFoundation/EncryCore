@@ -3,6 +3,7 @@ package encry.view
 import java.io.File
 import akka.actor.{Actor, Props}
 import akka.persistence.RecoveryCompleted
+import akka.pattern._
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
@@ -35,6 +36,8 @@ import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import scorex.crypto.authds.ADDigest
 import scala.annotation.tailrec
+import scala.collection.mutable
+import scala.concurrent.Future
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.util.{Failure, Success, Try}
 
@@ -110,7 +113,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           KafkaMessage("INFO", s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
       if (settings.levelDb.enable) context.actorSelection("/user/modifiersHolder") ! lm
-    case GetDataFromCurrentView(f) => sender() ! f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool))
+    case GetDataFromCurrentView(f) =>
+      val result = f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool))
+      result match {
+        case resultFuture: Future[_] => resultFuture.pipeTo(sender())
+        case _ => sender() ! result
+      }
     case GetNodeViewChanges(history, state, vault, mempool) =>
       if (history) sender() ! ChangedHistory(nodeView.history)
       if (state) sender() ! ChangedState(nodeView.state)

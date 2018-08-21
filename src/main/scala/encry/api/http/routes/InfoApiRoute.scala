@@ -23,10 +23,9 @@ case class InfoApiRoute(readersHolder: ActorRef,
 
   override val settings: RESTApiSettings = appSettings.restApi
 
-  private val launchTime: NetworkTime.Time = timeProvider.time()
+  private val launchTimeFuture: Future[NetworkTime.Time] = timeProvider.time()
 
   override val route: Route = (path("info") & get) {
-    val nodeUptime: Long = timeProvider.time() - launchTime
     val minerInfoF: Future[MinerStatus] = getMinerInfo
     val connectedPeersF: Future[Int] = getConnectedPeers
     val readersF: Future[Readers] = (readersHolder ? GetReaders).mapTo[Readers]
@@ -34,6 +33,9 @@ case class InfoApiRoute(readersHolder: ActorRef,
       minerInfo <- minerInfoF
       connectedPeers <- connectedPeersF
       readers <- readersF
+      currentTime <- timeProvider.time()
+      launchTime <- launchTimeFuture
+      nodeUptime = currentTime - launchTime
     } yield {
       InfoApiRoute.makeInfoJson(nodeId, minerInfo, connectedPeers, readers, getStateType, getNodeName, nodeUptime)
     }).okJson()

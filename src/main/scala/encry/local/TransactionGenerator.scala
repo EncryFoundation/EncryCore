@@ -44,8 +44,9 @@ class TransactionGenerator extends Actor with Logging {
     val boxes: IndexedSeq[AssetBox] = wd.boxes.foldLeft(Seq.empty[AssetBox]) { case (boxesAcc, box) =>
       if (boxesAcc.map(_.amount).sum <= (amountD + minimalFeeD)) boxesAcc :+ box else boxesAcc
     }.toIndexedSeq
-    TransactionFactory.defaultPaymentTransactionScratch(wd.secret, minimalFeeD, timeProvider.time(), boxes,
-      settings.testing.defaultRecipientAddress, amountD)
+    TransactionFactory.defaultPaymentTransactionScratch(wd.secret, minimalFeeD, timeProvider.estimatedTime, boxes,
+          settings.testing.defaultRecipientAddress, amountD)
+
   }
 }
 
