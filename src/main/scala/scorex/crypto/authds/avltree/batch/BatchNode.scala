@@ -46,7 +46,6 @@ sealed trait InternalNode[D <: Digest] extends Node[D] {
 
   def right: Node[D]
 
-  /* These two method may either mutate the existing node or create a new one */
   def getNew(newLeft: Node[D] = left, newRight: Node[D] = right, newBalance: Balance = b): InternalNode[D]
 
   def getNewKey(newKey: ADKey): InternalNode[D]
@@ -63,7 +62,6 @@ class InternalProverNode[D <: Digest](protected var k: ADKey,
 
   override def right: ProverNodes[D] = r
 
-  /* This method will mutate the existing node if isNew = true; else create a new one */
   def getNewKey(newKey: ADKey): InternalProverNode[D] = {
     if (isNew) {
       k = newKey // label doesn't change when key of an internal node changes
@@ -75,7 +73,6 @@ class InternalProverNode[D <: Digest](protected var k: ADKey,
     }
   }
 
-  /* This method will mutate the existing node if isNew = true; else create a new one */
   def getNew(newLeft: Node[D] = left, newRight: Node[D] = right, newBalance: Balance = b): InternalProverNode[D] = {
     if (isNew) {
       l = newLeft.asInstanceOf[ProverNodes[D]]
@@ -102,10 +99,8 @@ class InternalVerifierNode[D <: Digest](protected var l: Node[D], protected var 
 
   override def right: Node[D] = r
 
-  // Internal Verifier Keys have no keys -- so no-op
   def getNewKey(newKey: ADKey): InternalNode[D] = this
 
-  /* This method will mutate the existing node if isNew = true; else create a new one */
   def getNew(newLeft: Node[D] = l, newRight: Node[D] = r, newBalance: Balance = b): InternalVerifierNode[D] = {
     l = newLeft
     r = newRight
@@ -128,7 +123,7 @@ sealed trait Leaf[D <: Digest] extends Node[D] with KeyInVar {
 
   def value: ADValue = v
 
-  protected val hf: CryptographicHash[D] // TODO: Seems very wasteful to store hf in every node of the tree, when they are all the same. Is there a better way? Pass them in to label method from above? Same for InternalNode and for other, non-batch, trees
+  protected val hf: CryptographicHash[D]
 
   protected def computeLabel: D = hf.prefixedHash(0: Byte, k, v, nk)
 
@@ -142,7 +137,6 @@ sealed trait Leaf[D <: Digest] extends Node[D] with KeyInVar {
 class VerifierLeaf[D <: Digest](protected var k: ADKey, protected var v: ADValue, protected var nk: ADKey)
                                (implicit val hf: CryptographicHash[D]) extends Leaf[D] with VerifierNodes[D] {
 
-  /* This method will mutate the existing node if isNew = true; else create a new one */
   def getNew(newKey: ADKey = k, newValue: ADValue = v, newNextLeafKey: ADKey = nk): VerifierLeaf[D] = {
     k = newKey
     v = newValue
@@ -155,7 +149,6 @@ class VerifierLeaf[D <: Digest](protected var k: ADKey, protected var v: ADValue
 class ProverLeaf[D <: Digest](protected var k: ADKey, protected var v: ADValue, protected var nk: ADKey)
                              (implicit val hf: CryptographicHash[D]) extends Leaf[D] with ProverNodes[D] {
 
-  /* This method will mutate the existing node if isNew = true; else create a new one */
   def getNew(newKey: ADKey = k, newValue: ADValue = v, newNextLeafKey: ADKey = nk): ProverLeaf[D] = {
     if (isNew) {
       k = newKey

@@ -26,15 +26,6 @@ trait Modification extends Operation with ScorexEncoding {
 
   type UpdateFunction = OldValue => Try[Option[NewValue]]
 
-  /**
-    * Update functions takes Option[oldValue] and return Try[Option[newValue]]
-    * For example:
-    * Insert: None => Success(Some(newValue)), but Some(oldValue) => Failure()
-    * Update: Some(oldValue) => Success(Some(newValue))
-    * Delete: Some(oldValue) => Success(None), but None => Failure()
-    * ConditionalUpdate: Some(oldValue) => Success(Some(newValue)) or Failure(), depending
-    * on whether oldValue satisfied some desired conditions
-    */
   def updateFn: UpdateFunction
 }
 
@@ -78,13 +69,6 @@ case class RemoveIfExists(key: ADKey) extends Modification {
   override def toString: String = s"""RemoveIfExists(\"${encoder.encode(key)}\")"""
 }
 
-/**
-  * If the key exists in the tree, add delta to its value, fail if
-  * the result is negative, and remove the key if the result is equal to 0.
-  * If the key does not exist in the tree, treat it as if its value is 0:
-  * insert the key with value delta if delta is positive,
-  * fail if delta is negative, and do nothing if delta is 0.
-  */
 case class UpdateLongBy(key: ADKey, delta: Long) extends Modification {
   override def updateFn: UpdateFunction = {
     case m if delta == 0 => Success(m)
