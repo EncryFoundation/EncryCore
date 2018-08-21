@@ -28,7 +28,6 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.crypto.PrivateKey25519
 import scorex.crypto.authds.{ADDigest, SerializedAdProof}
 import scala.collection._
-import scala.concurrent.Future
 
 class Miner extends Actor with Logging {
 
@@ -135,8 +134,8 @@ class Miner extends Actor with Logging {
   }
 
   def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool],
-                      bestHeaderOpt: Option[EncryBlockHeader]): Future[CandidateBlock] =
-  timeProvider.time().map { timestamp =>
+                      bestHeaderOpt: Option[EncryBlockHeader]): CandidateBlock = {
+    val timestamp: Time = timeProvider.estimatedTime
     val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
 
     // `txsToPut` - valid, non-conflicting txs with respect to their fee amount.
@@ -179,7 +178,7 @@ class Miner extends Actor with Logging {
   }
 
   def produceCandidate(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Future[CandidateEnvelope]] { view =>
+    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
       val producingStartTime: Time = System.currentTimeMillis()
       startTime = producingStartTime
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
@@ -187,15 +186,14 @@ class Miner extends Actor with Logging {
         case Some(h) => log.info(s"Best header at height ${h.height}")
         case None => log.info("No best header opt")
       }
-      val candidate: Future[CandidateEnvelope] =
+      val candidate: CandidateEnvelope =
         if ((bestHeaderOpt.isDefined && (syncingDone || view.history.isFullChainSynced)) || settings.node.offlineGeneration) {
           log.info(s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
           if (settings.node.sendStat) context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
-          createCandidate(view, bestHeaderOpt).map { candidate =>
-            if (settings.node.sendStat) context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
-            CandidateEnvelope.fromCandidate(candidate)
-          }
-        } else Future.successful(CandidateEnvelope.empty)
+          val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
+          if (settings.node.sendStat) context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
+          envelope
+        } else CandidateEnvelope.empty
       candidate
     }
 }
