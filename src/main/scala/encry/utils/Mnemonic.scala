@@ -6,8 +6,8 @@ import scala.io.Source
 
 object Mnemonic {
 
-  private def getWords: Array[String] = Source
-    .fromFile(getClass.getResource("/languages/english/words.txt").toString).getLines.toArray
+  private def getWords: Array[String] =
+    Source.fromInputStream(getClass.getResourceAsStream("/languages/english/words.txt")).getLines.toArray
 
   def seedFromMnemonic(mnemonicCode: String, passPhrase: String = ""): Array[Byte] =
     Algos.hash(mnemonicCode + "mnemonic=" + passPhrase)
