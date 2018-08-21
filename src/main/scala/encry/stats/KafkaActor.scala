@@ -32,8 +32,8 @@ class KafkaActor extends Actor with Logging {
 
   override def receive: Receive = {
     case KafkaMessage(level: String, message: String) =>
-      val key = java.util.UUID.randomUUID().toString
-      producer.send(new ProducerRecord[String,String](topicName, key, assembleFullMessage(level, message)))
+      producer.send(new ProducerRecord[String,String](topicName, java.util.UUID.randomUUID().toString,
+        assembleFullMessage(level, message)))
   }
 
   override def preStart(): Unit = super.preStart()
