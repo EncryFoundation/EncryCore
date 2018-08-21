@@ -19,7 +19,7 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
 
   override val collectChangedNodes: Boolean = false
 
-  protected val labelLength = hf.DigestSize
+  protected val labelLength: Int = hf.DigestSize
 
   def digest: Option[ADDigest] = topNode.map(digest(_))
 

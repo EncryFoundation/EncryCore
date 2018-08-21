@@ -181,7 +181,7 @@ trait AuthenticatedTreeOps[D <: Digest] extends BatchProofConstants with ToStrin
               (r, false, false, toDelete, oldValue)
             }
           }
-        case r: LabelOnlyNode[D] =>
+        case _: LabelOnlyNode[D] =>
           throw new Error("Should never reach this point. If in prover, this is a bug. If in verifier, this proof is wrong.")
       }
     }
@@ -195,7 +195,7 @@ trait AuthenticatedTreeOps[D <: Digest] extends BatchProofConstants with ToStrin
             leaf.getNew(newNextLeafKey = nextLeafKey)
           case rN: InternalNode[D] =>
             rN.getNew(newRight = changeNextLeafKeyOfMaxNode(rN.right, nextLeafKey))
-          case rN: LabelOnlyNode[D] =>
+          case _: LabelOnlyNode[D] =>
             throw new Error("Should never reach this point. If in prover, this is a bug. In in verifier, this proof is wrong.")
         }
       }
@@ -207,7 +207,7 @@ trait AuthenticatedTreeOps[D <: Digest] extends BatchProofConstants with ToStrin
             leaf.getNew(newKey = newKey, newValue = newValue)
           case rN: InternalNode[D] =>
             rN.getNew(newLeft = changeKeyAndValueOfMinNode(rN.left, newKey, newValue))
-          case rN: LabelOnlyNode[D] =>
+          case _: LabelOnlyNode[D] =>
             throw new Error("Should never reach this point. If in prover, this is a bug. If in verifier, this proof is wrong.")
         }
       }
