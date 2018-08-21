@@ -12,12 +12,6 @@ sealed trait Operation {
 
 case class Lookup(override val key: ADKey) extends Operation
 
-case object UnknownModification extends Modification {
-  override val key: ADKey = ADKey @@ Array[Byte]()
-
-  override def updateFn: UpdateFunction = old => Success(old)
-}
-
 trait Modification extends Operation with ScorexEncoding {
   val key: ADKey
   type OldValue = Option[ADValue]
@@ -61,12 +55,6 @@ case class Remove(key: ADKey) extends Modification {
   }: UpdateFunction
 
   override def toString: String = s"""Remove(\"${encoder.encode(key)}\")"""
-}
-
-case class RemoveIfExists(key: ADKey) extends Modification {
-  override def updateFn: UpdateFunction = (_ => Success(None)): UpdateFunction
-
-  override def toString: String = s"""RemoveIfExists(\"${encoder.encode(key)}\")"""
 }
 
 case class UpdateLongBy(key: ADKey, delta: Long) extends Modification {

@@ -2,25 +2,19 @@ package scorex.crypto.authds.avltree.batch
 
 import scorex.crypto.authds._
 import scorex.crypto.hash._
-
 import scala.util.Try
 
-abstract class PersistentBatchAVLProver[D <: Digest, HF <: CryptographicHash[D]] {
+trait PersistentBatchAVLProver[D <: Digest, HF <: CryptographicHash[D]] {
 
   var avlProver: BatchAVLProver[D, HF]
   val storage: VersionedAVLStorage[D]
 
   def digest: ADDigest = avlProver.digest
 
-  def height: Int = avlProver.rootNodeHeight
-
-  def prover(): BatchAVLProver[D, HF] = avlProver
-
   def unauthenticatedLookup(key: ADKey): Option[ADValue] = avlProver.unauthenticatedLookup(key)
 
   def performOneOperation(operation: Operation): Try[Option[ADValue]] = avlProver.performOneOperation(operation)
 
-  //side effect: avlProver modifies itself
   def generateProofAndUpdateStorage[K <: Array[Byte], V <: Array[Byte]](additionalData: Seq[(K, V)]): SerializedAdProof = {
     storage.update(avlProver, additionalData).get
     avlProver.generateProof()

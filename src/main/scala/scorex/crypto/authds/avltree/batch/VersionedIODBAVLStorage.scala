@@ -18,8 +18,6 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
   val TopNodeKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(nodeParameters.labelSize)(123: Byte))
   val TopNodeHeight: ByteArrayWrapper = ByteArrayWrapper(Array.fill(nodeParameters.labelSize)(124: Byte))
 
-  override def update(prover: BatchAVLProver[D, _]): Try[Unit] = update(prover, Seq())
-
   override def rollback(version: ADDigest): Try[(ProverNodes[D], Int)] = Try {
     store.rollback(ByteArrayWrapper(version))
     val top: ProverNodes[D] = VersionedIODBAVLStorage.fetch[D](ADKey @@ store.get(TopNodeKey).get.data)(hf, store, nodeParameters)

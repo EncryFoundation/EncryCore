@@ -10,8 +10,6 @@ trait VersionedAVLStorage[D <: Digest] {
   def update[K <: Array[Byte], V <: Array[Byte]](batchProver: BatchAVLProver[D, _],
                                                  additionalData: Seq[(K, V)]): Try[Unit]
 
-  def update(batchProver: BatchAVLProver[D, _]): Try[Unit] = update(batchProver, Seq())
-
   def rollback(version: ADDigest): Try[(ProverNodes[D], Int)]
 
   def version: Option[ADDigest]
