@@ -7,8 +7,6 @@ import encry.cli.{Ast, Response}
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.settings.EncryAppSettings
-import encry.utils.NetworkTime.Time
-import encry.utils.NetworkTimeProvider
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
@@ -30,7 +28,6 @@ object Transfer extends Command {
     (nodeViewHolder ?
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[EncryTransaction]] { view =>
         Try {
-          lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
           val secret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
           val recipient: Address = args.requireArg[Ast.Str]("addr").s
           val fee: Long = args.requireArg[Ast.Num]("fee").i
@@ -43,15 +40,14 @@ object Transfer extends Command {
         }.toOption
       }).flatMap {
         case Some(tx: EncryTransaction) =>
-          Future.sequence(
-            Seq(Future.successful(tx), timeProvider.time())
-          ).map {
-            case Seq(tx: EncryTransaction, time: Time) =>
+          timeProvider
+            .time()
+            .map { time =>
               val txWithTimestamp = tx.copy(timestamp = time)
               nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](txWithTimestamp)
               Some(Response(txWithTimestamp.toString))
-          }
-        case None => Future.successful(Some(Response("Operation failed. Malformed data.")))
+            }
+        case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
       }
   }
 }
