@@ -19,6 +19,8 @@ import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSy
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.stats.KafkaActor
+import encry.stats.KafkaActor.KafkaMessage
 import encry.stats.StatsSender._
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages._

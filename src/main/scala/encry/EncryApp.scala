@@ -19,7 +19,7 @@ import encry.network.message._
 import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, ModifiersHolder, NetworkController}
 import encry.settings.EncryAppSettings
-import encry.stats.StatsSender
+import encry.stats.{KafkaActor, StatsSender}
 import encry.utils.{Logging, NetworkTimeProvider, Zombie}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
