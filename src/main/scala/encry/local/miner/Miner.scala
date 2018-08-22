@@ -26,7 +26,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.crypto.PrivateKey25519
-import scorex.crypto.authds.{ADDigest, SerializedAdProof}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 import scala.collection._
 
 class Miner extends Actor with Logging {

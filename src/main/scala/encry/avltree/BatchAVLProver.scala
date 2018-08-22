@@ -1,8 +1,8 @@
-package scorex.crypto.authds.avltree.batch
+package encry.avltree
 
 import com.google.common.primitives.Ints
 import encry.utils.Logging
-import scorex.crypto.authds._
+import org.encryfoundation.common.utils.TaggedTypes._
 import scorex.crypto.hash.{Blake2b256, CryptographicHash, Digest}
 import scorex.utils.ByteArray
 import scala.annotation.tailrec
@@ -18,7 +18,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
 
   protected val labelLength: Int = hf.DigestSize
 
-  private[batch] var topNode: EncryProverNodes[D] = oldRootAndHeight.map(_._1).getOrElse({
+  private[avltree] var topNode: EncryProverNodes[D] = oldRootAndHeight.map(_._1).getOrElse({
     val t = new ProverLeaf(NegativeInfinityKey,
       ADValue @@ Array.fill(valueLengthOpt.getOrElse(0))(0: Byte), PositiveInfinityKey)
     t.isNew = false
@@ -89,7 +89,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
 
   def digest: ADDigest = digest(topNode)
 
-  def performOneOperation(operation: Operation): Try[Option[ADValue]] = Try {
+  def performOneOperation(operation: encry.avltree.Operation): Try[Option[ADValue]] = Try {
     replayIndex = directionsBitLength
     returnResultOfOneOperation(operation, topNode) match {
       case Success(n) =>
@@ -141,7 +141,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
     loop(topNode, false)
   }
 
-  def generateProofForOperations(operations: Seq[Operation]): Try[(SerializedAdProof, ADDigest)] = Try {
+  def generateProofForOperations(operations: Seq[encry.avltree.Operation]): Try[(SerializedAdProof, ADDigest)] = Try {
     val newProver = new BatchAVLProver[D, HF](keyLength, valueLengthOpt, Some(topNode, rootNodeHeight), false)
     operations.foreach(o => newProver.performOneOperation(o).get)
     (newProver.generateProof(), newProver.digest)
@@ -255,7 +255,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
     treeWalk(internalNodeFn, leafFn, false)
   }
 
-  private[batch] def checkTree(postProof: Boolean = false): Unit = {
+  private[avltree] def checkTree(postProof: Boolean = false): Unit = {
     var fail: Boolean = false
 
     def checkTreeHelper(rNode: EncryProverNodes[D]): (ProverLeaf[D], ProverLeaf[D], Int) = {

@@ -1,7 +1,7 @@
-package scorex.crypto.authds.avltree.batch
+package encry.avltree
 
 import com.google.common.primitives.Ints
-import scorex.crypto.authds._
+import org.encryfoundation.common.utils.TaggedTypes._
 import scorex.crypto.hash._
 import scorex.utils.ByteArray
 import scala.collection.mutable

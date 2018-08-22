@@ -1,6 +1,6 @@
-package scorex.crypto.authds.avltree.batch
+package encry.avltree
 
-import scorex.crypto.authds.{ADKey, ADValue, Balance}
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ADValue, Balance}
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash._
 

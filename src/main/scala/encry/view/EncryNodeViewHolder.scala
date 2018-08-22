@@ -19,7 +19,6 @@ import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSy
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.settings.Algos
 import encry.stats.StatsSender._
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
@@ -30,11 +29,11 @@ import encry.view.state._
 import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import org.apache.commons.io.FileUtils
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
-import scorex.crypto.authds.ADDigest
+import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.concurrent.Future
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.util.{Failure, Success, Try}

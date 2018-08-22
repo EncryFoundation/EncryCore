@@ -1,11 +1,11 @@
-package scorex.crypto.authds.avltree.batch
+package encry.avltree
 
 import com.google.common.primitives.Ints
-import encry.settings.Algos
+import encry.avltree.VersionedIODBAVLStorage.{InternalNodePrefix, LeafPrefix}
 import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, Store}
-import scorex.crypto.authds.avltree.batch.VersionedIODBAVLStorage.{InternalNodePrefix, LeafPrefix}
-import scorex.crypto.authds.{ADDigest, ADKey, ADValue, Balance}
+import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, Balance}
 import scorex.crypto.hash
 import scorex.crypto.hash.{CryptographicHash, Digest}
 import scala.util.{Failure, Try}

@@ -1,7 +1,7 @@
-package scorex.crypto.authds.avltree.batch
+package encry.avltree
 
 import com.google.common.primitives.Longs
-import scorex.crypto.authds.{ADKey, ADValue}
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ADValue}
 import scorex.utils.ScorexEncoding
 import scala.util.{Failure, Success, Try}
 

@@ -18,11 +18,12 @@ import encry.local.miner.Miner.StartMining
 import encry.network.message._
 import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, ModifiersHolder, NetworkController}
-import encry.settings.{Algos, EncryAppSettings}
+import encry.settings.EncryAppSettings
 import encry.stats.StatsSender
 import encry.utils.{Logging, NetworkTimeProvider, Zombie}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
+import org.encryfoundation.common.Algos
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.io.Source

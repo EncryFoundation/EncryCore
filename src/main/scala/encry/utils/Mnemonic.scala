@@ -1,6 +1,6 @@
 package encry.utils
 
-import encry.settings.Algos
+import org.encryfoundation.common.Algos
 import scodec.bits.BitVector
 import scala.io.Source
 

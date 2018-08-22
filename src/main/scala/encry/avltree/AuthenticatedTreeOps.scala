@@ -1,6 +1,6 @@
-package scorex.crypto.authds.avltree.batch
+package encry.avltree
 
-import scorex.crypto.authds.{Balance, _}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, Balance}
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest
 import scorex.utils.ByteArray
@@ -28,7 +28,7 @@ trait AuthenticatedTreeOps[D <: Digest] {
 
   protected var rootNodeHeight: Int
 
-  protected def onNodeVisit(n: EncryNode[D], operation: Operation, isRotate: Boolean = false): Unit = {
+  protected def onNodeVisit(n: EncryNode[D], operation: encry.avltree.Operation, isRotate: Boolean = false): Unit = {
     n match {
       case p: EncryProverNodes[D] if collectChangedNodes && !n.visited && !p.isNew =>
         if (isRotate) {
@@ -36,7 +36,7 @@ trait AuthenticatedTreeOps[D <: Digest] {
         } else if (operation.isInstanceOf[Insert] || operation.isInstanceOf[Remove]
           || operation.isInstanceOf[InsertOrUpdate]) {
           changedNodesBuffer += p
-        } else if (!operation.isInstanceOf[Lookup]) {
+        } else if (!operation.isInstanceOf[encry.avltree.Lookup]) {
           changedNodesBufferToCheck += p
         }
       case _ =>
@@ -87,7 +87,7 @@ trait AuthenticatedTreeOps[D <: Digest] {
     newRoot.getNew(newLeft = newLeftChild, newRight = newRightChild, newBalance = Balance @@ 0.toByte)
   }
 
-  protected def returnResultOfOneOperation(operation: Operation, rootNode: EncryNode[D]): Try[(EncryNode[D], Option[ADValue])] = Try {
+  protected def returnResultOfOneOperation(operation: encry.avltree.Operation, rootNode: EncryNode[D]): Try[(EncryNode[D], Option[ADValue])] = Try {
     val key = operation.key
 
     require(ByteArray.compare(key, NegativeInfinityKey) > 0, s"Key ${Base16.encode(key)} is less than -inf")
@@ -96,12 +96,12 @@ trait AuthenticatedTreeOps[D <: Digest] {
 
     var savedNode: Option[EncryLeaf[D]] = None // The leaf to be saved in the hard deletion case, where we delete a leaf and copy its info over to another leaf
 
-    def modifyHelper(rNode: EncryNode[D], key: ADKey, operation: Operation): (EncryNode[D], Boolean, Boolean, Boolean, Option[ADValue]) = {
+    def modifyHelper(rNode: EncryNode[D], key: ADKey, operation: encry.avltree.Operation): (EncryNode[D], Boolean, Boolean, Boolean, Option[ADValue]) = {
       rNode match {
         case r: EncryLeaf[D] =>
           if (keyMatchesLeaf(key, r)) {
             operation match {
-              case m: Modification =>
+              case m: encry.avltree.Modification =>
                 m.updateFn(Some(r.value)) match {
                   case Success(None) => // delete key
                     onNodeVisit(r, operation)
@@ -115,14 +115,14 @@ trait AuthenticatedTreeOps[D <: Digest] {
                   case Failure(e) => // updateFunction doesn't like the value we found
                     throw e
                 }
-              case _: Lookup =>
+              case _: encry.avltree.Lookup =>
                 onNodeVisit(r, operation)
                 (r, false, false, false, Some(r.value))
             }
           } else {
             // x > r.key
             operation match {
-              case m: Modification =>
+              case m: encry.avltree.Modification =>
                 m.updateFn(None) match {
                   case Success(None) => // don't change anything, just lookup
                     onNodeVisit(rNode, operation)
@@ -134,7 +134,7 @@ trait AuthenticatedTreeOps[D <: Digest] {
                   case Failure(e) => // updateFunctions doesn't like that we found nothing
                     throw e
                 }
-              case _: Lookup =>
+              case _: encry.avltree.Lookup =>
                 onNodeVisit(rNode, operation)
                 (r, false, false, false, None)
             }

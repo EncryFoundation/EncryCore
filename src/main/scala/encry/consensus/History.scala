@@ -2,7 +2,7 @@ package encry.consensus
 
 import encry._
 import encry.modifiers.PersistentNodeViewModifier
-import encry.settings.Algos
+import org.encryfoundation.common.Algos
 
 object History {
 

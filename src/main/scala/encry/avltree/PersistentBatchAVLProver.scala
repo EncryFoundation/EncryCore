@@ -1,6 +1,6 @@
-package scorex.crypto.authds.avltree.batch
+package encry.avltree
 
-import scorex.crypto.authds._
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import scorex.crypto.hash._
 import scala.util.Try
 

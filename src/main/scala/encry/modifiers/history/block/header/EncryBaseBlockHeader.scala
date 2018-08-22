@@ -3,7 +3,7 @@ package encry.modifiers.history.block.header
 import encry.ModifierId
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.Block._
-import scorex.crypto.authds.ADDigest
+import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scorex.crypto.hash.Digest32
 
 trait EncryBaseBlockHeader extends EncryPersistentModifier {

@@ -7,10 +7,10 @@ import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.utils.{EncryGenerator, TestHelper}
 import encry.view.history.Height
 import org.encryfoundation.common.transaction.Input
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.Ast.Expr
 import org.encryfoundation.prismlang.core.{Ast, Types}
-import scorex.crypto.authds.ADKey
 import scorex.utils.Random
 import scala.util.{Random => Scarand}
 

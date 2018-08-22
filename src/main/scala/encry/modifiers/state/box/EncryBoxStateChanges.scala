@@ -1,7 +1,7 @@
 package encry.modifiers.state.box
 
-import encry.settings.Algos
-import scorex.crypto.authds._
+import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
 
 abstract class EncryBoxStateChangeOperation
 
