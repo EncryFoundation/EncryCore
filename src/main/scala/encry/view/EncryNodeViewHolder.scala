@@ -36,7 +36,6 @@ import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import scorex.crypto.authds.ADDigest
 import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.concurrent.Future
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.util.{Failure, Success, Try}
@@ -62,7 +61,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   override def postStop(): Unit = {
     logWarn("Stopping EncryNodeViewHolder")
-    if (settings.node.sendToKafka)
+    if (settings.kafka.sendToKafka)
       context.actorSelection("/user/kafkaActor") ! KafkaActor.KafkaMessage("INFO", "Stopping EncryNodeViewHolder")
     nodeView.history.closeStorage()
     nodeView.state.closeStorage()
@@ -73,12 +72,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       blocks.foreach { block =>
         pmodModifyRecovery(block) match {
           case Success(_) => log.info(s"Block ${block.encodedId} from recovery applied successfully")
-            if (settings.node.sendToKafka)
+            if (settings.kafka.sendToKafka)
               context.actorSelection("/user/kafkaActor") !
                 KafkaMessage("INFO", s"Block ${block.encodedId} from recovery applied successfully")
           case Failure(th) =>
             log.warn(s"Failed to apply block ${block.encodedId} from recovery", th)
-            if (settings.node.sendToKafka)
+            if (settings.kafka.sendToKafka)
               context.actorSelection("/user/kafkaActor") !
                 KafkaMessage("WARNING", s"Failed to apply block ${block.encodedId} from recovery")
             applicationsSuccessful = false
@@ -108,7 +107,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       log.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
-      if (settings.node.sendToKafka)
+      if (settings.kafka.sendToKafka)
         context.actorSelection("/user/kafkaActor") !
           KafkaMessage("INFO", s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
@@ -135,7 +134,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       if (availableBoxes.map(_.amount).sum >= limit * (amountD + minimalFeeD))
         sender() ! GenerateTransaction(WalletData(wallet.accountManager.mandatoryAccount, availableBoxes))
     case a: Any => logError("Strange input: " + a)
-      if (settings.node.sendToKafka)
+      if (settings.kafka.sendToKafka)
         context.actorSelection("/user/kafkaActor") ! KafkaMessage("ERROR", "Strange input: " + a)
   }
 
@@ -237,7 +236,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
       case Failure(e) =>
         logError("Rollback failed: ", e)
-        if (settings.node.sendToKafka)
+        if (settings.kafka.sendToKafka)
           context.actorSelection("/user/kafkaActor") ! KafkaMessage("ERROR", "Rollback failed")
         context.system.eventStream.publish(RollbackFailed(branchingPointOpt))
         EncryApp.forceStopApplication(500)
@@ -253,7 +252,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
     log.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
-    if (settings.node.sendToKafka)
+    if (settings.kafka.sendToKafka)
       context.actorSelection("/user/kafkaActor") !
         KafkaMessage("INFO", s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
     if (settings.node.sendStat) context.system
@@ -278,7 +277,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               else nodeView.wallet
               blocksApplied.foreach(newVault.scanPersistent)
               log.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
-              if (settings.node.sendToKafka)
+              if (settings.kafka.sendToKafka)
                 context.actorSelection("/user/kafkaActor") !
                   KafkaMessage("INFO", s"Persistent modifier ${pmod.encodedId} applied successfully")
               if (progressInfo.chainSwitchingNeeded)
@@ -299,7 +298,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
       case Failure(e) =>
         logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to history", e)
-        if (settings.node.sendToKafka)
+        if (settings.kafka.sendToKafka)
           context.actorSelection("/user/kafkaActor") !
             KafkaMessage("WARNING", s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to history")
         nodeViewSynchronizer ! SyntacticallyFailedModification(pmod, e)
@@ -369,13 +368,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         stateIn
       case (_, None, _) =>
         log.info("State and history are inconsistent. History is empty on startup, rollback state to genesis.")
-        if (settings.node.sendToKafka)
+        if (settings.kafka.sendToKafka)
           context.actorSelection("/user/kafkaActor") !
             KafkaMessage("INFO", "State and history are inconsistent. History is empty on startup, rollback state to genesis.")
         getRecreatedState()
       case (_, Some(bestBlock), _: DigestState) =>
         log.info(s"State and history are inconsistent. Going to switch state to version ${bestBlock.encodedId}")
-        if (settings.node.sendToKafka)
+        if (settings.kafka.sendToKafka)
           context.actorSelection("/user/kafkaActor") !
             KafkaMessage("INFO", s"State and history are inconsistent. Going to switch state to version ${bestBlock.encodedId}")
         getRecreatedState(Some(VersionTag !@@ bestBlock.id), Some(bestBlock.header.stateRoot))

@@ -13,33 +13,25 @@ class KafkaActor extends Actor with Logging {
   import KafkaActor.KafkaMessage
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read
-  lazy val kafkaBrokers: String = settings.node.kafkaBrokers
-  lazy val nodeName: String = settings.network.nodeName
-  val topicName: String = "Logs"
 
   val formatter: SimpleDateFormat = new SimpleDateFormat("yyyy:mm:dd:HH:mm:ss")
   def getDateTimeNow: String = formatter.format(Calendar.getInstance().getTime)
-  def assembleFullMessage(level: String, message: String): String = nodeName + " - " + getDateTimeNow + " - " +
-    level + " - " + message
+  def assembleFullMessage(level: String, message: String): String = settings.network.nodeName + " - " + getDateTimeNow +
+    " - " + level + " - " + message
 
   val kafkaParams: Properties= new Properties
-  kafkaParams.put("bootstrap.servers", kafkaBrokers)
+  kafkaParams.put("bootstrap.servers", settings.kafka.kafkaBrokers)
   kafkaParams.put("key.serializer", classOf[StringSerializer])
   kafkaParams.put("value.serializer", classOf[StringSerializer])
-  kafkaParams.put("group.id", "encry")
+  kafkaParams.put("group.id", settings.kafka.groupId)
 
   val producer: KafkaProducer[String,String] = new KafkaProducer[String,String](kafkaParams)
 
   override def receive: Receive = {
     case KafkaMessage(level: String, message: String) =>
-      producer.send(new ProducerRecord[String,String](topicName, java.util.UUID.randomUUID().toString,
+      producer.send(new ProducerRecord[String,String](settings.kafka.topicName, java.util.UUID.randomUUID().toString,
         assembleFullMessage(level, message)))
   }
-
-  override def preStart(): Unit = super.preStart()
-
-  override def postStop(): Unit = super.postStop()
-
 }
 
 object KafkaActor {
