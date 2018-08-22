@@ -54,6 +54,7 @@ libraryDependencies ++= Seq(
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
   "org.influxdb" % "influxdb-java" % "2.10",
   "org.apache.commons" % "commons-io" % "1.3.2",
+  "org.apache.kafka" % "kafka-clients" % "2.0.0",
   "commons-net" % "commons-net" % "3.6"
 ) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
 
