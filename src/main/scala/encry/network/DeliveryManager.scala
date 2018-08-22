@@ -99,6 +99,10 @@ class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor
         deleteSpam(spam.keys.toSeq)
       }
       if (fm.nonEmpty) nodeViewHolder ! ModifiersFromRemote(typeId, fm.values.toSeq)
+      historyReaderOpt.foreach { h =>
+        if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
+        else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
+      }
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
       requestDownload(modifierTypeId, Seq(modifierId))
     case FullBlockChainSynced => isBlockChainSynced = true
