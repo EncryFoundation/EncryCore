@@ -4,7 +4,6 @@ import com.google.common.primitives.Ints
 import scorex.crypto.authds._
 import scorex.crypto.hash._
 import scorex.utils.ByteArray
-
 import scala.collection.mutable
 import scala.util.{Failure, Try}
 
