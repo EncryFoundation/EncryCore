@@ -13,14 +13,14 @@ import scala.util.{Failure, Try}
 case class NodeParameters(keySize: Int, valueSize: Option[Int], labelSize: Int)
 
 class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodeParameters)(implicit val hf: CryptographicHash[D])
-  extends VersionedAVLStorage[D] with Logging {
+  extends Logging {
 
   val TopNodeKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(nodeParameters.labelSize)(123: Byte))
   val TopNodeHeight: ByteArrayWrapper = ByteArrayWrapper(Array.fill(nodeParameters.labelSize)(124: Byte))
 
-  override def rollback(version: ADDigest): Try[(ProverNodes[D], Int)] = Try {
+  def rollback(version: ADDigest): Try[(EncryProverNodes[D], Int)] = Try {
     store.rollback(ByteArrayWrapper(version))
-    val top: ProverNodes[D] = VersionedIODBAVLStorage.fetch[D](ADKey @@ store.get(TopNodeKey).get.data)(hf, store, nodeParameters)
+    val top: EncryProverNodes[D] = VersionedIODBAVLStorage.fetch[D](ADKey @@ store.get(TopNodeKey).get.data)(hf, store, nodeParameters)
     val topHeight: Int = Ints.fromByteArray(store.get(TopNodeHeight).get.data)
     top -> topHeight
   }.recoverWith { case e =>
@@ -28,11 +28,13 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
     Failure(e)
   }
 
-  override def version: Option[ADDigest] = store.lastVersionID.map(d => ADDigest @@ d.data)
+  def version: Option[ADDigest] = store.lastVersionID.map(d => ADDigest @@ d.data)
+
+  def isEmpty: Boolean = version.isEmpty
 
   def rollbackVersions: Iterable[ADDigest] = store.rollbackVersions().map(d => ADDigest @@ d.data)
 
-  override def update[K <: Array[Byte], V <: Array[Byte]](prover: BatchAVLProver[D, _], additionalData: Seq[(K, V)]): Try[Unit] = Try {
+  def update[K <: Array[Byte], V <: Array[Byte]](prover: BatchAVLProver[D, _], additionalData: Seq[(K, V)]): Try[Unit] = Try {
     val digestWrapper: Store.K = ByteArrayWrapper(prover.digest)
     val indexes: Seq[(Store.K, Store.K)] = Seq(TopNodeKey -> nodeKey(prover.topNode),
       TopNodeHeight -> ByteArrayWrapper(Ints.toByteArray(prover.rootNodeHeight)))
@@ -50,20 +52,20 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
   }
 
   // Should always serialize top node. It may not be new if it is the creation of the tree
-  private def serializedVisitedNodes(node: ProverNodes[D], isTop: Boolean): Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
+  private def serializedVisitedNodes(node: EncryProverNodes[D], isTop: Boolean): Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
     if (node.isNew || isTop) {
       val pair: (ByteArrayWrapper, ByteArrayWrapper) = (nodeKey(node), ByteArrayWrapper(toBytes(node)))
       node match {
-        case n: InternalProverNode[D] =>
+        case n: InternalProverEncryNode[D] =>
           pair +: (serializedVisitedNodes(n.left, isTop = false) ++ serializedVisitedNodes(n.right, isTop = false))
         case _: ProverLeaf[D] => Seq(pair)
       }
     } else Seq()
 
-  private def nodeKey(node: ProverNodes[D]): ByteArrayWrapper = ByteArrayWrapper(node.label)
+  private def nodeKey(node: EncryProverNodes[D]): ByteArrayWrapper = ByteArrayWrapper(node.label)
 
-  private def toBytes(node: ProverNodes[D]): Array[Byte] = node match {
-    case n: InternalProverNode[D] => InternalNodePrefix +: n.balance +: (n.key ++ n.left.label ++ n.right.label)
+  private def toBytes(node: EncryProverNodes[D]): Array[Byte] = node match {
+    case n: InternalProverEncryNode[D] => InternalNodePrefix +: n.balance +: (n.key ++ n.left.label ++ n.right.label)
     case n: ProverLeaf[D] if nodeParameters.valueSize.isDefined => LeafPrefix +: (n.key ++ n.value ++ n.nextLeafKey)
     case n: ProverLeaf[D] => LeafPrefix +: (n.key ++ Ints.toByteArray(n.value.length) ++ n.value ++ n.nextLeafKey)
   }
@@ -76,7 +78,7 @@ object VersionedIODBAVLStorage {
 
   def fetch[D <: hash.Digest](key: ADKey)(implicit hf: CryptographicHash[D],
                                           store: Store,
-                                          nodeParameters: NodeParameters): ProverNodes[D] = {
+                                          nodeParameters: NodeParameters): EncryProverNodes[D] = {
     val bytes: Array[Byte] = store(ByteArrayWrapper(key)).data
     val keySize: Int = nodeParameters.keySize
     val labelSize: Int = nodeParameters.labelSize
@@ -86,7 +88,7 @@ object VersionedIODBAVLStorage {
         val key: ADKey = ADKey @@ bytes.slice(2, 2 + keySize)
         val leftKey: ADKey = ADKey @@ bytes.slice(2 + keySize, 2 + keySize + labelSize)
         val rightKey: ADKey = ADKey @@ bytes.slice(2 + keySize + labelSize, 2 + keySize + (2 * labelSize))
-        val n: ProxyInternalProverNode[D] = new ProxyInternalProverNode[D](key, leftKey, rightKey, balance)
+        val n: ProxyInternalProverEncryNode[D] = new ProxyInternalProverEncryNode[D](key, leftKey, rightKey, balance)
         n.isNew = false
         n
       case LeafPrefix =>
@@ -108,19 +110,19 @@ object VersionedIODBAVLStorage {
     }
   }
 
-  class ProxyInternalProverNode[D <: Digest](protected var pk: ADKey,
-                                             val lkey: ADKey,
-                                             val rkey: ADKey,
-                                             protected var pb: Balance = Balance @@ 0.toByte)
-                                            (implicit val phf: CryptographicHash[D],
+  class ProxyInternalProverEncryNode[D <: Digest](protected var pk: ADKey,
+                                                  val lkey: ADKey,
+                                                  val rkey: ADKey,
+                                                  protected var pb: Balance = Balance @@ 0.toByte)
+                                                 (implicit val phf: CryptographicHash[D],
                                              store: Store,
                                              nodeParameters: NodeParameters)
-    extends InternalProverNode(k = pk, l = null, r = null, b = pb)(phf) {
-    override def left: ProverNodes[D] = {
+    extends InternalProverEncryNode(k = pk, l = null, r = null, b = pb)(phf) {
+    override def left: EncryProverNodes[D] = {
       if (l == null) l = VersionedIODBAVLStorage.fetch[D](lkey)
       l
     }
-    override def right: ProverNodes[D] = {
+    override def right: EncryProverNodes[D] = {
       if (r == null) r = VersionedIODBAVLStorage.fetch[D](rkey)
       r
     }

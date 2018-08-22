@@ -15,7 +15,7 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
                                                                 maxNumOperations: Option[Int] = None,
                                                                 maxDeletes: Option[Int] = None)
                                                                (implicit hf: HF = Blake2b256)
-  extends AuthenticatedTreeOps[D] with ToStringHelper {
+  extends AuthenticatedTreeOps[D] {
 
   override val collectChangedNodes: Boolean = false
 
@@ -27,7 +27,7 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
   private var lastRightStep = 0
   private var replayIndex = 0 // Keeps track of where we are when replaying directions
 
-  protected def nextDirectionIsLeft(key: ADKey, r: InternalNode[D]): Boolean = {
+  protected def nextDirectionIsLeft(key: ADKey, r: InternalEncryNode[D]): Boolean = {
     val ret = if ((proof(directionsIndex >> 3) & (1 << (directionsIndex & 7)).toByte) != 0) {
       true
     } else {
@@ -38,7 +38,7 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
     ret
   }
 
-  protected def keyMatchesLeaf(key: ADKey, r: Leaf[D]): Boolean = {
+  protected def keyMatchesLeaf(key: ADKey, r: EncryLeaf[D]): Boolean = {
     val c = ByteArray.compare(key, r.key)
     require(c >= 0)
     if (c == 0) {
@@ -61,9 +61,9 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
     ret
   }
 
-  protected def addNode(r: Leaf[D], key: ADKey, v: ADValue): InternalVerifierNode[D] = {
+  protected def addNode(r: EncryLeaf[D], key: ADKey, v: ADValue): InternalVerifierEncryNode[D] = {
     val n = r.nextLeafKey
-    new InternalVerifierNode(r.getNew(newNextLeafKey = key), new VerifierLeaf(key, v, n), Balance @@ 0.toByte)
+    new InternalVerifierEncryNode(r.getNew(newNextLeafKey = key), new VerifierLeaf(key, v, n), Balance @@ 0.toByte)
   }
 
   protected var rootNodeHeight = 0
@@ -95,7 +95,7 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
     var numNodes = 0
     val s = new mutable.Stack[VerifierNodes[D]] // Nodes and depths
     var i = 0
-    var previousLeaf: Option[Leaf[D]] = None
+    var previousLeaf: Option[EncryLeaf[D]] = None
     while (proof(i) != EndOfTreeInPackagedProof) {
       val n = proof(i)
       i += 1
@@ -105,7 +105,7 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
         case LabelInPackagedProof =>
           val label = proof.slice(i, i + labelLength).asInstanceOf[D]
           i += labelLength
-          s.push(new LabelOnlyNode[D](label))
+          s.push(new LabelOnlyEncryNode[D](label))
           previousLeaf = None
         case LeafInPackagedProof =>
           val key = if (previousLeaf.nonEmpty) {
@@ -131,7 +131,7 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
         case _ =>
           val right = s.pop
           val left = s.pop
-          s.push(new InternalVerifierNode(left, right, Balance @@ n))
+          s.push(new InternalVerifierEncryNode(left, right, Balance @@ n))
       }
     }
 
@@ -161,11 +161,11 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
         case leaf: VerifierLeaf[D] =>
           "At leaf label = " + arrayToString(leaf.label) + " key = " + arrayToString(leaf.key) +
             " nextLeafKey = " + arrayToString(leaf.nextLeafKey) + "value = " + leaf.value + "\n"
-        case r: InternalVerifierNode[D] =>
+        case r: InternalVerifierEncryNode[D] =>
           "Internal node label = " + arrayToString(r.label) + " balance = " +
             r.balance + "\n" + stringTreeHelper(r.left.asInstanceOf[VerifierNodes[D]], depth + 1) +
             stringTreeHelper(r.right.asInstanceOf[VerifierNodes[D]], depth + 1)
-        case n: LabelOnlyNode[D] =>
+        case n: LabelOnlyEncryNode[D] =>
           "Label-only node label = " + arrayToString(n.label) + "\n"
       })
 
@@ -173,30 +173,5 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
       case None => "None"
       case Some(t) => stringTreeHelper(t, 0)
     }
-  }
-
-  def extractNodes(extractor: VerifierNodes[D] => Boolean): Option[Seq[VerifierNodes[D]]] = {
-    def treeTraverser(rNode: VerifierNodes[D], collected: Seq[VerifierNodes[D]]): Seq[VerifierNodes[D]] = rNode match {
-      case l: VerifierLeaf[D] => if (extractor(l)) l +: collected else collected
-      case ln: LabelOnlyNode[D] => if (extractor(ln)) ln +: collected else collected
-      case int: InternalVerifierNode[D] =>
-        collected ++
-          treeTraverser(int.right.asInstanceOf[VerifierNodes[D]], Seq()) ++
-          treeTraverser(int.left.asInstanceOf[VerifierNodes[D]], Seq())
-    }
-
-    topNode.map(t => treeTraverser(t, Seq()))
-  }
-
-  def extractFirstNode(extractor: VerifierNodes[D] => Boolean): Option[VerifierNodes[D]] = {
-    def treeTraverser(rNode: VerifierNodes[D]): Option[VerifierNodes[D]] = rNode match {
-      case l: VerifierLeaf[D] => Some(l).filter(extractor)
-      case ln: LabelOnlyNode[D] => Some(ln).filter(extractor)
-      case int: InternalVerifierNode[D] =>
-        treeTraverser(int.left.asInstanceOf[VerifierNodes[D]]) orElse
-          treeTraverser(int.right.asInstanceOf[VerifierNodes[D]])
-    }
-
-    topNode.flatMap(t => treeTraverser(t))
   }
 }

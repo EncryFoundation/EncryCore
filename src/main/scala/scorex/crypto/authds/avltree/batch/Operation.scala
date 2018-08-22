@@ -32,15 +32,6 @@ case class Insert(key: ADKey, value: ADValue) extends Modification {
   override def toString: String = s"""Insert(\"${encoder.encode(key)}\",\"${encoder.encode(value)}\")"""
 }
 
-case class Update(key: ADKey, value: ADValue) extends Modification {
-  override def updateFn: UpdateFunction = {
-    case None => Failure(new Exception(s"Key ${encoder.encode(key)} does not exist"))
-    case Some(_) => Success(Some(value))
-  }: UpdateFunction
-
-  override def toString: String = s"""Update(\"${encoder.encode(key)}\",\"${encoder.encode(value)}\")"""
-}
-
 case class InsertOrUpdate(key: ADKey, value: ADValue) extends Modification {
   override def updateFn: UpdateFunction = (_ => Success(Some(value))): UpdateFunction
 

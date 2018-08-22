@@ -1,32 +1,36 @@
 package scorex.crypto.authds.avltree.batch
 
 import scorex.crypto.authds.{Balance, _}
+import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest
 import scorex.utils.ByteArray
 import scala.collection.mutable.ArrayBuffer
 import scala.util.{Failure, Success, Try}
 
-trait AuthenticatedTreeOps[D <: Digest] extends BatchProofConstants with ToStringHelper {
+trait AuthenticatedTreeOps[D <: Digest] {
 
-  type ChangeHappened = Boolean
-  type HeightIncreased = Boolean
-  type ToDelete = Boolean
+  protected def arrayToString(a: Array[Byte]): String = Base16.encode(a).take(8)
+
+  // Do not use bytes -1, 0, or 1 -- these are for balance
+  val LeafInPackagedProof: Byte = 2
+  val LabelInPackagedProof: Byte = 3
+  val EndOfTreeInPackagedProof: Byte = 4
 
   protected val keyLength: Int
   protected val valueLengthOpt: Option[Int]
   protected val collectChangedNodes: Boolean
 
-  protected val changedNodesBuffer: ArrayBuffer[ProverNodes[D]] = ArrayBuffer.empty
-  protected val changedNodesBufferToCheck: ArrayBuffer[ProverNodes[D]] = ArrayBuffer.empty
+  protected val changedNodesBuffer: ArrayBuffer[EncryProverNodes[D]] = ArrayBuffer.empty
+  protected val changedNodesBufferToCheck: ArrayBuffer[EncryProverNodes[D]] = ArrayBuffer.empty
 
   protected val PositiveInfinityKey: ADKey = ADKey @@ Array.fill(keyLength)(-1: Byte)
   protected val NegativeInfinityKey: ADKey = ADKey @@ Array.fill(keyLength)(0: Byte)
 
   protected var rootNodeHeight: Int
 
-  protected def onNodeVisit(n: Node[D], operation: Operation, isRotate: Boolean = false): Unit = {
+  protected def onNodeVisit(n: EncryNode[D], operation: Operation, isRotate: Boolean = false): Unit = {
     n match {
-      case p: ProverNodes[D] if collectChangedNodes && !n.visited && !p.isNew =>
+      case p: EncryProverNodes[D] if collectChangedNodes && !n.visited && !p.isNew =>
         if (isRotate) {
           changedNodesBufferToCheck += p
         } else if (operation.isInstanceOf[Insert] || operation.isInstanceOf[Remove]
@@ -40,21 +44,21 @@ trait AuthenticatedTreeOps[D <: Digest] extends BatchProofConstants with ToStrin
     n.visited = true
   }
 
-  protected def digest(rootNode: Node[D]): ADDigest = {
+  protected def digest(rootNode: EncryNode[D]): ADDigest = {
     assert(rootNodeHeight >= 0 && rootNodeHeight < 256)
     ADDigest @@ (rootNode.label :+ rootNodeHeight.toByte)
   }
 
-  protected def keyMatchesLeaf(key: ADKey, r: Leaf[D]): Boolean
+  protected def keyMatchesLeaf(key: ADKey, r: EncryLeaf[D]): Boolean
 
-  protected def nextDirectionIsLeft(key: ADKey, r: InternalNode[D]): Boolean
+  protected def nextDirectionIsLeft(key: ADKey, r: InternalEncryNode[D]): Boolean
 
-  protected def addNode(r: Leaf[D], key: ADKey, v: ADValue): InternalNode[D]
+  protected def addNode(r: EncryLeaf[D], key: ADKey, v: ADValue): InternalEncryNode[D]
 
   protected def replayComparison: Int
 
-  private def doubleLeftRotate(currentRoot: InternalNode[D], leftChild: Node[D], rightChild: InternalNode[D]): InternalNode[D] = {
-    val newRoot = rightChild.left.asInstanceOf[InternalNode[D]]
+  private def doubleLeftRotate(currentRoot: InternalEncryNode[D], leftChild: EncryNode[D], rightChild: InternalEncryNode[D]): InternalEncryNode[D] = {
+    val newRoot = rightChild.left.asInstanceOf[InternalEncryNode[D]]
     val (newLeftBalance: Balance, newRightBalance: Balance) = newRoot.balance match {
       case a if a == 0 =>
         (Balance @@ 0.toByte, Balance @@ 0.toByte)
@@ -68,8 +72,8 @@ trait AuthenticatedTreeOps[D <: Digest] extends BatchProofConstants with ToStrin
     newRoot.getNew(newLeft = newLeftChild, newRight = newRightChild, newBalance = Balance @@ 0.toByte)
   }
 
-  private def doubleRightRotate(currentRoot: InternalNode[D], leftChild: InternalNode[D], rightChild: Node[D]): InternalNode[D] = {
-    val newRoot = leftChild.right.asInstanceOf[InternalNode[D]]
+  private def doubleRightRotate(currentRoot: InternalEncryNode[D], leftChild: InternalEncryNode[D], rightChild: EncryNode[D]): InternalEncryNode[D] = {
+    val newRoot = leftChild.right.asInstanceOf[InternalEncryNode[D]]
     val (newLeftBalance: Balance, newRightBalance: Balance) = newRoot.balance match {
       case a if a == 0 =>
         (Balance @@ 0.toByte, Balance @@ 0.toByte)
@@ -83,18 +87,18 @@ trait AuthenticatedTreeOps[D <: Digest] extends BatchProofConstants with ToStrin
     newRoot.getNew(newLeft = newLeftChild, newRight = newRightChild, newBalance = Balance @@ 0.toByte)
   }
 
-  protected def returnResultOfOneOperation(operation: Operation, rootNode: Node[D]): Try[(Node[D], Option[ADValue])] = Try {
+  protected def returnResultOfOneOperation(operation: Operation, rootNode: EncryNode[D]): Try[(EncryNode[D], Option[ADValue])] = Try {
     val key = operation.key
 
-    require(ByteArray.compare(key, NegativeInfinityKey) > 0, s"Key ${encoder.encode(key)} is less than -inf")
-    require(ByteArray.compare(key, PositiveInfinityKey) < 0, s"Key ${encoder.encode(key)} is more than +inf")
+    require(ByteArray.compare(key, NegativeInfinityKey) > 0, s"Key ${Base16.encode(key)} is less than -inf")
+    require(ByteArray.compare(key, PositiveInfinityKey) < 0, s"Key ${Base16.encode(key)} is more than +inf")
     require(key.length == keyLength)
 
-    var savedNode: Option[Leaf[D]] = None // The leaf to be saved in the hard deletion case, where we delete a leaf and copy its info over to another leaf
+    var savedNode: Option[EncryLeaf[D]] = None // The leaf to be saved in the hard deletion case, where we delete a leaf and copy its info over to another leaf
 
-    def modifyHelper(rNode: Node[D], key: ADKey, operation: Operation): (Node[D], ChangeHappened, HeightIncreased, ToDelete, Option[ADValue]) = {
+    def modifyHelper(rNode: EncryNode[D], key: ADKey, operation: Operation): (EncryNode[D], Boolean, Boolean, Boolean, Option[ADValue]) = {
       rNode match {
-        case r: Leaf[D] =>
+        case r: EncryLeaf[D] =>
           if (keyMatchesLeaf(key, r)) {
             operation match {
               case m: Modification =>
@@ -135,14 +139,14 @@ trait AuthenticatedTreeOps[D <: Digest] extends BatchProofConstants with ToStrin
                 (r, false, false, false, None)
             }
           }
-        case r: InternalNode[D] =>
+        case r: InternalEncryNode[D] =>
           if (nextDirectionIsLeft(key, r)) {
             val (newLeftM, changeHappened, childHeightIncreased, toDelete, oldValue) = modifyHelper(r.left, key, operation)
             onNodeVisit(r, operation)
 
             if (changeHappened) {
               if (childHeightIncreased && r.balance < 0) {
-                val newLeft = newLeftM.asInstanceOf[InternalNode[D]]
+                val newLeft = newLeftM.asInstanceOf[InternalEncryNode[D]]
                 if (newLeft.balance < 0) {
                   val newR = r.getNew(newLeft = newLeft.right, newBalance = Balance @@ 0.toByte)
                   (newLeft.getNew(newRight = newR, newBalance = Balance @@ 0.toByte), true, false, false, oldValue)
@@ -164,7 +168,7 @@ trait AuthenticatedTreeOps[D <: Digest] extends BatchProofConstants with ToStrin
 
             if (changeHappened) {
               if (childHeightIncreased && r.balance > 0) {
-                val newRight = newRightM.asInstanceOf[InternalNode[D]]
+                val newRight = newRightM.asInstanceOf[InternalEncryNode[D]]
 
                 if (newRight.balance > 0) {
                   val newR = r.getNew(newRight = newRight.left, newBalance = Balance @@ 0.toByte)
@@ -181,33 +185,33 @@ trait AuthenticatedTreeOps[D <: Digest] extends BatchProofConstants with ToStrin
               (r, false, false, toDelete, oldValue)
             }
           }
-        case _: LabelOnlyNode[D] =>
+        case _: LabelOnlyEncryNode[D] =>
           throw new Error("Should never reach this point. If in prover, this is a bug. If in verifier, this proof is wrong.")
       }
     }
 
-    def deleteHelper(r: InternalNode[D], deleteMax: Boolean): (Node[D], Boolean) = {
+    def deleteHelper(r: InternalEncryNode[D], deleteMax: Boolean): (EncryNode[D], Boolean) = {
 
-      def changeNextLeafKeyOfMaxNode(rNode: Node[D], nextLeafKey: ADKey): Node[D] = {
+      def changeNextLeafKeyOfMaxNode(rNode: EncryNode[D], nextLeafKey: ADKey): EncryNode[D] = {
         onNodeVisit(rNode, operation)
         rNode match {
-          case leaf: Leaf[D] =>
+          case leaf: EncryLeaf[D] =>
             leaf.getNew(newNextLeafKey = nextLeafKey)
-          case rN: InternalNode[D] =>
+          case rN: InternalEncryNode[D] =>
             rN.getNew(newRight = changeNextLeafKeyOfMaxNode(rN.right, nextLeafKey))
-          case _: LabelOnlyNode[D] =>
+          case _: LabelOnlyEncryNode[D] =>
             throw new Error("Should never reach this point. If in prover, this is a bug. In in verifier, this proof is wrong.")
         }
       }
 
-      def changeKeyAndValueOfMinNode(rNode: Node[D], newKey: ADKey, newValue: ADValue): Node[D] = {
+      def changeKeyAndValueOfMinNode(rNode: EncryNode[D], newKey: ADKey, newValue: ADValue): EncryNode[D] = {
         onNodeVisit(rNode, operation)
         rNode match {
-          case leaf: Leaf[D] =>
+          case leaf: EncryLeaf[D] =>
             leaf.getNew(newKey = newKey, newValue = newValue)
-          case rN: InternalNode[D] =>
+          case rN: InternalEncryNode[D] =>
             rN.getNew(newLeft = changeKeyAndValueOfMinNode(rN.left, newKey, newValue))
-          case _: LabelOnlyNode[D] =>
+          case _: LabelOnlyEncryNode[D] =>
             throw new Error("Should never reach this point. If in prover, this is a bug. If in verifier, this proof is wrong.")
         }
       }
@@ -216,11 +220,11 @@ trait AuthenticatedTreeOps[D <: Digest] extends BatchProofConstants with ToStrin
 
       val direction = if (deleteMax) 1 else replayComparison
 
-      assert(!(direction < 0 && r.left.isInstanceOf[Leaf[D]]))
+      assert(!(direction < 0 && r.left.isInstanceOf[EncryLeaf[D]]))
 
-      if (direction >= 0 && r.right.isInstanceOf[Leaf[D]]) {
+      if (direction >= 0 && r.right.isInstanceOf[EncryLeaf[D]]) {
 
-        val rightChild = r.right.asInstanceOf[Leaf[D]]
+        val rightChild = r.right.asInstanceOf[EncryLeaf[D]]
         onNodeVisit(rightChild, operation)
         if (deleteMax) {
 
@@ -231,13 +235,13 @@ trait AuthenticatedTreeOps[D <: Digest] extends BatchProofConstants with ToStrin
           assert(direction == 0)
           (changeNextLeafKeyOfMaxNode(r.left, rightChild.nextLeafKey), true)
         }
-      } else if (direction == 0 && r.left.isInstanceOf[Leaf[D]]) {
-        val leftChild = r.left.asInstanceOf[Leaf[D]]
+      } else if (direction == 0 && r.left.isInstanceOf[EncryLeaf[D]]) {
+        val leftChild = r.left.asInstanceOf[EncryLeaf[D]]
         onNodeVisit(leftChild, operation)
         (changeKeyAndValueOfMinNode(r.right, leftChild.key, leftChild.value), true)
       } else {
         if (direction <= 0) {
-          val (newLeft, childHeightDecreased) = deleteHelper(r.left.asInstanceOf[InternalNode[D]], direction == 0)
+          val (newLeft, childHeightDecreased) = deleteHelper(r.left.asInstanceOf[InternalEncryNode[D]], direction == 0)
 
           val newRoot = if (direction == 0) {
             val s = savedNode.get
@@ -251,7 +255,7 @@ trait AuthenticatedTreeOps[D <: Digest] extends BatchProofConstants with ToStrin
           if (childHeightDecreased && newRoot.balance > 0) {
             onNodeVisit(newRoot.right, operation, isRotate = true)
 
-            val rightChild = newRoot.right.asInstanceOf[InternalNode[D]]
+            val rightChild = newRoot.right.asInstanceOf[InternalEncryNode[D]]
             if (rightChild.balance < 0) {
               onNodeVisit(rightChild.left, operation, isRotate = true)
               (doubleLeftRotate(newRoot, newLeft, rightChild), true)
@@ -267,11 +271,11 @@ trait AuthenticatedTreeOps[D <: Digest] extends BatchProofConstants with ToStrin
             (newRoot.getNew(newLeft = newLeft, newBalance = newBalance), childHeightDecreased && newBalance == 0)
           }
         } else {
-          val (newRight, childHeightDecreased) = deleteHelper(r.right.asInstanceOf[InternalNode[D]], deleteMax)
+          val (newRight, childHeightDecreased) = deleteHelper(r.right.asInstanceOf[InternalEncryNode[D]], deleteMax)
           if (childHeightDecreased && r.balance < 0) {
             onNodeVisit(r.left, operation, isRotate = true)
 
-            val leftChild = r.left.asInstanceOf[InternalNode[D]]
+            val leftChild = r.left.asInstanceOf[InternalEncryNode[D]]
             if (leftChild.balance > 0) {
               onNodeVisit(leftChild.right, operation, isRotate = true)
               (doubleRightRotate(r, leftChild, newRight), true)
@@ -292,7 +296,7 @@ trait AuthenticatedTreeOps[D <: Digest] extends BatchProofConstants with ToStrin
 
     val (newRootNode, _, heightIncreased, toDelete, oldValue) = modifyHelper(rootNode, key, operation)
     if (toDelete) {
-      val (postDeleteRootNode, heightDecreased) = deleteHelper(newRootNode.asInstanceOf[InternalNode[D]], deleteMax = false)
+      val (postDeleteRootNode, heightDecreased) = deleteHelper(newRootNode.asInstanceOf[InternalEncryNode[D]], deleteMax = false)
       if (heightDecreased) rootNodeHeight -= 1
       (postDeleteRootNode, oldValue)
     } else {

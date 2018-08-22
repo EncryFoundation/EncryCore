@@ -1,14 +1,14 @@
 package scorex.crypto.authds.avltree.batch
 
 import scorex.crypto.authds.{ADKey, ADValue, Balance}
+import scorex.crypto.encode.Base16
 import scorex.crypto.hash._
 
-sealed trait Node[D <: Digest] extends ToStringHelper {
+sealed trait EncryNode[D <: Digest] {
 
   var visited: Boolean = false
-
+  protected def arrayToString(a: Array[Byte]): String = Base16.encode(a).take(8)
   protected def computeLabel: D
-
   protected var labelOpt: Option[D] = None
 
   def label: D = labelOpt match {
@@ -21,19 +21,19 @@ sealed trait Node[D <: Digest] extends ToStringHelper {
   }
 }
 
-sealed trait ProverNodes[D <: Digest] extends Node[D] with KeyInVar {
+sealed trait EncryProverNodes[D <: Digest] extends EncryNode[D] with KeyInVar {
   var isNew: Boolean = true
 }
 
-sealed trait VerifierNodes[D <: Digest] extends Node[D]
+sealed trait VerifierNodes[D <: Digest] extends EncryNode[D]
 
-class LabelOnlyNode[D <: Digest](l: D) extends VerifierNodes[D] {
+class LabelOnlyEncryNode[D <: Digest](l: D) extends VerifierNodes[D] {
   labelOpt = Some(l)
 
   protected def computeLabel: D = l
 }
 
-sealed trait InternalNode[D <: Digest] extends Node[D] {
+sealed trait InternalEncryNode[D <: Digest] extends EncryNode[D] {
   protected var b: Balance
 
   protected val hf: CryptographicHash[D]
@@ -42,46 +42,46 @@ sealed trait InternalNode[D <: Digest] extends Node[D] {
 
   def balance: Balance = b
 
-  def left: Node[D]
+  def left: EncryNode[D]
 
-  def right: Node[D]
+  def right: EncryNode[D]
 
-  def getNew(newLeft: Node[D] = left, newRight: Node[D] = right, newBalance: Balance = b): InternalNode[D]
+  def getNew(newLeft: EncryNode[D] = left, newRight: EncryNode[D] = right, newBalance: Balance = b): InternalEncryNode[D]
 
-  def getNewKey(newKey: ADKey): InternalNode[D]
+  def getNewKey(newKey: ADKey): InternalEncryNode[D]
 }
 
-class InternalProverNode[D <: Digest](protected var k: ADKey,
-                                      protected var l: ProverNodes[D],
-                                      protected var r: ProverNodes[D],
-                                      protected var b: Balance = Balance @@ 0.toByte)(implicit val hf: CryptographicHash[D])
-  extends ProverNodes[D] with InternalNode[D] {
+class InternalProverEncryNode[D <: Digest](protected var k: ADKey,
+                                           protected var l: EncryProverNodes[D],
+                                           protected var r: EncryProverNodes[D],
+                                           protected var b: Balance = Balance @@ 0.toByte)(implicit val hf: CryptographicHash[D])
+  extends EncryProverNodes[D] with InternalEncryNode[D] {
 
 
-  override def left: ProverNodes[D] = l
+  override def left: EncryProverNodes[D] = l
 
-  override def right: ProverNodes[D] = r
+  override def right: EncryProverNodes[D] = r
 
-  def getNewKey(newKey: ADKey): InternalProverNode[D] = {
+  def getNewKey(newKey: ADKey): InternalProverEncryNode[D] = {
     if (isNew) {
       k = newKey // label doesn't change when key of an internal node changes
       this
     } else {
-      val ret = new InternalProverNode(newKey, left, right, b)
+      val ret = new InternalProverEncryNode(newKey, left, right, b)
       ret.labelOpt = labelOpt // label doesn't change when key of an internal node changes
       ret
     }
   }
 
-  def getNew(newLeft: Node[D] = left, newRight: Node[D] = right, newBalance: Balance = b): InternalProverNode[D] = {
+  def getNew(newLeft: EncryNode[D] = left, newRight: EncryNode[D] = right, newBalance: Balance = b): InternalProverEncryNode[D] = {
     if (isNew) {
-      l = newLeft.asInstanceOf[ProverNodes[D]]
-      r = newRight.asInstanceOf[ProverNodes[D]]
+      l = newLeft.asInstanceOf[EncryProverNodes[D]]
+      r = newRight.asInstanceOf[EncryProverNodes[D]]
       b = newBalance
       labelOpt = None
       this
     } else {
-      new InternalProverNode(k, newLeft.asInstanceOf[ProverNodes[D]], newRight.asInstanceOf[ProverNodes[D]], newBalance)
+      new InternalProverEncryNode(k, newLeft.asInstanceOf[EncryProverNodes[D]], newRight.asInstanceOf[EncryProverNodes[D]], newBalance)
     }
   }
 
@@ -91,17 +91,17 @@ class InternalProverNode[D <: Digest](protected var k: ADKey,
   }
 }
 
-class InternalVerifierNode[D <: Digest](protected var l: Node[D], protected var r: Node[D], protected var b: Balance)
-                                       (implicit val hf: CryptographicHash[D]) extends VerifierNodes[D] with InternalNode[D] {
+class InternalVerifierEncryNode[D <: Digest](protected var l: EncryNode[D], protected var r: EncryNode[D], protected var b: Balance)
+                                            (implicit val hf: CryptographicHash[D]) extends VerifierNodes[D] with InternalEncryNode[D] {
 
 
-  override def left: Node[D] = l
+  override def left: EncryNode[D] = l
 
-  override def right: Node[D] = r
+  override def right: EncryNode[D] = r
 
-  def getNewKey(newKey: ADKey): InternalNode[D] = this
+  def getNewKey(newKey: ADKey): InternalEncryNode[D] = this
 
-  def getNew(newLeft: Node[D] = l, newRight: Node[D] = r, newBalance: Balance = b): InternalVerifierNode[D] = {
+  def getNew(newLeft: EncryNode[D] = l, newRight: EncryNode[D] = r, newBalance: Balance = b): InternalVerifierEncryNode[D] = {
     l = newLeft
     r = newRight
     b = newBalance
@@ -114,7 +114,7 @@ class InternalVerifierNode[D <: Digest](protected var l: Node[D], protected var 
   }
 }
 
-sealed trait Leaf[D <: Digest] extends Node[D] with KeyInVar {
+sealed trait EncryLeaf[D <: Digest] extends EncryNode[D] with KeyInVar {
   protected var nk: ADKey
   protected var v: ADValue
 
@@ -127,7 +127,7 @@ sealed trait Leaf[D <: Digest] extends Node[D] with KeyInVar {
 
   protected def computeLabel: D = hf.prefixedHash(0: Byte, k, v, nk)
 
-  def getNew(newKey: ADKey = k, newValue: ADValue = v, newNextLeafKey: ADKey = nk): Leaf[D]
+  def getNew(newKey: ADKey = k, newValue: ADValue = v, newNextLeafKey: ADKey = nk): EncryLeaf[D]
 
   override def toString: String = {
     s"${arrayToString(label)}: Leaf(${arrayToString(key)}, ${arrayToString(value)}, ${arrayToString(nextLeafKey)})"
@@ -135,7 +135,7 @@ sealed trait Leaf[D <: Digest] extends Node[D] with KeyInVar {
 }
 
 class VerifierLeaf[D <: Digest](protected var k: ADKey, protected var v: ADValue, protected var nk: ADKey)
-                               (implicit val hf: CryptographicHash[D]) extends Leaf[D] with VerifierNodes[D] {
+                               (implicit val hf: CryptographicHash[D]) extends EncryLeaf[D] with VerifierNodes[D] {
 
   def getNew(newKey: ADKey = k, newValue: ADValue = v, newNextLeafKey: ADKey = nk): VerifierLeaf[D] = {
     k = newKey
@@ -147,7 +147,7 @@ class VerifierLeaf[D <: Digest](protected var k: ADKey, protected var v: ADValue
 }
 
 class ProverLeaf[D <: Digest](protected var k: ADKey, protected var v: ADValue, protected var nk: ADKey)
-                             (implicit val hf: CryptographicHash[D]) extends Leaf[D] with ProverNodes[D] {
+                             (implicit val hf: CryptographicHash[D]) extends EncryLeaf[D] with EncryProverNodes[D] {
 
   def getNew(newKey: ADKey = k, newValue: ADValue = v, newNextLeafKey: ADKey = nk): ProverLeaf[D] = {
     if (isNew) {
