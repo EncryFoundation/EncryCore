@@ -139,12 +139,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         context.actorSelection("/user/kafkaActor") ! KafkaMessage("ERROR", "Strange input: " + a)
   }
 
-  def computeApplications(): Unit = modifiersCache.popCandidate(nodeView.history) match {
-    case Some(mod) =>
-      pmodModify(mod)
-      computeApplications()
-    case None => Unit
-  }
+  def computeApplications(): Unit =
+    modifiersCache.popCandidate(nodeView.history) match {
+      case Some(mod) =>
+        pmodModify(mod)
+        computeApplications()
+      case None => Unit
+    }
 
   def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
@@ -285,8 +286,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               if (settings.node.sendStat)
                 newHistory.bestHeaderOpt.foreach(header =>
                   context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
-              if (newHistory.isFullChainSynced)
-                nodeViewSynchronizer ! FullBlockChainSynced
+              if (newHistory.isFullChainSynced) Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
               logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state", e)
