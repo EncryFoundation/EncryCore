@@ -19,7 +19,7 @@ class KafkaActor extends Actor with Logging {
   def assembleFullMessage(level: String, message: String): String = settings.network.nodeName + " - " + getDateTimeNow +
     " - " + level + " - " + message
 
-  val kafkaParams: Properties= new Properties
+  val kafkaParams: Properties = new Properties
   kafkaParams.put("bootstrap.servers", settings.kafka.kafkaBrokers)
   kafkaParams.put("key.serializer", classOf[StringSerializer])
   kafkaParams.put("value.serializer", classOf[StringSerializer])
