@@ -1,28 +1,31 @@
 package encry.view.mempool
 
+import akka.actor.Cancellable
 import encry.ModifierId
+import encry.EncryApp.system
 import encry.modifiers.mempool.Transaction
 import encry.settings.EncryAppSettings
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.mempool.EncryMempool._
-import monix.eval.Task
-import monix.execution.{CancelableFuture, Scheduler}
 import scala.collection.concurrent.TrieMap
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
 
 class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
                    settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
   extends MemoryPool[Transaction, EncryMempool] with EncryMempoolReader with AutoCloseable with Logging {
 
-  private implicit val cleanupScheduler: Scheduler = Scheduler.singleThread("mempool-cleanup-thread")
+  private def removeExpiredFuture(): Future[EncryMempool] =
+    timeProvider
+      .time()
+      .map {
+        time =>
+        filter(tx => (time - tx.timestamp) > settings.node.utxMaxAge.toMillis)
+      }
 
-  private val removeExpiredFuture: Task[EncryMempool] = Task.fromFuture(timeProvider.time()).flatMap { time =>
-    Task {
-      filter(tx => (time - tx.timestamp) > settings.node.utxMaxAge.toMillis)
-    }.delayExecution(settings.node.mempoolCleanupInterval)
-  }
-
-  private val cleanup: CancelableFuture[EncryMempool] = removeExpiredFuture.runAsync
+  private val cleanup: Cancellable =
+    system.scheduler.schedule(settings.node.mempoolCleanupInterval, settings.node.mempoolCleanupInterval)(removeExpiredFuture)
 
   override def close(): Unit = cleanup.cancel()
 
@@ -34,6 +37,7 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
       if ((size + validTxs.size) <= settings.node.mempoolMaxCapacity) {
         Success(putWithoutCheck(validTxs))
       } else {
+        removeExpiredFuture()
         val overflow: Int = (size + validTxs.size) - settings.node.mempoolMaxCapacity
         Success(putWithoutCheck(validTxs.take(validTxs.size - overflow)))
       }
@@ -51,15 +55,15 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
     this
   }
 
-  def removeAsync(txs: Seq[Transaction]): Unit = Task {
+  def removeAsync(txs: Seq[Transaction]): Unit = Future {
     txs.foreach(remove)
-  }.runAsync
+  }
 
   override def take(limit: Int): Iterable[Transaction] = unconfirmed.values.toSeq.take(limit)
 
   def takeAll: Iterable[Transaction] = unconfirmed.values.toSeq
 
-  override def filter(condition: (Transaction) => Boolean): EncryMempool = {
+  override def filter(condition: Transaction => Boolean): EncryMempool = {
     unconfirmed.retain { (_, v) =>
       condition(v)
     }
