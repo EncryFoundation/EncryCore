@@ -4,7 +4,6 @@ import com.typesafe.config.ConfigException
 import encry.view.state.StateMode
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
-
 import scala.concurrent.duration.FiniteDuration
 
 case class NodeSettings(stateMode: StateMode,
