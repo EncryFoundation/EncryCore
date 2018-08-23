@@ -323,7 +323,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     }.asInstanceOf[StateType]
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
-    val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
+    val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider, system)
     NodeView(history, state, wallet, memPool)
   }
 
@@ -331,7 +331,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     try {
       val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
-      val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
+      val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider, system)
       val state: StateType = restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
       Some(NodeView(history, state, wallet, memPool))
     } catch {

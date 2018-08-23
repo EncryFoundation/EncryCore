@@ -1,8 +1,7 @@
 package encry.view.mempool
 
-import akka.actor.Cancellable
+import akka.actor.{ActorSystem, Cancellable}
 import encry.ModifierId
-import encry.EncryApp.system
 import encry.modifiers.mempool.Transaction
 import encry.settings.EncryAppSettings
 import encry.utils.{Logging, NetworkTimeProvider}
@@ -13,10 +12,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
 
 class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
-                   settings: EncryAppSettings, timeProvider: NetworkTimeProvider)
+                   settings: EncryAppSettings, timeProvider: NetworkTimeProvider, system: ActorSystem)
   extends MemoryPool[Transaction, EncryMempool] with EncryMempoolReader with AutoCloseable with Logging {
 
-  private def removeExpiredFuture(): Future[EncryMempool] =
+  private def removeExpired(): Future[EncryMempool] =
     timeProvider
       .time()
       .map {
@@ -25,7 +24,7 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
       }
 
   private val cleanup: Cancellable =
-    system.scheduler.schedule(settings.node.mempoolCleanupInterval, settings.node.mempoolCleanupInterval)(removeExpiredFuture)
+    system.scheduler.schedule(settings.node.mempoolCleanupInterval, settings.node.mempoolCleanupInterval)(removeExpired)
 
   override def close(): Unit = cleanup.cancel()
 
@@ -37,7 +36,7 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
       if ((size + validTxs.size) <= settings.node.mempoolMaxCapacity) {
         Success(putWithoutCheck(validTxs))
       } else {
-        removeExpiredFuture()
+        removeExpired()
         val overflow: Int = (size + validTxs.size) - settings.node.mempoolMaxCapacity
         Success(putWithoutCheck(validTxs.take(validTxs.size - overflow)))
       }
@@ -79,6 +78,6 @@ object EncryMempool {
 
   type MemPoolResponse = Seq[Transaction]
 
-  def empty(settings: EncryAppSettings, timeProvider: NetworkTimeProvider): EncryMempool =
-    new EncryMempool(TrieMap.empty, settings, timeProvider)
+  def empty(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, system: ActorSystem): EncryMempool =
+    new EncryMempool(TrieMap.empty, settings, timeProvider, system)
 }
