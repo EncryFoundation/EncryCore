@@ -70,13 +70,12 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
   }
 
   protected def replayComparison: Int = {
-    val ret: Int = if (replayIndex == lastRightStep) {
+    val ret: Int = if (replayIndex == lastRightStep)
       0
-    } else if ((directions(replayIndex >> 3) & (1 << (replayIndex & 7)).toByte) == 0) {
+    else if ((directions(replayIndex >> 3) & (1 << (replayIndex & 7)).toByte) == 0)
       1
-    } else {
+    else
       -1
-    }
     replayIndex += 1
     ret
   }
@@ -122,9 +121,9 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
       currentNode match {
         case _ if currentNode.label sameElements label => true
         case r: InternalProverEncryNode[D] =>
-          if (keyFound) {
+          if (keyFound)
             loop(r.left, keyFound = true)
-          } else {
+          else
             ByteArray.compare(key, r.key) match {
               case 0 => // found in the tree -- go one step right, then left to the leaf
                 loop(r.right, keyFound = true)
@@ -133,16 +132,15 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
               case _ => // going right, not yet found
                 loop(r.right, keyFound = false)
             }
-          }
         case _ => false
       }
     }
-
-    loop(topNode, false)
+    loop(topNode, keyFound = false)
   }
 
   def generateProofForOperations(operations: Seq[encry.avltree.Operation]): Try[(SerializedAdProof, ADDigest)] = Try {
-    val newProver: BatchAVLProver[D, HF] = new BatchAVLProver[D, HF](keyLength, valueLengthOpt, Some(topNode, rootNodeHeight), false)
+    val newProver: BatchAVLProver[D, HF] =
+      new BatchAVLProver[D, HF](keyLength, valueLengthOpt, Some(topNode, rootNodeHeight), collectChangedNodes = false)
     operations.foreach(o => newProver.performOneOperation(o).get)
     (newProver.generateProof(), newProver.digest)
   }
@@ -153,7 +151,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
     val packagedTree = new mutable.ArrayBuffer[Byte]
     var previousLeafAvailable: Boolean = false
 
-    def packTree(rNode: EncryProverNodes[D]) {
+    def packTree(rNode: EncryProverNodes[D]): Unit =  {
       if (!rNode.visited) {
         packagedTree += LabelInPackagedProof
         packagedTree ++= rNode.label
@@ -166,9 +164,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
             packagedTree += LeafInPackagedProof
             if (!previousLeafAvailable) packagedTree ++= r.key
             packagedTree ++= r.nextLeafKey
-            if (valueLengthOpt.isEmpty) {
-              packagedTree ++= Ints.toByteArray(r.value.length)
-            }
+            if (valueLengthOpt.isEmpty) packagedTree ++= Ints.toByteArray(r.value.length)
             packagedTree ++= r.value
             previousLeafAvailable = true
           case r: InternalProverEncryNode[D] =>
