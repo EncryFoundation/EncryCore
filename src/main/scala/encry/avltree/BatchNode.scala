@@ -13,7 +13,7 @@ sealed trait EncryNode[D <: Digest] {
 
   def label: D = labelOpt match {
     case None =>
-      val l = computeLabel
+      val l: D = computeLabel
       labelOpt = Some(l)
       l
     case Some(l) =>
@@ -67,7 +67,7 @@ class InternalProverEncryNode[D <: Digest](protected var k: ADKey,
       k = newKey // label doesn't change when key of an internal node changes
       this
     } else {
-      val ret = new InternalProverEncryNode(newKey, left, right, b)
+      val ret: InternalProverEncryNode[D] = new InternalProverEncryNode(newKey, left, right, b)
       ret.labelOpt = labelOpt // label doesn't change when key of an internal node changes
       ret
     }

@@ -58,7 +58,7 @@ trait AuthenticatedTreeOps[D <: Digest] {
   protected def replayComparison: Int
 
   private def doubleLeftRotate(currentRoot: InternalEncryNode[D], leftChild: EncryNode[D], rightChild: InternalEncryNode[D]): InternalEncryNode[D] = {
-    val newRoot = rightChild.left.asInstanceOf[InternalEncryNode[D]]
+    val newRoot: InternalEncryNode[D] = rightChild.left.asInstanceOf[InternalEncryNode[D]]
     val (newLeftBalance: Balance, newRightBalance: Balance) = newRoot.balance match {
       case a if a == 0 =>
         (Balance @@ 0.toByte, Balance @@ 0.toByte)
@@ -67,13 +67,13 @@ trait AuthenticatedTreeOps[D <: Digest] {
       case a if a == 1 =>
         (Balance @@ -1.toByte, Balance @@ 0.toByte)
     }
-    val newLeftChild = currentRoot.getNew(newLeft = leftChild, newRight = newRoot.left, newBalance = newLeftBalance)
-    val newRightChild = rightChild.getNew(newLeft = newRoot.right, newBalance = newRightBalance)
+    val newLeftChild: InternalEncryNode[D] = currentRoot.getNew(newLeft = leftChild, newRight = newRoot.left, newBalance = newLeftBalance)
+    val newRightChild: InternalEncryNode[D] = rightChild.getNew(newLeft = newRoot.right, newBalance = newRightBalance)
     newRoot.getNew(newLeft = newLeftChild, newRight = newRightChild, newBalance = Balance @@ 0.toByte)
   }
 
   private def doubleRightRotate(currentRoot: InternalEncryNode[D], leftChild: InternalEncryNode[D], rightChild: EncryNode[D]): InternalEncryNode[D] = {
-    val newRoot = leftChild.right.asInstanceOf[InternalEncryNode[D]]
+    val newRoot: InternalEncryNode[D] = leftChild.right.asInstanceOf[InternalEncryNode[D]]
     val (newLeftBalance: Balance, newRightBalance: Balance) = newRoot.balance match {
       case a if a == 0 =>
         (Balance @@ 0.toByte, Balance @@ 0.toByte)
@@ -82,19 +82,19 @@ trait AuthenticatedTreeOps[D <: Digest] {
       case a if a == 1 =>
         (Balance @@ -1.toByte, Balance @@ 0.toByte)
     }
-    val newRightChild = currentRoot.getNew(newRight = rightChild, newLeft = newRoot.right, newBalance = newRightBalance)
-    val newLeftChild = leftChild.getNew(newRight = newRoot.left, newBalance = newLeftBalance)
+    val newRightChild: InternalEncryNode[D] = currentRoot.getNew(newRight = rightChild, newLeft = newRoot.right, newBalance = newRightBalance)
+    val newLeftChild: InternalEncryNode[D] = leftChild.getNew(newRight = newRoot.left, newBalance = newLeftBalance)
     newRoot.getNew(newLeft = newLeftChild, newRight = newRightChild, newBalance = Balance @@ 0.toByte)
   }
 
   protected def returnResultOfOneOperation(operation: encry.avltree.Operation, rootNode: EncryNode[D]): Try[(EncryNode[D], Option[ADValue])] = Try {
-    val key = operation.key
+    val key: ADKey = operation.key
 
     require(ByteArray.compare(key, NegativeInfinityKey) > 0, s"Key ${Base16.encode(key)} is less than -inf")
     require(ByteArray.compare(key, PositiveInfinityKey) < 0, s"Key ${Base16.encode(key)} is more than +inf")
     require(key.length == keyLength)
 
-    var savedNode: Option[EncryLeaf[D]] = None // The leaf to be saved in the hard deletion case, where we delete a leaf and copy its info over to another leaf
+    var savedNode: Option[EncryLeaf[D]] = None
 
     def modifyHelper(rNode: EncryNode[D], key: ADKey, operation: encry.avltree.Operation): (EncryNode[D], Boolean, Boolean, Boolean, Option[ADValue]) = {
       rNode match {
@@ -108,21 +108,20 @@ trait AuthenticatedTreeOps[D <: Digest] {
                     (r, false, false, true, Some(r.value))
                   case Success(Some(v)) => // update value
                     valueLengthOpt.foreach(vl => require(v.length == vl, s"Value length is fixed and should be $vl"))
-                    val oldValue = Some(r.value)
-                    val rNew = r.getNew(newValue = v)
+                    val oldValue: Option[ADValue] = Some(r.value)
+                    val rNew: EncryLeaf[D] = r.getNew(newValue = v)
                     onNodeVisit(r, operation)
                     (rNew, true, false, false, oldValue)
                   case Failure(e) => // updateFunction doesn't like the value we found
                     throw e
                 }
-              case _: encry.avltree.Lookup =>
+              case _: Lookup =>
                 onNodeVisit(r, operation)
                 (r, false, false, false, Some(r.value))
             }
           } else {
-            // x > r.key
             operation match {
-              case m: encry.avltree.Modification =>
+              case m: Modification =>
                 m.updateFn(None) match {
                   case Success(None) => // don't change anything, just lookup
                     onNodeVisit(rNode, operation)
@@ -134,7 +133,7 @@ trait AuthenticatedTreeOps[D <: Digest] {
                   case Failure(e) => // updateFunctions doesn't like that we found nothing
                     throw e
                 }
-              case _: encry.avltree.Lookup =>
+              case _: Lookup =>
                 onNodeVisit(rNode, operation)
                 (r, false, false, false, None)
             }
@@ -146,16 +145,16 @@ trait AuthenticatedTreeOps[D <: Digest] {
 
             if (changeHappened) {
               if (childHeightIncreased && r.balance < 0) {
-                val newLeft = newLeftM.asInstanceOf[InternalEncryNode[D]]
+                val newLeft: InternalEncryNode[D] = newLeftM.asInstanceOf[InternalEncryNode[D]]
                 if (newLeft.balance < 0) {
-                  val newR = r.getNew(newLeft = newLeft.right, newBalance = Balance @@ 0.toByte)
+                  val newR: InternalEncryNode[D] = r.getNew(newLeft = newLeft.right, newBalance = Balance @@ 0.toByte)
                   (newLeft.getNew(newRight = newR, newBalance = Balance @@ 0.toByte), true, false, false, oldValue)
                 } else {
                   (doubleRightRotate(r, newLeft, r.right), true, false, false, oldValue)
                 }
               } else {
-                val myHeightIncreased = childHeightIncreased && r.balance == (0: Byte)
-                val rBalance = if (childHeightIncreased) Balance @@ (r.balance - 1).toByte else r.balance
+                val myHeightIncreased: Boolean = childHeightIncreased && r.balance == (0: Byte)
+                val rBalance: Balance = if (childHeightIncreased) Balance @@ (r.balance - 1).toByte else r.balance
                 (r.getNew(newLeft = newLeftM, newBalance = rBalance), true, myHeightIncreased, false, oldValue)
               }
 
@@ -168,17 +167,17 @@ trait AuthenticatedTreeOps[D <: Digest] {
 
             if (changeHappened) {
               if (childHeightIncreased && r.balance > 0) {
-                val newRight = newRightM.asInstanceOf[InternalEncryNode[D]]
+                val newRight: InternalEncryNode[D] = newRightM.asInstanceOf[InternalEncryNode[D]]
 
                 if (newRight.balance > 0) {
-                  val newR = r.getNew(newRight = newRight.left, newBalance = Balance @@ 0.toByte)
+                  val newR: InternalEncryNode[D] = r.getNew(newRight = newRight.left, newBalance = Balance @@ 0.toByte)
                   (newRight.getNew(newLeft = newR, newBalance = Balance @@ 0.toByte), true, false, false, oldValue)
                 } else {
                   (doubleLeftRotate(r, r.left, newRight), true, false, false, oldValue)
                 }
               } else {
                 val myHeightIncreased: Boolean = childHeightIncreased && r.balance == (0: Byte)
-                val rBalance = if (childHeightIncreased) Balance @@ (r.balance + 1).toByte else r.balance
+                val rBalance: Balance = if (childHeightIncreased) Balance @@ (r.balance + 1).toByte else r.balance
                 (r.getNew(newRight = newRightM, newBalance = rBalance), true, myHeightIncreased, false, oldValue)
               }
             } else {
@@ -218,13 +217,13 @@ trait AuthenticatedTreeOps[D <: Digest] {
 
       onNodeVisit(r, operation)
 
-      val direction = if (deleteMax) 1 else replayComparison
+      val direction: Int = if (deleteMax) 1 else replayComparison
 
       assert(!(direction < 0 && r.left.isInstanceOf[EncryLeaf[D]]))
 
       if (direction >= 0 && r.right.isInstanceOf[EncryLeaf[D]]) {
 
-        val rightChild = r.right.asInstanceOf[EncryLeaf[D]]
+        val rightChild: EncryLeaf[D] = r.right.asInstanceOf[EncryLeaf[D]]
         onNodeVisit(rightChild, operation)
         if (deleteMax) {
 
@@ -236,17 +235,17 @@ trait AuthenticatedTreeOps[D <: Digest] {
           (changeNextLeafKeyOfMaxNode(r.left, rightChild.nextLeafKey), true)
         }
       } else if (direction == 0 && r.left.isInstanceOf[EncryLeaf[D]]) {
-        val leftChild = r.left.asInstanceOf[EncryLeaf[D]]
+        val leftChild: EncryLeaf[D] = r.left.asInstanceOf[EncryLeaf[D]]
         onNodeVisit(leftChild, operation)
         (changeKeyAndValueOfMinNode(r.right, leftChild.key, leftChild.value), true)
       } else {
         if (direction <= 0) {
-          val (newLeft, childHeightDecreased) = deleteHelper(r.left.asInstanceOf[InternalEncryNode[D]], direction == 0)
+          val (newLeft: EncryNode[D], childHeightDecreased: Boolean) = deleteHelper(r.left.asInstanceOf[InternalEncryNode[D]], direction == 0)
 
-          val newRoot = if (direction == 0) {
-            val s = savedNode.get
+          val newRoot: InternalEncryNode[D] = if (direction == 0) {
+            val s: EncryLeaf[D] = savedNode.get
             savedNode = None
-            val rWithChangedKey = r.getNewKey(s.key)
+            val rWithChangedKey: InternalEncryNode[D] = r.getNewKey(s.key)
             rWithChangedKey.getNew(newRight = changeKeyAndValueOfMinNode(rWithChangedKey.right, s.key, s.value))
           } else {
             r
@@ -255,48 +254,50 @@ trait AuthenticatedTreeOps[D <: Digest] {
           if (childHeightDecreased && newRoot.balance > 0) {
             onNodeVisit(newRoot.right, operation, isRotate = true)
 
-            val rightChild = newRoot.right.asInstanceOf[InternalEncryNode[D]]
+            val rightChild: InternalEncryNode[D] = newRoot.right.asInstanceOf[InternalEncryNode[D]]
             if (rightChild.balance < 0) {
               onNodeVisit(rightChild.left, operation, isRotate = true)
               (doubleLeftRotate(newRoot, newLeft, rightChild), true)
             } else {
-              val newLeftChild = newRoot.getNew(newLeft = newLeft, newRight = rightChild.left,
+              val newLeftChild: InternalEncryNode[D] = newRoot.getNew(newLeft = newLeft, newRight = rightChild.left,
                 newBalance = Balance @@ (1 - rightChild.balance).toByte)
-              val newR = rightChild.getNew(newLeft = newLeftChild,
+              val newR: InternalEncryNode[D] = rightChild.getNew(newLeft = newLeftChild,
                 newBalance = Balance @@ (rightChild.balance - 1).toByte)
               (newR, newR.balance == 0)
             }
           } else {
-            val newBalance = if (childHeightDecreased) Balance @@ (newRoot.balance + 1).toByte else newRoot.balance
+            val newBalance: Balance = if (childHeightDecreased) Balance @@ (newRoot.balance + 1).toByte else newRoot.balance
             (newRoot.getNew(newLeft = newLeft, newBalance = newBalance), childHeightDecreased && newBalance == 0)
           }
         } else {
-          val (newRight, childHeightDecreased) = deleteHelper(r.right.asInstanceOf[InternalEncryNode[D]], deleteMax)
+          val (newRight: EncryNode[D], childHeightDecreased: Boolean) = deleteHelper(r.right.asInstanceOf[InternalEncryNode[D]], deleteMax)
           if (childHeightDecreased && r.balance < 0) {
             onNodeVisit(r.left, operation, isRotate = true)
 
-            val leftChild = r.left.asInstanceOf[InternalEncryNode[D]]
+            val leftChild: InternalEncryNode[D] = r.left.asInstanceOf[InternalEncryNode[D]]
             if (leftChild.balance > 0) {
               onNodeVisit(leftChild.right, operation, isRotate = true)
               (doubleRightRotate(r, leftChild, newRight), true)
             } else {
-              val newRightChild = r.getNew(newLeft = leftChild.right, newRight = newRight,
+              val newRightChild: InternalEncryNode[D] = r.getNew(newLeft = leftChild.right, newRight = newRight,
                 newBalance = Balance @@ (-leftChild.balance - 1).toByte)
-              val newR = leftChild.getNew(newRight = newRightChild,
+              val newR: InternalEncryNode[D] = leftChild.getNew(newRight = newRightChild,
                 newBalance = Balance @@ (1 + leftChild.balance).toByte)
               (newR, newR.balance == 0)
             }
           } else {
-            val newBalance = if (childHeightDecreased) Balance @@ (r.balance - 1).toByte else r.balance
+            val newBalance: Balance = if (childHeightDecreased) Balance @@ (r.balance - 1).toByte else r.balance
             (r.getNew(newRight = newRight, newBalance = newBalance), childHeightDecreased && newBalance == 0)
           }
         }
       }
     }
 
-    val (newRootNode, _, heightIncreased, toDelete, oldValue) = modifyHelper(rootNode, key, operation)
+    val (newRootNode: EncryNode[D], _, heightIncreased: Boolean, toDelete: Boolean, oldValue: Option[ADValue]) =
+      modifyHelper(rootNode, key, operation)
     if (toDelete) {
-      val (postDeleteRootNode, heightDecreased) = deleteHelper(newRootNode.asInstanceOf[InternalEncryNode[D]], deleteMax = false)
+      val (postDeleteRootNode: EncryNode[D], heightDecreased: Boolean) =
+        deleteHelper(newRootNode.asInstanceOf[InternalEncryNode[D]], deleteMax = false)
       if (heightDecreased) rootNodeHeight -= 1
       (postDeleteRootNode, oldValue)
     } else {

@@ -1,9 +1,11 @@
 package encry.avltree
 
 import com.google.common.primitives.Ints
-import org.encryfoundation.common.utils.TaggedTypes._
+import org.encryfoundation.common.utils.TaggedTypes
+import org.encryfoundation.common.utils.TaggedTypes.{ADValue, _}
 import scorex.crypto.hash._
 import scorex.utils.ByteArray
+import supertagged.@@
 import scala.collection.mutable
 import scala.util.{Failure, Try}
 
@@ -27,7 +29,7 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
   private var replayIndex = 0 // Keeps track of where we are when replaying directions
 
   protected def nextDirectionIsLeft(key: ADKey, r: InternalEncryNode[D]): Boolean = {
-    val ret = if ((proof(directionsIndex >> 3) & (1 << (directionsIndex & 7)).toByte) != 0) {
+    val ret: Boolean = if ((proof(directionsIndex >> 3) & (1 << (directionsIndex & 7)).toByte) != 0) {
       true
     } else {
       lastRightStep = directionsIndex
@@ -38,7 +40,7 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
   }
 
   protected def keyMatchesLeaf(key: ADKey, r: EncryLeaf[D]): Boolean = {
-    val c = ByteArray.compare(key, r.key)
+    val c: Int = ByteArray.compare(key, r.key)
     require(c >= 0)
     if (c == 0) {
       true
@@ -49,7 +51,7 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
   }
 
   protected def replayComparison: Int = {
-    val ret = if (replayIndex == lastRightStep) {
+    val ret: Int = if (replayIndex == lastRightStep) {
       0
     } else if ((proof(replayIndex >> 3) & (1 << (replayIndex & 7)).toByte) == 0 && replayIndex < lastRightStep) {
       1
@@ -61,7 +63,7 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
   }
 
   protected def addNode(r: EncryLeaf[D], key: ADKey, v: ADValue): InternalVerifierEncryNode[D] = {
-    val n = r.nextLeafKey
+    val n: ADKey = r.nextLeafKey
     new InternalVerifierEncryNode(r.getNew(newNextLeafKey = key), new VerifierLeaf(key, v, n), Balance @@ 0.toByte)
   }
 
@@ -75,8 +77,8 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
     rootNodeHeight = startingDigest.last & 0xff
 
     val maxNodes = if (maxNumOperations.isDefined) {
-      var logNumOps = 0
-      var temp = 1
+      var logNumOps: Int = 0
+      var temp: Int = 1
       val realNumOperations: Int = maxNumOperations.getOrElse(0)
       while (temp < realNumOperations) {
         temp = temp * 2
@@ -84,7 +86,7 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
       }
 
       temp = 1 + math.max(rootNodeHeight, logNumOps)
-      val hnew = temp + temp / 2 // this will replace 1.4405 from the paper with 1.5 and will round down, which is safe, because hnew is an integer
+      val hnew: Int = temp + temp / 2 // this will replace 1.4405 from the paper with 1.5 and will round down, which is safe, because hnew is an integer
       val realMaxDeletes: Int = maxDeletes.getOrElse(realNumOperations)
       (realNumOperations + realMaxDeletes) * (2 * rootNodeHeight + 1) + realMaxDeletes * hnew + 1 // +1 needed in case numOperations == 0
     } else {
@@ -93,49 +95,49 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
 
     var numNodes = 0
     val s = new mutable.Stack[VerifierNodes[D]] // Nodes and depths
-    var i = 0
+    var i: Int = 0
     var previousLeaf: Option[EncryLeaf[D]] = None
     while (proof(i) != EndOfTreeInPackagedProof) {
-      val n = proof(i)
+      val n: Byte = proof(i)
       i += 1
       numNodes += 1
       require(maxNumOperations.isEmpty || numNodes <= maxNodes, "Proof too long")
       n match {
         case LabelInPackagedProof =>
-          val label = proof.slice(i, i + labelLength).asInstanceOf[D]
+          val label: D = proof.slice(i, i + labelLength).asInstanceOf[D]
           i += labelLength
           s.push(new LabelOnlyEncryNode[D](label))
           previousLeaf = None
         case LeafInPackagedProof =>
-          val key = if (previousLeaf.nonEmpty) {
+          val key: Array[Byte] @@ TaggedTypes.ADKey.Tag = if (previousLeaf.nonEmpty) {
             ADKey @@ previousLeaf.get.nextLeafKey
           }
           else {
-            val start = i
+            val start: Int = i
             i += keyLength
             ADKey @@ proof.slice(start, i)
           }
-          val nextLeafKey = ADKey @@ proof.slice(i, i + keyLength)
+          val nextLeafKey: ADKey = ADKey @@ proof.slice(i, i + keyLength)
           i += keyLength
           val valueLength: Int = valueLengthOpt.getOrElse {
-            val vl = Ints.fromByteArray(proof.slice(i, i + 4))
+            val vl: Int = Ints.fromByteArray(proof.slice(i, i + 4))
             i += 4
             vl
           }
-          val value = ADValue @@ proof.slice(i, i + valueLength)
+          val value: ADValue = ADValue @@ proof.slice(i, i + valueLength)
           i += valueLength
-          val leaf = new VerifierLeaf[D](key, value, nextLeafKey)
+          val leaf: VerifierLeaf[D] = new VerifierLeaf[D](key, value, nextLeafKey)
           s.push(leaf)
           previousLeaf = Some(leaf)
         case _ =>
-          val right = s.pop
-          val left = s.pop
+          val right: VerifierNodes[D] = s.pop
+          val left: VerifierNodes[D] = s.pop
           s.push(new InternalVerifierEncryNode(left, right, Balance @@ n))
       }
     }
 
     require(s.size == 1)
-    val root = s.pop
+    val root: VerifierNodes[D] = s.pop
     require(startingDigest startsWith root.label)
     directionsIndex = (i + 1) * 8 // Directions start right after the packed tree, which we just finished
     Some(root)
@@ -148,7 +150,7 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
 
   def performOneOperation(operation: Operation): Try[Option[ADValue]] = Try {
     replayIndex = directionsIndex
-    val operationResult = returnResultOfOneOperation(operation, topNode.get)
+    val operationResult: Try[(EncryNode[D], Option[ADValue])] = returnResultOfOneOperation(operation, topNode.get)
     topNode = operationResult.map(s => Some(s._1.asInstanceOf[VerifierNodes[D]])).getOrElse(None)
     operationResult.get._2
   }
