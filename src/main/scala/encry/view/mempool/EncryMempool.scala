@@ -18,8 +18,7 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
   private def removeExpired(): Future[EncryMempool] =
     timeProvider
       .time()
-      .map {
-        time =>
+      .map { time =>
         filter(tx => (time - tx.timestamp) > settings.node.utxMaxAge.toMillis)
       }
 
@@ -36,7 +35,6 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
       if ((size + validTxs.size) <= settings.node.mempoolMaxCapacity) {
         Success(putWithoutCheck(validTxs))
       } else {
-        removeExpired()
         val overflow: Int = (size + validTxs.size) - settings.node.mempoolMaxCapacity
         Success(putWithoutCheck(validTxs.take(validTxs.size - overflow)))
       }

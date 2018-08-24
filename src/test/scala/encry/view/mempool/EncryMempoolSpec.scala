@@ -24,7 +24,7 @@ class EncryMempoolSpec extends PropSpec with Matchers with EncryGenerator {
 
     mempool.put(txs)
 
-    maxCapacity - mempool.size >= 0 shouldBe true
+    mempool.size shouldBe maxCapacity
   }
 
   property("Mempool should not accept invalid transactions.") {
