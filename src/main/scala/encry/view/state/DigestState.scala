@@ -7,11 +7,12 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.Transaction
-import encry.settings.{Algos, Constants, NodeSettings}
 import encry.EncryApp.{settings => encrySettings, system}
 import encry.stats.LoggingActor.LogMessage
+import encry.settings.{Constants, NodeSettings}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import scorex.crypto.authds.ADDigest
+import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scala.util.{Failure, Success, Try}
 
 /** Minimal state variant which is storing only digest of UTXO authenticated as a dynamic dictionary. */

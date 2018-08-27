@@ -1,19 +1,18 @@
-package scorex.crypto.authds.avltree.batch
+package encry.avltree
 
 import com.google.common.primitives.Longs
+import encry.avltree.helpers.TestHelper
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import org.scalacheck.Test.Parameters
 import org.scalacheck.commands.Commands
 import org.scalacheck.{Gen, Prop}
 import org.scalatest.PropSpec
-import scorex.crypto.authds.avltree.batch.helpers.TestHelper
-import scorex.crypto.authds._
-import scorex.crypto.hash.{Blake2b256, Digest32}
+import scorex.crypto.hash.Digest32
 import scorex.utils.{Random => RandomBytes}
-
 import scala.util.{Failure, Random, Success, Try}
 
 class VersionedIODBAVLStorageStatefulSpecification extends PropSpec {
-  val params = Parameters.default
+  val params: Parameters = Parameters.default
     .withMinSize(10)
     .withMaxSize(50)
     .withMinSuccessfulTests(15)
@@ -33,7 +32,7 @@ object WithLSM extends VersionedIODBAVLStorageStatefulCommands with TestHelper {
   override protected val VL = 8
   override protected val LL = 32
 
-  override protected def createStatefulProver: PersistentBatchAVLProver[Digest32, HF] = {
+  override protected def createStatefulProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF] = {
     createPersistentProverWithLSM(keepVersions)
   }
 }
@@ -44,7 +43,7 @@ object WithQuick extends VersionedIODBAVLStorageStatefulCommands with TestHelper
   override protected val VL = 8
   override protected val LL = 32
 
-  override protected def createStatefulProver: PersistentBatchAVLProver[Digest32, HF] = {
+  override protected def createStatefulProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF] = {
     createPersistentProverWithQuick(keepVersions)
   }
 }
@@ -52,7 +51,7 @@ object WithQuick extends VersionedIODBAVLStorageStatefulCommands with TestHelper
 trait VersionedIODBAVLStorageStatefulCommands extends Commands { this: TestHelper =>
 
   override type State = Operations
-  override type Sut = PersistentBatchAVLProver[Digest32, HF]
+  override type Sut = encry.avltree.PersistentBatchAVLProver[Digest32, HF]
   val keepVersions = 1000
 
   private val MAXIMUM_GENERATED_OPERATIONS = 20
@@ -66,7 +65,7 @@ trait VersionedIODBAVLStorageStatefulCommands extends Commands { this: TestHelpe
 
   override def newSut(state: State): Sut = createStatefulProver
 
-  protected def createStatefulProver: PersistentBatchAVLProver[Digest32, HF]
+  protected def createStatefulProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF]
 
   override def destroySut(sut: Sut): Unit = ()
 
@@ -78,7 +77,7 @@ trait VersionedIODBAVLStorageStatefulCommands extends Commands { this: TestHelpe
     val appendsCommandsLength = Random.nextInt(MAXIMUM_GENERATED_OPERATIONS) + MINIMUM_OPERATIONS_LENGTH
 
     val keys = (0 until appendsCommandsLength).map { _ => ADKey @@ RandomBytes.randomBytes(KL) }.toList
-    val removedKeys = state.operations.filter(_.isInstanceOf[Remove]).map(_.key).distinct
+    val removedKeys = state.operations.filter(_.isInstanceOf[encry.avltree.Remove]).map(_.key).distinct
     val prevKeys = state.operations.map(_.key).distinct.filterNot(k1 => removedKeys.exists { k2 => k1.sameElements(k2) })
     val uniqueKeys = keys.filterNot(prevKeys.contains).distinct
     val updateKeys = Random.shuffle(prevKeys).take(safeDivide(prevKeys.length, UPDATE_FRACTION))
@@ -86,7 +85,7 @@ trait VersionedIODBAVLStorageStatefulCommands extends Commands { this: TestHelpe
 
     val appendCommands = uniqueKeys.map { k => Insert(k, ADValue @@ Longs.toByteArray(nextPositiveLong)) }
     val updateCommands = updateKeys.map { k => UpdateLongBy(k, nextPositiveLong) }
-    val removeCommands = removeKeys.map { k => Remove(k) }
+    val removeCommands = removeKeys.map { k => encry.avltree.Remove(k) }
 
     val all = appendCommands ++ updateCommands ++ removeCommands
 
@@ -104,15 +103,15 @@ trait VersionedIODBAVLStorageStatefulCommands extends Commands { this: TestHelpe
 
   private def nextPositiveLong: Long = Random.nextInt(Int.MaxValue).toLong
 
-  case class Operations(operations: List[Operation] = List.empty[Operation]) {
-    def include(ops: List[Operation]): Operations = Operations(operations ++ ops)
+  case class Operations(operations: List[encry.avltree.Operation] = List.empty[encry.avltree.Operation]) {
+    def include(ops: List[encry.avltree.Operation]): Operations = Operations(operations ++ ops)
   }
 
-  case class BackAndForthCheck(ops: List[Operation]) extends Command {
+  case class BackAndForthCheck(ops: List[encry.avltree.Operation]) extends Command {
 
     override type Result = ResultData
 
-    override def run(sut: PersistentBatchAVLProver[Digest32, HF]): Result = {
+    override def run(sut: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Result = {
       val digest = sut.digest
       ops.foreach(sut.performOneOperation)
       sut.checkTree(postProof = false)
@@ -139,7 +138,7 @@ trait VersionedIODBAVLStorageStatefulCommands extends Commands { this: TestHelpe
 
       val propBoolean = result match {
         case Success(data) =>
-          val verifier = new BatchAVLVerifier[Digest32, HF](data.digest, data.proof, KL, Some(VL))
+          val verifier = new encry.avltree.BatchAVLVerifier[Digest32, HF](data.digest, data.proof, KL, Some(VL))
           ops.foreach(verifier.performOneOperation)
           data.consistent && verifier.digest.exists(_.sameElements(data.postDigest))
         case Failure(_) =>
@@ -152,11 +151,11 @@ trait VersionedIODBAVLStorageStatefulCommands extends Commands { this: TestHelpe
 
   }
 
-  case class BackAndForthTwoTimesCheck(ops: List[Operation]) extends Command {
+  case class BackAndForthTwoTimesCheck(ops: List[encry.avltree.Operation]) extends Command {
 
     override type Result = ResultData
 
-    override def run(sut: PersistentBatchAVLProver[Digest32, HF]): Result = {
+    override def run(sut: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Result = {
 
       val (firstBatch, secondBatch) = ops.splitAt(ops.length / 2)
 
@@ -191,8 +190,8 @@ trait VersionedIODBAVLStorageStatefulCommands extends Commands { this: TestHelpe
       val propBoolean = result match {
         case Success(data) =>
           val (firstBatch, secondBatch) = ops.splitAt(ops.length / 2)
-          val verifier1 = new BatchAVLVerifier[Digest32, HF](data.digest1, data.proof1, KL, Some(VL))
-          val verifier2 = new BatchAVLVerifier[Digest32, HF](data.digest2, data.proof2, KL, Some(VL))
+          val verifier1 = new encry.avltree.BatchAVLVerifier[Digest32, HF](data.digest1, data.proof1, KL, Some(VL))
+          val verifier2 = new encry.avltree.BatchAVLVerifier[Digest32, HF](data.digest2, data.proof2, KL, Some(VL))
           firstBatch.foreach(verifier1.performOneOperation)
           secondBatch.foreach(verifier2.performOneOperation)
           verifier1.digest.exists(_.sameElements(data.digest2)) &&
@@ -211,11 +210,11 @@ trait VersionedIODBAVLStorageStatefulCommands extends Commands { this: TestHelpe
 
   }
 
-  case class BackAndForthDoubleCheck(ops: List[Operation]) extends Command {
+  case class BackAndForthDoubleCheck(ops: List[encry.avltree.Operation]) extends Command {
 
     override type Result = ResultData
 
-    override def run(sut: PersistentBatchAVLProver[Digest32, HF]): Result = {
+    override def run(sut: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Result = {
       val digest = sut.digest
       ops.foreach(sut.performOneOperation)
       sut.checkTree(postProof = false)
@@ -243,8 +242,8 @@ trait VersionedIODBAVLStorageStatefulCommands extends Commands { this: TestHelpe
 
       val propBoolean = result match {
         case Success(data) =>
-          val verifier1 = new BatchAVLVerifier[Digest32, HF](data.digest, data.proof, KL, Some(VL))
-          val verifier2 = new BatchAVLVerifier[Digest32, HF](data.digest2, data.proof2, KL, Some(VL))
+          val verifier1 = new encry.avltree.BatchAVLVerifier[Digest32, HF](data.digest, data.proof, KL, Some(VL))
+          val verifier2 = new encry.avltree.BatchAVLVerifier[Digest32, HF](data.digest2, data.proof2, KL, Some(VL))
           ops.foreach(verifier1.performOneOperation)
           ops.foreach(verifier2.performOneOperation)
           val verifiedFirstDataSet = verifier1.digest.exists(_.sameElements(data.postDigest))
@@ -265,9 +264,9 @@ trait VersionedIODBAVLStorageStatefulCommands extends Commands { this: TestHelpe
 
   }
 
-  case class ApplyAndRollback(ops: List[Operation]) extends UnitCommand {
+  case class ApplyAndRollback(ops: List[encry.avltree.Operation]) extends UnitCommand {
 
-    override def run(sut: PersistentBatchAVLProver[Digest32, HF]): Unit = {
+    override def run(sut: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Unit = {
       val digest = sut.digest
       ops.foreach(sut.performOneOperation)
       sut.checkTree(postProof = false)
@@ -285,11 +284,11 @@ trait VersionedIODBAVLStorageStatefulCommands extends Commands { this: TestHelpe
 
   }
 
-  case class RollbackMoreThanOneVersionRandomly(ops: List[Operation]) extends UnitCommand {
+  case class RollbackMoreThanOneVersionRandomly(ops: List[encry.avltree.Operation]) extends UnitCommand {
 
     private val STEP_SIZE = 5
 
-    override def run(sut: PersistentBatchAVLProver[Digest32, HF]): Result = {
+    override def run(sut: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Result = {
       val splitOps = splitOpsIntoBatches
 
       val digest = sut.digest
@@ -311,7 +310,7 @@ trait VersionedIODBAVLStorageStatefulCommands extends Commands { this: TestHelpe
       }
     }
 
-    private def splitOpsIntoBatches: List[List[Operation]] = Range(0, ops.length, STEP_SIZE).map { i =>
+    private def splitOpsIntoBatches: List[List[encry.avltree.Operation]] = Range(0, ops.length, STEP_SIZE).map { i =>
       ops.slice(i, i + STEP_SIZE)
     }.toList
 
@@ -322,11 +321,11 @@ trait VersionedIODBAVLStorageStatefulCommands extends Commands { this: TestHelpe
     override def postCondition(state: Operations, result: Boolean): Prop = Prop.propBoolean(result)
   }
 
-  case class SimpleCheck(ops: List[Operation]) extends Command {
+  case class SimpleCheck(ops: List[encry.avltree.Operation]) extends Command {
 
     override type Result = ResultData
 
-    override def run(sut: PersistentBatchAVLProver[Digest32, HF]): Result = {
+    override def run(sut: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Result = {
       val digest = sut.digest
       ops.foreach(sut.performOneOperation)
       sut.checkTree(postProof = false)
@@ -343,7 +342,7 @@ trait VersionedIODBAVLStorageStatefulCommands extends Commands { this: TestHelpe
     override def postCondition(state: Operations, result: Try[Result]): Prop = {
       val propBoolean = result match {
         case Success(data) =>
-          val verifier = new BatchAVLVerifier[Digest32, HF](data.digest, data.proof, KL, Some(VL))
+          val verifier = new encry.avltree.BatchAVLVerifier[Digest32, HF](data.digest, data.proof, KL, Some(VL))
           ops.foreach(verifier.performOneOperation)
           verifier.digest.exists(_.sameElements(data.postDigest))
         case Failure(_) =>

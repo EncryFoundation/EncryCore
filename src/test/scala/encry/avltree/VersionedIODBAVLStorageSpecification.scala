@@ -1,19 +1,18 @@
-package scorex.crypto.authds.avltree.batch
+package encry.avltree
 
 import com.google.common.primitives.Longs
+import encry.avltree
 import io.iohk.iodb.{ByteArrayWrapper, Store}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.crypto.authds.avltree.batch.helpers.TestHelper
-import scorex.crypto.authds.{ADDigest, ADKey, ADValue}
-import scorex.crypto.encode.Base16
+import encry.avltree.helpers.TestHelper
+import scorex.crypto.encode.{Base16, Base58}
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.utils.{Random => RandomBytes}
-
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.util.{Success, Try}
 
 class VersionedIODBAVLStorageSpecification extends PropSpec
@@ -40,7 +39,7 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
   val rollbackTest: PERSISTENT_PROVER => Unit = { (prover: PERSISTENT_PROVER) =>
 
     def ops(s: Int, e: Int): Unit = (s until e).foreach { i =>
-      prover.performOneOperation(Insert(ADKey @@ Blake2b256("k" + i).take(KL),
+      prover.performOneOperation(avltree.Insert(ADKey @@ Blake2b256("k" + i).take(KL),
         ADValue @@ Blake2b256("v" + i).take(VL)))
     }
 
@@ -48,23 +47,23 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
     prover.generateProofAndUpdateStorage()
 
     val digest = prover.digest
-    val digest58String = digest.toBase58
+    val digest58String = Base58.encode(digest)
 
     ops(100, 200)
     prover.generateProofAndUpdateStorage()
 
-    prover.digest.toBase58 should not equal digest58String
+    Base58.encode(prover.digest) should not equal digest58String
 
     prover.rollback(digest)
 
-    prover.digest.toBase58 shouldEqual digest58String
+    Base58.encode(prover.digest) shouldEqual digest58String
 
     prover.checkTree(true)
   }
 
   // Read-only access to some elements in parallel should not affect modifications application
   val parallelReadTest: PERSISTENT_PROVER => Unit = {
-    def performModifications(prover: PERSISTENT_PROVER, inserts: Seq[Insert]) = {
+    def performModifications(prover: PERSISTENT_PROVER, inserts: Seq[avltree.Insert]) = {
       inserts.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, m) =>
         t.flatMap(_ => prover.performOneOperation(m))
       }.get
@@ -85,11 +84,11 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
 
     prover: PERSISTENT_PROVER =>
       val pairs = (1 to 10000).map(_ => kvGen.sample.get)
-      pairs.foreach(p => prover.performOneOperation(Insert(p._1, p._2)))
+      pairs.foreach(p => prover.performOneOperation(avltree.Insert(p._1, p._2)))
       prover.generateProofAndUpdateStorage
 
-      val blocks: Seq[Seq[Insert]] = (0 until 10).map(_ => (0 until 10).flatMap(_ => kvGen.sample)
-        .map(kv => Insert(kv._1, kv._2)))
+      val blocks: Seq[Seq[avltree.Insert]] = (0 until 10).map(_ => (0 until 10).flatMap(_ => kvGen.sample)
+        .map(kv => avltree.Insert(kv._1, kv._2)))
 
       val parallelReadsFuture: Future[Unit] = startParallelReads(prover)
       // apply blocks
@@ -123,14 +122,14 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
 
     val initialElementsSize = 10000
 
-    val initialElements = (0 until initialElementsSize).map(i => Insert(intToKey(i), intToValue(i)))
+    val initialElements = (0 until initialElementsSize).map(i => avltree.Insert(intToKey(i), intToValue(i)))
     initialElements.foreach(op => prover.performOneOperation(op).get)
     prover.generateProofAndUpdateStorage
 
-    val toInsert: Seq[Insert] = (0 until 1000) map { i =>
-      Insert(intToKey(i, 1), intToValue(i, 1))
+    val toInsert: Seq[avltree.Insert] = (0 until 1000) map { i =>
+      avltree.Insert(intToKey(i, 1), intToValue(i, 1))
     }
-    val toRemove: Seq[Remove] = initialElements.take(1000).map(_.key).map(i => Remove(i))
+    val toRemove: Seq[avltree.Remove] = initialElements.take(1000).map(_.key).map(i => avltree.Remove(i))
     val mods: Seq[Modification] = toInsert ++ toRemove
     val nonMod = prover.avlProver.generateProofForOperations(mods).get
 
@@ -150,14 +149,14 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
     def oneMod(aKey: ADKey, aValue: ADValue): Unit = {
       prover.digest shouldBe digest
 
-      val m = Insert(aKey, aValue)
+      val m = avltree.Insert(aKey, aValue)
       prover.performOneOperation(m)
       val pf = prover.generateProofAndUpdateStorage()
 
       val verifier = createVerifier(digest, pf)
       verifier.performOneOperation(m).isSuccess shouldBe true
-      prover.digest.toBase58 should not equal digest.toBase58
-      prover.digest.toBase58 shouldEqual verifier.digest.get.toBase58
+      Base58.encode(prover.digest) should not equal Base58.encode(digest)
+      Base58.encode(prover.digest) shouldEqual Base58.encode(verifier.digest.get)
 
       prover.rollback(digest).get
 
@@ -190,7 +189,7 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
 
   val rollbackVersionsTest: (PERSISTENT_PROVER, STORAGE) => Unit = { (prover: PERSISTENT_PROVER, storage: STORAGE) =>
     (0L until 50L).foreach { long =>
-      val insert = Insert(ADKey @@ RandomBytes.randomBytes(32),
+      val insert = avltree.Insert(ADKey @@ RandomBytes.randomBytes(32),
         ADValue @@ com.google.common.primitives.Longs.toByteArray(long))
       prover.performOneOperation(insert)
       prover.generateProofAndUpdateStorage()
@@ -206,11 +205,11 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
 
     implicit def arrayToWrapper(in: Array[Byte]): ByteArrayWrapper = ByteArrayWrapper(in)
 
-    val insert1 = Insert(ADKey @@ RandomBytes.randomBytes(32), ADValue @@ Longs.toByteArray(1L))
-    val insert2 = Insert(ADKey @@ RandomBytes.randomBytes(32), ADValue @@ Longs.toByteArray(2L))
-    val insert3 = Insert(ADKey @@ RandomBytes.randomBytes(32), ADValue @@ Longs.toByteArray(3L))
-    val insert4 = Insert(ADKey @@ RandomBytes.randomBytes(32), ADValue @@ Longs.toByteArray(4L))
-    val insert5 = Insert(ADKey @@ RandomBytes.randomBytes(32), ADValue @@ Longs.toByteArray(5L))
+    val insert1 = avltree.Insert(ADKey @@ RandomBytes.randomBytes(32), ADValue @@ Longs.toByteArray(1L))
+    val insert2 = avltree.Insert(ADKey @@ RandomBytes.randomBytes(32), ADValue @@ Longs.toByteArray(2L))
+    val insert3 = avltree.Insert(ADKey @@ RandomBytes.randomBytes(32), ADValue @@ Longs.toByteArray(3L))
+    val insert4 = avltree.Insert(ADKey @@ RandomBytes.randomBytes(32), ADValue @@ Longs.toByteArray(4L))
+    val insert5 = avltree.Insert(ADKey @@ RandomBytes.randomBytes(32), ADValue @@ Longs.toByteArray(5L))
 
     val addInfo1 = RandomBytes.randomBytes(32) -> Longs.toByteArray(6L)
     val addInfo2 = RandomBytes.randomBytes(32) -> Longs.toByteArray(7L)
@@ -263,7 +262,7 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
 
             keys = key +: keys
 
-            p.performOneOperation(Insert(key, value)).isSuccess shouldBe true
+            p.performOneOperation(avltree.Insert(key, value)).isSuccess shouldBe true
             p.unauthenticatedLookup(key).isDefined shouldBe true
           }
 
@@ -271,24 +270,24 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
           val storage = createVersionedStorage(store)
           assert(storage.isEmpty)
 
-          val prover = createPersistentProver(storage, p)
+          val prover = PersistentBatchAVLProver.create[D, HF](p, storage, paranoidChecks = true).get
 
           val keyPosition = scala.util.Random.nextInt(keys.length)
           val rndKey = keys(keyPosition)
 
           prover.unauthenticatedLookup(rndKey).isDefined shouldBe true
-          val removalResult = prover.performOneOperation(Remove(rndKey))
+          val removalResult = prover.performOneOperation(avltree.Remove(rndKey))
           removalResult.isSuccess shouldBe true
 
           if (keyPosition > 0) {
-            prover.performOneOperation(Remove(keys.head)).isSuccess shouldBe true
+            prover.performOneOperation(avltree.Remove(keys.head)).isSuccess shouldBe true
           }
 
           keys = keys.tail.filterNot(_.sameElements(rndKey))
 
           val shuffledKeys = scala.util.Random.shuffle(keys)
           shuffledKeys.foreach { k =>
-            prover.performOneOperation(Remove(k)).isSuccess shouldBe true
+            prover.performOneOperation(avltree.Remove(k)).isSuccess shouldBe true
           }
         }
         store.close()

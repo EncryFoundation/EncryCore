@@ -1,9 +1,9 @@
 package encry.view.state
 
 import encry.view.history.Height
+import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import org.encryfoundation.prismlang.core.{PConvertible, Types}
-import scorex.crypto.authds.ADDigest
 
 case class EncryStateView(height: Height, lastBlockTimestamp: Long, stateDigest: ADDigest) extends PConvertible {
 

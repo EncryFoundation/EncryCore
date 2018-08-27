@@ -5,7 +5,7 @@ import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.transaction.EncryAddress
-import scorex.crypto.authds.ADKey
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scorex.crypto.signatures.Curve25519
 import scala.io.Source
 import scala.util.Random

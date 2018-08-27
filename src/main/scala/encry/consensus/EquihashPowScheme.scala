@@ -8,9 +8,10 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.Transaction
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import org.bouncycastle.crypto.digests.Blake2bDigest
-import scorex.crypto.authds.SerializedAdProof
+import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.TaggedTypes.SerializedAdProof
 import scorex.crypto.hash.Digest32
 import scala.annotation.tailrec
 import scala.math.BigInt
@@ -56,7 +57,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
         .map { solution => h.copy(nonce = nonce, equihashSolution = solution) }
         .find { newHeader => correctWorkDone(realDifficulty(newHeader), difficulty) }
       headerWithSuitableSolution match {
-        case headerWithFoundSolution@Some(_) => headerWithFoundSolution
+        case headerWithFoundSolution @ Some(_) => headerWithFoundSolution
         case None if nonce + 1 < finishingNonce => generateHeader(nonce + 1)
         case _ => None
       }

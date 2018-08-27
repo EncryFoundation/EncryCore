@@ -3,10 +3,10 @@ package encry.view.wallet
 import encry.EncryApp
 import encry.EncryApp.{settings, system}
 import encry.crypto.encryption.AES
-import encry.settings.Algos
 import encry.stats.LoggingActor.LogMessage
 import encry.utils.Mnemonic
 import io.iohk.iodb.{ByteArrayWrapper, Store}
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import scorex.crypto.hash.Blake2b256
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
@@ -37,9 +37,7 @@ case class AccountManager(store: Store) {
     val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
       Blake2b256.hash(
         seedOpt
-          .map {
-            Mnemonic.seedFromMnemonic(_)
-          }
+          .map { Mnemonic.seedFromMnemonic(_) }
           .getOrElse {
             val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
             println(s"\nMnemonic code is: \n$phrase")

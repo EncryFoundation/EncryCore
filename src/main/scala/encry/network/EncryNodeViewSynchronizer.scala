@@ -17,13 +17,13 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, Registe
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.message._
-import encry.settings.Algos
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.history.{EncryHistory, EncryHistoryReader, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.{EncryMempool, MempoolReader}
 import encry.view.state.StateReader
 import encry.{ModifierId, ModifierTypeId, VersionTag}
+import org.encryfoundation.common.Algos
 import encry.stats.LoggingActor.LogMessage
 import org.encryfoundation.common.transaction.Proposition
 

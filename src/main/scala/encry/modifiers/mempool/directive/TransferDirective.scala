@@ -4,15 +4,15 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.utils.Utils
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.EncryAddress
 import org.encryfoundation.common.transaction.EncryAddress.Address
-import scorex.crypto.authds
-import scorex.crypto.authds.ADKey
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scorex.crypto.hash.Digest32
 import supertagged.@@
 import scala.util.Try
@@ -77,7 +77,7 @@ object TransferDirectiveSerializer extends Serializer[TransferDirective] {
     val addressLen: Int = bytes.head.toInt
     val address: Address = new String(bytes.slice(1, 1 + addressLen), Algos.charset)
     val amount: Amount = Longs.fromByteArray(bytes.slice(1 + addressLen, 1 + addressLen + 8))
-    val tokenIdOpt: Option[@@[Array[DTypeId], authds.ADKey.Tag]] = if ((bytes.length - (1 + addressLen + 8)) == Constants.ModifierIdSize) {
+    val tokenIdOpt: Option[@@[Array[DTypeId], ADKey.Tag]] = if ((bytes.length - (1 + addressLen + 8)) == Constants.ModifierIdSize) {
       Some(ADKey @@ bytes.takeRight(Constants.ModifierIdSize))
     } else None
     TransferDirective(address, amount, tokenIdOpt)

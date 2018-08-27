@@ -6,10 +6,10 @@ import akka.actor.Actor
 import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.settings.Algos
 import encry.stats.StatsSender._
 import encry.view.history
 import encry.{ModifierId, ModifierTypeId}
+import org.encryfoundation.common.Algos
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global

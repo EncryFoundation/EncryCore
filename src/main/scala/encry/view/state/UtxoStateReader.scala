@@ -1,12 +1,14 @@
 package encry.view.state
 
+import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
 import encry.settings.Algos
+import encry.utils.Logging
 import encry.view.history.Height
 import io.iohk.iodb.Store
-import scorex.crypto.authds.ADKey
-import scorex.crypto.authds.avltree.batch.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
+import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scorex.crypto.hash.Digest32
 
 trait UtxoStateReader extends StateReader {

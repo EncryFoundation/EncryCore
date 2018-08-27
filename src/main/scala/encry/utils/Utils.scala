@@ -2,9 +2,9 @@ package encry.utils
 
 import com.google.common.primitives.Longs
 import encry.modifiers.mempool.Transaction.Nonce
-import encry.settings.Algos
 import encry.utils.LittleEndianBytes._
 import org.bouncycastle.crypto.Digest
+import org.encryfoundation.common.Algos
 
 object Utils {
 

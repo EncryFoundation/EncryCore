@@ -17,6 +17,7 @@ import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStatePro
 import encry.view.history.storage.HistoryStorage
 import encry.EncryApp.{settings, system}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import org.encryfoundation.common.Algos
 import scala.util.Try
 
 /**
