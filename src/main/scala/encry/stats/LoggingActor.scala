@@ -4,7 +4,7 @@ import java.text.SimpleDateFormat
 import akka.actor.Actor
 import com.typesafe.scalalogging.StrictLogging
 import encry.stats.LoggingActor.LogMessage
-import encry.EncryApp.settings
+import encry.EncryApp.{settings}
 import encry.stats.StatsSender.influxDB
 import encry.stats.KafkaActor.KafkaMessage
 
@@ -16,7 +16,7 @@ class LoggingActor extends Actor with StrictLogging {
       if (settings.logging.loggingMode == "influx" && settings.node.sendStat) {
 
         influxDB.write(8089,
-          s"""logsFromNode,nodeName=${settings.network.nodeName},logLevel=$logLevel value="$logMessage, [${sdf.format(logsTime)}]"""")
+          s"""logsFromNode,nodeName=${settings.network.nodeName},logLevel=$logLevel value="[${sdf.format(logsTime)}], $logMessage"""")
       }
       else if (settings.logging.loggingMode == "kafka" && settings.kafka.sendToKafka)
         context.system.actorSelection("/user/kafkaActor") ! KafkaMessage(logLevel, logMessage)

@@ -2,13 +2,12 @@ package encry.avltree.helpers
 
 import encry.avltree
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
-import encry.utils.Logging
 import io.iohk.iodb.{LSMStore, QuickStore, Store}
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256, Digest32}
 
-trait TestHelper extends FileHelper with Logging {
+trait TestHelper extends FileHelper {
 
   val enableQuickStore: Boolean = System.getProperty("java.specification.version").startsWith("8")
 

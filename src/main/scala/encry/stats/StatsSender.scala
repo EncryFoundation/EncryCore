@@ -23,14 +23,12 @@ class StatsSender extends Actor {
   val modifiersToApply: mutable.Map[String, (ModifierTypeId, Long)] = mutable.Map[String, (ModifierTypeId, Long)]()
 
   override def preStart(): Unit =
-    influxDB.write(8089, s"""nodesStartTime value="${settings.network.nodeName}"""")
+    influxDB.write(8189, s"""nodesStartTime value="${settings.network.nodeName}"""")
 
   override def receive: Receive = {
     case BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int) =>
-      influxDB.write(8089, s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache," +
+      influxDB.write(8189, s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache," +
         s"completedBlocksStat=$completedBlocks,notCompletedBlocksStat=$notCompletedBlocks")
-    case a : String ⇒
-      influxDB.write(8089, s"""logsfromnode,nodeName=${settings.network.nodeName} value="$a"""")
     case BestHeaderInChain(fb: EncryBlockHeader) =>
       influxDB.write(8189, util.Arrays.asList(
         s"difficulty,nodeName=${settings.network.nodeName} diff=${fb.difficulty.toString},height=${fb.height}",

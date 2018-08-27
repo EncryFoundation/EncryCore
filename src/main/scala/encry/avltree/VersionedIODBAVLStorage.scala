@@ -2,7 +2,8 @@ package encry.avltree
 
 import com.google.common.primitives.Ints
 import encry.avltree.VersionedIODBAVLStorage.{InternalNodePrefix, LeafPrefix}
-import encry.utils.Logging
+import encry.stats.LoggingActor.LogMessage
+import encry.EncryApp.{settings, system}
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, Balance}
@@ -12,8 +13,7 @@ import scala.util.{Failure, Try}
 
 case class NodeParameters(keySize: Int, valueSize: Option[Int], labelSize: Int)
 
-class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodeParameters)(implicit val hf: CryptographicHash[D])
-  extends Logging {
+class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodeParameters)(implicit val hf: CryptographicHash[D]) {
 
   val TopNodeKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(nodeParameters.labelSize)(123: Byte))
   val TopNodeHeight: ByteArrayWrapper = ByteArrayWrapper(Array.fill(nodeParameters.labelSize)(124: Byte))
@@ -24,7 +24,9 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
     val topHeight: Int = Ints.fromByteArray(store.get(TopNodeHeight).get.data)
     top -> topHeight
   }.recoverWith { case e =>
-    log.info(s"Failed to recover tree for digest ${Algos.encode(version)}:", e)
+    if (settings.logging.enableLogging)
+      system.actorSelection("user/loggingActor") !
+        LogMessage("Info", s"Failed to recover tree for digest ${Algos.encode(version)}: $e", System.currentTimeMillis())
     Failure(e)
   }
 
@@ -43,11 +45,17 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
     val toUpdateWrapped: Seq[(Store.K, Store.K)] = additionalData.map { case (k, v) => ByteArrayWrapper(k) -> ByteArrayWrapper(v) }
     val toUpdateWithWrapped: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = toUpdate ++ toUpdateWrapped
     val toRemoveMerged: List[ByteArrayWrapper] = toRemove.filterNot(toUpdate.map(_._1).intersect(toRemove).contains)
-    log.info(s"Update storage to version $digestWrapper: ${toUpdateWithWrapped.size} elements to insert," +
-      s" ${toRemove.size} elements to remove")
+    if (settings.logging.enableLogging && Try(system.name).isSuccess)
+      system.actorSelection("user/loggingActor") !
+        LogMessage("Info", s"Update storage to version $digestWrapper: ${toUpdateWithWrapped.size} elements to insert," +
+          s" ${toRemove.size} elements to remove", System.currentTimeMillis())
     store.update(digestWrapper, toRemoveMerged, toUpdateWithWrapped)
   }.recoverWith { case e =>
-    log.info("Failed to update tree", e)
+    if (settings.logging.enableLogging && Try(system.startTime).isSuccess) {
+      println("qwert")
+      system.actorSelection("user/loggingActor") !
+        LogMessage("Warn", s"Failed to update tree: $e", System.currentTimeMillis())
+    }
     Failure(e)
   }
 
@@ -115,16 +123,18 @@ object VersionedIODBAVLStorage {
                                                   val rkey: ADKey,
                                                   protected var pb: Balance = Balance @@ 0.toByte)
                                                  (implicit val phf: CryptographicHash[D],
-                                             store: Store,
-                                             nodeParameters: NodeParameters)
+                                                  store: Store,
+                                                  nodeParameters: NodeParameters)
     extends InternalProverEncryNode(k = pk, l = null, r = null, b = pb)(phf) {
     override def left: EncryProverNodes[D] = {
       if (l == null) l = VersionedIODBAVLStorage.fetch[D](lkey)
       l
     }
+
     override def right: EncryProverNodes[D] = {
       if (r == null) r = VersionedIODBAVLStorage.fetch[D](rkey)
       r
     }
   }
+
 }

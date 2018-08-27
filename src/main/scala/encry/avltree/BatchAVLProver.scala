@@ -1,7 +1,8 @@
 package encry.avltree
 
 import com.google.common.primitives.Ints
-import encry.utils.Logging
+import encry.stats.LoggingActor.LogMessage
+import encry.EncryApp.{settings, system}
 import org.encryfoundation.common.utils.TaggedTypes._
 import scorex.crypto.hash.{Blake2b256, CryptographicHash, Digest}
 import scorex.utils.ByteArray
@@ -14,7 +15,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
                                                               oldRootAndHeight: Option[(EncryProverNodes[D], Int)] = None,
                                                               val collectChangedNodes: Boolean = true)
                                                              (implicit val hf: HF = Blake2b256)
-  extends AuthenticatedTreeOps[D] with Logging {
+  extends AuthenticatedTreeOps[D] {
 
   protected val labelLength: Int = hf.DigestSize
 
@@ -259,7 +260,9 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
         if (!t) {
           var x: Int = rNode.key(0).toInt
           if (x < 0) x = x + 256
-          log.error("Tree failed at key = " + x + ": " + s)
+          if (settings.logging.enableLogging)
+            system.actorSelection("user/loggingActor") !
+              LogMessage("Error","Tree failed at key = " + x + ": " + s, System.currentTimeMillis())
           fail = true
         }
       }
