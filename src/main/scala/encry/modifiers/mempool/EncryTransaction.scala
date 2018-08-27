@@ -4,8 +4,9 @@ import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.ModifierId
 import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
 import encry.modifiers.state.box.Box.Amount
-import encry.settings.Algos
+import encry.settings.{Algos, Constants}
 import encry.validation.{ModifierValidator, ValidationResult}
+import encry.EncryApp.timeProvider
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.common.serialization.Serializer
@@ -29,18 +30,19 @@ case class EncryTransaction(fee: Amount,
   override val messageToSign: Array[Byte] =
     UnsignedEncryTransaction.bytesToSign(fee, timestamp, inputs, directives)
 
-  val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
-  override lazy val semanticValidity: Try[Unit] = validateStateless.toTry
+  override val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
 
-  def validSize: Boolean = length <= maxSize
+  override lazy val semanticValidity: Try[Unit] = validateStateless.toTry
 
   def validateStateless: ValidationResult =
     accumulateErrors
-      .demand(validSize, "Invalid size")
       .demand(fee >= 0, "Negative fee amount")
+      .demand(timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift, "Invalid timestamp")
+      .demand(inputs.lengthCompare(inputs.toSet.size) == 0, "Inputs duplication")
+      .demand(inputs.lengthCompare(Short.MaxValue) <= 0, "Wrong number of inputs")
+      .demand(directives.lengthCompare(Short.MaxValue) <= 0 && directives.nonEmpty, "Wrong number of directives")
       .demand(directives.forall(_.isValid), "Invalid outputs")
-      .demand(inputs.size <= Short.MaxValue, s"Too many inputs in transaction $toString")
-      .demand(directives.size <= Short.MaxValue, s"Too many directives in transaction $toString")
+      .demand(size <= Constants.PayloadMaxSize, "Invalid size")
       .result
 
   override val tpe: Types.Product = Types.EncryTransaction

@@ -18,7 +18,6 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
   private def removeExpired(): EncryMempool =
     filter(tx => (timeProvider.estimatedTime - tx.timestamp) > settings.node.utxMaxAge.toMillis)
 
-
   private val cleanup: Cancellable =
     system.scheduler.schedule(settings.node.mempoolCleanupInterval, settings.node.mempoolCleanupInterval)(removeExpired)
 
@@ -27,7 +26,8 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
   override def put(tx: Transaction): Try[EncryMempool] = put(Seq(tx))
 
   override def put(txs: Iterable[Transaction]): Try[EncryMempool] = {
-    val validTxs: Iterable[Transaction] = txs.filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
+    val validTxs: Iterable[Transaction] = txs
+      .filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
     if (validTxs.nonEmpty) {
       if ((size + validTxs.size) <= settings.node.mempoolMaxCapacity) {
         Success(putWithoutCheck(validTxs))
