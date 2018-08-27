@@ -1,13 +1,12 @@
-package scorex.crypto.authds.avltree.batch
+package encry.avltree
 
-import encry.settings.Algos
 import io.iohk.iodb.LSMStore
+import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.crypto.authds.avltree.batch.benchmark.IODBBenchmark.getRandomTempDir
-import scorex.crypto.authds.{ADDigest, ADKey, ADValue, SerializedAdProof}
+import encry.avltree.benchmark.IODBBenchmark.getRandomTempDir
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.utils.Random
-
 import scala.util.{Failure, Try}
 
 class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {

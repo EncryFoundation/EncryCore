@@ -1,7 +1,7 @@
-package scorex.crypto.authds.avltree.batch.benchmark
+package encry.avltree.benchmark
 
+import encry.avltree.helpers.FileHelper
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
-import scorex.crypto.authds.avltree.batch.helpers.FileHelper
 import scorex.utils.Random
 
 object IODBBenchmark extends App with FileHelper {

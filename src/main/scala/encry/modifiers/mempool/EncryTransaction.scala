@@ -4,11 +4,12 @@ import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.ModifierId
 import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
 import encry.modifiers.state.box.Box.Amount
-import encry.settings.{Algos, Constants}
 import encry.validation.{ModifierValidator, ValidationResult}
 import encry.EncryApp.timeProvider
+import encry.settings.Constants
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.{Input, InputSerializer, Proof, ProofSerializer}
 import org.encryfoundation.prismlang.core.Types

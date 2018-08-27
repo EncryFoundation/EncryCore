@@ -1,10 +1,10 @@
 package encry.api.http
 
 import java.security.SecureRandom
-
 import akka.actor.ActorRefFactory
 import akka.http.scaladsl.server.Route
-import encry.settings.{Algos, RESTApiSettings}
+import encry.settings.RESTApiSettings
+import org.encryfoundation.common.Algos
 import scorex.crypto.hash.Blake2b256
 
 case class UtilsApiRoute(override val settings: RESTApiSettings)(implicit val context: ActorRefFactory) extends ApiRoute {

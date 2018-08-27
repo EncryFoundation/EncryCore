@@ -1,8 +1,8 @@
 package encry.validation
 
 import encry.consensus.ModifierSemanticValidity
-import encry.settings.Algos
 import encry.validation.ValidationResult.{Invalid, Valid}
+import org.encryfoundation.common.Algos
 
 trait ModifierValidator {
 

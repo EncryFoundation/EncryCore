@@ -1,13 +1,14 @@
-package scorex.crypto.authds.avltree.batch.helpers
+package encry.avltree.helpers
 
+import encry.avltree
+import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
+import encry.utils.Logging
 import io.iohk.iodb.{LSMStore, QuickStore, Store}
-import scorex.crypto.authds.avltree.batch._
-import scorex.crypto.authds.{ADDigest, SerializedAdProof}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256, Digest32}
-import scorex.utils.ScryptoLogging
 
-trait TestHelper extends FileHelper with ScryptoLogging {
+trait TestHelper extends FileHelper with Logging {
 
   val enableQuickStore: Boolean = System.getProperty("java.specification.version").startsWith("8")
 
@@ -18,9 +19,9 @@ trait TestHelper extends FileHelper with ScryptoLogging {
   type D = Digest32
   type AD = ADDigest
   type P = SerializedAdProof
-  type PROVER = BatchAVLProver[D, HF]
-  type VERIFIER = BatchAVLVerifier[D, HF]
-  type PERSISTENT_PROVER = PersistentBatchAVLProver[D, HF]
+  type PROVER = avltree.BatchAVLProver[D, HF]
+  type VERIFIER = avltree.BatchAVLVerifier[D, HF]
+  type PERSISTENT_PROVER = avltree.PersistentBatchAVLProver[D, HF]
   type STORAGE = VersionedIODBAVLStorage[D]
 
   protected val KL: Int
@@ -44,7 +45,7 @@ trait TestHelper extends FileHelper with ScryptoLogging {
   def createVersionedStorage(store: Store): STORAGE = new VersionedIODBAVLStorage(store, NodeParameters(KL, Some(VL), LL))
 
   def createPersistentProver(storage: STORAGE): PERSISTENT_PROVER = {
-    val prover = new BatchAVLProver[D, HF](KL, Some(VL))
+    val prover = new avltree.BatchAVLProver[D, HF](KL, Some(VL))
     createPersistentProver(storage, prover)
   }
 
@@ -63,7 +64,7 @@ trait TestHelper extends FileHelper with ScryptoLogging {
     createPersistentProver(storage)
   }
 
-  def createVerifier(digest: AD, proof: P): VERIFIER = new BatchAVLVerifier[D, HF](digest, proof, KL, Some(VL))
+  def createVerifier(digest: AD, proof: P): VERIFIER = new avltree.BatchAVLVerifier[D, HF](digest, proof, KL, Some(VL))
 
 
   implicit class DigestToBase58String(d: ADDigest) {

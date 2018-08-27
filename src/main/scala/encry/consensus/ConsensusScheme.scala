@@ -4,9 +4,8 @@ import encry.ModifierId
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.Transaction
-import scorex.crypto.authds.SerializedAdProof
+import org.encryfoundation.common.utils.TaggedTypes.SerializedAdProof
 import scorex.crypto.hash.Digest32
-
 import scala.math.BigInt
 
 trait ConsensusScheme {

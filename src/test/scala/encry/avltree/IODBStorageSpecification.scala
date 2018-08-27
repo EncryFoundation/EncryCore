@@ -1,12 +1,11 @@
-package scorex.crypto.authds.avltree.batch
+package encry.avltree
 
 import com.google.common.primitives.Longs
+import encry.avltree.helpers.TestHelper
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.crypto.authds.avltree.batch.helpers.TestHelper
 import scorex.crypto.hash.Blake2b256
-
 import scala.collection.mutable.ArrayBuffer
 
 class IODBStorageSpecification extends PropSpec
