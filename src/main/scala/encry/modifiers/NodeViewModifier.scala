@@ -2,8 +2,8 @@ package encry.modifiers
 
 import com.typesafe.config.ConfigFactory
 import encry.modifiers.mempool.Transaction
-import encry.settings.Algos
 import encry.{ModifierId, ModifierTypeId}
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.BytesSerializable
 import org.encryfoundation.common.transaction.Proposition
 import scala.util.Try

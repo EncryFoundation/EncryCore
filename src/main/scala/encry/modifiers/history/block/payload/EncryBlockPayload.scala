@@ -2,12 +2,12 @@ package encry.modifiers.history.block.payload
 
 import com.google.common.primitives.{Bytes, Ints}
 import encry.modifiers.mempool._
-import encry.settings.Algos
 import encry.{ModifierId, ModifierTypeId}
 import io.circe.Encoder
 import io.circe.syntax._
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
-import scorex.crypto.authds.LeafData
+import org.encryfoundation.common.utils.TaggedTypes.LeafData
 import scorex.crypto.hash.Digest32
 import scala.util.Try
 

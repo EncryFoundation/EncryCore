@@ -19,7 +19,6 @@ import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSy
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.settings.Algos
 import encry.stats.KafkaActor
 import encry.stats.KafkaActor.KafkaMessage
 import encry.stats.StatsSender._
@@ -32,9 +31,10 @@ import encry.view.state._
 import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import org.apache.commons.io.FileUtils
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
-import scorex.crypto.authds.ADDigest
+import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scala.annotation.tailrec
 import scala.concurrent.Future
 import scala.collection.{IndexedSeq, Seq, mutable}
@@ -323,7 +323,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     }.asInstanceOf[StateType]
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
-    val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
+    val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider, system)
     NodeView(history, state, wallet, memPool)
   }
 
@@ -331,7 +331,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     try {
       val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
-      val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider)
+      val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider, system)
       val state: StateType = restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
       Some(NodeView(history, state, wallet, memPool))
     } catch {

@@ -5,15 +5,14 @@ import encry.ModifierId
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.utils.Utils
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
-import scorex.crypto.authds
-import scorex.crypto.authds.ADKey
-import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
 import scala.util.Try
 
@@ -70,7 +69,7 @@ object ScriptedAssetDirectiveSerializer extends Serializer[ScriptedAssetDirectiv
   override def parseBytes(bytes: Array[Byte]): Try[ScriptedAssetDirective] = Try {
     val contractHash: ContractHash = bytes.take(Constants.DigestLength)
     val amount: Amount = Longs.fromByteArray(bytes.slice(Constants.DigestLength, Constants.DigestLength + 8))
-    val tokenIdOpt: Option[authds.ADKey] = if ((bytes.length - (Constants.DigestLength + 8)) == Constants.ModifierIdSize) {
+    val tokenIdOpt: Option[ADKey] = if ((bytes.length - (Constants.DigestLength + 8)) == Constants.ModifierIdSize) {
       Some(ADKey @@ bytes.takeRight(Constants.ModifierIdSize))
     } else None
     ScriptedAssetDirective(contractHash, amount, tokenIdOpt)

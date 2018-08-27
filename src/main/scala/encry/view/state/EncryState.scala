@@ -3,14 +3,13 @@ package encry.view.state
 import java.io.File
 import akka.actor.ActorRef
 import encry.VersionTag
-import encry.consensus.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
 import encry.modifiers.state.box._
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
 import encry.utils.Logging
 import io.iohk.iodb.Store
-import scorex.crypto.authds.ADDigest
+import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scorex.crypto.encode.Base16
 import scala.util.Try
 

@@ -5,10 +5,11 @@ import encry.ModifierId
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{EncryBaseBox, EncryProposition, TokenIssuingBox}
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.utils.Utils
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import scorex.crypto.encode.Base16

@@ -10,17 +10,17 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.{ModifierId, ModifierTypeId}
 import io.circe.Encoder
 import io.circe.syntax._
 import cats.implicits._
 import org.bouncycastle.crypto.digests.Blake2bDigest
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
-import scorex.crypto.authds.ADDigest
+import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
-
 import scala.util.Try
 
 case class EncryBlockHeader(override val version: Version,

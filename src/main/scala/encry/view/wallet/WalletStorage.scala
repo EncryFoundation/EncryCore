@@ -5,11 +5,11 @@ import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box._
-import encry.settings.Algos
 import encry.storage.EncryStorage
 import io.iohk.iodb.{ByteArrayWrapper, Store}
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PublicKey25519
-import scorex.crypto.authds.ADKey
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
 
 case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends EncryStorage {
 
@@ -19,23 +19,30 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
     .flatMap(d => StateModifierDeserializer.parseBytes(d.data, id.head).toOption)
 
   def allBoxes: Seq[EncryBaseBox] = store.getAll
-    .filter(dataFromStore => !getTokensId.contains(dataFromStore._1.data) && !dataFromStore._1.equals(tokensIdsKey))
+    .filter(_._2 == balancesKey)
     .foldLeft(Seq[EncryBaseBox]()) { case (acc, id) =>
       getBoxById(ADKey @@ id._1.data).map(bx => acc :+ bx).getOrElse(acc)
     }
 
   def containsBox(id: ADKey): Boolean = getBoxById(id).isDefined
 
-  def getTokenBalanceById(id: TokenId): Option[Amount] = store.get(keyByTokenId(id)).map(v => Longs.fromByteArray(v.data))
+  def getTokenBalanceById(id: TokenId): Option[Amount] = getBalances
+    .find(_._1 sameElements id)
+    .map(_._2)
 
-  def getTokensId: Seq[TokenId] = readComplexValue(tokensIdsKey, 32).map(ADKey @@ _).getOrElse(Seq())
+  def getBalances: Map[TokenId, Amount] = store.get(balancesKey)
+    .map {
+      _.data
+        .sliding(40, 40)
+        .map(ch => ch.take(32) -> Longs.fromByteArray(ch.takeRight(8)))
+    }
+    .map(_.toMap)
+    .getOrElse(Map.empty)
 }
 
 object WalletStorage {
 
-  val tokensIdsKey: ByteArrayWrapper = ByteArrayWrapper(Algos.hash("tokens_id"))
+  val balancesKey: ByteArrayWrapper = ByteArrayWrapper(Algos.hash("balances"))
 
   def keyByBoxId(id: ADKey): ByteArrayWrapper = ByteArrayWrapper(id)
-
-  def keyByTokenId(id: TokenId): ByteArrayWrapper = ByteArrayWrapper(id)
 }

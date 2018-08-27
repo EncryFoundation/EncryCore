@@ -9,8 +9,7 @@ import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import encry.view.state.{StateMode, UtxoStateReader}
 import io.circe.Json
 import io.circe.syntax._
-import scorex.crypto.authds.ADKey
-
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scala.concurrent.Future
 
 case class StateInfoApiRoute(readersHolder: ActorRef,

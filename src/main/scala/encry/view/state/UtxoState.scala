@@ -5,6 +5,7 @@ import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import encry.EncryApp.settings
 import encry.VersionTag
+import encry.avltree.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import encry.consensus.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
@@ -16,18 +17,18 @@ import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box._
-import encry.settings.Algos.HF
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.utils.{BalanceCalculator, Logging}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import scorex.crypto.authds._
-import scorex.crypto.authds.avltree.batch._
+import org.encryfoundation.common.Algos
+import org.encryfoundation.common.Algos.HF
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
 import scala.util.{Failure, Success, Try}
 
-class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32, HF],
+class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
                 override val version: VersionTag,
                 override val height: Height,
                 override val stateStore: Store,
@@ -218,8 +219,8 @@ object UtxoState extends Logging {
       .map(d => Ints.fromByteArray(d.data)).getOrElse(Constants.Chain.PreGenesisHeight)
     val lastBlockTimestamp: Amount = stateStore.get(ByteArrayWrapper(lastBlockTimeKey))
       .map(d => Longs.fromByteArray(d.data)).getOrElse(0L)
-    val persistentProver: PersistentBatchAVLProver[Digest32, HF] = {
-      val bp: BatchAVLProver[Digest32, HF] = new BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
+    val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF] = {
+      val bp: encry.avltree.BatchAVLProver[Digest32, HF] = new encry.avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
       val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
       val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(stateStore, np)(Algos.hash)
       PersistentBatchAVLProver.create(bp, storage).getOrElse(throw new Error("Fatal: Failed to create persistent prover"))
@@ -241,15 +242,16 @@ object UtxoState extends Logging {
   }
 
   def genesis(boxes: List[EncryBaseBox], stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val p: BatchAVLProver[Digest32, HF] = new BatchAVLProver[Digest32, Algos.HF](keyLength = EncryBox.BoxIdSize, valueLengthOpt = None)
-    boxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
+    val p: BatchAVLProver[Digest32, HF] =
+      new BatchAVLProver[Digest32, Algos.HF](keyLength = EncryBox.BoxIdSize, valueLengthOpt = None)
+    boxes.foreach(b => p.performOneOperation(encry.avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
     val stateStore: LSMStore = new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions)
     val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
     val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(stateStore, np)(Algos.hash)
     log.info(s"Generating UTXO State with ${boxes.size} boxes")
 
-    val persistentProver: PersistentBatchAVLProver[Digest32, HF] = PersistentBatchAVLProver.create(
+    val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF] = PersistentBatchAVLProver.create(
       p, storage, metadata(EncryState.genesisStateVersion, p.digest, Constants.Chain.PreGenesisHeight, 0L), paranoidChecks = true
     ).getOrElse(throw new Error("Fatal: Failed to create persistent prover"))
 
