@@ -96,83 +96,69 @@ trait AuthenticatedTreeOps[D <: Digest] {
       rNode match {
         case r: EncryLeaf[D] =>
           if (keyMatchesLeaf(key, r)) operation match {
-            case m: encry.avltree.Modification =>
-              m.updateFn(Some(r.value)) match {
-                case Success(None) => // delete key
-                  onNodeVisit(r, operation)
-                  (r, false, false, true, Some(r.value))
-                case Success(Some(v)) => // update value
-                  valueLengthOpt.foreach(vl => require(v.length == vl, s"Value length is fixed and should be $vl"))
-                  val oldValue: Option[ADValue] = Some(r.value)
-                  val rNew: EncryLeaf[D] = r.getNew(newValue = v)
-                  onNodeVisit(r, operation)
-                  (rNew, true, false, false, oldValue)
-                case Failure(e) => // updateFunction doesn't like the value we found
-                  throw e
-              }
+            case m: encry.avltree.Modification => m.updateFn(Some(r.value)) match {
+              case Success(None) => // delete key
+                onNodeVisit(r, operation)
+                (r, false, false, true, Some(r.value))
+              case Success(Some(v)) => // update value
+                valueLengthOpt.foreach(vl => require(v.length == vl, s"Value length is fixed and should be $vl"))
+                val oldValue: Option[ADValue] = Some(r.value)
+                val rNew: EncryLeaf[D] = r.getNew(newValue = v)
+                onNodeVisit(r, operation)
+                (rNew, true, false, false, oldValue)
+              case Failure(e) => throw e // updateFunction doesn't like the value we found
+            }
             case _: Lookup =>
               onNodeVisit(r, operation)
               (r, false, false, false, Some(r.value))
           } else operation match {
-              case m: Modification =>
-                m.updateFn(None) match {
-                  case Success(None) => // don't change anything, just lookup
-                    onNodeVisit(rNode, operation)
-                    (r, false, false, false, None)
-                  case Success(Some(v)) => // insert new value
-                    valueLengthOpt.foreach(vl => require(v.length == vl, s"Value length is fixed and should be $vl"))
-                    onNodeVisit(rNode, operation)
-                    (addNode(r, key, v), true, true, false, None)
-                  case Failure(e) => // updateFunctions doesn't like that we found nothing
-                    throw e
-                }
-              case _: Lookup =>
+            case m: Modification => m.updateFn(None) match {
+              case Success(None) => // don't change anything, just lookup
                 onNodeVisit(rNode, operation)
                 (r, false, false, false, None)
+              case Success(Some(v)) => // insert new value
+                valueLengthOpt.foreach(vl => require(v.length == vl, s"Value length is fixed and should be $vl"))
+                onNodeVisit(rNode, operation)
+                (addNode(r, key, v), true, true, false, None)
+              case Failure(e) => throw e // updateFunctions doesn't like that we found nothing
             }
+            case _: Lookup =>
+              onNodeVisit(rNode, operation)
+              (r, false, false, false, None)
+          }
         case r: InternalEncryNode[D] =>
           if (nextDirectionIsLeft(key, r)) {
             val (newLeftM, changeHappened, childHeightIncreased, toDelete, oldValue) = modifyHelper(r.left, key, operation)
             onNodeVisit(r, operation)
-
             if (changeHappened) {
               if (childHeightIncreased && r.balance < 0) {
                 val newLeft: InternalEncryNode[D] = newLeftM.asInstanceOf[InternalEncryNode[D]]
                 if (newLeft.balance < 0) {
                   val newR: InternalEncryNode[D] = r.getNew(newLeft = newLeft.right, newBalance = Balance @@ 0.toByte)
                   (newLeft.getNew(newRight = newR, newBalance = Balance @@ 0.toByte), true, false, false, oldValue)
-                } else {
-                  (doubleRightRotate(r, newLeft, r.right), true, false, false, oldValue)
-                }
+                } else (doubleRightRotate(r, newLeft, r.right), true, false, false, oldValue)
               } else {
                 val myHeightIncreased: Boolean = childHeightIncreased && r.balance == (0: Byte)
                 val rBalance: Balance = if (childHeightIncreased) Balance @@ (r.balance - 1).toByte else r.balance
                 (r.getNew(newLeft = newLeftM, newBalance = rBalance), true, myHeightIncreased, false, oldValue)
               }
             } else (r, false, false, toDelete, oldValue)
-
           } else {
             val (newRightM, changeHappened, childHeightIncreased, toDelete, oldValue) = modifyHelper(r.right, key, operation)
             onNodeVisit(r, operation)
-
             if (changeHappened) {
               if (childHeightIncreased && r.balance > 0) {
                 val newRight: InternalEncryNode[D] = newRightM.asInstanceOf[InternalEncryNode[D]]
-
                 if (newRight.balance > 0) {
                   val newR: InternalEncryNode[D] = r.getNew(newRight = newRight.left, newBalance = Balance @@ 0.toByte)
                   (newRight.getNew(newLeft = newR, newBalance = Balance @@ 0.toByte), true, false, false, oldValue)
-                } else {
-                  (doubleLeftRotate(r, r.left, newRight), true, false, false, oldValue)
-                }
+                } else (doubleLeftRotate(r, r.left, newRight), true, false, false, oldValue)
               } else {
                 val myHeightIncreased: Boolean = childHeightIncreased && r.balance == (0: Byte)
                 val rBalance: Balance = if (childHeightIncreased) Balance @@ (r.balance + 1).toByte else r.balance
                 (r.getNew(newRight = newRightM, newBalance = rBalance), true, myHeightIncreased, false, oldValue)
               }
-            } else {
-              (r, false, false, toDelete, oldValue)
-            }
+            } else (r, false, false, toDelete, oldValue)
           }
         case _: LabelOnlyEncryNode[D] =>
           throw new Error("Should never reach this point. If in prover, this is a bug. If in verifier, this proof is wrong.")
@@ -184,10 +170,8 @@ trait AuthenticatedTreeOps[D <: Digest] {
       def changeNextLeafKeyOfMaxNode(rNode: EncryNode[D], nextLeafKey: ADKey): EncryNode[D] = {
         onNodeVisit(rNode, operation)
         rNode match {
-          case leaf: EncryLeaf[D] =>
-            leaf.getNew(newNextLeafKey = nextLeafKey)
-          case rN: InternalEncryNode[D] =>
-            rN.getNew(newRight = changeNextLeafKeyOfMaxNode(rN.right, nextLeafKey))
+          case leaf: EncryLeaf[D] => leaf.getNew(newNextLeafKey = nextLeafKey)
+          case rN: InternalEncryNode[D] => rN.getNew(newRight = changeNextLeafKeyOfMaxNode(rN.right, nextLeafKey))
           case _: LabelOnlyEncryNode[D] =>
             throw new Error("Should never reach this point. If in prover, this is a bug. In in verifier, this proof is wrong.")
         }
@@ -196,10 +180,8 @@ trait AuthenticatedTreeOps[D <: Digest] {
       def changeKeyAndValueOfMinNode(rNode: EncryNode[D], newKey: ADKey, newValue: ADValue): EncryNode[D] = {
         onNodeVisit(rNode, operation)
         rNode match {
-          case leaf: EncryLeaf[D] =>
-            leaf.getNew(newKey = newKey, newValue = newValue)
-          case rN: InternalEncryNode[D] =>
-            rN.getNew(newLeft = changeKeyAndValueOfMinNode(rN.left, newKey, newValue))
+          case leaf: EncryLeaf[D] => leaf.getNew(newKey = newKey, newValue = newValue)
+          case rN: InternalEncryNode[D] => rN.getNew(newLeft = changeKeyAndValueOfMinNode(rN.left, newKey, newValue))
           case _: LabelOnlyEncryNode[D] =>
             throw new Error("Should never reach this point. If in prover, this is a bug. If in verifier, this proof is wrong.")
         }
@@ -212,15 +194,12 @@ trait AuthenticatedTreeOps[D <: Digest] {
       assert(!(direction < 0 && r.left.isInstanceOf[EncryLeaf[D]]))
 
       if (direction >= 0 && r.right.isInstanceOf[EncryLeaf[D]]) {
-
         val rightChild: EncryLeaf[D] = r.right.asInstanceOf[EncryLeaf[D]]
         onNodeVisit(rightChild, operation)
         if (deleteMax) {
-
           savedNode = Some(rightChild)
           (r.left, true)
         } else {
-
           assert(direction == 0)
           (changeNextLeafKeyOfMaxNode(r.left, rightChild.nextLeafKey), true)
         }
@@ -230,16 +209,15 @@ trait AuthenticatedTreeOps[D <: Digest] {
         (changeKeyAndValueOfMinNode(r.right, leftChild.key, leftChild.value), true)
       } else {
         if (direction <= 0) {
-          val (newLeft: EncryNode[D], childHeightDecreased: Boolean) = deleteHelper(r.left.asInstanceOf[InternalEncryNode[D]], direction == 0)
+          val (newLeft: EncryNode[D], childHeightDecreased: Boolean) =
+            deleteHelper(r.left.asInstanceOf[InternalEncryNode[D]], direction == 0)
 
           val newRoot: InternalEncryNode[D] = if (direction == 0) {
             val s: EncryLeaf[D] = savedNode.get
             savedNode = None
             val rWithChangedKey: InternalEncryNode[D] = r.getNewKey(s.key)
             rWithChangedKey.getNew(newRight = changeKeyAndValueOfMinNode(rWithChangedKey.right, s.key, s.value))
-          } else {
-            r
-          }
+          } else r
 
           if (childHeightDecreased && newRoot.balance > 0) {
             onNodeVisit(newRoot.right, operation, isRotate = true)
@@ -260,10 +238,10 @@ trait AuthenticatedTreeOps[D <: Digest] {
             (newRoot.getNew(newLeft = newLeft, newBalance = newBalance), childHeightDecreased && newBalance == 0)
           }
         } else {
-          val (newRight: EncryNode[D], childHeightDecreased: Boolean) = deleteHelper(r.right.asInstanceOf[InternalEncryNode[D]], deleteMax)
+          val (newRight: EncryNode[D], childHeightDecreased: Boolean) =
+            deleteHelper(r.right.asInstanceOf[InternalEncryNode[D]], deleteMax)
           if (childHeightDecreased && r.balance < 0) {
             onNodeVisit(r.left, operation, isRotate = true)
-
             val leftChild: InternalEncryNode[D] = r.left.asInstanceOf[InternalEncryNode[D]]
             if (leftChild.balance > 0) {
               onNodeVisit(leftChild.right, operation, isRotate = true)
