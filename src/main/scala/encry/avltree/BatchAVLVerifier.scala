@@ -29,9 +29,8 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
   private var replayIndex = 0 // Keeps track of where we are when replaying directions
 
   protected def nextDirectionIsLeft(key: ADKey, r: InternalEncryNode[D]): Boolean = {
-    val ret: Boolean = if ((proof(directionsIndex >> 3) & (1 << (directionsIndex & 7)).toByte) != 0) {
-      true
-    } else {
+    val ret: Boolean = if ((proof(directionsIndex >> 3) & (1 << (directionsIndex & 7)).toByte) != 0) true
+    else {
       lastRightStep = directionsIndex
       false
     }
@@ -42,22 +41,17 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
   protected def keyMatchesLeaf(key: ADKey, r: EncryLeaf[D]): Boolean = {
     val c: Int = ByteArray.compare(key, r.key)
     require(c >= 0)
-    if (c == 0) {
-      true
-    } else {
+    if (c == 0) true
+    else {
       require(ByteArray.compare(key, r.nextLeafKey) < 0)
       false
     }
   }
 
   protected def replayComparison: Int = {
-    val ret: Int = if (replayIndex == lastRightStep) {
-      0
-    } else if ((proof(replayIndex >> 3) & (1 << (replayIndex & 7)).toByte) == 0 && replayIndex < lastRightStep) {
-      1
-    } else {
-      -1
-    }
+    val ret: Int = if (replayIndex == lastRightStep) 0
+    else if ((proof(replayIndex >> 3) & (1 << (replayIndex & 7)).toByte) == 0 && replayIndex < lastRightStep) 1
+    else -1
     replayIndex += 1
     ret
   }
@@ -76,7 +70,7 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
     require(startingDigest.length == labelLength + 1)
     rootNodeHeight = startingDigest.last & 0xff
 
-    val maxNodes = if (maxNumOperations.isDefined) {
+    val maxNodes: Int = if (maxNumOperations.isDefined) {
       var logNumOps: Int = 0
       var temp: Int = 1
       val realNumOperations: Int = maxNumOperations.getOrElse(0)
@@ -84,16 +78,12 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
         temp = temp * 2
         logNumOps += 1
       }
-
       temp = 1 + math.max(rootNodeHeight, logNumOps)
       val hnew: Int = temp + temp / 2 // this will replace 1.4405 from the paper with 1.5 and will round down, which is safe, because hnew is an integer
       val realMaxDeletes: Int = maxDeletes.getOrElse(realNumOperations)
       (realNumOperations + realMaxDeletes) * (2 * rootNodeHeight + 1) + realMaxDeletes * hnew + 1 // +1 needed in case numOperations == 0
-    } else {
-      0
-    }
-
-    var numNodes = 0
+    } else 0
+    var numNodes: Int = 0
     val s = new mutable.Stack[VerifierNodes[D]] // Nodes and depths
     var i: Int = 0
     var previousLeaf: Option[EncryLeaf[D]] = None
@@ -109,9 +99,7 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
           s.push(new LabelOnlyEncryNode[D](label))
           previousLeaf = None
         case LeafInPackagedProof =>
-          val key: Array[Byte] @@ TaggedTypes.ADKey.Tag = if (previousLeaf.nonEmpty) {
-            ADKey @@ previousLeaf.get.nextLeafKey
-          }
+          val key: Array[Byte] @@ TaggedTypes.ADKey.Tag = if (previousLeaf.nonEmpty) ADKey @@ previousLeaf.get.nextLeafKey
           else {
             val start: Int = i
             i += keyLength
@@ -135,7 +123,6 @@ class BatchAVLVerifier[D <: Digest, HF <: CryptographicHash[D]](startingDigest: 
           s.push(new InternalVerifierEncryNode(left, right, Balance @@ n))
       }
     }
-
     require(s.size == 1)
     val root: VerifierNodes[D] = s.pop
     require(startingDigest startsWith root.label)
