@@ -4,7 +4,7 @@ import java.text.SimpleDateFormat
 import akka.actor.Actor
 import com.typesafe.scalalogging.StrictLogging
 import encry.stats.LoggingActor.LogMessage
-import encry.EncryApp.{settings}
+import encry.EncryApp.settings
 import encry.stats.StatsSender.influxDB
 import encry.stats.KafkaActor.KafkaMessage
 
