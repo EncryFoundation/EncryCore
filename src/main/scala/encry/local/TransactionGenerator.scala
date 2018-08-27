@@ -46,7 +46,6 @@ class TransactionGenerator extends Actor with Logging {
     }.toIndexedSeq
     TransactionFactory.defaultPaymentTransactionScratch(wd.secret, minimalFeeD, timeProvider.estimatedTime, boxes,
           settings.testing.defaultRecipientAddress, amountD)
-
   }
 }
 
