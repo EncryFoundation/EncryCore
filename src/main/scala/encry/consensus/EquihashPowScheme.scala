@@ -9,15 +9,13 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.Transaction
 import encry.settings.{Algos, Constants}
-import encry.utils.Logging
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import scorex.crypto.authds.SerializedAdProof
 import scorex.crypto.hash.Digest32
-
 import scala.annotation.tailrec
 import scala.math.BigInt
 
-case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Logging {
+case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
 
   private val seed: Array[Byte] =
     "equi_seed_12".getBytes(Algos.charset) ++ Chars.toByteArray(n) ++ Chars.toByteArray(k)
@@ -58,7 +56,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Logg
         .map { solution => h.copy(nonce = nonce, equihashSolution = solution) }
         .find { newHeader => correctWorkDone(realDifficulty(newHeader), difficulty) }
       headerWithSuitableSolution match {
-        case headerWithFoundSolution @ Some(_) => headerWithFoundSolution
+        case headerWithFoundSolution@Some(_) => headerWithFoundSolution
         case None if nonce + 1 < finishingNonce => generateHeader(nonce + 1)
         case _ => None
       }
@@ -87,14 +85,14 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with Logg
   override def getDerivedHeaderFields(parentOpt: Option[EncryBlockHeader],
                                       adProofBytes: SerializedAdProof,
                                       transactions: Seq[Transaction]): (Byte, ModifierId, Digest32, Digest32, Int) = {
-      val version = Constants.Chain.Version
-      val parentId: ModifierId = parentOpt.map(_.id).getOrElse(EncryBlockHeader.GenesisParentId)
-      val adProofsRoot = ADProofs.proofDigest(adProofBytes)
-      val txsRoot = EncryBlockPayload.rootHash(transactions.map(_.id))
-      val height = parentOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1
+    val version = Constants.Chain.Version
+    val parentId: ModifierId = parentOpt.map(_.id).getOrElse(EncryBlockHeader.GenesisParentId)
+    val adProofsRoot = ADProofs.proofDigest(adProofBytes)
+    val txsRoot = EncryBlockPayload.rootHash(transactions.map(_.id))
+    val height = parentOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1
 
-      (version, parentId, adProofsRoot, txsRoot, height)
-    }
+    (version, parentId, adProofsRoot, txsRoot, height)
+  }
 
   override def realDifficulty(header: EncryBlockHeader): Difficulty = {
     Difficulty @@ (Constants.Chain.MaxTarget / BigInt(1, header.powHash))

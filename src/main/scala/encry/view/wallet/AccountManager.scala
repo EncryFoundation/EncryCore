@@ -1,17 +1,18 @@
 package encry.view.wallet
 
 import encry.EncryApp
-import encry.EncryApp.settings
+import encry.EncryApp.{settings, system}
 import encry.crypto.encryption.AES
 import encry.settings.Algos
-import encry.utils.{Logging, Mnemonic}
+import encry.stats.LoggingActor.LogMessage
+import encry.utils.Mnemonic
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import scorex.crypto.hash.Blake2b256
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scala.util.Try
 
-case class AccountManager(store: Store) extends Logging {
+case class AccountManager(store: Store) {
 
   import encry.storage.EncryStorage._
 
@@ -59,7 +60,7 @@ case class AccountManager(store: Store) extends Logging {
   }
 
   private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, settings.wallet.password))
-    .fold(e => { logError("AccountManager: decryption failed", e.getCause); EncryApp.forceStopApplication(500) }, r => r)
+    .fold(e => { system.actorSelection("user/loggingActor") ! LogMessage("Error",s"AccountManager: decryption failed cause ${e.getCause}"); EncryApp.forceStopApplication(500) }, r => r)
 
   private def saveAccount(privateKey: PrivateKey, publicKey: PublicKey): Unit =
     store.update(

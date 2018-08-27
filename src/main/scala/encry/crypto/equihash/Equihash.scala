@@ -11,7 +11,6 @@ import scala.collection.mutable.ArrayBuffer
 
 object Equihash {
 
-  private val log: Logger = LoggerFactory.getLogger(getClass)
   private val wordSize: Int = 32
   private val byteSize: Int = 8
 

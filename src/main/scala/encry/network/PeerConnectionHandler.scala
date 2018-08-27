@@ -11,7 +11,7 @@ import encry.EncryApp._
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle, _}
 import encry.network.message.MessageHandler
 import encry.network.peer.PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
-import encry.utils.Logging
+import encry.stats.LoggingActor.LogMessage
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
@@ -20,7 +20,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
                             connection: ActorRef,
                             direction: ConnectionType,
                             ownSocketAddress: Option[InetSocketAddress],
-                            remote: InetSocketAddress) extends Actor with Logging {
+                            remote: InetSocketAddress) extends Actor {
 
   import PeerConnectionHandler.ReceivableMessages._
 
@@ -41,19 +41,22 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   def processErrors(stateName: CommunicationState): Receive = {
     case CommandFailed(w: Write) =>
-      logWarn(s"Write failed :$w " + remote + s" in state $stateName")
+      context.system.actorSelection("/user/loggingActor") ! LogMessage("Warn", s"Write failed :$w " + remote + s" in state $stateName")
       connection ! Close
       connection ! ResumeReading
       connection ! ResumeWriting
     case cc: ConnectionClosed =>
-      log.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
+      context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Info", "Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
       peerManager ! Disconnected(remote)
       context stop self
     case CloseConnection =>
-      log.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")
+      context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Info", s"Enforced to abort communication with: " + remote + s" in state $stateName")
       connection ! Close
     case CommandFailed(cmd: Tcp.Command) =>
-      log.info("Failed to execute command : " + cmd + s" in state $stateName")
+      context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Info", "Failed to execute command : " + cmd + s" in state $stateName")
       connection ! ResumeReading
   }
 
@@ -65,7 +68,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
           val hb: Array[Byte] = Handshake(Version(settings.network.appVersion), settings.network.nodeName,
             ownSocketAddress, time).bytes
           connection ! Tcp.Write(ByteString(hb))
-          log.info(s"Handshake sent to $remote")
+          context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Handshake sent to $remote")
           handshakeSent = true
           if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
         }
@@ -75,19 +78,19 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
     case Received(data) =>
       HandshakeSerializer.parseBytes(data.toArray) match {
         case Success(handshake) =>
-          log.info(s"Got a Handshake from $remote")
+          context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Got a Handshake from $remote")
           receivedHandshake = Some(handshake)
           connection ! ResumeReading
           if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
         case Failure(t) =>
-          log.info(s"Error during parsing a handshake", t)
+          context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Error during parsing a handshake: $t")
           self ! CloseConnection
       }
   }
 
   def handshakeTimeout: Receive = {
     case HandshakeTimeout =>
-      log.info(s"Handshake timeout with $remote, going to drop the connection")
+      context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Handshake timeout with $remote, going to drop the connection")
       self ! CloseConnection
   }
 
@@ -105,7 +108,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   def workingCycleLocalInterface: Receive = {
     case msg: message.Message[_] =>
       def sendOutMessage(): Unit = {
-        log.info("Send message " + msg.spec + " to " + remote)
+        context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", "Send message " + msg.spec + " to " + remote)
         connection ! Write(ByteString(Ints.toByteArray(msg.bytes.length) ++ msg.bytes))
       }
 
@@ -122,11 +125,11 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
       t._1.find { packet =>
         messagesHandler.parseBytes(packet.toByteBuffer, selfPeer) match {
           case Success(message) =>
-            log.info("Received message " + message.spec + " from " + remote)
+            context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", "Received message " + message.spec + " from " + remote)
             networkController ! message
             false
           case Failure(e) =>
-            log.info(s"Corrupted data from: " + remote, e)
+            context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Corrupted data from: " + remote + s"$e")
             true
         }
       }
@@ -134,7 +137,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   }
 
   def reportStrangeInput: Receive = {
-    case nonsense: Any => logWarn(s"Strange input for PeerConnectionHandler: $nonsense")
+    case nonsense: Any => context.system.actorSelection("/user/loggingActor") ! LogMessage("Warn", s"Strange input for PeerConnectionHandler: $nonsense")
   }
 
   def workingCycle: Receive =
@@ -153,21 +156,21 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   def dead: Receive = {
 
-    case message => log.debug(s"Get smth strange: $message")
+    case message => context.system.actorSelection("/user/loggingActor") ! LogMessage("Debug", s"Get smth strange: $message")
   }
 
   def deadNotIn: Receive = {
 
-    case message => log.debug(s"Get smth node strange: $message")
+    case message => context.system.actorSelection("/user/loggingActor") ! LogMessage("Debug", s"Get smth node strange: $message")
   }
 
   override def postStop(): Unit = {
-    log.info(s"Peer handler $self to $remote is destroyed.")
+    context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Peer handler $self to $remote is destroyed.")
     connection ! Close
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    logger.info(s"Reason of restarting actor $self: ${reason.toString}.")
+    context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Reason of restarting actor $self: ${reason.toString}.")
   }
 
   def getPacket(data: ByteString): (List[ByteString], ByteString) = {

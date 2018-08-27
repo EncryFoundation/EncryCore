@@ -6,12 +6,13 @@ import encry.consensus.ModifierSemanticValidity.Invalid
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
-import encry.utils.Logging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
+import encry.EncryApp.system
+import encry.stats.LoggingActor.LogMessage
 import io.iohk.iodb.ByteArrayWrapper
 import scala.util.{Failure, Try}
 
-trait BlockProcessor extends BlockHeaderProcessor with Logging {
+trait BlockProcessor extends BlockHeaderProcessor {
 
   import BlockProcessor._
 
@@ -144,7 +145,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
         s"updates block ${prevBest.map(_.encodedId).getOrElse("None")} " +
         s"with height ${prevBest.map(_.header.height).getOrElse(-1)}"
     }
-    log.info(s"Full block ${appliedBlock.encodedId} appended, " +
+    system.actorSelection("user/loggingActor") ! LogMessage("Info", s"Full block ${appliedBlock.encodedId} appended, " +
       s"going to apply ${toApply.length}$toRemoveStr modifiers.$newStatusStr")
   }
 

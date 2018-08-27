@@ -3,19 +3,19 @@ package encry.local.explorer.database
 import cats.effect.IO
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
-import encry.EncryApp.settings
+import encry.EncryApp.{settings, system}
 import encry.ModifierId
 import QueryRepository._
 import com.zaxxer.hikari.HikariDataSource
 import doobie.hikari.HikariTransactor
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.utils.Logging
+import encry.stats.LoggingActor.LogMessage
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.control.NonFatal
 
-class DBService extends Logging {
+class DBService {
 
   def processBlock(block: EncryBlock): Future[Int] = runAsync(processBlockQuery(block))
 
@@ -43,7 +43,9 @@ class DBService extends Logging {
         .unsafeToFuture()
         .recoverWith {
           case NonFatal(th) =>
-            log.warn("Failed to perform db operation", th)
+            if(settings.logging.enableLogging)
+              system.actorSelection("user/loggingActor") !
+                LogMessage("Warn", s"Failed to perform db operation caused $th", System.currentTimeMillis().toString)
             Future.failed(th)
         }
     } else Future.successful(0)

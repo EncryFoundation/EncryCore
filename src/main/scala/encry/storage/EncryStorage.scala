@@ -2,12 +2,13 @@ package encry.storage
 
 import encry.VersionTag
 import encry.settings.Algos
+import encry.stats.LoggingActor.LogMessage
 import encry.storage.codec.FixLenComplexValueCodec
-import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scala.util.{Failure, Success, Try}
+import encry.EncryApp.system
 
-trait EncryStorage extends AutoCloseable with Logging {
+trait EncryStorage extends AutoCloseable {
 
   val store: Store
 
@@ -42,7 +43,7 @@ trait EncryStorage extends AutoCloseable with Logging {
     }
 
   override def close(): Unit = {
-    log.info("Closing storage")
+    system.actorSelection("user/loggingActor") ! LogMessage("Info", "Closing storage")
     store.close()
   }
 }

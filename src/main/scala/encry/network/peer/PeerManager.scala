@@ -11,12 +11,12 @@ import encry.network.PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages._
 import encry.network.peer.PeerManager._
 import encry.network.{Handshake, SendingStrategy}
-import encry.utils.Logging
+import encry.stats.LoggingActor.LogMessage
 import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.util.Random
 
-class PeerManager extends Actor with Logging {
+class PeerManager extends Actor {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
   var connectingPeers: Set[InetSocketAddress] = Set.empty
@@ -37,11 +37,13 @@ class PeerManager extends Actor with Logging {
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
     case DoConnecting(remote, direction) =>
       if (connectingPeers.contains(remote) && direction != Incoming) {
-        log.info(s"Trying to connect twice to $remote, going to drop the duplicate connection")
+        context.system.actorSelection("/user/loggingActor") !
+          LogMessage("Info", s"Trying to connect twice to $remote, going to drop the duplicate connection")
         sender() ! CloseConnection
       }
       else if (direction != Incoming) {
-        log.info(s"Connecting to $remote")
+        context.system.actorSelection("/user/loggingActor") !
+          LogMessage("Info", s"Connecting to $remote")
         connectingPeers += remote
       }
       sender() ! StartInteraction
@@ -70,7 +72,8 @@ class PeerManager extends Actor with Logging {
           .foreach { address => sender() ! ConnectTo(address)
           }
     case RecoveryCompleted =>
-      log.info("Received RecoveryCompleted")
+      context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Info", "Received RecoveryCompleted")
       recoveryCompleted = true
       addKnownPeersToPeersDatabase()
   }

@@ -8,17 +8,13 @@ import encry.consensus.EncrySupplyController
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.settings.Algos
 import encry.stats.StatsSender._
-import encry.utils.Logging
 import encry.view.history
 import encry.{ModifierId, ModifierTypeId}
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class StatsSender extends Actor with Logging {
-
-  val influxDB: InfluxDB =
-    InfluxDBFactory.connect(settings.influxDB.url, settings.influxDB.login, settings.influxDB.password)
+class StatsSender extends Actor {
 
   var modifiersToDownload: Map[String, (ModifierTypeId, Long)] = Map()//todo delete after completed task about stat
 
@@ -27,12 +23,14 @@ class StatsSender extends Actor with Logging {
   val modifiersToApply: mutable.Map[String, (ModifierTypeId, Long)] = mutable.Map[String, (ModifierTypeId, Long)]()
 
   override def preStart(): Unit =
-    influxDB.write(8189, s"""nodesStartTime value="${settings.network.nodeName}"""")
+    influxDB.write(8089, s"""nodesStartTime value="${settings.network.nodeName}"""")
 
   override def receive: Receive = {
     case BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int) =>
-      influxDB.write(8189, s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache," +
+      influxDB.write(8089, s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache," +
         s"completedBlocksStat=$completedBlocks,notCompletedBlocksStat=$notCompletedBlocks")
+    case a : String ⇒
+      influxDB.write(8089, s"""logsfromnode,nodeName=${settings.network.nodeName} value="$a"""")
     case BestHeaderInChain(fb: EncryBlockHeader) =>
       influxDB.write(8189, util.Arrays.asList(
         s"difficulty,nodeName=${settings.network.nodeName} diff=${fb.difficulty.toString},height=${fb.height}",
@@ -104,6 +102,9 @@ class StatsSender extends Actor with Logging {
 }
 
 object StatsSender {
+
+  val influxDB: InfluxDB =
+    InfluxDBFactory.connect(settings.influxDB.url, settings.influxDB.login, settings.influxDB.password)
 
   case class CandidateProducingTime(time: Long)
 

@@ -19,8 +19,9 @@ import encry.network.message._
 import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, ModifiersHolder, NetworkController}
 import encry.settings.{Algos, EncryAppSettings}
-import encry.stats.{KafkaActor, StatsSender}
-import encry.utils.{Logging, NetworkTimeProvider, Zombie}
+import encry.stats.{KafkaActor, LoggingActor, StatsSender}
+import encry.stats.LoggingActor.LogMessage
+import encry.utils.{NetworkTimeProvider, Zombie}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import scala.concurrent.ExecutionContextExecutor
@@ -28,7 +29,7 @@ import scala.concurrent.duration._
 import scala.io.Source
 import scala.language.postfixOps
 
-object EncryApp extends App with Logging {
+object EncryApp extends App {
 
   implicit val system: ActorSystem = ActorSystem()
   implicit val materializer: ActorMaterializer = ActorMaterializer()
@@ -70,6 +71,7 @@ object EncryApp extends App with Logging {
     system.actorOf(Props[TransactionGenerator].withDispatcher("transaction-generator-dispatcher"), "tx-generator")
   if (settings.node.enableCLI) cliListener ! StartListening
   system.actorOf(Props[Zombie], "zombie")
+  if (settings.logging.enableLogging) system.actorOf(Props[LoggingActor], "loggingActor")
 
   if (settings.restApi.enabled) {
     import akka.http.scaladsl.model.StatusCodes._
@@ -78,7 +80,7 @@ object EncryApp extends App with Logging {
       ExceptionHandler {
         case e: Exception =>
           extractUri { uri =>
-            logError(s"Request to $uri could not be handled normally due to: $e")
+            system.actorSelection("user/loggingActor") ! LogMessage("Error",s"Request to $uri could not be handled normally due to: $e")
             complete(HttpResponse(InternalServerError, entity = "Internal server error"))
           }
       }
