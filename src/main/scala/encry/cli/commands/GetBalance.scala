@@ -2,7 +2,7 @@ package encry.cli.commands
 import akka.pattern._
 import akka.util.Timeout
 import encry.cli.Response
-import encry.settings.{Algos, EncryAppSettings}
+import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
@@ -10,6 +10,7 @@ import encry.view.wallet.EncryWallet
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import scala.concurrent.Future
 import encry.EncryApp._
+import org.encryfoundation.common.Algos
 
 object GetBalance extends Command {
 

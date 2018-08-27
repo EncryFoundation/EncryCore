@@ -2,19 +2,20 @@ package encry.view.state
 
 import java.io.File
 import akka.actor.ActorRef
+import encry.avltree
+import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
-import encry.settings.Algos.HF
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
 import encry.view.history.Height
 import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.crypto
+import org.encryfoundation.common.Algos.HF
+import org.encryfoundation.common.{Algos, crypto}
 import org.encryfoundation.common.transaction.Pay2PubKeyAddress
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, SerializedAdProof}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.crypto.authds.avltree.batch._
-import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
@@ -22,12 +23,12 @@ import scorex.utils.Random
 class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
   def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-    val p = new BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
-    bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
+    val p = new avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
+    bh.sortedBoxes.foreach(b => p.performOneOperation(avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
     val stateStore = new LSMStore(dir, keySize = 32, keepVersions = 10)
 
-    val persistentProver: PersistentBatchAVLProver[Digest32, HF] = {
+    val persistentProver: avltree.PersistentBatchAVLProver[Digest32, HF] = {
       val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
       val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(stateStore, np)(Algos.hash)
       PersistentBatchAVLProver.create(p, storage).get

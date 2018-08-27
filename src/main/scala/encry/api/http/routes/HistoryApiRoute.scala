@@ -7,13 +7,14 @@ import encry.ModifierId
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.settings.{Algos, EncryAppSettings, RESTApiSettings}
+import encry.settings.{EncryAppSettings, RESTApiSettings}
 import encry.utils.Logging
 import encry.view.EncryViewReadersHolder.GetDataFromHistory
 import encry.view.history.EncryHistoryReader
 import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
+import org.encryfoundation.common.Algos
 import scala.concurrent.Future
 
 case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings: EncryAppSettings,

@@ -2,7 +2,7 @@ package encry.modifiers.state.box
 
 import org.encryfoundation.common.serialization.BytesSerializable
 import org.encryfoundation.common.transaction.Proposition
-import scorex.crypto.authds._
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
 
 trait Box[P <: Proposition] extends BytesSerializable {
   val value: Box.Amount

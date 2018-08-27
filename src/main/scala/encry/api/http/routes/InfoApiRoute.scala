@@ -6,11 +6,12 @@ import akka.pattern.ask
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
-import encry.settings.{Algos, Constants, EncryAppSettings, RESTApiSettings}
+import encry.settings.{Constants, EncryAppSettings, RESTApiSettings}
 import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import io.circe.Json
 import io.circe.syntax._
+import org.encryfoundation.common.Algos
 import scala.concurrent.Future
 
 case class InfoApiRoute(readersHolder: ActorRef,
