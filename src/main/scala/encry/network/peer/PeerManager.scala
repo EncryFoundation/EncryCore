@@ -39,8 +39,7 @@ class PeerManager extends Actor with Logging {
       if (connectingPeers.contains(remote) && direction != Incoming) {
         log.info(s"Trying to connect twice to $remote, going to drop the duplicate connection")
         sender() ! CloseConnection
-      }
-      else if (direction != Incoming) {
+      } else if (direction != Incoming) {
         log.info(s"Connecting to $remote")
         connectingPeers += remote
       }
@@ -67,8 +66,7 @@ class PeerManager extends Actor with Logging {
       if (connectedPeers.size + connectingPeers.size <= settings.network.maxConnections)
         randomPeer.filter(address => !connectedPeers.exists(_._1 == address) &&
           !connectingPeers.exists(_.getHostName == address.getHostName) && checkPossibilityToAddPeerWRecovery(address))
-          .foreach { address => sender() ! ConnectTo(address)
-          }
+          .foreach { address => sender() ! ConnectTo(address) }
     case RecoveryCompleted =>
       log.info("Received RecoveryCompleted")
       recoveryCompleted = true
