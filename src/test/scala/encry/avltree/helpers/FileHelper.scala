@@ -1,4 +1,4 @@
-package scorex.crypto.authds.avltree.batch.helpers
+package encry.avltree.helpers
 
 import java.io.File
 

@@ -1,10 +1,11 @@
 package encry.modifiers.state.box
 
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.view.history.Height
 import io.circe.Encoder
 import io.circe.syntax._
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.EncryAddress.Address
 import org.encryfoundation.common.transaction._

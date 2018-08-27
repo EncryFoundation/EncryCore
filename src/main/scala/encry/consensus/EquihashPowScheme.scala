@@ -8,12 +8,12 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.Transaction
-import encry.settings.{Algos, Constants}
+import encry.settings.Constants
 import encry.utils.Logging
 import org.bouncycastle.crypto.digests.Blake2bDigest
-import scorex.crypto.authds.SerializedAdProof
+import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.TaggedTypes.SerializedAdProof
 import scorex.crypto.hash.Digest32
-
 import scala.annotation.tailrec
 import scala.math.BigInt
 

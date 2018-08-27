@@ -1,17 +1,17 @@
 package encry.modifiers.history
 
 import com.google.common.primitives.Bytes
+import encry.avltree.{BatchAVLVerifier, Modification}
 import encry.modifiers.state.box._
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
-import encry.settings.{Algos, Constants}
-import encry.{ModifierId, ModifierTypeId}
+import encry.settings.Constants
+import encry._
 import io.circe.Encoder
 import io.circe.syntax._
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
-import scorex.crypto.authds.avltree.batch.{BatchAVLVerifier, Insert, Modification, Remove}
-import scorex.crypto.authds.{ADDigest, ADValue, SerializedAdProof}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
-
 import scala.util.{Failure, Success, Try}
 
 case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
@@ -87,10 +87,10 @@ object ADProofs {
   def toModification(op: EncryBoxStateChangeOperation): Modification =
     op match {
       case Insertion(box) => box match {
-        case bx: EncryBaseBox => Insert(bx.id, ADValue @@ bx.bytes)
+        case bx: EncryBaseBox => avltree.Insert(bx.id, ADValue @@ bx.bytes)
         case _ => throw new Exception("Got state modifier of unknown type.")
       }
-      case Removal(id) => Remove(id)
+      case Removal(id) => avltree.Remove(id)
     }
 }
 

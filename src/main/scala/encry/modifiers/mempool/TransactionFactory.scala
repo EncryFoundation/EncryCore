@@ -7,8 +7,8 @@ import encry.view.history.Height
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import org.encryfoundation.common.transaction.EncryAddress.Address
 import org.encryfoundation.common.transaction.{Input, Proof, PubKeyLockedContract}
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
-import scorex.crypto.authds.ADKey
 
 object TransactionFactory {
 

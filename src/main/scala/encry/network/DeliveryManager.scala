@@ -10,7 +10,6 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToN
 import encry.network.PeerConnectionHandler._
 import encry.network.message.BasicMsgDataTypes.ModifiersData
 import encry.network.message.{InvSpec, Message, ModifiersSpec, RequestModifierSpec}
-import encry.settings.Algos
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.DownloadRequest
@@ -18,6 +17,7 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.EncryMempool
 import encry.{ModifierId, ModifierTypeId}
+import org.encryfoundation.common.Algos
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Try}

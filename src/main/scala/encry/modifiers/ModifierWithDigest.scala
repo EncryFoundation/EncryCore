@@ -1,7 +1,7 @@
 package encry.modifiers
 
-import encry.settings.Algos
 import encry.{ModifierId, ModifierTypeId}
+import org.encryfoundation.common.Algos
 
 trait ModifierWithDigest extends PersistentNodeViewModifier {
 

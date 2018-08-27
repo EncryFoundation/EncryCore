@@ -10,13 +10,14 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.history.block.{Block, EncryBlock}
 import encry.settings.Constants._
-import encry.settings.{Algos, Constants, NodeSettings}
+import encry.settings.{Constants, NodeSettings}
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.validation.{ModifierValidator, ValidationResult}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import encry.{EncryApp, _}
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.concurrent.Future
