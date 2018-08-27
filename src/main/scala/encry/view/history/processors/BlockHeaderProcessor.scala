@@ -11,21 +11,19 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.history.block.{Block, EncryBlock}
 import encry.settings.Constants._
 import encry.settings.{Constants, NodeSettings}
-import encry.utils.NetworkTimeProvider
+import encry.utils.{Logging, NetworkTimeProvider}
 import encry.validation.{ModifierValidator, ValidationResult}
 import encry.view.history.Height
 import encry.view.history.storage.HistoryStorage
 import encry.{EncryApp, _}
-import encry.stats.LoggingActor.LogMessage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.concurrent.Future
 import scala.util.Try
-import encry.EncryApp.{settings, system}
 
-trait BlockHeaderProcessor {
+trait BlockHeaderProcessor extends Logging {
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider
@@ -69,8 +67,7 @@ trait BlockHeaderProcessor {
       requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
     else if (!isHeadersChainSynced && isNewHeader(header)) {
       // Headers chain is synced after this header. Start downloading full blocks
-      if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-        LogMessage("Info", s"Headers chain is synced after header ${header.encodedId} at height ${header.height}", System.currentTimeMillis())
+      info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
       isHeadersChainSyncedVar = true
       blockDownloadProcessor.updateBestBlock(header)
       Seq.empty
@@ -130,8 +127,7 @@ trait BlockHeaderProcessor {
           val toProcess: Seq[EncryBlockHeader] = if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
           ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
         case None =>
-          if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-            LogMessage("Error","Should always have best header after header application", System.currentTimeMillis())
+          error("Should always have best header after header application")
           EncryApp.forceStopApplication()
       }
     case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
@@ -140,8 +136,7 @@ trait BlockHeaderProcessor {
   private def getHeaderInfoUpdate(h: EncryBlockHeader): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier)] = {
     val difficulty: Difficulty = h.difficulty
     if (h.isGenesis) {
-      if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-        LogMessage("Info",s"Initialize header chain with genesis header ${h.encodedId}", System.currentTimeMillis())
+      info(s"Initialize header chain with genesis header ${h.encodedId}")
       Option(Seq(
         BestHeaderKey -> ByteArrayWrapper(h.id),
         heightIdsKey(Constants.Chain.GenesisHeight) -> ByteArrayWrapper(h.id),
@@ -169,8 +164,7 @@ trait BlockHeaderProcessor {
     * header ids at this height */
   private def bestBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
     val prevHeight = bestHeaderHeight
-    if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-      LogMessage("Info",s"New best header ${h.encodedId} with score: $score. New height: ${h.height}, old height: $prevHeight", System.currentTimeMillis())
+    info(s"New best header ${h.encodedId} with score: $score. New height: ${h.height}, old height: $prevHeight")
     val self: (ByteArrayWrapper, ByteArrayWrapper) =
       heightIdsKey(h.height) -> ByteArrayWrapper((Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray)
     val parentHeaderOpt: Option[EncryBlockHeader] = typedModifierById[EncryBlockHeader](h.parentId)
@@ -186,8 +180,7 @@ trait BlockHeaderProcessor {
 
   /** Row to storage, that put this orphaned block id to the end of header ids at this height */
   private def orphanedBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
-    if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-      LogMessage("Info",s"New orphaned header ${h.encodedId} at height ${h.height} with score $score", System.currentTimeMillis())
+    info(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
     Seq(heightIdsKey(h.height) -> ByteArrayWrapper((headerIdsAtHeight(h.height) :+ h.id).flatten.toArray))
   }
 

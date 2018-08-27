@@ -1,8 +1,8 @@
 package encry.avltree
 
 import com.google.common.primitives.Ints
-import encry.stats.LoggingActor.LogMessage
 import encry.EncryApp.{settings, system}
+import encry.utils.Logging
 import org.encryfoundation.common.utils.TaggedTypes._
 import scorex.crypto.hash.{Blake2b256, CryptographicHash, Digest}
 import scorex.utils.ByteArray
@@ -15,7 +15,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
                                                               oldRootAndHeight: Option[(EncryProverNodes[D], Int)] = None,
                                                               val collectChangedNodes: Boolean = true)
                                                              (implicit val hf: HF = Blake2b256)
-  extends AuthenticatedTreeOps[D] {
+  extends AuthenticatedTreeOps[D] with Logging {
 
   protected val labelLength: Int = hf.DigestSize
 
@@ -122,6 +122,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
         case _ => false
       }
     }
+
     loop(topNode, keyFound = false)
   }
 
@@ -229,13 +230,11 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
 
     def checkTreeHelper(rNode: EncryProverNodes[D]): (ProverLeaf[D], ProverLeaf[D], Int) = {
       def myRequire(t: Boolean, s: String): Unit = if (!t) {
-          var x: Int = rNode.key(0).toInt
-          if (x < 0) x = x + 256
-          if (settings.logging.enableLogging)
-            system.actorSelection("user/loggingActor") !
-              LogMessage("Error","Tree failed at key = " + x + ": " + s, System.currentTimeMillis())
-          fail = true
-        }
+        var x: Int = rNode.key(0).toInt
+        if (x < 0) x = x + 256
+        error("Tree failed at key = " + x + ": " + s)
+        fail = true
+      }
 
       myRequire(!postProof || (!rNode.visited && !rNode.isNew), "postproof flags")
       rNode match {

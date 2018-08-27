@@ -4,14 +4,13 @@ import java.lang
 import java.util.concurrent.ConcurrentHashMap
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.stats.LoggingActor.LogMessage
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
 import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
-import encry.EncryApp.{system, settings}
+import encry.utils.Logging
 
 /**
   * A cache which is storing persistent modifiers not applied to history yet.
@@ -121,7 +120,7 @@ trait LRUCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader] extend
 }
 
 class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader]
-(override val maxSize: Int) extends ModifiersCache[PMOD, HR] with LRUCache[PMOD, HR] {
+(override val maxSize: Int) extends ModifiersCache[PMOD, HR] with LRUCache[PMOD, HR] with Logging {
 
   /**
     * Default implementation is just about to scan. Not efficient at all and should be probably rewritten in a
@@ -137,8 +136,7 @@ class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryR
         case Failure(_: RecoverableModifierError) =>
           false
         case Failure(e) =>
-          if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-            LogMessage("Warn", s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e", System.currentTimeMillis())
+          warn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
           remove(k, rememberKey = true)
           false
         case Success(_) =>
@@ -162,8 +160,7 @@ case class EncryModifiersCache(override val maxSize: Int)
     def tryToApply(k: K, v: EncryPersistentModifier): Boolean = {
       history.testApplicable(v) match {
         case Failure(e: MalformedModifierError) =>
-          if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-            LogMessage("Warn", s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e", System.currentTimeMillis())
+          warn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
           remove(k, rememberKey = true)
           false
         case m => m.isSuccess

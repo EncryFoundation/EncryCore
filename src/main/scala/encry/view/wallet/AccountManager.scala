@@ -1,10 +1,9 @@
 package encry.view.wallet
 
 import encry.EncryApp
-import encry.EncryApp.{settings, system}
+import encry.EncryApp.settings
 import encry.crypto.encryption.AES
-import encry.stats.LoggingActor.LogMessage
-import encry.utils.Mnemonic
+import encry.utils.{Logging, Mnemonic}
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
@@ -12,7 +11,7 @@ import scorex.crypto.hash.Blake2b256
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scala.util.Try
 
-case class AccountManager(store: Store) {
+case class AccountManager(store: Store) extends Logging {
 
   import encry.storage.EncryStorage._
 
@@ -37,7 +36,9 @@ case class AccountManager(store: Store) {
     val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
       Blake2b256.hash(
         seedOpt
-          .map { Mnemonic.seedFromMnemonic(_) }
+          .map {
+            Mnemonic.seedFromMnemonic(_)
+          }
           .getOrElse {
             val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
             println(s"\nMnemonic code is: \n$phrase")
@@ -61,8 +62,7 @@ case class AccountManager(store: Store) {
 
   private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, settings.wallet.password))
     .fold(e => {
-      if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-        LogMessage("Error", s"AccountManager: decryption failed cause ${e.getCause}", System.currentTimeMillis())
+      error(s"AccountManager: decryption failed cause ${e.getCause}")
       EncryApp.forceStopApplication(500)
     }, r => r)
 

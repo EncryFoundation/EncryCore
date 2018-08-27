@@ -11,12 +11,12 @@ import encry.network.PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages._
 import encry.network.peer.PeerManager._
 import encry.network.{Handshake, SendingStrategy}
-import encry.stats.LoggingActor.LogMessage
+import encry.utils.Logging
 import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.util.Random
 
-class PeerManager extends Actor {
+class PeerManager extends Actor with Logging {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
   var connectingPeers: Set[InetSocketAddress] = Set.empty
@@ -37,15 +37,11 @@ class PeerManager extends Actor {
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
     case DoConnecting(remote, direction) =>
       if (connectingPeers.contains(remote) && direction != Incoming) {
-        if (settings.logging.enableLogging)
-          context.system.actorSelection("/user/loggingActor") !
-            LogMessage("Info", s"Trying to connect twice to $remote, going to drop the duplicate connection", System.currentTimeMillis())
+        info(s"Trying to connect twice to $remote, going to drop the duplicate connection")
         sender() ! CloseConnection
       }
       else if (direction != Incoming) {
-        if (settings.logging.enableLogging)
-          context.system.actorSelection("/user/loggingActor") !
-            LogMessage("Info", s"Connecting to $remote", System.currentTimeMillis())
+        info(s"Connecting to $remote")
         connectingPeers += remote
       }
       sender() ! StartInteraction
@@ -74,9 +70,7 @@ class PeerManager extends Actor {
           .foreach { address => sender() ! ConnectTo(address)
           }
     case RecoveryCompleted =>
-      if (settings.logging.enableLogging)
-        context.system.actorSelection("/user/loggingActor") !
-          LogMessage("Info", "Received RecoveryCompleted", System.currentTimeMillis())
+      info("Received RecoveryCompleted")
       recoveryCompleted = true
       addKnownPeersToPeersDatabase()
   }

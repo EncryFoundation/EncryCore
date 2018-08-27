@@ -7,9 +7,8 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.Transaction
-import encry.EncryApp.{settings => encrySettings, system}
-import encry.stats.LoggingActor.LogMessage
 import encry.settings.{Constants, NodeSettings}
+import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
@@ -21,7 +20,7 @@ class DigestState protected(override val version: VersionTag,
                             val stateStore: Store,
                             settings: NodeSettings)
   extends EncryState[DigestState]
-    with ModifierValidation[EncryPersistentModifier] {
+    with ModifierValidation[EncryPersistentModifier] with Logging {
 
   stateStore.lastVersionID
     .foreach(id => assert(version sameElements id.data, "`version` should always be equal to store.lastVersionID"))
@@ -43,12 +42,10 @@ class DigestState protected(override val version: VersionTag,
           .getOrElse(Failure(new Exception("Proofs are empty"))))
       }.flatten match {
         case s: Success[_] =>
-          if (encrySettings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-            LogMessage("Info", s"Valid modifier applied to DigestState: ${block.encodedId}", System.currentTimeMillis())
+          info(s"Valid modifier applied to DigestState: ${block.encodedId}")
           s
         case Failure(e) =>
-          if (encrySettings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-            LogMessage("Warn", s"Modifier $mod is not valid: $e", System.currentTimeMillis())
+          warn(s"Modifier $mod is not valid: $e")
           Failure(e)
       }
     case mod: Any =>
@@ -64,30 +61,25 @@ class DigestState protected(override val version: VersionTag,
   //todo: utxo snapshot could go here
   override def applyModifier(mod: EncryPersistentModifier): Try[DigestState] = mod match {
     case block: EncryBlock if settings.verifyTransactions =>
-      if (encrySettings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-        LogMessage("Info", s"Got new full block with id ${block.encodedId} with root ${Algos.encoder.encode(block.header.stateRoot)}", System.currentTimeMillis())
+      info(s"Got new full block with id ${block.encodedId} with root ${Algos.encoder.encode(block.header.stateRoot)}")
       this.validate(block).flatMap(_ => update(VersionTag !@@ block.header.id, block.header.stateRoot))
 
     case header: EncryBlockHeader if !settings.verifyTransactions =>
-      if (encrySettings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-        LogMessage("Info", s"Got new Header ${header.encodedId} with root ${Algos.encoder.encode(header.stateRoot)}", System.currentTimeMillis())
+      info(s"Got new Header ${header.encodedId} with root ${Algos.encoder.encode(header.stateRoot)}")
       update(VersionTag !@@ header.id, header.stateRoot)
 
     case a: Any =>
-      if (encrySettings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-        LogMessage("Info", s"Unhandled modifier: $a", System.currentTimeMillis())
+      info(s"Unhandled modifier: $a")
       Failure(new Exception(s"Unhandled modifier: $mod"))
   }
 
   override def rollbackTo(version: VersionTag): Try[DigestState] = {
-    if (encrySettings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-      LogMessage("Info", s"Rollback Digest State to version ${Algos.encoder.encode(version)}", System.currentTimeMillis())
+    info(s"Rollback Digest State to version ${Algos.encoder.encode(version)}")
     val wrappedVersion: ByteArrayWrapper = ByteArrayWrapper(version)
     Try(stateStore.rollback(wrappedVersion)).map { _ =>
       stateStore.clean(Constants.DefaultKeepVersions)
       val rootHash: ADDigest = ADDigest @@ stateStore.get(wrappedVersion).get.data
-      if (encrySettings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-        LogMessage("Info", s"Rollback to version ${Algos.encoder.encode(version)} with roothash ${Algos.encoder.encode(rootHash)}", System.currentTimeMillis())
+      info(s"Rollback to version ${Algos.encoder.encode(version)} with roothash ${Algos.encoder.encode(rootHash)}")
       new DigestState(version, rootHash, stateStore, settings)
     }
   }

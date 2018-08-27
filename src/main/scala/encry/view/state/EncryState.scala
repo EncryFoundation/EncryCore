@@ -7,8 +7,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
 import encry.modifiers.state.box._
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
-import encry.EncryApp.{system, settings}
-import encry.stats.LoggingActor.LogMessage
+import encry.utils.Logging
 import io.iohk.iodb.Store
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scorex.crypto.encode.Base16
@@ -48,7 +47,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   override type NVCT = this.type
 }
 
-object EncryState {
+object EncryState extends Logging {
 
   def initialStateBoxes: IndexedSeq[AssetBox] = IndexedSeq(AssetBox(EncryProposition.open, -9, 0))
 
@@ -63,14 +62,9 @@ object EncryState {
   def generateGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
     val supplyBoxes: List[EncryBaseBox] = EncryState.initialStateBoxes.toList
     UtxoState.genesis(supplyBoxes, stateDir, nodeViewHolderRef).ensuring(us => {
-      if (settings.logging.enableLogging) {
-        system.actorSelection("user/loggingActor") !
-          LogMessage("Info", s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}", System.currentTimeMillis())
-        system.actorSelection("user/loggingActor") !
-          LogMessage("Info", s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}", System.currentTimeMillis())
-        system.actorSelection("user/loggingActor") !
-          LogMessage("Info", s"Generated UTXO state with ${supplyBoxes.size} boxes inside.", System.currentTimeMillis())
-      }
+      info(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
+      info(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
+      info(s"Generated UTXO state with ${supplyBoxes.size} boxes inside.")
       us.rootHash.sameElements(afterGenesisStateDigest) && us.version.sameElements(genesisStateVersion)
     })
   }

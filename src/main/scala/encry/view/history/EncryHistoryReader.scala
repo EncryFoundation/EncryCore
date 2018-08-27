@@ -12,14 +12,13 @@ import encry.settings.{Constants, NodeSettings}
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
-import encry.EncryApp.{settings, system}
-import encry.stats.LoggingActor.LogMessage
 import encry.EncryApp.settings
+import encry.utils.Logging
 import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
-trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProcessor with BaseADProofProcessor {
+trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProcessor with BaseADProofProcessor with Logging {
 
   protected val nodeSettings: NodeSettings
 
@@ -196,8 +195,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
       case None if contains(modifierId) => ModifierSemanticValidity.Unknown
       case None => ModifierSemanticValidity.Absent
       case m =>
-        if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-          LogMessage("Error", s"Incorrect validity status: $m", System.currentTimeMillis())
+        error(s"Incorrect validity status: $m")
         ModifierSemanticValidity.Absent
     }
 }

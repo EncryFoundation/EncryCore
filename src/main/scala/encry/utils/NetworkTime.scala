@@ -23,7 +23,7 @@ protected case class NetworkTime(offset: NetworkTime.Offset, lastUpdate: Network
 
 case class NetworkTimeProviderSettings(server: String, updateEvery: FiniteDuration, timeout: FiniteDuration)
 
-class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) {
+class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) extends Logging {
 
   private type State = Either[(NetworkTime, Future[NetworkTime]), NetworkTime]
 
@@ -50,8 +50,7 @@ class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) {
         val state: Either[(NetworkTime, Future[NetworkTime]), NetworkTime] =
           if (time > nt.lastUpdate + ntpSettings.updateEvery.toMillis) {
             Left(nt -> Future(updateOffSet()).map { mbOffset =>
-              if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-                LogMessage("Info", "New offset adjusted: " + mbOffset, System.currentTimeMillis())
+              info("New offset adjusted: " + mbOffset)
               val offset = mbOffset.getOrElse(nt.offset)
               NetworkTime(offset, NetworkTime.localWithOffset(offset))
             })
@@ -62,8 +61,7 @@ class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) {
           .map(networkTime => NetworkTime.localWithOffset(networkTime.offset) -> Right(networkTime))
           .recover {
             case NonFatal(th) =>
-              if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
-                LogMessage("Warn", s"Failed to evaluate networkTimeFuture $th", System.currentTimeMillis())
+              warn(s"Failed to evaluate networkTimeFuture $th")
               NetworkTime.localWithOffset(nt.offset) -> Left(nt -> networkTimeFuture)
           }
     }

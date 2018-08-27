@@ -9,11 +9,11 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, Registe
 import encry.network.message.{GetPeersSpec, Message, PeersSpec}
 import encry.network.peer.PeerManager._
 import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
-import encry.stats.LoggingActor.LogMessage
+import encry.utils.Logging
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class PeerSynchronizer extends Actor {
+class PeerSynchronizer extends Actor with Logging {
 
   implicit val timeout: Timeout = Timeout(settings.network.syncTimeout.getOrElse(5 seconds))
 
@@ -29,8 +29,7 @@ class PeerSynchronizer extends Actor {
       if spec.messageCode == PeersSpec.messageCode =>
       peers.filter(checkPossibilityToAddPeer).foreach(isa =>
         peerManager ! AddOrUpdatePeer(isa, None, Some(remote.direction)))
-      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
-        LogMessage("Debug", s"Get new peers: [${peers.mkString(",")}] from ${remote.socketAddress}", System.currentTimeMillis())
+      debug(s"Get new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
     case DataFromPeer(spec, _, remote) if spec.messageCode == GetPeersSpec.messageCode =>
       (peerManager ? RandomPeers(3))
         .mapTo[Seq[InetSocketAddress]]
@@ -39,13 +38,10 @@ class PeerSynchronizer extends Actor {
             if (remote.socketAddress.getAddress.isSiteLocalAddress) true
             else !address.getAddress.isSiteLocalAddress && address != remote.socketAddress
           })
-          if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
-            LogMessage("Info", s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}", System.currentTimeMillis())
+          info(s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
           networkController ! SendToNetwork(Message(PeersSpec, Right(correctPeers), None), SendToPeer(remote))
-          if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
-            LogMessage("Debug", s"Send to ${remote.socketAddress} peers message which contains next peers: ${peers.mkString(",")}", System.currentTimeMillis())
+          debug(s"Send to ${remote.socketAddress} peers message which contains next peers: ${peers.mkString(",")}")
         }
-    case nonsense: Any => if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
-      LogMessage("Warn", s"PeerSynchronizer: got something strange $nonsense", System.currentTimeMillis())
+    case nonsense: Any => warn(s"PeerSynchronizer: got something strange $nonsense")
   }
 }

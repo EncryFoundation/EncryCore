@@ -4,6 +4,7 @@ import com.google.common.primitives.Ints
 import encry.avltree.VersionedIODBAVLStorage.{InternalNodePrefix, LeafPrefix}
 import encry.stats.LoggingActor.LogMessage
 import encry.EncryApp.{settings, system}
+import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, Balance}
@@ -13,7 +14,8 @@ import scala.util.{Failure, Try}
 
 case class NodeParameters(keySize: Int, valueSize: Option[Int], labelSize: Int)
 
-class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodeParameters)(implicit val hf: CryptographicHash[D]) {
+class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodeParameters)(implicit val hf: CryptographicHash[D])
+  extends Logging {
 
   val TopNodeKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(nodeParameters.labelSize)(123: Byte))
   val TopNodeHeight: ByteArrayWrapper = ByteArrayWrapper(Array.fill(nodeParameters.labelSize)(124: Byte))
@@ -24,9 +26,7 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
     val topHeight: Int = Ints.fromByteArray(store.get(TopNodeHeight).get.data)
     top -> topHeight
   }.recoverWith { case e =>
-    if (settings.logging.enableLogging)
-      system.actorSelection("user/loggingActor") !
-        LogMessage("Info", s"Failed to recover tree for digest ${Algos.encode(version)}: $e", System.currentTimeMillis())
+    info(s"Failed to recover tree for digest ${Algos.encode(version)}: $e")
     Failure(e)
   }
 
@@ -45,17 +45,11 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
     val toUpdateWrapped: Seq[(Store.K, Store.K)] = additionalData.map { case (k, v) => ByteArrayWrapper(k) -> ByteArrayWrapper(v) }
     val toUpdateWithWrapped: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = toUpdate ++ toUpdateWrapped
     val toRemoveMerged: List[ByteArrayWrapper] = toRemove.filterNot(toUpdate.map(_._1).intersect(toRemove).contains)
-    if (settings.logging.enableLogging && Try(system.name).isSuccess)
-      system.actorSelection("user/loggingActor") !
-        LogMessage("Info", s"Update storage to version $digestWrapper: ${toUpdateWithWrapped.size} elements to insert," +
-          s" ${toRemove.size} elements to remove", System.currentTimeMillis())
+    info(s"Update storage to version $digestWrapper: ${toUpdateWithWrapped.size} elements to insert," +
+      s" ${toRemove.size} elements to remove")
     store.update(digestWrapper, toRemoveMerged, toUpdateWithWrapped)
   }.recoverWith { case e =>
-    if (settings.logging.enableLogging && Try(system.startTime).isSuccess) {
-      println("qwert")
-      system.actorSelection("user/loggingActor") !
-        LogMessage("Warn", s"Failed to update tree: $e", System.currentTimeMillis())
-    }
+    info(s"Failed to update tree: $e")
     Failure(e)
   }
 

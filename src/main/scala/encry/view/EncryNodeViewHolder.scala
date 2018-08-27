@@ -19,8 +19,6 @@ import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSy
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.stats.KafkaActor
-import encry.stats.KafkaActor.KafkaMessage
 import encry.stats.StatsSender._
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
@@ -29,7 +27,7 @@ import encry.view.mempool.EncryMempool
 import encry.view.state._
 import encry.view.wallet.EncryWallet
 import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
-import encry.stats.LoggingActor.LogMessage
+import encry.utils.Logging
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
@@ -40,7 +38,7 @@ import scala.concurrent.Future
 import scala.collection.{mutable, IndexedSeq, Seq}
 import scala.util.{Failure, Success, Try}
 
-class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor {
+class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging {
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: EncryMempool)
 
@@ -60,8 +58,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor {
   }
 
   override def postStop(): Unit = {
-    if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-      LogMessage("Warn", "Stopping EncryNodeViewHolder", System.currentTimeMillis())
+    warn(s"Stopping EncryNodeViewHolder")
     nodeView.history.closeStorage()
     nodeView.state.closeStorage()
   }
@@ -71,11 +68,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor {
       blocks.foreach { block =>
         pmodModifyRecovery(block) match {
           case Success(_) =>
-            if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-              LogMessage("Info", s"Block ${block.encodedId} from recovery applied successfully", System.currentTimeMillis())
+            info(s"Block ${block.encodedId} from recovery applied successfully")
           case Failure(th) =>
-            if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-              LogMessage("Warn", s"Failed to apply block ${block.encodedId} from recovery caused $th", System.currentTimeMillis())
+            warn(s"Failed to apply block ${block.encodedId} from recovery caused $th")
             applicationsSuccessful = false
             peerManager ! RecoveryCompleted
         }
@@ -88,25 +83,21 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor {
           case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
             if (nodeView.history.contains(pmod.id) || modifiersCache.contains(key(pmod.id)))
-              if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-                LogMessage("Warn", s"Received modifier ${pmod.encodedId} that is already in history", System.currentTimeMillis())
-              else {
-                modifiersCache.put(key(pmod.id), pmod)
-                if (settings.levelDb.enable)
-                  context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
-              }
+              warn(s"Received modifier ${pmod.encodedId} that is already in history")
+            else {
+              modifiersCache.put(key(pmod.id), pmod)
+              if (settings.levelDb.enable)
+                context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
+            }
         }
-        if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-          LogMessage("Info", s"Cache before(${modifiersCache.size})", System.currentTimeMillis())
+        info(s"Cache before(${modifiersCache.size})")
         computeApplications()
         if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
-        if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-          LogMessage("Info", s"Cache after(${modifiersCache.size})", System.currentTimeMillis())
+        info(s"Cache after(${modifiersCache.size})")
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
-      if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-        LogMessage("Info", s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}", System.currentTimeMillis())
+      info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
       if (settings.levelDb.enable) context.actorSelection("/user/modifiersHolder") ! lm
     case GetDataFromCurrentView(f) =>
@@ -131,8 +122,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor {
       if (availableBoxes.map(_.amount).sum >= limit * (amountD + minimalFeeD))
         sender() ! GenerateTransaction(WalletData(wallet.accountManager.mandatoryAccount, availableBoxes))
     case a: Any =>
-      if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-        LogMessage("Error", "Strange input: " + a, System.currentTimeMillis())
+      error(s"Strange input: $a")
   }
 
   def computeApplications(): Unit =
@@ -232,32 +222,28 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor {
           case None => (uf.history, Success(uf.state), uf.suffix)
         }
       case Failure(e) =>
-        if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-          LogMessage("Error", s"Rollback failed: $e", System.currentTimeMillis())
+        error(s"Rollback failed: $e")
         context.system.eventStream.publish(RollbackFailed(branchingPointOpt))
         EncryApp.forceStopApplication(500)
     }
   }
 
   def pmodModifyRecovery(block: EncryBlock): Try[Unit] = if (!nodeView.history.contains(block.id)) Try {
-    if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-      LogMessage("Info", s"Trying to apply block ${block.encodedId} from recovery", System.currentTimeMillis())
+    info(s"Trying to apply block ${block.encodedId} from recovery")
     pmodModify(block.header)
     nodeView.history.blockDownloadProcessor.updateBestBlock(block.header)
     pmodModify(block.payload)
   } else Success(Unit)
 
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
-    if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-      LogMessage("Info", s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder", System.currentTimeMillis())
+    info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
     if (settings.node.sendStat) context.system
       .actorSelection("user/statsSender") ! StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
         if (settings.node.sendStat)
           context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
-        if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-          LogMessage("Info", s"Going to apply modifications to the state: $progressInfo", System.currentTimeMillis())
+        info(s"Going to apply modifications to the state: $progressInfo")
         nodeViewSynchronizer ! SyntacticallySuccessfulModifier(pmod)
         if (progressInfo.toApply.nonEmpty) {
           val startPoint: Long = System.currentTimeMillis()
@@ -272,8 +258,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor {
                 nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
               else nodeView.wallet
               blocksApplied.foreach(newVault.scanPersistent)
-              if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-                LogMessage("Info", s"Persistent modifier ${pmod.encodedId} applied successfully", System.currentTimeMillis())
+              info(s"Persistent modifier ${pmod.encodedId} applied successfully")
               if (progressInfo.chainSwitchingNeeded)
                 context.actorSelection("/user/blockListener") ! ChainSwitching(progressInfo.toRemove.map(_.id))
               if (settings.node.sendStat)
@@ -282,8 +267,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor {
               if (newHistory.isFullChainSynced) Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
-              if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-                LogMessage("Warn", s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state caused $e", System.currentTimeMillis())
+              warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state because of: $e")
               updateNodeView(updatedHistory = Some(newHistory))
               nodeViewSynchronizer ! SemanticallyFailedModification(pmod, e)
           }
@@ -292,12 +276,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor {
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Failure(e) =>
-        if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-          LogMessage("Warn", s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to history caused $e", System.currentTimeMillis())
+        warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to history caused $e")
         nodeViewSynchronizer ! SyntacticallyFailedModification(pmod, e)
     }
-  } else if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-    LogMessage("Warn", s"Trying to apply modifier ${pmod.encodedId} that's already in history", System.currentTimeMillis())
+  } else warn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
 
   def txModify(tx: Transaction): Unit = nodeView.mempool.put(tx) match {
     case Success(newPool) =>
@@ -330,8 +312,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor {
       Some(NodeView(history, state, wallet, memPool))
     } catch {
       case ex: Throwable =>
-        if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-          LogMessage("Info", s"${ex.getMessage} during state restore. Recover from Modifiers holder!", System.currentTimeMillis())
+        info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
         new File(settings.directory).listFiles.foreach(dir => {
           FileUtils.cleanDirectory(dir)
         })
@@ -356,27 +337,22 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor {
   def restoreConsistentState(stateIn: StateType, history: EncryHistory): StateType =
     (stateIn.version, history.bestBlockOpt, stateIn) match {
       case (stateId, None, _) if stateId sameElements EncryState.genesisStateVersion =>
-        if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-          LogMessage("Info", "State and history are both empty on startup", System.currentTimeMillis())
+        info(s"State and history are both empty on startup")
         stateIn
       case (stateId, Some(block), _) if stateId sameElements block.id =>
-        if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-          LogMessage("Info", s"State and history have the same version ${Algos.encode(stateId)}, no recovery needed.", System.currentTimeMillis())
+        info(s"State and history have the same version ${Algos.encode(stateId)}, no recovery needed.")
         stateIn
       case (_, None, _) =>
-        if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-          LogMessage("Info", "State and history are inconsistent. History is empty on startup, rollback state to genesis.", System.currentTimeMillis())
+        info(s"State and history are inconsistent. History is empty on startup, rollback state to genesis.")
         getRecreatedState()
       case (_, Some(bestBlock), _: DigestState) =>
-        if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-          LogMessage("Info", s"State and history are inconsistent. Going to switch state to version ${bestBlock.encodedId}", System.currentTimeMillis())
+        info(s"State and history are inconsistent. Going to switch state to version ${bestBlock.encodedId}")
         getRecreatedState(Some(VersionTag !@@ bestBlock.id), Some(bestBlock.header.stateRoot))
       case (stateId, Some(historyBestBlock), state: StateType@unchecked) =>
         val stateBestHeaderOpt = history.typedModifierById[EncryBlockHeader](ModifierId !@@ stateId)
         val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
-        if (settings.logging.enableLogging) context.system.actorSelection("user/loggingActor") !
-          LogMessage("Info", s"State and history are inconsistent. Going to rollback to ${rollbackId.map(Algos.encode)} and " +
-            s"apply ${newChain.length} modifiers", System.currentTimeMillis())
+        info(s"State and history are inconsistent. Going to rollback to ${rollbackId.map(Algos.encode)} and " +
+          s"apply ${newChain.length} modifiers")
         val startState = rollbackId.map(id => state.rollbackTo(VersionTag !@@ id).get)
           .getOrElse(getRecreatedState())
         val toApply = newChain.headers.map { h =>

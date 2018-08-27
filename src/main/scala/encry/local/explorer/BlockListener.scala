@@ -7,14 +7,12 @@ import encry.local.explorer.database.DBService
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import encry.EncryApp.settings
-import encry.stats.LoggingActor.LogMessage
+import encry.utils.Logging
 
-class BlockListener(dBService: DBService) extends Actor {
+class BlockListener(dBService: DBService) extends Actor with Logging {
 
   override def preStart(): Unit = {
-    if(settings.logging.enableLogging)
-      context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", "Start listening to new blocks.", System.currentTimeMillis())
+    info(s"Start listening to new blocks.")
     context.system.eventStream.subscribe(context.self, classOf[SemanticallySuccessfulModifier[_]])
   }
 
