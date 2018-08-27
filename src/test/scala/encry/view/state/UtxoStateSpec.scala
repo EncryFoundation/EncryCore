@@ -4,7 +4,7 @@ import java.io.File
 import akka.actor.ActorRef
 import encry.avltree
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
-import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
+import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount

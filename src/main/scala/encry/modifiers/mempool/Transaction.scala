@@ -8,13 +8,11 @@ import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, DataBox}
 import encry.modifiers.state.box.EncryBaseBox
-import encry.settings.{Algos, Constants}
-import io.circe.{Decoder, Encoder, HCursor}
+import io.circe.{Decoder, HCursor}
 import io.circe.syntax._
 import org.encryfoundation.common.transaction._
-import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer}
-import org.encryfoundation.prismlang.core.{PConvertible, Types}
-import scorex.crypto.authds.ADKey
+import org.encryfoundation.prismlang.compiler.CompiledContractSerializer
+import org.encryfoundation.prismlang.core.Types
 import encry.settings.Constants
 import io.circe.Encoder
 import org.encryfoundation.common.Algos
@@ -28,6 +26,7 @@ import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.validation.{ModifierValidator, ValidationResult}
 import org.encryfoundation.common.serialization.Serializer
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 
 case class Transaction(fee: Amount,

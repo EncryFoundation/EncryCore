@@ -6,7 +6,7 @@ import encry.modifiers.state.box.EncryBaseBox
 import encry.utils.Logging
 import io.circe._
 import org.encryfoundation.common.serialization.BytesSerializable
-import scorex.crypto.authds.ADKey
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scorex.crypto.hash.Digest32
 
 trait  Directive extends BytesSerializable {

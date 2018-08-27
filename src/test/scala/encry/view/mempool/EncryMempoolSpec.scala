@@ -2,7 +2,6 @@ package encry.view.mempool
 
 import encry.modifiers.mempool.Transaction
 import akka.actor.ActorSystem
-import encry.modifiers.mempool.EncryTransaction
 import encry.settings.EncryAppSettings
 import encry.utils.{EncryGenerator, NetworkTimeProvider}
 import org.scalatest.{Matchers, PropSpec}
