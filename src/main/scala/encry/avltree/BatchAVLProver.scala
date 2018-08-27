@@ -38,27 +38,21 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
   private var found: Boolean = false // keeps track of whether the key for the current
 
   protected def nextDirectionIsLeft(key: ADKey, r: InternalEncryNode[D]): Boolean = {
-    val ret: Boolean = if (found) {
-      true
-    } else {
+    val ret: Boolean = if (found) true
+    else {
       ByteArray.compare(key, r.asInstanceOf[InternalProverEncryNode[D]].key) match {
         case 0 => // found in the tree -- go one step right, then left to the leaf
           found = true
           lastRightStep = directionsBitLength
           false
-        case o if o < 0 => // going left
-          true
-        case _ => // going right
-          false
+        case o if o < 0 => true // going left
+        case _ => false // going right
       }
     }
-    if ((directionsBitLength & 7) == 0) {
-      directions += (if (ret) 1: Byte else 0: Byte)
-    } else {
-      if (ret) {
-        val i = directionsBitLength >> 3
-        directions(i) = (directions(i) | (1 << (directionsBitLength & 7))).toByte // change last byte
-      }
+    if ((directionsBitLength & 7) == 0) directions += (if (ret) 1: Byte else 0: Byte)
+    else if (ret) {
+      val i = directionsBitLength >> 3
+      directions(i) = (directions(i) | (1 << (directionsBitLength & 7))).toByte // change last byte
     }
     directionsBitLength += 1
     ret
@@ -71,12 +65,9 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
   }
 
   protected def replayComparison: Int = {
-    val ret: Int = if (replayIndex == lastRightStep)
-      0
-    else if ((directions(replayIndex >> 3) & (1 << (replayIndex & 7)).toByte) == 0)
-      1
-    else
-      -1
+    val ret: Int = if (replayIndex == lastRightStep) 0
+    else if ((directions(replayIndex >> 3) & (1 << (replayIndex & 7)).toByte) == 0) 1
+    else -1
     replayIndex += 1
     ret
   }
@@ -122,17 +113,12 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
       currentNode match {
         case _ if currentNode.label sameElements label => true
         case r: InternalProverEncryNode[D] =>
-          if (keyFound)
-            loop(r.left, keyFound = true)
-          else
-            ByteArray.compare(key, r.key) match {
-              case 0 => // found in the tree -- go one step right, then left to the leaf
-                loop(r.right, keyFound = true)
-              case o if o < 0 => // going left, not yet found
-                loop(r.left, keyFound = false)
-              case _ => // going right, not yet found
-                loop(r.right, keyFound = false)
-            }
+          if (keyFound) loop(r.left, keyFound = true)
+          else ByteArray.compare(key, r.key) match {
+            case 0 => loop(r.right, keyFound = true) // found in the tree -- go one step right, then left to the leaf
+            case o if o < 0 => loop(r.left, keyFound = false) // going left, not yet found
+            case _ => loop(r.right, keyFound = false) // going right, not yet found
+          }
         case _ => false
       }
     }
@@ -152,7 +138,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
     val packagedTree = new mutable.ArrayBuffer[Byte]
     var previousLeafAvailable: Boolean = false
 
-    def packTree(rNode: EncryProverNodes[D]): Unit =  {
+    def packTree(rNode: EncryProverNodes[D]): Unit = {
       if (!rNode.visited) {
         packagedTree += LabelInPackagedProof
         packagedTree ++= rNode.label
@@ -176,17 +162,15 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
       }
     }
 
-    def resetNew(r: EncryProverNodes[D]): Unit = {
-      if (r.isNew) {
-        r match {
-          case rn: InternalProverEncryNode[D] =>
-            resetNew(rn.left)
-            resetNew(rn.right)
-          case _ =>
-        }
-        r.isNew = false
-        r.visited = false
+    def resetNew(r: EncryProverNodes[D]): Unit = if (r.isNew) {
+      r match {
+        case rn: InternalProverEncryNode[D] =>
+          resetNew(rn.left)
+          resetNew(rn.right)
+        case _ =>
       }
+      r.isNew = false
+      r.visited = false
     }
 
     packTree(oldTopNode)
@@ -204,50 +188,38 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
   def treeWalk[IR, LR](internalNodeFn: (InternalProverEncryNode[D], IR) => (EncryProverNodes[D], IR),
                        leafFn: (ProverLeaf[D], IR) => LR,
                        initial: IR): LR = {
-    def walk(rNode: EncryProverNodes[D], ir: IR): LR = {
-      rNode match {
-        case leaf: ProverLeaf[D] =>
-          leafFn(leaf, ir)
-
-        case r: InternalProverEncryNode[D] =>
-          val i = internalNodeFn(r, ir)
-          walk(i._1, i._2)
-      }
+    def walk(rNode: EncryProverNodes[D], ir: IR): LR = rNode match {
+      case leaf: ProverLeaf[D] => leafFn(leaf, ir)
+      case r: InternalProverEncryNode[D] =>
+        val i: (EncryProverNodes[D], IR) = internalNodeFn(r, ir)
+        walk(i._1, i._2)
     }
 
     walk(topNode, initial)
   }
 
   def randomWalk(rand: Random = new Random): Option[(ADKey, ADValue)] = {
-    def internalNodeFn(r: InternalProverEncryNode[D], dummy: Unit.type) =
+    def internalNodeFn(r: InternalProverEncryNode[D], dummy: Unit.type): (EncryProverNodes[D], Unit.type) =
       if (rand.nextBoolean()) (r.right, Unit) else (r.left, Unit)
 
-    def leafFn(leaf: ProverLeaf[D], dummy: Unit.type): Option[(ADKey, ADValue)] = {
+    def leafFn(leaf: ProverLeaf[D], dummy: Unit.type): Option[(ADKey, ADValue)] =
       if (leaf.key sameElements PositiveInfinityKey) None
       else if (leaf.key sameElements NegativeInfinityKey) None
       else Some(leaf.key -> leaf.value)
-    }
 
     treeWalk(internalNodeFn, leafFn, Unit)
   }
 
   def unauthenticatedLookup(key: ADKey): Option[ADValue] = {
-    def internalNodeFn(r: InternalProverEncryNode[D], found: Boolean) =
-      if (found) {
-        (r.left, true)
-      } else {
-        ByteArray.compare(key, r.key) match {
-          case 0 => // found in the tree -- go one step right, then left to the leaf
-            (r.right, true)
-          case o if o < 0 => // going left, not yet found
-            (r.left, false)
-          case _ => // going right, not yet found
-            (r.right, false)
-        }
+    def internalNodeFn(r: InternalProverEncryNode[D], found: Boolean): (EncryProverNodes[D], Boolean) =
+      if (found) (r.left, true)
+      else ByteArray.compare(key, r.key) match {
+        case 0 => (r.right, true) // found in the tree -- go one step right, then left to the leaf
+        case o if o < 0 => (r.left, false) // going left, not yet found
+        case _ => (r.right, false) // going right, not yet found
       }
 
-    def leafFn(leaf: ProverLeaf[D], found: Boolean): Option[ADValue] =
-      if (found) Some(leaf.value) else None
+    def leafFn(leaf: ProverLeaf[D], found: Boolean): Option[ADValue] = if (found) Some(leaf.value) else None
 
     treeWalk(internalNodeFn, leafFn, false)
   }
@@ -256,8 +228,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
     var fail: Boolean = false
 
     def checkTreeHelper(rNode: EncryProverNodes[D]): (ProverLeaf[D], ProverLeaf[D], Int) = {
-      def myRequire(t: Boolean, s: String): Unit = {
-        if (!t) {
+      def myRequire(t: Boolean, s: String): Unit = if (!t) {
           var x: Int = rNode.key(0).toInt
           if (x < 0) x = x + 256
           if (settings.logging.enableLogging)
@@ -265,7 +236,6 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
               LogMessage("Error","Tree failed at key = " + x + ": " + s, System.currentTimeMillis())
           fail = true
         }
-      }
 
       myRequire(!postProof || (!rNode.visited && !rNode.isNew), "postproof flags")
       rNode match {
@@ -274,7 +244,6 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
             myRequire(ByteArray.compare(r.left.key, r.key) < 0, "wrong left key")
           if (r.right.isInstanceOf[InternalProverEncryNode[D]])
             myRequire(ByteArray.compare(r.right.key, r.key) > 0, "wrong right key")
-
           val (minLeft: ProverLeaf[D], maxLeft: ProverLeaf[D], leftHeight: Int) = checkTreeHelper(r.left)
           val (minRight: ProverLeaf[D], maxRight: ProverLeaf[D], rightHeight: Int) = checkTreeHelper(r.right)
           myRequire(maxLeft.nextLeafKey sameElements minRight.key, "children don't match")
@@ -282,9 +251,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
           myRequire(r.balance >= -1 && r.balance <= 1 && r.balance.toInt == rightHeight - leftHeight, "wrong balance")
           val height: Int = math.max(leftHeight, rightHeight) + 1
           (minLeft, maxRight, height)
-
-        case l: ProverLeaf[D] =>
-          (l, l, 0)
+        case l: ProverLeaf[D] => (l, l, 0)
       }
     }
 
@@ -292,7 +259,6 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
     require(minTree.key sameElements NegativeInfinityKey)
     require(maxTree.nextLeafKey sameElements PositiveInfinityKey)
     require(treeHeight == rootNodeHeight)
-
     require(!fail, "Tree failed: \n" + toString)
   }
 
