@@ -17,7 +17,7 @@ import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network.message._
 import encry.network.peer.PeerManager
-import encry.network.{EncryNodeViewSynchronizer, ModifiersHolder, NetworkController}
+import encry.network._
 import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, StatsSender}
 import encry.utils.{Logging, NetworkTimeProvider, Zombie}
@@ -67,6 +67,7 @@ object EncryApp extends App with Logging {
   if (settings.postgres.enabledSave) system.actorOf(Props(classOf[BlockListener], DBService()), "blockListener")
   if (settings.node.mining) miner ! StartMining
   if (settings.levelDb.enable) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
+  else if (settings.postgres.enableRestore) system.actorOf(Props[PostgresRestore], "postgresRestore") ! StartRecovery
   if (settings.testing.transactionGeneration)
     system.actorOf(Props[TransactionGenerator].withDispatcher("transaction-generator-dispatcher"), "tx-generator")
   if (settings.node.enableCLI) cliListener ! StartListening
