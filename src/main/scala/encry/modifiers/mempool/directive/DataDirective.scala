@@ -1,6 +1,7 @@
 package encry.modifiers.mempool.directive
 
 import com.google.common.primitives.{Bytes, Ints}
+import encry.ModifierId
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.{DataBox, EncryBaseBox, EncryProposition}
 import encry.settings.{Algos, Constants}
@@ -9,6 +10,7 @@ import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
+import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
 import scala.util.Try
 
@@ -24,6 +26,9 @@ case class DataDirective(contractHash: ContractHash, data: Array[Byte]) extends 
   override lazy val isValid: Boolean = data.length <= Constants.MaxDataLength
 
   override def serializer: Serializer[M] = DataDirectiveSerializer
+
+  override def toDbVersion(txId: ModifierId): DirectiveDBVersion =
+    DirectiveDBVersion(Base16.encode(txId), typeId, isValid, contractHash, 0L, "", None, data)
 }
 
 object DataDirective {

@@ -56,7 +56,7 @@ object EncryBlockPayloadSerializer extends Serializer[EncryBlockPayload] {
     val leftBytes: Array[Byte] = bytes.drop(36)
     val txs: Seq[Transaction] = (0 until txQty).foldLeft(Seq[Transaction](), 0) { case ((acc, shift), _) =>
       val len: Int = Ints.fromByteArray(leftBytes.slice(shift, shift + 4))
-      EncryTransactionSerializer
+      TransactionSerializer
         .parseBytes(leftBytes.slice(shift + 4, shift + 4 + len)).map(d => (acc :+ d, shift + 4 + len))
         .getOrElse(throw new Exception("Serialization failed."))
     }._1

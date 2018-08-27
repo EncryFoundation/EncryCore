@@ -7,6 +7,7 @@ CREATE TABLE headers(
   state_root VARCHAR(66) NOT NULL,
   transactions_root VARCHAR(64) NOT NULL,
   ts BIGINT NOT NULL,
+  nonce BIGINT NOT NULL,
   difficulty BIGINT NOT NULL,
   block_size BIGINT NOT NULL,
   equihash_solution INTEGER ARRAY NOT NULL,
@@ -21,6 +22,7 @@ CREATE TABLE headers(
 
 CREATE TABLE transactions(
   id VARCHAR(64) PRIMARY KEY,
+  fee BIGINT NOT NULL,
   block_id VARCHAR(64) REFERENCES headers (id),
   is_coinbase BOOLEAN NOT NULL,
   ts BIGINT NOT NULL
@@ -38,5 +40,17 @@ CREATE TABLE outputs(
 CREATE TABLE inputs(
   id VARCHAR(64) PRIMARY KEY,
   tx_id VARCHAR(64) REFERENCES transactions (id),
+  contract_bytes TEXT NOT NULL,
   serialized_proofs VARCHAR NOT NULL
+);
+
+CREATE TABLE directives(
+  tx_id VARCHAR(64) REFERENCES transactions (id),
+  type_id SMALLINT NOT NULL,
+  is_valid BOOLEAN NOT NULL,
+  contract_hash SMALLINT[] NOT NULL,
+  amount BIGINT NOT NULL,
+  address TEXT NOT NULL,
+  token_id_opt SMALLINT[],
+  data_field SMALLINT[] NOT NULL
 );

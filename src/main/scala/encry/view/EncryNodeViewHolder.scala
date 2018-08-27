@@ -13,7 +13,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
-import encry.modifiers.mempool.{EncryTransactionSerializer, Transaction}
+import encry.modifiers.mempool.{TransactionSerializer, Transaction}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
@@ -51,7 +51,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,
     ADProofs.modifierTypeId -> ADProofSerializer,
-    Transaction.ModifierTypeId -> EncryTransactionSerializer
+    Transaction.ModifierTypeId -> TransactionSerializer
   )
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {

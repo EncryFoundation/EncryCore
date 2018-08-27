@@ -63,7 +63,7 @@ object EncryApp extends App with Logging {
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.kafka.sendToKafka) system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
   if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
-  if (settings.postgres.enabled) system.actorOf(Props(classOf[BlockListener], DBService()), "blockListener")
+  if (settings.postgres.enabledSave) system.actorOf(Props(classOf[BlockListener], DBService()), "blockListener")
   if (settings.node.mining) miner ! StartMining
   if (settings.levelDb.enable) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
   if (settings.testing.transactionGeneration)

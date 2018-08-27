@@ -3,7 +3,7 @@ package encry.modifiers.mempool
 import encry.modifiers.InstanceFactory
 import org.scalatest.{Matchers, PropSpec}
 
-class EncryTransactionSpec extends PropSpec with Matchers with InstanceFactory {
+class TransactionSpec extends PropSpec with Matchers with InstanceFactory {
 
   private val txValid = paymentTransactionValid
 

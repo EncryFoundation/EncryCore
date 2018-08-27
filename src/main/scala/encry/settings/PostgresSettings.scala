@@ -3,4 +3,6 @@ package encry.settings
 case class PostgresSettings(host: String,
                             user: String,
                             password: String,
-                            enabled: Boolean = false)
+                            enabledSave: Boolean = false,
+                            enableRestore: Boolean = false,
+                            restoreBatchSize: Option[Int] = None)

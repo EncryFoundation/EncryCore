@@ -1,6 +1,6 @@
 package encry.modifiers.history.block.payload
 
-import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
+import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.utils.TestHelper
 import org.scalatest.FunSuite
 import encry.ModifierId
@@ -15,7 +15,7 @@ class EncryBlockPayloadSerializerTest extends FunSuite {
 
     val timestamp = 12345678L
 
-    val txs: Seq[EncryTransaction] = keys.map { k =>
+    val txs: Seq[Transaction] = keys.map { k =>
       TransactionFactory.coinbaseTransactionScratch(k.publicImage, timestamp, 10L, 0, Height @@ 100)
     }
 

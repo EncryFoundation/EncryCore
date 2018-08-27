@@ -8,7 +8,7 @@ import encry.local.explorer.database.DBService
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.mempool.EncryTransaction
+import encry.modifiers.mempool.Transaction
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.utils.EncryGenerator
 import org.scalatest.mockito.MockitoSugar
@@ -56,7 +56,7 @@ class BlockListenerSpec extends TestKit(ActorSystem("BlockListenerSpec")) with I
     val dbServiceMock: DBService = mock[DBService]
     val actor: ActorRef = system.actorOf(Props(new BlockListener(dbServiceMock)))
     val sampleHeader: EncryBlockHeader = genHeader
-    val sampleTxs: Seq[EncryTransaction] = genValidPaymentTxs(100)
+    val sampleTxs: Seq[Transaction] = genValidPaymentTxs(100)
     val samplePayload: EncryBlockPayload = EncryBlockPayload(sampleHeader.id, sampleTxs)
     val sampleBlock: EncryBlock = EncryBlock(sampleHeader, samplePayload, None)
     val sampleModifier: SemanticallySuccessfulModifier[EncryBlock] = SemanticallySuccessfulModifier(sampleBlock)

@@ -3,7 +3,7 @@ package encry.local
 import akka.actor.Actor
 import encry.EncryApp._
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
+import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.stats.StatsSender.TransactionGeneratorStat
@@ -24,10 +24,10 @@ class TransactionGenerator extends Actor with Logging {
   def receive: Receive = {
     case GenerateTransaction(walletData: WalletData) if limit > 0 =>
       val startTime: Long = System.currentTimeMillis()
-      val txs: Seq[EncryTransaction] = (0 until limit).foldLeft(Seq[EncryTransaction](), walletData) {
+      val txs: Seq[Transaction] = (0 until limit).foldLeft(Seq[Transaction](), walletData) {
         case ((transactions, wd), i) =>
           if (wd.boxes.map(_.amount).sum > (limit - i) * (amountD + minimalFeeD)) {
-            val tx: EncryTransaction = createTransaction(wd)
+            val tx: Transaction = createTransaction(wd)
             val leftBoxes: Seq[AssetBox] = wd.boxes.filterNot(bx => tx.inputs.map(_.boxId).contains(bx.id))
             (transactions :+ tx) -> wd.copy(boxes = leftBoxes)
           } else transactions -> wd
@@ -35,12 +35,12 @@ class TransactionGenerator extends Actor with Logging {
       if (settings.node.sendStat)
         context.system.actorSelection("user/statsSender") ! TransactionGeneratorStat(txs.size, System.currentTimeMillis() - startTime)
       txs.foreach(tx =>
-        nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
+        nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, Transaction](tx)
       )
     case SemanticallySuccessfulModifier(_: EncryBlock) => nodeViewHolder ! FetchWalletData(settings.testing.limitPerEpoch, minimalFeeD)
   }
 
-  def createTransaction(wd: WalletData): EncryTransaction = {
+  def createTransaction(wd: WalletData): Transaction = {
     val boxes: IndexedSeq[AssetBox] = wd.boxes.foldLeft(Seq.empty[AssetBox]) { case (boxesAcc, box) =>
       if (boxesAcc.map(_.amount).sum <= (amountD + minimalFeeD)) boxesAcc :+ box else boxesAcc
     }.toIndexedSeq

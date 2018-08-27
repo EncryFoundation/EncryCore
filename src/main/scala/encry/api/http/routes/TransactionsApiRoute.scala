@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.modifiers.mempool.EncryTransaction
+import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.EncryProposition
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import encry.view.mempool.EncryMempoolReader
@@ -33,9 +33,9 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
   }.map(_.map(_.asJson).asJson)
 
   def defaultTransferTransactionR: Route = path("send") {
-    post(entity(as[EncryTransaction]) {
+    post(entity(as[Transaction]) {
       tx => complete {
-        nodeViewActorRef ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](tx)
+        nodeViewActorRef ! LocallyGeneratedTransaction[EncryProposition, Transaction](tx)
         StatusCodes.OK
       }
     })

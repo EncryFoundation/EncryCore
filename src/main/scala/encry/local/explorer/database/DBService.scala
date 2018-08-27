@@ -9,7 +9,9 @@ import QueryRepository._
 import com.zaxxer.hikari.HikariDataSource
 import doobie.hikari.HikariTransactor
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.{EncryBlockHeader, HeaderDBVersion}
+import encry.modifiers.mempool.directive.DirectiveDBVersion
+import encry.modifiers.mempool.{InputDBVersion, TransactionDBVersion}
 import encry.utils.Logging
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -25,8 +27,18 @@ class DBService extends Logging {
 
   def processOrphanedHeader(header: EncryBlockHeader): Future[Int] = runAsync(insertOrphanedHeaderQuery(header))
 
+  def selectHeight: Future[Int] = runAsync(heightQuery)
+
+  def headersByRange(from: Int, to: Int): Future[List[HeaderDBVersion]] = runAsync(headersByRangeQuery(from, to))
+
+  def txsByRange(from: Int, to: Int): Future[List[TransactionDBVersion]] = runAsync(txsByRangeQuery(from, to))
+
+  def directivesByTxIds(ids: Seq[String]): Future[List[DirectiveDBVersion]] = runAsync(directivesByTransactionIdsQuery(ids))
+
+  def inputsByTxIds(ids: Seq[String]): Future[List[InputDBVersion]] = runAsync(inputsByTransactionIdsQuery(ids))
+
   private lazy val dataSource = new HikariDataSource
-  if (settings.postgres.enabled) {
+  if (settings.postgres.enabledSave) {
     dataSource.setJdbcUrl(settings.postgres.host)
     dataSource.setUsername(settings.postgres.user)
     dataSource.setPassword(settings.postgres.password)
@@ -35,18 +47,16 @@ class DBService extends Logging {
 
   private lazy val pgTransactor: HikariTransactor[IO] = HikariTransactor[IO](dataSource)
 
-  private def runAsync(io: ConnectionIO[Int]): Future[Int] =
-    if (settings.postgres.enabled) {
-      (for {
-        res <- io.transact(pgTransactor)
-      } yield res)
-        .unsafeToFuture()
-        .recoverWith {
-          case NonFatal(th) =>
-            log.warn("Failed to perform db operation", th)
-            Future.failed(th)
-        }
-    } else Future.successful(0)
+  private def runAsync[A](io: ConnectionIO[A]): Future[A] =
+    (for {
+      res <- io.transact(pgTransactor)
+    } yield res)
+      .unsafeToFuture()
+      .recoverWith {
+        case NonFatal(th) =>
+          log.warn("Failed to perform db operation", th)
+          Future.failed(th)
+      }
 }
 
 object DBService {
