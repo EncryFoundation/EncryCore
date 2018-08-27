@@ -48,9 +48,9 @@ CREATE TABLE directives(
   tx_id VARCHAR(64) REFERENCES transactions (id),
   type_id SMALLINT NOT NULL,
   is_valid BOOLEAN NOT NULL,
-  contract_hash SMALLINT[] NOT NULL,
+  contract_hash TEXT NOT NULL,
   amount BIGINT NOT NULL,
   address TEXT NOT NULL,
-  token_id_opt SMALLINT[],
-  data_field SMALLINT[] NOT NULL
+  token_id_opt TEXT,
+  data_field TEXT NOT NULL
 );

@@ -68,7 +68,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def receive: Receive = {
-    case BlocksFromLocalPersistence(blocks) if settings.levelDb.recoverMode =>
+    case BlocksFromLocalPersistence(blocks) if settings.levelDb.recoverMode || settings.postgres.enableRestore =>
       blocks.foreach { block =>
         pmodModifyRecovery(block) match {
           case Success(_) => log.info(s"Block ${block.encodedId} from recovery applied successfully")
@@ -310,7 +310,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, Transaction](tx)
-    case Failure(e) =>
+    case Failure(e) => log.warn(s"Failed to put tx ${tx.id} to mempool", e)
   }
 
   def genesisState: NodeView = {

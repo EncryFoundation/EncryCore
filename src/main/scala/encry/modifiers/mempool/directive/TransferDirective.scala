@@ -13,7 +13,6 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.EncryAddress
 import org.encryfoundation.common.transaction.EncryAddress.Address
-import scorex.crypto.authds
 import scorex.crypto.encode.Base16
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scorex.crypto.hash.Digest32
@@ -39,7 +38,7 @@ case class TransferDirective(address: Address,
   lazy val isIntrinsic: Boolean = tokenIdOpt.isEmpty
 
   override def toDbVersion(txId: ModifierId): DirectiveDBVersion =
-    DirectiveDBVersion(Base16.encode(txId), typeId, isValid, Array.emptyByteArray, amount, address, tokenIdOpt, Array.emptyByteArray)
+    DirectiveDBVersion(Base16.encode(txId), typeId, isValid, "", amount, address, tokenIdOpt.map(Base16.encode), "")
 }
 
 object TransferDirective {

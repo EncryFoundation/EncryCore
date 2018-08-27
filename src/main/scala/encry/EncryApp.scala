@@ -67,7 +67,7 @@ object EncryApp extends App with Logging {
   if (settings.postgres.enabledSave) system.actorOf(Props(classOf[BlockListener], DBService()), "blockListener")
   if (settings.node.mining) miner ! StartMining
   if (settings.levelDb.enable) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
-  else if (settings.postgres.enableRestore) system.actorOf(Props[PostgresRestore], "postgresRestore") ! StartRecovery
+  else if (settings.postgres.enableRestore) system.actorOf(Props(classOf[PostgresRestore], DBService()), "postgresRestore") ! StartRecovery
   if (settings.testing.transactionGeneration)
     system.actorOf(Props[TransactionGenerator].withDispatcher("transaction-generator-dispatcher"), "tx-generator")
   if (settings.node.enableCLI) cliListener ! StartListening

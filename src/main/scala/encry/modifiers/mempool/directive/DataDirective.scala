@@ -29,7 +29,7 @@ case class DataDirective(contractHash: ContractHash, data: Array[Byte]) extends 
   override def serializer: Serializer[M] = DataDirectiveSerializer
 
   override def toDbVersion(txId: ModifierId): DirectiveDBVersion =
-    DirectiveDBVersion(Base16.encode(txId), typeId, isValid, contractHash, 0L, "", None, data)
+    DirectiveDBVersion(Base16.encode(txId), typeId, isValid, Base16.encode(contractHash), 0L, "", None, Base16.encode(data))
 }
 
 object DataDirective {

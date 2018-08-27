@@ -10,14 +10,14 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import scorex.crypto.encode.Base16
 import cats.implicits._
 import doobie.Fragments.{in, whereAndOpt}
-import doobie._
 import doobie.postgres.implicits._
 import doobie.implicits._
 import doobie.util.log.LogHandler
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, Transaction, TransactionDBVersion}
+import encry.utils.Logging
 
-protected[database] object QueryRepository {
+protected[database] object QueryRepository extends Logging {
 
   def processBlockQuery(block: EncryBlock): ConnectionIO[Int] =
     for {
@@ -97,8 +97,8 @@ protected[database] object QueryRepository {
     val inputs: Seq[InputDBVersion] = p.transactions.flatMap(InputDBVersion(_))
     val query =
       """
-        |INSERT INTO public.inputs (id, tx_id, serialized_proofs)
-        |VALUES (?, ?, ?);
+        |INSERT INTO public.inputs (id, tx_id, contract_bytes, serialized_proofs)
+        |VALUES (?, ?, ?, ?);
         |""".stripMargin
     Update[InputDBVersion](query).updateMany(inputs.toList)
   }

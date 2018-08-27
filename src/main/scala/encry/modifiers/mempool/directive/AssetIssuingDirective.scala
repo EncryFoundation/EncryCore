@@ -33,7 +33,7 @@ case class AssetIssuingDirective(contractHash: ContractHash, amount: Amount) ext
   override def serializer: Serializer[M] = AssetIssuingDirectiveSerializer
 
   override def toDbVersion(txId: ModifierId): DirectiveDBVersion =
-    DirectiveDBVersion(Base16.encode(txId), typeId, isValid, contractHash, amount, "", None, Array.emptyByteArray)
+    DirectiveDBVersion(Base16.encode(txId), typeId, isValid, Base16.encode(contractHash), amount, "", None, "")
 }
 
 object AssetIssuingDirective {

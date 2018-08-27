@@ -5,8 +5,10 @@ import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.EncryBaseBox
 import encry.utils.Logging
 import io.circe._
+import cats.implicits._
 import org.encryfoundation.common.serialization.BytesSerializable
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
+import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
 
 trait  Directive extends BytesSerializable {
@@ -48,17 +50,28 @@ object Directive {
 case class DirectiveDBVersion(txId: String,
                               dTypeId: DTypeId,
                               isValid: Boolean,
-                              contractHash: Array[Byte],
+                              contractHash: String,
                               amount: Long,
                               address: String,
-                              tokenIdOpt: Option[Array[Byte]],
-                              data: Array[Byte]) extends Logging {
+                              tokenIdOpt: Option[String],
+                              data: String) extends Logging {
   def toDirective: Option[Directive] = {
     dTypeId match {
-      case AssetIssuingDirective.TypeId => Some(AssetIssuingDirective(contractHash, amount))
-      case TransferDirective.TypeId => Some(TransferDirective(address, amount, tokenIdOpt.map(ADKey @@ _)))
-      case ScriptedAssetDirective.TypeId => Some(ScriptedAssetDirective(contractHash, amount, tokenIdOpt.map(ADKey @@ _)))
-      case DataDirective.TypeId => Some(DataDirective(contractHash, data))
+      case AssetIssuingDirective.TypeId => Base16.decode(contractHash).map(AssetIssuingDirective(_, amount)).toOption
+      case TransferDirective.TypeId => tokenIdOpt match {
+        case Some(tokenIdStr) => Base16.decode(tokenIdStr)
+          .map(tokenId => TransferDirective(address, amount, Some(ADKey @@ tokenId))).toOption
+        case None => Some(TransferDirective(address, amount, None))
+      }
+      case ScriptedAssetDirective.TypeId => tokenIdOpt match {
+        case Some(tokenIdStr) => (Base16.decode(tokenIdStr), Base16.decode(contractHash)).mapN {
+          case (tokenId, contractHashDec) => ScriptedAssetDirective(contractHashDec, amount, Some(ADKey @@ tokenId))
+        }.toOption
+        case None => Base16.decode(contractHash).map(ScriptedAssetDirective(_, amount, None)).toOption
+      }
+      case DataDirective.TypeId => (Base16.decode(contractHash), Base16.decode(data)).mapN {
+        case (contractHashDec, dataDec) => DataDirective(contractHashDec, dataDec)
+      }.toOption
       case _ =>
         log.warn(s"Malformed directive from DB: $this")
         None

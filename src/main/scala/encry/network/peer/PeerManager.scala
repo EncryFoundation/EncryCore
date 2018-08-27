@@ -20,7 +20,7 @@ class PeerManager extends Actor with Logging {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
   var connectingPeers: Set[InetSocketAddress] = Set.empty
-  var recoveryCompleted: Boolean = !settings.levelDb.recoverMode
+  var recoveryCompleted: Boolean = !(settings.levelDb.recoverMode || settings.postgres.enableRestore)
 
   addKnownPeersToPeersDatabase()
 
