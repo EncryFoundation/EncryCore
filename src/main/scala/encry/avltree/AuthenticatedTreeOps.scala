@@ -31,14 +31,10 @@ trait AuthenticatedTreeOps[D <: Digest] {
   protected def onNodeVisit(n: EncryNode[D], operation: encry.avltree.Operation, isRotate: Boolean = false): Unit = {
     n match {
       case p: EncryProverNodes[D] if collectChangedNodes && !n.visited && !p.isNew =>
-        if (isRotate) {
-          changedNodesBufferToCheck += p
-        } else if (operation.isInstanceOf[Insert] || operation.isInstanceOf[Remove]
-          || operation.isInstanceOf[InsertOrUpdate]) {
+        if (isRotate) changedNodesBufferToCheck += p
+        else if (operation.isInstanceOf[Insert] || operation.isInstanceOf[Remove] || operation.isInstanceOf[InsertOrUpdate])
           changedNodesBuffer += p
-        } else if (!operation.isInstanceOf[encry.avltree.Lookup]) {
-          changedNodesBufferToCheck += p
-        }
+        else if (!operation.isInstanceOf[encry.avltree.Lookup]) changedNodesBufferToCheck += p
       case _ =>
     }
     n.visited = true
@@ -57,37 +53,36 @@ trait AuthenticatedTreeOps[D <: Digest] {
 
   protected def replayComparison: Int
 
-  private def doubleLeftRotate(currentRoot: InternalEncryNode[D], leftChild: EncryNode[D], rightChild: InternalEncryNode[D]): InternalEncryNode[D] = {
+  private def doubleLeftRotate(currentRoot: InternalEncryNode[D], leftChild: EncryNode[D],
+                               rightChild: InternalEncryNode[D]): InternalEncryNode[D] = {
     val newRoot: InternalEncryNode[D] = rightChild.left.asInstanceOf[InternalEncryNode[D]]
     val (newLeftBalance: Balance, newRightBalance: Balance) = newRoot.balance match {
-      case a if a == 0 =>
-        (Balance @@ 0.toByte, Balance @@ 0.toByte)
-      case a if a == -1 =>
-        (Balance @@ 0.toByte, Balance @@ 1.toByte)
-      case a if a == 1 =>
-        (Balance @@ -1.toByte, Balance @@ 0.toByte)
+      case a if a == 0 => (Balance @@ 0.toByte, Balance @@ 0.toByte)
+      case a if a == -1 => (Balance @@ 0.toByte, Balance @@ 1.toByte)
+      case a if a == 1 => (Balance @@ -1.toByte, Balance @@ 0.toByte)
     }
-    val newLeftChild: InternalEncryNode[D] = currentRoot.getNew(newLeft = leftChild, newRight = newRoot.left, newBalance = newLeftBalance)
+    val newLeftChild: InternalEncryNode[D] = currentRoot
+      .getNew(newLeft = leftChild, newRight = newRoot.left, newBalance = newLeftBalance)
     val newRightChild: InternalEncryNode[D] = rightChild.getNew(newLeft = newRoot.right, newBalance = newRightBalance)
     newRoot.getNew(newLeft = newLeftChild, newRight = newRightChild, newBalance = Balance @@ 0.toByte)
   }
 
-  private def doubleRightRotate(currentRoot: InternalEncryNode[D], leftChild: InternalEncryNode[D], rightChild: EncryNode[D]): InternalEncryNode[D] = {
+  private def doubleRightRotate(currentRoot: InternalEncryNode[D], leftChild: InternalEncryNode[D],
+                                rightChild: EncryNode[D]): InternalEncryNode[D] = {
     val newRoot: InternalEncryNode[D] = leftChild.right.asInstanceOf[InternalEncryNode[D]]
     val (newLeftBalance: Balance, newRightBalance: Balance) = newRoot.balance match {
-      case a if a == 0 =>
-        (Balance @@ 0.toByte, Balance @@ 0.toByte)
-      case a if a == -1 =>
-        (Balance @@ 0.toByte, Balance @@ 1.toByte)
-      case a if a == 1 =>
-        (Balance @@ -1.toByte, Balance @@ 0.toByte)
+      case a if a == 0 => (Balance @@ 0.toByte, Balance @@ 0.toByte)
+      case a if a == -1 => (Balance @@ 0.toByte, Balance @@ 1.toByte)
+      case a if a == 1 => (Balance @@ -1.toByte, Balance @@ 0.toByte)
     }
-    val newRightChild: InternalEncryNode[D] = currentRoot.getNew(newRight = rightChild, newLeft = newRoot.right, newBalance = newRightBalance)
+    val newRightChild: InternalEncryNode[D] = currentRoot
+      .getNew(newRight = rightChild, newLeft = newRoot.right, newBalance = newRightBalance)
     val newLeftChild: InternalEncryNode[D] = leftChild.getNew(newRight = newRoot.left, newBalance = newLeftBalance)
     newRoot.getNew(newLeft = newLeftChild, newRight = newRightChild, newBalance = Balance @@ 0.toByte)
   }
 
-  protected def returnResultOfOneOperation(operation: encry.avltree.Operation, rootNode: EncryNode[D]): Try[(EncryNode[D], Option[ADValue])] = Try {
+  protected def returnResultOfOneOperation(operation: encry.avltree.Operation,
+                                           rootNode: EncryNode[D]): Try[(EncryNode[D], Option[ADValue])] = Try {
     val key: ADKey = operation.key
 
     require(ByteArray.compare(key, NegativeInfinityKey) > 0, s"Key ${Base16.encode(key)} is less than -inf")
@@ -96,31 +91,29 @@ trait AuthenticatedTreeOps[D <: Digest] {
 
     var savedNode: Option[EncryLeaf[D]] = None
 
-    def modifyHelper(rNode: EncryNode[D], key: ADKey, operation: encry.avltree.Operation): (EncryNode[D], Boolean, Boolean, Boolean, Option[ADValue]) = {
+    def modifyHelper(rNode: EncryNode[D], key: ADKey,
+                     operation: encry.avltree.Operation): (EncryNode[D], Boolean, Boolean, Boolean, Option[ADValue]) = {
       rNode match {
         case r: EncryLeaf[D] =>
-          if (keyMatchesLeaf(key, r)) {
-            operation match {
-              case m: encry.avltree.Modification =>
-                m.updateFn(Some(r.value)) match {
-                  case Success(None) => // delete key
-                    onNodeVisit(r, operation)
-                    (r, false, false, true, Some(r.value))
-                  case Success(Some(v)) => // update value
-                    valueLengthOpt.foreach(vl => require(v.length == vl, s"Value length is fixed and should be $vl"))
-                    val oldValue: Option[ADValue] = Some(r.value)
-                    val rNew: EncryLeaf[D] = r.getNew(newValue = v)
-                    onNodeVisit(r, operation)
-                    (rNew, true, false, false, oldValue)
-                  case Failure(e) => // updateFunction doesn't like the value we found
-                    throw e
-                }
-              case _: Lookup =>
-                onNodeVisit(r, operation)
-                (r, false, false, false, Some(r.value))
-            }
-          } else {
-            operation match {
+          if (keyMatchesLeaf(key, r)) operation match {
+            case m: encry.avltree.Modification =>
+              m.updateFn(Some(r.value)) match {
+                case Success(None) => // delete key
+                  onNodeVisit(r, operation)
+                  (r, false, false, true, Some(r.value))
+                case Success(Some(v)) => // update value
+                  valueLengthOpt.foreach(vl => require(v.length == vl, s"Value length is fixed and should be $vl"))
+                  val oldValue: Option[ADValue] = Some(r.value)
+                  val rNew: EncryLeaf[D] = r.getNew(newValue = v)
+                  onNodeVisit(r, operation)
+                  (rNew, true, false, false, oldValue)
+                case Failure(e) => // updateFunction doesn't like the value we found
+                  throw e
+              }
+            case _: Lookup =>
+              onNodeVisit(r, operation)
+              (r, false, false, false, Some(r.value))
+          } else operation match {
               case m: Modification =>
                 m.updateFn(None) match {
                   case Success(None) => // don't change anything, just lookup
@@ -137,7 +130,6 @@ trait AuthenticatedTreeOps[D <: Digest] {
                 onNodeVisit(rNode, operation)
                 (r, false, false, false, None)
             }
-          }
         case r: InternalEncryNode[D] =>
           if (nextDirectionIsLeft(key, r)) {
             val (newLeftM, changeHappened, childHeightIncreased, toDelete, oldValue) = modifyHelper(r.left, key, operation)
@@ -157,10 +149,8 @@ trait AuthenticatedTreeOps[D <: Digest] {
                 val rBalance: Balance = if (childHeightIncreased) Balance @@ (r.balance - 1).toByte else r.balance
                 (r.getNew(newLeft = newLeftM, newBalance = rBalance), true, myHeightIncreased, false, oldValue)
               }
+            } else (r, false, false, toDelete, oldValue)
 
-            } else {
-              (r, false, false, toDelete, oldValue)
-            }
           } else {
             val (newRightM, changeHappened, childHeightIncreased, toDelete, oldValue) = modifyHelper(r.right, key, operation)
             onNodeVisit(r, operation)
