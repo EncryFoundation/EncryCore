@@ -6,7 +6,7 @@ import encry.stats.LoggingActor.LogMessage
 import encry.storage.codec.FixLenComplexValueCodec
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import scala.util.{Failure, Success, Try}
-import encry.EncryApp.system
+import encry.EncryApp.{settings, system}
 
 trait EncryStorage extends AutoCloseable {
 
@@ -14,7 +14,7 @@ trait EncryStorage extends AutoCloseable {
 
   def insert(version: ByteArrayWrapper,
              toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit =
-      store.update(version, Seq.empty, toInsert)
+    store.update(version, Seq.empty, toInsert)
 
   def remove(version: ByteArrayWrapper,
              toRemove: Seq[ByteArrayWrapper]): Unit =
@@ -43,7 +43,8 @@ trait EncryStorage extends AutoCloseable {
     }
 
   override def close(): Unit = {
-    system.actorSelection("user/loggingActor") ! LogMessage("Info", "Closing storage")
+    if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+      LogMessage("Info", "Closing storage", System.currentTimeMillis())
     store.close()
   }
 }

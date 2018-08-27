@@ -37,13 +37,15 @@ class PeerManager extends Actor {
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
     case DoConnecting(remote, direction) =>
       if (connectingPeers.contains(remote) && direction != Incoming) {
-        context.system.actorSelection("/user/loggingActor") !
-          LogMessage("Info", s"Trying to connect twice to $remote, going to drop the duplicate connection")
+        if (settings.logging.enableLogging)
+          context.system.actorSelection("/user/loggingActor") !
+            LogMessage("Info", s"Trying to connect twice to $remote, going to drop the duplicate connection", System.currentTimeMillis())
         sender() ! CloseConnection
       }
       else if (direction != Incoming) {
-        context.system.actorSelection("/user/loggingActor") !
-          LogMessage("Info", s"Connecting to $remote")
+        if (settings.logging.enableLogging)
+          context.system.actorSelection("/user/loggingActor") !
+            LogMessage("Info", s"Connecting to $remote", System.currentTimeMillis())
         connectingPeers += remote
       }
       sender() ! StartInteraction
@@ -72,8 +74,9 @@ class PeerManager extends Actor {
           .foreach { address => sender() ! ConnectTo(address)
           }
     case RecoveryCompleted =>
-      context.system.actorSelection("/user/loggingActor") !
-        LogMessage("Info", "Received RecoveryCompleted")
+      if (settings.logging.enableLogging)
+        context.system.actorSelection("/user/loggingActor") !
+          LogMessage("Info", "Received RecoveryCompleted", System.currentTimeMillis())
       recoveryCompleted = true
       addKnownPeersToPeersDatabase()
   }

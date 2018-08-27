@@ -41,22 +41,23 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   def processErrors(stateName: CommunicationState): Receive = {
     case CommandFailed(w: Write) =>
-      context.system.actorSelection("/user/loggingActor") ! LogMessage("Warn", s"Write failed :$w " + remote + s" in state $stateName")
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Warn", s"Write failed :$w " + remote + s" in state $stateName", System.currentTimeMillis())
       connection ! Close
       connection ! ResumeReading
       connection ! ResumeWriting
     case cc: ConnectionClosed =>
-      context.system.actorSelection("/user/loggingActor") !
-        LogMessage("Info", "Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Info", "Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName", System.currentTimeMillis())
       peerManager ! Disconnected(remote)
       context stop self
     case CloseConnection =>
-      context.system.actorSelection("/user/loggingActor") !
-        LogMessage("Info", s"Enforced to abort communication with: " + remote + s" in state $stateName")
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Info", s"Enforced to abort communication with: " + remote + s" in state $stateName", System.currentTimeMillis())
       connection ! Close
     case CommandFailed(cmd: Tcp.Command) =>
-      context.system.actorSelection("/user/loggingActor") !
-        LogMessage("Info", "Failed to execute command : " + cmd + s" in state $stateName")
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Info", "Failed to execute command : " + cmd + s" in state $stateName", System.currentTimeMillis())
       connection ! ResumeReading
   }
 
@@ -68,7 +69,8 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
           val hb: Array[Byte] = Handshake(Version(settings.network.appVersion), settings.network.nodeName,
             ownSocketAddress, time).bytes
           connection ! Tcp.Write(ByteString(hb))
-          context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Handshake sent to $remote")
+          if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+            LogMessage("Info", s"Handshake sent to $remote", System.currentTimeMillis())
           handshakeSent = true
           if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
         }
@@ -78,19 +80,22 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
     case Received(data) =>
       HandshakeSerializer.parseBytes(data.toArray) match {
         case Success(handshake) =>
-          context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Got a Handshake from $remote")
+          if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+            LogMessage("Info", s"Got a Handshake from $remote", System.currentTimeMillis())
           receivedHandshake = Some(handshake)
           connection ! ResumeReading
           if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
         case Failure(t) =>
-          context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Error during parsing a handshake: $t")
+          if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+            LogMessage("Info", s"Error during parsing a handshake: $t", System.currentTimeMillis())
           self ! CloseConnection
       }
   }
 
   def handshakeTimeout: Receive = {
     case HandshakeTimeout =>
-      context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Handshake timeout with $remote, going to drop the connection")
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Info", s"Handshake timeout with $remote, going to drop the connection", System.currentTimeMillis())
       self ! CloseConnection
   }
 
@@ -108,7 +113,8 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   def workingCycleLocalInterface: Receive = {
     case msg: message.Message[_] =>
       def sendOutMessage(): Unit = {
-        context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", "Send message " + msg.spec + " to " + remote)
+        if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+          LogMessage("Info", "Send message " + msg.spec + " to " + remote, System.currentTimeMillis())
         connection ! Write(ByteString(Ints.toByteArray(msg.bytes.length) ++ msg.bytes))
       }
 
@@ -125,11 +131,13 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
       t._1.find { packet =>
         messagesHandler.parseBytes(packet.toByteBuffer, selfPeer) match {
           case Success(message) =>
-            context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", "Received message " + message.spec + " from " + remote)
+            if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+              LogMessage("Info", "Received message " + message.spec + " from " + remote, System.currentTimeMillis())
             networkController ! message
             false
           case Failure(e) =>
-            context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Corrupted data from: " + remote + s"$e")
+            if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+              LogMessage("Info", s"Corrupted data from: " + remote + s"$e", System.currentTimeMillis())
             true
         }
       }
@@ -137,7 +145,8 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   }
 
   def reportStrangeInput: Receive = {
-    case nonsense: Any => context.system.actorSelection("/user/loggingActor") ! LogMessage("Warn", s"Strange input for PeerConnectionHandler: $nonsense")
+    case nonsense: Any => if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+      LogMessage("Warn", s"Strange input for PeerConnectionHandler: $nonsense", System.currentTimeMillis())
   }
 
   def workingCycle: Receive =
@@ -156,21 +165,25 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   def dead: Receive = {
 
-    case message => context.system.actorSelection("/user/loggingActor") ! LogMessage("Debug", s"Get smth strange: $message")
+    case message => if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+      LogMessage("Debug", s"Get smth strange: $message", System.currentTimeMillis())
   }
 
   def deadNotIn: Receive = {
 
-    case message => context.system.actorSelection("/user/loggingActor") ! LogMessage("Debug", s"Get smth node strange: $message")
+    case message => if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+      LogMessage("Debug", s"Get smth node strange: $message", System.currentTimeMillis())
   }
 
   override def postStop(): Unit = {
-    context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Peer handler $self to $remote is destroyed.")
+    if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+      LogMessage("Info", s"Peer handler $self to $remote is destroyed.", System.currentTimeMillis())
     connection ! Close
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Reason of restarting actor $self: ${reason.toString}.")
+    if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+      LogMessage("Info", s"Reason of restarting actor $self: ${reason.toString}.", System.currentTimeMillis())
   }
 
   def getPacket(data: ByteString): (List[ByteString], ByteString) = {

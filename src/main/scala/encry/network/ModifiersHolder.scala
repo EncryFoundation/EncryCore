@@ -24,29 +24,35 @@ class ModifiersHolder extends PersistentActor {
   var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
 
   context.system.scheduler.schedule(10.second, 30.second) {
-    context.system.actorSelection("/user/loggingActor") ! LogMessage("Debug", Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
-   }
+    if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+      LogMessage("Debug", Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString, System.currentTimeMillis())
+  }
 
   context.system.scheduler.scheduleOnce(5 seconds) {
     if (completedBlocks.nonEmpty) self ! SendBlocks
   }
 
-  override def preStart(): Unit = context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"ModifiersHolder actor is started.")
+  override def preStart(): Unit = if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+    LogMessage("Info", s"ModifiersHolder actor is started.", System.currentTimeMillis())
 
   override def receiveRecover: Receive = if (settings.levelDb.recoverMode) receiveRecoverEnabled else receiveRecoverDisabled
 
   def receiveRecoverEnabled: Receive = {
     case header: EncryBlockHeader =>
       updateHeaders(header)
-      context.system.actorSelection("/user/loggingActor") ! LogMessage("Debug", s"Header ${header.height} is recovered from leveldb.")
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Debug", s"Header ${header.height} is recovered from leveldb.", System.currentTimeMillis())
     case payload: EncryBlockPayload =>
       updatePayloads(payload)
-      context.system.actorSelection("/user/loggingActor") ! LogMessage("Debug", s"Payload ${Algos.encode(payload.headerId)} is recovered from leveldb.")
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Debug", s"Payload ${Algos.encode(payload.headerId)} is recovered from leveldb.", System.currentTimeMillis())
     case block: EncryBlock =>
       updateCompletedBlocks(block)
-      context.system.actorSelection("/user/loggingActor") ! LogMessage("Debug", s"Block ${block.header.height} is recovered from leveldb.")
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Debug", s"Block ${block.header.height} is recovered from leveldb.", System.currentTimeMillis())
     case RecoveryCompleted if completedBlocks.isEmpty =>
-      context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", "Recovery completed.")
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Info", "Recovery completed.", System.currentTimeMillis())
       peerManager ! RecoveryCompleted
     case RecoveryCompleted =>
       context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
@@ -59,7 +65,8 @@ class ModifiersHolder extends PersistentActor {
   override def receiveCommand: Receive = {
     case CheckAllBlocksSent =>
       if (completedBlocks.isEmpty) {
-        context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", "Recovery completed.")
+        if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+          LogMessage("Info", "Recovery completed.", System.currentTimeMillis())
         peerManager ! RecoveryCompleted
       }
       else context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
@@ -70,7 +77,8 @@ class ModifiersHolder extends PersistentActor {
 
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
-    case x: Any => context.system.actorSelection("/user/loggingActor") ! LogMessage("Error", s"Strange input: $x.")
+    case x: Any => if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+      LogMessage("Error", s"Strange input: $x.", System.currentTimeMillis())
   }
 
   def createBlockIfPossible(payloadId: ModifierId): Unit =
@@ -85,29 +93,34 @@ class ModifiersHolder extends PersistentActor {
     case header: EncryBlockHeader =>
       if (!headers.contains(Algos.encode(header.id)))
         persist(header) { header =>
-          context.system.actorSelection("/user/loggingActor") !
-            LogMessage("Debug", s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully.")
+          if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+            LogMessage("Debug", s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully.", System.currentTimeMillis())
         }
       updateHeaders(header)
-      context.system.actorSelection("/user/loggingActor") ! LogMessage("Debug", s"Get header ${Algos.encode(header.id)} on height ${header.height}")
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Debug", s"Get header ${Algos.encode(header.id)} on height ${header.height}", System.currentTimeMillis())
     case payload: EncryBlockPayload =>
       if (!payloads.contains(Algos.encode(payload.id)))
-        persist(payload) { payload => context.system.actorSelection("/user/loggingActor") !
-          LogMessage("Debug", s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully.") }
+        persist(payload) { payload =>
+          if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+            LogMessage("Debug", s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully.", System.currentTimeMillis())
+        }
       updatePayloads(payload)
-      context.system.actorSelection("/user/loggingActor") ! LogMessage("Debug", s"Get payload with id: ${Algos.encode(payload.id)} " +
-        s"${
-          nonCompletedBlocks.get(Algos.encode(payload.id)).map(headerId =>
-            headers.get(headerId).map(header => s"for header $headerId height: ${header._1.height}"))
-        }")
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Debug", s"Get payload with id: ${Algos.encode(payload.id)} " +
+          s"${
+            nonCompletedBlocks.get(Algos.encode(payload.id)).map(headerId =>
+              headers.get(headerId).map(header => s"for header $headerId height: ${header._1.height}"))
+          }", System.currentTimeMillis())
     case block: EncryBlock =>
       if (!completedBlocks.values.toSeq.contains(block))
         persist(block) { block =>
-          context.system.actorSelection("/user/loggingActor") !
-            LogMessage("Debug", s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} is persisted successfully.")
+          if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+            LogMessage("Debug", s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} is persisted successfully.", System.currentTimeMillis())
         }
       updateCompletedBlocks(block)
-    case x: Any => context.system.actorSelection("/user/loggingActor") ! LogMessage("Error", s"Strange input $x.")
+    case x: Any => if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+      LogMessage("Error", s"Strange input $x.", System.currentTimeMillis())
   }
 
   def updateHeaders(header: EncryBlockHeader): Unit = {

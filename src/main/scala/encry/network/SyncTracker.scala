@@ -12,6 +12,7 @@ import scala.concurrent.duration._
 import History._
 import encry.stats.LoggingActor.LogMessage
 import encry.utils.NetworkTime.Time
+import encry.EncryApp.settings
 
 case class SyncTracker(deliveryManager: ActorRef,
                        context: ActorContext,
@@ -34,7 +35,8 @@ case class SyncTracker(deliveryManager: ActorRef,
     statuses = statuses.updated(peer, status)
     val seniorsAfter: Int = numOfSeniors()
     if (seniorsBefore > 0 && seniorsAfter == 0) {
-      context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", "Syncing is done, switching to stable regime")
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Info", "Syncing is done, switching to stable regime", System.currentTimeMillis())
       scheduleSendSyncInfo()
     }
   }
@@ -42,13 +44,13 @@ case class SyncTracker(deliveryManager: ActorRef,
   def clearStatus(remote: InetSocketAddress): Unit = {
     statuses.keys.find(_.socketAddress == remote) match {
       case Some(peer) => statuses -= peer
-      case None => context.system.actorSelection("/user/loggingActor") !
-        LogMessage("Warn", s"Trying to clear status for $remote, but it is not found")
+      case None => if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Warn", s"Trying to clear status for $remote, but it is not found", System.currentTimeMillis())
     }
     lastSyncSentTime.keys.find(_.socketAddress.getAddress == remote.getAddress) match {
       case Some(peer) => lastSyncSentTime -= peer
-      case None => context.system.actorSelection("/user/loggingActor") !
-        LogMessage("Warn", s"Trying to clear last sync time for $remote, but it is not found")
+      case None => if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Warn", s"Trying to clear last sync time for $remote, but it is not found", System.currentTimeMillis())
     }
   }
 
@@ -79,9 +81,9 @@ case class SyncTracker(deliveryManager: ActorRef,
     else nonOutdated.filter(p => (System.currentTimeMillis() - lastSyncSentTime.getOrElse(p, 0L))
       .millis >= networkSettings.syncInterval)
     peers.foreach(updateLastSyncSentTime)
-    context.system.actorSelection("/user/loggingActor") !
+    if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
       LogMessage("Debug", s"Trying to get nodes to sync and they are: ${peers.map(_.socketAddress).mkString(",")} and " +
-      s"handler are: ${peers.map(_.handlerRef).mkString(",")}")
+        s"handler are: ${peers.map(_.handlerRef).mkString(",")}", System.currentTimeMillis())
     peers
   }
 }

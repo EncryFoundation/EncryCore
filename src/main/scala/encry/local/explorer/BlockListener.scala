@@ -14,7 +14,7 @@ class BlockListener(dBService: DBService) extends Actor {
 
   override def preStart(): Unit = {
     if(settings.logging.enableLogging)
-      context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", "Start listening to new blocks.")
+      context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", "Start listening to new blocks.", System.currentTimeMillis())
     context.system.eventStream.subscribe(context.self, classOf[SemanticallySuccessfulModifier[_]])
   }
 

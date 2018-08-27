@@ -1,6 +1,4 @@
 package encry.settings
 
-case class LoggingSettings(sendToInflux: Boolean,
-                           sendToLocalFile: Boolean,
-                           sendToKafka: Boolean,
+case class LoggingSettings(loggingMode: String,
                            enableLogging: Boolean)

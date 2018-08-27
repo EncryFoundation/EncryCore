@@ -29,7 +29,8 @@ class PeerSynchronizer extends Actor {
       if spec.messageCode == PeersSpec.messageCode =>
       peers.filter(checkPossibilityToAddPeer).foreach(isa =>
         peerManager ! AddOrUpdatePeer(isa, None, Some(remote.direction)))
-      context.system.actorSelection("/user/loggingActor") ! LogMessage("Debug", s"Get new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Debug", s"Get new peers: [${peers.mkString(",")}] from ${remote.socketAddress}", System.currentTimeMillis())
     case DataFromPeer(spec, _, remote) if spec.messageCode == GetPeersSpec.messageCode =>
       (peerManager ? RandomPeers(3))
         .mapTo[Seq[InetSocketAddress]]
@@ -38,13 +39,13 @@ class PeerSynchronizer extends Actor {
             if (remote.socketAddress.getAddress.isSiteLocalAddress) true
             else !address.getAddress.isSiteLocalAddress && address != remote.socketAddress
           })
-          context.system.actorSelection("/user/loggingActor") !
-            LogMessage("Info", s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
+          if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+            LogMessage("Info", s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}", System.currentTimeMillis())
           networkController ! SendToNetwork(Message(PeersSpec, Right(correctPeers), None), SendToPeer(remote))
-          context.system.actorSelection("/user/loggingActor") !
-            LogMessage("Debug", s"Send to ${remote.socketAddress} peers message which contains next peers: ${peers.mkString(",")}")
+          if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+            LogMessage("Debug", s"Send to ${remote.socketAddress} peers message which contains next peers: ${peers.mkString(",")}", System.currentTimeMillis())
         }
-    case nonsense: Any => context.system.actorSelection("/user/loggingActor") !
-      LogMessage("Warn", s"PeerSynchronizer: got something strange $nonsense")
+    case nonsense: Any => if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+      LogMessage("Warn", s"PeerSynchronizer: got something strange $nonsense", System.currentTimeMillis())
   }
 }

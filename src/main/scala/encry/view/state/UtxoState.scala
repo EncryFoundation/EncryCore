@@ -43,7 +43,9 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
   override def maxRollbackDepth: Int = Constants.Chain.MaxRollbackDepth
 
   private def onAdProofGenerated(proof: ADProofs): Unit = {
-    if (nodeViewHolderRef.isEmpty) system.actorSelection("user/loggingActor") ! LogMessage("Warn", "Got proof while nodeViewHolderRef is empty")
+    if (nodeViewHolderRef.isEmpty)
+      if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+        LogMessage("Warn", "Got proof while nodeViewHolderRef is empty", System.currentTimeMillis())
     nodeViewHolderRef.foreach(_ ! LocallyGeneratedModifier(proof))
   }
 
@@ -80,8 +82,9 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
 
     case block: EncryBlock =>
-      system.actorSelection("user/loggingActor") ! LogMessage("Info",s"Applying block with header ${block.header.encodedId} to UtxoState with " +
-        s"root hash ${Algos.encode(rootHash)} at height $height")
+      if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+        LogMessage("Info", s"Applying block with header ${block.header.encodedId} to UtxoState with " +
+          s"root hash ${Algos.encode(rootHash)} at height $height", System.currentTimeMillis())
 
       applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] =
@@ -90,8 +93,9 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
         val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
 
         if (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest) onAdProofGenerated(ADProofs(block.header.id, proofBytes))
-        system.actorSelection("user/loggingActor") ! LogMessage("Info",s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with" +
-          s" root hash ${Algos.encode(rootHash)}")
+        if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+          LogMessage("Info", s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with" +
+            s" root hash ${Algos.encode(rootHash)}", System.currentTimeMillis())
 
         if (!stateStore.get(ByteArrayWrapper(block.id)).exists(_.data sameElements block.header.stateRoot))
           throw new Exception("Storage kept roothash is not equal to the declared one.")
@@ -104,8 +108,9 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
 
         new UtxoState(persistentProver, VersionTag !@@ block.id, Height @@ block.header.height, stateStore, lastBlockTimestamp, nodeViewHolderRef)
       }.recoverWith[UtxoState] { case e =>
-        system.actorSelection("user/loggingActor") ! LogMessage("Warn",s"Failed to apply block with header ${block.header.encodedId} to UTXOState with root" +
-          s" ${Algos.encode(rootHash)}: $e")
+        if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+          LogMessage("Warn", s"Failed to apply block with header ${block.header.encodedId} to UTXOState with root" +
+            s" ${Algos.encode(rootHash)}: $e", System.currentTimeMillis())
         Failure(e)
       }
 
@@ -116,19 +121,22 @@ class UtxoState(override val persistentProver: PersistentBatchAVLProver[Digest32
   }
 
   def generateProofs(txs: Seq[Transaction]): Try[(SerializedAdProof, ADDigest)] = Try {
-    system.actorSelection("user/loggingActor") ! LogMessage("Info",s"Generating proof for ${txs.length} transactions ...")
+    Try(if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+      LogMessage("Info", s"Generating proof for ${txs.length} transactions ...", System.currentTimeMillis()))
     val rootHash: ADDigest = persistentProver.digest
     if (txs.isEmpty) throw new Exception("Got empty transaction sequence")
     else if (!storage.version.exists(_.sameElements(rootHash)))
       throw new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}")
     persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
   }.flatten.recoverWith[(SerializedAdProof, ADDigest)] { case e =>
-    system.actorSelection("user/loggingActor") ! LogMessage("Warn",s"Failed to generate ADProof cause $e")
+    Try(if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+      LogMessage("Warn", s"Failed to generate ADProof cause $e", System.currentTimeMillis()))
     Failure(e)
   }
 
   override def rollbackTo(version: VersionTag): Try[UtxoState] = {
-    system.actorSelection("user/loggingActor") ! LogMessage("Info",s"Rollback UtxoState to version ${Algos.encoder.encode(version)}")
+    if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+      LogMessage("Info", s"Rollback UtxoState to version ${Algos.encoder.encode(version)}", System.currentTimeMillis())
     stateStore.get(ByteArrayWrapper(version)) match {
       case Some(v) =>
         val rollbackResult: Try[UtxoState] = persistentProver.rollback(ADDigest @@ v.data).map { _ =>
@@ -248,7 +256,8 @@ object UtxoState {
     val stateStore: LSMStore = new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions)
     val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
     val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(stateStore, np)(Algos.hash)
-    system.actorSelection("user/loggingActor") ! LogMessage("Info",s"Generating UTXO State with ${boxes.size} boxes")
+    if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+      LogMessage("Info", s"Generating UTXO State with ${boxes.size} boxes", System.currentTimeMillis())
 
     val persistentProver: PersistentBatchAVLProver[Digest32, HF] = PersistentBatchAVLProver.create(
       p, storage, metadata(EncryState.genesisStateVersion, p.digest, Constants.Chain.PreGenesisHeight, 0L), paranoidChecks = true

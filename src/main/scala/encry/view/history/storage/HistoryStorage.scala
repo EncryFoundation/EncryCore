@@ -3,7 +3,9 @@ package encry.view.history.storage
 import encry.ModifierId
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.HistoryModifierSerializer
+import encry.stats.LoggingActor.LogMessage
 import encry.storage.EncryStorage
+import encry.EncryApp.{settings, system}
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.serialization.Serializer
 import scala.util.{Failure, Random, Success}
@@ -15,7 +17,8 @@ class HistoryStorage(override val store: Store, val objectsStore: Store) extends
       HistoryModifierSerializer.parseBytes(res.data) match {
         case Success(b) => Some(b)
         case Failure(e) =>
-          logWarn(s"Failed to parse block from db: ", e)
+          if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+            LogMessage("Warn", s"Failed to parse block from db: $e", System.currentTimeMillis())
           None
       }
     }

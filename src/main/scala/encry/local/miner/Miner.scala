@@ -60,19 +60,22 @@ class Miner extends Actor {
         Props(classOf[EncryMiningWorker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
       candidateOpt match {
         case Some(candidateBlock) =>
-          context.system.actorSelection("/user/loggingActor") !
-            LogMessage("Info", s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+          if (settings.logging.enableLogging)
+            context.system.actorSelection("/user/loggingActor") !
+              LogMessage("Info", s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}", System.currentTimeMillis())
           context.children.foreach(_ ! NextChallenge(candidateBlock))
         case None => produceCandidate()
       }
     case DisableMining if context.children.nonEmpty =>
-      context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", "Received DisableMining msg")
+      if (settings.logging.enableLogging)
+        context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", "Received DisableMining msg", System.currentTimeMillis())
       killAllWorkers()
       candidateOpt = None
       context.become(miningDisabled)
     case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
-      context.system.actorSelection("/user/loggingActor") !
-        LogMessage("Info", s"Going to propagate new block $block from worker $workerIdx")
+      if (settings.logging.enableLogging)
+        context.system.actorSelection("/user/loggingActor") !
+          LogMessage("Info", s"Going to propagate new block $block from worker $workerIdx", System.currentTimeMillis())
       killAllWorkers()
       nodeViewHolder ! LocallyGeneratedModifier(block.header)
       nodeViewHolder ! LocallyGeneratedModifier(block.payload)
@@ -107,9 +110,10 @@ class Miner extends Actor {
 
   def receiveSemanticallySuccessfulModifier: Receive = {
     case SemanticallySuccessfulModifier(mod: EncryBlock) if needNewCandidate(mod) =>
-      context.system.actorSelection("/user/loggingActor") !
-        LogMessage("Info", s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
-          s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+      if (settings.logging.enableLogging)
+        context.system.actorSelection("/user/loggingActor") !
+          LogMessage("Info", s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
+            s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}", System.currentTimeMillis())
       produceCandidate()
     case SemanticallySuccessfulModifier(_) =>
   }
@@ -118,14 +122,16 @@ class Miner extends Actor {
     case c: CandidateBlock => procCandidateBlock(c)
     case cEnv: CandidateEnvelope if cEnv.c.nonEmpty => procCandidateBlock(cEnv.c.get)
     case _: CandidateEnvelope =>
-      context.system.actorSelection("/user/loggingActor") !
-        LogMessage("Debug", "Received empty CandidateEnvelope, going to suspend mining for a while")
+      if (settings.logging.enableLogging)
+        context.system.actorSelection("/user/loggingActor") !
+          LogMessage("Debug", "Received empty CandidateEnvelope, going to suspend mining for a while", System.currentTimeMillis())
       self ! DisableMining
   }
 
   def unknownMessage: Receive = {
-    case m => context.system.actorSelection("/user/loggingActor") !
-      LogMessage("Warn", s"Unexpected message $m")
+    case m =>
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Warn", s"Unexpected message $m", System.currentTimeMillis())
   }
 
   def chainEvents: Receive = {
@@ -133,8 +139,9 @@ class Miner extends Actor {
   }
 
   def procCandidateBlock(c: CandidateBlock): Unit = {
-    context.system.actorSelection("/user/loggingActor") !
-      LogMessage("Info", s"Got candidate block $c in ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+    if (settings.logging.enableLogging)
+      context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Info", s"Got candidate block $c in ${dateFormat.format(new Date(System.currentTimeMillis()))}", System.currentTimeMillis())
     candidateOpt = Some(c)
     self ! StartMining
   }
@@ -177,9 +184,10 @@ class Miner extends Actor {
     val candidate: CandidateBlock =
       CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
 
-    context.system.actorSelection("/user/loggingActor") !
-      LogMessage("Info", s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
-        s"and 1 coinbase for height $height")
+    if (settings.logging.enableLogging)
+      context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Info", s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
+          s"and 1 coinbase for height $height", System.currentTimeMillis())
 
     candidate
   }
@@ -191,16 +199,19 @@ class Miner extends Actor {
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
       bestHeaderOpt match {
         case Some(h) =>
-          context.system.actorSelection("/user/loggingActor") !
-            LogMessage("Info", s"Best header at height ${h.height}")
+          if (settings.logging.enableLogging)
+            context.system.actorSelection("/user/loggingActor") !
+              LogMessage("Info", s"Best header at height ${h.height}", System.currentTimeMillis())
         case None =>
-          context.system.actorSelection("/user/loggingActor") !
-            LogMessage("Info", s"No best header opt")
+          if (settings.logging.enableLogging)
+            context.system.actorSelection("/user/loggingActor") !
+              LogMessage("Info", s"No best header opt", System.currentTimeMillis())
       }
       val candidate: CandidateEnvelope =
         if ((bestHeaderOpt.isDefined && (syncingDone || view.history.isFullChainSynced)) || settings.node.offlineGeneration) {
-          context.system.actorSelection("/user/loggingActor") !
-            LogMessage("Info", s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+          if (settings.logging.enableLogging)
+            context.system.actorSelection("/user/loggingActor") !
+              LogMessage("Info", s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}", System.currentTimeMillis())
           if (settings.node.sendStat) context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
           val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
           if (settings.node.sendStat) context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime)

@@ -194,7 +194,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
       case None if contains(modifierId) => ModifierSemanticValidity.Unknown
       case None => ModifierSemanticValidity.Absent
       case m =>
-        system.actorSelection("user/loggingActor") ! LogMessage("Error", s"Incorrect validity status: $m")
+        if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+          LogMessage("Error", s"Incorrect validity status: $m", System.currentTimeMillis())
         ModifierSemanticValidity.Absent
     }
 }

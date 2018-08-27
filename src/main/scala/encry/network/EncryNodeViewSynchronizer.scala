@@ -47,7 +47,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
   override def receive: Receive = {
     case SyntacticallySuccessfulModifier(mod)
       if (mod.isInstanceOf[EncryBlockHeader] || mod.isInstanceOf[EncryBlockPayload] || mod.isInstanceOf[ADProofs]) &&
-      historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
+        historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
     case SyntacticallySuccessfulModifier(mod) =>
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
       deliveryManager ! DownloadRequest(modifierTypeId, modifierId)
@@ -65,51 +65,57 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
     case DisconnectedPeer(remote) => deliveryManager ! DisconnectedPeer(remote)
     case DataFromPeer(spec, syncInfo: EncrySyncInfo@unchecked, remote) if spec.messageCode == syncInfoSpec.messageCode =>
-      context.system.actorSelection("/user/loggingActor") !
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
         LogMessage("Info", s"Get sync message from ${remote.socketAddress} with " +
-        s"${syncInfo.lastHeaderIds.size} headers. Head headerId is " +
-        s"${Algos.encode(syncInfo.lastHeaderIds.headOption.getOrElse(Array.emptyByteArray))}")
+          s"${syncInfo.lastHeaderIds.size} headers. Head headerId is " +
+          s"${Algos.encode(syncInfo.lastHeaderIds.headOption.getOrElse(Array.emptyByteArray))}", System.currentTimeMillis())
       historyReaderOpt match {
         case Some(historyReader) =>
           val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, settings.network.networkChunkSize)
           val ext: ModifierIds = extensionOpt.getOrElse(Seq())
           val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
-          context.system.actorSelection("/user/loggingActor") !
-            LogMessage("Info", s"Comparison with $remote having starting points ${encry.idsToString(syncInfo.startingPoints)}. " +
-            s"Comparison result is $comparison. Sending extension of length ${ext.length}")
-          context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Extension ids: ${encry.idsToString(ext)}")
-          context.system.actorSelection("/user/loggingActor") ! LogMessage("Debug", s"Get sync message from ${remote.socketAddress} with headers: " +
-            s"${syncInfo.lastHeaderIds.map(Algos.encode).mkString(",")}")
+          if (settings.logging.enableLogging) {
+            context.system.actorSelection("/user/loggingActor") !
+              LogMessage("Info", s"Comparison with $remote having starting points ${encry.idsToString(syncInfo.startingPoints)}. " +
+                s"Comparison result is $comparison. Sending extension of length ${ext.length}", System.currentTimeMillis())
+            context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Extension ids: ${encry.idsToString(ext)}", System.currentTimeMillis())
+            context.system.actorSelection("/user/loggingActor") ! LogMessage("Debug", s"Get sync message from ${remote.socketAddress} with headers: " +
+              s"${syncInfo.lastHeaderIds.map(Algos.encode).mkString(",")}", System.currentTimeMillis())
+          }
           if (!(extensionOpt.nonEmpty || comparison != Younger))
-            context.system.actorSelection("/user/loggingActor") ! LogMessage("Warn", "Extension is empty while comparison is younger")
+            if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+              LogMessage("Warn", "Extension is empty while comparison is younger", System.currentTimeMillis())
           deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == RequestModifierSpec.MessageCode =>
-      context.system.actorSelection("/user/loggingActor") ! LogMessage("Info", s"Get requestMsg from ${remote.socketAddress}. TypeID:${invData._1}." +
-        s" Modifiers: ${invData._2.foldLeft("|")((str, id) => str + "|" + Algos.encode(id))}")
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+        LogMessage("Info", s"Get requestMsg from ${remote.socketAddress}. TypeID:${invData._1}." +
+          s" Modifiers: ${invData._2.foldLeft("|")((str, id) => str + "|" + Algos.encode(id))}", System.currentTimeMillis())
       historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
         val objs: Seq[NodeViewModifier] = invData._1 match {
           case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
           case _: ModifierTypeId => invData._2.flatMap(id => readers._1.modifierById(id))
         }
-        context.system.actorSelection("/user/loggingActor") !
-          LogMessage("Info", s"Requested ${invData._2.length} modifiers ${encry.idsToString(invData)}, " +
-          s"sending ${objs.length} modifiers ${encry.idsToString(invData._1, objs.map(_.id))} ")
-        context.system.actorSelection("/user/loggingActor") !
-          LogMessage("Debug", s"Peer: ${remote.socketAddress} requested for modifiers of type ${invData._1} with ids: " +
-          s"${invData._2.map(Algos.encode).mkString(",")}")
+        if (settings.logging.enableLogging) {
+          context.system.actorSelection("/user/loggingActor") !
+            LogMessage("Info", s"Requested ${invData._2.length} modifiers ${encry.idsToString(invData)}, " +
+              s"sending ${objs.length} modifiers ${encry.idsToString(invData._1, objs.map(_.id))} ", System.currentTimeMillis())
+          context.system.actorSelection("/user/loggingActor") !
+            LogMessage("Debug", s"Peer: ${remote.socketAddress} requested for modifiers of type ${invData._1} with ids: " +
+              s"${invData._2.map(Algos.encode).mkString(",")}", System.currentTimeMillis())
+        }
         self ! ResponseFromLocal(remote, invData._1, objs)
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
-      context.system.actorSelection("/user/loggingActor") !
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
         LogMessage("Debug", s"Get inv message from ${remote.socketAddress} with modTypeId: ${invData._1} and modifiers: " +
-        s"${invData._2.foldLeft("|") { case (str, id) => str + "|" + Algos.encode(id) }}")
+          s"${invData._2.foldLeft("|") { case (str, id) => str + "|" + Algos.encode(id) }}", System.currentTimeMillis())
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
-      context.system.actorSelection("/user/loggingActor") !
+      if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
         LogMessage("Debug", s"Get modifiers from ${remote.socketAddress} with modTypeID: ${data._1} and modifiers: " +
-        s"${data._2.keys.foldLeft("|") { case (str, id) => str + "|" + Algos.encode(id) }}")
+          s"${data._2.keys.foldLeft("|") { case (str, id) => str + "|" + Algos.encode(id) }}", System.currentTimeMillis())
       deliveryManager ! DataFromPeer(spec, data: ModifiersData@unchecked, remote)
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       deliveryManager ! RequestFromLocal(peer, modifierTypeId, modifierIds)
@@ -124,7 +130,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
       }
     case StopSync => deliveryManager ! StopSync
     case ContinueSync => deliveryManager ! ContinueSync
-    case a: Any => context.system.actorSelection("/user/loggingActor") ! LogMessage("Error", s"Strange input (sender: ${sender()}): ${a.getClass}\n" + a)
+    case a: Any => if (settings.logging.enableLogging) context.system.actorSelection("/user/loggingActor") !
+      LogMessage("Error", s"Strange input (sender: ${sender()}): ${a.getClass}\n" + a, System.currentTimeMillis())
   }
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =

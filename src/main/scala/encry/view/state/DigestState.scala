@@ -8,7 +8,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.Transaction
 import encry.settings.{Algos, Constants, NodeSettings}
-import encry.EncryApp.system
+import encry.EncryApp.{settings => encrySettings, system}
 import encry.stats.LoggingActor.LogMessage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import scorex.crypto.authds.ADDigest
@@ -42,10 +42,12 @@ class DigestState protected(override val version: VersionTag,
           .getOrElse(Failure(new Exception("Proofs are empty"))))
       }.flatten match {
         case s: Success[_] =>
-          system.actorSelection("user/loggingActor") ! LogMessage("Info",s"Valid modifier applied to DigestState: ${block.encodedId}")
+          if (encrySettings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+            LogMessage("Info", s"Valid modifier applied to DigestState: ${block.encodedId}", System.currentTimeMillis())
           s
         case Failure(e) =>
-          system.actorSelection("user/loggingActor") ! LogMessage("Warn",s"Modifier $mod is not valid: ", e)
+          if (encrySettings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+            LogMessage("Warn", s"Modifier $mod is not valid: $e", System.currentTimeMillis())
           Failure(e)
       }
     case mod: Any =>
@@ -61,25 +63,30 @@ class DigestState protected(override val version: VersionTag,
   //todo: utxo snapshot could go here
   override def applyModifier(mod: EncryPersistentModifier): Try[DigestState] = mod match {
     case block: EncryBlock if settings.verifyTransactions =>
-      system.actorSelection("user/loggingActor") ! LogMessage("Info",s"Got new full block with id ${block.encodedId} with root ${Algos.encoder.encode(block.header.stateRoot)}")
+      if (encrySettings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+        LogMessage("Info", s"Got new full block with id ${block.encodedId} with root ${Algos.encoder.encode(block.header.stateRoot)}", System.currentTimeMillis())
       this.validate(block).flatMap(_ => update(VersionTag !@@ block.header.id, block.header.stateRoot))
 
     case header: EncryBlockHeader if !settings.verifyTransactions =>
-      system.actorSelection("user/loggingActor") ! LogMessage("Info",s"Got new Header ${header.encodedId} with root ${Algos.encoder.encode(header.stateRoot)}")
+      if (encrySettings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+        LogMessage("Info", s"Got new Header ${header.encodedId} with root ${Algos.encoder.encode(header.stateRoot)}", System.currentTimeMillis())
       update(VersionTag !@@ header.id, header.stateRoot)
 
     case a: Any =>
-      system.actorSelection("user/loggingActor") ! LogMessage("Info",s"Unhandled modifier: $a")
+      if (encrySettings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+        LogMessage("Info", s"Unhandled modifier: $a", System.currentTimeMillis())
       Failure(new Exception(s"Unhandled modifier: $mod"))
   }
 
   override def rollbackTo(version: VersionTag): Try[DigestState] = {
-    system.actorSelection("user/loggingActor") ! LogMessage("Info",s"Rollback Digest State to version ${Algos.encoder.encode(version)}")
+    if (encrySettings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+      LogMessage("Info", s"Rollback Digest State to version ${Algos.encoder.encode(version)}", System.currentTimeMillis())
     val wrappedVersion: ByteArrayWrapper = ByteArrayWrapper(version)
     Try(stateStore.rollback(wrappedVersion)).map { _ =>
       stateStore.clean(Constants.DefaultKeepVersions)
       val rootHash: ADDigest = ADDigest @@ stateStore.get(wrappedVersion).get.data
-      system.actorSelection("user/loggingActor") ! LogMessage("Info",s"Rollback to version ${Algos.encoder.encode(version)} with roothash ${Algos.encoder.encode(rootHash)}")
+      if (encrySettings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+        LogMessage("Info", s"Rollback to version ${Algos.encoder.encode(version)} with roothash ${Algos.encoder.encode(rootHash)}", System.currentTimeMillis())
       new DigestState(version, rootHash, stateStore, settings)
     }
   }

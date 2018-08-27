@@ -43,9 +43,9 @@ class DBService {
         .unsafeToFuture()
         .recoverWith {
           case NonFatal(th) =>
-            if(settings.logging.enableLogging)
+            if (settings.logging.enableLogging)
               system.actorSelection("user/loggingActor") !
-                LogMessage("Warn", s"Failed to perform db operation caused $th", System.currentTimeMillis().toString)
+                LogMessage("Warn", s"Failed to perform db operation because of: $th", System.currentTimeMillis())
             Future.failed(th)
         }
     } else Future.successful(0)

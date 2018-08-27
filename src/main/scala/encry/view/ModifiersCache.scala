@@ -11,7 +11,7 @@ import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
-import encry.EncryApp.system
+import encry.EncryApp.{system, settings}
 
 /**
   * A cache which is storing persistent modifiers not applied to history yet.
@@ -137,8 +137,8 @@ class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryR
         case Failure(_: RecoverableModifierError) =>
           false
         case Failure(e) =>
-          system.actorSelection("user/loggingActor") !
-            LogMessage("Warn", s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
+          if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+            LogMessage("Warn", s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e", System.currentTimeMillis())
           remove(k, rememberKey = true)
           false
         case Success(_) =>
@@ -162,8 +162,8 @@ case class EncryModifiersCache(override val maxSize: Int)
     def tryToApply(k: K, v: EncryPersistentModifier): Boolean = {
       history.testApplicable(v) match {
         case Failure(e: MalformedModifierError) =>
-          system.actorSelection("user/loggingActor") !
-            LogMessage("Warn", s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
+          if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+            LogMessage("Warn", s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e", System.currentTimeMillis())
           remove(k, rememberKey = true)
           false
         case m => m.isSuccess

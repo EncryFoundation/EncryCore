@@ -80,7 +80,8 @@ object EncryApp extends App {
       ExceptionHandler {
         case e: Exception =>
           extractUri { uri =>
-            system.actorSelection("user/loggingActor") ! LogMessage("Error",s"Request to $uri could not be handled normally due to: $e")
+            if (settings.logging.enableLogging) system.actorSelection("user/loggingActor") !
+              LogMessage("Error", s"Request to $uri could not be handled normally due to: $e", System.currentTimeMillis())
             complete(HttpResponse(InternalServerError, entity = "Internal server error"))
           }
       }
