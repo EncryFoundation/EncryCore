@@ -12,7 +12,7 @@ import cats.implicits._
 import doobie.Fragments.{in, whereAndOpt}
 import doobie.postgres.implicits._
 import doobie.implicits._
-import doobie.util.log.LogHandler
+import doobie.util.log.{ExecFailure, LogHandler, ProcessingFailure, Success}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, Transaction, TransactionDBVersion}
 import encry.utils.Logging
@@ -81,8 +81,6 @@ protected[database] object QueryRepository extends Logging {
       ++ whereAndOpt(NonEmptyList.fromList(ids.toList).map(nel => in(fr"tx_id", nel)))).query[DirectiveDBVersion].to[List]
   }
 
-  private implicit val han: LogHandler = LogHandler.jdkLogHandler
-
   private def insertTransactionsQuery(block: EncryBlock): ConnectionIO[Int] = {
     val txs: Seq[TransactionDBVersion] = TransactionDBVersion(block)
     val query =
@@ -123,5 +121,34 @@ protected[database] object QueryRepository extends Logging {
         |VALUES (?, ?, ?, ?, ?, ?, ?, ?);
         |""".stripMargin
     Update[DirectiveDBVersion](query).updateMany(directives.toList)
+  }
+
+  private implicit val logHandler: LogHandler = LogHandler {
+    case Success(s, a, e1, e2) =>
+      log.info(s"""Successful Statement Execution:
+                  |
+            |  ${s.lines.dropWhile(_.trim.isEmpty).mkString("\n  ")}
+                  |
+            | arguments = [${a.mkString(", ")}]
+                  |   elapsed = ${e1.toMillis} ms exec + ${e2.toMillis} ms processing (${(e1 + e2).toMillis} ms total)
+          """.stripMargin)
+    case ProcessingFailure(s, a, e1, e2, t) =>
+      log.warn(s"""Failed Resultset Processing:
+                  |
+            |  ${s.lines.dropWhile(_.trim.isEmpty).mkString("\n  ")}
+                  |
+            | arguments = [${a.mkString(", ")}]
+                  |   elapsed = ${e1.toMillis} ms exec + ${e2.toMillis} ms processing (failed) (${(e1 + e2).toMillis} ms total)
+                  |   failure = ${t.getMessage}
+          """.stripMargin)
+    case ExecFailure(s, a, e1, t) =>
+      log.warn(s"""Failed Statement Execution:
+                  |
+            |  ${s.lines.dropWhile(_.trim.isEmpty).mkString("\n  ")}
+                  |
+            | arguments = [${a.mkString(", ")}]
+                  |   elapsed = ${e1.toMillis} ms exec (failed)
+                  |   failure = ${t.getMessage}
+          """.stripMargin)
   }
 }
