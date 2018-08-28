@@ -2,6 +2,7 @@ package encry.stats
 
 import java.io.File
 import java.util
+import java.text.SimpleDateFormat
 import akka.actor.Actor
 import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
@@ -9,6 +10,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.stats.StatsSender._
 import encry.view.history
 import encry.{ModifierId, ModifierTypeId}
+import encry.stats.LoggingActor.LogMessage
 import org.encryfoundation.common.Algos
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 import scala.collection.mutable
@@ -18,6 +20,9 @@ class StatsSender extends Actor {
 
   var modifiersToDownload: Map[String, (ModifierTypeId, Long)] = Map()//todo delete after completed task about stat
 
+  val influxDB: InfluxDB =
+    InfluxDBFactory.connect(settings.influxDB.url, settings.influxDB.login, settings.influxDB.password)
+
   influxDB.setRetentionPolicy("autogen")
 
   val modifiersToApply: mutable.Map[String, (ModifierTypeId, Long)] = mutable.Map[String, (ModifierTypeId, Long)]()
@@ -25,7 +30,19 @@ class StatsSender extends Actor {
   override def preStart(): Unit =
     influxDB.write(8189, s"""nodesStartTime value="${settings.network.nodeName}"""")
 
+  val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+
   override def receive: Receive = {
+    case LogMessage(logLevel, logMessage, logsTime) => influxDB.write(8089,
+      s"""logsFromNode,nodeName=${settings.network.nodeName},logLevel=${
+        logLevel match {
+          case "Info" => 1
+          case "Debug" => 2
+          case "Warn" => 3
+          case "Error" => 4
+          case _ => 4
+        }
+      } value="[${sdf.format(logsTime)}], $logMessage"""")
     case BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int) =>
       influxDB.write(8189, s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache," +
         s"completedBlocksStat=$completedBlocks,notCompletedBlocksStat=$notCompletedBlocks")
@@ -100,9 +117,6 @@ class StatsSender extends Actor {
 }
 
 object StatsSender {
-
-  val influxDB: InfluxDB =
-    InfluxDBFactory.connect(settings.influxDB.url, settings.influxDB.login, settings.influxDB.password)
 
   case class CandidateProducingTime(time: Long)
 
