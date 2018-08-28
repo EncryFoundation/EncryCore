@@ -44,10 +44,8 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
   override def maxRollbackDepth: Int = Constants.Chain.MaxRollbackDepth
 
   private def onAdProofGenerated(proof: ADProofs): Unit = {
-    if (nodeViewHolderRef.isEmpty) {
-      warn(s"Got proof while nodeViewHolderRef is empty")
-      nodeViewHolderRef.foreach(_ ! LocallyGeneratedModifier(proof))
-    }
+    if (nodeViewHolderRef.isEmpty) warn(s"Got proof while nodeViewHolderRef is empty")
+    nodeViewHolderRef.foreach(_ ! LocallyGeneratedModifier(proof))
   }
 
   def applyBlockTransactions(blockTransactions: Seq[Transaction],
