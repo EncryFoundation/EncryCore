@@ -27,14 +27,14 @@ class StatsSender extends Actor with Logging {
   val modifiersToApply: mutable.Map[String, (ModifierTypeId, Long)] = mutable.Map[String, (ModifierTypeId, Long)]()
 
   override def preStart(): Unit =
-    influxDB.write(8189, s"""nodesStartTime value="${settings.network.nodeName}"""")
+    influxDB.write(settings.influxDB.udpPort, s"""nodesStartTime value="${settings.network.nodeName}"""")
 
   override def receive: Receive = {
     case BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int) =>
-      influxDB.write(8189, s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache," +
+      influxDB.write(settings.influxDB.udpPort, s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache," +
         s"completedBlocksStat=$completedBlocks,notCompletedBlocksStat=$notCompletedBlocks")
     case BestHeaderInChain(fb: EncryBlockHeader) =>
-      influxDB.write(8189, util.Arrays.asList(
+      influxDB.write(settings.influxDB.udpPort, util.Arrays.asList(
         s"difficulty,nodeName=${settings.network.nodeName} diff=${fb.difficulty.toString},height=${fb.height}",
         s"height,nodeName=${settings.network.nodeName},header=${Algos.encode(fb.id)} height=${fb.height}",
         s"stateWeight,nodeName=${settings.network.nodeName},height=${fb.height} " +
@@ -51,7 +51,7 @@ class StatsSender extends Actor with Logging {
         .time()
         .map { time =>
           influxDB.write(
-            8189,
+            settings.influxDB.udpPort,
             util.Arrays.asList(
               s"miningEnd,nodeName=${settings.network.nodeName},block=${Algos.encode(blockHeader.id)}," +
                 s"height=${blockHeader.height},worker=$workerIdx value=${time - blockHeader.timestamp}",
@@ -66,25 +66,25 @@ class StatsSender extends Actor with Logging {
 
     case EndOfApplyingModif(modifierId) =>
       modifiersToApply.get(Algos.encode(modifierId)).foreach { modInfo =>
-        influxDB.write(8189, s"modifApplying,nodeName=${settings.network.nodeName}," +
+        influxDB.write(settings.influxDB.udpPort, s"modifApplying,nodeName=${settings.network.nodeName}," +
           s"modType=${modInfo._1} value=${System.currentTimeMillis() - modInfo._2}")
         modifiersToApply -= Algos.encode(modifierId)
       }
 
     case TransactionGeneratorStat(txsQty: Int, generationTime: Long) =>
-      influxDB.write(8189, s"transactionGenerator,nodeName=${settings.network.nodeName} txsQty=$txsQty,generationTime=$generationTime")
+      influxDB.write(settings.influxDB.udpPort, s"transactionGenerator,nodeName=${settings.network.nodeName} txsQty=$txsQty,generationTime=$generationTime")
 
     case SleepTime(time: Long) =>
-      influxDB.write(8189, s"sleepTime,nodeName=${settings.network.nodeName} value=$time")
+      influxDB.write(settings.influxDB.udpPort, s"sleepTime,nodeName=${settings.network.nodeName} value=$time")
 
     case MiningTime(time: Long) =>
-      influxDB.write(8189, s"miningTime,nodeName=${settings.network.nodeName} value=$time")
+      influxDB.write(settings.influxDB.udpPort, s"miningTime,nodeName=${settings.network.nodeName} value=$time")
 
     case CandidateProducingTime(time: Long) =>
-      influxDB.write(8189, s"candidateProducing,nodeName=${settings.network.nodeName} value=$time")
+      influxDB.write(settings.influxDB.udpPort, s"candidateProducing,nodeName=${settings.network.nodeName} value=$time")
 
     case StateUpdating(time: Long) =>
-      influxDB.write(8189, s"stateUpdatingTime,nodeName=${settings.network.nodeName} value=$time")
+      influxDB.write(settings.influxDB.udpPort, s"stateUpdatingTime,nodeName=${settings.network.nodeName} value=$time")
 
     case SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
       modifiersToDownload = modifiersToDownload ++ modifiers.map(mod => (Algos.encode(mod), (modifierTypeId, System.currentTimeMillis())))
@@ -93,7 +93,7 @@ class StatsSender extends Actor with Logging {
       modifiers.foreach(downloadedModifierId =>
         modifiersToDownload.get(Algos.encode(downloadedModifierId)).foreach { dowloadInfo =>
           influxDB.write(
-            8189,
+            settings.influxDB.udpPort,
             s"modDownloadStat,nodeName=${settings.network.nodeName},modId=${Algos.encode(downloadedModifierId)}," +
               s"modType=${dowloadInfo._1} value=${System.currentTimeMillis() - dowloadInfo._2}"
           )
@@ -123,7 +123,9 @@ object StatsSender {
 
   case class GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
 
-  case class BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int)//Todo no use
+  case class BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int)
+
+  //Todo no use
 
   case class StateUpdating(time: Long)
 
