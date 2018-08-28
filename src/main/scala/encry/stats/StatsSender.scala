@@ -33,7 +33,7 @@ class StatsSender extends Actor {
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
   override def receive: Receive = {
-    case LogMessage(logLevel, logMessage, logsTime) => influxDB.write(8089,
+    case LogMessage(logLevel, logMessage, logsTime) => influxDB.write(settings.influxDB.udpPort,
       s"""logsFromNode,nodeName=${settings.network.nodeName},logLevel=${
         logLevel match {
           case "Info" => 1
