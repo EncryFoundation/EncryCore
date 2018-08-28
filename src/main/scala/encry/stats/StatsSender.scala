@@ -18,7 +18,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class StatsSender extends Actor {
 
-  var modifiersToDownload: Map[String, (ModifierTypeId, Long)] = Map()//todo delete after completed task about stat
+  var modifiersToDownload: Map[String, (ModifierTypeId, Long)] = Map()
 
   val influxDB: InfluxDB =
     InfluxDBFactory.connect(settings.influxDB.url, settings.influxDB.login, settings.influxDB.password)
@@ -33,7 +33,7 @@ class StatsSender extends Actor {
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
   override def receive: Receive = {
-    case LogMessage(logLevel, logMessage, logsTime) => influxDB.write(settings.influxDB.udpPort,
+    case LogMessage(logLevel, logMessage, logTime) => influxDB.write(settings.influxDB.udpPort,
       s"""logsFromNode,nodeName=${settings.network.nodeName},logLevel=${
         logLevel match {
           case "Info" => 1
@@ -42,7 +42,7 @@ class StatsSender extends Actor {
           case "Error" => 4
           case _ => 4
         }
-      } value="[${sdf.format(logsTime)}], $logMessage"""")
+      } value="[${sdf.format(logTime)}], $logMessage"""")
     case BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int) =>
       influxDB.write(settings.influxDB.udpPort, s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache," +
         s"completedBlocksStat=$completedBlocks,notCompletedBlocksStat=$notCompletedBlocks")
@@ -138,9 +138,8 @@ object StatsSender {
 
   case class BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int)
 
-  //Todo no use
-
   case class StateUpdating(time: Long)
 
   case class TransactionGeneratorStat(txsQty: Int, generationTime: Long)
+
 }
