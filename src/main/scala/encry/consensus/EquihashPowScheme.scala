@@ -7,6 +7,7 @@ import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.block.Block.Version
 import encry.modifiers.mempool.Transaction
 import encry.settings.Constants
 import org.bouncycastle.crypto.digests.Blake2bDigest
@@ -86,11 +87,11 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
   override def getDerivedHeaderFields(parentOpt: Option[EncryBlockHeader],
                                       adProofBytes: SerializedAdProof,
                                       transactions: Seq[Transaction]): (Byte, ModifierId, Digest32, Digest32, Int) = {
-    val version = Constants.Chain.Version
+    val version: Version = Constants.Chain.Version
     val parentId: ModifierId = parentOpt.map(_.id).getOrElse(EncryBlockHeader.GenesisParentId)
-    val adProofsRoot = ADProofs.proofDigest(adProofBytes)
-    val txsRoot = EncryBlockPayload.rootHash(transactions.map(_.id))
-    val height = parentOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1
+    val adProofsRoot: Digest32 = ADProofs.proofDigest(adProofBytes)
+    val txsRoot: Digest32 = EncryBlockPayload.rootHash(transactions.map(_.id))
+    val height: Int = parentOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1
 
     (version, parentId, adProofsRoot, txsRoot, height)
   }

@@ -78,8 +78,7 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           info(s"Extension ids: ${encry.idsToString(ext)}")
           info(s"Get sync message from ${remote.socketAddress} with headers: " +
             s"${syncInfo.lastHeaderIds.map(Algos.encode).mkString(",")}")
-          if (!(extensionOpt.nonEmpty || comparison != Younger))
-            warn("Extension is empty while comparison is younger")
+          if (!(extensionOpt.nonEmpty || comparison != Younger)) warn("Extension is empty while comparison is younger")
           deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
       }
