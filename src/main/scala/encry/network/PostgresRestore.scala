@@ -13,7 +13,6 @@ import encry.modifiers.mempool.{InputDBVersion, Transaction, TransactionDBVersio
 import encry.view.EncryNodeViewHolder.ReceivableMessages.BlocksFromLocalPersistence
 import org.encryfoundation.common.transaction.ProofSerializer
 import scorex.crypto.encode.Base16
-import scala.collection.immutable
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
@@ -27,6 +26,7 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
     case Failure(_) =>
       peerManager ! RecoveryCompleted
       nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true)
+      context.stop(self)
   }
 
   override def receive: Receive = {
@@ -36,8 +36,7 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
   def startRecovery(): Future[Unit] = heightFuture.flatMap { height =>
     settings.postgres.restoreBatchSize match {
       case Some(step) =>
-        val slides: Iterator[immutable.IndexedSeq[Int]] = (0 to height).sliding(step, step)
-        slides.foldLeft(Future.successful(List[EncryBlock]())) { case (prevBlocks, slide) =>
+        (0 to height).sliding(step, step).foldLeft(Future.successful(List[EncryBlock]())) { case (prevBlocks, slide) =>
           val from: Int = slide.head
           val to: Int = slide.last
           prevBlocks.flatMap { retrievedBlocks =>
@@ -48,7 +47,6 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
           log.info(s"All blocks restored from postgres")
           peerManager ! RecoveryCompleted
           context.stop(self)
-          Unit
         }
       case None => Future.unit
     }

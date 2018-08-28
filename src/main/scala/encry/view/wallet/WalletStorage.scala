@@ -19,7 +19,7 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
     .flatMap(d => StateModifierDeserializer.parseBytes(d.data, id.head).toOption)
 
   def allBoxes: Seq[EncryBaseBox] = store.getAll
-    .filter(_._2 != balancesKey)
+    .filter(_._2 == balancesKey)
     .foldLeft(Seq[EncryBaseBox]()) { case (acc, id) =>
       getBoxById(ADKey @@ id._1.data).map(bx => acc :+ bx).getOrElse(acc)
     }

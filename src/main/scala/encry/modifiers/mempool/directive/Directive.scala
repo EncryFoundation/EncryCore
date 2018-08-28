@@ -11,7 +11,7 @@ import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
 
-trait  Directive extends BytesSerializable {
+trait Directive extends BytesSerializable {
 
   val typeId: DTypeId
   val isValid: Boolean
@@ -55,7 +55,7 @@ case class DirectiveDBVersion(txId: String,
                               address: String,
                               tokenIdOpt: Option[String],
                               data: String) extends Logging {
-  def toDirective: Option[Directive] = {
+  def toDirective: Option[Directive] =
     dTypeId match {
       case AssetIssuingDirective.TypeId => Base16.decode(contractHash).map(AssetIssuingDirective(_, amount)).toOption
       case TransferDirective.TypeId => tokenIdOpt match {
@@ -76,5 +76,4 @@ case class DirectiveDBVersion(txId: String,
         log.warn(s"Malformed directive from DB: $this")
         None
     }
-  }
 }

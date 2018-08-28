@@ -139,7 +139,6 @@ object TransactionSerializer extends Serializer[Transaction] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[Transaction] = Try {
-
     val fee: Amount = Longs.fromByteArray(bytes.take(8))
     val timestamp: Amount = Longs.fromByteArray(bytes.slice(8, 16))
     val unlockersQty: Int = Shorts.fromByteArray(bytes.slice(16, 18))
