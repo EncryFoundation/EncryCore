@@ -21,7 +21,7 @@ import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.PConvertible
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
-import scala.util.Try
+import scala.util.{Success, Try}
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.validation.{ModifierValidator, ValidationResult}
@@ -200,15 +200,16 @@ object UnsignedTransaction {
 }
 
 
-case class TransactionDBVersion(id: String, fee: Long, blockId: String, isCoinbase: Boolean, timestamp: Timestamp)
+case class TransactionDBVersion(id: String, fee: Long, blockId: String, isCoinbase: Boolean, timestamp: Timestamp, proof: Option[String])
 
 case object TransactionDBVersion {
   def apply(block: EncryBlock): Seq[TransactionDBVersion] = {
     if (block.payload.transactions.nonEmpty) {
       val transactions: Seq[TransactionDBVersion] = block.payload.transactions.map { tx =>
         val id: String = Base16.encode(tx.id)
+        val proof: Option[String] = tx.defaultProofOpt.map(p => Base16.encode(p.bytes))
         val blockId: String = Base16.encode(block.header.id)
-        TransactionDBVersion(id, tx.fee, blockId, isCoinbase = false, block.header.timestamp)
+        TransactionDBVersion(id, tx.fee, blockId, isCoinbase = false, block.header.timestamp, proof)
       }.toIndexedSeq
       transactions.init :+ transactions.last.copy(isCoinbase = true)
     } else Seq.empty
@@ -227,7 +228,8 @@ case class InputDBVersion(id: String, txId: String, contractByteVersion: String,
         .recoverWith {
           case _ => CompiledContractSerializer.parseBytes(decodedContractBytes).map(_.asLeft)
         }
-      decodedBase16Proofs  <- proofs.split(",").toList.traverse(Base16.decode)
+      decodedBase16Proofs  <- if (proofs.length != 0) proofs.split(",").toList.traverse(Base16.decode)
+                              else Success(List.empty)
       decodedProofs        <- decodedBase16Proofs.traverse(ProofSerializer.parseBytes)
     } yield {
       Input(ADKey @@ decodedId, decodedContract, decodedProofs)

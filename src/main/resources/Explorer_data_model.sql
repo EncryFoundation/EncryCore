@@ -25,7 +25,8 @@ CREATE TABLE transactions(
   fee BIGINT NOT NULL,
   block_id VARCHAR(64) REFERENCES headers (id),
   is_coinbase BOOLEAN NOT NULL,
-  ts BIGINT NOT NULL
+  ts BIGINT NOT NULL,
+  proof TEXT
 );
 
 CREATE TABLE outputs(

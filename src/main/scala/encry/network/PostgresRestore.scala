@@ -11,6 +11,7 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, Transaction, TransactionDBVersion}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.BlocksFromLocalPersistence
+import org.encryfoundation.common.transaction.ProofSerializer
 import scorex.crypto.encode.Base16
 import scala.collection.immutable
 import scala.concurrent.Future
@@ -23,7 +24,9 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
 
   heightFuture.onComplete {
     case Success(_) =>
-    case Failure(_) => peerManager ! RecoveryCompleted
+    case Failure(_) =>
+      peerManager ! RecoveryCompleted
+      nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true)
   }
 
   override def receive: Receive = {
@@ -33,20 +36,21 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
   def startRecovery(): Future[Unit] = heightFuture.flatMap { height =>
     settings.postgres.restoreBatchSize match {
       case Some(step) =>
-        val slides: Iterator[immutable.IndexedSeq[Int]] = (0 to height).sliding(step)
+        val slides: Iterator[immutable.IndexedSeq[Int]] = (0 to height).sliding(step, step)
         slides.foldLeft(Future.successful(List[EncryBlock]())) { case (prevBlocks, slide) =>
           val from: Int = slide.head
           val to: Int = slide.last
           prevBlocks.flatMap { retrievedBlocks =>
-            nodeViewHolder ! BlocksFromLocalPersistence(retrievedBlocks)
+            nodeViewHolder ! BlocksFromLocalPersistence(retrievedBlocks, to == height)
             selectBlocksByRange(from, to)
           }
         }.map { _ =>
+          log.info(s"All blocks restored from postgres")
           peerManager ! RecoveryCompleted
           context.stop(self)
           Unit
         }
-      case None => Future.successful(Unit)
+      case None => Future.unit
     }
   }
 
@@ -70,7 +74,8 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
             tx.timestamp,
             groupedInputs.getOrElse(tx.id, IndexedSeq.empty).flatMap(_.toInput.toOption).toIndexedSeq,
             groupedDirectives.getOrElse(tx.id, List.empty).flatMap(_.toDirective).toIndexedSeq,
-            None)
+            tx.proof.flatMap(Base16.decode(_).toOption).flatMap(ProofSerializer.parseBytes(_).toOption)
+          )
         }
       }
       headers.map { header =>

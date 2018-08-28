@@ -66,7 +66,7 @@ protected[database] object QueryRepository extends Logging {
   }
 
   def txsByRangeQuery(from: Int, to: Int): ConnectionIO[List[TransactionDBVersion]] = {
-    sql"""SELECT id, fee, block_id, is_coinbase, ts FROM public.transactions
+    sql"""SELECT id, fee, block_id, is_coinbase, ts, proof FROM public.transactions
          |WHERE block_id in (SELECT id FROM public.headers WHERE height >= $from AND height <= $to);
        """.stripMargin.query[TransactionDBVersion].to[List]
   }
@@ -87,8 +87,8 @@ protected[database] object QueryRepository extends Logging {
     val txs: Seq[TransactionDBVersion] = TransactionDBVersion(block)
     val query =
       """
-        |INSERT INTO public.transactions (id, fee, block_id, is_coinbase, ts)
-        |VALUES (?, ?, ?, ?, ?);
+        |INSERT INTO public.transactions (id, fee, block_id, is_coinbase, ts, proof)
+        |VALUES (?, ?, ?, ?, ?, ?);
         |""".stripMargin
     Update[TransactionDBVersion](query).updateMany(txs.toList)
   }
