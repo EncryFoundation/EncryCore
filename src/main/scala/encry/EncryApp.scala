@@ -6,7 +6,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.stream.ActorMaterializer
-import encry.api.http.routes.{HistoryApiRoute, InfoApiRoute, StateInfoApiRoute, TransactionsApiRoute}
+import encry.api.http.routes._
 import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
@@ -90,7 +90,8 @@ object EncryApp extends App with Logging {
       InfoApiRoute(readersHolder, miner, peerManager, settings, nodeId, timeProvider),
       HistoryApiRoute(readersHolder, miner, settings, nodeId, settings.node.stateMode),
       TransactionsApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
-      StateInfoApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode)
+      StateInfoApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
+      WalletInfoApiRoute(nodeViewHolder, settings.restApi)
     )
     val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
     Http().bindAndHandle(combinedRoute, settings.restApi.bindAddress.getAddress.getHostAddress, settings.restApi.bindAddress.getPort)
