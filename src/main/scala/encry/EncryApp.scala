@@ -71,7 +71,7 @@ object EncryApp extends App with Logging {
     system.actorOf(Props[TransactionGenerator].withDispatcher("transaction-generator-dispatcher"), "tx-generator")
   if (settings.node.enableCLI) cliListener ! StartListening
   system.actorOf(Props[Zombie], "zombie")
-  if (settings.logging.loggingMode != "off") system.actorOf(Props[LoggingActor], "loggingActor")
+  if (settings.node.loggingMode != "off") system.actorOf(Props[LoggingActor], "loggingActor")
 
   if (settings.restApi.enabled) {
     import akka.http.scaladsl.model.StatusCodes._

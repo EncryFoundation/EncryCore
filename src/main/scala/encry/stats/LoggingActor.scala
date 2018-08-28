@@ -10,11 +10,11 @@ class LoggingActor extends Actor with StrictLogging {
 
   override def receive: Receive = {
     case LogMessage(logLevel, logMessage, logsTime) =>
-      if (settings.logging.loggingMode == "influx" && settings.node.sendStat)
+      if (settings.node.loggingMode == "influx" && settings.node.sendStat)
         context.system.actorSelection("user/statsSender") ! LogMessage(logLevel, logMessage, logsTime)
-      else if (settings.logging.loggingMode == "kafka" && settings.kafka.sendToKafka)
+      else if (settings.node.loggingMode == "kafka" && settings.kafka.sendToKafka)
         context.system.actorSelection("/user/kafkaActor") ! KafkaMessage(logLevel, logMessage)
-      else if (settings.logging.loggingMode == "file")
+      else if (settings.node.loggingMode == "file")
         logLevel match {
           case "Info" => logger.info(logMessage)
           case "Warn" => logger.warn(logMessage)

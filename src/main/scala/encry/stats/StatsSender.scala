@@ -42,7 +42,7 @@ class StatsSender extends Actor {
           case "Error" => 4
           case _ => 4
         }
-      } value="[${sdf.format(logTime)}], $logMessage"""")
+      } value="[${sdf.format(logTime)}] $logMessage"""")
     case BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int) =>
       influxDB.write(settings.influxDB.udpPort, s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache," +
         s"completedBlocksStat=$completedBlocks,notCompletedBlocksStat=$notCompletedBlocks")
