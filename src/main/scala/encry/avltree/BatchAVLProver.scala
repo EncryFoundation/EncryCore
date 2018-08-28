@@ -232,7 +232,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
       def myRequire(t: Boolean, s: String): Unit = if (!t) {
         var x: Int = rNode.key(0).toInt
         if (x < 0) x = x + 256
-        error("Tree failed at key = " + x + ": " + s)
+        logError("Tree failed at key = " + x + ": " + s)
         fail = true
       }
 

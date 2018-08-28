@@ -16,7 +16,7 @@ class HistoryStorage(override val store: Store, val objectsStore: Store) extends
       HistoryModifierSerializer.parseBytes(res.data) match {
         case Success(b) => Some(b)
         case Failure(e) =>
-          warn(s"Failed to parse block from db: $e")
+          logWarn(s"Failed to parse block from db: $e")
           None
       }
     }

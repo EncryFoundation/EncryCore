@@ -26,7 +26,7 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
     val topHeight: Int = Ints.fromByteArray(store.get(TopNodeHeight).get.data)
     top -> topHeight
   }.recoverWith { case e =>
-    info(s"Failed to recover tree for digest ${Algos.encode(version)}: $e")
+    logInfo(s"Failed to recover tree for digest ${Algos.encode(version)}: $e")
     Failure(e)
   }
 
@@ -45,11 +45,11 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
     val toUpdateWrapped: Seq[(Store.K, Store.K)] = additionalData.map { case (k, v) => ByteArrayWrapper(k) -> ByteArrayWrapper(v) }
     val toUpdateWithWrapped: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = toUpdate ++ toUpdateWrapped
     val toRemoveMerged: List[ByteArrayWrapper] = toRemove.filterNot(toUpdate.map(_._1).intersect(toRemove).contains)
-    info(s"Update storage to version $digestWrapper: ${toUpdateWithWrapped.size} elements to insert," +
+    logInfo(s"Update storage to version $digestWrapper: ${toUpdateWithWrapped.size} elements to insert," +
       s" ${toRemove.size} elements to remove")
     store.update(digestWrapper, toRemoveMerged, toUpdateWithWrapped)
   }.recoverWith { case e =>
-    info(s"Failed to update tree: $e")
+    logInfo(s"Failed to update tree: $e")
     Failure(e)
   }
 

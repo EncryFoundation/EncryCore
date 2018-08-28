@@ -39,7 +39,7 @@ trait EncryHistory extends EncryHistoryReader with Logging {
 
   /** Appends modifier to the history if it is applicable. */
   def append(modifier: EncryPersistentModifier): Try[(EncryHistory, History.ProgressInfo[EncryPersistentModifier])] = {
-    info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
+    logInfo(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Try {
       modifier match {
         case header: EncryBlockHeader => (this, process(header))
@@ -50,7 +50,7 @@ trait EncryHistory extends EncryHistoryReader with Logging {
   }
 
   def reportModifierIsValid(modifier: EncryPersistentModifier): EncryHistory = {
-    info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as valid ")
+    logInfo(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as valid ")
     markModifierValid(modifier)
     this
   }
@@ -58,7 +58,7 @@ trait EncryHistory extends EncryHistoryReader with Logging {
   /** Report some modifier as valid or invalid semantically */
   def reportModifierIsInvalid(modifier: EncryPersistentModifier, progressInfo: ProgressInfo[EncryPersistentModifier]):
   (EncryHistory, ProgressInfo[EncryPersistentModifier]) = {
-    info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
+    logInfo(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
     this -> markModifierInvalid(modifier)
   }
 
@@ -84,7 +84,7 @@ trait EncryHistory extends EncryHistoryReader with Logging {
         val validityRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = invalidatedHeaders
           .flatMap(h => Seq(h.id, h.payloadId, h.adProofsId)
             .map(id => validityKey(id) -> ByteArrayWrapper(Array(0.toByte))))
-        info(s"Going to invalidate ${invalidatedHeader.encodedId} and ${invalidatedHeaders.map(_.encodedId)}")
+        logInfo(s"Going to invalidate ${invalidatedHeader.encodedId} and ${invalidatedHeaders.map(_.encodedId)}")
         val bestHeaderIsInvalidated: Boolean = bestHeaderIdOpt.exists(id => invalidatedHeaders.exists(_.id sameElements id))
         val bestFullIsInvalidated: Boolean = bestBlockIdOpt.exists(id => invalidatedHeaders.exists(_.id sameElements id))
         (bestHeaderIsInvalidated, bestFullIsInvalidated) match {

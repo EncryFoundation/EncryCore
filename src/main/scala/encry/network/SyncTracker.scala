@@ -35,7 +35,7 @@ case class SyncTracker(deliveryManager: ActorRef,
     statuses = statuses.updated(peer, status)
     val seniorsAfter: Int = numOfSeniors()
     if (seniorsBefore > 0 && seniorsAfter == 0) {
-      info("Syncing is done, switching to stable regime")
+      logInfo("Syncing is done, switching to stable regime")
       scheduleSendSyncInfo()
     }
   }
@@ -43,11 +43,11 @@ case class SyncTracker(deliveryManager: ActorRef,
   def clearStatus(remote: InetSocketAddress): Unit = {
     statuses.keys.find(_.socketAddress == remote) match {
       case Some(peer) => statuses -= peer
-      case None => warn(s"Trying to clear status for $remote, but it is not found")
+      case None => logWarn(s"Trying to clear status for $remote, but it is not found")
     }
     lastSyncSentTime.keys.find(_.socketAddress.getAddress == remote.getAddress) match {
       case Some(peer) => lastSyncSentTime -= peer
-      case None => warn(s"Trying to clear last sync time for $remote, but it is not found")
+      case None => logWarn(s"Trying to clear last sync time for $remote, but it is not found")
     }
   }
 
@@ -78,7 +78,7 @@ case class SyncTracker(deliveryManager: ActorRef,
     else nonOutdated.filter(p => (System.currentTimeMillis() - lastSyncSentTime.getOrElse(p, 0L))
       .millis >= networkSettings.syncInterval)
     peers.foreach(updateLastSyncSentTime)
-    debug(s"Trying to get nodes to sync and they are: ${peers.map(_.socketAddress).mkString(",")} and " +
+    logDebug(s"Trying to get nodes to sync and they are: ${peers.map(_.socketAddress).mkString(",")} and " +
       s"handler are: ${peers.map(_.handlerRef).mkString(",")}")
     peers
   }

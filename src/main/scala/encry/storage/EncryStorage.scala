@@ -43,7 +43,7 @@ trait EncryStorage extends AutoCloseable with Logging {
     }
 
   override def close(): Unit = {
-    info("Closing storage")
+    logInfo("Closing storage")
     store.close()
   }
 }

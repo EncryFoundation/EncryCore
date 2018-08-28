@@ -136,7 +136,7 @@ class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryR
         case Failure(_: RecoverableModifierError) =>
           false
         case Failure(e) =>
-          warn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
+          logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
           remove(k, rememberKey = true)
           false
         case Success(_) =>
@@ -160,7 +160,7 @@ case class EncryModifiersCache(override val maxSize: Int)
     def tryToApply(k: K, v: EncryPersistentModifier): Boolean = {
       history.testApplicable(v) match {
         case Failure(e: MalformedModifierError) =>
-          warn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
+          logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
           remove(k, rememberKey = true)
           false
         case m => m.isSuccess

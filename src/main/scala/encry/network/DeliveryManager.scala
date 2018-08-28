@@ -54,7 +54,7 @@ class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor
   def syncSending: Receive = {
     case SendLocalSyncInfo =>
       if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2)
-        info("Trying to send sync info too often")
+        logInfo("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case StopSync => context.become(netMessages)
   }
@@ -63,7 +63,7 @@ class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       statusTracker.updateStatus(remote, status)
       status match {
-        case Unknown => info("Peer status is still unknown")
+        case Unknown => logInfo("Peer status is still unknown")
         case Younger => sendExtension(remote, status, extOpt)
         case _ =>
       }
@@ -91,10 +91,10 @@ class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor
         modifiers partition { case (id, _) => isSpam(id) }
       if (settings.node.sendStat)
         context.actorSelection("/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
-      info(s"Got modifiers (${modifiers.size}) of type $typeId from remote connected peer: $remote")
+      logInfo(s"Got modifiers (${modifiers.size}) of type $typeId from remote connected peer: $remote")
       for ((id, _) <- modifiers) receive(typeId, id, remote)
       if (spam.nonEmpty) {
-        info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
+        logInfo(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
           s": ${spam.keys.map(Algos.encode)}")
         deleteSpam(spam.keys.toSeq)
       }
@@ -110,7 +110,7 @@ class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor
     case DisableMining => isMining = false
     case SendLocalSyncInfo =>
       if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2)
-        info("Trying to send sync info too often")
+        logInfo("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       historyReaderOpt = Some(reader)
@@ -138,7 +138,7 @@ class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor
           } else notRequested
       }
       if (notRequestedIds.nonEmpty) {
-        debug(s"Ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mtid with ids: " +
+        logDebug(s"Ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mtid with ids: " +
           s"${notRequestedIds.map(id => Algos.encode(id) + "|" + id).mkString(",")}")
         cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
       }
@@ -156,7 +156,7 @@ class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor
       if (peerInfo._2._2 < settings.network.maxDeliveryChecks && statusTracker.statuses.exists(peer =>
         peer._1.socketAddress == cp.socketAddress)) {
         statusTracker.statuses.find(peer => peer._1.socketAddress == cp.socketAddress).foreach { peer =>
-          debug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mtid with id: " +
+          logDebug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mtid with id: " +
             s"${Algos.encode(mid)}")
           peer._1.handlerRef ! Message(requestModifierSpec, Right(mtid -> Seq(mid)), None)
           val cancellable: Cancellable = context.system.scheduler
@@ -189,14 +189,14 @@ class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor
 
   def sendExtension(remote: ConnectedPeer, status: HistoryComparisonResult,
                     extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit = extOpt match {
-    case None => info(s"extOpt is empty for: $remote. Its status is: $status.")
+    case None => logInfo(s"extOpt is empty for: $remote. Its status is: $status.")
     case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
       case (mid, mods) => networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
     }
   }
 
   def tryWithLogging(fn: => Unit): Unit = Try(fn).recoverWith {
-    case e => info(s"Unexpected error: $e")
+    case e => logInfo(s"Unexpected error: $e")
       Failure(e)
   }
 

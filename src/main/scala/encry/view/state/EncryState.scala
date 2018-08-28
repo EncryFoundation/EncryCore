@@ -62,9 +62,9 @@ object EncryState extends Logging {
   def generateGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
     val supplyBoxes: List[EncryBaseBox] = EncryState.initialStateBoxes.toList
     UtxoState.genesis(supplyBoxes, stateDir, nodeViewHolderRef).ensuring(us => {
-      info(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
-      info(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
-      info(s"Generated UTXO state with ${supplyBoxes.size} boxes inside.")
+      logInfo(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
+      logInfo(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
+      logInfo(s"Generated UTXO state with ${supplyBoxes.size} boxes inside.")
       us.rootHash.sameElements(afterGenesisStateDigest) && us.version.sameElements(genesisStateVersion)
     })
   }

@@ -37,11 +37,11 @@ class PeerManager extends Actor with Logging {
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
     case DoConnecting(remote, direction) =>
       if (connectingPeers.contains(remote) && direction != Incoming) {
-        info(s"Trying to connect twice to $remote, going to drop the duplicate connection")
+        logInfo(s"Trying to connect twice to $remote, going to drop the duplicate connection")
         sender() ! CloseConnection
       }
       else if (direction != Incoming) {
-        info(s"Connecting to $remote")
+        logInfo(s"Connecting to $remote")
         connectingPeers += remote
       }
       sender() ! StartInteraction
@@ -69,7 +69,7 @@ class PeerManager extends Actor with Logging {
           !connectingPeers.exists(_.getHostName == address.getHostName) && checkPossibilityToAddPeerWRecovery(address))
           .foreach { address => sender() ! ConnectTo(address) }
     case RecoveryCompleted =>
-      info("Received RecoveryCompleted")
+      logInfo("Received RecoveryCompleted")
       recoveryCompleted = true
       addKnownPeersToPeersDatabase()
   }

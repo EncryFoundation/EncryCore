@@ -144,7 +144,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
         s"updates block ${prevBest.map(_.encodedId).getOrElse("None")} " +
         s"with height ${prevBest.map(_.header.height).getOrElse(-1)}"
     }
-    info(s"Full block ${appliedBlock.encodedId} appended, " +
+    logInfo(s"Full block ${appliedBlock.encodedId} appended, " +
       s"going to apply ${toApply.length}$toRemoveStr modifiers.$newStatusStr")
   }
 

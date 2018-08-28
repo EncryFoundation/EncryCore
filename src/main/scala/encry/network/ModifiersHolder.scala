@@ -24,29 +24,29 @@ class ModifiersHolder extends PersistentActor with Logging {
   var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
 
   context.system.scheduler.schedule(10.second, 30.second) {
-    debug(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
+    logDebug(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
   }
 
   context.system.scheduler.scheduleOnce(5 seconds) {
     if (completedBlocks.nonEmpty) self ! SendBlocks
   }
 
-  override def preStart(): Unit = info(s"ModifiersHolder actor is started.")
+  override def preStart(): Unit = logInfo(s"ModifiersHolder actor is started.")
 
   override def receiveRecover: Receive = if (settings.levelDb.recoverMode) receiveRecoverEnabled else receiveRecoverDisabled
 
   def receiveRecoverEnabled: Receive = {
     case header: EncryBlockHeader =>
       updateHeaders(header)
-      debug(s"Header ${header.height} is recovered from leveldb.")
+      logDebug(s"Header ${header.height} is recovered from leveldb.")
     case payload: EncryBlockPayload =>
       updatePayloads(payload)
-      debug(s"Payload ${Algos.encode(payload.headerId)} is recovered from leveldb.")
+      logDebug(s"Payload ${Algos.encode(payload.headerId)} is recovered from leveldb.")
     case block: EncryBlock =>
       updateCompletedBlocks(block)
-      debug(s"Block ${block.header.height} is recovered from leveldb.")
+      logDebug(s"Block ${block.header.height} is recovered from leveldb.")
     case RecoveryCompleted if completedBlocks.isEmpty =>
-      info("Recovery completed.")
+      logInfo("Recovery completed.")
       peerManager ! RecoveryCompleted
     case RecoveryCompleted =>
       context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
@@ -59,7 +59,7 @@ class ModifiersHolder extends PersistentActor with Logging {
   override def receiveCommand: Receive = {
     case CheckAllBlocksSent =>
       if (completedBlocks.isEmpty) {
-        info("Recovery completed.")
+        logInfo("Recovery completed.")
         peerManager ! RecoveryCompleted
       }
       else context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
@@ -70,7 +70,7 @@ class ModifiersHolder extends PersistentActor with Logging {
 
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
-    case x: Any => error(s"Strange input: $x.")
+    case x: Any => logError(s"Strange input: $x.")
   }
 
   def createBlockIfPossible(payloadId: ModifierId): Unit =
@@ -85,27 +85,27 @@ class ModifiersHolder extends PersistentActor with Logging {
     case header: EncryBlockHeader =>
       if (!headers.contains(Algos.encode(header.id)))
         persist(header) { header =>
-          debug(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully.")
+          logDebug(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully.")
         }
       updateHeaders(header)
-      debug(s"Get header ${Algos.encode(header.id)} on height ${header.height}")
+      logDebug(s"Get header ${Algos.encode(header.id)} on height ${header.height}")
     case payload: EncryBlockPayload =>
       if (!payloads.contains(Algos.encode(payload.id)))
         persist(payload) { payload =>
-          debug(s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully.")
+          logDebug(s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully.")
         }
       updatePayloads(payload)
-      debug(s"Get payload with id: ${Algos.encode(payload.id)} " +
+      logDebug(s"Get payload with id: ${Algos.encode(payload.id)} " +
         s"${
           nonCompletedBlocks.get(Algos.encode(payload.id)).map(headerId =>
             headers.get(headerId).map(header => s"for header $headerId height: ${header._1.height}"))}")
     case block: EncryBlock =>
       if (!completedBlocks.values.toSeq.contains(block))
         persist(block) { block =>
-          debug(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} is persisted successfully.")
+          logDebug(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} is persisted successfully.")
         }
       updateCompletedBlocks(block)
-    case x: Any => error(s"Strange input $x.")
+    case x: Any => logError(s"Strange input $x.")
   }
 
   def updateHeaders(header: EncryBlockHeader): Unit = {

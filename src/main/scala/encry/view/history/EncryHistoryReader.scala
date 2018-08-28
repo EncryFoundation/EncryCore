@@ -195,7 +195,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
       case None if contains(modifierId) => ModifierSemanticValidity.Unknown
       case None => ModifierSemanticValidity.Absent
       case m =>
-        error(s"Incorrect validity status: $m")
+        logError(s"Incorrect validity status: $m")
         ModifierSemanticValidity.Absent
     }
 }

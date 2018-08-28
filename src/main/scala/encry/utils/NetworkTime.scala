@@ -50,7 +50,7 @@ class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) extends Logg
         val state: Either[(NetworkTime, Future[NetworkTime]), NetworkTime] =
           if (time > nt.lastUpdate + ntpSettings.updateEvery.toMillis) {
             Left(nt -> Future(updateOffSet()).map { mbOffset =>
-              info("New offset adjusted: " + mbOffset)
+              logInfo("New offset adjusted: " + mbOffset)
               val offset = mbOffset.getOrElse(nt.offset)
               NetworkTime(offset, NetworkTime.localWithOffset(offset))
             })
@@ -61,7 +61,7 @@ class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) extends Logg
           .map(networkTime => NetworkTime.localWithOffset(networkTime.offset) -> Right(networkTime))
           .recover {
             case NonFatal(th) =>
-              warn(s"Failed to evaluate networkTimeFuture $th")
+              logWarn(s"Failed to evaluate networkTimeFuture $th")
               NetworkTime.localWithOffset(nt.offset) -> Left(nt -> networkTimeFuture)
           }
     }

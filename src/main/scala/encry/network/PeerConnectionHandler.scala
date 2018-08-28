@@ -41,19 +41,19 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   def processErrors(stateName: CommunicationState): Receive = {
     case CommandFailed(w: Write) =>
-      warn(s"Write failed :$w " + remote + s" in state $stateName")
+      logWarn(s"Write failed :$w " + remote + s" in state $stateName")
       connection ! Close
       connection ! ResumeReading
       connection ! ResumeWriting
     case cc: ConnectionClosed =>
-      info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
+      logInfo("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
       peerManager ! Disconnected(remote)
       context stop self
     case CloseConnection =>
-      info(s"Enforced to abort communication with: " + remote + s" in state $stateName")
+      logInfo(s"Enforced to abort communication with: " + remote + s" in state $stateName")
       connection ! Close
     case CommandFailed(cmd: Tcp.Command) =>
-      info("Failed to execute command : " + cmd + s" in state $stateName")
+      logInfo("Failed to execute command : " + cmd + s" in state $stateName")
       connection ! ResumeReading
   }
 
@@ -65,7 +65,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
           val hb: Array[Byte] = Handshake(Version(settings.network.appVersion), settings.network.nodeName,
             ownSocketAddress, time).bytes
           connection ! Tcp.Write(ByteString(hb))
-          info(s"Handshake sent to $remote")
+          logInfo(s"Handshake sent to $remote")
           handshakeSent = true
           if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
         }
@@ -75,19 +75,19 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
     case Received(data) =>
       HandshakeSerializer.parseBytes(data.toArray) match {
         case Success(handshake) =>
-          info(s"Got a Handshake from $remote")
+          logInfo(s"Got a Handshake from $remote")
           receivedHandshake = Some(handshake)
           connection ! ResumeReading
           if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
         case Failure(t) =>
-          info(s"Error during parsing a handshake: $t")
+          logInfo(s"Error during parsing a handshake: $t")
           self ! CloseConnection
       }
   }
 
   def handshakeTimeout: Receive = {
     case HandshakeTimeout =>
-      info(s"Handshake timeout with $remote, going to drop the connection")
+      logInfo(s"Handshake timeout with $remote, going to drop the connection")
       self ! CloseConnection
   }
 
@@ -105,7 +105,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   def workingCycleLocalInterface: Receive = {
     case msg: message.Message[_] =>
       def sendOutMessage(): Unit = {
-        info("Send message " + msg.spec + " to " + remote)
+        logInfo("Send message " + msg.spec + " to " + remote)
         connection ! Write(ByteString(Ints.toByteArray(msg.bytes.length) ++ msg.bytes))
       }
 
@@ -122,11 +122,11 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
       t._1.find { packet =>
         messagesHandler.parseBytes(packet.toByteBuffer, selfPeer) match {
           case Success(message) =>
-            info("Received message " + message.spec + " from " + remote)
+            logInfo("Received message " + message.spec + " from " + remote)
             networkController ! message
             false
           case Failure(e) =>
-            info(s"Corrupted data from: " + remote + s"$e")
+            logInfo(s"Corrupted data from: " + remote + s"$e")
             true
         }
       }
@@ -134,7 +134,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   }
 
   def reportStrangeInput: Receive = {
-    case nonsense: Any => warn(s"Strange input for PeerConnectionHandler: $nonsense")
+    case nonsense: Any => logWarn(s"Strange input for PeerConnectionHandler: $nonsense")
   }
 
   def workingCycle: Receive =
@@ -153,21 +153,21 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   def dead: Receive = {
 
-    case message => debug( s"Get smth strange: $message")
+    case message => logDebug( s"Get smth strange: $message")
   }
 
   def deadNotIn: Receive = {
 
-    case message => debug(s"Get smth node strange: $message")
+    case message => logDebug(s"Get smth node strange: $message")
   }
 
   override def postStop(): Unit = {
-    info(s"Peer handler $self to $remote is destroyed.")
+    logInfo(s"Peer handler $self to $remote is destroyed.")
     connection ! Close
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    info(s"Reason of restarting actor $self: ${reason.toString}.")
+    logInfo(s"Reason of restarting actor $self: ${reason.toString}.")
   }
 
   def getPacket(data: ByteString): (List[ByteString], ByteString) = {
