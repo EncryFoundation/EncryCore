@@ -1,13 +1,20 @@
 package encry.utils
 
-import com.typesafe.scalalogging.{Logger, StrictLogging}
-import encry.utils.ExtUtils._
+import encry.EncryApp.{settings, system}
+import encry.stats.LoggingActor.LogMessage
+import scala.util.Try
 
-trait Logging extends StrictLogging {
-  implicit val log: Logger = logger
-  def logInfo(s: String): String = s.logInfo
-  def logWarn(s: String): String = s.logWarn
-  def logError(s: String): String = s.logErr
-  def logWarn(message: String, cause: Throwable): Unit = log.warn(message, cause)
-  def logError(message: String, cause: Throwable): Unit = log.error(message, cause)
+trait Logging {
+
+  def logInfo(logMessage: String): Unit = if (settings.node.loggingMode != "off" && Try(system.name).isSuccess)
+    system.actorSelection("user/loggingActor") ! LogMessage("Info", logMessage, System.currentTimeMillis())
+
+  def logDebug(logMessage: String): Unit = if (settings.node.loggingMode != "off" && Try(system.name).isSuccess)
+    system.actorSelection("user/loggingActor") ! LogMessage("Debug", logMessage, System.currentTimeMillis())
+
+  def logWarn(logMessage: String): Unit = if (settings.node.loggingMode != "off" && Try(system.name).isSuccess)
+    system.actorSelection("user/loggingActor") ! LogMessage("Warn", logMessage, System.currentTimeMillis())
+
+  def logError(logMessage: String): Unit = if (settings.node.loggingMode != "off" && Try(system.name).isSuccess)
+    system.actorSelection("user/loggingActor") ! LogMessage("Error", logMessage, System.currentTimeMillis())
 }

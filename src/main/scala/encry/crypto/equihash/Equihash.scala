@@ -5,13 +5,10 @@ import java.math.BigInteger
 import encry.utils.LittleEndianBytes._
 import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests.Blake2bDigest
-import org.slf4j.{Logger, LoggerFactory}
-
 import scala.collection.mutable.ArrayBuffer
 
 object Equihash {
 
-  private val log: Logger = LoggerFactory.getLogger(getClass)
   private val wordSize: Int = 32
   private val byteSize: Int = 8
 

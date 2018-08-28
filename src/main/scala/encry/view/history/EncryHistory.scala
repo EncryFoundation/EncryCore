@@ -10,7 +10,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings._
-import encry.utils.NetworkTimeProvider
+import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
 import encry.view.history.storage.HistoryStorage
@@ -32,14 +32,14 @@ import scala.util.Try
   *   1. Be downloaded from other peers (verifyTransactions == true)
   *   2. Be ignored by history (verifyTransactions == false)
   */
-trait EncryHistory extends EncryHistoryReader {
+trait EncryHistory extends EncryHistoryReader with Logging {
 
   def isFullChainSynced: Boolean = bestHeaderOpt
     .exists(bestHeader => bestBlockOpt.exists(b => ByteArrayWrapper(b.header.id) == ByteArrayWrapper(bestHeader.id)))
 
   /** Appends modifier to the history if it is applicable. */
   def append(modifier: EncryPersistentModifier): Try[(EncryHistory, History.ProgressInfo[EncryPersistentModifier])] = {
-    log.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
+    logInfo(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Try {
       modifier match {
         case header: EncryBlockHeader => (this, process(header))
@@ -50,7 +50,7 @@ trait EncryHistory extends EncryHistoryReader {
   }
 
   def reportModifierIsValid(modifier: EncryPersistentModifier): EncryHistory = {
-    log.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as valid ")
+    logInfo(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as valid ")
     markModifierValid(modifier)
     this
   }
@@ -58,7 +58,7 @@ trait EncryHistory extends EncryHistoryReader {
   /** Report some modifier as valid or invalid semantically */
   def reportModifierIsInvalid(modifier: EncryPersistentModifier, progressInfo: ProgressInfo[EncryPersistentModifier]):
   (EncryHistory, ProgressInfo[EncryPersistentModifier]) = {
-    log.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
+    logInfo(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
     this -> markModifierInvalid(modifier)
   }
 
@@ -84,7 +84,7 @@ trait EncryHistory extends EncryHistoryReader {
         val validityRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = invalidatedHeaders
           .flatMap(h => Seq(h.id, h.payloadId, h.adProofsId)
             .map(id => validityKey(id) -> ByteArrayWrapper(Array(0.toByte))))
-        log.info(s"Going to invalidate ${invalidatedHeader.encodedId} and ${invalidatedHeaders.map(_.encodedId)}")
+        logInfo(s"Going to invalidate ${invalidatedHeader.encodedId} and ${invalidatedHeaders.map(_.encodedId)}")
         val bestHeaderIsInvalidated: Boolean = bestHeaderIdOpt.exists(id => invalidatedHeaders.exists(_.id sameElements id))
         val bestFullIsInvalidated: Boolean = bestBlockIdOpt.exists(id => invalidatedHeaders.exists(_.id sameElements id))
         (bestHeaderIsInvalidated, bestFullIsInvalidated) match {

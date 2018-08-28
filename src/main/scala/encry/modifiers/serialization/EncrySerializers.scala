@@ -5,7 +5,6 @@ import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPaylo
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{EncryTransaction, EncryTransactionSerializer}
 import akka.serialization.{Serializer => AkkaSerializer}
-import encry.utils.Logging
 import scala.util.{Failure, Success}
 
 case class EncryDeserializationException(th: Throwable) extends RuntimeException(th.getLocalizedMessage)
@@ -61,7 +60,7 @@ class EncryProofsSerializer extends AkkaSerializer {
     }
 }
 
-class EncryHeaderSerializer extends AkkaSerializer with Logging {
+class EncryHeaderSerializer extends AkkaSerializer {
   override def identifier: Int = 44
 
   override def toBinary(o: AnyRef): Array[Byte] = o match {

@@ -2,10 +2,11 @@ package encry.storage
 
 import encry.VersionTag
 import encry.storage.codec.FixLenComplexValueCodec
-import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.Algos
 import scala.util.{Failure, Success, Try}
+import encry.EncryApp.{settings, system}
+import encry.utils.Logging
 
 trait EncryStorage extends AutoCloseable with Logging {
 
@@ -13,7 +14,7 @@ trait EncryStorage extends AutoCloseable with Logging {
 
   def insert(version: ByteArrayWrapper,
              toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit =
-      store.update(version, Seq.empty, toInsert)
+    store.update(version, Seq.empty, toInsert)
 
   def remove(version: ByteArrayWrapper,
              toRemove: Seq[ByteArrayWrapper]): Unit =
@@ -42,7 +43,7 @@ trait EncryStorage extends AutoCloseable with Logging {
     }
 
   override def close(): Unit = {
-    log.info("Closing storage")
+    logInfo("Closing storage")
     store.close()
   }
 }

@@ -19,7 +19,7 @@ import encry.network.message._
 import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, ModifiersHolder, NetworkController}
 import encry.settings.EncryAppSettings
-import encry.stats.{KafkaActor, StatsSender}
+import encry.stats.{KafkaActor, LoggingActor, StatsSender}
 import encry.utils.{Logging, NetworkTimeProvider, Zombie}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
@@ -71,6 +71,7 @@ object EncryApp extends App with Logging {
     system.actorOf(Props[TransactionGenerator].withDispatcher("transaction-generator-dispatcher"), "tx-generator")
   if (settings.node.enableCLI) cliListener ! StartListening
   system.actorOf(Props[Zombie], "zombie")
+  if (settings.node.loggingMode != "off") system.actorOf(Props[LoggingActor], "loggingActor")
 
   if (settings.restApi.enabled) {
     import akka.http.scaladsl.model.StatusCodes._

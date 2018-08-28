@@ -59,7 +59,7 @@ case class AccountManager(store: Store) extends Logging {
   }
 
   private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, settings.wallet.password))
-    .fold(e => { logError("AccountManager: decryption failed", e.getCause); EncryApp.forceStopApplication(500) }, r => r)
+    .fold(e => { logError(s"AccountManager: decryption failed cause ${e.getCause}"); EncryApp.forceStopApplication(500) }, r => r)
 
   private def saveAccount(privateKey: PrivateKey, publicKey: PublicKey): Unit =
     store.update(

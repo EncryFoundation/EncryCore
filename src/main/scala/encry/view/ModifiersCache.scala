@@ -4,16 +4,17 @@ import java.lang
 import java.util.concurrent.ConcurrentHashMap
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.utils.Logging
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
 import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
+import encry.utils.Logging
 
 /**
   * A cache which is storing persistent modifiers not applied to history yet.
+  *
   * @tparam PMOD - type of a persistent node view modifier (or a family of modifiers).
   */
 trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
@@ -40,12 +41,14 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
 
   /**
     * Defines a best (and application-specific) candidate to be applied.
+    *
     * @param history - an interface to history which could be needed to define a candidate
     * @return - candidate if it is found
     */
   def findCandidateKey(history: H): Option[K]
 
   protected def onPut(key: K): Unit = {}
+
   protected def onRemove(key: K, rememberKey: Boolean): Unit = {}
 
   /**
@@ -57,7 +60,7 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
   def contains(key: K): Boolean = cache.contains(key) || rememberedKeys.contains(key)
 
   def put(key: K, value: V): Unit = {
-    if(!contains(key)) {
+    if (!contains(key)) {
       onPut(key)
       cache.put(key, value)
       if (size > maxSize) remove(keyToRemove())
@@ -66,18 +69,20 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
 
   /**
     * Remove an element from the cache.
-    * @param key - modifier's key
+    *
+    * @param key         - modifier's key
     * @param rememberKey - whether to remember the key as belonging to cache. E.g. invalid modifiers are
     *                    to be remembered (for not to be requested from the network again).
     * @return
     */
   def remove(key: K, rememberKey: Boolean = false): Option[V] = synchronized {
-    cache.remove(key).map {removed =>
-        onRemove(key, rememberKey)
-        if (rememberKey) rememberedKeys.add(key)
-        removed
-      }
+    cache.remove(key).map { removed =>
+      onRemove(key, rememberKey)
+      if (rememberKey) rememberedKeys.add(key)
+      removed
     }
+  }
+
   def popCandidate(history: H): Option[V] = synchronized {
     findCandidateKey(history).flatMap(k => remove(k))
   }
@@ -96,12 +101,12 @@ trait LRUCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader] extend
   @tailrec
   private def evictionCandidate(): K = {
     val k = evictionQueue.dequeue()
-    if(cache.contains(k)) k else evictionCandidate()
+    if (cache.contains(k)) k else evictionCandidate()
   }
 
   override protected def onPut(key: K): Unit = {
     evictionQueue.enqueue(key)
-    if(evictionQueue.size > maxSize + cleaningThreshold){
+    if (evictionQueue.size > maxSize + cleaningThreshold) {
       evictionQueue.dequeueAll(k => !cache.contains(k))
     }
   }
@@ -131,7 +136,7 @@ class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryR
         case Failure(_: RecoverableModifierError) =>
           false
         case Failure(e) =>
-          log.warn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache", e)
+          logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
           remove(k, rememberKey = true)
           false
         case Success(_) =>
@@ -145,7 +150,7 @@ case class EncryModifiersCache(override val maxSize: Int)
   extends DefaultModifiersCache[EncryPersistentModifier, EncryHistory](maxSize) {
 
   override def put(key: K, value: V): Unit =
-    if(!contains(key)) {
+    if (!contains(key)) {
       onPut(key)
       cache.put(key, value)
     }
@@ -155,7 +160,7 @@ case class EncryModifiersCache(override val maxSize: Int)
     def tryToApply(k: K, v: EncryPersistentModifier): Boolean = {
       history.testApplicable(v) match {
         case Failure(e: MalformedModifierError) =>
-          log.warn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache", e)
+          logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
           remove(k, rememberKey = true)
           false
         case m => m.isSuccess
@@ -171,14 +176,14 @@ case class EncryModifiersCache(override val maxSize: Int)
       .flatMap(id => cache.get(id).map(v => id -> v))
       .find(p => tryToApply(p._1, p._2)).map(_._1)
       .orElse {
-      // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
+        // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
         cache.find { case (k, v) =>
           v match {
             case h: EncryBlockHeader if h.height > headersHeight + 1 => false
             case _ => tryToApply(k, v)
           }
         }.map { case (k, _) => k }
-    }
+      }
   }
 }
 
