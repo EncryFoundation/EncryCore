@@ -25,7 +25,7 @@ class PeerManager extends Actor with Logging {
   addKnownPeersToPeersDatabase()
 
   override def receive: Receive = {
-    case GetConnectedPeers => sender() ! (connectedPeers.values.map(_.handshake).toSeq: Seq[Handshake])
+    case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
     case GetAllPeers => sender() ! PeerDatabase.knownPeers()
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
       if (!isSelf(address, None)) timeProvider
@@ -67,8 +67,7 @@ class PeerManager extends Actor with Logging {
       if (connectedPeers.size + connectingPeers.size <= settings.network.maxConnections)
         randomPeer.filter(address => !connectedPeers.exists(_._1 == address) &&
           !connectingPeers.exists(_.getHostName == address.getHostName) && checkPossibilityToAddPeerWRecovery(address))
-          .foreach { address => sender() ! ConnectTo(address)
-          }
+          .foreach { address => sender() ! ConnectTo(address) }
     case RecoveryCompleted =>
       info("Received RecoveryCompleted")
       recoveryCompleted = true

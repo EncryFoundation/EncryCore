@@ -1,17 +1,15 @@
 package encry.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
-
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import encry.api.http.PeersApiRoute.PeerInfoResponse
-import encry.network.Handshake
+import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.peer.PeerInfo
 import encry.settings.RESTApiSettings
 import io.circe.Encoder
 import io.circe.generic.semiauto._
-
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.matching.Regex
@@ -37,13 +35,12 @@ case class PeersApiRoute(peerManager: ActorRef,
   }
 
   def connectedPeers: Route = (path("connected") & get) {
-    val result: Future[Seq[PeerInfoResponse]] = askActor[Seq[Handshake]](peerManager, GetConnectedPeers).map {
-      _.map { handshake =>
+    val result: Future[Seq[PeerInfoResponse]] = askActor[Seq[ConnectedPeer]](peerManager, GetConnectedPeers).map {
+      _.map { peer =>
         PeerInfoResponse(
-          address = handshake.declaredAddress.map(_.toString).getOrElse(""),
-          lastSeen = System.currentTimeMillis(),
-          name = Some(handshake.nodeName),
-          connectionType = None)
+          address = peer.socketAddress.toString,
+          name = Some(peer.handshake.nodeName),
+          connectionType = Some(peer.direction.toString))
       }
     }
     onSuccess(result) { r => complete(r) }
@@ -64,7 +61,6 @@ case class PeersApiRoute(peerManager: ActorRef,
 object PeersApiRoute {
 
   case class PeerInfoResponse(address: String,
-                              lastSeen: Long,
                               name: Option[String],
                               connectionType: Option[String])
 
@@ -72,7 +68,6 @@ object PeersApiRoute {
 
     def fromAddressAndInfo(address: InetSocketAddress, peerInfo: PeerInfo): PeerInfoResponse = PeerInfoResponse(
       address.toString,
-      peerInfo.lastSeen,
       peerInfo.nodeName,
       peerInfo.connectionType.map(_.toString)
     )
