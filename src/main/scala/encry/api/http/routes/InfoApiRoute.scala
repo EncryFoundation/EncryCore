@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
-import encry.network.Handshake
+import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import encry.settings.{Constants, EncryAppSettings, RESTApiSettings}
 import encry.utils.{NetworkTime, NetworkTimeProvider}
@@ -42,7 +42,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
     }).okJson()
   }
 
-  private def getConnectedPeers: Future[Int] = (peerManager ? GetConnectedPeers).mapTo[Seq[Handshake]].map(_.size)
+  private def getConnectedPeers: Future[Int] = (peerManager ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map(_.size)
 
   private def getStateType: String = appSettings.node.stateMode.verboseName
 
