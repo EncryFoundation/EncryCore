@@ -1,6 +1,7 @@
 package encry.view.history.processors
 
 import com.google.common.primitives.Ints
+import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
 import encry.local.explorer.BlockListener.NewOrphaned
@@ -20,7 +21,6 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
 import scala.collection.immutable
-import scala.concurrent.Future
 import scala.util.Try
 
 trait BlockHeaderProcessor extends Logging {
