@@ -4,11 +4,10 @@ import java.text.SimpleDateFormat
 import java.util.{Calendar, Properties}
 import akka.actor.Actor
 import encry.settings.EncryAppSettings
-import encry.utils.Logging
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.serialization.StringSerializer
 
-class KafkaActor extends Actor with Logging {
+class KafkaActor extends Actor {
 
   import KafkaActor.KafkaMessage
 

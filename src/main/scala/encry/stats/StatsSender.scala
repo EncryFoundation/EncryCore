@@ -2,25 +2,26 @@ package encry.stats
 
 import java.io.File
 import java.util
+import java.text.SimpleDateFormat
 import akka.actor.Actor
 import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.stats.StatsSender._
-import encry.utils.Logging
 import encry.view.history
 import encry.{ModifierId, ModifierTypeId}
+import encry.stats.LoggingActor.LogMessage
 import org.encryfoundation.common.Algos
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class StatsSender extends Actor with Logging {
+class StatsSender extends Actor {
+
+  var modifiersToDownload: Map[String, (ModifierTypeId, Long)] = Map()
 
   val influxDB: InfluxDB =
     InfluxDBFactory.connect(settings.influxDB.url, settings.influxDB.login, settings.influxDB.password)
-
-  var modifiersToDownload: Map[String, (ModifierTypeId, Long)] = Map()//todo delete after completed task about stat
 
   influxDB.setRetentionPolicy("autogen")
 
@@ -29,7 +30,19 @@ class StatsSender extends Actor with Logging {
   override def preStart(): Unit =
     influxDB.write(settings.influxDB.udpPort, s"""nodesStartTime value="${settings.network.nodeName}"""")
 
+  val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+
   override def receive: Receive = {
+    case LogMessage(logLevel, logMessage, logTime) => influxDB.write(settings.influxDB.udpPort,
+      s"""logsFromNode,nodeName=${settings.network.nodeName},logLevel=${
+        logLevel match {
+          case "Info" => 1
+          case "Debug" => 2
+          case "Warn" => 3
+          case "Error" => 4
+          case _ => 4
+        }
+      } value="[${sdf.format(logTime)}] $logMessage"""")
     case BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int) =>
       influxDB.write(settings.influxDB.udpPort, s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache," +
         s"completedBlocksStat=$completedBlocks,notCompletedBlocksStat=$notCompletedBlocks")
@@ -125,9 +138,8 @@ object StatsSender {
 
   case class BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int)
 
-  //Todo no use
-
   case class StateUpdating(time: Long)
 
   case class TransactionGeneratorStat(txsQty: Int, generationTime: Long)
+
 }

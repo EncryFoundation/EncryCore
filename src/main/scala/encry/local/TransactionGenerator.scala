@@ -7,11 +7,10 @@ import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.stats.StatsSender.TransactionGeneratorStat
-import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
 import org.encryfoundation.common.crypto.PrivateKey25519
 
-class TransactionGenerator extends Actor with Logging {
+class TransactionGenerator extends Actor {
 
   import TransactionGenerator._
 
