@@ -12,7 +12,7 @@ import encry.utils.Logging
 class BlockListener(dBService: DBService) extends Actor with Logging {
 
   override def preStart(): Unit = {
-    logger.info("Start listening to new blocks.")
+    logInfo(s"Start listening to new blocks.")
     context.system.eventStream.subscribe(context.self, classOf[SemanticallySuccessfulModifier[_]])
   }
 

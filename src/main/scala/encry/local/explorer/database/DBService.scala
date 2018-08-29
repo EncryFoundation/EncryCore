@@ -43,7 +43,7 @@ class DBService extends Logging {
         .unsafeToFuture()
         .recoverWith {
           case NonFatal(th) =>
-            log.warn("Failed to perform db operation", th)
+            logWarn(s"Failed to perform db operation because of: $th")
             Future.failed(th)
         }
     } else Future.successful(0)

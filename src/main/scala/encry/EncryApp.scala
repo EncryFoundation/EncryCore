@@ -6,7 +6,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.stream.ActorMaterializer
-import encry.api.http.routes.{HistoryApiRoute, InfoApiRoute, StateInfoApiRoute, TransactionsApiRoute}
+import encry.api.http.routes._
 import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
@@ -19,7 +19,7 @@ import encry.network.message._
 import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, ModifiersHolder, NetworkController}
 import encry.settings.EncryAppSettings
-import encry.stats.{KafkaActor, StatsSender}
+import encry.stats.{KafkaActor, LoggingActor, StatsSender}
 import encry.utils.{Logging, NetworkTimeProvider, Zombie}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
@@ -71,6 +71,7 @@ object EncryApp extends App with Logging {
     system.actorOf(Props[TransactionGenerator].withDispatcher("transaction-generator-dispatcher"), "tx-generator")
   if (settings.node.enableCLI) cliListener ! StartListening
   system.actorOf(Props[Zombie], "zombie")
+  if (settings.node.loggingMode != "off") system.actorOf(Props[LoggingActor], "loggingActor")
 
   if (settings.restApi.enabled) {
     import akka.http.scaladsl.model.StatusCodes._
@@ -90,7 +91,8 @@ object EncryApp extends App with Logging {
       InfoApiRoute(readersHolder, miner, peerManager, settings, nodeId, timeProvider),
       HistoryApiRoute(readersHolder, miner, settings, nodeId, settings.node.stateMode),
       TransactionsApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
-      StateInfoApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode)
+      StateInfoApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
+      WalletInfoApiRoute(nodeViewHolder, settings.restApi)
     )
     val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
     Http().bindAndHandle(combinedRoute, settings.restApi.bindAddress.getAddress.getHostAddress, settings.restApi.bindAddress.getPort)

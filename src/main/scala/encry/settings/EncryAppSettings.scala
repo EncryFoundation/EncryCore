@@ -2,7 +2,7 @@ package encry.settings
 
 import java.io.File
 import com.typesafe.config.ConfigFactory
-import encry.utils.{Logging, NetworkTimeProviderSettings}
+import encry.utils.NetworkTimeProviderSettings
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
@@ -19,7 +19,7 @@ case class EncryAppSettings(directory: String,
                             influxDB: InfluxDBSettings,
                             levelDb: LevelDbSettings)
 
-object EncryAppSettings extends Logging with SettingsReaders with NodeSettingsReader {
+object EncryAppSettings extends SettingsReaders with NodeSettingsReader {
 
   val read: EncryAppSettings = ConfigFactory.load("local.conf")
     .withFallback(ConfigFactory.load).as[EncryAppSettings]("encry")

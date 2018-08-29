@@ -4,7 +4,7 @@ import akka.actor.{ActorSystem, Cancellable}
 import encry.ModifierId
 import encry.modifiers.mempool.Transaction
 import encry.settings.EncryAppSettings
-import encry.utils.{Logging, NetworkTimeProvider}
+import encry.utils.NetworkTimeProvider
 import encry.view.mempool.EncryMempool._
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
@@ -13,7 +13,7 @@ import scala.util.{Failure, Success, Try}
 
 class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
                    settings: EncryAppSettings, timeProvider: NetworkTimeProvider, system: ActorSystem)
-  extends MemoryPool[Transaction, EncryMempool] with EncryMempoolReader with AutoCloseable with Logging {
+  extends MemoryPool[Transaction, EncryMempool] with EncryMempoolReader with AutoCloseable {
 
   private def removeExpired(): EncryMempool =
     filter(tx => (timeProvider.estimatedTime - tx.timestamp) > settings.node.utxMaxAge.toMillis)

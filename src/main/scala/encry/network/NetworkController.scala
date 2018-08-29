@@ -14,14 +14,13 @@ import encry.network.peer.PeerManager._
 import encry.network.message.{Message, MessageHandler}
 import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import encry.settings.NetworkSettings
-import encry.utils.Logging
 import encry.view.history.EncrySyncInfoMessageSpec
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
 import scala.util.{Failure, Success, Try}
 
-class NetworkController extends Actor with Logging {
+class NetworkController extends Actor {
 
   val networkSettings: NetworkSettings = settings.network
   context.actorOf(Props[PeerSynchronizer].withDispatcher("network-dispatcher"), "peerSynchronizer")
@@ -37,13 +36,11 @@ class NetworkController extends Actor with Logging {
         NetworkInterface.getNetworkInterfaces.asScala.exists { intf =>
           intf.getInterfaceAddresses.asScala.exists { intfAddr => myAddrs.contains(intfAddr.getAddress) }
         }
-      } recover { case t: Throwable =>
-        logError("Declared address validation failed: ", t)
-      }
+      } recover { case t: Throwable => logError(s"Declared address validation failed: $t") }
     }
   }
 
-  log.info(s"Declared address: $externalSocketAddress")
+  logInfo(s"Declared address: $externalSocketAddress")
 
   IO(Tcp) ! Bind(self, networkSettings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
 
@@ -51,10 +48,10 @@ class NetworkController extends Actor with Logging {
 
   def bindingLogic: Receive = {
     case Bound(_) =>
-      log.info("Successfully bound to the port " + networkSettings.bindAddress.getPort)
+      logInfo("Successfully bound to the port " + networkSettings.bindAddress.getPort)
       context.system.scheduler.schedule(600.millis, 5.seconds)(peerManager ! CheckPeers)
     case CommandFailed(_: Bind) =>
-      logError("Network port " + networkSettings.bindAddress.getPort + " already in use!")
+      logInfo("Network port " + networkSettings.bindAddress.getPort + " already in use!")
       context stop self
   }
 
@@ -66,7 +63,7 @@ class NetworkController extends Actor with Logging {
             case Some(handler) => handler ! DataFromPeer(spec, content, remote)
             case None => logError("No handlers found for message: " + spec.messageCode)
           }
-        case Failure(e) => logError("Failed to deserialize data: ", e)
+        case Failure(e) => logError(s"Failed to deserialize data: $e")
       }
     case SendToNetwork(message, sendingStrategy) =>
       (peerManager ? FilterPeers(sendingStrategy)) (5 seconds)
@@ -77,7 +74,7 @@ class NetworkController extends Actor with Logging {
   def peerLogic: Receive = {
     case ConnectTo(remote)
       if checkPossibilityToAddPeer(remote) =>
-      log.info(s"Connecting to: $remote")
+      logInfo(s"Connecting to: $remote")
       outgoing += remote
       IO(Tcp) ! Connect(remote,
         localAddress = externalSocketAddress,
@@ -91,21 +88,21 @@ class NetworkController extends Actor with Logging {
         case Incoming => s"New incoming connection from $remote established (bound to local $local)"
         case Outgoing => s"New outgoing connection to $remote established (bound to local $local)"
       }
-      log.info(logMsg)
+      logInfo(logMsg)
       context.actorOf(PeerConnectionHandler.props(messagesHandler, sender(), direction, externalSocketAddress, remote)
         .withDispatcher("network-dispatcher"))
       outgoing -= remote
     case CommandFailed(c: Connect) =>
       outgoing -= c.remoteAddress
-      log.info("Failed to connect to : " + c.remoteAddress)
+      logInfo("Failed to connect to : " + c.remoteAddress)
       peerManager ! Disconnected(c.remoteAddress)
   }
 
   override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse {
     case RegisterMessagesHandler(specs, handler) =>
-      log.info(s"Registering handlers for ${specs.map(s => s.messageCode -> s.messageName)}")
+      logInfo( s"Registering handlers for ${specs.map(s => s.messageCode -> s.messageName)}")
       messageHandlers += specs.map(_.messageCode) -> handler
-    case CommandFailed(cmd: Tcp.Command) => log.info("Failed to execute command : " + cmd)
+    case CommandFailed(cmd: Tcp.Command) => context.actorSelection("/user/statsSender") ! "Failed to execute command : " + cmd
     case nonsense: Any => logWarn(s"NetworkController: got something strange $nonsense")
   }
 }

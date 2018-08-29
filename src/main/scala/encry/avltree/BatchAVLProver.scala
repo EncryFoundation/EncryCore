@@ -1,6 +1,7 @@
 package encry.avltree
 
 import com.google.common.primitives.Ints
+import encry.EncryApp.{settings, system}
 import encry.utils.Logging
 import org.encryfoundation.common.utils.TaggedTypes._
 import scorex.crypto.hash.{Blake2b256, CryptographicHash, Digest}
@@ -176,10 +177,12 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
     packTree(oldTopNode)
     packagedTree += EndOfTreeInPackagedProof
     packagedTree ++= directions
+
     resetNew(topNode)
     directions = new mutable.ArrayBuffer[Byte]
     directionsBitLength = 0
     oldTopNode = topNode
+
     SerializedAdProof @@ packagedTree.toArray
   }
 
@@ -229,7 +232,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
       def myRequire(t: Boolean, s: String): Unit = if (!t) {
         var x: Int = rNode.key(0).toInt
         if (x < 0) x = x + 256
-        log.error("Tree failed at key = " + x + ": " + s)
+        logError("Tree failed at key = " + x + ": " + s)
         fail = true
       }
 

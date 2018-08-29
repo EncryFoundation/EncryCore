@@ -20,8 +20,7 @@ class DigestState protected(override val version: VersionTag,
                             val stateStore: Store,
                             settings: NodeSettings)
   extends EncryState[DigestState]
-    with ModifierValidation[EncryPersistentModifier]
-    with Logging {
+    with ModifierValidation[EncryPersistentModifier] with Logging {
 
   stateStore.lastVersionID
     .foreach(id => assert(version sameElements id.data, "`version` should always be equal to store.lastVersionID"))
@@ -43,10 +42,10 @@ class DigestState protected(override val version: VersionTag,
           .getOrElse(Failure(new Exception("Proofs are empty"))))
       }.flatten match {
         case s: Success[_] =>
-          log.info(s"Valid modifier applied to DigestState: ${block.encodedId}")
+          logInfo(s"Valid modifier applied to DigestState: ${block.encodedId}")
           s
         case Failure(e) =>
-          logWarn(s"Modifier $mod is not valid: ", e)
+          logWarn(s"Modifier $mod is not valid: $e")
           Failure(e)
       }
     case mod: Any =>
@@ -62,25 +61,25 @@ class DigestState protected(override val version: VersionTag,
   //todo: utxo snapshot could go here
   override def applyModifier(mod: EncryPersistentModifier): Try[DigestState] = mod match {
     case block: EncryBlock if settings.verifyTransactions =>
-      log.info(s"Got new full block with id ${block.encodedId} with root ${Algos.encoder.encode(block.header.stateRoot)}")
+      logInfo(s"Got new full block with id ${block.encodedId} with root ${Algos.encoder.encode(block.header.stateRoot)}")
       this.validate(block).flatMap(_ => update(VersionTag !@@ block.header.id, block.header.stateRoot))
 
     case header: EncryBlockHeader if !settings.verifyTransactions =>
-      log.info(s"Got new Header ${header.encodedId} with root ${Algos.encoder.encode(header.stateRoot)}")
+      logInfo(s"Got new Header ${header.encodedId} with root ${Algos.encoder.encode(header.stateRoot)}")
       update(VersionTag !@@ header.id, header.stateRoot)
 
     case a: Any =>
-      log.info(s"Unhandled modifier: $a")
+      logInfo(s"Unhandled modifier: $a")
       Failure(new Exception(s"Unhandled modifier: $mod"))
   }
 
   override def rollbackTo(version: VersionTag): Try[DigestState] = {
-    log.info(s"Rollback Digest State to version ${Algos.encoder.encode(version)}")
+    logInfo(s"Rollback Digest State to version ${Algos.encoder.encode(version)}")
     val wrappedVersion: ByteArrayWrapper = ByteArrayWrapper(version)
     Try(stateStore.rollback(wrappedVersion)).map { _ =>
       stateStore.clean(Constants.DefaultKeepVersions)
       val rootHash: ADDigest = ADDigest @@ stateStore.get(wrappedVersion).get.data
-      log.info(s"Rollback to version ${Algos.encoder.encode(version)} with roothash ${Algos.encoder.encode(rootHash)}")
+      logInfo(s"Rollback to version ${Algos.encoder.encode(version)} with roothash ${Algos.encoder.encode(rootHash)}")
       new DigestState(version, rootHash, stateStore, settings)
     }
   }
