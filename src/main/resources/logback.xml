@@ -13,7 +13,7 @@
 
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${application.home:-.}/logs/application.%d.log</fileNamePattern>
+            <fileNamePattern>${application.home:-.}/logs/application-%d.log</fileNamePattern>
             <maxHistory>5</maxHistory>
         </rollingPolicy>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
