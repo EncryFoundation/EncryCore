@@ -30,13 +30,12 @@ trait Transaction extends NodeViewModifier with PConvertible {
   val directives: IndexedSeq[Directive]
   val defaultProofOpt: Option[Proof]
   val semanticValidity: Try[Unit]
-  val length: Int = this.bytes.length
-  val maxSize: Int = Constants.TransactionMaxSize
+  lazy val size: Int = this.bytes.length
   lazy val newBoxes: Traversable[EncryBaseBox] =
     directives.zipWithIndex.flatMap { case (d, idx) => d.boxes(Digest32 !@@ id, idx) }
   lazy val costMultiplier: Amount =
     inputs.map(_.contract.fold(cc => cc, rc => rc.contract)).map(CompiledContract.costOf).sum +
-    (Constants.PersistentByteCost * length) +
+    (Constants.PersistentByteCost * size) +
     (Constants.StateByteCost * newBoxes.map(_.bytes).foldLeft(Array.empty[Byte])(_ ++ _).length)
 
   override def toString: String = s"<EncryTransaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}>"

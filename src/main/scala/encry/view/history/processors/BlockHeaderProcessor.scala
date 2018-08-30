@@ -300,7 +300,7 @@ trait BlockHeaderProcessor extends Logging {
     private def validateChildBlockHeader(header: EncryBlockHeader, parent: EncryBlockHeader): ValidationResult = {
       failFast
         .validate(header.timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift) {
-          error(s"Header timestamp ${header.timestamp} is too far in future from now ${timeProvider.time()}")
+          error(s"Header timestamp ${header.timestamp} is too far in future from now ${timeProvider.estimatedTime}")
         }
         .validate(header.timestamp > parent.timestamp) {
           fatal(s"Header timestamp ${header.timestamp} is not greater than parents ${parent.timestamp}")

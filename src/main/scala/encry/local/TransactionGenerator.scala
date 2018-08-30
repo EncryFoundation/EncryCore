@@ -45,7 +45,6 @@ class TransactionGenerator extends Actor {
     }.toIndexedSeq
     TransactionFactory.defaultPaymentTransactionScratch(wd.secret, minimalFeeD, timeProvider.estimatedTime, boxes,
           settings.testing.defaultRecipientAddress, amountD)
-
   }
 }
 
