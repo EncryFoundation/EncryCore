@@ -1,6 +1,7 @@
 package encry.network
 
 import akka.persistence._
+import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
@@ -8,7 +9,6 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, LocallyGeneratedModifier}
-import encry.{ModifierId, ModifierTypeId}
 import org.encryfoundation.common.Algos
 import encry.utils.Logging
 import scala.collection.immutable.SortedMap

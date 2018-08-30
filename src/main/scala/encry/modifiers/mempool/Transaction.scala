@@ -1,10 +1,10 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.Ints
+import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.history.block.Block.Timestamp
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.NodeViewModifier
-import encry.{ModifierId, ModifierTypeId}
 import encry.modifiers.mempool.directive.Directive
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, DataBox}
@@ -52,7 +52,7 @@ object Transaction {
     case tx: EncryTransaction => EncryTransaction.jsonEncoder(tx)
   }
 
-  val ModifierTypeId: ModifierTypeId = encry.ModifierTypeId @@ 2.toByte
+  val ModifierTypeId: ModifierTypeId = encry.CoreTaggedTypes.ModifierTypeId @@ 2.toByte
 }
 
 case class TransactionDBVersion(id: String, blockId: String, isCoinbase: Boolean, timestamp: Timestamp)
