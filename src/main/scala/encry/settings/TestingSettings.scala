@@ -1,7 +1,6 @@
 package encry.settings
 
-case class TestingSettings(transactionGeneration: Boolean,
-                           minimalFee: Int,
+case class TestingSettings(minimalFee: Int,
                            amount: Int,
                            defaultRecipientAddress: String,
                            limitPerEpoch: Int)
