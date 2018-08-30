@@ -1,5 +1,6 @@
 package encry.consensus
 
+import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.modifiers.history.block.Block.{Timestamp, Version}
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.Transaction

@@ -2,6 +2,7 @@ package encry.consensus
 
 import com.google.common.primitives.Chars
 import encry.ModifierId
+import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.crypto.equihash.{Equihash, EquihashSolution}
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock

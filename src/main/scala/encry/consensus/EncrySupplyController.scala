@@ -1,9 +1,8 @@
 package encry.consensus
 
 import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.settings.Constants
-import encry.view.history.Height
+import encry.view.history.History.Height
 
 object EncrySupplyController {
 
