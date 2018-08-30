@@ -43,7 +43,7 @@ class StatsSender extends Actor {
           case _ => 4
         }
       } value="[${sdf.format(logTime)}] $logMessage"""")
-    case HeightStatistic(bestHeaderHeight, bestBlockHeight) =>
+    case HeightStatistics(bestHeaderHeight, bestBlockHeight) =>
       influxDB.write(settings.influxDB.udpPort,
         s"chainStat,nodeName=${settings.network.nodeName} value=$bestHeaderHeight,bestBlockHeight=$bestBlockHeight")
     case BestHeaderInChain(fb: EncryBlockHeader) =>
@@ -136,7 +136,7 @@ object StatsSender {
 
   case class GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
 
-  case class HeightStatistic(bestHeaderHeight: Int, bestBlockHeight: Int)
+  case class HeightStatistics(bestHeaderHeight: Int, bestBlockHeight: Int)
 
   case class StateUpdating(time: Long)
 
