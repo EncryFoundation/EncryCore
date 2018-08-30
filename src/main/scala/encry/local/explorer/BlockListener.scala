@@ -1,7 +1,7 @@
 package encry.local.explorer
 
 import akka.actor.Actor
-import encry.ModifierId
+import encry.CoreTaggedTypes.ModifierId
 import encry.local.explorer.BlockListener.{ChainSwitching, NewOrphaned}
 import encry.local.explorer.database.DBService
 import encry.modifiers.history.block.EncryBlock

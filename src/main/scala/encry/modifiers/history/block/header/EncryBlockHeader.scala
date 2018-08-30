@@ -2,6 +2,8 @@ package encry.modifiers.history.block.header
 
 import com.google.common.primitives.{Ints, _}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
+import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
+import encry.consensus.Difficulty
 import encry.crypto.equihash.{Equihash, EquihashSolution, EquihashSolutionsSerializer}
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.Block._
@@ -11,7 +13,6 @@ import encry.modifiers.mempool.Transaction
 import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
 import encry.settings.Constants
-import encry.{ModifierId, ModifierTypeId}
 import io.circe.Encoder
 import io.circe.syntax._
 import org.bouncycastle.crypto.digests.Blake2bDigest

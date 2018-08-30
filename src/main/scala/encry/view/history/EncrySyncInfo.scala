@@ -1,12 +1,12 @@
 package encry.view.history
 
+import encry.CoreTaggedTypes.ModifierId
 import encry.consensus.SyncInfo
 import encry.EncryApp.settings
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.consensus.History.ModifierIds
 import encry.modifiers.NodeViewModifier
 import encry.network.message.SyncInfoMessageSpec
-import encry.ModifierId
 import org.encryfoundation.common.serialization.Serializer
 import scala.util.Try
 

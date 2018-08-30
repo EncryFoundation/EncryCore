@@ -1,6 +1,6 @@
 package encry.view.mempool
 
-import encry.ModifierId
+import encry.CoreTaggedTypes.ModifierId
 import encry.view.NodeViewComponent
 import encry.modifiers.mempool.Transaction
 
