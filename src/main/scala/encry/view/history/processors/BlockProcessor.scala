@@ -1,6 +1,6 @@
 package encry.view.history.processors
 
-import encry.ModifierId
+import encry.CoreTaggedTypes.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.consensus.ModifierSemanticValidity.Invalid
 import encry.modifiers.EncryPersistentModifier

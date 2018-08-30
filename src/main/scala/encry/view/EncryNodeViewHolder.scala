@@ -4,6 +4,8 @@ import java.io.File
 import akka.actor.{Actor, Props}
 import akka.persistence.RecoveryCompleted
 import akka.pattern._
+import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
+import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
@@ -11,7 +13,7 @@ import encry.modifiers._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
-import encry.modifiers.history.{ADProofs, ADProofSerializer}
+import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{EncryTransactionSerializer, Transaction}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
@@ -25,7 +27,6 @@ import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state._
 import encry.view.wallet.EncryWallet
-import encry.{EncryApp, ModifierId, ModifierTypeId, VersionTag}
 import encry.utils.Logging
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.Algos
@@ -34,7 +35,7 @@ import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scala.annotation.tailrec
 import scala.concurrent.Future
-import scala.collection.{mutable, IndexedSeq, Seq}
+import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging {

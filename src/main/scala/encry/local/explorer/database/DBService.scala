@@ -4,10 +4,10 @@ import cats.effect.IO
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 import encry.EncryApp.settings
-import encry.ModifierId
 import QueryRepository._
 import com.zaxxer.hikari.HikariDataSource
 import doobie.hikari.HikariTransactor
+import encry.CoreTaggedTypes.ModifierId
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.utils.Logging

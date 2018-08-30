@@ -3,8 +3,8 @@ package encry.view.state
 import java.io.File
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
-import encry.EncryApp.settings
-import encry.VersionTag
+import encry.CoreTaggedTypes.VersionTag
+import encry.EncryApp.{settings, system}
 import encry.avltree.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import encry.consensus.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier

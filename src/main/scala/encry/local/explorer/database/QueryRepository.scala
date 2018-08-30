@@ -2,7 +2,6 @@ package encry.local.explorer.database
 
 import doobie.free.connection.ConnectionIO
 import doobie.util.update.Update
-import encry.ModifierId
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, HeaderDBVersion}
 import encry.modifiers.history.block.payload.EncryBlockPayload
@@ -10,6 +9,7 @@ import scorex.crypto.encode.Base16
 import cats.implicits._
 import doobie.postgres.implicits._
 import doobie.util.log.LogHandler
+import encry.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, TransactionDBVersion}
 
 protected[database] object QueryRepository {

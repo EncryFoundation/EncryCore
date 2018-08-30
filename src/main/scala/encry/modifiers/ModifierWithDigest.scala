@@ -1,6 +1,6 @@
 package encry.modifiers
 
-import encry.{ModifierId, ModifierTypeId}
+import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import org.encryfoundation.common.Algos
 
 trait ModifierWithDigest extends PersistentNodeViewModifier {
@@ -14,5 +14,5 @@ trait ModifierWithDigest extends PersistentNodeViewModifier {
 
 object ModifierWithDigest {
   def computeId(modifierType: ModifierTypeId, headerId: Array[Byte], digest: Array[Byte]): ModifierId =
-    ModifierId @@ Algos.hash.prefixedHash(modifierType, headerId, digest)
+    ModifierId @@ Algos.hash.prefixedHash(modifierType, headerId, digest).repr
 }

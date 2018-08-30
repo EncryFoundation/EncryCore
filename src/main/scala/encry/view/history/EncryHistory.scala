@@ -1,7 +1,7 @@
 package encry.view.history
 
 import java.io.File
-import encry.ModifierId
+import encry.CoreTaggedTypes.ModifierId
 import encry.consensus.History
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
