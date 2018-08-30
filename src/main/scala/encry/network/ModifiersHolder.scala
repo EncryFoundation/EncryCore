@@ -9,7 +9,6 @@ import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, LocallyGeneratedModifier}
 import encry.{ModifierId, ModifierTypeId}
-import encry.stats.StatsSender.BlocksStat
 import org.encryfoundation.common.Algos
 import encry.utils.Logging
 import scala.collection.immutable.SortedMap
