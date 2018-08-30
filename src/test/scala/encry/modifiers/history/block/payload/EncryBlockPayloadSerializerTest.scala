@@ -4,7 +4,6 @@ import encry.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.utils.TestHelper
 import org.scalatest.FunSuite
-import encry.ModifierId
 import encry.view.history.History.Height
 
 class EncryBlockPayloadSerializerTest extends FunSuite {
