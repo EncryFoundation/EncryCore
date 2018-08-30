@@ -1,5 +1,6 @@
 package encry.view.history.processors
 
+import com.google.common.primitives.Ints
 import encry.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.consensus.ModifierSemanticValidity.Invalid
@@ -9,6 +10,7 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.utils.Logging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
+
 import scala.util.{Failure, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with Logging {
@@ -45,7 +47,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     case ToProcess(fullBlock, newModRow, newBestHeader, newBestChain, _)
       if isValidFirstBlock(fullBlock.header) =>
       logStatus(Seq(), newBestChain, fullBlock, None)
-      updateStorage(newModRow, newBestHeader.id)
+      updateStorage(newModRow, newBestHeader)
       ProgressInfo(None, Seq.empty, newBestChain, Seq.empty)
   }
 
@@ -70,7 +72,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
               .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
               .getOrElse(false)
 
-        updateStorage(newModRow, newBestHeader.id, updateBestHeader)
+        updateStorage(newModRow, newBestHeader, updateBestHeader)
 
         if (blocksToKeep >= 0) {
           val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)
@@ -117,11 +119,20 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     historyStorage.removeObjects(toRemove)
   }
 
-  private def updateStorage(newModRow: EncryPersistentModifier, bestFullHeaderId: ModifierId, updateHeaderInfo: Boolean = false): Unit = {
-    val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeaderId)
+  private def updateStorage(newModRow: EncryPersistentModifier,
+                            bestFullHeader: EncryBlockHeader,
+                            updateHeaderInfo: Boolean = false): Unit = {
+    val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeader.id)
     val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-      if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)
-      else Seq(BestBlockKey -> bestFullHeaderIdWrapped)
+      if (updateHeaderInfo) {
+        val bestFullHeaderScore: BigInt = scoreOf(bestFullHeader.parentId).getOrElse(BigInt(0)) + bestFullHeader.difficulty
+        Seq(
+          BestBlockKey -> bestFullHeaderIdWrapped,
+          BestHeaderKey -> bestFullHeaderIdWrapped,
+          headerScoreKey(bestFullHeader.id) -> ByteArrayWrapper(bestFullHeaderScore.toByteArray),
+          headerHeightKey(bestFullHeader.id) -> ByteArrayWrapper(Ints.toByteArray(bestFullHeader.height))
+        ) ++ bestBlockHeaderIdsRow(bestFullHeader)
+      } else Seq(BestBlockKey -> bestFullHeaderIdWrapped)
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
   }
 

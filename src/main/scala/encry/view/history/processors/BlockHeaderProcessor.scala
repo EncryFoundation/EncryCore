@@ -23,6 +23,7 @@ import scala.collection.immutable
 import scala.concurrent.Future
 import scala.util.Try
 
+// scalastyle:off
 trait BlockHeaderProcessor extends Logging {
 
   protected val nodeSettings: NodeSettings
@@ -133,7 +134,7 @@ trait BlockHeaderProcessor extends Logging {
     case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
 
-  private def getHeaderInfoUpdate(h: EncryBlockHeader): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier)] = {
+  protected def getHeaderInfoUpdate(h: EncryBlockHeader): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier)] = {
     val difficulty: Difficulty = h.difficulty
     if (h.isGenesis) {
       logInfo(s"Initialize header chain with genesis header ${h.encodedId}")
@@ -150,7 +151,8 @@ trait BlockHeaderProcessor extends Logging {
         val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
         val heightRow: (ByteArrayWrapper, ByteArrayWrapper) = headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
         val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (score > bestHeadersChainScore) {
-          bestBlockHeaderIdsRow(h, score)
+          logInfo(s"New best header ${h.encodedId} with score: $score. New height: ${h.height}, old height: $bestHeaderHeight")
+          bestBlockHeaderIdsRow(h)
         } else {
           EncryApp.system.actorSelection("/user/blockListener") ! NewOrphaned(h) // TODO: Remove direct system import when possible.
           orphanedBlockHeaderIdsRow(h, score)
@@ -162,9 +164,7 @@ trait BlockHeaderProcessor extends Logging {
 
   /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
     * header ids at this height */
-  private def bestBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
-    val prevHeight = bestHeaderHeight
-    logInfo(s"New best header ${h.encodedId} with score: $score. New height: ${h.height}, old height: $prevHeight")
+  protected def bestBlockHeaderIdsRow(h: EncryBlockHeader): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
     val self: (ByteArrayWrapper, ByteArrayWrapper) =
       heightIdsKey(h.height) -> ByteArrayWrapper((Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray)
     val parentHeaderOpt: Option[EncryBlockHeader] = typedModifierById[EncryBlockHeader](h.parentId)
