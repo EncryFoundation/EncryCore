@@ -68,9 +68,7 @@ class ModifiersHolder extends PersistentActor with Logging {
       completedBlocks = completedBlocks.drop(settings.levelDb.batchSize)
       nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend)
 
-    case RequestedModifiers(modifierTypeId, modifiers) =>
-
-      updateModifiers(modifierTypeId, modifiers)
+    case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
     case x: Any => logError(s"Strange input: $x.")
   }
