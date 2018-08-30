@@ -9,7 +9,6 @@ import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
-import encry.local.TransactionGenerator.{FetchWalletData, GenerateTransaction, WalletData, amountD}
 import encry.modifiers._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
@@ -117,11 +116,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       }
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
-    case FetchWalletData(limit: Int, minimalFeeD: Int) =>
-      val wallet: EncryWallet = nodeView.wallet
-      val availableBoxes: Seq[AssetBox] = wallet.walletStorage.allBoxes.filter(_.isAmountCarrying).map(_.asInstanceOf[AssetBox])
-      if (availableBoxes.map(_.amount).sum >= limit * (amountD + minimalFeeD))
-        sender() ! GenerateTransaction(WalletData(wallet.accountManager.mandatoryAccount, availableBoxes))
     case a: Any =>
       logError(s"Strange input: $a")
   }

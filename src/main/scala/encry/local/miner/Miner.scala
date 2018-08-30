@@ -5,7 +5,7 @@ import java.util.Date
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus._
-import encry.local.miner.EncryMiningWorker.NextChallenge
+import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryTransaction, Transaction, TransactionFactory}
@@ -57,7 +57,7 @@ class Miner extends Actor with Logging {
       self ! StartMining
     case StartMining =>
       for (i <- 0 until numberOfWorkers) yield context.actorOf(
-        Props(classOf[EncryMiningWorker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
+        Props(classOf[Worker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
       candidateOpt match {
         case Some(candidateBlock) =>
           logInfo(s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}")

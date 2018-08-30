@@ -97,8 +97,8 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
         self ! ResponseFromLocal(remote, invData._1, objs)
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
-      logDebug(s"Get inv message from ${remote.socketAddress} with modTypeId: ${invData._1} and modifiers: " +
-        s"${invData._2.foldLeft("|") { case (str, id) => str + "|" + Algos.encode(id) }}")
+      logDebug(s"Get inv message from ${remote.socketAddress} " +
+        s"with modTypeId ${invData._1}: ${invData._2.size} modifiers.")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       logDebug( s"Get modifiers from ${remote.socketAddress} with modTypeID: ${data._1} and modifiers: " +

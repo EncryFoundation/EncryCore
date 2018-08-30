@@ -19,7 +19,6 @@ import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box._
 import encry.utils.{BalanceCalculator, Logging}
 import encry.settings.Constants
-import encry.stats.LoggingActor.LogMessage
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
@@ -77,7 +76,6 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     }
   }
 
-  /** State transition function `APPLY(S,TX) -> S'`. */
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
 
     case block: EncryBlock =>
@@ -148,18 +146,6 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     persistentProver.storage.rollbackVersions.map(v =>
       VersionTag @@ stateStore.get(ByteArrayWrapper(Algos.hash(v))).get.data)
 
-  /**
-    * Carries out an exhaustive validation of the given transaction.
-    *
-    * Transaction validation algorithm:
-    * 0. Check semantic validity of transaction
-    * For each box referenced in transaction:
-    * 1. Check if box is in the state
-    * 2. Parse box from the state storage
-    * 3. Try to unlock the box, providing appropriate context and proof
-    * For all asset types:
-    * 4. Make sure inputs.sum >= outputs.sum
-    */
   def validate(tx: Transaction, allowedOutputDelta: Amount = 0L): Try[Unit] =
     tx.semanticValidity.map { _: Unit =>
 
