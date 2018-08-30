@@ -29,13 +29,13 @@ protected[database] object QueryRepository extends Logging {
     } yield txsR + headerR + outsR + insR + dirR
 
   def markAsRemovedFromMainChainQuery(ids: List[ModifierId]): ConnectionIO[Int] = {
-    val query = s"UPDATE public.headers SET best_chain = FALSE WHERE id = ?"
+    val query: String = s"UPDATE public.headers SET best_chain = FALSE WHERE id = ?"
     Update[String](query).updateMany(ids.map(Base16.encode))
   }
 
   def insertHeaderQuery(block: EncryBlock): ConnectionIO[Int] = {
     val headerDB: HeaderDBVersion = HeaderDBVersion(block)
-    val query =
+    val query: String =
       """
         |INSERT INTO public.headers (id, parent_id, version, height, ad_proofs_root, state_root, transactions_root, ts, nonce, difficulty,
         |      block_size, equihash_solution, ad_proofs, tx_qty, miner_address, miner_reward, fees_total, txs_size, best_chain)
@@ -46,7 +46,7 @@ protected[database] object QueryRepository extends Logging {
 
   def insertOrphanedHeaderQuery(header: EncryBlockHeader): ConnectionIO[Int] = {
     val headerDB: HeaderDBVersion = HeaderDBVersion(header)
-    val query =
+    val query: String =
       """
         |INSERT INTO public.headers (id, parent_id, version, height, ad_proofs_root, state_root, transactions_root, ts, nonce, difficulty,
         |      block_size, equihash_solution, ad_proofs, tx_qty, miner_address, miner_reward, fees_total, txs_size, best_chain)
@@ -55,35 +55,29 @@ protected[database] object QueryRepository extends Logging {
     Update[HeaderDBVersion](query).run(headerDB)
   }
 
-  def heightQuery: ConnectionIO[Int] = {
-    sql"SELECT MAX(height) FROM headers;".query[Int].unique
-  }
+  def heightQuery: ConnectionIO[Int] = sql"SELECT MAX(height) FROM headers;".query[Int].unique
 
-  def headersByRangeQuery(from: Int, to: Int): ConnectionIO[List[HeaderDBVersion]] = {
+  def headersByRangeQuery(from: Int, to: Int): ConnectionIO[List[HeaderDBVersion]] =
     sql"""SELECT id, parent_id, version, height, ad_proofs_root, state_root, transactions_root, ts, nonce, difficulty,
       block_size, equihash_solution, ad_proofs, tx_qty, miner_address, miner_reward, fees_total, txs_size, best_chain
       FROM public.headers WHERE height >= $from AND height <= $to ORDER BY height ASC;""".query[HeaderDBVersion].to[List]
-  }
 
-  def txsByRangeQuery(from: Int, to: Int): ConnectionIO[List[TransactionDBVersion]] = {
+  def txsByRangeQuery(from: Int, to: Int): ConnectionIO[List[TransactionDBVersion]] =
     sql"""SELECT id, fee, block_id, is_coinbase, ts, proof FROM public.transactions
          |WHERE block_id in (SELECT id FROM public.headers WHERE height >= $from AND height <= $to);
        """.stripMargin.query[TransactionDBVersion].to[List]
-  }
 
-  def inputsByTransactionIdsQuery(ids: Seq[String]): ConnectionIO[List[InputDBVersion]] = {
+  def inputsByTransactionIdsQuery(ids: Seq[String]): ConnectionIO[List[InputDBVersion]] =
     (fr"SELECT * FROM public.inputs "
       ++ whereAndOpt(NonEmptyList.fromList(ids.toList).map(nel => in(fr"tx_id", nel)))).query[InputDBVersion].to[List]
-  }
 
-  def directivesByTransactionIdsQuery(ids: Seq[String]): ConnectionIO[List[DirectiveDBVersion]] = {
+  def directivesByTransactionIdsQuery(ids: Seq[String]): ConnectionIO[List[DirectiveDBVersion]] =
     (fr"SELECT * FROM public.directives "
       ++ whereAndOpt(NonEmptyList.fromList(ids.toList).map(nel => in(fr"tx_id", nel)))).query[DirectiveDBVersion].to[List]
-  }
 
   private def insertTransactionsQuery(block: EncryBlock): ConnectionIO[Int] = {
     val txs: Seq[TransactionDBVersion] = TransactionDBVersion(block)
-    val query =
+    val query: String =
       """
         |INSERT INTO public.transactions (id, fee, block_id, is_coinbase, ts, proof)
         |VALUES (?, ?, ?, ?, ?, ?);
@@ -93,7 +87,7 @@ protected[database] object QueryRepository extends Logging {
 
   private def insertInputsQuery(p: EncryBlockPayload): ConnectionIO[Int] = {
     val inputs: Seq[InputDBVersion] = p.transactions.flatMap(InputDBVersion(_))
-    val query =
+    val query: String =
       """
         |INSERT INTO public.inputs (id, tx_id, contract_bytes, serialized_proofs)
         |VALUES (?, ?, ?, ?);
@@ -103,7 +97,7 @@ protected[database] object QueryRepository extends Logging {
 
   private def insertOutputsQuery(p: EncryBlockPayload): ConnectionIO[Int] = {
     val outputs: Seq[OutputDBVersion] = p.transactions.flatMap(OutputDBVersion(_))
-    val query =
+    val query: String =
       """
         |INSERT INTO public.outputs (id, tx_id, monetary_value, coin_id, contract_hash, data)
         |VALUES (?, ?, ?, ?, ?, ?);
@@ -115,7 +109,7 @@ protected[database] object QueryRepository extends Logging {
     val directives: Seq[DirectiveDBVersion] = txs.map(tx => tx.id -> tx.directives).flatMap {
       case (id, directives) => directives.map(_.toDbVersion(id))
     }
-    val query =
+    val query: String =
       """
         |INSERT INTO public.directives (tx_id, type_id, is_valid, contract_hash, amount, address, token_id_opt, data_field)
         |VALUES (?, ?, ?, ?, ?, ?, ?, ?);
