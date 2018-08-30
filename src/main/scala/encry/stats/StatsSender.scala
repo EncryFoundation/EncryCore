@@ -43,8 +43,8 @@ class StatsSender extends Actor {
           case _ => 4
         }
       } value="[${sdf.format(logTime)}] $logMessage"""")
-    case BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int) =>
-      influxDB.write(settings.influxDB.udpPort, s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache," +
+    case BlocksStat(notCompletedBlocks, headerCache, payloadCache, completedBlocks) =>
+      influxDB.write(settings.influxDB.udpPort, s"blocksStatistic,nodeName=${settings.network.nodeName} headerStats=$headerCache,payloadStats=$payloadCache," +
         s"completedBlocksStat=$completedBlocks,notCompletedBlocksStat=$notCompletedBlocks")
     case BestHeaderInChain(fb: EncryBlockHeader) =>
       influxDB.write(settings.influxDB.udpPort, util.Arrays.asList(
