@@ -1,6 +1,7 @@
 package encry.view.history.processors
 
 import com.google.common.primitives.Ints
+import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
 import encry.local.explorer.BlockListener.NewOrphaned
@@ -20,7 +21,6 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
 import scala.collection.immutable
-import scala.concurrent.Future
 import scala.util.Try
 
 // scalastyle:off
@@ -300,7 +300,7 @@ trait BlockHeaderProcessor extends Logging {
     private def validateChildBlockHeader(header: EncryBlockHeader, parent: EncryBlockHeader): ValidationResult = {
       failFast
         .validate(header.timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift) {
-          error(s"Header timestamp ${header.timestamp} is too far in future from now ${timeProvider.time()}")
+          error(s"Header timestamp ${header.timestamp} is too far in future from now ${timeProvider.estimatedTime}")
         }
         .validate(header.timestamp > parent.timestamp) {
           fatal(s"Header timestamp ${header.timestamp} is not greater than parents ${parent.timestamp}")

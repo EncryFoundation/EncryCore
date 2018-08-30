@@ -5,12 +5,12 @@ import akka.actor.Actor
 import encry.EncryApp.miner
 import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
 import encry.local.miner.Miner.MinedBlock
-import encry.local.miner.EncryMiningWorker.{MineBlock, NextChallenge}
+import encry.local.miner.Worker.{MineBlock, NextChallenge}
 import java.text.SimpleDateFormat
 import encry.settings.Constants
 import encry.utils.Logging
 
-class EncryMiningWorker(myIdx: Int, numberOfWorkers: Int) extends Actor with Logging {
+class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with Logging {
 
   val sdf: SimpleDateFormat = new SimpleDateFormat("HH:mm:ss")
   var challengeStartTime: Date = new Date(System.currentTimeMillis())
@@ -38,7 +38,7 @@ class EncryMiningWorker(myIdx: Int, numberOfWorkers: Int) extends Actor with Log
 
 }
 
-object EncryMiningWorker {
+object Worker {
 
   case class NextChallenge(candidateBlock: CandidateBlock)
 

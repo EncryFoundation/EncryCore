@@ -1,6 +1,6 @@
 package encry.view.history
 
-import encry._
+import encry.CoreTaggedTypes.ModifierId
 import encry.consensus.History._
 import encry.consensus.ModifierSemanticValidity
 import encry.modifiers.EncryPersistentModifier

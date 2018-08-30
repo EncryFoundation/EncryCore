@@ -1,7 +1,7 @@
 package encry.view.history.processors
 
 import com.google.common.primitives.Ints
-import encry.ModifierId
+import encry.CoreTaggedTypes.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.consensus.ModifierSemanticValidity.Invalid
 import encry.modifiers.EncryPersistentModifier
@@ -10,7 +10,6 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.utils.Logging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
-
 import scala.util.{Failure, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with Logging {

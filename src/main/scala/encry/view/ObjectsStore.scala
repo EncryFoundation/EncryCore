@@ -1,8 +1,7 @@
 package encry.view
 
-import encry.ModifierId
+import encry.CoreTaggedTypes.ModifierId
 import encry.modifiers.EncryPersistentModifier
-
 import scala.util.Try
 
 trait ObjectsStore {

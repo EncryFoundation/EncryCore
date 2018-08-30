@@ -1,6 +1,7 @@
 package encry.network
 
 import akka.actor.{Actor, Cancellable}
+import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
 import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
@@ -15,7 +16,6 @@ import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.EncryMempool
-import encry.{ModifierId, ModifierTypeId}
 import encry.utils.Logging
 import org.encryfoundation.common.Algos
 import scala.collection.mutable
