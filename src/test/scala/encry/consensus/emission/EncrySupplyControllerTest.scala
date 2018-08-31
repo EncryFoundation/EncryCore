@@ -2,7 +2,7 @@ package encry.consensus.emission
 
 import encry.consensus.EncrySupplyController
 import encry.settings.Constants
-import encry.view.history.Height
+import encry.view.history.History.Height
 import org.scalatest.{Matchers, PropSpec}
 
 import scala.concurrent.duration._

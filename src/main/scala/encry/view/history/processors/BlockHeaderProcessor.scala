@@ -1,6 +1,7 @@
 package encry.view.history.processors
 
 import com.google.common.primitives.Ints
+import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
@@ -14,7 +15,7 @@ import encry.settings.Constants._
 import encry.settings.{Constants, NodeSettings}
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.validation.{ModifierValidator, ValidationResult}
-import encry.view.history.Height
+import encry.view.history.History.Height
 import encry.view.history.storage.HistoryStorage
 import encry.{EncryApp, _}
 import io.iohk.iodb.ByteArrayWrapper
