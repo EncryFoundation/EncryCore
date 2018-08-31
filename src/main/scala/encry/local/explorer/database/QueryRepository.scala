@@ -9,7 +9,7 @@ import scorex.crypto.encode.Base16
 import cats.implicits._
 import doobie.postgres.implicits._
 import doobie.util.log.LogHandler
-import encry.CoreTaggedTypes.ModifierId
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, TransactionDBVersion}
 
 protected[database] object QueryRepository {

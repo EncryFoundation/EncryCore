@@ -1,4 +1,4 @@
-package encry
+package encry.utils
 
 import supertagged.TaggedType
 

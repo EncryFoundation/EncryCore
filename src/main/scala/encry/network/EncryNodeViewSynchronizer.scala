@@ -2,7 +2,7 @@ package encry.network
 
 import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorRef, Props}
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.EncryApp._
 import encry.consensus.History._
 import encry.consensus.SyncInfo

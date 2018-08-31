@@ -2,7 +2,7 @@ package encry.view.history.processors
 
 import com.google.common.primitives.Ints
 import encry.consensus.ConsensusTaggedTypes.Difficulty
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
 import encry.local.explorer.BlockListener.NewOrphaned

@@ -1,6 +1,6 @@
 package encry.modifiers
 
-import encry.CoreTaggedTypes.ModifierId
+import encry.utils.CoreTaggedTypes.ModifierId
 
 trait EncryPersistentModifier extends PersistentNodeViewModifier {
 

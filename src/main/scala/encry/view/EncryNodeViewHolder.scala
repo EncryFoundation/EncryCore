@@ -4,7 +4,7 @@ import java.io.File
 import akka.actor.{Actor, Props}
 import akka.persistence.RecoveryCompleted
 import akka.pattern._
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo

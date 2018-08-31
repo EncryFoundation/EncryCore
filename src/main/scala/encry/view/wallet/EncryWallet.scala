@@ -2,7 +2,7 @@ package encry.view.wallet
 
 import java.io.File
 import com.google.common.primitives.Longs
-import encry.CoreTaggedTypes.{ModifierId, VersionTag}
+import encry.utils.CoreTaggedTypes.{ModifierId, VersionTag}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.mempool.Transaction

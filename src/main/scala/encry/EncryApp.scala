@@ -8,8 +8,8 @@ import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.stream.ActorMaterializer
 import encry.api.http.routes._
 import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
-import encry.cli.ConsolePromptListener
-import encry.cli.ConsolePromptListener.StartListening
+import encry.cli.ConsoleListener
+import encry.cli.ConsoleListener.StartListening
 import encry.local.explorer.BlockListener
 import encry.local.explorer.database.DBService
 import encry.local.miner.Miner
@@ -18,11 +18,12 @@ import encry.network.message._
 import encry.network.peer.PeerManager
 import encry.network.{EncryNodeViewSynchronizer, ModifiersHolder, NetworkController}
 import encry.settings.EncryAppSettings
-import encry.stats.{KafkaActor, LoggingActor, StatsSender}
-import encry.utils.{Logging, NetworkTimeProvider, Zombie}
+import encry.stats.{KafkaActor, LoggingActor, StatsSender, Zombie}
+import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import org.encryfoundation.common.Algos
+
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.io.Source
@@ -65,7 +66,7 @@ object EncryApp extends App with Logging {
   if (settings.node.mining) miner ! StartMining
   if (settings.levelDb.enable) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
   if (settings.node.enableCLI) {
-    system.actorOf(Props[ConsolePromptListener], "cliListener")
+    system.actorOf(Props[ConsoleListener], "cliListener")
     system.actorSelection("/user/cliListener") ! StartListening
   }
   if (settings.node.loggingMode != "off") {

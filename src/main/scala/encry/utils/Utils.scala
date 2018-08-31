@@ -1,7 +1,7 @@
 package encry.utils
 
 import com.google.common.primitives.Longs
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
+import CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.mempool.Transaction.Nonce
 import encry.network.message.BasicMsgDataTypes.InvData
 import org.encryfoundation.common.Algos
