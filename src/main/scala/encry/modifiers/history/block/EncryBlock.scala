@@ -1,6 +1,7 @@
 package encry.modifiers.history.block
 
 import com.google.common.primitives.{Bytes, Ints}
+import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
@@ -8,7 +9,6 @@ import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.mempool.Transaction
 import encry.validation.{ModifierValidator, ValidationResult}
-import encry.{ModifierId, ModifierTypeId}
 import io.circe.Encoder
 import io.circe.syntax._
 import org.encryfoundation.common.serialization.Serializer

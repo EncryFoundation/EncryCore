@@ -1,6 +1,6 @@
 package encry.view.state
 
-import encry.VersionTag
+import encry.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewComponent
 
 trait StateReader extends NodeViewComponent {

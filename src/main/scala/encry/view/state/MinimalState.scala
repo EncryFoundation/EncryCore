@@ -1,6 +1,6 @@
 package encry.view.state
 
-import encry.VersionTag
+import encry.CoreTaggedTypes.VersionTag
 import encry.modifiers.PersistentNodeViewModifier
 import encry.modifiers.mempool.Transaction
 import org.encryfoundation.common.transaction.Proposition

@@ -2,8 +2,8 @@ package encry.utils
 
 import java.io.File
 import akka.actor.ActorRef
-import encry.{ModifierId, avltree}
-import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
+import encry.CoreTaggedTypes.ModifierId
+import encry.avltree._
 import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
@@ -129,12 +129,12 @@ trait EncryGenerator {
 
   def genUtxoState: UtxoState = {
     def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-      val p: avltree.BatchAVLProver[Digest32, Algos.HF] = new avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
-      bh.sortedBoxes.foreach(b => p.performOneOperation(avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
+      val p: BatchAVLProver[Digest32, Algos.HF] = new BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
+      bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
       val stateStore: LSMStore = new LSMStore(dir, keySize = 32, keepVersions = 10)
 
-      val persistentProver: avltree.PersistentBatchAVLProver[Digest32, HF] = {
+      val persistentProver: PersistentBatchAVLProver[Digest32, HF] = {
         val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
         val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(stateStore, np)(Algos.hash)
         PersistentBatchAVLProver.create(p, storage).get
