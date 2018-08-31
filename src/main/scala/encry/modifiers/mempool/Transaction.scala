@@ -1,5 +1,7 @@
 package encry.modifiers.mempool
 
+import com.google.common.primitives.Ints
+import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.history.block.Block.Timestamp
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.NodeViewModifier
@@ -58,19 +60,31 @@ case class Transaction(fee: Amount,
       .demand(directives.size <= Short.MaxValue, s"Too many directives in transaction $toString")
       .result
 
-  val length: Int = this.bytes.length
+  lazy val size: Int = this.bytes.length
 
-  val maxSize: Int = Constants.TransactionMaxSize
 
   lazy val newBoxes: Traversable[EncryBaseBox] =
     directives.zipWithIndex.flatMap { case (d, idx) => d.boxes(Digest32 !@@ id, idx) }
 
   lazy val costMultiplier: Amount =
     inputs.map(_.contract.fold(cc => cc, rc => rc.contract)).map(CompiledContract.costOf).sum +
-    (Constants.PersistentByteCost * length) +
+    (Constants.PersistentByteCost * size) +
     (Constants.StateByteCost * newBoxes.map(_.bytes).foldLeft(Array.empty[Byte])(_ ++ _).length)
 
   override def toString: String = s"<Transaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}>"
+
+  override lazy val semanticValidity: Try[Unit] = validateStateless.toTry
+
+  def validateStateless: ValidationResult =
+    accumulateErrors
+      .demand(fee >= 0, "Negative fee amount")
+      .demand(timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift, "Invalid timestamp")
+      .demand(inputs.lengthCompare(inputs.toSet.size) == 0, "Inputs duplication")
+      .demand(inputs.lengthCompare(Short.MaxValue) <= 0, "Wrong number of inputs")
+      .demand(directives.lengthCompare(Short.MaxValue) <= 0 && directives.nonEmpty, "Wrong number of directives")
+      .demand(directives.forall(_.isValid), "Invalid outputs")
+      .demand(size <= Constants.PayloadMaxSize, "Invalid size")
+      .result
 
   val tpe: Types.Product = Types.EncryTransaction
 

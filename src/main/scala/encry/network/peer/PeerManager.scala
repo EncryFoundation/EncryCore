@@ -25,7 +25,7 @@ class PeerManager extends Actor with Logging {
   addKnownPeersToPeersDatabase()
 
   override def receive: Receive = {
-    case GetConnectedPeers => sender() ! (connectedPeers.values.map(_.handshake).toSeq: Seq[Handshake])
+    case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
     case GetAllPeers => sender() ! PeerDatabase.knownPeers()
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
       if (!isSelf(address, None)) timeProvider
@@ -37,11 +37,11 @@ class PeerManager extends Actor with Logging {
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
     case DoConnecting(remote, direction) =>
       if (connectingPeers.contains(remote) && direction != Incoming) {
-        log.info(s"Trying to connect twice to $remote, going to drop the duplicate connection")
+        logInfo(s"Trying to connect twice to $remote, going to drop the duplicate connection")
         sender() ! CloseConnection
       }
       else if (direction != Incoming) {
-        log.info(s"Connecting to $remote")
+        logInfo(s"Connecting to $remote")
         connectingPeers += remote
       }
       sender() ! StartInteraction
@@ -67,10 +67,9 @@ class PeerManager extends Actor with Logging {
       if (connectedPeers.size + connectingPeers.size <= settings.network.maxConnections)
         randomPeer.filter(address => !connectedPeers.exists(_._1 == address) &&
           !connectingPeers.exists(_.getHostName == address.getHostName) && checkPossibilityToAddPeerWRecovery(address))
-          .foreach { address => sender() ! ConnectTo(address)
-          }
+          .foreach { address => sender() ! ConnectTo(address) }
     case RecoveryCompleted =>
-      log.info("Received RecoveryCompleted")
+      logInfo("Received RecoveryCompleted")
       recoveryCompleted = true
       addKnownPeersToPeersDatabase()
   }

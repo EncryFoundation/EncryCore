@@ -2,11 +2,10 @@ package encry.view.mempool
 
 import akka.actor.Cancellable
 import akka.actor.{ActorSystem, Cancellable}
-import encry.ModifierId
-import encry.EncryApp.system
+import encry.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.Transaction
 import encry.settings.EncryAppSettings
-import encry.utils.{Logging, NetworkTimeProvider}
+import encry.utils.NetworkTimeProvider
 import encry.view.mempool.EncryMempool._
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
@@ -15,11 +14,10 @@ import scala.util.{Failure, Success, Try}
 
 class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
                    settings: EncryAppSettings, timeProvider: NetworkTimeProvider, system: ActorSystem)
-  extends MemoryPool[Transaction, EncryMempool] with EncryMempoolReader with AutoCloseable with Logging {
+  extends MemoryPool[Transaction, EncryMempool] with EncryMempoolReader with AutoCloseable {
 
   private def removeExpired(): EncryMempool =
     filter(tx => (timeProvider.estimatedTime - tx.timestamp) > settings.node.utxMaxAge.toMillis)
-
 
   private val cleanup: Cancellable =
     system.scheduler.schedule(settings.node.mempoolCleanupInterval, settings.node.mempoolCleanupInterval)(removeExpired)
@@ -29,7 +27,8 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
   override def put(tx: Transaction): Try[EncryMempool] = put(Seq(tx))
 
   override def put(txs: Iterable[Transaction]): Try[EncryMempool] = {
-    val validTxs: Iterable[Transaction] = txs.filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
+    val validTxs: Iterable[Transaction] = txs
+      .filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
     if (validTxs.nonEmpty) {
       if ((size + validTxs.size) <= settings.node.mempoolMaxCapacity) {
         Success(putWithoutCheck(validTxs))

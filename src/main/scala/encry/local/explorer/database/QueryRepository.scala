@@ -3,19 +3,20 @@ package encry.local.explorer.database
 import cats.data.NonEmptyList
 import doobie.free.connection.ConnectionIO
 import doobie.util.update.Update
-import encry.ModifierId
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, HeaderDBVersion}
 import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.mempool.directive.DirectiveDBVersion
+import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, Transaction, TransactionDBVersion}
+import encry.CoreTaggedTypes.ModifierId
+import encry.utils.Logging
 import scorex.crypto.encode.Base16
 import cats.implicits._
 import doobie.Fragments.{in, whereAndOpt}
 import doobie.postgres.implicits._
+import doobie.util.log.LogHandler
 import doobie.implicits._
 import doobie.util.log.{ExecFailure, LogHandler, ProcessingFailure, Success}
-import encry.modifiers.mempool.directive.DirectiveDBVersion
-import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, Transaction, TransactionDBVersion}
-import encry.utils.Logging
 
 protected[database] object QueryRepository extends Logging {
 

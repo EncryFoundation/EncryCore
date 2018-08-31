@@ -1,8 +1,8 @@
 package encry.modifiers
 
 import com.typesafe.config.ConfigFactory
+import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.mempool.Transaction
-import encry.{ModifierId, ModifierTypeId}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.BytesSerializable
 import org.encryfoundation.common.transaction.Proposition

@@ -2,7 +2,7 @@ package encry.local.explorer
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
-import encry.ModifierId
+import encry.CoreTaggedTypes.ModifierId
 import encry.local.explorer.BlockListener.{ChainSwitching, NewOrphaned}
 import encry.local.explorer.database.DBService
 import encry.modifiers.history.block.EncryBlock
@@ -15,7 +15,6 @@ import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import org.mockito.Mockito._
 import org.mockito.ArgumentMatchers.{eq => eq_}
-
 import scala.concurrent.Future
 import scala.concurrent.duration._
 

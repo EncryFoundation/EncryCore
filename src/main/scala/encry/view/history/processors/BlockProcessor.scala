@@ -1,6 +1,6 @@
 package encry.view.history.processors
 
-import encry.ModifierId
+import encry.CoreTaggedTypes.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.consensus.ModifierSemanticValidity.Invalid
 import encry.modifiers.EncryPersistentModifier
@@ -144,7 +144,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
         s"updates block ${prevBest.map(_.encodedId).getOrElse("None")} " +
         s"with height ${prevBest.map(_.header.height).getOrElse(-1)}"
     }
-    log.info(s"Full block ${appliedBlock.encodedId} appended, " +
+    logInfo(s"Full block ${appliedBlock.encodedId} appended, " +
       s"going to apply ${toApply.length}$toRemoveStr modifiers.$newStatusStr")
   }
 

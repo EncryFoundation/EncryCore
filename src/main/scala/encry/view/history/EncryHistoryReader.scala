@@ -1,6 +1,6 @@
 package encry.view.history
 
-import encry._
+import encry.CoreTaggedTypes.ModifierId
 import encry.consensus.History._
 import encry.consensus.ModifierSemanticValidity
 import encry.modifiers.EncryPersistentModifier
@@ -9,11 +9,11 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.{Constants, NodeSettings}
-import encry.utils.Logging
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
 import encry.EncryApp.settings
+import encry.utils.Logging
 import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}

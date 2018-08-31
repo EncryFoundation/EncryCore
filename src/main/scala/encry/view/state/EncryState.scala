@@ -2,7 +2,7 @@ package encry.view.state
 
 import java.io.File
 import akka.actor.ActorRef
-import encry.VersionTag
+import encry.CoreTaggedTypes.VersionTag
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
 import encry.modifiers.state.box._
@@ -14,7 +14,7 @@ import scorex.crypto.encode.Base16
 import scala.util.Try
 
 trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
-  extends MinimalState[EncryPersistentModifier, IState] with Logging {
+  extends MinimalState[EncryPersistentModifier, IState] {
 
   self: IState =>
 
@@ -62,9 +62,9 @@ object EncryState extends Logging {
   def generateGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
     val supplyBoxes: List[EncryBaseBox] = EncryState.initialStateBoxes.toList
     UtxoState.genesis(supplyBoxes, stateDir, nodeViewHolderRef).ensuring(us => {
-      log.info(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
-      log.info(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
-      log.info(s"Generated UTXO state with ${supplyBoxes.size} boxes inside.")
+      logInfo(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
+      logInfo(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
+      logInfo(s"Generated UTXO state with ${supplyBoxes.size} boxes inside.")
       us.rootHash.sameElements(afterGenesisStateDigest) && us.version.sameElements(genesisStateVersion)
     })
   }

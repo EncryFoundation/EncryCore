@@ -1,6 +1,7 @@
 package encry.view.history.processors
 
 import com.google.common.primitives.Ints
+import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
 import encry.local.explorer.BlockListener.NewOrphaned
@@ -20,7 +21,6 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
 import scala.collection.immutable
-import scala.concurrent.Future
 import scala.util.Try
 
 trait BlockHeaderProcessor extends Logging {
@@ -67,7 +67,7 @@ trait BlockHeaderProcessor extends Logging {
       requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
     else if (!isHeadersChainSynced && isNewHeader(header)) {
       // Headers chain is synced after this header. Start downloading full blocks
-      log.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
+      logInfo(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
       isHeadersChainSyncedVar = true
       blockDownloadProcessor.updateBestBlock(header)
       Seq.empty
@@ -136,7 +136,7 @@ trait BlockHeaderProcessor extends Logging {
   private def getHeaderInfoUpdate(h: EncryBlockHeader): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier)] = {
     val difficulty: Difficulty = h.difficulty
     if (h.isGenesis) {
-      log.info(s"Initialize header chain with genesis header ${h.encodedId}")
+      logInfo(s"Initialize header chain with genesis header ${h.encodedId}")
       Option(Seq(
         BestHeaderKey -> ByteArrayWrapper(h.id),
         heightIdsKey(Constants.Chain.GenesisHeight) -> ByteArrayWrapper(h.id),
@@ -164,7 +164,7 @@ trait BlockHeaderProcessor extends Logging {
     * header ids at this height */
   private def bestBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
     val prevHeight = bestHeaderHeight
-    log.info(s"New best header ${h.encodedId} with score: $score. New height: ${h.height}, old height: $prevHeight")
+    logInfo(s"New best header ${h.encodedId} with score: $score. New height: ${h.height}, old height: $prevHeight")
     val self: (ByteArrayWrapper, ByteArrayWrapper) =
       heightIdsKey(h.height) -> ByteArrayWrapper((Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray)
     val parentHeaderOpt: Option[EncryBlockHeader] = typedModifierById[EncryBlockHeader](h.parentId)
@@ -180,7 +180,7 @@ trait BlockHeaderProcessor extends Logging {
 
   /** Row to storage, that put this orphaned block id to the end of header ids at this height */
   private def orphanedBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
-    log.info(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
+    logInfo(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
     Seq(heightIdsKey(h.height) -> ByteArrayWrapper((headerIdsAtHeight(h.height) :+ h.id).flatten.toArray))
   }
 
@@ -300,7 +300,7 @@ trait BlockHeaderProcessor extends Logging {
     private def validateChildBlockHeader(header: EncryBlockHeader, parent: EncryBlockHeader): ValidationResult = {
       failFast
         .validate(header.timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift) {
-          error(s"Header timestamp ${header.timestamp} is too far in future from now ${timeProvider.time()}")
+          error(s"Header timestamp ${header.timestamp} is too far in future from now ${timeProvider.estimatedTime}")
         }
         .validate(header.timestamp > parent.timestamp) {
           fatal(s"Header timestamp ${header.timestamp} is not greater than parents ${parent.timestamp}")
