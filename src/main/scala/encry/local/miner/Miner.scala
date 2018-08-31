@@ -4,7 +4,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
-import encry.consensus._
+import encry.consensus.{CandidateBlock, EncrySupplyController}
+import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
@@ -18,7 +19,8 @@ import encry.utils.Logging
 import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.CurrentView
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
-import encry.view.history.{EncryHistory, Height}
+import encry.view.history.EncryHistory
+import encry.view.history.History.Height
 import encry.view.mempool.EncryMempool
 import encry.view.state.{StateMode, UtxoState}
 import encry.view.wallet.EncryWallet

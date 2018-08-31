@@ -5,7 +5,7 @@ import encry.modifiers.state.Keys
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.utils.{EncryGenerator, TestHelper}
-import encry.view.history.Height
+import encry.view.history.History.Height
 import org.encryfoundation.common.transaction.Input
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.encryfoundation.prismlang.compiler.CompiledContract
