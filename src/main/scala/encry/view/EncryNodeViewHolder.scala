@@ -55,7 +55,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   system.scheduler.schedule(5.second, 5.second) {
     if (settings.node.sendStat)
-      system.actorSelection("user/statsSender") ! HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
+      system.actorSelection("user/statsSender") !
+        HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
