@@ -37,6 +37,7 @@ import scala.annotation.tailrec
 import scala.concurrent.Future
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.util.{Failure, Success, Try}
+import scala.concurrent.duration._
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging {
 
@@ -51,6 +52,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     ADProofs.modifierTypeId -> ADProofSerializer,
     Transaction.ModifierTypeId -> EncryTransactionSerializer
   )
+
+  system.scheduler.schedule(5.second, 5.second) {
+    if (settings.node.sendStat)
+      system.actorSelection("user/statsSender") !
+        HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
+  }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     reason.printStackTrace()
