@@ -9,18 +9,16 @@ import encry.stats.KafkaActor.KafkaMessage
 class LoggingActor extends Actor with StrictLogging {
 
   override def receive: Receive = {
-    case LogMessage(logLevel, logMessage, logsTime) =>
-      if (settings.node.loggingMode == "influx" && settings.node.sendStat)
-        context.system.actorSelection("user/statsSender") ! LogMessage(logLevel, logMessage, logsTime)
-      else if (settings.node.loggingMode == "kafka" && settings.kafka.sendToKafka)
-        context.system.actorSelection("/user/kafkaActor") ! KafkaMessage(logLevel, logMessage)
-      else if (settings.node.loggingMode == "file")
-        logLevel match {
-          case "Info" => logger.info(logMessage)
-          case "Warn" => logger.warn(logMessage)
-          case "Error" => logger.error(logMessage)
-          case "Debug" => logger.debug(logMessage)
-        }
+    case LogMessage(logLevel, logMessage, logsTime) => settings.node.loggingMode match {
+      case "Influx" => context.system.actorSelection(path = "user/statsSender") ! LogMessage(logLevel, logMessage, logsTime)
+      case "kafka" => context.system.actorSelection(path = "/user/kafkaActor") ! KafkaMessage(logLevel, logMessage)
+      case "file" => logLevel match {
+        case "Info" => logger.info(logMessage)
+        case "Warn" => logger.warn(logMessage)
+        case "Error" => logger.error(logMessage)
+        case "Debug" => logger.debug(logMessage)
+      }
+    }
     case _ =>
   }
 }

@@ -1,6 +1,6 @@
 package encry.view.wallet
 
-import encry.VersionTag
+import encry.CoreTaggedTypes.VersionTag
 import encry.modifiers.PersistentNodeViewModifier
 import encry.view.NodeViewComponent
 import encry.modifiers.mempool.Transaction

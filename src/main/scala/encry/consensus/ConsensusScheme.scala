@@ -1,6 +1,6 @@
 package encry.consensus
 
-import encry.ModifierId
+import encry.CoreTaggedTypes.ModifierId
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.Transaction
