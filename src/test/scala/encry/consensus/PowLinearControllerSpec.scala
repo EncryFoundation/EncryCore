@@ -1,7 +1,7 @@
 package encry.consensus
 
 import encry.settings.Constants
-import encry.view.history.Height
+import encry.view.history.History.Height
 import org.scalatest.{Matchers, PropSpec}
 
 import scala.collection.immutable

@@ -14,6 +14,7 @@ import encry.view.history.processors.payload.BaseBlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
 import encry.EncryApp.settings
 import encry.utils.Logging
+import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}

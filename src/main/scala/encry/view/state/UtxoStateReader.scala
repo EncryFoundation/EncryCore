@@ -3,7 +3,7 @@ package encry.view.state
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box._
-import encry.view.history.Height
+import encry.view.history.History.Height
 import io.iohk.iodb.Store
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
