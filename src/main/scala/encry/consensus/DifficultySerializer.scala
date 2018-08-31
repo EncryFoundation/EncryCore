@@ -1,6 +1,7 @@
 package encry.consensus
 
 import java.math.BigInteger
+import encry.consensus.ConsensusTaggedTypes.{Difficulty, NBits}
 
 //TODO object of no use
 object DifficultySerializer {
