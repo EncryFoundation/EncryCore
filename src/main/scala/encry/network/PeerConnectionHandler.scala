@@ -152,13 +152,11 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   }
 
   def dead: Receive = {
-
-    case message => logDebug( s"Get smth strange: $message")
+    case message => logDebug(s"Got smth strange: $message")
   }
 
   def deadNotIn: Receive = {
-
-    case message => logDebug(s"Get smth node strange: $message")
+    case message => logDebug(s"Got smth node strange: $message")
   }
 
   override def postStop(): Unit = {

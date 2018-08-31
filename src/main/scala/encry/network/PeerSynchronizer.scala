@@ -29,7 +29,7 @@ class PeerSynchronizer extends Actor with Logging {
       if spec.messageCode == PeersSpec.messageCode =>
       peers.filter(checkPossibilityToAddPeer).foreach(isa =>
         peerManager ! AddOrUpdatePeer(isa, None, Some(remote.direction)))
-      logDebug(s"Get new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
+      logDebug(s"Got new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
     case DataFromPeer(spec, _, remote) if spec.messageCode == GetPeersSpec.messageCode =>
       (peerManager ? RandomPeers(3))
         .mapTo[Seq[InetSocketAddress]]
