@@ -31,7 +31,7 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
 
   override def receive: Receive = {
     case StartRecovery => startRecovery().map { _ =>
-      log.info(s"All blocks restored from postgres")
+      logInfo(s"All blocks restored from postgres")
       peerManager ! RecoveryCompleted
       context.stop(self)
     }

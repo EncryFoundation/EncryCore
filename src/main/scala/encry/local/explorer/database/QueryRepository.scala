@@ -120,7 +120,7 @@ protected[database] object QueryRepository extends Logging {
 
   private implicit val logHandler: LogHandler = LogHandler {
     case Success(s, a, e1, e2) =>
-      log.info(s"""Successful Statement Execution:
+      logInfo(s"""Successful Statement Execution:
                   |
             |  ${s.lines.dropWhile(_.trim.isEmpty).mkString("\n  ")}
                   |
@@ -128,7 +128,7 @@ protected[database] object QueryRepository extends Logging {
                   |   elapsed = ${e1.toMillis} ms exec + ${e2.toMillis} ms processing (${(e1 + e2).toMillis} ms total)
           """.stripMargin)
     case ProcessingFailure(s, a, e1, e2, t) =>
-      log.warn(s"""Failed Resultset Processing:
+      logWarn(s"""Failed Resultset Processing:
                   |
             |  ${s.lines.dropWhile(_.trim.isEmpty).mkString("\n  ")}
                   |
@@ -137,7 +137,7 @@ protected[database] object QueryRepository extends Logging {
                   |   failure = ${t.getMessage}
           """.stripMargin)
     case ExecFailure(s, a, e1, t) =>
-      log.warn(s"""Failed Statement Execution:
+      logWarn(s"""Failed Statement Execution:
                   |
             |  ${s.lines.dropWhile(_.trim.isEmpty).mkString("\n  ")}
                   |

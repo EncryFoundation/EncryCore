@@ -283,7 +283,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, Transaction](tx)
-    case Failure(e) => log.warn(s"Failed to put tx ${tx.id} to mempool", e)
+    case Failure(e) => logWarn(s"Failed to put tx ${tx.id} to mempool with exception ${e.getLocalizedMessage}")
   }
 
   def genesisState: NodeView = {
@@ -376,7 +376,7 @@ object EncryNodeViewHolder {
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    case class BlocksFromLocalPersistence(blocks: Seq[EncryBlock], allBlocksSent: Boolean = false)
+    case class BlocksFromLocalPersistence(blocks: Seq[EncryBlock], allBlocksSent: Boolean = true)
 
     case class ModifiersFromRemote(modTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
 

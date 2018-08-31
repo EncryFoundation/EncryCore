@@ -1,7 +1,7 @@
 package encry.modifiers.mempool.directive
 
 import com.google.common.primitives.{Bytes, Ints}
-import encry.ModifierId
+import encry.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.{DataBox, EncryBaseBox, EncryProposition}
 import encry.settings.Constants

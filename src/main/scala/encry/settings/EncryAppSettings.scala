@@ -32,8 +32,6 @@ case class WalletSettings(password: String, seed: Option[String])
 
 case class LevelDbSettings(enable: Boolean, recoverMode: Boolean, batchSize: Int)
 
-case class PostgresSettings(host: String, user: String, password: String, enabled: Boolean = false)
-
 case class KafkaSettings(sendToKafka: Boolean, topicName: String, groupId: String, kafkaBrokers: String)
 
 case class InfluxDBSettings(url: String, login: String, password: String, udpPort: Int)

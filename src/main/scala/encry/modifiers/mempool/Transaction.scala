@@ -1,15 +1,14 @@
 package encry.modifiers.mempool
 
-import com.google.common.primitives.Ints
 import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.history.block.Block.Timestamp
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.NodeViewModifier
-import encry.{ModifierId, ModifierTypeId}
 import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, DataBox}
 import encry.modifiers.state.box.EncryBaseBox
+import encry.EncryApp.timeProvider
 import io.circe.{Decoder, HCursor}
 import io.circe.syntax._
 import org.encryfoundation.common.transaction._
@@ -26,6 +25,7 @@ import scorex.crypto.hash.Digest32
 import scala.util.{Success, Try}
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
+import encry.CoreTaggedTypes
 import encry.validation.{ModifierValidator, ValidationResult}
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
@@ -47,21 +47,7 @@ case class Transaction(fee: Amount,
     UnsignedTransaction.bytesToSign(fee, timestamp, inputs, directives)
   val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
 
-  lazy val semanticValidity: Try[Unit] = validateStateless.toTry
-
-  def validSize: Boolean = length <= maxSize
-
-  def validateStateless: ValidationResult =
-    accumulateErrors
-      .demand(validSize, "Invalid size")
-      .demand(fee >= 0, "Negative fee amount")
-      .demand(directives.forall(_.isValid), "Invalid outputs")
-      .demand(inputs.size <= Short.MaxValue, s"Too many inputs in transaction $toString")
-      .demand(directives.size <= Short.MaxValue, s"Too many directives in transaction $toString")
-      .result
-
   lazy val size: Int = this.bytes.length
-
 
   lazy val newBoxes: Traversable[EncryBaseBox] =
     directives.zipWithIndex.flatMap { case (d, idx) => d.boxes(Digest32 !@@ id, idx) }
@@ -73,7 +59,7 @@ case class Transaction(fee: Amount,
 
   override def toString: String = s"<Transaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}>"
 
-  override lazy val semanticValidity: Try[Unit] = validateStateless.toTry
+  lazy val semanticValidity: Try[Unit] = validateStateless.toTry
 
   def validateStateless: ValidationResult =
     accumulateErrors
@@ -102,7 +88,7 @@ object Transaction {
 
   case class TransactionValidationException(s: String) extends Exception(s)
 
-  val ModifierTypeId: ModifierTypeId = encry.ModifierTypeId @@ 2.toByte
+  val ModifierTypeId: ModifierTypeId = CoreTaggedTypes.ModifierTypeId @@ 2.toByte
 
   implicit val jsonEncoder: Encoder[Transaction] = (tx: Transaction) => Map(
     "id" -> Algos.encode(tx.id).asJson,

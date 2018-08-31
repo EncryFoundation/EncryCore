@@ -1,11 +1,11 @@
 package encry.modifiers.mempool.directive
 
-import encry.ModifierId
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.EncryBaseBox
 import encry.utils.Logging
 import io.circe._
 import cats.implicits._
+import encry.CoreTaggedTypes.ModifierId
 import org.encryfoundation.common.serialization.BytesSerializable
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scorex.crypto.encode.Base16
@@ -73,7 +73,7 @@ case class DirectiveDBVersion(txId: String,
         case (contractHashDec, dataDec) => DataDirective(contractHashDec, dataDec)
       }.toOption
       case _ =>
-        log.warn(s"Malformed directive from DB: $this")
+        logWarn(s"Malformed directive from DB: $this")
         None
     }
 }
