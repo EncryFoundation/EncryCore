@@ -122,16 +122,12 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
                             bestFullHeader: EncryBlockHeader,
                             updateHeaderInfo: Boolean = false): Unit = {
     val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeader.id)
+    val bestBlockData: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = Seq(BestBlockKey -> bestFullHeaderIdWrapped)
     val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-      if (updateHeaderInfo) {
-        val bestFullHeaderScore: BigInt = scoreOf(bestFullHeader.parentId).getOrElse(BigInt(0)) + bestFullHeader.difficulty
-        Seq(
-          BestBlockKey -> bestFullHeaderIdWrapped,
-          BestHeaderKey -> bestFullHeaderIdWrapped,
-          headerScoreKey(bestFullHeader.id) -> ByteArrayWrapper(bestFullHeaderScore.toByteArray),
-          headerHeightKey(bestFullHeader.id) -> ByteArrayWrapper(Ints.toByteArray(bestFullHeader.height))
-        ) ++ bestBlockHeaderIdsRow(bestFullHeader)
-      } else Seq(BestBlockKey -> bestFullHeaderIdWrapped)
+      if (updateHeaderInfo) getHeaderInfoUpdate(bestFullHeader)
+        .map { _._1 ++ bestBlockData }
+        .getOrElse(bestBlockData)
+      else bestBlockData
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
   }
 
