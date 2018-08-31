@@ -1,6 +1,8 @@
 package encry.view.history.processors
 
 import com.google.common.primitives.Ints
+import encry.consensus.ConsensusTaggedTypes.Difficulty
+import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
 import encry.local.explorer.BlockListener.NewOrphaned
@@ -13,14 +15,13 @@ import encry.settings.Constants._
 import encry.settings.{Constants, NodeSettings}
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.validation.{ModifierValidator, ValidationResult}
-import encry.view.history.Height
+import encry.view.history.History.Height
 import encry.view.history.storage.HistoryStorage
 import encry.{EncryApp, _}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
 import scala.collection.immutable
-import scala.concurrent.Future
 import scala.util.Try
 
 trait BlockHeaderProcessor extends Logging {
@@ -300,7 +301,7 @@ trait BlockHeaderProcessor extends Logging {
     private def validateChildBlockHeader(header: EncryBlockHeader, parent: EncryBlockHeader): ValidationResult = {
       failFast
         .validate(header.timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift) {
-          error(s"Header timestamp ${header.timestamp} is too far in future from now ${timeProvider.time()}")
+          error(s"Header timestamp ${header.timestamp} is too far in future from now ${timeProvider.estimatedTime}")
         }
         .validate(header.timestamp > parent.timestamp) {
           fatal(s"Header timestamp ${header.timestamp} is not greater than parents ${parent.timestamp}")

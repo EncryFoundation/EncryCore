@@ -1,8 +1,8 @@
 package encry.settings
 
-import encry.consensus.Difficulty
+import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.modifiers.history.block.Block.Version
-import encry.view.history.Height
+import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scala.concurrent.duration._
@@ -13,11 +13,11 @@ object Constants {
 
   val ModifierIdSize: Int = DigestLength
 
-  // Maximum block size in bytes
-  val BlockMaxSize: Int = 1000000
+  // Maximum block payload size in bytes
+  val PayloadMaxSize: Int = 1000000
 
-  // Maximum transaction size in bytes
-  val TransactionMaxSize: Int = BlockMaxSize / 4
+  // Maximum block header size in bytes
+  val HeaderMaxSize: Int = 200
 
   val DefaultKeepVersions: Int = 200
 
@@ -70,7 +70,8 @@ object Constants {
     // Maximum number of epochs blockchain state can be rolled back
     val MaxRollbackDepth: Int = 100
 
-    val MaxTimeDrift: Long = 10 * DesiredBlockInterval.toMillis
+    // Maximum delta any timestamp can differ from current estimated time
+    val MaxTimeDrift: Long = (2 hours).toMillis
   }
 
   object Equihash {

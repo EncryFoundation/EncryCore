@@ -2,6 +2,7 @@ package encry.network
 
 import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorRef, Props}
+import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.EncryApp._
 import encry.consensus.History._
 import encry.consensus.SyncInfo
@@ -22,8 +23,8 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeV
 import encry.view.history.{EncryHistory, EncryHistoryReader, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.{EncryMempool, MempoolReader}
 import encry.view.state.StateReader
-import encry.{ModifierId, ModifierTypeId, VersionTag}
 import encry.utils.Logging
+import encry.utils.Utils._
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.Proposition
 
@@ -73,9 +74,9 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, settings.network.networkChunkSize)
           val ext: ModifierIds = extensionOpt.getOrElse(Seq())
           val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
-          logInfo(s"Comparison with $remote having starting points ${encry.idsToString(syncInfo.startingPoints)}. " +
+          logInfo(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}")
-          logInfo(s"Extension ids: ${encry.idsToString(ext)}")
+          logInfo(s"Extension ids: ${idsToString(ext)}")
           if (!(extensionOpt.nonEmpty || comparison != Younger)) logWarn("Extension is empty while comparison is younger")
           deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
@@ -88,16 +89,16 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
           case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
           case _: ModifierTypeId => invData._2.flatMap(id => readers._1.modifierById(id))
         }
-        logDebug(s"Requested ${invData._2.length} modifiers ${encry.idsToString(invData)}, " +
-          s"sending ${objs.length} modifiers ${encry.idsToString(invData._1, objs.map(_.id))} ")
+        logDebug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
+          s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
         logDebug(s"Peer: ${remote.socketAddress} requested for modifiers of type ${invData._1} with ids: " +
           s"${invData._2.map(Algos.encode).mkString(",")}")
 
         self ! ResponseFromLocal(remote, invData._1, objs)
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
-      logDebug(s"Get inv message from ${remote.socketAddress} with modTypeId: ${invData._1} and modifiers: " +
-        s"${invData._2.foldLeft("|") { case (str, id) => str + "|" + Algos.encode(id) }}")
+      logDebug(s"Get inv message from ${remote.socketAddress} " +
+        s"with modTypeId ${invData._1}: ${invData._2.size} modifiers.")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       logDebug( s"Get modifiers from ${remote.socketAddress} with modTypeID: ${data._1} and modifiers: " +

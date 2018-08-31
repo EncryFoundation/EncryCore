@@ -4,8 +4,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
-import encry.consensus._
-import encry.local.miner.EncryMiningWorker.NextChallenge
+import encry.consensus.{CandidateBlock, EncrySupplyController}
+import encry.consensus.ConsensusTaggedTypes.Difficulty
+import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.mempool.{EncryTransaction, Transaction, TransactionFactory}
@@ -18,7 +19,8 @@ import encry.utils.Logging
 import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.CurrentView
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
-import encry.view.history.{EncryHistory, Height}
+import encry.view.history.EncryHistory
+import encry.view.history.History.Height
 import encry.view.mempool.EncryMempool
 import encry.view.state.{StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
@@ -57,7 +59,7 @@ class Miner extends Actor with Logging {
       self ! StartMining
     case StartMining =>
       for (i <- 0 until numberOfWorkers) yield context.actorOf(
-        Props(classOf[EncryMiningWorker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
+        Props(classOf[Worker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
       candidateOpt match {
         case Some(candidateBlock) =>
           logInfo(s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
@@ -144,7 +146,7 @@ class Miner extends Actor with Logging {
       .foldLeft((Seq[Transaction](), Seq[Transaction](), Set[ByteArrayWrapper]())) {
         case ((validTxs, invalidTxs, bxsAcc), tx) =>
           val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.inputs.map(u => ByteArrayWrapper(u.boxId))
-          if ((validTxs.map(_.length).sum + tx.length) <= Constants.BlockMaxSize - 124) {
+          if ((validTxs.map(_.size).sum + tx.size) <= Constants.PayloadMaxSize) {
             if (view.state.validate(tx).isSuccess && bxsRaw.forall(k =>
               !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size)
               (validTxs :+ tx, invalidTxs, bxsAcc ++ bxsRaw)

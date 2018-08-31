@@ -1,11 +1,11 @@
 package encry.modifiers.history
 
 import com.google.common.primitives.Bytes
-import encry.avltree.{BatchAVLVerifier, Modification}
+import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
+import encry.avltree.{BatchAVLVerifier, Insert, Modification, Remove}
 import encry.modifiers.state.box._
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
 import encry.settings.Constants
-import encry._
 import io.circe.Encoder
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
@@ -87,10 +87,10 @@ object ADProofs {
   def toModification(op: EncryBoxStateChangeOperation): Modification =
     op match {
       case Insertion(box) => box match {
-        case bx: EncryBaseBox => avltree.Insert(bx.id, ADValue @@ bx.bytes)
+        case bx: EncryBaseBox => Insert(bx.id, ADValue @@ bx.bytes)
         case _ => throw new Exception("Got state modifier of unknown type.")
       }
-      case Removal(id) => avltree.Remove(id)
+      case Removal(id) => Remove(id)
     }
 }
 
