@@ -1,8 +1,8 @@
-package encry.view
+package encry.view.history
 
 import supertagged.TaggedType
 
-package object history {
+object History {
 
   object Height extends TaggedType[Int]
 
