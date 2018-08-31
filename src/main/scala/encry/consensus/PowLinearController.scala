@@ -1,9 +1,9 @@
 package encry.consensus
 
-import encry.consensus
+import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.settings.Constants
-import encry.view.history.Height
+import encry.view.history.History.Height
 import supertagged.@@
 
 object PowLinearController {
@@ -20,7 +20,7 @@ object PowLinearController {
         val start: (Int, EncryBlockHeader) = d.head
         val end: (Int, EncryBlockHeader) = d.last
         require(end._1 - start._1 == chainParams.EpochLength, s"Incorrect heights interval for $d")
-        val diff: @@[BigInt, consensus.Difficulty.Tag] = Difficulty @@ (end._2.requiredDifficulty * chainParams.DesiredBlockInterval.toMillis *
+        val diff: @@[BigInt, Difficulty.Tag] = Difficulty @@ (end._2.requiredDifficulty * chainParams.DesiredBlockInterval.toMillis *
           chainParams.EpochLength / (end._2.timestamp - start._2.timestamp))
         (end._1, diff)
       }

@@ -1,6 +1,6 @@
 package encry.view.state
 
-import encry.view.history.Height
+import encry.view.history.History.Height
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import org.encryfoundation.prismlang.core.{PConvertible, Types}

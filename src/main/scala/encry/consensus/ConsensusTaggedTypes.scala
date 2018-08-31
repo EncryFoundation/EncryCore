@@ -1,8 +1,8 @@
-package encry
+package encry.consensus
 
 import supertagged.TaggedType
 
-package object consensus {
+object ConsensusTaggedTypes {
 
   object Difficulty extends TaggedType[BigInt]
 

@@ -11,6 +11,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.stats.StatsSender._
 import encry.view.history
 import encry.stats.LoggingActor.LogMessage
+import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 import scala.collection.mutable
@@ -55,7 +56,7 @@ class StatsSender extends Actor {
         s"historyWeight,nodeName=${settings.network.nodeName},height=${fb.height} " +
           s"value=${new File("encry/data/history/").listFiles.foldLeft(0L)(_ + _.length())}",
         s"supply,nodeName=${settings.network.nodeName},height=${fb.height} " +
-          s"value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[history.Height])}"
+          s"value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[Height])}"
       )
       )
 
