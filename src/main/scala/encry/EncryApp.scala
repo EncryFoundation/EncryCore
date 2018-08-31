@@ -59,16 +59,19 @@ object EncryApp extends App with Logging {
   lazy val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
-  val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.kafka.sendToKafka) system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
-  if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
   if (settings.postgres.enabled) system.actorOf(Props(classOf[BlockListener], DBService()), "blockListener")
   if (settings.node.mining) miner ! StartMining
   if (settings.levelDb.enable) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
-  if (settings.node.enableCLI) cliListener ! StartListening
-  system.actorOf(Props[Zombie], "zombie")
-  if (settings.node.loggingMode != "off") system.actorOf(Props[LoggingActor], "loggingActor")
+  if (settings.node.enableCLI) {
+    system.actorOf(Props[ConsolePromptListener], "cliListener")
+    system.actorSelection("/user/cliListener") ! StartListening
+  }
+  if (settings.node.loggingMode != "off") {
+    system.actorOf(Props[LoggingActor], "loggingActor")
+    system.actorOf(Props[Zombie], "zombie")
+  }
 
   if (settings.restApi.enabled) {
     import akka.http.scaladsl.model.StatusCodes._
