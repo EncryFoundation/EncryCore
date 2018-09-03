@@ -1,6 +1,7 @@
-package encry.utils
+package encry.stats
 
 import akka.actor.{Actor, DeadLetter, UnhandledMessage}
+import encry.utils.Logging
 
 class Zombie extends Actor with Logging {
 

@@ -1,7 +1,7 @@
 package encry.modifiers.history.block
 
 import com.google.common.primitives.{Bytes, Ints}
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}

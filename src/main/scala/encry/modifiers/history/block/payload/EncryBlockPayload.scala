@@ -1,7 +1,7 @@
 package encry.modifiers.history.block.payload
 
 import com.google.common.primitives.{Bytes, Ints}
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.mempool._
 import io.circe.Encoder
 import io.circe.syntax._

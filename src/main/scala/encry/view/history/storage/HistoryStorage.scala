@@ -1,6 +1,6 @@
 package encry.view.history.storage
 
-import encry.CoreTaggedTypes.ModifierId
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.HistoryModifierSerializer
 import encry.storage.EncryStorage

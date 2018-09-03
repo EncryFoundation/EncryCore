@@ -4,7 +4,7 @@ import java.io.File
 import java.util
 import java.text.SimpleDateFormat
 import akka.actor.Actor
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
 import encry.modifiers.history.block.header.EncryBlockHeader

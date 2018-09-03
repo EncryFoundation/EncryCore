@@ -1,7 +1,7 @@
 package encry.modifiers.history
 
 import com.google.common.primitives.Bytes
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.avltree.{BatchAVLVerifier, Insert, Modification, Remove}
 import encry.modifiers.state.box._
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}

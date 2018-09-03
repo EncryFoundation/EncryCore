@@ -1,6 +1,6 @@
 package encry.view
 
-import encry.CoreTaggedTypes.ModifierId
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.EncryPersistentModifier
 import scala.util.Try
 

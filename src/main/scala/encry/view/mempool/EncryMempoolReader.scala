@@ -1,6 +1,6 @@
 package encry.view.mempool
 
-import encry.CoreTaggedTypes.ModifierId
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.Transaction
 import encry.view.mempool.EncryMempool.{MemPoolRequest, MemPoolResponse, TxKey}
 import scala.collection.concurrent.TrieMap
