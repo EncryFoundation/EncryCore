@@ -24,7 +24,6 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
 
-//scalastyle:off
 trait BlockHeaderProcessor extends Logging {
 
   protected val nodeSettings: NodeSettings
@@ -82,7 +81,6 @@ trait BlockHeaderProcessor extends Logging {
 
   private def isNewHeader(header: EncryBlockHeader): Boolean =
     timeProvider.estimatedTime - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * Constants.Chain.NewHeaderTimeMultiplier
-
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
@@ -165,7 +163,7 @@ trait BlockHeaderProcessor extends Logging {
 
   /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
     * header ids at this height */
-  protected def bestBlockHeaderIdsRow(h: EncryBlockHeader): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
+  private def bestBlockHeaderIdsRow(h: EncryBlockHeader): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
     val self: (ByteArrayWrapper, ByteArrayWrapper) =
       heightIdsKey(h.height) -> ByteArrayWrapper((Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray)
     val parentHeaderOpt: Option[EncryBlockHeader] = typedModifierById[EncryBlockHeader](h.parentId)
