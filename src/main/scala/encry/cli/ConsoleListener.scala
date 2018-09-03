@@ -6,9 +6,9 @@ import encry.cli.commands._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class ConsolePromptListener extends Actor {
+class ConsoleListener extends Actor {
 
-  import ConsolePromptListener._
+  import ConsoleListener._
 
   override def receive: Receive = {
     case StartListening =>
@@ -30,7 +30,7 @@ class ConsolePromptListener extends Actor {
   }
 }
 
-object ConsolePromptListener {
+object ConsoleListener {
 
   case object StartListening
 
@@ -58,5 +58,5 @@ object ConsolePromptListener {
   ))
 
   val cmdDictionary: Map[String, Map[String, Command]] =
-    ConsolePromptListener.nodeCmds ++ ConsolePromptListener.appCmds ++ ConsolePromptListener.walletCmds
+    ConsoleListener.nodeCmds ++ ConsoleListener.appCmds ++ ConsoleListener.walletCmds
 }

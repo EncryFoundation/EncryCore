@@ -1,6 +1,6 @@
 package encry.modifiers.history.block
 
-import encry.CoreTaggedTypes.ModifierId
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.EncryBlockHeader

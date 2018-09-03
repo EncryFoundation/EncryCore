@@ -1,7 +1,7 @@
 package encry.modifiers.mempool
 
 import com.google.common.primitives.Ints
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.history.block.Block.Timestamp
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.NodeViewModifier
@@ -10,6 +10,7 @@ import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, DataBox}
 import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.Constants
+import encry.utils.CoreTaggedTypes
 import io.circe.Encoder
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.{Input, Proof}
@@ -17,6 +18,7 @@ import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.PConvertible
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
+
 import scala.util.Try
 
 trait Transaction extends NodeViewModifier with PConvertible {
@@ -52,7 +54,7 @@ object Transaction {
     case tx: EncryTransaction => EncryTransaction.jsonEncoder(tx)
   }
 
-  val ModifierTypeId: ModifierTypeId = encry.CoreTaggedTypes.ModifierTypeId @@ 2.toByte
+  val ModifierTypeId: ModifierTypeId = CoreTaggedTypes.ModifierTypeId @@ 2.toByte
 }
 
 case class TransactionDBVersion(id: String, blockId: String, isCoinbase: Boolean, timestamp: Timestamp)

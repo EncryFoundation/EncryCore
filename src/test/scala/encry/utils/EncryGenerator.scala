@@ -2,7 +2,7 @@ package encry.utils
 
 import java.io.File
 import akka.actor.ActorRef
-import encry.CoreTaggedTypes.ModifierId
+import CoreTaggedTypes.ModifierId
 import encry.avltree._
 import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.history.block.header.EncryBlockHeader

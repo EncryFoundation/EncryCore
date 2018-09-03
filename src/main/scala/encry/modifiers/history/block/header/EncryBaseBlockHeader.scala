@@ -1,6 +1,6 @@
 package encry.modifiers.history.block.header
 
-import encry.CoreTaggedTypes.ModifierId
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.Block._
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest

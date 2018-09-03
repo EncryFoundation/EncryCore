@@ -2,7 +2,7 @@ package encry.view.state
 
 import java.io.File
 import akka.actor.ActorRef
-import encry.CoreTaggedTypes.VersionTag
+import encry.utils.CoreTaggedTypes.VersionTag
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
 import encry.modifiers.state.box._

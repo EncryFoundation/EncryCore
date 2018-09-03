@@ -1,6 +1,6 @@
 package encry.modifiers.history.block.payload
 
-import encry.CoreTaggedTypes.ModifierId
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
 import encry.utils.TestHelper
 import org.scalatest.FunSuite
