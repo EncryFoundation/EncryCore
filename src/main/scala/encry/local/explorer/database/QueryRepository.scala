@@ -7,18 +7,15 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, HeaderDBVersion}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.directive.DirectiveDBVersion
-import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, Transaction, TransactionDBVersion}
-import encry.CoreTaggedTypes.ModifierId
 import encry.utils.Logging
 import scorex.crypto.encode.Base16
 import cats.implicits._
 import doobie.Fragments.{in, whereAndOpt}
 import doobie.postgres.implicits._
-import doobie.util.log.LogHandler
 import doobie.implicits._
 import doobie.util.log.{ExecFailure, LogHandler, ProcessingFailure, Success}
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, TransactionDBVersion}
+import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, TransactionDBVersion, Transaction}
 
 protected[database] object QueryRepository extends Logging {
 

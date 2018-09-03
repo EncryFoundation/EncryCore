@@ -5,7 +5,7 @@ import encry.modifiers.state.box.EncryBaseBox
 import encry.utils.Logging
 import io.circe._
 import cats.implicits._
-import encry.CoreTaggedTypes.ModifierId
+import encry.utils.CoreTaggedTypes.ModifierId
 import org.encryfoundation.common.serialization.BytesSerializable
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scorex.crypto.encode.Base16

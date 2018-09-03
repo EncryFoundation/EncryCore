@@ -1,8 +1,6 @@
 package encry.modifiers.mempool
 
-import com.google.common.primitives.Ints
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.history.block.Block.Timestamp
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.NodeViewModifier
@@ -28,7 +26,6 @@ import scorex.crypto.hash.Digest32
 import scala.util.{Success, Try}
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import encry.CoreTaggedTypes
 import encry.validation.{ModifierValidator, ValidationResult}
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
@@ -86,12 +83,12 @@ case class Transaction(fee: Amount,
 
 object Transaction {
 
+  val ModifierTypeId: ModifierTypeId = CoreTaggedTypes.ModifierTypeId @@ 2.toByte
+
   type TxTypeId = Byte
   type Nonce = Long
 
   case class TransactionValidationException(s: String) extends Exception(s)
-
-  val ModifierTypeId: ModifierTypeId = CoreTaggedTypes.ModifierTypeId @@ 2.toByte
 
   implicit val jsonEncoder: Encoder[Transaction] = (tx: Transaction) => Map(
     "id" -> Algos.encode(tx.id).asJson,
@@ -166,11 +163,9 @@ object TransactionSerializer extends Serializer[Transaction] {
       ProofSerializer.parseBytes(leftBytes2.drop(directivesLen)).map(Some(_))
         .getOrElse(throw SerializationException)
     }
-  val ModifierTypeId: ModifierTypeId = CoreTaggedTypes.ModifierTypeId @@ 2.toByte
-}
-
     Transaction(fee, timestamp, unlockers, directives, proofOpt)
   }
+
 }
 
 case class UnsignedTransaction(fee: Amount,
