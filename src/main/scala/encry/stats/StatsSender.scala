@@ -44,9 +44,9 @@ class StatsSender extends Actor {
           case _ => 4
         }
       } value="[${sdf.format(logTime)}] $logMessage"""")
-    case BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int) =>
-      influxDB.write(settings.influxDB.udpPort, s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache," +
-        s"completedBlocksStat=$completedBlocks,notCompletedBlocksStat=$notCompletedBlocks")
+    case HeightStatistics(bestHeaderHeight, bestBlockHeight) =>
+      influxDB.write(settings.influxDB.udpPort,
+        s"chainStat,nodeName=${settings.network.nodeName} value=$bestHeaderHeight,bestBlockHeight=$bestBlockHeight")
     case BestHeaderInChain(fb: EncryBlockHeader) =>
       influxDB.write(settings.influxDB.udpPort, util.Arrays.asList(
         s"difficulty,nodeName=${settings.network.nodeName} diff=${fb.difficulty.toString},height=${fb.height}",
@@ -137,7 +137,7 @@ object StatsSender {
 
   case class GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
 
-  case class BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int)
+  case class HeightStatistics(bestHeaderHeight: Int, bestBlockHeight: Int)
 
   case class StateUpdating(time: Long)
 
