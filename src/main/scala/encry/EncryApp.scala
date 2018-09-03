@@ -23,7 +23,6 @@ import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import org.encryfoundation.common.Algos
-
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.io.Source
