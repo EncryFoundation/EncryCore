@@ -4,7 +4,7 @@ import java.io.File
 import akka.actor.{Actor, Props}
 import akka.persistence.RecoveryCompleted
 import akka.pattern._
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
@@ -37,6 +37,7 @@ import scala.annotation.tailrec
 import scala.concurrent.Future
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.util.{Failure, Success, Try}
+import scala.concurrent.duration._
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging {
 
@@ -52,6 +53,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     ADProofs.modifierTypeId -> ADProofSerializer,
     Transaction.ModifierTypeId -> TransactionSerializer
   )
+
+  system.scheduler.schedule(5.second, 5.second) {
+    if (settings.node.sendStat)
+      system.actorSelection("user/statsSender") !
+        HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
+  }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     reason.printStackTrace()

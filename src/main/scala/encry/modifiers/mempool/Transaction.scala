@@ -1,5 +1,7 @@
 package encry.modifiers.mempool
 
+import com.google.common.primitives.Ints
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.history.block.Block.Timestamp
 import encry.modifiers.history.block.EncryBlock
@@ -15,6 +17,7 @@ import org.encryfoundation.common.transaction._
 import org.encryfoundation.prismlang.compiler.CompiledContractSerializer
 import org.encryfoundation.prismlang.core.Types
 import encry.settings.Constants
+import encry.utils.CoreTaggedTypes
 import io.circe.Encoder
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.{Input, Proof}
@@ -163,6 +166,8 @@ object TransactionSerializer extends Serializer[Transaction] {
       ProofSerializer.parseBytes(leftBytes2.drop(directivesLen)).map(Some(_))
         .getOrElse(throw SerializationException)
     }
+  val ModifierTypeId: ModifierTypeId = CoreTaggedTypes.ModifierTypeId @@ 2.toByte
+}
 
     Transaction(fee, timestamp, unlockers, directives, proofOpt)
   }

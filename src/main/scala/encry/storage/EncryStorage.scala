@@ -1,6 +1,6 @@
 package encry.storage
 
-import encry.CoreTaggedTypes.VersionTag
+import encry.utils.CoreTaggedTypes.VersionTag
 import encry.storage.codec.FixLenComplexValueCodec
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.Algos

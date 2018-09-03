@@ -3,7 +3,7 @@ package encry.modifiers.mempool
 import encry.modifiers.mempool.directive.{Directive, TransferDirective}
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.MonetaryBox
-import encry.view.history.Height
+import encry.view.history.History.Height
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import org.encryfoundation.common.transaction.EncryAddress.Address
 import org.encryfoundation.common.transaction.{Input, Proof, PubKeyLockedContract}

@@ -1,6 +1,6 @@
 package encry.modifiers.state.box.proposition
 
-import encry.view.history.Height
+import encry.view.history.History.Height
 import scorex.crypto.authds.ADDigest
 import scorex.utils.Random
 

@@ -17,6 +17,8 @@ import doobie.postgres.implicits._
 import doobie.util.log.LogHandler
 import doobie.implicits._
 import doobie.util.log.{ExecFailure, LogHandler, ProcessingFailure, Success}
+import encry.utils.CoreTaggedTypes.ModifierId
+import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, TransactionDBVersion}
 
 protected[database] object QueryRepository extends Logging {
 

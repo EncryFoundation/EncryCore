@@ -1,7 +1,7 @@
 package encry.view.history
 
 import java.io.File
-import encry.CoreTaggedTypes.ModifierId
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
@@ -38,7 +38,7 @@ trait EncryHistory extends EncryHistoryReader with Logging {
     .exists(bestHeader => bestBlockOpt.exists(b => ByteArrayWrapper(b.header.id) == ByteArrayWrapper(bestHeader.id)))
 
   /** Appends modifier to the history if it is applicable. */
-  def append(modifier: EncryPersistentModifier): Try[(EncryHistory, History.ProgressInfo[EncryPersistentModifier])] = {
+  def append(modifier: EncryPersistentModifier): Try[(EncryHistory, ProgressInfo[EncryPersistentModifier])] = {
     logInfo(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Try {
       modifier match {

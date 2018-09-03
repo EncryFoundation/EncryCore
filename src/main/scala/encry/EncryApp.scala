@@ -8,8 +8,8 @@ import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.stream.ActorMaterializer
 import encry.api.http.routes._
 import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
-import encry.cli.ConsolePromptListener
-import encry.cli.ConsolePromptListener.StartListening
+import encry.cli.ConsoleListener
+import encry.cli.ConsoleListener.StartListening
 import encry.local.explorer.BlockListener
 import encry.local.explorer.database.DBService
 import encry.local.miner.Miner
@@ -18,8 +18,8 @@ import encry.network.message._
 import encry.network.peer.PeerManager
 import encry.network._
 import encry.settings.EncryAppSettings
-import encry.stats.{KafkaActor, LoggingActor, StatsSender}
-import encry.utils.{Logging, NetworkTimeProvider, Zombie}
+import encry.stats.{KafkaActor, LoggingActor, StatsSender, Zombie}
+import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.history.EncrySyncInfoMessageSpec
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import org.encryfoundation.common.Algos
@@ -59,7 +59,6 @@ object EncryApp extends App with Logging {
   lazy val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
-  val cliListener: ActorRef = system.actorOf(Props[ConsolePromptListener], "cliListener")
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.kafka.sendToKafka) system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
   if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
@@ -67,9 +66,16 @@ object EncryApp extends App with Logging {
   if (settings.node.mining) miner ! StartMining
   if (settings.levelDb.enable) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
   else if (settings.postgres.enableRestore) system.actorOf(Props(classOf[PostgresRestore], DBService()), "postgresRestore") ! StartRecovery
-  if (settings.node.enableCLI) cliListener ! StartListening
   system.actorOf(Props[Zombie], "zombie")
   if (settings.node.loggingMode != "off") system.actorOf(Props[LoggingActor], "loggingActor")
+  if (settings.node.enableCLI) {
+    system.actorOf(Props[ConsoleListener], "cliListener")
+    system.actorSelection("/user/cliListener") ! StartListening
+  }
+  if (settings.node.loggingMode != "off") {
+    system.actorOf(Props[LoggingActor], "loggingActor")
+    system.actorOf(Props[Zombie], "zombie")
+  }
 
   if (settings.restApi.enabled) {
     import akka.http.scaladsl.model.StatusCodes._

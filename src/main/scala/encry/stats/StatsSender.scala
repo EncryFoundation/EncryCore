@@ -4,13 +4,14 @@ import java.io.File
 import java.util
 import java.text.SimpleDateFormat
 import akka.actor.Actor
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.stats.StatsSender._
 import encry.view.history
 import encry.stats.LoggingActor.LogMessage
+import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 import scala.collection.mutable
@@ -43,9 +44,9 @@ class StatsSender extends Actor {
           case _ => 4
         }
       } value="[${sdf.format(logTime)}] $logMessage"""")
-    case BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int) =>
-      influxDB.write(settings.influxDB.udpPort, s"blocksStatistic headerStats=$headerCache,payloadStats=$payloadCache," +
-        s"completedBlocksStat=$completedBlocks,notCompletedBlocksStat=$notCompletedBlocks")
+    case HeightStatistics(bestHeaderHeight, bestBlockHeight) =>
+      influxDB.write(settings.influxDB.udpPort,
+        s"chainStat,nodeName=${settings.network.nodeName} value=$bestHeaderHeight,bestBlockHeight=$bestBlockHeight")
     case BestHeaderInChain(fb: EncryBlockHeader) =>
       influxDB.write(settings.influxDB.udpPort, util.Arrays.asList(
         s"difficulty,nodeName=${settings.network.nodeName} diff=${fb.difficulty.toString},height=${fb.height}",
@@ -55,7 +56,7 @@ class StatsSender extends Actor {
         s"historyWeight,nodeName=${settings.network.nodeName},height=${fb.height} " +
           s"value=${new File("encry/data/history/").listFiles.foldLeft(0L)(_ + _.length())}",
         s"supply,nodeName=${settings.network.nodeName},height=${fb.height} " +
-          s"value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[history.Height])}"
+          s"value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[Height])}"
       )
       )
 
@@ -136,7 +137,7 @@ object StatsSender {
 
   case class GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
 
-  case class BlocksStat(notCompletedBlocks: Int, headerCache: Int, payloadCache: Int, completedBlocks: Int)
+  case class HeightStatistics(bestHeaderHeight: Int, bestBlockHeight: Int)
 
   case class StateUpdating(time: Long)
 

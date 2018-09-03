@@ -3,7 +3,7 @@ package encry.view.state
 import java.io.File
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
-import encry.CoreTaggedTypes.VersionTag
+import encry.utils.CoreTaggedTypes.VersionTag
 import encry.EncryApp.{settings, system}
 import encry.avltree.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import encry.consensus.EncrySupplyController
@@ -20,7 +20,7 @@ import encry.modifiers.state.box._
 import encry.utils.{BalanceCalculator, Logging}
 import encry.settings.Constants
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
-import encry.view.history.Height
+import encry.view.history.History.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.Algos.HF

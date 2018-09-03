@@ -7,7 +7,7 @@ import encry.consensus.SyncInfo
 import encry.modifiers.NodeViewModifier
 import encry.network.message.BasicMsgDataTypes._
 import encry.network.message.Message.MessageCode
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import supertagged.@@
 import scala.util.Try
 

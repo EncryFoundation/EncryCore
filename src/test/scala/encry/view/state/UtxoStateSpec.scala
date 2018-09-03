@@ -10,7 +10,7 @@ import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
 import encry.settings.Constants
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
-import encry.view.history.Height
+import encry.view.history.History.Height
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.Algos.HF
 import org.encryfoundation.common.{Algos, crypto}
