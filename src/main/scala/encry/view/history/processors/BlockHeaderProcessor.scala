@@ -149,10 +149,7 @@ trait BlockHeaderProcessor extends Logging {
           .flatMap(scoreOf)
           .exists(_ < score)
         val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-          if (betterScore) {
-            println(s"isBetterHeader($score) >> ${h.encodedId} >> " + betterScore)
-            Seq(BestHeaderKey -> ByteArrayWrapper(h.id))
-          } else Seq.empty
+          if (betterScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
         val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
         val heightRow: (ByteArrayWrapper, ByteArrayWrapper) = headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
         val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (betterScore) {
