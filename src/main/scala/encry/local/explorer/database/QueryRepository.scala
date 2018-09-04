@@ -39,7 +39,7 @@ protected[database] object QueryRepository extends Logging {
       """
         |INSERT INTO public.headers (id, parent_id, version, height, ad_proofs_root, state_root, transactions_root, ts, nonce, difficulty,
         |      block_size, equihash_solution, ad_proofs, tx_qty, miner_address, miner_reward, fees_total, txs_size, best_chain)
-        |VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        |VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING
       """.stripMargin
     Update[HeaderDBVersion](query).run(headerDB)
   }
@@ -50,7 +50,7 @@ protected[database] object QueryRepository extends Logging {
       """
         |INSERT INTO public.headers (id, parent_id, version, height, ad_proofs_root, state_root, transactions_root, ts, nonce, difficulty,
         |      block_size, equihash_solution, ad_proofs, tx_qty, miner_address, miner_reward, fees_total, txs_size, best_chain)
-        |VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        |VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING
       """.stripMargin
     Update[HeaderDBVersion](query).run(headerDB)
   }
@@ -60,7 +60,7 @@ protected[database] object QueryRepository extends Logging {
   def headersByRangeQuery(from: Int, to: Int): ConnectionIO[List[HeaderDBVersion]] =
     sql"""SELECT id, parent_id, version, height, ad_proofs_root, state_root, transactions_root, ts, nonce, difficulty,
       block_size, equihash_solution, ad_proofs, tx_qty, miner_address, miner_reward, fees_total, txs_size, best_chain
-      FROM public.headers WHERE height >= $from AND height <= $to ORDER BY height ASC;""".query[HeaderDBVersion].to[List]
+      FROM public.headers WHERE height >= $from AND height <= $to AND best_chain = TRUE ORDER BY height ASC;""".query[HeaderDBVersion].to[List]
 
   def txsByRangeQuery(from: Int, to: Int): ConnectionIO[List[TransactionDBVersion]] =
     sql"""SELECT id, fee, block_id, is_coinbase, ts, proof FROM public.transactions
@@ -80,7 +80,7 @@ protected[database] object QueryRepository extends Logging {
     val query: String =
       """
         |INSERT INTO public.transactions (id, fee, block_id, is_coinbase, ts, proof)
-        |VALUES (?, ?, ?, ?, ?, ?);
+        |VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING;
         |""".stripMargin
     Update[TransactionDBVersion](query).updateMany(txs.toList)
   }
@@ -90,7 +90,7 @@ protected[database] object QueryRepository extends Logging {
     val query: String =
       """
         |INSERT INTO public.inputs (id, tx_id, contract_bytes, serialized_proofs)
-        |VALUES (?, ?, ?, ?);
+        |VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING;
         |""".stripMargin
     Update[InputDBVersion](query).updateMany(inputs.toList)
   }
@@ -100,7 +100,7 @@ protected[database] object QueryRepository extends Logging {
     val query: String =
       """
         |INSERT INTO public.outputs (id, tx_id, monetary_value, coin_id, contract_hash, data)
-        |VALUES (?, ?, ?, ?, ?, ?);
+        |VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING;
         |""".stripMargin
     Update[OutputDBVersion](query).updateMany(outputs.toList)
   }
@@ -112,7 +112,7 @@ protected[database] object QueryRepository extends Logging {
     val query: String =
       """
         |INSERT INTO public.directives (tx_id, type_id, is_valid, contract_hash, amount, address, token_id_opt, data_field)
-        |VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        |VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING;
         |""".stripMargin
     Update[DirectiveDBVersion](query).updateMany(directives.toList)
   }

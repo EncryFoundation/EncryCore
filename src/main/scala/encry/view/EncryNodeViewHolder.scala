@@ -9,12 +9,13 @@ import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
+import encry.local.miner.Miner.DisableMining
 import encry.modifiers._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
-import encry.modifiers.mempool.{TransactionSerializer, Transaction}
+import encry.modifiers.mempool.{Transaction, TransactionSerializer}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
@@ -46,6 +47,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
   var receivedAll: Boolean = !settings.postgres.enableRestore
+  var triedToDownload: Boolean = !settings.postgres.enableRestore
   val modifiersCache: EncryModifiersCache = EncryModifiersCache(1000)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
@@ -73,7 +75,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   override def receive: Receive = {
     case BlocksFromLocalPersistence(blocks, allSent) if settings.levelDb.recoverMode || settings.postgres.enableRestore =>
-      receivedAll = allSent
       blocks.foreach { block =>
         pmodModifyRecovery(block) match {
           case Success(_) =>
@@ -83,6 +84,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             applicationsSuccessful = false
             peerManager ! RecoveryCompleted
         }
+      }
+      receivedAll = allSent
+      if (receivedAll) {
+        logInfo(s"Received all blocks from recovery")
+        peerManager ! RecoveryCompleted
       }
       if (applicationsSuccessful && settings.levelDb.recoverMode) sender ! SendBlocks
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
@@ -269,6 +275,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                 newHistory.bestHeaderOpt.foreach(header =>
                   context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
               if (newHistory.isFullChainSynced && receivedAll) Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
+              else miner ! DisableMining
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
               logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state because of: $e")

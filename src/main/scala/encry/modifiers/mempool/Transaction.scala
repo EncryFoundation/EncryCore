@@ -210,7 +210,11 @@ case object TransactionDBVersion {
         val blockId: String = Base16.encode(block.header.id)
         TransactionDBVersion(id, tx.fee, blockId, isCoinbase = false, block.header.timestamp, proof)
       }.toIndexedSeq
-      transactions.init :+ transactions.last.copy(isCoinbase = true)
+      transactions match {
+        case coinbase :: Nil => Seq(coinbase.copy(isCoinbase = true))
+        case init :+ coinbase => init :+ coinbase.copy(isCoinbase = true)
+        case Nil => throw new RuntimeException("Payload should contain at least one transaction")
+      }
     } else Seq.empty
   }
 }

@@ -22,7 +22,7 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
   val heightFuture: Future[Int] = dbService.selectHeight
 
   heightFuture.onComplete {
-    case Success(_) =>
+    case Success(height) => logInfo(s"Going to download $height blocks from postgres")
     case Failure(_) =>
       peerManager ! RecoveryCompleted
       nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true)
@@ -32,7 +32,6 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
   override def receive: Receive = {
     case StartRecovery => startRecovery().map { _ =>
       logInfo(s"All blocks restored from postgres")
-      peerManager ! RecoveryCompleted
       context.stop(self)
     }
   }
@@ -44,7 +43,7 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
           val from: Int = slide.head
           val to: Int = slide.last
           prevBlocks.flatMap { retrievedBlocks =>
-            if (retrievedBlocks.nonEmpty) nodeViewHolder ! BlocksFromLocalPersistence(retrievedBlocks, to == height)
+            nodeViewHolder ! BlocksFromLocalPersistence(retrievedBlocks, to == height)
             selectBlocksByRange(from, to)
           }
         }.map(_ => Unit)
