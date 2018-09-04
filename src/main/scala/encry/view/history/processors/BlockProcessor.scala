@@ -51,7 +51,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
 
   private def processBetterChain: BlockProcessing = {
     case toProcess @ ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
-      if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
+      if bestBlockOpt.nonEmpty && isBetterBlock(fullBlock) =>
 
       val prevBest: EncryBlock = bestBlockOpt.get
       val (prevChain: EncryHeaderChain, newChain: EncryHeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
@@ -64,13 +64,8 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
         //application of this block leads to full chain with higher score
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
-        val updateBestHeader: Boolean =
-          !isInBestChain(fullBlock.id) &&
-            scoreOf(fullBlock.id)
-              .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
-              .getOrElse(false)
 
-        updateStorage(newModRow, newBestHeader, updateBestHeader)
+        updateStorage(newModRow, newBestHeader)
 
         if (blocksToKeep >= 0) {
           val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)
@@ -85,15 +80,12 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   protected def isValidFirstBlock(header: EncryBlockHeader): Boolean =
     header.height == blockDownloadProcessor.minimalBlockHeight && bestBlockIdOpt.isEmpty
 
-  private def isBetterChain(id: ModifierId): Boolean = {
-    val isBetter: Option[Boolean] = for {
-      bestFullBlockId <- bestBlockIdOpt
-      prevBestScore <- scoreOf(bestFullBlockId)
-      score <- scoreOf(id)
-    } yield score > prevBestScore
-
-    isBetter getOrElse false
-  }
+  private def isBetterBlock(block: EncryBlock): Boolean =
+    (if (block.header.height == bestHeaderHeight && !bestHeaderIdOpt.exists(_ sameElements block.id)) bestHeaderIdOpt
+    else bestBlockIdOpt)
+      .flatMap(scoreOf)
+      .flatMap(bestScore => scoreOf(block.id).map(_ > bestScore))
+      .getOrElse(false)
 
   private def nonBestBlock: BlockProcessing = {
     case params =>
@@ -117,17 +109,10 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     historyStorage.removeObjects(toRemove)
   }
 
-  private def updateStorage(newModRow: EncryPersistentModifier,
-                            bestFullHeader: EncryBlockHeader,
-                            updateHeaderInfo: Boolean = false): Unit = {
+  private def updateStorage(newModRow: EncryPersistentModifier, bestFullHeader: EncryBlockHeader): Unit = {
     val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeader.id)
     val bestBlockData: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = Seq(BestBlockKey -> bestFullHeaderIdWrapped)
-    val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-      if (updateHeaderInfo) getHeaderInfoUpdate(bestFullHeader)
-        .map { _._1 ++ bestBlockData }
-        .getOrElse(bestBlockData)
-      else bestBlockData
-    historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
+    historyStorage.bulkInsert(storageVersion(newModRow), bestBlockData, Seq(newModRow))
   }
 
   private def storageVersion(newModRow: EncryPersistentModifier) = ByteArrayWrapper(newModRow.id)

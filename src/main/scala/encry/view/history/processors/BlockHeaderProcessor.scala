@@ -1,8 +1,8 @@
 package encry.view.history.processors
 
 import com.google.common.primitives.Ints
+import encry.EncryApp
 import encry.consensus.ConsensusTaggedTypes.Difficulty
-import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
 import encry.local.explorer.BlockListener.NewOrphaned
@@ -13,11 +13,11 @@ import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.history.block.{Block, EncryBlock}
 import encry.settings.Constants._
 import encry.settings.{Constants, NodeSettings}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.validation.{ModifierValidator, ValidationResult}
 import encry.view.history.History.Height
 import encry.view.history.storage.HistoryStorage
-import encry.{EncryApp, _}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
@@ -133,7 +133,7 @@ trait BlockHeaderProcessor extends Logging {
     case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
 
-  protected def getHeaderInfoUpdate(h: EncryBlockHeader): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier)] = {
+  private def getHeaderInfoUpdate(h: EncryBlockHeader): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier)] = {
     val difficulty: Difficulty = h.difficulty
     if (h.isGenesis) {
       logInfo(s"Initialize header chain with genesis header ${h.encodedId}")
@@ -144,12 +144,18 @@ trait BlockHeaderProcessor extends Logging {
         headerScoreKey(h.id) -> ByteArrayWrapper(difficulty.toByteArray)), h)
     } else {
       scoreOf(h.parentId).map { parentScore =>
-        val score = Difficulty @@ (parentScore + difficulty)
+        val score: Difficulty = Difficulty @@ (parentScore + difficulty)
+        val betterScore: Boolean = bestHeaderIdOpt
+          .flatMap(scoreOf)
+          .exists(_ < score)
         val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-          if (score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
+          if (betterScore) {
+            println(s"isBetterHeader($score) >> ${h.encodedId} >> " + betterScore)
+            Seq(BestHeaderKey -> ByteArrayWrapper(h.id))
+          } else Seq.empty
         val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
         val heightRow: (ByteArrayWrapper, ByteArrayWrapper) = headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
-        val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (score > bestHeadersChainScore) {
+        val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (betterScore) {
           logInfo(s"New best header ${h.encodedId} with score: $score. New height: ${h.height}, old height: $bestHeaderHeight")
           bestBlockHeaderIdsRow(h)
         } else {
@@ -204,8 +210,6 @@ trait BlockHeaderProcessor extends Logging {
   def isInBestChain(h: EncryBlockHeader): Boolean = bestHeaderIdAtHeight(h.height).exists(_ sameElements h.id)
 
   private def bestHeaderIdAtHeight(h: Int): Option[ModifierId] = headerIdsAtHeight(h).headOption
-
-  private def bestHeadersChainScore: BigInt = scoreOf(bestHeaderIdOpt.get).get
 
   protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))
 
