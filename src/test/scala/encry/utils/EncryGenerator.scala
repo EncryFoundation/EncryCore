@@ -6,7 +6,7 @@ import CoreTaggedTypes.ModifierId
 import encry.avltree._
 import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
+import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, MonetaryBox}
 import encry.settings.Constants
@@ -47,7 +47,7 @@ trait EncryGenerator {
     PrivateKey25519(keys._1, keys._2)
   }
 
-  def genValidPaymentTxs(qty: Int): Seq[EncryTransaction] = {
+  def genValidPaymentTxs(qty: Int): Seq[Transaction] = {
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
     val now = System.currentTimeMillis()
 
@@ -58,7 +58,7 @@ trait EncryGenerator {
     }
   }
 
-  def genValidPaymentTxsToAddr(qty: Int, address: Address): Seq[EncryTransaction] = {
+  def genValidPaymentTxsToAddr(qty: Int, address: Address): Seq[Transaction] = {
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
 
     keys.map { k =>
@@ -68,14 +68,14 @@ trait EncryGenerator {
     }
   }
 
-  def genValidPaymentTxToAddrWithSpentBoxes(boxes: IndexedSeq[AssetBox], address: Address): EncryTransaction = {
+  def genValidPaymentTxToAddrWithSpentBoxes(boxes: IndexedSeq[AssetBox], address: Address): Transaction = {
     val key: PrivateKey25519 = genPrivKeys(1).head
 
     TransactionFactory.defaultPaymentTransactionScratch(key, Props.txFee,
       scala.util.Random.nextLong(), boxes, address, Props.boxValue)
   }
 
-  def genValidPaymentTxsToAddrWithDiffTokens(qty: Int, address: Address): Seq[EncryTransaction] = {
+  def genValidPaymentTxsToAddrWithDiffTokens(qty: Int, address: Address): Seq[Transaction] = {
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
     val tokens: Seq[ADKey] = (0 until qty).foldLeft(Seq[ADKey]()) {
       case (seq, _) => seq :+ (ADKey @@ Random.randomBytes())
@@ -89,11 +89,11 @@ trait EncryGenerator {
     }
   }
 
-  def genChainSpendingTxs(qty: Int): Seq[EncryTransaction] = {
+  def genChainSpendingTxs(qty: Int): Seq[Transaction] = {
 
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
     val timestamp: Amount = System.currentTimeMillis()
-    keys.foldLeft(Seq[EncryTransaction]()) { (seq, key) =>
+    keys.foldLeft(Seq[Transaction]()) { (seq, key) =>
       val useBoxes: IndexedSeq[MonetaryBox] = if (seq.isEmpty) IndexedSeq(genAssetBox(key.publicImage.address.address))
         else seq.last.newBoxes.map(_.asInstanceOf[MonetaryBox]).toIndexedSeq
       seq :+ TransactionFactory.defaultPaymentTransactionScratch(key, Props.txFee,
@@ -101,7 +101,7 @@ trait EncryGenerator {
     }
   }
 
-  def genInvalidPaymentTxs(qty: Int): Seq[EncryTransaction] = {
+  def genInvalidPaymentTxs(qty: Int): Seq[Transaction] = {
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
     val timestamp: Amount = System.currentTimeMillis()
 

@@ -18,7 +18,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
   private val genHelper = TestHelper
 
-  lazy val fakeTransaction: EncryTransaction = {
+  lazy val fakeTransaction: Transaction = {
     val fee = genHelper.Props.txFee
     val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address.address),
       genHelper.genAssetBox(publicKey.address.address))
@@ -27,7 +27,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
       publicKey.address.address, 12345678L)
   }
 
-  lazy val paymentTransactionValid: EncryTransaction = {
+  lazy val paymentTransactionValid: Transaction = {
     val fee: Amount = genHelper.Props.txFee
     val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genHelper.genAssetBox(publicKey.address.address),
       genHelper.genAssetBox(publicKey.address.address))
@@ -36,7 +36,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
       publicKey.address.address, genHelper.Props.txAmount)
   }
 
-  def paymentTransactionDynamic: EncryTransaction = {
+  def paymentTransactionDynamic: Transaction = {
     val fee = genHelper.Props.txFee
     val useBoxes = (0 to 5).map(_ => {
       AssetBox(
@@ -50,14 +50,14 @@ trait InstanceFactory extends Keys with EncryGenerator {
       publicKey.address.address, genHelper.Props.txAmount)
   }
 
-  lazy val paymentTransactionInvalid: EncryTransaction = {
+  lazy val paymentTransactionInvalid: Transaction = {
     val useBoxes = IndexedSeq(genHelper.genAssetBox(publicKey.address.address))
 
     TransactionFactory.defaultPaymentTransactionScratch(secret, -100, timestamp, useBoxes,
       randomAddress, genHelper.Props.txAmount)
   }
 
-  lazy val coinbaseTransaction: EncryTransaction = {
+  lazy val coinbaseTransaction: Transaction = {
     TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, 10L, 0, Height @@ 100)
   }
 
