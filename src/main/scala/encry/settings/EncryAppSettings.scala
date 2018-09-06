@@ -30,7 +30,7 @@ case class TestingSettings(minimalFee: Int, amount: Int, defaultRecipientAddress
 
 case class WalletSettings(password: String, seed: Option[String])
 
-case class LevelDbSettings(enable: Boolean, recoverMode: Boolean, batchSize: Int)
+case class LevelDbSettings(enableSave: Boolean, enableRestore: Boolean, batchSize: Int)
 
 case class KafkaSettings(sendToKafka: Boolean, topicName: String, groupId: String, kafkaBrokers: String)
 

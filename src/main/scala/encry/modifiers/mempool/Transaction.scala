@@ -57,7 +57,8 @@ case class Transaction(fee: Amount,
     (Constants.PersistentByteCost * size) +
     (Constants.StateByteCost * newBoxes.map(_.bytes).foldLeft(Array.empty[Byte])(_ ++ _).length)
 
-  override def toString: String = s"<Transaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}>"
+  override def toString: String =
+    s"<Transaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}>"
 
   lazy val semanticValidity: Try[Unit] = validateStateless.toTry
 
@@ -199,7 +200,8 @@ object UnsignedTransaction {
 }
 
 
-case class TransactionDBVersion(id: String, fee: Long, blockId: String, isCoinbase: Boolean, timestamp: Timestamp, proof: Option[String])
+case class TransactionDBVersion(id: String, fee: Long, blockId: String, isCoinbase: Boolean,
+                                timestamp: Timestamp, proof: Option[String])
 
 case object TransactionDBVersion {
   def apply(block: EncryBlock): Seq[TransactionDBVersion] = {

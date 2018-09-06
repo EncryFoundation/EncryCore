@@ -74,7 +74,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def receive: Receive = {
-    case BlocksFromLocalPersistence(blocks, allSent) if settings.levelDb.recoverMode || settings.postgres.enableRestore =>
+    case BlocksFromLocalPersistence(blocks, allSent) if settings.levelDb.enableRestore || settings.postgres.enableRestore =>
       blocks.foreach { block =>
         pmodModifyRecovery(block) match {
           case Success(_) =>
@@ -101,7 +101,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
               modifiersCache.put(key(pmod.id), pmod)
-              if (settings.levelDb.enable)
+              if (settings.levelDb.enableSave)
                 context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
             }
         }
@@ -114,7 +114,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       logInfo(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
-      if (settings.levelDb.enable) context.actorSelection("/user/modifiersHolder") ! lm
+      if (settings.levelDb.enableSave) context.actorSelection("/user/modifiersHolder") ! lm
     case GetDataFromCurrentView(f) =>
       val result = f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool))
       result match {

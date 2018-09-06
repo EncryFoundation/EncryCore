@@ -20,10 +20,13 @@ object TransactionFactory {
                                        amount: Amount,
                                        tokenIdOpt: Option[ADKey] = None): Transaction = {
     val pubKey: PublicKey25519 = privKey.publicImage
-    val uInputs: IndexedSeq[Input] = useBoxes.map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes)))).toIndexedSeq
+    val uInputs: IndexedSeq[Input] = useBoxes
+      .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes)))).toIndexedSeq
     val change: Amount = useBoxes.map(_.amount).sum - (amount + fee)
     val directives: IndexedSeq[TransferDirective] =
-      if (change > 0) IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt), TransferDirective(pubKey.address.address, change, tokenIdOpt))
+      if (change > 0) IndexedSeq(
+        TransferDirective(recipient, amount, tokenIdOpt), TransferDirective(pubKey.address.address, change, tokenIdOpt)
+      )
       else IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt))
 
     val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, directives)
