@@ -2,9 +2,8 @@ package encry.view
 
 import java.io.File
 import akka.actor.{Actor, Props}
-import akka.persistence.RecoveryCompleted
 import akka.pattern._
-import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
+import akka.persistence.RecoveryCompleted
 import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
@@ -16,29 +15,30 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderS
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
-import encry.modifiers.state.box.{AssetBox, EncryProposition}
-import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
+import encry.modifiers.state.box.EncryProposition
+import encry.network.DeliveryManager.FullBlockChainSynced
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
+import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state._
 import encry.view.wallet.EncryWallet
-import encry.utils.Logging
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scala.annotation.tailrec
-import scala.concurrent.Future
 import scala.collection.{IndexedSeq, Seq, mutable}
-import scala.util.{Failure, Success, Try}
+import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging {
 
@@ -92,7 +92,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       }
       if (applicationsSuccessful && settings.levelDb.enableRestore) sender ! SendBlocks
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
-      if (modifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
@@ -107,7 +106,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
         logInfo(s"Cache before(${modifiersCache.size})")
         computeApplications()
-        if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
         logInfo(s"Cache after(${modifiersCache.size})")
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
@@ -116,10 +114,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       pmodModify(lm.pmod)
       if (settings.levelDb.enableSave) context.actorSelection("/user/modifiersHolder") ! lm
     case GetDataFromCurrentView(f) =>
-      val result = f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool))
-      result match {
+      f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool)) match {
         case resultFuture: Future[_] => resultFuture.pipeTo(sender())
-        case _ => sender() ! result
+        case result => sender() ! result
       }
     case GetNodeViewChanges(history, state, vault, mempool) =>
       if (history) sender() ! ChangedHistory(nodeView.history)
