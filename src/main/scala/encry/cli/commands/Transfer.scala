@@ -4,7 +4,7 @@ import akka.pattern._
 import akka.util.Timeout
 import encry.EncryApp._
 import encry.cli.{Ast, Response}
-import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
+import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.settings.EncryAppSettings
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
@@ -26,7 +26,7 @@ object Transfer extends Command {
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (nodeViewHolder ?
-      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[EncryTransaction]] { view =>
+      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Transaction]] { view =>
         Try {
           val secret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
           val recipient: Address = args.requireArg[Ast.Str]("addr").s
@@ -39,12 +39,12 @@ object Transfer extends Command {
           TransactionFactory.defaultPaymentTransactionScratch(secret, fee, 0L, boxes, recipient, amount)
         }.toOption
       }).flatMap {
-        case Some(tx: EncryTransaction) =>
+        case Some(tx: Transaction) =>
           timeProvider
             .time()
             .map { time =>
               val txWithTimestamp = tx.copy(timestamp = time)
-              nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, EncryTransaction](txWithTimestamp)
+              nodeViewHolder ! LocallyGeneratedTransaction[EncryProposition, Transaction](txWithTimestamp)
               Some(Response(txWithTimestamp.toString))
             }
         case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))

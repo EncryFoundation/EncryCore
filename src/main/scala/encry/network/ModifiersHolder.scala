@@ -1,7 +1,7 @@
 package encry.network
 
 import akka.persistence._
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
@@ -33,7 +33,7 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   override def preStart(): Unit = logInfo(s"ModifiersHolder actor is started.")
 
-  override def receiveRecover: Receive = if (settings.levelDb.recoverMode) receiveRecoverEnabled else receiveRecoverDisabled
+  override def receiveRecover: Receive = if (settings.levelDb.enableRestore) receiveRecoverEnabled else receiveRecoverDisabled
 
   def receiveRecoverEnabled: Receive = {
     case header: EncryBlockHeader =>
@@ -88,14 +88,14 @@ class ModifiersHolder extends PersistentActor with Logging {
           logDebug(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully.")
         }
       updateHeaders(header)
-      logDebug(s"Get header ${Algos.encode(header.id)} on height ${header.height}")
+      logDebug(s"Got header ${Algos.encode(header.id)} on height ${header.height}")
     case payload: EncryBlockPayload =>
       if (!payloads.contains(Algos.encode(payload.id)))
         persist(payload) { payload =>
           logDebug(s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully.")
         }
       updatePayloads(payload)
-      logDebug(s"Get payload with id: ${Algos.encode(payload.id)} " +
+      logDebug(s"Got payload with id: ${Algos.encode(payload.id)} " +
         s"${
           nonCompletedBlocks.get(Algos.encode(payload.id)).map(headerId =>
             headers.get(headerId).map(header => s"for header $headerId height: ${header._1.height}"))}")

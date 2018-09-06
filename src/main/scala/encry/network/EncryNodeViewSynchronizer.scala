@@ -2,7 +2,7 @@ package encry.network
 
 import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorRef, Props}
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.EncryApp._
 import encry.consensus.History._
 import encry.consensus.SyncInfo
@@ -91,18 +91,14 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
         }
         logDebug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
           s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
-        logDebug(s"Peer: ${remote.socketAddress} requested for modifiers of type ${invData._1} with ids: " +
-          s"${invData._2.map(Algos.encode).mkString(",")}")
-
+        logDebug(s"Peer: ${remote.socketAddress} requested for modifiers of type ${invData._1}.")
         self ! ResponseFromLocal(remote, invData._1, objs)
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
-      logDebug(s"Get inv message from ${remote.socketAddress} " +
-        s"with modTypeId ${invData._1}: ${invData._2.size} modifiers.")
+      logDebug(s"Got inv message from ${remote.socketAddress}.")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
-      logDebug( s"Get modifiers from ${remote.socketAddress} with modTypeID: ${data._1} and modifiers: " +
-        s"${data._2.keys.foldLeft("|") { case (str, id) => str + "|" + Algos.encode(id) }}")
+      logDebug( s"Got modifiers from ${remote.socketAddress} with modTypeID: ${data._1}.")
       deliveryManager ! DataFromPeer(spec, data: ModifiersData@unchecked, remote)
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       deliveryManager ! RequestFromLocal(peer, modifierTypeId, modifierIds)

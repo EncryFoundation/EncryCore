@@ -9,7 +9,7 @@ import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.mempool.{EncryTransaction, Transaction, TransactionFactory}
+import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.network.DeliveryManager.FullBlockChainSynced
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
@@ -103,6 +103,7 @@ class Miner extends Actor with Logging {
     case FullBlockChainSynced =>
       syncingDone = true
       if (settings.node.mining) self ! EnableMining
+    case DisableMining =>
   }
 
   def receiveSemanticallySuccessfulModifier: Receive = {
@@ -159,7 +160,7 @@ class Miner extends Actor with Logging {
     val minerSecret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
     val feesTotal: Amount = txsToPut.map(_.fee).sum
     val supplyTotal: Amount = EncrySupplyController.supplyAt(view.state.height)
-    val coinbase: EncryTransaction = TransactionFactory
+    val coinbase: Transaction = TransactionFactory
       .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, view.state.height)
 
     val txs: Seq[Transaction] = txsToPut.sortBy(_.timestamp) :+ coinbase

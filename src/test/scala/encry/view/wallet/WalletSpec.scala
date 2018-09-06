@@ -1,11 +1,11 @@
 package encry.view.wallet
 
-import encry.CoreTaggedTypes.ModifierId
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.mempool.EncryTransaction
+import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.{AssetBox, MonetaryBox}
 import encry.settings.{Constants, EncryAppSettings}
 import encry.utils.TestHelper.Props
@@ -27,11 +27,11 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val wallet: EncryWallet = EncryWallet(walletStore, accountManager)
 
-    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddr(4, accountManager.mandatoryAccount.publicImage.address.address)
+    val validTxs: Seq[Transaction] = genValidPaymentTxsToAddr(4, accountManager.mandatoryAccount.publicImage.address.address)
 
     val useBox: AssetBox = validTxs.head.newBoxes.head.asInstanceOf[AssetBox]
 
-    val spentTx: EncryTransaction = genValidPaymentTxToAddrWithSpentBoxes(IndexedSeq(useBox), randomAddress)
+    val spentTx: Transaction = genValidPaymentTxToAddrWithSpentBoxes(IndexedSeq(useBox), randomAddress)
 
     val correctBalance: Long = validTxs.foldLeft(0L) {
       case (sum, transaction) => sum + transaction.newBoxes.foldLeft(0L) {
@@ -74,7 +74,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val wallet: EncryWallet = EncryWallet(walletStore, keyManager)
 
-    val validTxs: Seq[EncryTransaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.mandatoryAccount.publicImage.address.address)
+    val validTxs: Seq[Transaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.mandatoryAccount.publicImage.address.address)
 
     val blockPayload: EncryBlockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
 

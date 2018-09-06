@@ -1,6 +1,6 @@
 package encry.consensus
 
-import encry.CoreTaggedTypes.{ModifierId, ModifierTypeId}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.PersistentNodeViewModifier
 import org.encryfoundation.common.Algos
 

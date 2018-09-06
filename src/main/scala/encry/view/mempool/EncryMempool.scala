@@ -1,7 +1,8 @@
 package encry.view.mempool
 
+import akka.actor.Cancellable
 import akka.actor.{ActorSystem, Cancellable}
-import encry.CoreTaggedTypes.ModifierId
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.Transaction
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
