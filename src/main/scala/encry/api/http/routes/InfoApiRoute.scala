@@ -1,8 +1,10 @@
 package encry.api.http.routes
 
+import java.net.InetAddress
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import encry.EncryApp.{settings => appSettings}
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
@@ -12,6 +14,7 @@ import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
+
 import scala.concurrent.Future
 
 case class InfoApiRoute(readersHolder: ActorRef,
@@ -47,6 +50,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
   private def getStateType: String = appSettings.node.stateMode.verboseName
 
   private def getNodeName: String = appSettings.network.nodeName
+    .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + appSettings.network.bindAddress.getPort)
 
   private def getMinerInfo: Future[MinerStatus] = (miner ? GetMinerStatus).mapTo[MinerStatus]
 }
