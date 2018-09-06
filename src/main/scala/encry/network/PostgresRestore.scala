@@ -15,6 +15,7 @@ import org.encryfoundation.common.transaction.ProofSerializer
 import scorex.crypto.encode.Base16
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 class PostgresRestore(dbService: DBService) extends Actor with Logging {
@@ -45,6 +46,11 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
           prevBlocks.flatMap { retrievedBlocks =>
             nodeViewHolder ! BlocksFromLocalPersistence(retrievedBlocks, to == height)
             selectBlocksByRange(from, to)
+              .recoverWith {
+                case NonFatal(th) =>
+                  logWarn(s"Failure during restore: ${th.getLocalizedMessage}")
+                  Future.failed(th)
+              }
           }
         }.map(_ => Unit)
       case None => Future.unit

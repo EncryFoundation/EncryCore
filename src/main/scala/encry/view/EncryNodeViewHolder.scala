@@ -78,9 +78,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       blocks.foreach { block =>
         pmodModifyRecovery(block) match {
           case Success(_) =>
-            logInfo(s"Block ${block.encodedId} from recovery applied successfully")
+            logInfo(s"Block ${block.encodedId} on height ${block.header.height} from recovery applied successfully")
           case Failure(th) =>
-            logWarn(s"Failed to apply block ${block.encodedId} from recovery caused $th")
+            logWarn(s"Failed to apply block ${block.encodedId} on height ${block.header.height} from recovery caused $th")
             applicationsSuccessful = false
             peerManager ! RecoveryCompleted
         }
