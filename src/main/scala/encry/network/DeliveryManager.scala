@@ -53,7 +53,7 @@ class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor
 
   def syncSending: Receive = {
     case SendLocalSyncInfo =>
-      if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2)
+      if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2 && isBlockChainSynced)
         logInfo("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case StopSync => context.become(netMessages)
@@ -109,9 +109,6 @@ class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor
     case StartMining => isMining = true
     case DisableMining => isMining = false
     case SendLocalSyncInfo =>
-      if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2)
-        logInfo("Trying to send sync info too often")
-      else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       historyReaderOpt = Some(reader)
     case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
