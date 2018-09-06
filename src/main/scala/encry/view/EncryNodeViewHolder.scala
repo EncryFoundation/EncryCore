@@ -3,7 +3,7 @@ package encry.view
 import java.io.File
 import akka.actor.{Actor, Props}
 import akka.pattern._
-import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
+import akka.persistence.RecoveryCompleted
 import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
@@ -15,12 +15,13 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderS
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
-import encry.modifiers.state.box.{AssetBox, EncryProposition}
-import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
+import encry.modifiers.state.box.EncryProposition
+import encry.network.DeliveryManager.FullBlockChainSynced
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
@@ -36,8 +37,8 @@ import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging {
 
