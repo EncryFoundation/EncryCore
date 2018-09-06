@@ -90,7 +90,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         logInfo(s"Received all blocks from recovery")
         peerManager ! RecoveryCompleted
       }
-      if (applicationsSuccessful && settings.levelDb.recoverMode) sender ! SendBlocks
+      if (applicationsSuccessful && settings.levelDb.enableRestore) sender ! SendBlocks
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
       if (modifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
       modifierSerializers.get(modifierTypeId).foreach { companion =>
