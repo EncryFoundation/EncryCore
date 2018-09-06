@@ -22,7 +22,7 @@ case class EncryAppSettings(directory: String,
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader {
 
   val read: EncryAppSettings = ConfigFactory.load("local.conf")
-    .withFallback(ConfigFactory.load).as[EncryAppSettings]("encry")
+    .withFallback(ConfigFactory.load()).as[EncryAppSettings]("encry")
 
 }
 
@@ -30,9 +30,7 @@ case class TestingSettings(minimalFee: Int, amount: Int, defaultRecipientAddress
 
 case class WalletSettings(password: String, seed: Option[String])
 
-case class LevelDbSettings(enable: Boolean, recoverMode: Boolean, batchSize: Int)
-
-case class PostgresSettings(host: String, user: String, password: String, enabled: Boolean = false)
+case class LevelDbSettings(enableSave: Boolean, enableRestore: Boolean, batchSize: Int)
 
 case class KafkaSettings(sendToKafka: Boolean, topicName: String, groupId: String, kafkaBrokers: String)
 

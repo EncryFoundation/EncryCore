@@ -18,15 +18,18 @@ object TransactionFactory {
                                        useBoxes: IndexedSeq[MonetaryBox],
                                        recipient: Address,
                                        amount: Amount,
-                                       tokenIdOpt: Option[ADKey] = None): EncryTransaction = {
+                                       tokenIdOpt: Option[ADKey] = None): Transaction = {
     val pubKey: PublicKey25519 = privKey.publicImage
-    val uInputs: IndexedSeq[Input] = useBoxes.map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes)))).toIndexedSeq
+    val uInputs: IndexedSeq[Input] = useBoxes
+      .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes)))).toIndexedSeq
     val change: Amount = useBoxes.map(_.amount).sum - (amount + fee)
     val directives: IndexedSeq[TransferDirective] =
-      if (change > 0) IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt), TransferDirective(pubKey.address.address, change, tokenIdOpt))
+      if (change > 0) IndexedSeq(
+        TransferDirective(recipient, amount, tokenIdOpt), TransferDirective(pubKey.address.address, change, tokenIdOpt)
+      )
       else IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt))
 
-    val uTransaction: UnsignedEncryTransaction = UnsignedEncryTransaction(fee, timestamp, uInputs, directives)
+    val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, directives)
     val signature: Signature25519 = privKey.sign(uTransaction.messageToSign)
 
     uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
@@ -36,10 +39,10 @@ object TransactionFactory {
                                  timestamp: Long,
                                  supply: Amount,
                                  amount: Amount,
-                                 height: Height): EncryTransaction = {
+                                 height: Height): Transaction = {
     val directives: IndexedSeq[Directive with Product] =
       IndexedSeq(TransferDirective(pubKey.address.address, amount + supply))
 
-    EncryTransaction(0, timestamp, IndexedSeq.empty, directives, None)
+    Transaction(0, timestamp, IndexedSeq.empty, directives, None)
   }
 }

@@ -1,6 +1,7 @@
 package encry.modifiers.mempool.directive
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
@@ -12,6 +13,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.EncryAddress
 import org.encryfoundation.common.transaction.EncryAddress.Address
+import scorex.crypto.encode.Base16
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scorex.crypto.hash.Digest32
 import supertagged.@@
@@ -34,6 +36,9 @@ case class TransferDirective(address: Address,
   override def serializer: Serializer[M] = TransferDirectiveSerializer
 
   lazy val isIntrinsic: Boolean = tokenIdOpt.isEmpty
+
+  override def toDbVersion(txId: ModifierId): DirectiveDBVersion =
+    DirectiveDBVersion(Base16.encode(txId), typeId, isValid, "", amount, address, tokenIdOpt.map(Base16.encode), "")
 }
 
 object TransferDirective {

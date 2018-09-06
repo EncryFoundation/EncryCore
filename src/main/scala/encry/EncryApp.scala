@@ -16,7 +16,7 @@ import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network.message._
 import encry.network.peer.PeerManager
-import encry.network.{EncryNodeViewSynchronizer, ModifiersHolder, NetworkController}
+import encry.network._
 import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, LoggingActor, StatsSender, Zombie}
 import encry.utils.{Logging, NetworkTimeProvider}
@@ -61,9 +61,12 @@ object EncryApp extends App with Logging {
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
   if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.kafka.sendToKafka) system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
-  if (settings.postgres.enabled) system.actorOf(Props(classOf[BlockListener], DBService()), "blockListener")
+  if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
+  lazy val dbService: DBService = DBService()
+  if (settings.postgres.enableSave) system.actorOf(Props(classOf[BlockListener], dbService), "blockListener")
   if (settings.node.mining) miner ! StartMining
-  if (settings.levelDb.enable) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
+  if (settings.levelDb.enableSave) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
+  else if (settings.postgres.enableRestore) system.actorOf(Props(classOf[PostgresRestore], dbService), "postgresRestore") ! StartRecovery
   if (settings.node.enableCLI) {
     system.actorOf(Props[ConsoleListener], "cliListener")
     system.actorSelection("/user/cliListener") ! StartListening
