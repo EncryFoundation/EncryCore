@@ -36,7 +36,7 @@ class StatsSender extends Actor {
   val modifiersToApply: mutable.Map[String, (ModifierTypeId, Long)] = mutable.Map[String, (ModifierTypeId, Long)]()
 
   override def preStart(): Unit ={
-    influxDB.write(settings.influxDB.udpPort, s"""nodesStartTime value="${nodeName}"""")}
+    influxDB.write(settings.influxDB.udpPort, s"""nodesStartTime value="$nodeName"""")}
 
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
