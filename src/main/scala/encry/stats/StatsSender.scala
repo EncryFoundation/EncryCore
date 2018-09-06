@@ -15,7 +15,6 @@ import encry.stats.LoggingActor.LogMessage
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
 import org.influxdb.{InfluxDB, InfluxDBFactory}
-
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -35,8 +34,8 @@ class StatsSender extends Actor {
 
   val modifiersToApply: mutable.Map[String, (ModifierTypeId, Long)] = mutable.Map[String, (ModifierTypeId, Long)]()
 
-  override def preStart(): Unit ={
-    influxDB.write(settings.influxDB.udpPort, s"""nodesStartTime value="$nodeName"""")}
+  override def preStart(): Unit =
+    influxDB.write(settings.influxDB.udpPort, s"""nodesStartTime value="$nodeName"""")
 
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 

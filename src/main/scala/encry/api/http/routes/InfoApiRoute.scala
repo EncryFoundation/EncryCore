@@ -14,7 +14,6 @@ import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
-
 import scala.concurrent.Future
 
 case class InfoApiRoute(readersHolder: ActorRef,
