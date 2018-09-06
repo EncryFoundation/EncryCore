@@ -98,7 +98,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def calculateBestFullChain(block: EncryBlock): Seq[EncryBlock] = {
     val continuations: Seq[Seq[EncryBlockHeader]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
     val chains: Seq[Seq[EncryBlock]] = continuations.map(_.map(getBlock).takeWhile(_.nonEmpty).flatten)
-    chains.map(block +: _).maxBy(c => scoreOf(c.last.id).getOrElse(0))
+    chains.map(block +: _).maxBy(c => scoreOf(c.last.id).getOrElse(BigInt(0)))
   }
 
   private def clipBlockDataAt(heights: Seq[Int]): Try[Unit] = Try {
