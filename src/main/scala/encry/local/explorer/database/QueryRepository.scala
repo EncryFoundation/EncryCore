@@ -57,6 +57,8 @@ protected[database] object QueryRepository extends Logging {
 
   def heightQuery: ConnectionIO[Int] = sql"SELECT MAX(height) FROM headers;".query[Int].unique
 
+  def heightOptQuery: ConnectionIO[Option[Int]] = sql"SELECT MAX(height) FROM headers;".query[Option[Int]].unique
+
   def headersByRangeQuery(from: Int, to: Int): ConnectionIO[List[HeaderDBVersion]] =
     sql"""SELECT id, parent_id, version, height, ad_proofs_root, state_root, transactions_root, ts, nonce, difficulty,
       block_size, equihash_solution, ad_proofs, tx_qty, miner_address, miner_reward, fees_total, txs_size, best_chain

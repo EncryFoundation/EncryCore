@@ -29,6 +29,8 @@ class DBService extends Logging {
 
   def selectHeight: Future[Int] = runAsync(heightQuery)
 
+  def selectHeightOpt: Future[Option[Int]] = runAsync(heightOptQuery)
+
   def headersByRange(from: Int, to: Int): Future[List[HeaderDBVersion]] = runAsync(headersByRangeQuery(from, to))
 
   def txsByRange(from: Int, to: Int): Future[List[TransactionDBVersion]] = runAsync(txsByRangeQuery(from, to))
