@@ -32,8 +32,8 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     */
   protected def processBlock(fullBlock: EncryBlock, modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
     val bestFullChain: Seq[EncryBlock] = calculateBestFullChain(fullBlock)
-    val newBestAfterThis: EncryBlockHeader = bestFullChain.last.header
-    processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, nodeSettings.blocksToKeep))
+    val newBestHeader: EncryBlockHeader = bestFullChain.last.header
+    processing(ToProcess(fullBlock, modToApply, newBestHeader, bestFullChain, nodeSettings.blocksToKeep))
   }
 
   private def processing: BlockProcessing =
@@ -45,7 +45,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     case ToProcess(fullBlock, newModRow, newBestHeader, newBestChain, _)
       if isValidFirstBlock(fullBlock.header) =>
       logStatus(Seq(), newBestChain, fullBlock, None)
-      updateStorage(newModRow, newBestHeader)
+      updateStorage(newModRow, newBestHeader.id)
       ProgressInfo(None, Seq.empty, newBestChain, Seq.empty)
   }
 
@@ -65,7 +65,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
 
-        updateStorage(newModRow, newBestHeader)
+        updateStorage(newModRow, newBestHeader.id)
 
         if (blocksToKeep >= 0) {
           val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)
@@ -98,7 +98,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def calculateBestFullChain(block: EncryBlock): Seq[EncryBlock] = {
     val continuations: Seq[Seq[EncryBlockHeader]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
     val chains: Seq[Seq[EncryBlock]] = continuations.map(_.map(getBlock).takeWhile(_.nonEmpty).flatten)
-    chains.map(c => block +: c).maxBy(c => scoreOf(c.last.id).get)
+    chains.map(block +: _).maxBy(c => scoreOf(c.last.id).getOrElse(0))
   }
 
   private def clipBlockDataAt(heights: Seq[Int]): Try[Unit] = Try {
@@ -109,8 +109,8 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     historyStorage.removeObjects(toRemove)
   }
 
-  private def updateStorage(newModRow: EncryPersistentModifier, bestFullHeader: EncryBlockHeader): Unit = {
-    val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeader.id)
+  private def updateStorage(newModRow: EncryPersistentModifier, bestFullHeaderId: ModifierId): Unit = {
+    val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeaderId)
     val bestBlockData: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = Seq(BestBlockKey -> bestFullHeaderIdWrapped)
     historyStorage.bulkInsert(storageVersion(newModRow), bestBlockData, Seq(newModRow))
   }

@@ -96,8 +96,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
   protected[history] def continuationHeaderChains(header: EncryBlockHeader,
                                                   filterCond: EncryBlockHeader => Boolean): Seq[Seq[EncryBlockHeader]] = {
     @tailrec
-    def loop(currentHeight: Int, acc: Seq[Seq[EncryBlockHeader]]): Seq[Seq[EncryBlockHeader]] = {
-      val nextLevelHeaders: Seq[EncryBlockHeader] = Seq(currentHeight)
+    def loop(currentHeightOpt: Option[Int], acc: Seq[Seq[EncryBlockHeader]]): Seq[Seq[EncryBlockHeader]] = {
+      val nextLevelHeaders: Seq[EncryBlockHeader] = currentHeightOpt.toSeq
         .flatMap { h => headerIdsAtHeight(h + 1) }
         .flatMap { id => typedModifierById[EncryBlockHeader](id) }
         .filter(filterCond)
@@ -107,11 +107,11 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
           acc.find(chain => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(h +: _)
         }
         val nonUpdatedChains: Seq[Seq[EncryBlockHeader]] = acc.filter(chain => !nextLevelHeaders.exists(_.parentId sameElements chain.head.id))
-        loop(currentHeight + 1, updatedChains ++ nonUpdatedChains)
+        loop(currentHeightOpt.map(_ + 1), updatedChains ++ nonUpdatedChains)
       }
     }
 
-    loop(header.height, Seq(Seq(header)))
+    loop(heightOf(header.id), Seq(Seq(header)))
   }
 
   def testApplicable(modifier: EncryPersistentModifier): Try[Unit] = modifier match {
