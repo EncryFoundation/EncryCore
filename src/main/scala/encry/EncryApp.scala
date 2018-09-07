@@ -11,7 +11,6 @@ import encry.api.http.routes._
 import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
 import encry.cli.ConsoleListener
 import encry.cli.ConsoleListener.StartListening
-import encry.EncryApp.{settings => appSettings}
 import encry.local.explorer.BlockListener
 import encry.local.explorer.database.DBService
 import encry.local.miner.Miner
@@ -39,8 +38,8 @@ object EncryApp extends App with Logging {
   lazy val settings: EncryAppSettings = EncryAppSettings.read
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
-  val nodeId: Array[Byte] = Algos.hash(appSettings.network.nodeName
-    .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + appSettings.network.bindAddress.getPort)).take(5)
+  val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName
+    .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)).take(5)
   lazy val basicSpecs = {
     val invSpec = new InvSpec(settings.network.maxInvObjects)
     val requestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
