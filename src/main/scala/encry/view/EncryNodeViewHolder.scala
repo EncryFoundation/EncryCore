@@ -8,13 +8,14 @@ import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
+import encry.local.miner.Miner.DisableMining
 import encry.modifiers._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
-import encry.modifiers.mempool.{EncryTransactionSerializer, Transaction}
-import encry.modifiers.state.box.EncryProposition
+import encry.modifiers.mempool.{Transaction, TransactionSerializer}
+import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
@@ -45,12 +46,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
+  var receivedAll: Boolean = !settings.postgres.enableRestore
+  var triedToDownload: Boolean = !settings.postgres.enableRestore
   val modifiersCache: EncryModifiersCache = EncryModifiersCache(1000)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     EncryBlockHeader.modifierTypeId -> EncryBlockHeaderSerializer,
     EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,
     ADProofs.modifierTypeId -> ADProofSerializer,
-    Transaction.ModifierTypeId -> EncryTransactionSerializer
+    Transaction.ModifierTypeId -> TransactionSerializer
   )
 
   system.scheduler.schedule(5.second, 5.second) {
@@ -71,18 +74,23 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def receive: Receive = {
-    case BlocksFromLocalPersistence(blocks) if settings.levelDb.recoverMode =>
+    case BlocksFromLocalPersistence(blocks, allSent) if settings.levelDb.enableRestore || settings.postgres.enableRestore =>
       blocks.foreach { block =>
         pmodModifyRecovery(block) match {
           case Success(_) =>
-            logInfo(s"Block ${block.encodedId} from recovery applied successfully")
+            logInfo(s"Block ${block.encodedId} on height ${block.header.height} from recovery applied successfully")
           case Failure(th) =>
-            logWarn(s"Failed to apply block ${block.encodedId} from recovery caused $th")
+            logWarn(s"Failed to apply block ${block.encodedId} on height ${block.header.height} from recovery caused $th")
             applicationsSuccessful = false
             peerManager ! RecoveryCompleted
         }
       }
-      if (applicationsSuccessful) sender ! SendBlocks
+      receivedAll = allSent
+      if (receivedAll) {
+        logInfo(s"Received all blocks from recovery")
+        peerManager ! RecoveryCompleted
+      }
+      if (applicationsSuccessful && settings.levelDb.enableRestore) sender ! SendBlocks
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
       if (modifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
       modifierSerializers.get(modifierTypeId).foreach { companion =>
@@ -93,7 +101,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
               modifiersCache.put(key(pmod.id), pmod)
-              if (settings.levelDb.enable)
+              if (settings.levelDb.enableSave)
                 context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
             }
         }
@@ -106,7 +114,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       logInfo(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
-      if (settings.levelDb.enable) context.actorSelection("/user/modifiersHolder") ! lm
+      if (settings.levelDb.enableSave) context.actorSelection("/user/modifiersHolder") ! lm
     case GetDataFromCurrentView(f) =>
       val result = f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool))
       result match {
@@ -266,7 +274,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               if (settings.node.sendStat)
                 newHistory.bestHeaderOpt.foreach(header =>
                   context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
-              if (newHistory.isFullChainSynced) Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
+              if (newHistory.isFullChainSynced && receivedAll) Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
+              else miner ! DisableMining
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
               logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state because of: $e")
@@ -288,7 +297,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, Transaction](tx)
-    case Failure(e) =>
+    case Failure(e) => logWarn(s"Failed to put tx ${tx.id} to mempool with exception ${e.getLocalizedMessage}")
   }
 
   def genesisState: NodeView = {
@@ -381,7 +390,7 @@ object EncryNodeViewHolder {
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    case class BlocksFromLocalPersistence(blocks: Seq[EncryBlock])
+    case class BlocksFromLocalPersistence(blocks: Seq[EncryBlock], allBlocksSent: Boolean = true)
 
     case class ModifiersFromRemote(modTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
 

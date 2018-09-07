@@ -1,7 +1,7 @@
 package encry.view.mempool
 
+import encry.modifiers.mempool.Transaction
 import akka.actor.ActorSystem
-import encry.modifiers.mempool.EncryTransaction
 import encry.settings.EncryAppSettings
 import encry.utils.{EncryGenerator, NetworkTimeProvider}
 import org.scalatest.{Matchers, PropSpec}
@@ -20,7 +20,7 @@ class EncryMempoolSpec extends PropSpec with Matchers with EncryGenerator {
 
     val maxCapacity: Int = settings.node.mempoolMaxCapacity
 
-    val txs: Seq[EncryTransaction] = genValidPaymentTxs(maxCapacity + 12)
+    val txs: Seq[Transaction] = genValidPaymentTxs(maxCapacity + 12)
 
     mempool.put(txs)
 
@@ -31,9 +31,9 @@ class EncryMempoolSpec extends PropSpec with Matchers with EncryGenerator {
 
     val mempool: EncryMempool = EncryMempool.empty(settings, timeProvider, as)
 
-    val validTxs: Seq[EncryTransaction] = genValidPaymentTxs(60)
+    val validTxs: Seq[Transaction] = genValidPaymentTxs(60)
 
-    val invalidTxs: Seq[EncryTransaction] = genInvalidPaymentTxs(100)
+    val invalidTxs: Seq[Transaction] = genInvalidPaymentTxs(100)
 
     mempool.put(validTxs ++ invalidTxs)
 

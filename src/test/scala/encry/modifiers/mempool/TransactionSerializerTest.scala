@@ -3,7 +3,7 @@ package encry.modifiers.mempool
 import encry.modifiers.InstanceFactory
 import org.scalatest.FunSuite
 
-class EncryTransactionSerializerTest extends FunSuite with InstanceFactory {
+class TransactionSerializerTest extends FunSuite with InstanceFactory {
 
   test("toBytes & parseBytes (Transfer)") {
 
@@ -11,7 +11,7 @@ class EncryTransactionSerializerTest extends FunSuite with InstanceFactory {
 
     val txSerialized = tx.bytes
 
-    val txDeserialized = EncryTransactionSerializer.parseBytes(txSerialized)
+    val txDeserialized = TransactionSerializer.parseBytes(txSerialized)
 
     assert(txDeserialized.isSuccess, "Deserialization failed.")
 
@@ -24,7 +24,7 @@ class EncryTransactionSerializerTest extends FunSuite with InstanceFactory {
 
     val txSerialized = tx.bytes
 
-    val txDeserialized = EncryTransactionSerializer.parseBytes(txSerialized)
+    val txDeserialized = TransactionSerializer.parseBytes(txSerialized)
 
     assert(txDeserialized.isSuccess, "Deserialization failed.")
 

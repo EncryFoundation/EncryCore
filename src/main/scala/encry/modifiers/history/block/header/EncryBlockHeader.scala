@@ -14,6 +14,7 @@ import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
 import encry.settings.Constants
 import io.circe.Encoder
 import io.circe.syntax._
+import cats.implicits._
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
@@ -73,6 +74,7 @@ case class HeaderDBVersion(id: String,
                            stateRoot: String,
                            transactionsRoot: String,
                            ts: Long,
+                           nonce: Long,
                            difficulty: Long,
                            length: Int,
                            solution: List[Int],
@@ -82,7 +84,25 @@ case class HeaderDBVersion(id: String,
                            minerReward: Long,
                            feesTotal: Long,
                            txsSize: Int,
-                           bestChain: Boolean)
+                           bestChain: Boolean) {
+  def toHeader: Try[EncryBlockHeader] = {
+    (Base16.decode(parentId), Base16.decode(proofsRoot), Base16.decode(stateRoot), Base16.decode(transactionsRoot)).mapN {
+      case (decodedParentId, decodedProofsRoot, decodedStateRoot, decodeTxRoot) =>
+        EncryBlockHeader(
+          version,
+          ModifierId @@ decodedParentId,
+          Digest32 @@ decodedProofsRoot,
+          ADDigest @@ decodedStateRoot,
+          Digest32 @@ decodeTxRoot,
+          ts,
+          height,
+          nonce,
+          Difficulty @@ BigInt(difficulty),
+          EquihashSolution(solution)
+        )
+    }
+  }
+}
 
 object HeaderDBVersion {
   def apply(block: EncryBlock): HeaderDBVersion = {
@@ -95,7 +115,8 @@ object HeaderDBVersion {
       Base16.encode(block.header.adProofsRoot),
       Base16.encode(block.header.stateRoot),
       Base16.encode(block.header.transactionsRoot),
-      block.header.timestamp.toLong,
+      block.header.timestamp,
+      block.header.nonce,
       block.header.difficulty.toLong,
       block.bytes.length,
       block.header.equihashSolution.ints.toList,
@@ -118,7 +139,8 @@ object HeaderDBVersion {
       Base16.encode(header.adProofsRoot),
       Base16.encode(header.stateRoot),
       Base16.encode(header.transactionsRoot),
-      header.timestamp.toLong,
+      header.timestamp,
+      header.nonce,
       header.difficulty.toLong,
       header.bytes.length,
       header.equihashSolution.ints.toList,

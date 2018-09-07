@@ -5,7 +5,7 @@ import encry.modifiers.state.box.AssetBox
 import encry.utils.TestHelper
 import org.scalatest.{Matchers, PropSpec}
 
-class EncryTransactionSpec extends PropSpec with Matchers with InstanceFactory {
+class TransactionSpec extends PropSpec with Matchers with InstanceFactory {
 
   private val txValid = paymentTransactionValid
 
@@ -18,7 +18,7 @@ class EncryTransactionSpec extends PropSpec with Matchers with InstanceFactory {
 
   property("semanticValidity of invalid tx (Inputs duplication)") {
 
-    val tx: EncryTransaction = {
+    val tx: Transaction = {
       val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(TestHelper.genAssetBox(publicKey.address.address))
 
       TransactionFactory.defaultPaymentTransactionScratch(secret, 100, timestamp, useBoxes ++ useBoxes ++ useBoxes,
@@ -30,7 +30,7 @@ class EncryTransactionSpec extends PropSpec with Matchers with InstanceFactory {
 
   property("semanticValidity of invalid tx (Negative fee)") {
 
-    val tx: EncryTransaction = {
+    val tx: Transaction = {
       val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(TestHelper.genAssetBox(publicKey.address.address))
 
       TransactionFactory.defaultPaymentTransactionScratch(secret, -100, timestamp, useBoxes,
@@ -42,7 +42,7 @@ class EncryTransactionSpec extends PropSpec with Matchers with InstanceFactory {
 
   property("semanticValidity of invalid tx (Empty inputs)") {
 
-    val tx: EncryTransaction = {
+    val tx: Transaction = {
       val useBoxes: IndexedSeq[AssetBox] = IndexedSeq.empty
 
       TransactionFactory.defaultPaymentTransactionScratch(secret, -100, timestamp, useBoxes,
@@ -54,7 +54,7 @@ class EncryTransactionSpec extends PropSpec with Matchers with InstanceFactory {
 
   property("semanticValidity of invalid tx (Too many inputs)") {
 
-    val tx: EncryTransaction = {
+    val tx: Transaction = {
       val useBoxes: IndexedSeq[AssetBox] = (0 to Short.MaxValue + 10)
         .foldLeft(IndexedSeq.empty[AssetBox]) { case (acc, _) => acc :+ TestHelper.genAssetBox(publicKey.address.address) }
 

@@ -4,7 +4,8 @@ import java.io.File
 import akka.actor.ActorRef
 import encry.avltree
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
-import encry.modifiers.mempool.{EncryTransaction, TransactionFactory}
+import encry.modifiers.mempool.{Transaction, TransactionFactory}
+import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
 import encry.settings.Constants
@@ -48,16 +49,16 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val state: UtxoState = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None)
 
-    val regularTransactions: Seq[EncryTransaction] = initialBoxes.map { bx =>
+    val regularTransactions: Seq[Transaction] = initialBoxes.map { bx =>
       TransactionFactory.defaultPaymentTransactionScratch(
         secret, 10000, timestamp, IndexedSeq(bx), randomAddress, 5000)
     }
 
     val fees: Amount = regularTransactions.map(_.fee).sum
 
-    val coinbase: EncryTransaction = TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, 25L, fees, Height @@ 100)
+    val coinbase: Transaction = TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, 25L, fees, Height @@ 100)
 
-    val transactions: Seq[EncryTransaction] = regularTransactions.sortBy(_.timestamp) :+ coinbase
+    val transactions: Seq[Transaction] = regularTransactions.sortBy(_.timestamp) :+ coinbase
 
     val (_: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(transactions).get
 
