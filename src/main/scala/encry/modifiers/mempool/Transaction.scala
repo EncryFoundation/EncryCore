@@ -58,7 +58,7 @@ case class Transaction(fee: Amount,
     (Constants.StateByteCost * newBoxes.map(_.bytes).foldLeft(Array.empty[Byte])(_ ++ _).length)
 
   override def toString: String =
-    s"<Transaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}>"
+    s"<Transaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}, directives=${directives.mkString(", ")}>"
 
   lazy val semanticValidity: Try[Unit] = validateStateless.toTry
 

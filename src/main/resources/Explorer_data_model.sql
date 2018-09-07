@@ -53,13 +53,15 @@ CREATE INDEX tx_id_inputs_index ON inputs (tx_id);
 
 CREATE TABLE directives(
   tx_id VARCHAR(64) REFERENCES transactions (id),
+  number_in_tx INTEGER NOT NULL,
   type_id SMALLINT NOT NULL,
   is_valid BOOLEAN NOT NULL,
   contract_hash TEXT NOT NULL,
   amount BIGINT NOT NULL,
   address TEXT NOT NULL,
   token_id_opt TEXT,
-  data_field TEXT NOT NULL
+  data_field TEXT NOT NULL,
+  PRIMARY KEY (tx_id, number_in_tx)
 );
 
 CREATE INDEX tx_id_directives_index ON directives (tx_id);

@@ -37,8 +37,8 @@ case class TransferDirective(address: Address,
 
   lazy val isIntrinsic: Boolean = tokenIdOpt.isEmpty
 
-  override def toDbVersion(txId: ModifierId): DirectiveDBVersion =
-    DirectiveDBVersion(Base16.encode(txId), typeId, isValid, "", amount, address, tokenIdOpt.map(Base16.encode), "")
+  override def toDbVersion(txId: ModifierId, numberInTx: Int): DirectiveDBVersion =
+    DirectiveDBVersion(Base16.encode(txId), numberInTx, typeId, isValid, "", amount, address, tokenIdOpt.map(Base16.encode), "")
 }
 
 object TransferDirective {

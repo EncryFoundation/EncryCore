@@ -109,12 +109,14 @@ protected[database] object QueryRepository extends Logging {
 
   private def insertDirectivesQuery(txs: Seq[Transaction]): ConnectionIO[Int] = {
     val directives: Seq[DirectiveDBVersion] = txs.map(tx => tx.id -> tx.directives).flatMap {
-      case (id, directives) => directives.map(_.toDbVersion(id))
+      case (id, directives) => directives.zipWithIndex.map {
+        case (directive, number) => directive.toDbVersion(id, number)
+      }
     }
     val query: String =
       """
-        |INSERT INTO public.directives (tx_id, type_id, is_valid, contract_hash, amount, address, token_id_opt, data_field)
-        |VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING;
+        |INSERT INTO public.directives (tx_id, number_in_tx, type_id, is_valid, contract_hash, amount, address, token_id_opt, data_field)
+        |VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING;
         |""".stripMargin
     Update[DirectiveDBVersion](query).updateMany(directives.toList)
   }
