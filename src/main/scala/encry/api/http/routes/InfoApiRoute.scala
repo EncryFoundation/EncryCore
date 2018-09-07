@@ -4,7 +4,6 @@ import java.net.InetAddress
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.EncryApp.{settings => appSettings}
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
