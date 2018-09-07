@@ -1,5 +1,6 @@
 package encry.api.http.routes
 
+import java.net.InetAddress
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
@@ -47,6 +48,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
   private def getStateType: String = appSettings.node.stateMode.verboseName
 
   private def getNodeName: String = appSettings.network.nodeName
+    .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + appSettings.network.bindAddress.getPort)
 
   private def getMinerInfo: Future[MinerStatus] = (miner ? GetMinerStatus).mapTo[MinerStatus]
 }

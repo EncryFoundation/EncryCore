@@ -3,7 +3,7 @@ package encry.settings
 import java.net.InetSocketAddress
 import scala.concurrent.duration.FiniteDuration
 
-case class NetworkSettings(nodeName: String,
+case class NetworkSettings(nodeName: Option[String],
                            addedMaxDelay: Option[FiniteDuration],
                            networkChunkSize: Int,
                            localOnly: Boolean,
