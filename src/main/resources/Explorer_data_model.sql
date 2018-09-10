@@ -17,7 +17,8 @@ CREATE TABLE headers(
   miner_reward BIGINT NOT NULL,
   fees_total BIGINT NOT NULL,
   txs_size BIGINT NOT NULL,
-  best_chain BOOLEAN NOT NULL
+  best_chain BOOLEAN NOT NULL,
+  block_ad_proofs TEXT
 );
 
 CREATE INDEX height_index ON headers (height);

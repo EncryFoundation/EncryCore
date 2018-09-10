@@ -243,6 +243,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     pmodModify(block.header)
     nodeView.history.blockDownloadProcessor.updateBestBlock(block.header)
     pmodModify(block.payload)
+    block.adProofsOpt.foreach(pmodModify(_))
   } else Success(Unit)
 
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
