@@ -1,12 +1,13 @@
 package encry.network
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 import java.nio.ByteOrder
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
+import encry.EncryApp.settings
 import encry.EncryApp._
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle, _}
 import encry.network.message.MessageHandler
@@ -62,7 +63,8 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
       timeProvider
         .time()
         .map { time =>
-          val hb: Array[Byte] = Handshake(Version(settings.network.appVersion), settings.network.nodeName,
+          val hb: Array[Byte] = Handshake(Version(settings.network.appVersion), settings.network.nodeName
+            .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort),
             ownSocketAddress, time).bytes
           connection ! Tcp.Write(ByteString(hb))
           logInfo(s"Handshake sent to $remote")
