@@ -3,7 +3,6 @@ package encry.utils
 import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.util.Timeout
-
 import scala.concurrent.Future
 import scala.reflect.ClassTag
 

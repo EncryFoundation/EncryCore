@@ -1,8 +1,7 @@
 package encry.crypto.equihash
 
 import java.math.BigInteger
-
-import encry.utils.LittleEndianBytes._
+import java.nio.{ByteBuffer, ByteOrder}
 import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import scala.collection.mutable.ArrayBuffer
@@ -13,7 +12,7 @@ object Equihash {
   private val byteSize: Int = 8
 
   def nonceToLeBytes(nonce: BigInt): Array[Byte] =
-    (for (i <- 0 to 7) yield leIntToByteArray((nonce >> 32 * i).intValue())).reduce(_ ++ _)
+    (for (i <- 0 to 7) yield littleEndianIntToByteArray((nonce >> 32 * i).intValue())).reduce(_ ++ _)
 
   def hashNonce[T <: Digest](digest: T, nonce: BigInt): Unit = {
     val arr: Array[Byte] = nonceToLeBytes(nonce)
@@ -26,7 +25,7 @@ object Equihash {
 
 
   def hashXi[T <: Digest](digest: T, xi: Int): Unit = {
-    val arr: Array[Byte] = leIntToByteArray(xi)
+    val arr: Array[Byte] = littleEndianIntToByteArray(xi)
     digest.update(arr, 0, arr.length)
   }
 
@@ -142,7 +141,7 @@ object Equihash {
     val wordsPerHash: Int = 512 / n
     val hidx: Int = idx / wordsPerHash
     val hrem: Int = idx % wordsPerHash
-    val idxdata: Array[Byte] = leIntToByteArray(hidx)
+    val idxdata: Array[Byte] = littleEndianIntToByteArray(hidx)
     val ctx1: Blake2bDigest = new Blake2bDigest(digestWithoutIdx)
     ctx1.update(idxdata, 0, idxdata.length)
     val digest: Array[Byte] = new Array[Byte](ctx1.getDigestSize)
@@ -205,5 +204,12 @@ object Equihash {
       }
       words.head == BigInteger.ZERO && pairWiseCheck && xorConditionsCheck
     }
+  }
+
+  def littleEndianIntToByteArray(i: Int): Array[Byte] = {
+    val bb = ByteBuffer.allocate(Integer.SIZE / 8)
+    bb.order(ByteOrder.LITTLE_ENDIAN)
+    bb.putInt(i)
+    bb.array
   }
 }
