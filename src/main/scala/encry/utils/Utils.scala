@@ -2,13 +2,12 @@ package encry.utils
 
 import com.google.common.primitives.Longs
 import CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.modifiers.mempool.Transaction.Nonce
 import encry.network.message.BasicMsgDataTypes.InvData
 import org.encryfoundation.common.Algos
 
 object Utils {
 
-  def nonceFromDigest(digest: Array[Byte]): Nonce = Longs.fromByteArray(Algos.hash(digest).take(8))
+  def nonceFromDigest(digest: Array[Byte]): Long = Longs.fromByteArray(Algos.hash(digest).take(8))
 
   def idsToString(ids: Seq[(ModifierTypeId, ModifierId)]): String = (ids.headOption, ids.lastOption) match {
     case (Some(f), Some(l)) if f._2 sameElements l._2 => s"[(${f._1},${Algos.encode(f._2)})]"

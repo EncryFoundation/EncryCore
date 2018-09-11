@@ -27,8 +27,6 @@ case class AssetBox(override val proposition: EncryProposition,
 
   override def serializer: Serializer[M] = AssetBoxSerializer
 
-  lazy val isIntrinsic: Boolean = tokenIdOpt.isEmpty
-
   override val tpe: Types.Product = Types.AssetBox
 
   override def asVal: PValue = PValue(asPrism, Types.AssetBox)

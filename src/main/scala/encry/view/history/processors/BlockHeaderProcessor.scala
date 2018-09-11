@@ -76,12 +76,13 @@ trait BlockHeaderProcessor extends Logging {
 
   private def requiredModifiersForHeader(h: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] =
     if (!nodeSettings.verifyTransactions) Seq.empty
-    else if (nodeSettings.stateMode.isDigest) Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId))
+    else if (nodeSettings.stateMode.isDigest)
+      Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId))
     else Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
 
   private def isNewHeader(header: EncryBlockHeader): Boolean =
-    timeProvider.estimatedTime - header.timestamp < Constants.Chain.DesiredBlockInterval.toMillis * Constants.Chain.NewHeaderTimeMultiplier
-
+    timeProvider.estimatedTime - header.timestamp <
+      Constants.Chain.DesiredBlockInterval.toMillis * Constants.Chain.NewHeaderTimeMultiplier
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
@@ -110,22 +111,15 @@ trait BlockHeaderProcessor extends Logging {
 
   def bestHeaderHeight: Int = bestHeaderIdOpt.flatMap(id => heightOf(id)).getOrElse(Constants.Chain.PreGenesisHeight)
 
-  /**
-    * @return height of best header with transactions and proofs
-    */
   def bestBlockHeight: Int = bestBlockIdOpt.flatMap(id => heightOf(id)).getOrElse(Constants.Chain.PreGenesisHeight)
 
-  /**
-    * @return ProgressInfo - info required for State to be consistent with History
-    */
   protected def process(h: EncryBlockHeader): ProgressInfo[EncryPersistentModifier] = getHeaderInfoUpdate(h) match {
     case Some(dataToUpdate) =>
       historyStorage.bulkInsert(ByteArrayWrapper(h.id), dataToUpdate._1, Seq(dataToUpdate._2))
       bestHeaderIdOpt match {
         case Some(bestHeaderId) =>
-          // If we verify transactions, we don't need to send this header to state.
-          // If we don't and this is the best header, we should send this header to state to update state root hash
-          val toProcess: Seq[EncryBlockHeader] = if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
+          val toProcess: Seq[EncryBlockHeader] =
+            if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
           ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
         case None =>
           logError("Should always have best header after header application")

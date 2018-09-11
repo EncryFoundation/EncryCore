@@ -3,7 +3,6 @@ package encry.validation
 import akka.http.scaladsl.server.Route
 import encry.api.http.ApiError
 import io.circe.{ACursor, Decoder, DecodingFailure}
-
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
