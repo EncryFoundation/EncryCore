@@ -35,8 +35,6 @@ case class TransferDirective(address: Address,
 
   override def serializer: Serializer[M] = TransferDirectiveSerializer
 
-  lazy val isIntrinsic: Boolean = tokenIdOpt.isEmpty
-
   override def toDbVersion(txId: ModifierId): DirectiveDBVersion =
     DirectiveDBVersion(Base16.encode(txId), typeId, isValid, "", amount, address, tokenIdOpt.map(Base16.encode), "")
 }
