@@ -75,7 +75,7 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
       val groupedInputs: Map[String, List[InputDBVersion]] = inputs.groupBy(_.txId)
       val groupedDirectives: Map[String, List[DirectiveDBVersion]] = directives.groupBy(_.txId)
       val txsWithIO: Map[String, List[Transaction]] = txs.groupBy(_.blockId).mapValues {
-        _.map { tx =>
+        _.sortBy(_.number).sortBy(_.isCoinbase).map { tx =>
           Transaction(
             tx.fee,
             tx.timestamp,

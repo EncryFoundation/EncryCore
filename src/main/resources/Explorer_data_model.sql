@@ -25,6 +25,7 @@ CREATE INDEX height_index ON headers (height);
 
 CREATE TABLE transactions(
   id VARCHAR(64) PRIMARY KEY,
+  number_in_block INTEGER NOT NULL,
   fee BIGINT NOT NULL,
   block_id VARCHAR(64) REFERENCES headers (id),
   is_coinbase BOOLEAN NOT NULL,

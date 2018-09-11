@@ -57,7 +57,7 @@ case class Transaction(fee: Amount,
     (Constants.StateByteCost * newBoxes.map(_.bytes).foldLeft(Array.empty[Byte])(_ ++ _).length)
 
   override def toString: String =
-    s"<Transaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}, directives=${directives.mkString(", ")}>"
+    s"<Transaction id=${Algos.encode(id)}\nfee=$fee\ninputs=$inputs\ndirectives=$directives\nts=$timestamp\nproofs=$defaultProofOpt>"
 
   lazy val semanticValidity: Try[Unit] = validateStateless.toTry
 
@@ -199,17 +199,17 @@ object UnsignedTransaction {
 }
 
 
-case class TransactionDBVersion(id: String, fee: Long, blockId: String, isCoinbase: Boolean,
+case class TransactionDBVersion(id: String, number: Int, fee: Long, blockId: String, isCoinbase: Boolean,
                                 timestamp: Timestamp, proof: Option[String])
 
 case object TransactionDBVersion {
   def apply(block: EncryBlock): Seq[TransactionDBVersion] = {
     if (block.payload.transactions.nonEmpty) {
-      val transactions: Seq[TransactionDBVersion] = block.payload.transactions.map { tx =>
+      val transactions: Seq[TransactionDBVersion] = block.payload.transactions.zipWithIndex.map { case (tx, number) =>
         val id: String = Base16.encode(tx.id)
         val proof: Option[String] = tx.defaultProofOpt.map(p => Base16.encode(p.bytes))
         val blockId: String = Base16.encode(block.header.id)
-        TransactionDBVersion(id, tx.fee, blockId, isCoinbase = false, block.header.timestamp, proof)
+        TransactionDBVersion(id, number, tx.fee, blockId, isCoinbase = false, tx.timestamp, proof)
       }.toIndexedSeq
       transactions match {
         case coinbase :: Nil => Seq(coinbase.copy(isCoinbase = true))
