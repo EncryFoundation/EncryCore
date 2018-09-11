@@ -43,6 +43,7 @@ case class Transaction(fee: Amount,
   override def serializer: Serializer[Transaction] = TransactionSerializer
 
   val messageToSign: Array[Byte] = UnsignedTransaction.bytesToSign(fee, timestamp, inputs, directives)
+
   val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
 
   lazy val size: Int = this.bytes.length

@@ -57,13 +57,12 @@ object TransferDirective {
       address <- c.downField("address").as[String]
       amount <- c.downField("amount").as[Long]
       tokenIdOpt <- c.downField("tokenId").as[Option[String]]
-    } yield {
-      TransferDirective(
-        address,
-        amount,
-        tokenIdOpt.flatMap(id => Algos.decode(id).map(ADKey @@ _).toOption)
-      )
-    }
+    } yield TransferDirective(
+      address,
+      amount,
+      tokenIdOpt.flatMap(id => Algos.decode(id).map(ADKey @@ _).toOption)
+    )
+
   }
 }
 
