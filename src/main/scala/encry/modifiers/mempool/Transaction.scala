@@ -12,7 +12,6 @@ import encry.EncryApp.timeProvider
 import io.circe.{Decoder, HCursor}
 import io.circe.syntax._
 import org.encryfoundation.common.transaction._
-import org.encryfoundation.prismlang.compiler.CompiledContractSerializer
 import org.encryfoundation.prismlang.core.Types
 import encry.settings.Constants
 import encry.utils.CoreTaggedTypes
@@ -227,12 +226,7 @@ case class InputDBVersion(id: String, txId: String, contractByteVersion: String,
     for {
       decodedId            <- Base16.decode(id)
       decodedContractBytes <- Base16.decode(contractByteVersion)
-      decodedContract      <- RegularContract.Serializer
-        .parseBytes(decodedContractBytes)
-        .map(_.asRight)
-        .recoverWith {
-          case _ => CompiledContractSerializer.parseBytes(decodedContractBytes).map(_.asLeft)
-        }
+      decodedContract      <- InputSerializer.decodeEitherCompiledOrRegular(decodedContractBytes)
       decodedBase16Proofs  <- if (proofs.length != 0) proofs.split(",").toList.traverse(Base16.decode)
                               else Success(List.empty)
       decodedProofs        <- decodedBase16Proofs.traverse(ProofSerializer.parseBytes)
@@ -246,7 +240,7 @@ case object InputDBVersion {
     val txId: String = Base16.encode(tx.id)
     tx.inputs.map { in =>
       val id: String = Base16.encode(in.boxId)
-      val contractBytes: String = Base16.encode(in.contract.map(_.bytes).leftMap(_.bytes).fold(identity, identity))
+      val contractBytes: String = Base16.encode(InputSerializer.encodeEitherCompiledOrRegular(in.contract))
       val proofs: String = in.proofs.map(_.bytes).map(Base16.encode).mkString(",")
       InputDBVersion(id, txId, contractBytes, proofs)
     }
