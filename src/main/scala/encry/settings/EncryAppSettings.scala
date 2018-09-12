@@ -7,17 +7,16 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 case class EncryAppSettings(directory: String,
-                            testing: TestingSettings,
                             node: NodeSettings,
-                            wallet: WalletSettings,
+                            wallet: Option[WalletSettings],
                             dataDir: File,
                             kafka: KafkaSettings,
                             network: NetworkSettings,
                             restApi: RESTApiSettings,
                             ntp: NetworkTimeProviderSettings,
-                            postgres: PostgresSettings,
-                            influxDB: InfluxDBSettings,
-                            levelDb: LevelDbSettings)
+                            postgres: Option[PostgresSettings],
+                            influxDB: Option[InfluxDBSettings],
+                            levelDb: Option[LevelDbSettings])
 
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader {
 
@@ -25,8 +24,6 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader {
     .withFallback(ConfigFactory.load()).as[EncryAppSettings]("encry")
 
 }
-
-case class TestingSettings(minimalFee: Int, amount: Int, defaultRecipientAddress: String, limitPerEpoch: Int)
 
 case class WalletSettings(password: String, seed: Option[String])
 

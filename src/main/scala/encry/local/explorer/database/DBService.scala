@@ -38,10 +38,10 @@ class DBService extends Logging {
   def inputsByTxIds(ids: Seq[String]): Future[List[InputDBVersion]] = runAsync(inputsByTransactionIdsQuery(ids))
 
   private lazy val dataSource = new HikariDataSource
-  if (settings.postgres.enableSave || settings.postgres.enableRestore) {
-    dataSource.setJdbcUrl(settings.postgres.host)
-    dataSource.setUsername(settings.postgres.user)
-    dataSource.setPassword(settings.postgres.password)
+  if (settings.postgres.exists(_.enableSave) || settings.postgres.exists(_.enableRestore)) {
+    dataSource.setJdbcUrl(settings.postgres.map(_.host).getOrElse(throw new RuntimeException("host not specified")))
+    dataSource.setUsername(settings.postgres.map(_.user).getOrElse(throw new RuntimeException("user not specified")))
+    dataSource.setPassword(settings.postgres.map(_.password).getOrElse(throw new RuntimeException("password not specified")))
     dataSource.setMaximumPoolSize(5)
   }
 
