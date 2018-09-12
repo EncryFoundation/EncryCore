@@ -95,19 +95,18 @@ trait EncryGenerator {
     val timestamp: Amount = System.currentTimeMillis()
     keys.foldLeft(Seq[Transaction]()) { (seq, key) =>
       val useBoxes: IndexedSeq[MonetaryBox] = if (seq.isEmpty) IndexedSeq(genAssetBox(key.publicImage.address.address))
-        else seq.last.newBoxes.map(_.asInstanceOf[MonetaryBox]).toIndexedSeq
+      else seq.last.newBoxes.map(_.asInstanceOf[MonetaryBox]).toIndexedSeq
       seq :+ TransactionFactory.defaultPaymentTransactionScratch(key, Props.txFee,
         timestamp, useBoxes, randomAddress, Props.boxValue)
     }
   }
 
   def genInvalidPaymentTxs(qty: Int): Seq[Transaction] = {
-    val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
     val timestamp: Amount = System.currentTimeMillis()
-
-    keys.map { k =>
-      val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genAssetBox(PublicKey25519(PublicKey @@ Random.randomBytes(32)).address.address))
-      TransactionFactory.defaultPaymentTransactionScratch(k, -100, timestamp, useBoxes, randomAddress, Props.boxValue)
+    genPrivKeys(qty).map { key =>
+      val useBoxes: IndexedSeq[AssetBox] =
+        IndexedSeq(genAssetBox(PublicKey25519(PublicKey @@ Random.randomBytes(32)).address.address))
+      TransactionFactory.defaultPaymentTransactionScratch(key, -100, timestamp, useBoxes, randomAddress, Props.boxValue)
     }
   }
 
@@ -125,28 +124,5 @@ trait EncryGenerator {
       Constants.Chain.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
-  }
-
-  def genUtxoState: UtxoState = {
-    def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
-      val p: BatchAVLProver[Digest32, Algos.HF] = new BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
-      bh.sortedBoxes.foreach(b => p.performOneOperation(Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
-
-      val stateStore: LSMStore = new LSMStore(dir, keySize = 32, keepVersions = 10)
-
-      val persistentProver: PersistentBatchAVLProver[Digest32, HF] = {
-        val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
-        val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(stateStore, np)(Algos.hash)
-        PersistentBatchAVLProver.create(p, storage).get
-      }
-
-      new UtxoState(persistentProver, EncryState.genesisStateVersion, Constants.Chain.GenesisHeight, stateStore, 0L, None)
-    }
-
-    val bxs: IndexedSeq[AssetBox] = TestHelper.genAssetBoxes
-
-    val boxHolder: BoxHolder = BoxHolder(bxs)
-
-    utxoFromBoxHolder(boxHolder, FileHelper.getRandomTempDir, None)
   }
 }
