@@ -261,7 +261,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
           if (settings.node.sendStat)
-            context.actorSelection("user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
+            context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
           newStateTry match {
             case Success(newMinState) =>
               val newMemPool: EncryMempool = updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)
