@@ -55,11 +55,31 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     ADProofs.modifierTypeId -> ADProofSerializer,
     Transaction.ModifierTypeId -> TransactionSerializer
   )
+  var txsInBlocks: Int = 0
 
-  system.scheduler.schedule(5.second, 5.second) {
+  system.scheduler.schedule(5 second, 5 second) {
     if (settings.node.sendStat)
       system.actorSelection("user/statsSender") !
         HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
+  }
+
+  system.scheduler.schedule(5 second, 1 second) {
+    if (settings.node.sendStat) {
+      val txsInLastBlock: Int = nodeView.history.bestBlockOpt.map(x => x.payload.transactions.size).getOrElse(0)
+      val txsInMempool: Int = nodeView.mempool.unconfirmed.values.size
+      val diffBtw: Int = txsInMempool - txsInLastBlock
+
+      system.actorSelection("user/statsSender") !
+        TransactionsStatMessage(txsInLastBlock, nodeView.history.bestBlockHeight)
+
+      system.actorSelection("user/statsSender") ! MempoolStat(txsInMempool)
+
+      system.actorSelection("user/statsSender") ! DiffBtwMempoolAndLastBlockTxs(diffBtw)
+    }
+  }
+  system.scheduler.schedule(5 second, 10 second) {
+    system.actorSelection("user/statsSender") ! TxsInBlockchain(txsInBlocks)
+    txsInBlocks = 0
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -110,12 +130,16 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
         logInfo(s"Cache after(${modifiersCache.size})")
       }
-    case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
+    case lt: Test[EncryProposition, Transaction] => lt.tx.foreach(txModify)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       logInfo(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
       if (settings.levelDb.enableSave) context.actorSelection("/user/modifiersHolder") ! lm
     case GetDataFromCurrentView(f) =>
+      if(nodeView.wallet.walletStorage.allBoxes.isEmpty)
+        println("empty")
+      if(nodeView.wallet.getBalances.isEmpty)
+        println(":emty11")
       val result = f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool))
       result match {
         case resultFuture: Future[_] => resultFuture.pipeTo(sender())
@@ -296,6 +320,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case Success(newPool) =>
       val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
+
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, Transaction](tx)
     case Failure(e) => logWarn(s"Failed to put tx ${tx.id} to mempool with exception ${e.getLocalizedMessage}")
   }
@@ -397,6 +422,8 @@ object EncryNodeViewHolder {
     case class LocallyGeneratedTransaction[P <: Proposition, EncryBaseTransaction](tx: EncryBaseTransaction)
 
     case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentNodeViewModifier](pmod: EncryPersistentModifier)
+
+    case class Test[P <: Proposition, EncryBaseTransaction](tx: List[EncryBaseTransaction])
 
   }
 

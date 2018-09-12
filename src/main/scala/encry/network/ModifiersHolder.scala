@@ -8,6 +8,7 @@ import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
+import encry.stats.StatsSender.TransactionsStatMessage
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, LocallyGeneratedModifier}
 import org.encryfoundation.common.Algos
 import encry.utils.Logging

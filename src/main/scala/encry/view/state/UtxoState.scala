@@ -19,6 +19,7 @@ import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box._
 import encry.utils.{BalanceCalculator, Logging}
 import encry.settings.Constants
+import encry.stats.StatsSender.TxsInBlock
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.History.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
@@ -52,7 +53,9 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     def applyTry(txs: Seq[Transaction], allowedOutputDelta: Amount = 0L): Try[Unit] =
       txs.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, tx) =>
         t.flatMap { _ =>
-          validate(tx, allowedOutputDelta).flatMap { _ =>
+          val res: Try[Unit] = validate(tx, allowedOutputDelta)
+          if(res.isFailure) println(s"transaction denied $res, ${tx.timestamp} ${tx.id}")
+           res.flatMap { _ =>
             extractStateChanges(tx).operations.map(ADProofs.toModification)
               .foldLeft[Try[Option[ADValue]]](Success(None)) { case (tIn, m) =>
                 tIn.flatMap(_ => persistentProver.performOneOperation(m))
@@ -81,7 +84,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     case block: EncryBlock =>
       logInfo(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
-
+      system.actorSelection("user/statsSender") ! TxsInBlock(block.payload.transactions.size)
       applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] =
           metadata(VersionTag !@@ block.id, block.header.stateRoot, Height @@ block.header.height, block.header.timestamp)

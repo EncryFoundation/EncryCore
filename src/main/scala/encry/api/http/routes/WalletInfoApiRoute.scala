@@ -4,6 +4,7 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
+import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.RESTApiSettings
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.EncryHistory
@@ -18,7 +19,9 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
                               restApiSettings: RESTApiSettings)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
-  override val route: Route = pathPrefix("wallet") { infoR ~ getUtxosR }
+  override val route: Route = pathPrefix("wallet") {
+    infoR ~ getUtxosR
+  }
 
   override val settings: RESTApiSettings = restApiSettings
 
@@ -39,7 +42,10 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
 
   def getUtxosR: Route = (path("utxos") & get) {
     getWallet
-      .map { _.walletStorage.allBoxes.asJson }
+      .map { x =>
+        val a: List[EncryBaseBox] = util.Random.shuffle(x.walletStorage.allBoxes.toList)
+          a.take(10).asJson
+      }
       .okJson()
   }
 }

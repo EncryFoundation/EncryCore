@@ -18,11 +18,16 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
   def getBoxById(id: ADKey): Option[EncryBaseBox] = store.get(keyByBoxId(id))
     .flatMap(d => StateModifierDeserializer.parseBytes(d.data, id.head).toOption)
 
-  def allBoxes: Seq[EncryBaseBox] = store.getAll
-    .filter(_._2 != balancesKey)
-    .foldLeft(Seq[EncryBaseBox]()) { case (acc, id) =>
-      getBoxById(ADKey @@ id._1.data).map(bx => acc :+ bx).getOrElse(acc)
-    }
+  def allBoxes: Seq[EncryBaseBox] = {
+    store.getAll
+      .filter { x =>
+        x._2 != balancesKey
+      }
+      .foldLeft(Seq[EncryBaseBox]()) { case (acc, id) =>
+        getBoxById(ADKey @@ id._1.data).map{bx =>
+          acc :+ bx}.getOrElse(acc)
+      }
+  }
 
   def containsBox(id: ADKey): Boolean = getBoxById(id).isDefined
 
