@@ -66,11 +66,11 @@ class ModifiersHolder extends PersistentActor with Logging {
     case SendBlocks =>
       val blocksToSend: Seq[EncryBlock] = completedBlocks.take(settings.levelDb
         .map(_.batchSize)
-        .getOrElse(throw new RuntimeException("LevelDb restore batchsize not specified"))).values.toSeq
+        .getOrElse(throw new RuntimeException("batchsize not specified"))).values.toSeq
 
       completedBlocks = completedBlocks.drop(settings.levelDb
         .map(_.batchSize)
-        .getOrElse(throw new RuntimeException("LevelDb restore batchsize not specified")))
+        .getOrElse(throw new RuntimeException("batchsize not specified")))
       nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend)
 
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
