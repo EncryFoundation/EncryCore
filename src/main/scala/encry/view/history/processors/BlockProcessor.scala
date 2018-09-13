@@ -20,17 +20,20 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
 
   protected def getBlock(h: EncryBlockHeader): Option[EncryBlock]
 
-  protected def commonBlockThenSuffixes(header1: EncryBlockHeader, header2: EncryBlockHeader): (EncryHeaderChain, EncryHeaderChain)
+  protected def commonBlockThenSuffixes(header1: EncryBlockHeader,
+                                        header2: EncryBlockHeader): (EncryHeaderChain, EncryHeaderChain)
 
-  protected[history] def continuationHeaderChains(header: EncryBlockHeader, filterCond: EncryBlockHeader => Boolean): Seq[Seq[EncryBlockHeader]]
+  protected[history] def continuationHeaderChains(header: EncryBlockHeader,
+                                                  filterCond: EncryBlockHeader => Boolean): Seq[Seq[EncryBlockHeader]]
 
   /** Process full block when we have one.
     *
-    * @param fullBlock - block to process
+    * @param fullBlock  - block to process
     * @param modToApply - new part of the block we want to apply
     * @return ProgressInfo required for State to process to be consistent with History
     */
-  protected def processBlock(fullBlock: EncryBlock, modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
+  protected def processBlock(fullBlock: EncryBlock,
+                             modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
     val bestFullChain: Seq[EncryBlock] = calculateBestFullChain(fullBlock)
     val newBestHeader: EncryBlockHeader = bestFullChain.last.header
     processing(ToProcess(fullBlock, modToApply, newBestHeader, bestFullChain, nodeSettings.blocksToKeep))
@@ -50,7 +53,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   }
 
   private def processBetterChain: BlockProcessing = {
-    case toProcess @ ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
+    case toProcess@ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterBlock(fullBlock) =>
 
       val prevBest: EncryBlock = bestBlockOpt.get
@@ -59,7 +62,8 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       val toApply: Seq[EncryBlock] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
 
-      if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess) //block have higher score but is not linkable to full chain
+      //block have higher score but is not linkable to full chain
+      if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
         //application of this block leads to full chain with higher score
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))

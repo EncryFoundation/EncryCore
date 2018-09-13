@@ -106,7 +106,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
         val updatedChains: Seq[Seq[EncryBlockHeader]] = nextLevelHeaders.flatMap { h =>
           acc.find(chain => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(h +: _)
         }
-        val nonUpdatedChains: Seq[Seq[EncryBlockHeader]] = acc.filter(chain => !nextLevelHeaders.exists(_.parentId sameElements chain.head.id))
+        val nonUpdatedChains: Seq[Seq[EncryBlockHeader]] =
+          acc.filter(chain => !nextLevelHeaders.exists(_.parentId sameElements chain.head.id))
         loop(currentHeightOpt.map(_ + 1), updatedChains ++ nonUpdatedChains)
       }
     }

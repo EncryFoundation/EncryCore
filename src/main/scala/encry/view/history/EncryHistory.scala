@@ -2,7 +2,6 @@ package encry.view.history
 
 import java.io.File
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.consensus.History
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
@@ -10,7 +9,7 @@ import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings._
-import encry.utils.{Logging, NetworkTimeProvider}
+import encry.utils.NetworkTimeProvider
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
 import encry.view.history.storage.HistoryStorage
@@ -30,7 +29,7 @@ import scala.util.Try
   * BlockPayloadProcessor: Processor of BlockPayload. BlockPayload may
   *   1. Be downloaded from other peers (verifyTransactions == true)
   *   2. Be ignored by history (verifyTransactions == false) */
-trait EncryHistory extends EncryHistoryReader with Logging {
+trait EncryHistory extends EncryHistoryReader {
 
   def isFullChainSynced: Boolean = bestHeaderOpt
     .exists(bestHeader => bestBlockOpt.exists(b => ByteArrayWrapper(b.header.id) == ByteArrayWrapper(bestHeader.id)))
@@ -92,7 +91,8 @@ trait EncryHistory extends EncryHistoryReader with Logging {
             ProgressInfo[EncryPersistentModifier](None, Seq.empty, Seq.empty, Seq.empty)
           case _ =>
             // Modifiers from best header and best full chain are involved, links change required.
-            val newBestHeader: EncryBlockHeader = loopHeightDown(bestHeaderHeight, id => !invalidatedHeaders.exists(_.id sameElements id))
+            val newBestHeader: EncryBlockHeader =
+              loopHeightDown(bestHeaderHeight, id => !invalidatedHeaders.exists(_.id sameElements id))
               .ensuring(_.isDefined, "Where unable to find new best header, can't invalidate genesis block")
               .get
 

@@ -8,7 +8,6 @@ import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
-import encry.local.miner.Miner.DisableMining
 import encry.modifiers._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
@@ -80,7 +79,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           case Success(_) =>
             logInfo(s"Block ${block.encodedId} on height ${block.header.height} from recovery applied successfully")
           case Failure(th) =>
-            logWarn(s"Failed to apply block ${block.encodedId} on height ${block.header.height} from recovery caused $th")
+            logWarn(s"Failed to apply block ${block.encodedId} on height ${block.header.height} " +
+              s"from recovery caused $th")
             applicationsSuccessful = false
             peerManager ! RecoveryCompleted
         }
@@ -277,7 +277,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               if (newHistory.isFullChainSynced && receivedAll) Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
-              logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state because of: $e")
+              logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
+                s"to minimal state because of: $e")
               updateNodeView(updatedHistory = Some(newHistory))
               nodeViewSynchronizer ! SemanticallyFailedModification(pmod, e)
           }
@@ -318,7 +319,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
       val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider, system)
-      val state: StateType = restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
+      val state: StateType =
+        restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
       Some(NodeView(history, state, wallet, memPool))
     } catch {
       case ex: Throwable =>
