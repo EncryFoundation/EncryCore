@@ -32,8 +32,6 @@ case class ScriptedAssetDirective(contractHash: ContractHash,
 
   override def serializer: Serializer[M] = ScriptedAssetDirectiveSerializer
 
-  lazy val isIntrinsic: Boolean = tokenIdOpt.isEmpty
-
   override def toDbVersion(txId: ModifierId, numberInTx: Int): DirectiveDBVersion =
     DirectiveDBVersion(Base16.encode(txId), numberInTx, typeId, isValid, Base16.encode(contractHash), amount, "", tokenIdOpt.map(Base16.encode), "")
 }

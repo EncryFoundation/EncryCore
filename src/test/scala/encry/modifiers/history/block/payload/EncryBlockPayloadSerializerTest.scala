@@ -11,7 +11,7 @@ class EncryBlockPayloadSerializerTest extends FunSuite {
   test("testParseBytes & testToBytes") {
 
     val factory = TestHelper
-    val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath).slice(0, 10)
+    val keys = factory.genKeys(10)
 
     val timestamp = 12345678L
 

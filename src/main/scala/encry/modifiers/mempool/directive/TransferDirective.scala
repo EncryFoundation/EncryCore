@@ -35,8 +35,6 @@ case class TransferDirective(address: Address,
 
   override def serializer: Serializer[M] = TransferDirectiveSerializer
 
-  lazy val isIntrinsic: Boolean = tokenIdOpt.isEmpty
-
   override def toDbVersion(txId: ModifierId, numberInTx: Int): DirectiveDBVersion =
     DirectiveDBVersion(Base16.encode(txId), numberInTx, typeId, isValid, "", amount, address, tokenIdOpt.map(Base16.encode), "")
 }
@@ -57,13 +55,12 @@ object TransferDirective {
       address <- c.downField("address").as[String]
       amount <- c.downField("amount").as[Long]
       tokenIdOpt <- c.downField("tokenId").as[Option[String]]
-    } yield {
-      TransferDirective(
-        address,
-        amount,
-        tokenIdOpt.flatMap(id => Algos.decode(id).map(ADKey @@ _).toOption)
-      )
-    }
+    } yield TransferDirective(
+      address,
+      amount,
+      tokenIdOpt.flatMap(id => Algos.decode(id).map(ADKey @@ _).toOption)
+    )
+
   }
 }
 

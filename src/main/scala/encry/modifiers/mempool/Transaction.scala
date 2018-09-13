@@ -18,14 +18,13 @@ import encry.utils.CoreTaggedTypes
 import io.circe.Encoder
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.{Input, Proof}
-import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.PConvertible
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
 import scala.util.{Success, Try}
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import encry.validation.{ModifierValidator, ValidationResult}
+import encry.validation.ModifierValidator
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
@@ -36,14 +35,14 @@ case class Transaction(fee: Amount,
                        directives: IndexedSeq[Directive],
                        defaultProofOpt: Option[Proof]) extends NodeViewModifier with ModifierValidator with PConvertible {
 
-  val modifierTypeId: ModifierTypeId = Transaction.ModifierTypeId
+  override val modifierTypeId: ModifierTypeId = Transaction.ModifierTypeId
 
   override type M = Transaction
 
   override def serializer: Serializer[Transaction] = TransactionSerializer
 
-  val messageToSign: Array[Byte] =
-    UnsignedTransaction.bytesToSign(fee, timestamp, inputs, directives)
+  val messageToSign: Array[Byte] = UnsignedTransaction.bytesToSign(fee, timestamp, inputs, directives)
+
   val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
 
   lazy val size: Int = this.bytes.length
@@ -51,26 +50,19 @@ case class Transaction(fee: Amount,
   lazy val newBoxes: Traversable[EncryBaseBox] =
     directives.zipWithIndex.flatMap { case (d, idx) => d.boxes(Digest32 !@@ id, idx) }
 
-  lazy val costMultiplier: Amount =
-    inputs.map(_.contract.fold(cc => cc, rc => rc.contract)).map(CompiledContract.costOf).sum +
-    (Constants.PersistentByteCost * size) +
-    (Constants.StateByteCost * newBoxes.map(_.bytes).foldLeft(Array.empty[Byte])(_ ++ _).length)
-
   override def toString: String =
     s"<Transaction id=${Algos.encode(id)}\nfee=$fee\ninputs=$inputs\ndirectives=$directives\nts=$timestamp\nproofs=$defaultProofOpt>"
 
-  lazy val semanticValidity: Try[Unit] = validateStateless.toTry
-
-  def validateStateless: ValidationResult =
-    accumulateErrors
-      .demand(fee >= 0, "Negative fee amount")
-      .demand(timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift, "Invalid timestamp")
-      .demand(inputs.lengthCompare(inputs.toSet.size) == 0, "Inputs duplication")
-      .demand(inputs.lengthCompare(Short.MaxValue) <= 0, "Wrong number of inputs")
-      .demand(directives.lengthCompare(Short.MaxValue) <= 0 && directives.nonEmpty, "Wrong number of directives")
-      .demand(directives.forall(_.isValid), "Invalid outputs")
-      .demand(size <= Constants.PayloadMaxSize, "Invalid size")
-      .result
+  lazy val semanticValidity: Try[Unit] = accumulateErrors
+    .demand(fee >= 0, "Negative fee amount")
+    .demand(timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift, "Invalid timestamp")
+    .demand(inputs.lengthCompare(inputs.toSet.size) == 0, "Inputs duplication")
+    .demand(inputs.lengthCompare(Short.MaxValue) <= 0, "Wrong number of inputs")
+    .demand(directives.lengthCompare(Short.MaxValue) <= 0 && directives.nonEmpty, "Wrong number of directives")
+    .demand(directives.forall(_.isValid), "Invalid outputs")
+    .demand(size <= Constants.PayloadMaxSize, "Invalid size")
+    .result
+    .toTry
 
   val tpe: Types.Product = Types.EncryTransaction
 
@@ -84,9 +76,6 @@ case class Transaction(fee: Amount,
 object Transaction {
 
   val ModifierTypeId: ModifierTypeId = CoreTaggedTypes.ModifierTypeId @@ 2.toByte
-
-  type TxTypeId = Byte
-  type Nonce = Long
 
   case class TransactionValidationException(s: String) extends Exception(s)
 
@@ -107,15 +96,13 @@ object Transaction {
       inputs <- c.downField("inputs").as[IndexedSeq[Input]]
       directives <- c.downField("directives").as[IndexedSeq[Directive]]
       defaultProofOpt <- c.downField("defaultProofOpt").as[Option[Proof]]
-    } yield {
-      Transaction(
-        fee,
-        timestamp,
-        inputs,
-        directives,
-        defaultProofOpt
-      )
-    }
+    } yield Transaction(
+      fee,
+      timestamp,
+      inputs,
+      directives,
+      defaultProofOpt
+    )
   }
 }
 
@@ -169,9 +156,9 @@ object TransactionSerializer extends Serializer[Transaction] {
 }
 
 case class UnsignedTransaction(fee: Amount,
-                                    timestamp: Long,
-                                    inputs: IndexedSeq[Input],
-                                    directives: IndexedSeq[Directive]) {
+                               timestamp: Long,
+                               inputs: IndexedSeq[Input],
+                               directives: IndexedSeq[Directive]) {
 
   val messageToSign: Array[Byte] =
     UnsignedTransaction.bytesToSign(fee, timestamp, inputs, directives)
@@ -224,7 +211,7 @@ case object TransactionDBVersion {
 case class InputDBVersion(id: String, txId: String, contractByteVersion: String, proofs: String, numberInTx: Int) {
   def toInput: Try[Input] =
     for {
-      decodedId            <- Base16.decode(id)
+      decodedId <- Base16.decode(id)
       decodedContractBytes <- Base16.decode(contractByteVersion)
       decodedContract      <- InputSerializer.decodeEitherCompiledOrRegular(decodedContractBytes)
       decodedBase16Proofs  <- if (proofs.length != 0) proofs.split(",").toList.traverse(Base16.decode)
