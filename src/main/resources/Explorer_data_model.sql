@@ -48,7 +48,8 @@ CREATE TABLE inputs(
   id VARCHAR(64) PRIMARY KEY,
   tx_id VARCHAR(64) REFERENCES transactions (id),
   contract_bytes TEXT NOT NULL,
-  serialized_proofs VARCHAR NOT NULL
+  serialized_proofs VARCHAR NOT NULL,
+  number_in_tx INTEGER NOT NULL
 );
 
 CREATE INDEX tx_id_inputs_index ON inputs (tx_id);

@@ -92,8 +92,8 @@ protected[database] object QueryRepository extends Logging {
     val inputs: Seq[InputDBVersion] = p.transactions.flatMap(InputDBVersion(_))
     val query: String =
       """
-        |INSERT INTO public.inputs (id, tx_id, contract_bytes, serialized_proofs)
-        |VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING;
+        |INSERT INTO public.inputs (id, tx_id, contract_bytes, serialized_proofs, number_in_tx)
+        |VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING;
         |""".stripMargin
     Update[InputDBVersion](query).updateMany(inputs.toList)
   }

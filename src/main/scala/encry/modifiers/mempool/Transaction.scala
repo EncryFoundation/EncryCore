@@ -221,7 +221,7 @@ case object TransactionDBVersion {
 }
 
 
-case class InputDBVersion(id: String, txId: String, contractByteVersion: String, proofs: String) {
+case class InputDBVersion(id: String, txId: String, contractByteVersion: String, proofs: String, numberInTx: Int) {
   def toInput: Try[Input] =
     for {
       decodedId            <- Base16.decode(id)
@@ -238,11 +238,11 @@ case class InputDBVersion(id: String, txId: String, contractByteVersion: String,
 case object InputDBVersion {
   def apply(tx: Transaction): Seq[InputDBVersion] = {
     val txId: String = Base16.encode(tx.id)
-    tx.inputs.map { in =>
+    tx.inputs.zipWithIndex.map { case (in, number) =>
       val id: String = Base16.encode(in.boxId)
       val contractBytes: String = Base16.encode(InputSerializer.encodeEitherCompiledOrRegular(in.contract))
       val proofs: String = in.proofs.map(_.bytes).map(Base16.encode).mkString(",")
-      InputDBVersion(id, txId, contractBytes, proofs)
+      InputDBVersion(id, txId, contractBytes, proofs, number)
     }
   }
 }
