@@ -44,7 +44,7 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
     getWallet
       .map { x =>
         val a: List[EncryBaseBox] = util.Random.shuffle(x.walletStorage.allBoxes.toList)
-          a.take(10).asJson
+          a.take(2000).asJson
       }
       .okJson()
   }

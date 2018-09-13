@@ -54,11 +54,11 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
       txs.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, tx) =>
         t.flatMap { _ =>
           val res: Try[Unit] = validate(tx, allowedOutputDelta)
-          if(res.isFailure) println(s"transaction denied $res, ${tx.timestamp} ${tx.id}")
-           res.flatMap { _ =>
+          if (res.isFailure) println(s"transaction denied $res, ${tx.timestamp} ${tx.id}")
+          res.flatMap { _ =>
             extractStateChanges(tx).operations.map(ADProofs.toModification)
               .foldLeft[Try[Option[ADValue]]](Success(None)) { case (tIn, m) =>
-                tIn.flatMap(_ => persistentProver.performOneOperation(m))
+              tIn.flatMap(_ => persistentProver.performOneOperation(m))
             }
           }
         }
@@ -84,6 +84,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     case block: EncryBlock =>
       logInfo(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
+      if (block.payload.transactions.size != 1) println(block.header.height)
       system.actorSelection("user/statsSender") ! TxsInBlock(block.payload.transactions.size)
       applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] =
@@ -157,19 +158,19 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
       val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => persistentProver.unauthenticatedLookup(input.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, input.boxId.head))
         .map(_.toOption -> input)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
-          (bxOpt, tx.defaultProofOpt) match {
-            // If no `proofs` provided, then `defaultProof` is used.
-            case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
-              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
-                defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc :+ bx else acc
-            case (Some(bx), Some(defaultProof)) =>
-              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, Seq(defaultProof))) acc :+ bx else acc
-            case (Some(bx), defaultProofOpt) =>
-              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
-                defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
-            case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
-          }
+        (bxOpt, tx.defaultProofOpt) match {
+          // If no `proofs` provided, then `defaultProof` is used.
+          case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
+            if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
+              defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc :+ bx else acc
+          case (Some(bx), Some(defaultProof)) =>
+            if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, Seq(defaultProof))) acc :+ bx else acc
+          case (Some(bx), defaultProofOpt) =>
+            if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
+              defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
+          case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
         }
+      }
 
       val validBalance: Boolean = {
         val debitB: Map[TokenId, Amount] = BalanceCalculator.balanceSheet(bxs)
