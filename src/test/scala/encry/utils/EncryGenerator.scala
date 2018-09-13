@@ -2,7 +2,6 @@ package encry.utils
 
 import java.io.File
 import akka.actor.ActorRef
-import CoreTaggedTypes.ModifierId
 import encry.avltree._
 import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.history.block.header.EncryBlockHeader
@@ -10,7 +9,8 @@ import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, MonetaryBox}
 import encry.settings.Constants
-import encry.utils.TestHelper.{Props, rndGen}
+import encry.utils.CoreTaggedTypes.ModifierId
+import encry.utils.TestHelper.Props
 import encry.view.state.{BoxHolder, EncryState, UtxoState}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.Algos
@@ -22,6 +22,7 @@ import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue}
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
+import scala.util.{Random => ScRand}
 
 trait EncryGenerator {
 
@@ -30,7 +31,7 @@ trait EncryGenerator {
   def randomAddress: Address = Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address
 
   def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None): AssetBox =
-    AssetBox(EncryProposition.addressLocked(address), rndGen.nextLong(), amount, tokenIdOpt)
+    AssetBox(EncryProposition.addressLocked(address), ScRand.nextLong(), amount, tokenIdOpt)
 
   def genTxOutputs(boxes: Traversable[EncryBaseBox]): IndexedSeq[ADKey] =
     boxes.foldLeft(IndexedSeq[ADKey]()) { case (s, box) =>
@@ -39,7 +40,7 @@ trait EncryGenerator {
 
   def genValidAssetBoxes(secret: PrivateKey25519, amount: Amount, qty: Int): Seq[AssetBox] =
     (0 to qty).foldLeft(IndexedSeq[AssetBox]()) { case (bxs, _) =>
-      bxs :+ AssetBox(EncryProposition.pubKeyLocked(secret.publicKeyBytes), rndGen.nextLong(), amount)
+      bxs :+ AssetBox(EncryProposition.pubKeyLocked(secret.publicKeyBytes), ScRand.nextLong(), amount)
     }
 
   def genPrivKeys(qty: Int): Seq[PrivateKey25519] = (0 until qty).map { _ =>
