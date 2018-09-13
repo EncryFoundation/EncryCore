@@ -36,7 +36,9 @@ case class AccountManager(store: Store) extends Logging {
     val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
       Blake2b256.hash(
         seedOpt
-          .map { Mnemonic.seedFromMnemonic(_) }
+          .map {
+            Mnemonic.seedFromMnemonic(_)
+          }
           .getOrElse {
             val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
             println(s"\nMnemonic code is: \n$phrase")
@@ -60,14 +62,20 @@ case class AccountManager(store: Store) extends Logging {
 
   private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, settings.wallet.map(_.password)
     .getOrElse(throw new RuntimeException("password not specified"))))
-    .fold(e => { logError(s"AccountManager: decryption failed cause ${e.getCause}"); EncryApp.forceStopApplication(500) }, r => r)
+    .fold(e => { 
+      logError(s"AccountManager: decryption failed cause ${e.getCause}"); 
+      EncryApp.forceStopApplication(500) 
+    }, r => r)
 
   private def saveAccount(privateKey: PrivateKey, publicKey: PublicKey): Unit =
     store.update(
       scala.util.Random.nextLong(),
       Seq.empty,
-      Seq((ByteArrayWrapper(AccountManager.AccountPrefix +: publicKey), ByteArrayWrapper(AES.encrypt(privateKey, settings.wallet.map(_.password)
+
+      Seq((ByteArrayWrapper(AccountManager.AccountPrefix +: publicKey), 
+        ByteArrayWrapper(AES.encrypt(privateKey, settings.wallet.map(_.password)
         .getOrElse(throw new RuntimeException("password not specified"))))))
+
     )
 }
 

@@ -2,7 +2,6 @@ package encry.settings
 
 import java.io.File
 import java.net.InetSocketAddress
-
 import com.typesafe.config.Config
 import encry.utils.ByteStr
 import net.ceedubs.ficus.readers.ValueReader

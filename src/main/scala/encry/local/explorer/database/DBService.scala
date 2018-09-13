@@ -3,10 +3,10 @@ package encry.local.explorer.database
 import cats.effect.IO
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
-import encry.EncryApp.settings
+import doobie.hikari.HikariTransactor
 import QueryRepository._
 import com.zaxxer.hikari.HikariDataSource
-import doobie.hikari.HikariTransactor
+import encry.EncryApp.settings
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, HeaderDBVersion}
@@ -20,8 +20,6 @@ import scala.util.control.NonFatal
 class DBService extends Logging {
 
   def processBlock(block: EncryBlock): Future[Int] = runAsync(processBlockQuery(block))
-
-  def processHeader(block: EncryBlock): Future[Int] = runAsync(insertHeaderQuery(block))
 
   def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] = runAsync(markAsRemovedFromMainChainQuery(ids))
 
