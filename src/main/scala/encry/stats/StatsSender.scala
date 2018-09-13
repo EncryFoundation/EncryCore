@@ -30,9 +30,9 @@ class StatsSender extends Actor {
 
   val InfluxLogin: String = settings.influxDB.map(_.login).getOrElse(throw new RuntimeException("login not specified"))
 
-  val InfluxPassword: String = settings.influxDB.map(_.password).getOrElse(throw new RuntimeException("pass not specified"))
+  val InfluxPassword: String = settings.influxDB.map(_.password).getOrElse(throw new RuntimeException("password not specified"))
 
-  val InfluxPort: Int = settings.influxDB.map(_.udpPort).getOrElse(throw new RuntimeException("upd port not specified"))
+  val InfluxPort: Int = settings.influxDB.map(_.udpPort).getOrElse(throw new RuntimeException("udp port not specified"))
 
   val influxDB: InfluxDB =
     InfluxDBFactory.connect(InfluxURL, InfluxLogin, InfluxPassword)
