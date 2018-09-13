@@ -61,8 +61,8 @@ object EncryApp extends App with Logging {
   lazy val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
-  if (settings.node.sendStat) system.actorOf(Props[StatsSender], "statsSender")
-  if (settings.kafka.sendToKafka) system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
+  if (settings.influxDB.isDefined) system.actorOf(Props[StatsSender], "statsSender")
+  if (settings.kafka.exists(_.sendToKafka)) system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
   if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
   lazy val dbService: DBService = DBService()
   if (settings.postgres.exists(_.enableSave)) system.actorOf(Props(classOf[BlockListener], dbService), "blockListener")
@@ -78,7 +78,7 @@ object EncryApp extends App with Logging {
     system.actorOf(Props[Zombie], "zombie")
   }
 
-  if (settings.restApi.enabled) {
+  if (settings.restApi.enabled.getOrElse(false)) {
     import akka.http.scaladsl.model.StatusCodes._
     import akka.http.scaladsl.server.Directives._
     implicit def apiExceptionHandler: ExceptionHandler =

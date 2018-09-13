@@ -29,7 +29,7 @@ class NetworkController extends Actor {
   var outgoing: Set[InetSocketAddress] = Set.empty
   lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse None
 
-  if (!networkSettings.localOnly) {
+  if (!networkSettings.localOnly.getOrElse(false)) {
     networkSettings.declaredAddress.foreach { myAddress =>
       Try {
         val myAddrs: Array[InetAddress] = InetAddress.getAllByName(new URI("http://" + myAddress).getHost)

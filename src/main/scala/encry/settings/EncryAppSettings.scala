@@ -8,9 +8,8 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 case class EncryAppSettings(directory: String,
                             node: NodeSettings,
-                            wallet: WalletSettings,
-                            dataDir: File,
-                            kafka: KafkaSettings,
+                            wallet: Option[WalletSettings],
+                            kafka: Option[KafkaSettings],
                             network: NetworkSettings,
                             restApi: RESTApiSettings,
                             ntp: NetworkTimeProviderSettings,
