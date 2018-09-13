@@ -22,7 +22,7 @@ class ConsoleListener extends Actor {
                     case Some(x) => print(x.msg + s"\n$prompt")
                     case None =>
                   }
-              case None =>
+              case None => println("Unknown command. Type 'app help' to see command list.")
             }
           case Failure(_) =>
         }

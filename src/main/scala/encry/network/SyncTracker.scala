@@ -2,17 +2,15 @@ package encry.network
 
 import java.net.InetSocketAddress
 import akka.actor.{ActorContext, ActorRef, Cancellable}
-import encry.consensus.History
+import encry.consensus.History._
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
 import encry.network.PeerConnectionHandler._
 import encry.settings.NetworkSettings
+import encry.utils.Logging
+import encry.utils.NetworkTime.Time
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import History._
-import encry.utils.NetworkTime.Time
-import encry.EncryApp.settings
-import encry.utils.Logging
 
 case class SyncTracker(deliveryManager: ActorRef,
                        context: ActorContext,
@@ -70,10 +68,11 @@ case class SyncTracker(deliveryManager: ActorRef,
     * `Older` status.
     */
   def peersToSyncWith(): Seq[ConnectedPeer] = {
-    val outdated = outdatedPeers()
-    lazy val unknowns = statuses.filter(_._2 == Unknown).keys.toIndexedSeq
-    lazy val olders = statuses.filter(_._2 == Older).keys.toIndexedSeq
-    lazy val nonOutdated = if (olders.nonEmpty) olders(scala.util.Random.nextInt(olders.size)) +: unknowns else unknowns
+    val outdated: Seq[ConnectedPeer] = outdatedPeers()
+    lazy val unknowns: IndexedSeq[ConnectedPeer] = statuses.filter(_._2 == Unknown).keys.toIndexedSeq
+    lazy val olders: IndexedSeq[ConnectedPeer] = statuses.filter(_._2 == Older).keys.toIndexedSeq
+    lazy val nonOutdated: IndexedSeq[ConnectedPeer] =
+      if (olders.nonEmpty) olders(scala.util.Random.nextInt(olders.size)) +: unknowns else unknowns
     val peers: Seq[ConnectedPeer] = if (outdated.nonEmpty) outdated
     else nonOutdated.filter(p => (System.currentTimeMillis() - lastSyncSentTime.getOrElse(p, 0L))
       .millis >= networkSettings.syncInterval)
