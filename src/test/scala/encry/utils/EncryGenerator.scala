@@ -101,6 +101,7 @@ trait EncryGenerator {
     }
   }
 
+
   def genInvalidPaymentTxs(qty: Int): Seq[Transaction] = {
     val timestamp: Amount = System.currentTimeMillis()
     genPrivKeys(qty).map { key =>
