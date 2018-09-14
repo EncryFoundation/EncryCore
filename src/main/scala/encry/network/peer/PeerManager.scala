@@ -122,6 +122,6 @@ object PeerManager {
   }
 
   def checkPossibilityToAddPeer(address: InetSocketAddress): Boolean =
-    (settings.network.connectOnlyWithKnownPeers && settings.network.knownPeers.contains(address)) ||
-      !settings.network.connectOnlyWithKnownPeers
+    (settings.network.connectOnlyWithKnownPeers.getOrElse(false) && settings.network.knownPeers.contains(address)) ||
+      !settings.network.connectOnlyWithKnownPeers.getOrElse(false)
 }

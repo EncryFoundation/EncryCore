@@ -2,14 +2,12 @@ package encry.view
 
 import java.io.File
 import akka.actor.{Actor, Props}
-import akka.persistence.RecoveryCompleted
 import akka.pattern._
-import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
+import akka.persistence.RecoveryCompleted
 import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
-import encry.local.miner.Miner.DisableMining
 import encry.modifiers._
 import encry.modifiers.history.block.EncryBlock
 import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
@@ -22,23 +20,24 @@ import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
+import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state._
 import encry.view.wallet.EncryWallet
-import encry.utils.Logging
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scala.annotation.tailrec
-import scala.concurrent.Future
 import scala.collection.{IndexedSeq, Seq, mutable}
-import scala.util.{Failure, Success, Try}
+import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging {
 
@@ -57,7 +56,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   )
 
   system.scheduler.schedule(5.second, 5.second) {
-    if (settings.node.sendStat)
+    if (settings.influxDB.isDefined)
       system.actorSelection("user/statsSender") !
         HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
   }
@@ -80,7 +79,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           case Success(_) =>
             logInfo(s"Block ${block.encodedId} on height ${block.header.height} from recovery applied successfully")
           case Failure(th) =>
-            logWarn(s"Failed to apply block ${block.encodedId} on height ${block.header.height} from recovery caused $th")
+            logWarn(s"Failed to apply block ${block.encodedId} on height ${block.header.height} " +
+              s"from recovery caused $th")
             applicationsSuccessful = false
             peerManager ! RecoveryCompleted
         }
@@ -247,11 +247,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
     logInfo(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
-    if (settings.node.sendStat) context.system
+    if (settings.influxDB.isDefined) context.system
       .actorSelection("user/statsSender") ! StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
-        if (settings.node.sendStat)
+        if (settings.influxDB.isDefined)
           context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
         logInfo(s"Going to apply modifications to the state: $progressInfo")
         nodeViewSynchronizer ! SyntacticallySuccessfulModifier(pmod)
@@ -259,7 +259,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           val startPoint: Long = System.currentTimeMillis()
           val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
-          if (settings.node.sendStat)
+          if (settings.influxDB.isDefined)
             context.actorSelection("user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
           newStateTry match {
             case Success(newMinState) =>
@@ -271,13 +271,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               logInfo(s"Persistent modifier ${pmod.encodedId} applied successfully")
               if (progressInfo.chainSwitchingNeeded)
                 context.actorSelection("/user/blockListener") ! ChainSwitching(progressInfo.toRemove.map(_.id))
-              if (settings.node.sendStat)
+              if (settings.influxDB.isDefined)
                 newHistory.bestHeaderOpt.foreach(header =>
                   context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
               if (newHistory.isFullChainSynced && receivedAll) Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
-              logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to minimal state because of: $e")
+              logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
+                s"to minimal state because of: $e")
               updateNodeView(updatedHistory = Some(newHistory))
               nodeViewSynchronizer ! SemanticallyFailedModification(pmod, e)
           }
@@ -318,7 +319,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
       val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider, system)
-      val state: StateType = restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
+      val state: StateType =
+        restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
       Some(NodeView(history, state, wallet, memPool))
     } catch {
       case ex: Throwable =>
