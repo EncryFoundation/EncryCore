@@ -63,7 +63,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
 
   private def getMinerInfo: Future[MinerStatus] = (miner ? GetMinerStatus).mapTo[MinerStatus]
 
-  private def getConnectionWithPeers: Boolean = appSettings.network.connectOnlyWithKnownPeers
+  private def getConnectionWithPeers: Boolean = appSettings.network.connectOnlyWithKnownPeers.getOrElse(false)
 }
 
 object InfoApiRoute {
@@ -77,7 +77,7 @@ object InfoApiRoute {
                    knownPeers: Seq[InetSocketAddress],
                    storage: String,
                    nodeUptime: Long,
-                   WithPeer: Boolean): Json = {
+                   connectWithOnlyKnownPeer: Boolean): Json = {
     val stateVersion = readers.s.map(_.version).map(Algos.encode)
     val bestHeader = readers.h.flatMap(_.bestHeaderOpt)
     val bestFullBlock = readers.h.flatMap(_.bestBlockOpt)
@@ -99,7 +99,7 @@ object InfoApiRoute {
       "knownPeers" -> knownPeers.map{x => x.getHostName + ":" + x.getPort}.asJson,
       "storage" -> storage.asJson,
       "uptime" -> nodeUptime.asJson,
-      "isConnectedWithKnownPeers" -> WithPeer.asJson,
+      "isConnectedWithKnownPeers" -> connectWithOnlyKnownPeer.asJson,
     ).asJson
   }
 }
