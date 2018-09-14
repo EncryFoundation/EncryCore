@@ -10,8 +10,6 @@ sealed trait ValidationResult {
 
   import ValidationResult._
 
-  def isValid: Boolean
-
   def message: String
 
   def errors: Seq[ModifierError]
@@ -39,28 +37,29 @@ object ValidationResult {
   type Valid = ValidationResult.Valid.type
 
   final case object Valid extends ValidationResult {
-    def isValid: Boolean = true
+
     def message: String = "OK"
+
     def errors: Seq[ModifierError] = Seq.empty
+
     def ++(next: ValidationResult): ValidationResult = next
+
     def toTry: Try[Unit] = Success(())
   }
 
   final case class Invalid(errors: Seq[ModifierError]) extends ValidationResult {
-    def isValid: Boolean = false
+
     def isFatal: Boolean = errors.exists(_.isFatal)
+
     def message: String = "Validation errors: " + errors.mkString(" | ")
 
-    def ++(next: ValidationResult): ValidationResult = {
-      next match {
+    def ++(next: ValidationResult): ValidationResult = next match {
         case Valid => this
         case Invalid(e2) => Invalid(errors ++ e2)
       }
-    }
 
     @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-    lazy val toTry: Try[Unit] = {
-      if (errors.size == 1) Failure(errors.head.toThrowable) else Failure(MultipleErrors(errors))
-    }
+    lazy val toTry: Try[Unit] = if (errors.size == 1) Failure(errors.head.toThrowable) else Failure(MultipleErrors(errors))
   }
+
 }

@@ -38,7 +38,8 @@ trait ModifierValidator {
   /** Shortcut `require`-like method for the simple single-check validation with recoverable error.
     * If you need to validate against multiple checks then use [[failFast]] and [[accumulateErrors]]
     */
-  def recoverable(condition: Boolean, recoverableError: => String): ValidationResult = validate(condition)(error(recoverableError))
+  def recoverable(condition: Boolean, recoverableError: => String): ValidationResult =
+    validate(condition)(error(recoverableError))
 
 }
 
