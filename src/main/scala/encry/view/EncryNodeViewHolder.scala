@@ -136,10 +136,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       pmodModify(lm.pmod)
       if (settings.levelDb.enableSave) context.actorSelection("/user/modifiersHolder") ! lm
     case GetDataFromCurrentView(f) =>
-      if (nodeView.wallet.walletStorage.allBoxes.isEmpty)
-        println("empty")
-      if (nodeView.wallet.getBalances.isEmpty)
-        println(":emty11")
       val result = f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool))
       result match {
         case resultFuture: Future[_] => resultFuture.pipeTo(sender())

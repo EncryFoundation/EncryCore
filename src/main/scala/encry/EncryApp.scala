@@ -22,7 +22,7 @@ import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, LoggingActor, StatsSender, Zombie}
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.history.EncrySyncInfoMessageSpec
-import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
+import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder, WalletStorageHolder}
 import org.encryfoundation.common.Algos
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
@@ -77,6 +77,8 @@ object EncryApp extends App with Logging {
     system.actorOf(Props[LoggingActor], "loggingActor")
     system.actorOf(Props[Zombie], "zombie")
   }
+
+  system.actorOf(Props[WalletStorageHolder], "WalletStorageHolder")
 
   if (settings.restApi.enabled) {
     import akka.http.scaladsl.model.StatusCodes._

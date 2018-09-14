@@ -26,15 +26,11 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
     val c1 = System.currentTimeMillis() - a
     system.actorSelection("user/statsSender") ! GetAllTiming(c1, a1.size)
 
-
     val b: Seq[EncryBaseBox] = store.getAll.filter { x => x._2 != balancesKey }.foldLeft(Seq[EncryBaseBox]()) {
       case (acc, id) => getBoxById(ADKey @@ id._1.data).map { bx => acc :+ bx }.getOrElse(acc)
     }
 
-
     val c = System.currentTimeMillis() - a
-    println(c + " time")
-    println(b.size + " size of func")
     system.actorSelection("user/statsSender") ! WorkedTime(c, b.size)
     b
   }

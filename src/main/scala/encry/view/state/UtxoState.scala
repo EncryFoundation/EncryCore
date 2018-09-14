@@ -84,7 +84,6 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     case block: EncryBlock =>
       logInfo(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
-      if (block.payload.transactions.size != 1) println(block.header.height)
       system.actorSelection("user/statsSender") ! TxsInBlock(block.payload.transactions.size)
       applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] =
@@ -155,9 +154,11 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
 
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, rootHash)
 
-      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => persistentProver.unauthenticatedLookup(input.boxId)
+      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap{input => val a: Option[ADValue] = persistentProver.unauthenticatedLookup(input.boxId)
+      if(a.isEmpty) println("non valid")
+      a
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, input.boxId.head))
-        .map(_.toOption -> input)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
+        .map(_.toOption -> input)}.foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
         (bxOpt, tx.defaultProofOpt) match {
           // If no `proofs` provided, then `defaultProof` is used.
           case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
@@ -186,7 +187,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         }
       }
 
-      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
+      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx"); //println(s"non valid transaction! Non-positive balance in $tx")
     }
 
   def isValid(tx: Transaction, allowedOutputDelta: Amount = 0L): Boolean = validate(tx, allowedOutputDelta).isSuccess
