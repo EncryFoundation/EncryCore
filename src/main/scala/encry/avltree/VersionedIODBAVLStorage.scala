@@ -2,8 +2,6 @@ package encry.avltree
 
 import com.google.common.primitives.Ints
 import encry.avltree.VersionedIODBAVLStorage.{InternalNodePrefix, LeafPrefix}
-import encry.stats.LoggingActor.LogMessage
-import encry.EncryApp.{settings, system}
 import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.Algos
@@ -14,7 +12,8 @@ import scala.util.{Failure, Try}
 
 case class NodeParameters(keySize: Int, valueSize: Option[Int], labelSize: Int)
 
-class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodeParameters)(implicit val hf: CryptographicHash[D])
+class VersionedIODBAVLStorage[D <: Digest](store: Store,
+                                           nodeParameters: NodeParameters)(implicit val hf: CryptographicHash[D])
   extends Logging {
 
   val TopNodeKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(nodeParameters.labelSize)(123: Byte))
@@ -22,7 +21,8 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
 
   def rollback(version: ADDigest): Try[(EncryProverNodes[D], Int)] = Try {
     store.rollback(ByteArrayWrapper(version))
-    val top: EncryProverNodes[D] = VersionedIODBAVLStorage.fetch[D](ADKey @@ store.get(TopNodeKey).get.data)(hf, store, nodeParameters)
+    val top: EncryProverNodes[D] =
+      VersionedIODBAVLStorage.fetch[D](ADKey @@ store.get(TopNodeKey).get.data)(hf, store, nodeParameters)
     val topHeight: Int = Ints.fromByteArray(store.get(TopNodeHeight).get.data)
     top -> topHeight
   }.recoverWith { case e =>
@@ -36,13 +36,15 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store, nodeParameters: NodePar
 
   def rollbackVersions: Iterable[ADDigest] = store.rollbackVersions().map(d => ADDigest @@ d.data)
 
-  def update[K <: Array[Byte], V <: Array[Byte]](prover: BatchAVLProver[D, _], additionalData: Seq[(K, V)]): Try[Unit] = Try {
+  def update[K <: Array[Byte], V <: Array[Byte]](prover: BatchAVLProver[D, _],
+                                                 additionalData: Seq[(K, V)]): Try[Unit] = Try {
     val digestWrapper: Store.K = ByteArrayWrapper(prover.digest)
     val indexes: Seq[(Store.K, Store.K)] = Seq(TopNodeKey -> nodeKey(prover.topNode),
       TopNodeHeight -> ByteArrayWrapper(Ints.toByteArray(prover.rootNodeHeight)))
     val toRemove: List[Store.K] = prover.removedNodes().map(rn => ByteArrayWrapper(rn.label))
     val toUpdate: Seq[(Store.K, Store.K)] = indexes ++ serializedVisitedNodes(prover.topNode, isTop = true)
-    val toUpdateWrapped: Seq[(Store.K, Store.K)] = additionalData.map { case (k, v) => ByteArrayWrapper(k) -> ByteArrayWrapper(v) }
+    val toUpdateWrapped: Seq[(Store.K, Store.K)] =
+      additionalData.map { case (k, v) => ByteArrayWrapper(k) -> ByteArrayWrapper(v) }
     val toUpdateWithWrapped: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = toUpdate ++ toUpdateWrapped
     val toRemoveMerged: List[ByteArrayWrapper] = toRemove.filterNot(toUpdate.map(_._1).intersect(toRemove).contains)
     logInfo(s"Update storage to version $digestWrapper: ${toUpdateWithWrapped.size} elements to insert," +

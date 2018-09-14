@@ -15,17 +15,13 @@ trait AuthenticatedTreeOps[D <: Digest] {
   val LeafInPackagedProof: Byte = 2
   val LabelInPackagedProof: Byte = 3
   val EndOfTreeInPackagedProof: Byte = 4
-
   protected val keyLength: Int
   protected val valueLengthOpt: Option[Int]
   protected val collectChangedNodes: Boolean
-
   protected val changedNodesBuffer: ArrayBuffer[EncryProverNodes[D]] = ArrayBuffer.empty
   protected val changedNodesBufferToCheck: ArrayBuffer[EncryProverNodes[D]] = ArrayBuffer.empty
-
   protected val PositiveInfinityKey: ADKey = ADKey @@ Array.fill(keyLength)(-1: Byte)
   protected val NegativeInfinityKey: ADKey = ADKey @@ Array.fill(keyLength)(0: Byte)
-
   protected var rootNodeHeight: Int
 
   protected def onNodeVisit(n: EncryNode[D], operation: encry.avltree.Operation, isRotate: Boolean = false): Unit = {
