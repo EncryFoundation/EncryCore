@@ -1,10 +1,8 @@
 package encry.local.explorer.database
 
-import cats.data.NonEmptyList
 import cats.implicits._
 import doobie.free.connection.ConnectionIO
 import doobie.util.update.Update
-import doobie.Fragments.{in, whereAndOpt}
 import doobie.postgres.implicits._
 import doobie.implicits._
 import doobie.util.log.{ExecFailure, LogHandler, ProcessingFailure, Success}
@@ -55,7 +53,7 @@ protected[database] object QueryRepository extends Logging {
     Update[HeaderDBVersion](query).run(headerDB)
   }
 
-  def heightQuery: ConnectionIO[Int] = sql"SELECT MAX(height) FROM headers WHERE id IN (SELECT DISTINCT block_id FROM transactions);".query[Int].unique
+  def heightQuery: ConnectionIO[Int] = sql"""SELECT MAX(height) FROM headers WHERE id IN (SELECT DISTINCT block_id FROM transactions);""".query[Int].unique
 
   def heightOptQuery: ConnectionIO[Option[Int]] =
     sql"SELECT MAX(height) FROM headers WHERE id IN (SELECT DISTINCT block_id FROM transactions);".query[Option[Int]].unique
@@ -71,12 +69,14 @@ protected[database] object QueryRepository extends Logging {
        """.stripMargin.query[TransactionDBVersion].to[List]
 
   def inputsByTransactionIdsQuery(ids: Seq[String]): ConnectionIO[List[InputDBVersion]] =
-    (fr"SELECT * FROM public.inputs "
-      ++ whereAndOpt(NonEmptyList.fromList(ids.toList).map(nel => in(fr"tx_id", nel)))).query[InputDBVersion].to[List]
+    sql"""WITH tmp(k) AS (VALUES (${ids.toList}))
+         |SELECT * FROM public.inputs WHERE tx_id = ANY(SELECT unnest(k) FROM tmp)
+       """.stripMargin.query[InputDBVersion].to[List]
 
   def directivesByTransactionIdsQuery(ids: Seq[String]): ConnectionIO[List[DirectiveDBVersion]] =
-    (fr"SELECT * FROM public.directives "
-      ++ whereAndOpt(NonEmptyList.fromList(ids.toList).map(nel => in(fr"tx_id", nel)))).query[DirectiveDBVersion].to[List]
+    sql"""WITH tmp(k) AS (VALUES (${ids.toList}))
+         |SELECT * FROM public.directives WHERE tx_id = ANY(SELECT unnest(k) FROM tmp)
+       """.stripMargin.query[DirectiveDBVersion].to[List]
 
   private def insertTransactionsQuery(block: EncryBlock): ConnectionIO[Int] = {
     val txs: Seq[TransactionDBVersion] = TransactionDBVersion(block)
