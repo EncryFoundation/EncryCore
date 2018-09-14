@@ -53,6 +53,12 @@ class DBService extends Logging {
     dataSource.setMaximumPoolSize(settings.postgres.maxPoolSize)
   }
 
+  private def shutdown(): Unit = {
+    logInfo("Shutting down dataSource")
+    dataSource.close()
+  }
+  sys.addShutdownHook(shutdown())
+
   private lazy val pgTransactor: HikariTransactor[IO] = HikariTransactor[IO](dataSource)
 
   private def runAsync[A](io: ConnectionIO[A], queryName: String): Future[A] =

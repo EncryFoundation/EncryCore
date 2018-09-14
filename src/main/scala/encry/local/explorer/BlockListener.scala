@@ -10,7 +10,7 @@ import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySu
 import encry.utils.Logging
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
 class BlockListener(dBService: DBService) extends Actor with Logging {
 
@@ -21,11 +21,14 @@ class BlockListener(dBService: DBService) extends Actor with Logging {
 
   val currentHeightOptFuture: Future[Option[Int]] = dBService.selectHeightOpt
 
-  currentHeightOptFuture.recover {
-    case NonFatal(th) =>
+  currentHeightOptFuture.onComplete {
+    case Success(heightOpt) => heightOpt match {
+      case Some(height) => logInfo(s"Going to begin writing to table with $height blocks")
+      case None => logInfo("Going to begin writing to empty database")
+    }
+    case Failure(th) =>
       logWarn(s"Failed to connect to database with exception $th")
       context.stop(self)
-      Some(Int.MaxValue)
   }
 
   override def receive: Receive = {
