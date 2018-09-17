@@ -72,7 +72,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
         Seq.empty
       case Some(fb) =>
         logInfo("Looks like bestBlockOpt exist!")
-        continuation(Height @@ fb.header.height, Seq.empty)
+        continuation(Height @@ (fb.header.height + 1), Seq.empty)
       case None => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
