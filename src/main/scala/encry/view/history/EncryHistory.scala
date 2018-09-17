@@ -110,8 +110,10 @@ trait EncryHistory extends EncryHistoryReader {
                 continuationHeaderChains(branchPoint.header, h => getBlock(h).isDefined && !invalidatedHeaders.contains(h))
                   .maxBy(chain => scoreOf(chain.last.id).getOrElse(BigInt(0)))
                   .flatMap(h => getBlock(h))
-              val changedLinks: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
+              val changedLinks: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
+                logInfo(s"Switch bestBlock to ${Algos.encode(validChain.last.id)}")
                 Seq(BestBlockKey -> ByteArrayWrapper(validChain.last.id), BestHeaderKey -> ByteArrayWrapper(newBestHeader.id))
+              }
               val toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = validityRow ++ changedLinks
               historyStorage.insert(validityKey(modifier.id), toInsert)
               ProgressInfo[EncryPersistentModifier](Some(branchPoint.id), invalidatedChain.tail, validChain.tail, Seq.empty)

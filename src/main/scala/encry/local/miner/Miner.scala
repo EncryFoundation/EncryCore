@@ -30,6 +30,7 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 import scala.collection._
+import scala.concurrent.duration._
 
 class Miner extends Actor with Logging {
 
@@ -42,7 +43,10 @@ class Miner extends Actor with Logging {
   var syncingDone: Boolean = false
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
 
-  override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
+  override def preStart(): Unit = {
+    context.system.scheduler.schedule(10.second, 30.second) (self ! Heartbeat)
+    context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
+  }
 
   override def postStop(): Unit = killAllWorkers()
 
@@ -85,6 +89,7 @@ class Miner extends Actor with Logging {
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
+    case Heartbeat => logInfo(s"Mining enabled! Current cond opt: ${candidateOpt.map(_.asJson).getOrElse("No cond opt!")}")
     case _ =>
   }
 
@@ -96,6 +101,7 @@ class Miner extends Actor with Logging {
       unknownMessage
 
   def miningDisabled: Receive = {
+    case Heartbeat => logInfo("Mining disabled!")
     case EnableMining =>
       context.become(miningEnabled)
       self ! StartMining
@@ -202,6 +208,8 @@ class Miner extends Actor with Logging {
 }
 
 object Miner {
+
+  case object Heartbeat
 
   case object DisableMining
 
