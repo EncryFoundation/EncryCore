@@ -16,17 +16,16 @@ class WalletStorageHolder extends Actor {
 
   var buffer = Seq.empty[EncryBaseBox]
 
-  system.scheduler.schedule(10 second, 120 second) {
+  system.scheduler.schedule(10 second, 60 second) {
     system.actorSelection("user/nodeViewHolder") !
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Seq[EncryBaseBox]] {
         _.vault.walletStorage.allBoxes }
   }
 
   override def receive: Receive = {
-    case GetAllBoxes() =>
-      val a: Seq[EncryBaseBox] = buffer.takeRight(900)
+    case GetAllBoxes() => val a = buffer.takeRight(buffer.size / 2)
       sender() ! a
-      buffer = buffer.dropRight(900)
+      buffer = buffer.diff(a)
     case seq: Seq[EncryBaseBox] => buffer = seq
   }
 }
