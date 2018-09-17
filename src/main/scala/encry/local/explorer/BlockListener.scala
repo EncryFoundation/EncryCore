@@ -33,9 +33,9 @@ class BlockListener(dBService: DBService) extends Actor with Logging {
   override def receive: Receive = {
     case SemanticallySuccessfulModifier(block: Block) => dBService.processBlock(block)
     case NewOrphaned(header: Header) => dBService.processOrphanedHeader(header)
-    case SemanticallySuccessfulModifier(block: EncryBlock) =>
+    case SemanticallySuccessfulModifier(block: Block) =>
       currentHeightOptFuture.map(heightOpt => if(heightOpt.forall(_ < block.header.height)) dBService.processBlock(block))
-    case NewOrphaned(header: EncryBlockHeader) => dBService.processOrphanedHeader(header)
+    case NewOrphaned(header: Header) => dBService.processOrphanedHeader(header)
     case ChainSwitching(ids) => dBService.markAsRemovedFromMainChain(ids.toList)
   }
 }

@@ -6,16 +6,12 @@ import encry.EncryApp.{nodeViewHolder, peerManager, settings}
 import encry.utils.Logging
 import encry.local.explorer.database.DBService
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
-import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.HeaderDBVersion
-import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.history.{Block, HeaderDBVersion, Payload}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, Transaction, TransactionDBVersion}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.BlocksFromLocalPersistence
 import org.encryfoundation.common.transaction.ProofSerializer
 import scorex.crypto.encode.Base16
-
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.control.NonFatal
