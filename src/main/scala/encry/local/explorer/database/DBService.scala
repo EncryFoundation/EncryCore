@@ -46,11 +46,11 @@ class DBService extends Logging {
     runAsync(inputsByTransactionIdsQuery(ids), "inputsByTxIds")
 
   private lazy val dataSource = new HikariDataSource
-  if (settings.postgres.enableSave || settings.postgres.enableRestore) {
-    dataSource.setJdbcUrl(settings.postgres.host)
-    dataSource.setUsername(settings.postgres.user)
-    dataSource.setPassword(settings.postgres.password)
-    dataSource.setMaximumPoolSize(settings.postgres.maxPoolSize)
+  if (settings.postgres.exists(_.enableSave) || settings.postgres.exists(_.enableRestore)) {
+    dataSource.setJdbcUrl(settings.postgres.map(_.host).getOrElse(throw new RuntimeException("host not specified")))
+    dataSource.setUsername(settings.postgres.map(_.user).getOrElse(throw new RuntimeException("user not specified")))
+    dataSource.setPassword(settings.postgres.map(_.password).getOrElse(throw new RuntimeException("password not specified")))
+    dataSource.setMaximumPoolSize(5)
   }
 
   private def shutdown(): Unit = {

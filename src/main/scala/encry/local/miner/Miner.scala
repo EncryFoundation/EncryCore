@@ -76,7 +76,7 @@ class Miner extends Actor with Logging {
       killAllWorkers()
       nodeViewHolder ! LocallyGeneratedModifier(block.header)
       nodeViewHolder ! LocallyGeneratedModifier(block.payload)
-      if (settings.node.sendStat) {
+      if (settings.influxDB.isDefined) {
         context.actorSelection("/user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
         context.actorSelection("/user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
       }
@@ -192,9 +192,9 @@ class Miner extends Actor with Logging {
       val candidate: CandidateEnvelope =
         if ((bestHeaderOpt.isDefined && (syncingDone || view.history.isFullChainSynced)) || settings.node.offlineGeneration) {
           logInfo(s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
-          if (settings.node.sendStat) context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
+          if (settings.influxDB.isDefined) context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
           val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
-          if (settings.node.sendStat) context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
+          if (settings.influxDB.isDefined) context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
           envelope
         } else CandidateEnvelope.empty
       candidate

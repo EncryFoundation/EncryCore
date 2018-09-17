@@ -39,7 +39,7 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
   }
 
   def startRecovery(): Future[Unit] = heightFuture.flatMap { height =>
-    settings.postgres.restoreBatchSize match {
+    settings.postgres.flatMap(_.restoreBatchSize) match {
       case Some(step) =>
         (0 to height).sliding(step, step).foldLeft(Future.successful(List[EncryBlock]())) { case (prevBlocks, slide) =>
           val from: Int = slide.head
