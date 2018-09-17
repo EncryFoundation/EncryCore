@@ -5,6 +5,10 @@ import akka.persistence.RecoveryCompleted
 import encry.EncryApp.{nodeViewHolder, peerManager, settings}
 import encry.utils.Logging
 import encry.local.explorer.database.DBService
+import encry.modifiers.history.{ADProofSerializer, ADProofs}
+import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.header.HeaderDBVersion
+import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.history.{Block, HeaderDBVersion, Payload}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, Transaction, TransactionDBVersion}
@@ -15,7 +19,7 @@ import scorex.crypto.encode.Base16
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.control.NonFatal
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 class PostgresRestore(dbService: DBService) extends Actor with Logging {
 
@@ -61,8 +65,11 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
     val txsFuture: Future[List[TransactionDBVersion]] = dbService.txsByRange(from, to)
     for {
       headers    <- headersFuture
-        .map(_.map(_.toHeader).map(Future.fromTry))
-        .flatMap(fs => Future.sequence(fs))
+        .map {
+          _.map(h => (h.toHeader, parseAdProofs(h.adProofOpt))).collect {
+            case (Success(header), Success(proofs)) => Try((header, proofs))
+          }.map(Future.fromTry)
+        }.flatMap(fs => Future.sequence(fs))
       txs        <- txsFuture
       inputs     <- dbService.inputsByTxIds(txs.map(_.id))
       directives <- dbService.directivesByTxIds(txs.map(_.id))
@@ -70,20 +77,29 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
       val groupedInputs: Map[String, List[InputDBVersion]] = inputs.groupBy(_.txId)
       val groupedDirectives: Map[String, List[DirectiveDBVersion]] = directives.groupBy(_.txId)
       val txsWithIO: Map[String, List[Transaction]] = txs.groupBy(_.blockId).mapValues {
-        _.map { tx =>
+        _.sortBy(_.number).map { tx =>
           Transaction(
             tx.fee,
             tx.timestamp,
-            groupedInputs.getOrElse(tx.id, IndexedSeq.empty).flatMap(_.toInput.toOption).toIndexedSeq,
-            groupedDirectives.getOrElse(tx.id, List.empty).flatMap(_.toDirective).toIndexedSeq,
+            groupedInputs.getOrElse(tx.id, IndexedSeq.empty).sortBy(_.numberInTx).flatMap(_.toInput.toOption).toIndexedSeq,
+            groupedDirectives.getOrElse(tx.id, List.empty).sortBy(_.numberInTx).flatMap(_.toDirective).toIndexedSeq,
             tx.proof.flatMap(Base16.decode(_).toOption).flatMap(ProofSerializer.parseBytes(_).toOption)
           )
         }
       }
-      headers.map { header =>
-        Block(header, Payload(header.id, txsWithIO.getOrElse(Base16.encode(header.id), Seq.empty)), None)
+      headers.map { case (header, adProofOpt) =>
+        Block(header, Payload(header.id, txsWithIO.getOrElse(Base16.encode(header.id), Seq.empty)), adProofOpt)
       }
     }
+  }
+
+  private def parseAdProofs(serializedOpt: Option[String]): Try[Option[ADProofs]] = serializedOpt match {
+    case None => Success(None)
+    case Some(serialized) =>
+      Base16
+        .decode(serialized)
+        .flatMap(ADProofSerializer.parseBytes)
+        .map(Option(_))
   }
 
 }

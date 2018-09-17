@@ -22,19 +22,28 @@ class DBService extends Logging {
 
   def processBlock(block: Block): Future[Int] = runAsync(processBlockQuery(block))
 
-  def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] = runAsync(markAsRemovedFromMainChainQuery(ids))
+  def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] =
+    runAsync(markAsRemovedFromMainChainQuery(ids), "markAsRemovedFromMainChain")
 
   def processOrphanedHeader(header: Header): Future[Int] = runAsync(insertOrphanedHeaderQuery(header))
+  def processOrphanedHeader(header: EncryBlockHeader): Future[Int] =
+    runAsync(insertOrphanedHeaderQuery(header), "processOrphanedHeader")
 
-  def selectHeight: Future[Int] = runAsync(heightQuery)
+  def selectHeight: Future[Int] = runAsync(heightQuery, "selectHeight")
 
-  def headersByRange(from: Int, to: Int): Future[List[HeaderDBVersion]] = runAsync(headersByRangeQuery(from, to))
+  def selectHeightOpt: Future[Option[Int]] = runAsync(heightOptQuery, "selectHeightOpt")
 
-  def txsByRange(from: Int, to: Int): Future[List[TransactionDBVersion]] = runAsync(txsByRangeQuery(from, to))
+  def headersByRange(from: Int, to: Int): Future[List[HeaderDBVersion]] =
+    runAsync(headersByRangeQuery(from, to), "headersByRange")
 
-  def directivesByTxIds(ids: Seq[String]): Future[List[DirectiveDBVersion]] = runAsync(directivesByTransactionIdsQuery(ids))
+  def txsByRange(from: Int, to: Int): Future[List[TransactionDBVersion]] =
+    runAsync(txsByRangeQuery(from, to), "txsByRange")
 
-  def inputsByTxIds(ids: Seq[String]): Future[List[InputDBVersion]] = runAsync(inputsByTransactionIdsQuery(ids))
+  def directivesByTxIds(ids: Seq[String]): Future[List[DirectiveDBVersion]] =
+    runAsync(directivesByTransactionIdsQuery(ids), "directivesByTxIds")
+
+  def inputsByTxIds(ids: Seq[String]): Future[List[InputDBVersion]] =
+    runAsync(inputsByTransactionIdsQuery(ids), "inputsByTxIds")
 
   private lazy val dataSource = new HikariDataSource
   if (settings.postgres.exists(_.enableSave) || settings.postgres.exists(_.enableRestore)) {
@@ -44,16 +53,22 @@ class DBService extends Logging {
     dataSource.setMaximumPoolSize(5)
   }
 
+  private def shutdown(): Unit = {
+    logInfo("Shutting down dataSource")
+    dataSource.close()
+  }
+  sys.addShutdownHook(shutdown())
+
   private lazy val pgTransactor: HikariTransactor[IO] = HikariTransactor[IO](dataSource)
 
-  private def runAsync[A](io: ConnectionIO[A]): Future[A] =
+  private def runAsync[A](io: ConnectionIO[A], queryName: String): Future[A] =
     (for {
       res <- io.transact(pgTransactor)
     } yield res)
       .unsafeToFuture()
       .recoverWith {
         case NonFatal(th) =>
-          logWarn(s"Failed to perform db operation with exception ${th.getLocalizedMessage}")
+          logWarn(s"Failed to perform $queryName query with exception ${th.getLocalizedMessage}")
           Future.failed(th)
       }
 }

@@ -25,6 +25,7 @@ class BlockListenerSpec extends TestKit(ActorSystem("BlockListenerSpec")) with I
 
     actor ! sampleModifier
     expectNoMsg(1 second)
+    verify(dbServiceMock).selectHeightOpt
     verify(dbServiceMock).processBlock(eq_(sampleBlock))
   }
 
@@ -51,7 +52,9 @@ class BlockListenerSpec extends TestKit(ActorSystem("BlockListenerSpec")) with I
   // internal
 
   private trait BlockListenerSpecWiring {
+    val noHeight: Future[Option[Int]] = Future.successful(None)
     val dbServiceMock: DBService = mock[DBService]
+    when(dbServiceMock.selectHeightOpt).thenReturn(Future.successful(None))
     val actor: ActorRef = system.actorOf(Props(new BlockListener(dbServiceMock)))
     val sampleHeader: Header = genHeader
     val sampleTxs: Seq[Transaction] = genValidPaymentTxs(100)

@@ -104,7 +104,7 @@ class Miner extends Actor with Logging {
     case FullBlockChainSynced =>
       syncingDone = true
       if (settings.node.mining) self ! EnableMining
-    case DisableMining =>
+    case DisableMining | SemanticallySuccessfulModifier(_) =>
   }
 
   def receiveSemanticallySuccessfulModifier: Receive = {

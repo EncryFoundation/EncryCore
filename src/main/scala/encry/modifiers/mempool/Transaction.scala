@@ -10,7 +10,6 @@ import encry.EncryApp.timeProvider
 import io.circe.{Decoder, HCursor}
 import io.circe.syntax._
 import org.encryfoundation.common.transaction._
-import org.encryfoundation.prismlang.compiler.CompiledContractSerializer
 import org.encryfoundation.prismlang.core.Types
 import encry.settings.Constants
 import encry.utils.CoreTaggedTypes
@@ -52,7 +51,7 @@ case class Transaction(fee: Amount,
     directives.zipWithIndex.flatMap { case (d, idx) => d.boxes(Digest32 !@@ id, idx) }
 
   override def toString: String =
-    s"<Transaction id=${Algos.encode(id)} fee=$fee inputs=${inputs.map(u => Algos.encode(u.boxId))}>"
+    s"<Transaction id=${Algos.encode(id)}\nfee=$fee\ninputs=$inputs\ndirectives=$directives\nts=$timestamp\nproofs=$defaultProofOpt>"
 
   lazy val semanticValidity: Try[Unit] = accumulateErrors
     .demand(fee >= 0, "Negative fee amount")
@@ -187,17 +186,17 @@ object UnsignedTransaction {
 }
 
 
-case class TransactionDBVersion(id: String, fee: Long, blockId: String, isCoinbase: Boolean,
+case class TransactionDBVersion(id: String, number: Int, fee: Long, blockId: String, isCoinbase: Boolean,
                                 timestamp: Timestamp, proof: Option[String])
 
 case object TransactionDBVersion {
   def apply(block: Block): Seq[TransactionDBVersion] = {
     if (block.payload.transactions.nonEmpty) {
-      val transactions: Seq[TransactionDBVersion] = block.payload.transactions.map { tx =>
+      val transactions: Seq[TransactionDBVersion] = block.payload.transactions.zipWithIndex.map { case (tx, number) =>
         val id: String = Base16.encode(tx.id)
         val proof: Option[String] = tx.defaultProofOpt.map(p => Base16.encode(p.bytes))
         val blockId: String = Base16.encode(block.header.id)
-        TransactionDBVersion(id, tx.fee, blockId, isCoinbase = false, block.header.timestamp, proof)
+        TransactionDBVersion(id, number, tx.fee, blockId, isCoinbase = false, tx.timestamp, proof)
       }.toIndexedSeq
       transactions match {
         case coinbase :: Nil => Seq(coinbase.copy(isCoinbase = true))
@@ -209,20 +208,15 @@ case object TransactionDBVersion {
 }
 
 
-case class InputDBVersion(id: String, txId: String, contractByteVersion: String, proofs: String) {
+case class InputDBVersion(id: String, txId: String, contractByteVersion: String, proofs: String, numberInTx: Int) {
   def toInput: Try[Input] =
     for {
       decodedId <- Base16.decode(id)
       decodedContractBytes <- Base16.decode(contractByteVersion)
-      decodedContract <- RegularContract.Serializer
-        .parseBytes(decodedContractBytes)
-        .map(_.asRight)
-        .recoverWith {
-          case _ => CompiledContractSerializer.parseBytes(decodedContractBytes).map(_.asLeft)
-        }
-      decodedBase16Proofs <- if (proofs.length != 0) proofs.split(",").toList.traverse(Base16.decode)
-      else Success(List.empty)
-      decodedProofs <- decodedBase16Proofs.traverse(ProofSerializer.parseBytes)
+      decodedContract      <- InputSerializer.decodeEitherCompiledOrRegular(decodedContractBytes)
+      decodedBase16Proofs  <- if (proofs.length != 0) proofs.split(",").toList.traverse(Base16.decode)
+                              else Success(List.empty)
+      decodedProofs        <- decodedBase16Proofs.traverse(ProofSerializer.parseBytes)
     } yield {
       Input(ADKey @@ decodedId, decodedContract, decodedProofs)
     }
@@ -231,11 +225,11 @@ case class InputDBVersion(id: String, txId: String, contractByteVersion: String,
 case object InputDBVersion {
   def apply(tx: Transaction): Seq[InputDBVersion] = {
     val txId: String = Base16.encode(tx.id)
-    tx.inputs.map { in =>
+    tx.inputs.zipWithIndex.map { case (in, number) =>
       val id: String = Base16.encode(in.boxId)
-      val contractBytes: String = Base16.encode(in.contract.map(_.bytes).leftMap(_.bytes).fold(identity, identity))
+      val contractBytes: String = Base16.encode(InputSerializer.encodeEitherCompiledOrRegular(in.contract))
       val proofs: String = in.proofs.map(_.bytes).map(Base16.encode).mkString(",")
-      InputDBVersion(id, txId, contractBytes, proofs)
+      InputDBVersion(id, txId, contractBytes, proofs, number)
     }
   }
 }
