@@ -5,9 +5,7 @@ import java.io.File
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.{ADProofs, Block, Header}
-import encry.modifiers.history.block.header.HeaderChain
-import encry.modifiers.history.block.payload.Payload
+import encry.modifiers.history._
 import encry.settings._
 import encry.utils.NetworkTimeProvider
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}

@@ -1,10 +1,10 @@
-package encry.modifiers.history.block.payload
+package encry.modifiers.history
 
 import com.google.common.primitives.{Bytes, Ints}
-import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest, TransactionsCarryingPersistentNodeViewModifier}
-import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.mempool._
 import encry.modifiers.state.box.EncryProposition
+import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest, TransactionsCarryingPersistentNodeViewModifier}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import io.circe.Encoder
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
@@ -28,7 +28,7 @@ case class Payload(override val headerId: ModifierId, txs: Seq[Transaction])
 
   override lazy val digest: Digest32 = Payload.rootHash(txs.map(_.id))
 
-  override def serializer: Serializer[Payload] = EncryBlockPayloadSerializer
+  override def serializer: Serializer[Payload] = PayloadSerializer
 
   override def toString: String = s"Payload(headerId=${Algos.encode(headerId)}, txsQty=${transactions.size})"
 }
@@ -45,7 +45,7 @@ object Payload {
   def rootHash(ids: Seq[ModifierId]): Digest32 = Algos.merkleTreeRoot(LeafData !@@ ids)
 }
 
-object EncryBlockPayloadSerializer extends Serializer[Payload] {
+object PayloadSerializer extends Serializer[Payload] {
 
   override def toBytes(obj: Payload): Array[Byte] =
     Bytes.concat(

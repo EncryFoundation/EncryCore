@@ -8,9 +8,7 @@ import doobie.Fragments.{in, whereAndOpt}
 import doobie.postgres.implicits._
 import doobie.implicits._
 import doobie.util.log.{ExecFailure, LogHandler, ProcessingFailure, Success}
-import encry.modifiers.history.{Block, Header, HeaderDBVersion}
-import encry.modifiers.history.HeaderDBVersion
-import encry.modifiers.history.block.payload.Payload
+import encry.modifiers.history.{Block, Header, HeaderDBVersion, Payload}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.utils.Logging
 import encry.utils.CoreTaggedTypes.ModifierId

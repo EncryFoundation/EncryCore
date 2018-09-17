@@ -5,8 +5,7 @@ import akka.persistence.RecoveryCompleted
 import encry.EncryApp.{nodeViewHolder, peerManager, settings}
 import encry.utils.Logging
 import encry.local.explorer.database.DBService
-import encry.modifiers.history.{Block, HeaderDBVersion}
-import encry.modifiers.history.block.payload.Payload
+import encry.modifiers.history.{Block, HeaderDBVersion, Payload}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, Transaction, TransactionDBVersion}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.BlocksFromLocalPersistence

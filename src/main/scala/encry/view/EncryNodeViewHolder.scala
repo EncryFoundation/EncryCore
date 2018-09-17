@@ -9,8 +9,6 @@ import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
 import encry.modifiers._
-import encry.modifiers.history.EncryBlockHeaderSerializer
-import encry.modifiers.history.block.payload.{EncryBlockPayloadSerializer, Payload}
 import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
 import encry.modifiers.state.box.EncryProposition
@@ -48,8 +46,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   var triedToDownload: Boolean = !settings.postgres.exists(_.enableRestore)
   val modifiersCache: EncryModifiersCache = EncryModifiersCache(1000)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
-    Header.modifierTypeId -> EncryBlockHeaderSerializer,
-    Payload.modifierTypeId -> EncryBlockPayloadSerializer,
+    Header.modifierTypeId -> HeaderSerializer,
+    Payload.modifierTypeId -> PayloadSerializer,
     ADProofs.modifierTypeId -> ADProofSerializer,
     Transaction.ModifierTypeId -> TransactionSerializer
   )

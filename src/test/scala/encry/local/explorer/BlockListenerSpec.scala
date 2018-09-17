@@ -5,8 +5,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.local.explorer.BlockListener.{ChainSwitching, NewOrphaned}
 import encry.local.explorer.database.DBService
-import encry.modifiers.history.{Block, Header}
-import encry.modifiers.history.block.payload.Payload
+import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.utils.EncryGenerator

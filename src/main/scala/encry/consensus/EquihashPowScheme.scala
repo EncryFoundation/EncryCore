@@ -4,8 +4,7 @@ import com.google.common.primitives.Chars
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.crypto.equihash.{Equihash, EquihashSolution}
-import encry.modifiers.history.{ADProofs, Block, Header}
-import encry.modifiers.history.block.payload.Payload
+import encry.modifiers.history.{ADProofs, Block, Header, Payload}
 import encry.modifiers.history.Block.Version
 import encry.modifiers.mempool.Transaction
 import encry.settings.Constants

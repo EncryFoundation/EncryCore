@@ -4,9 +4,7 @@ import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History._
 import encry.consensus.ModifierSemanticValidity
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.{ADProofs, Block, Header}
-import encry.modifiers.history.block.header.HeaderChain
-import encry.modifiers.history.block.payload.Payload
+import encry.modifiers.history._
 import encry.settings.{Constants, NodeSettings}
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
@@ -15,7 +13,6 @@ import encry.EncryApp.settings
 import encry.utils.Logging
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
-
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
@@ -169,7 +166,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
       if (chains._1.head == chains._2.head) chains
       else {
         val biggerOther: HeaderChain = headerChainBack(numberBack, otherChain.head, _ => false) ++ otherChain.tail
-        if (!otherChain.head.isGenesis) loop(biggerOther.size, biggerOther)
+        if (!otherChain.head.isGenesis) loop(biggerOther.length, biggerOther)
         else throw new Exception(s"Common point not found for headers $header1 and $header2")
       }
     }

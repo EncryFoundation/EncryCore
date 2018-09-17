@@ -7,9 +7,7 @@ import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
 import encry.local.explorer.BlockListener.NewOrphaned
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.{ADProofs, Block, Header}
-import encry.modifiers.history.block.header.HeaderChain
-import encry.modifiers.history.block.payload.Payload
+import encry.modifiers.history._
 import encry.settings.Constants._
 import encry.settings.{Constants, NodeSettings}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}

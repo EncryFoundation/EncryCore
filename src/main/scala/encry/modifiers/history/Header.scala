@@ -5,7 +5,6 @@ import com.google.common.primitives.{Ints, _}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.crypto.equihash.{Equihash, EquihashSolution, EquihashSolutionsSerializer}
 import encry.modifiers.history.Block.{Height, Timestamp, Version}
-import encry.modifiers.history.block.payload.Payload
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
@@ -19,7 +18,6 @@ import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
-
 import scala.util.Try
 
 case class Header(version: Version,
@@ -60,7 +58,7 @@ case class Header(version: Version,
     case _ => false
   }
 
-  override def serializer: Serializer[M] = EncryBlockHeaderSerializer
+  override def serializer: Serializer[M] = HeaderSerializer
 
   override def toString: String = s"Header(id=$encodedId, height=$height)"
 }
@@ -104,6 +102,7 @@ case class HeaderDBVersion(id: String,
 }
 
 object HeaderDBVersion {
+
   def apply(block: Block): HeaderDBVersion = {
     val (minerAddress: String, minerReward: Long) = minerInfo(block.payload.transactions.last)
     HeaderDBVersion(
@@ -154,9 +153,9 @@ object HeaderDBVersion {
   }
 
   private def minerInfo(coinbase: Transaction): (String, Long) = coinbase.directives.head match {
-      case TransferDirective(address, amount, tokenIdOpt) if tokenIdOpt.isEmpty => address -> amount
-      case _ => "unknown" -> 0
-    }
+    case TransferDirective(address, amount, tokenIdOpt) if tokenIdOpt.isEmpty => address -> amount
+    case _ => "unknown" -> 0
+  }
 
 }
 
@@ -180,7 +179,7 @@ object Header {
 
   def getPowHash(header: Header): Digest32 = {
     val digest: Blake2bDigest = new Blake2bDigest(256)
-    val bytes: Array[Byte] = EncryBlockHeaderSerializer.bytesWithoutPow(header)
+    val bytes: Array[Byte] = HeaderSerializer.bytesWithoutPow(header)
     digest.update(bytes, 0, bytes.length)
     Equihash.hashNonce(digest, header.nonce)
     Equihash.hashSolution(digest, header.equihashSolution)
@@ -196,7 +195,7 @@ object Header {
   }
 }
 
-object EncryBlockHeaderSerializer extends Serializer[Header] {
+object HeaderSerializer extends Serializer[Header] {
 
   def bytesWithoutPow(h: Header): Array[Byte] =
     Bytes.concat(

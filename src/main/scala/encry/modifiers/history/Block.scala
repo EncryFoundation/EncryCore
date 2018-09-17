@@ -1,7 +1,6 @@
 package encry.modifiers.history
 
 import com.google.common.primitives.{Bytes, Ints}
-import encry.modifiers.history.block.payload.{EncryBlockPayloadSerializer, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.state.box.EncryProposition
@@ -12,7 +11,6 @@ import io.circe.Encoder
 import io.circe.syntax._
 import org.encryfoundation.common.serialization.Serializer
 import scorex.crypto.encode.Base16
-
 import scala.util.Try
 
 case class Block(header: Header,
@@ -40,7 +38,7 @@ case class Block(header: Header,
 
   override lazy val id: ModifierId = header.id
 
-  override def serializer: Serializer[Block] = EncryBlockSerializer
+  override def serializer: Serializer[Block] = BlockSerializer
 
   def dataString: String = {
     val encodedId: String = Base16.encode(id)
@@ -84,7 +82,7 @@ object Block {
   ).asJson
 }
 
-object EncryBlockSerializer extends Serializer[Block] {
+object BlockSerializer extends Serializer[Block] {
 
   override def toBytes(obj: Block): Array[Byte] = {
     val headerBytes: Array[Byte] = obj.header.serializer.toBytes(obj.header)
@@ -104,11 +102,11 @@ object EncryBlockSerializer extends Serializer[Block] {
   override def parseBytes(bytes: Array[Byte]): Try[Block] = Try {
     var pointer: Int = 4
     val headerSize: Int = Ints.fromByteArray(bytes.slice(0, pointer))
-    val header: Try[Header] = EncryBlockHeaderSerializer.parseBytes(bytes.slice(pointer, pointer + headerSize))
+    val header: Try[Header] = HeaderSerializer.parseBytes(bytes.slice(pointer, pointer + headerSize))
     pointer += headerSize
     val payloadSize: Int = Ints.fromByteArray(bytes.slice(pointer, pointer + 4))
     val payload: Try[Payload] =
-      EncryBlockPayloadSerializer.parseBytes(bytes.slice(pointer + 4, pointer + 4 + payloadSize))
+      PayloadSerializer.parseBytes(bytes.slice(pointer + 4, pointer + 4 + payloadSize))
     pointer += payloadSize + 4
     val aDProofsSize: Int = Ints.fromByteArray(bytes.slice(pointer, pointer + 4))
     val aDProofs: Try[ADProofs] = ADProofSerializer.parseBytes(bytes.slice(pointer + 4, pointer + 4 + aDProofsSize))

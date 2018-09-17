@@ -2,8 +2,7 @@ package encry.view.wallet
 
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.InstanceFactory
-import encry.modifiers.history.{Block, Header}
-import encry.modifiers.history.block.payload.Payload
+import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.{AssetBox, MonetaryBox}
 import encry.settings.{Constants, EncryAppSettings}

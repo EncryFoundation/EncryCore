@@ -8,8 +8,7 @@ import encry.EncryApp._
 import encry.consensus.History._
 import encry.consensus.SyncInfo
 import encry.local.miner.Miner.{DisableMining, StartMining}
-import encry.modifiers.history.{ADProofs, Header}
-import encry.modifiers.history.block.payload.Payload
+import encry.modifiers.history.{ADProofs, Header, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}

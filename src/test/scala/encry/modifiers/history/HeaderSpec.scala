@@ -1,4 +1,4 @@
-package encry.modifiers.history.block.header
+package encry.modifiers.history
 
 import encry.utils.EncryGenerator
 import org.scalatest.{Matchers, PropSpec}

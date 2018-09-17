@@ -1,8 +1,8 @@
 package encry.view.history.processors.payload
 
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.block.payload.Payload
 import encry.consensus.History.ProgressInfo
+import encry.modifiers.history.Payload
 
 import scala.util.{Failure, Try}
 

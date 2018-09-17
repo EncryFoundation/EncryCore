@@ -2,8 +2,7 @@ package encry.view.history.processors.payload
 
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.{ADProofs, Block, Header}
-import encry.modifiers.history.block.payload.Payload
+import encry.modifiers.history.{ADProofs, Block, Header, Payload}
 import encry.view.history.processors.BlockProcessor
 import encry.view.history.storage.HistoryStorage
 

@@ -1,6 +1,4 @@
-package encry.modifiers.history.block.header
-
-import encry.modifiers.history.Header
+package encry.modifiers.history
 
 case class HeaderChain(headers: IndexedSeq[Header]) {
   headers.indices.foreach { i =>
@@ -13,8 +11,6 @@ case class HeaderChain(headers: IndexedSeq[Header]) {
 
   def headOption: Option[Header] = headers.headOption
 
-  def last: Header = headers.last
-
   def tail: HeaderChain = HeaderChain(headers.tail)
 
   def take(i: Int): HeaderChain = HeaderChain(headers.take(i))
@@ -25,11 +21,7 @@ case class HeaderChain(headers: IndexedSeq[Header]) {
     HeaderChain(commonBlockThenSuffixes)
   }
 
-  def apply(idx: Int): Header = headers(idx)
-
-  lazy val size: Int = length
-
-  lazy val length: Int = headers.size
+  val length: Int = headers.size
 
   def ++(c: HeaderChain): HeaderChain = HeaderChain(headers ++ c.headers)
 }
