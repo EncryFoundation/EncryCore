@@ -35,7 +35,6 @@ class MessageSerializer[Content] extends Serializer[Message[Content]] {
     MAGIC ++ Array(obj.spec.messageCode) ++ Ints.toByteArray(obj.dataLength) ++ dataWithChecksum
   }
 
-  //TODO move MessageHandler.parseBytes here
   override def parseBytes(bytes: Array[Byte]): Try[Message[Content]] = ???
 }
 

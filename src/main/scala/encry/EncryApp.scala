@@ -103,7 +103,8 @@ object EncryApp extends App with Logging {
       WalletInfoApiRoute(nodeViewHolder, settings.restApi)
     )
     val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
-    Http().bindAndHandle(combinedRoute, settings.restApi.bindAddress.getAddress.getHostAddress, settings.restApi.bindAddress.getPort)
+    Http().bindAndHandle(combinedRoute, settings.restApi.bindAddress.getAddress.getHostAddress,
+      settings.restApi.bindAddress.getPort)
   }
 
   def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)

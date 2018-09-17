@@ -12,9 +12,7 @@ case class ByteStr(arr: Array[Byte]) {
 
   override def hashCode(): Int = java.util.Arrays.hashCode(arr)
 
-  lazy val encoded: String = Algos.encode(arr)
-
-  override lazy val toString: String = encoded
+  override lazy val toString: String = Algos.encode(arr)
 }
 
 object ByteStr {

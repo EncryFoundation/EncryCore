@@ -74,7 +74,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
     val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None)
 
     val factory = TestHelper
-    val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath)
+    val keys = factory.genKeys(TestHelper.Props.keysQty)
 
     val fee = factory.Props.txFee
 
@@ -113,7 +113,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
     val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None)
 
     val factory = TestHelper
-    val keys = factory.getOrGenerateKeys(factory.Props.keysFilePath)
+    val keys = factory.genKeys(TestHelper.Props.keysQty)
 
     val fee = factory.Props.txFee
 
