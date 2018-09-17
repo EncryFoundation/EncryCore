@@ -21,10 +21,12 @@ import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
+import io.circe.syntax._
+import io.circe.{Encoder, Json}
 import scala.collection.immutable
 import scala.util.Try
 
-trait BlockHeaderProcessor extends Logging {
+trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider
@@ -43,20 +45,34 @@ trait BlockHeaderProcessor extends Logging {
     def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] = {
       if (acc.lengthCompare(howMany) >= 0) acc
       else {
-        headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[EncryBlockHeader](id)) match {
+        headerIdsAtHeight(height).map{modifierId =>
+          logInfo(s"Going to calculate necessary modifiers: ${Algos.encode(modifierId)}")
+          modifierId
+        }.headOption.flatMap(id => {
+          logInfo(s"Header by this id is: ${typedModifierById[EncryBlockHeader](id).asJson}")
+          typedModifierById[EncryBlockHeader](id)
+        }) match {
           case Some(bestHeaderAtThisHeight) =>
+            logInfo(s"Best header on height $height is ${bestHeaderAtThisHeight.asJson}")
             val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
               .filter(m => !excluding.exists(_ sameElements m._2))
               .filter(m => !contains(m._2))
+            logInfo(s"Need to download: ${toDownload.map(_._2).map(Algos.encode).mkString(",")}")
             continuation(Height @@ (height + 1), acc ++ toDownload)
           case None => acc
         }
       }
     }
 
+    logInfo(s"Going to download modifiers. BestBlockOpt is: ${bestBlockOpt.map(_.asJson)}")
+
     bestBlockOpt match {
-      case _ if !isHeadersChainSynced => Seq.empty
-      case Some(fb) => continuation(Height @@ (fb.header.height + 1), Seq.empty)
+      case _ if !isHeadersChainSynced =>
+        logInfo("Header chain is not sync!")
+        Seq.empty
+      case Some(fb) =>
+        logInfo("Looks like bestBlockOpt exist!")
+        continuation(Height @@ (fb.header.height + 1), Seq.empty)
       case None => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
