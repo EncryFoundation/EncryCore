@@ -5,6 +5,8 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
+import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import encry.settings._
@@ -38,9 +40,9 @@ case class InfoApiRoute(readersHolder: ActorRef,
       currentTime <- timeProvider.time()
       launchTime <- launchTimeFuture
       nodeUptime = currentTime - launchTime
-    } yield {
-      InfoApiRoute.makeInfoJson(nodeId, minerInfo, connectedPeers, readers, getStateType, getNodeName, getAddress, storageInfo, nodeUptime,getConnectionWithPeers)
-    }).okJson()
+    } yield InfoApiRoute.makeInfoJson(nodeId, minerInfo, connectedPeers, readers, getStateType, getNodeName,
+      getAddress, storageInfo, nodeUptime, getConnectionWithPeers)
+      ).okJson()
   }
 
   private def getConnectedPeers: Future[Int] = (peerManager ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map(_.size)
@@ -52,10 +54,13 @@ case class InfoApiRoute(readersHolder: ActorRef,
 
   private def storageInfo: String = (appSettings.levelDb, appSettings.postgres) match {
     case (Some(LevelDbSettings(levelDbSave, levelDbRestore, _)), Some(PostgresSettings(_, _, _, pgSave, pgRestore, _))) =>
-      if ((levelDbSave || levelDbRestore) && (pgSave || pgRestore))  s"LevelDb(${if(levelDbSave) "write" else ""} ${if(levelDbRestore) "read" else ""}), " +
-        s"Postgres(${if(pgSave) "write" else ""} ${if(pgRestore) "read" else ""})"
-      else if ((levelDbSave || levelDbRestore) && (!pgSave || !pgRestore)) s"LevelDb(${if(levelDbSave) "write" else ""} ${if(levelDbRestore) "read" else ""})"
-      else if ((!levelDbSave || !levelDbRestore) && (pgSave || pgRestore)) s"Postgres(${if(pgSave) "write" else ""} ${if(pgRestore) "read" else ""})"
+      if ((levelDbSave || levelDbRestore) && (pgSave || pgRestore))
+        s"LevelDb(${if (levelDbSave) "write" else ""} ${if (levelDbRestore) "read" else ""}), " +
+          s"Postgres(${if (pgSave) "write" else ""} ${if (pgRestore) "read" else ""})"
+      else if ((levelDbSave || levelDbRestore) && (!pgSave || !pgRestore))
+        s"LevelDb(${if (levelDbSave) "write" else ""} ${if (levelDbRestore) "read" else ""})"
+      else if ((!levelDbSave || !levelDbRestore) && (pgSave || pgRestore))
+        s"Postgres(${if (pgSave) "write" else ""} ${if (pgRestore) "read" else ""})"
       else ""
   }
 
@@ -78,10 +83,10 @@ object InfoApiRoute {
                    storage: String,
                    nodeUptime: Long,
                    connectWithOnlyKnownPeer: Boolean): Json = {
-    val stateVersion = readers.s.map(_.version).map(Algos.encode)
-    val bestHeader = readers.h.flatMap(_.bestHeaderOpt)
-    val bestFullBlock = readers.h.flatMap(_.bestBlockOpt)
-    val unconfirmedCount = readers.m.map(_.size).getOrElse(0)
+    val stateVersion: Option[String] = readers.s.map(_.version).map(Algos.encode)
+    val bestHeader: Option[EncryBlockHeader] = readers.h.flatMap(_.bestHeaderOpt)
+    val bestFullBlock: Option[EncryBlock] = readers.h.flatMap(_.bestBlockOpt)
+    val unconfirmedCount: Int = readers.m.map(_.size).getOrElse(0)
     Map(
       "name" -> nodeName.asJson,
       "headersHeight" -> bestHeader.map(_.height).getOrElse(0).asJson,
@@ -96,7 +101,7 @@ object InfoApiRoute {
       "stateVersion" -> stateVersion.asJson,
       "isMining" -> minerInfo.isMining.asJson,
       "peersCount" -> connectedPeersLength.asJson,
-      "knownPeers" -> knownPeers.map{x => x.getHostName + ":" + x.getPort}.asJson,
+      "knownPeers" -> knownPeers.map { x => x.getHostName + ":" + x.getPort }.asJson,
       "storage" -> storage.asJson,
       "uptime" -> nodeUptime.asJson,
       "isConnectedWithKnownPeers" -> connectWithOnlyKnownPeer.asJson,
