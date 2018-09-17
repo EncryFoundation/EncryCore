@@ -2,23 +2,16 @@ package encry.view
 
 import java.lang
 import java.util.concurrent.ConcurrentHashMap
-
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.Header
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
-
 import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
 import encry.utils.Logging
 
-/**
-  * A cache which is storing persistent modifiers not applied to history yet.
-  *
-  * @tparam PMOD - type of a persistent node view modifier (or a family of modifiers).
-  */
 trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
 
   type K = mutable.WrappedArray[Byte]
