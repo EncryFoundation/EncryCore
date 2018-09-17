@@ -6,7 +6,7 @@ import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.{Header, EncryHeaderChain}
+import encry.modifiers.history.block.header.{Header, HeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings._
 import encry.utils.NetworkTimeProvider
@@ -142,7 +142,7 @@ trait EncryHistory extends EncryHistoryReader {
           // Marks non-best full block as valid. Should have more blocks to apply to sync state and history.
           val bestFullHeader: Header = bestBlockOpt.get.header
           val limit: Int = bestFullHeader.height - block.header.height
-          val chainBack: EncryHeaderChain = headerChainBack(limit, bestFullHeader, h => h.parentId sameElements block.header.id)
+          val chainBack: HeaderChain = headerChainBack(limit, bestFullHeader, h => h.parentId sameElements block.header.id)
             .ensuring(_.headOption.isDefined, s"Should have next block to apply, failed for ${block.header}")
           // Block in the best chain that is linked to this header.
           val toApply: Option[EncryBlock] = chainBack.headOption.flatMap(opt => getBlock(opt))

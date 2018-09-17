@@ -8,7 +8,7 @@ import encry.consensus.{ModifierSemanticValidity, _}
 import encry.local.explorer.BlockListener.NewOrphaned
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.header.{Header, EncryHeaderChain}
+import encry.modifiers.history.block.header.{Header, HeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.history.block.{Block, EncryBlock}
 import encry.settings.Constants._
@@ -231,7 +231,7 @@ trait BlockHeaderProcessor extends Logging {
     *         Note now it includes one header satisfying until condition!
     */
   protected def headerChainBack(limit: Int, startHeader: Header,
-                                until: Header => Boolean): EncryHeaderChain = {
+                                until: Header => Boolean): HeaderChain = {
     @tailrec
     def loop(header: Header, acc: Seq[Header]): Seq[Header] = {
       if (acc.length == limit || until(header)) acc
@@ -242,8 +242,8 @@ trait BlockHeaderProcessor extends Logging {
       }
     }
 
-    if (bestHeaderIdOpt.isEmpty || (limit == 0)) EncryHeaderChain(Seq())
-    else EncryHeaderChain(loop(startHeader, Seq(startHeader)).reverse)
+    if (bestHeaderIdOpt.isEmpty || (limit == 0)) HeaderChain(Seq())
+    else HeaderChain(loop(startHeader, Seq(startHeader)).reverse)
   }
 
   /**
@@ -267,7 +267,7 @@ trait BlockHeaderProcessor extends Logging {
     val requiredHeights: Seq[Height] =
       difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
         .ensuring(_.last == parentHeight, "Incorrect heights sequence!")
-    val chain: EncryHeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1,
+    val chain: HeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1,
       parent, (_: Header) => false)
     val requiredHeaders: immutable.IndexedSeq[(Int, Header)] = (requiredHeights.min to requiredHeights.max)
       .zip(chain.headers).filter(p => requiredHeights.contains(p._1))

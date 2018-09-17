@@ -2,30 +2,34 @@ package encry.modifiers.history.block
 
 import com.google.common.primitives.{Bytes, Ints}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.block.header.{Header, EncryBlockHeaderSerializer}
+import encry.modifiers.{EncryPersistentModifier, TransactionsCarryingPersistentNodeViewModifier}
+import encry.modifiers.history.block.header.{EncryBlockHeaderSerializer, Header}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.mempool.Transaction
+import encry.modifiers.state.box.EncryProposition
 import encry.validation.{ModifierValidator, ValidationResult}
 import io.circe.Encoder
 import io.circe.syntax._
 import org.encryfoundation.common.serialization.Serializer
 import scorex.crypto.encode.Base16
+
 import scala.util.Try
 
-case class EncryBlock(override val header: Header,
-                      override val payload: EncryBlockPayload,
-                      adProofsOpt: Option[ADProofs]) extends EncryBaseBlock with ModifierValidator {
+case class EncryBlock(header: Header,
+                      payload: EncryBlockPayload,
+                      adProofsOpt: Option[ADProofs])
+  extends TransactionsCarryingPersistentNodeViewModifier[EncryProposition, Transaction]
+    with EncryPersistentModifier with ModifierValidator {
 
   override type M = EncryBlock
 
-  override val toSeq: Seq[EncryPersistentModifier] = Seq(header, payload) ++ adProofsOpt.toSeq
+  val toSeq: Seq[EncryPersistentModifier] = Seq(header, payload) ++ adProofsOpt.toSeq
 
   override def transactions: Seq[Transaction] = payload.transactions
 
-  override def semanticValidity: Try[Unit] = validateSemantically.toTry
+  def semanticValidity: Try[Unit] = validateSemantically.toTry
 
   def validateSemantically: ValidationResult =
     accumulateErrors
@@ -61,6 +65,9 @@ case class EncryBlock(override val header: Header,
     case TransferDirective(address, amount, tokenIdOpt) if tokenIdOpt.isEmpty => address -> amount
     case _ => "unknown" -> 0
   }
+
+  override def toString: String = s"<Block height=${header.height} timestamp=${header.timestamp} txQty=${payload.transactions.size} id=${header.encodedId}>"
+
 }
 
 object EncryBlock {
@@ -90,7 +97,7 @@ object EncryBlockSerializer extends Serializer[EncryBlock] {
     )
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[EncryBlock] = Try{
+  override def parseBytes(bytes: Array[Byte]): Try[EncryBlock] = Try {
     var pointer: Int = 4
     val headerSize: Int = Ints.fromByteArray(bytes.slice(0, pointer))
     val header: Try[Header] = EncryBlockHeaderSerializer.parseBytes(bytes.slice(pointer, pointer + headerSize))

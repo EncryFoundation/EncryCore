@@ -1,6 +1,6 @@
 package encry.modifiers.history.block.header
 
-case class EncryHeaderChain(headers: IndexedSeq[Header]) {
+case class HeaderChain(headers: IndexedSeq[Header]) {
   headers.indices.foreach { i =>
     if (i > 0) require(headers(i).parentId sameElements headers(i - 1).id)
   }
@@ -13,14 +13,14 @@ case class EncryHeaderChain(headers: IndexedSeq[Header]) {
 
   def last: Header = headers.last
 
-  def tail: EncryHeaderChain = EncryHeaderChain(headers.tail)
+  def tail: HeaderChain = HeaderChain(headers.tail)
 
-  def take(i: Int): EncryHeaderChain = EncryHeaderChain(headers.take(i))
+  def take(i: Int): HeaderChain = HeaderChain(headers.take(i))
 
-  def takeAfter(h: Header): EncryHeaderChain = {
+  def takeAfter(h: Header): HeaderChain = {
     val commonIndex = headers.indexWhere(_.id sameElements h.id)
     val commonBlockThenSuffixes = headers.takeRight(headers.length - commonIndex)
-    EncryHeaderChain(commonBlockThenSuffixes)
+    HeaderChain(commonBlockThenSuffixes)
   }
 
   def apply(idx: Int): Header = headers(idx)
@@ -29,12 +29,12 @@ case class EncryHeaderChain(headers: IndexedSeq[Header]) {
 
   lazy val length: Int = headers.size
 
-  def ++(c: EncryHeaderChain): EncryHeaderChain = EncryHeaderChain(headers ++ c.headers)
+  def ++(c: HeaderChain): HeaderChain = HeaderChain(headers ++ c.headers)
 }
 
-object EncryHeaderChain {
+object HeaderChain {
 
-  lazy val empty = EncryHeaderChain(IndexedSeq.empty[Header])
+  lazy val empty = HeaderChain(IndexedSeq.empty[Header])
 
-  def apply(seq: Seq[Header]): EncryHeaderChain = EncryHeaderChain(seq.toIndexedSeq)
+  def apply(seq: Seq[Header]): HeaderChain = HeaderChain(seq.toIndexedSeq)
 }

@@ -6,7 +6,7 @@ import encry.consensus.ModifierSemanticValidity
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.{Header, EncryHeaderChain}
+import encry.modifiers.history.block.header.{Header, HeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.{Constants, NodeSettings}
 import encry.view.history.processors.BlockHeaderProcessor
@@ -77,7 +77,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
       val heightFrom: Int = Math.min(bestHeaderHeight, size - 1)
       val startId: ModifierId = headerIdsAtHeight(heightFrom).head
       val startHeader: Header = typedModifierById[Header](startId).get
-      val headers: EncryHeaderChain = headerChainBack(size, startHeader, _ => false)
+      val headers: HeaderChain = headerChainBack(size, startHeader, _ => false)
         .ensuring(_.headers.exists(_.height == Constants.Chain.GenesisHeight), "Should always contain genesis header")
       headers.headers.flatMap(h => Seq((Header.modifierTypeId, h.id)))
     } else {
@@ -125,8 +125,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
   /** Checks whether the modifier is applicable to the history. */
   def applicable(modifier: EncryPersistentModifier): Boolean = testApplicable(modifier).isSuccess
 
-  def lastHeaders(count: Int): EncryHeaderChain = bestHeaderOpt
-    .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(EncryHeaderChain.empty)
+  def lastHeaders(count: Int): HeaderChain = bestHeaderOpt
+    .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(HeaderChain.empty)
 
   def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
     historyStorage.modifierById(id)
@@ -152,7 +152,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
     * @return (Modifier required to rollback first, header chain to apply)
     */
   def getChainToHeader(fromHeaderOpt: Option[Header],
-                       toHeader: Header): (Option[ModifierId], EncryHeaderChain) = fromHeaderOpt match {
+                       toHeader: Header): (Option[ModifierId], HeaderChain) = fromHeaderOpt match {
     case Some(h1) =>
       val (prevChain, newChain) = commonBlockThenSuffixes(h1, toHeader)
       (prevChain.headOption.map(_.id), newChain.tail)
@@ -161,29 +161,29 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
 
   /** Finds common block and sub-chains from common block to header1 and header2. */
   protected[history] def commonBlockThenSuffixes(header1: Header,
-                                                 header2: Header): (EncryHeaderChain, EncryHeaderChain) = {
+                                                 header2: Header): (HeaderChain, HeaderChain) = {
     val heightDelta: Int = Math.max(header1.height - header2.height, 0)
 
-    def loop(numberBack: Int, otherChain: EncryHeaderChain): (EncryHeaderChain, EncryHeaderChain) = {
-      val chains: (EncryHeaderChain, EncryHeaderChain) = commonBlockThenSuffixes(otherChain, header1, numberBack + heightDelta)
+    def loop(numberBack: Int, otherChain: HeaderChain): (HeaderChain, HeaderChain) = {
+      val chains: (HeaderChain, HeaderChain) = commonBlockThenSuffixes(otherChain, header1, numberBack + heightDelta)
       if (chains._1.head == chains._2.head) chains
       else {
-        val biggerOther: EncryHeaderChain = headerChainBack(numberBack, otherChain.head, _ => false) ++ otherChain.tail
+        val biggerOther: HeaderChain = headerChainBack(numberBack, otherChain.head, _ => false) ++ otherChain.tail
         if (!otherChain.head.isGenesis) loop(biggerOther.size, biggerOther)
         else throw new Exception(s"Common point not found for headers $header1 and $header2")
       }
     }
 
-    loop(2, EncryHeaderChain(Seq(header2)))
+    loop(2, HeaderChain(Seq(header2)))
   }
 
   /** Finds common block and sub-chains with `otherChain`. */
-  protected[history] def commonBlockThenSuffixes(otherChain: EncryHeaderChain,
+  protected[history] def commonBlockThenSuffixes(otherChain: HeaderChain,
                                                  startHeader: Header,
-                                                 limit: Int): (EncryHeaderChain, EncryHeaderChain) = {
+                                                 limit: Int): (HeaderChain, HeaderChain) = {
     def until(h: Header): Boolean = otherChain.exists(_.id sameElements h.id)
 
-    val currentChain: EncryHeaderChain = headerChainBack(limit, startHeader, until)
+    val currentChain: HeaderChain = headerChainBack(limit, startHeader, until)
     (currentChain, otherChain.takeAfter(currentChain.head))
   }
 

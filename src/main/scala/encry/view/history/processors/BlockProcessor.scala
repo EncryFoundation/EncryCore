@@ -5,7 +5,7 @@ import encry.consensus.History.ProgressInfo
 import encry.consensus.ModifierSemanticValidity.Invalid
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.{Header, EncryHeaderChain}
+import encry.modifiers.history.block.header.{Header, HeaderChain}
 import encry.utils.Logging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
@@ -21,7 +21,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   protected def getBlock(h: Header): Option[EncryBlock]
 
   protected def commonBlockThenSuffixes(header1: Header,
-                                        header2: Header): (EncryHeaderChain, EncryHeaderChain)
+                                        header2: Header): (HeaderChain, HeaderChain)
 
   protected[history] def continuationHeaderChains(header: Header,
                                                   filterCond: Header => Boolean): Seq[Seq[Header]]
@@ -57,7 +57,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       if bestBlockOpt.nonEmpty && isBetterBlock(fullBlock) =>
 
       val prevBest: EncryBlock = bestBlockOpt.get
-      val (prevChain: EncryHeaderChain, newChain: EncryHeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
+      val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
       val toRemove: Seq[EncryBlock] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[EncryBlock] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
