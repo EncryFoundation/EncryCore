@@ -14,20 +14,23 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 
 class WalletStorageHolder extends Actor {
 
-  var buffer = Set.empty[EncryBaseBox]
+  var buffer = Seq.empty[EncryBaseBox]
 
-  system.scheduler.schedule(0 second, 15 second) {
+  system.scheduler.schedule(10 second, 120 second) {
     system.actorSelection("user/nodeViewHolder") !
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Seq[EncryBaseBox]] {
         _.vault.walletStorage.allBoxes }
   }
 
-  system.scheduler.schedule(5 second, 15 second) {
-    println(buffer.size)
+  system.scheduler.schedule(15 second, 125 second) {
+    //println(buffer.size)
   }
 
   override def receive: Receive = {
-    case GetAllBoxes() => sender() ! buffer.toSeq
-    case seq: Seq[EncryBaseBox] => buffer ++= seq
+    case GetAllBoxes() =>
+      val a: Seq[EncryBaseBox] = buffer.takeRight(900)
+      sender() ! a
+      buffer = buffer.dropRight(900)
+    case seq: Seq[EncryBaseBox] => buffer = seq
   }
 }

@@ -54,7 +54,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
       txs.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, tx) =>
         t.flatMap { _ =>
           val res: Try[Unit] = validate(tx, allowedOutputDelta)
-          if (res.isFailure) println(s"transaction denied $res, ${tx.timestamp} ${tx.id}")
+          //if (res.isFailure) println(s"transaction denied $res, ${tx.timestamp} ${tx.id}")
           res.flatMap { _ =>
             extractStateChanges(tx).operations.map(ADProofs.toModification)
               .foldLeft[Try[Option[ADValue]]](Success(None)) { case (tIn, m) =>
@@ -155,7 +155,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, rootHash)
 
       val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap{input => val a: Option[ADValue] = persistentProver.unauthenticatedLookup(input.boxId)
-      if(a.isEmpty) println("non valid")
+      //if(a.isEmpty) println("non valid")
       a
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, input.boxId.head))
         .map(_.toOption -> input)}.foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
