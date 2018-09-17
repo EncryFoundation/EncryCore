@@ -69,7 +69,9 @@ class Miner extends Actor with Logging {
         case Some(candidateBlock) =>
           logInfo(s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
           context.children.foreach(_ ! NextChallenge(candidateBlock))
-        case None => produceCandidate()
+        case None =>
+          logInfo("Candidate is empty! Producing new candidate!")
+          produceCandidate()
       }
     case DisableMining if context.children.nonEmpty =>
       logInfo("Received DisableMining msg")
@@ -90,7 +92,9 @@ class Miner extends Actor with Logging {
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
-    case Heartbeat => logInfo(s"Mining enabled! Current cond opt: ${candidateOpt.map(_.asJson).getOrElse("No cond opt!")}")
+    case Heartbeat =>
+      logInfo(s"Mining enabled! Current cond opt: ${candidateOpt.map(_.asJson).getOrElse("No cond opt!")}")
+      if (candidateOpt.isEmpty) self ! StartMining
     case _ =>
   }
 
@@ -192,6 +196,7 @@ class Miner extends Actor with Logging {
       val producingStartTime: Time = System.currentTimeMillis()
       startTime = producingStartTime
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
+      logInfo(s"Best header during block creation is: ${bestHeaderOpt.asJson}")
       bestHeaderOpt match {
         case Some(h) => logInfo(s"Best header at height ${h.height}")
         case None => logInfo(s"No best header opt")
@@ -199,9 +204,9 @@ class Miner extends Actor with Logging {
       val candidate: CandidateEnvelope =
         if ((bestHeaderOpt.isDefined && (syncingDone || view.history.isFullChainSynced)) || settings.node.offlineGeneration) {
           logInfo(s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
-          if (settings.node.sendStat) context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
+          if (settings.node.sendStat) system.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
           val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
-          if (settings.node.sendStat) context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
+          if (settings.node.sendStat) system.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
           envelope
         } else CandidateEnvelope.empty
       candidate
