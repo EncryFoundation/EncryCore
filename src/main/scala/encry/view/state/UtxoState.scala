@@ -10,7 +10,7 @@ import encry.consensus.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.Header
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.mempool.Transaction.TransactionValidationException
 import encry.modifiers.state.StateModifierDeserializer
@@ -108,7 +108,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         Failure(e)
       }
 
-    case header: EncryBlockHeader =>
+    case header: Header =>
       Success(new UtxoState(persistentProver, VersionTag !@@ header.id, height, stateStore, lastBlockTimestamp, nodeViewHolderRef))
 
     case _ => Failure(new Exception("Got Modifier of unknown type."))

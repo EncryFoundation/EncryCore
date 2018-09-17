@@ -3,7 +3,7 @@ package encry.modifiers.history.block
 import com.google.common.primitives.{Bytes, Ints}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
+import encry.modifiers.history.block.header.{Header, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.directive.TransferDirective
@@ -15,7 +15,7 @@ import org.encryfoundation.common.serialization.Serializer
 import scorex.crypto.encode.Base16
 import scala.util.Try
 
-case class EncryBlock(override val header: EncryBlockHeader,
+case class EncryBlock(override val header: Header,
                       override val payload: EncryBlockPayload,
                       adProofsOpt: Option[ADProofs]) extends EncryBaseBlock with ModifierValidator {
 
@@ -93,7 +93,7 @@ object EncryBlockSerializer extends Serializer[EncryBlock] {
   override def parseBytes(bytes: Array[Byte]): Try[EncryBlock] = Try{
     var pointer: Int = 4
     val headerSize: Int = Ints.fromByteArray(bytes.slice(0, pointer))
-    val header: Try[EncryBlockHeader] = EncryBlockHeaderSerializer.parseBytes(bytes.slice(pointer, pointer + headerSize))
+    val header: Try[Header] = EncryBlockHeaderSerializer.parseBytes(bytes.slice(pointer, pointer + headerSize))
     pointer += headerSize
     val payloadSize: Int = Ints.fromByteArray(bytes.slice(pointer, pointer + 4))
     val payload: Try[EncryBlockPayload] = EncryBlockPayloadSerializer.parseBytes(bytes.slice(pointer + 4, pointer + 4 + payloadSize))

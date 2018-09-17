@@ -1,7 +1,7 @@
 package encry.modifiers.history
 
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
+import encry.modifiers.history.block.header.{Header, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import org.encryfoundation.common.serialization.Serializer
 import scala.util.{Failure, Try}
@@ -9,8 +9,8 @@ import scala.util.{Failure, Try}
 object HistoryModifierSerializer extends Serializer[EncryPersistentModifier] {
 
   override def toBytes(obj: EncryPersistentModifier): Array[Byte] = obj match {
-    case m: EncryBlockHeader =>
-      EncryBlockHeader.modifierTypeId +: EncryBlockHeaderSerializer.toBytes(m)
+    case m: Header =>
+      Header.modifierTypeId +: EncryBlockHeaderSerializer.toBytes(m)
     case m: ADProofs =>
       ADProofs.modifierTypeId +: ADProofSerializer.toBytes(m)
     case m: EncryBlockPayload =>
@@ -21,7 +21,7 @@ object HistoryModifierSerializer extends Serializer[EncryPersistentModifier] {
 
   override def parseBytes(bytes: Array[Byte]): Try[EncryPersistentModifier] =
     Try(bytes.head).flatMap {
-      case EncryBlockHeader.`modifierTypeId` =>
+      case Header.`modifierTypeId` =>
         EncryBlockHeaderSerializer.parseBytes(bytes.tail)
       case ADProofs.`modifierTypeId` =>
         ADProofSerializer.parseBytes(bytes.tail)

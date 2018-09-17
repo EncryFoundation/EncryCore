@@ -3,7 +3,7 @@ package encry.view.wallet
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.Header
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.{AssetBox, MonetaryBox}
@@ -64,7 +64,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val txsQty: Int = 4
 
-    val blockHeader: EncryBlockHeader = genHeader
+    val blockHeader: Header = genHeader
 
     val walletStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
 

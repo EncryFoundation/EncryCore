@@ -1,6 +1,6 @@
 package encry.modifiers.history.block
 
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.Header
 import encry.modifiers.history.block.payload.EncryBaseBlockPayload
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.EncryProposition
@@ -11,7 +11,7 @@ trait EncryBaseBlock
   extends TransactionsCarryingPersistentNodeViewModifier[EncryProposition, Transaction]
     with EncryPersistentModifier {
 
-  val header: EncryBlockHeader
+  val header: Header
 
   val payload: EncryBaseBlockPayload
 

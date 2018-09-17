@@ -9,7 +9,7 @@ import com.zaxxer.hikari.HikariDataSource
 import encry.EncryApp.settings
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.{EncryBlockHeader, HeaderDBVersion}
+import encry.modifiers.history.block.header.{Header, HeaderDBVersion}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, TransactionDBVersion}
 import encry.utils.Logging
@@ -23,7 +23,7 @@ class DBService extends Logging {
 
   def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] = runAsync(markAsRemovedFromMainChainQuery(ids))
 
-  def processOrphanedHeader(header: EncryBlockHeader): Future[Int] = runAsync(insertOrphanedHeaderQuery(header))
+  def processOrphanedHeader(header: Header): Future[Int] = runAsync(insertOrphanedHeaderQuery(header))
 
   def selectHeight: Future[Int] = runAsync(heightQuery)
 

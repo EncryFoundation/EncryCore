@@ -8,7 +8,7 @@ import encry.consensus.{CandidateBlock, EncrySupplyController}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.Header
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.network.DeliveryManager.FullBlockChainSynced
@@ -137,7 +137,7 @@ class Miner extends Actor with Logging {
   }
 
   def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool],
-                      bestHeaderOpt: Option[EncryBlockHeader]): CandidateBlock = {
+                      bestHeaderOpt: Option[Header]): CandidateBlock = {
     val timestamp: Time = timeProvider.estimatedTime
     val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
 
@@ -184,7 +184,7 @@ class Miner extends Actor with Logging {
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
       val producingStartTime: Time = System.currentTimeMillis()
       startTime = producingStartTime
-      val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
+      val bestHeaderOpt: Option[Header] = view.history.bestBlockOpt.map(_.header)
       bestHeaderOpt match {
         case Some(h) => logInfo(s"Best header at height ${h.height}")
         case None => logInfo(s"No best header opt")

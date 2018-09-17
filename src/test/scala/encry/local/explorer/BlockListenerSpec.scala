@@ -6,7 +6,7 @@ import encry.utils.CoreTaggedTypes.ModifierId
 import encry.local.explorer.BlockListener.{ChainSwitching, NewOrphaned}
 import encry.local.explorer.database.DBService
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.Header
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.Transaction
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
@@ -54,7 +54,7 @@ class BlockListenerSpec extends TestKit(ActorSystem("BlockListenerSpec")) with I
   private trait BlockListenerSpecWiring {
     val dbServiceMock: DBService = mock[DBService]
     val actor: ActorRef = system.actorOf(Props(new BlockListener(dbServiceMock)))
-    val sampleHeader: EncryBlockHeader = genHeader
+    val sampleHeader: Header = genHeader
     val sampleTxs: Seq[Transaction] = genValidPaymentTxs(100)
     val samplePayload: EncryBlockPayload = EncryBlockPayload(sampleHeader.id, sampleTxs)
     val sampleBlock: EncryBlock = EncryBlock(sampleHeader, samplePayload, None)

@@ -5,7 +5,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.Header
 import encry.modifiers.mempool.Transaction
 import encry.settings.{Constants, NodeSettings}
 import encry.utils.Logging
@@ -64,7 +64,7 @@ class DigestState protected(override val version: VersionTag,
       logInfo(s"Got new full block with id ${block.encodedId} with root ${Algos.encoder.encode(block.header.stateRoot)}")
       this.validate(block).flatMap(_ => update(VersionTag !@@ block.header.id, block.header.stateRoot))
 
-    case header: EncryBlockHeader if !settings.verifyTransactions =>
+    case header: Header if !settings.verifyTransactions =>
       logInfo(s"Got new Header ${header.encodedId} with root ${Algos.encoder.encode(header.stateRoot)}")
       update(VersionTag !@@ header.id, header.stateRoot)
 

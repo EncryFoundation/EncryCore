@@ -9,7 +9,7 @@ import doobie.postgres.implicits._
 import doobie.implicits._
 import doobie.util.log.{ExecFailure, LogHandler, ProcessingFailure, Success}
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.{EncryBlockHeader, HeaderDBVersion}
+import encry.modifiers.history.block.header.{Header, HeaderDBVersion}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.utils.Logging
@@ -44,7 +44,7 @@ protected[database] object QueryRepository extends Logging {
     Update[HeaderDBVersion](query).run(headerDB)
   }
 
-  def insertOrphanedHeaderQuery(header: EncryBlockHeader): ConnectionIO[Int] = {
+  def insertOrphanedHeaderQuery(header: Header): ConnectionIO[Int] = {
     val headerDB: HeaderDBVersion = HeaderDBVersion(header)
     val query: String =
       """

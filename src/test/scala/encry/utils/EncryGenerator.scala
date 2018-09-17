@@ -4,7 +4,7 @@ import java.io.File
 import akka.actor.ActorRef
 import encry.avltree._
 import encry.crypto.equihash.EquihashSolution
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.Header
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, MonetaryBox}
@@ -112,9 +112,9 @@ trait EncryGenerator {
     }
   }
 
-  def genHeader: EncryBlockHeader = {
+  def genHeader: Header = {
     val random = new scala.util.Random
-    EncryBlockHeader(
+    Header(
       1.toByte,
       ModifierId @@ Random.randomBytes(),
       Digest32 @@ Random.randomBytes(),

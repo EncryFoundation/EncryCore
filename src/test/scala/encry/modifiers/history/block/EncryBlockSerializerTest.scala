@@ -3,7 +3,7 @@ package encry.modifiers.history.block
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.Header
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.Constants
@@ -18,7 +18,7 @@ class EncryBlockSerializerTest extends FunSuite with EncryGenerator {
 
   test("testToBytes $ testFromBytes") {
 
-    val blockHeader = EncryBlockHeader(
+    val blockHeader = Header(
       99: Byte,
       ModifierId @@ Random.randomBytes(),
       Digest32 @@ Random.randomBytes(),

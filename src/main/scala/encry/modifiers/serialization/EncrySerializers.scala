@@ -1,6 +1,6 @@
 package encry.modifiers.serialization
 
-import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
+import encry.modifiers.history.block.header.{Header, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
@@ -64,7 +64,7 @@ class EncryHeaderSerializer extends AkkaSerializer {
   override def identifier: Int = 44
 
   override def toBinary(o: AnyRef): Array[Byte] = o match {
-    case h: EncryBlockHeader => EncryBlockHeaderSerializer.toBytes(h)
+    case h: Header => EncryBlockHeaderSerializer.toBytes(h)
     case _ => throw new IllegalArgumentException
   }
 

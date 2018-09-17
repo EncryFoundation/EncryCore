@@ -4,7 +4,7 @@ import akka.persistence._
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp._
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.Header
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
@@ -18,7 +18,7 @@ import scala.language.postfixOps
 class ModifiersHolder extends PersistentActor with Logging {
 
   var stat: Statistics = Statistics(0, 0, 0, 0, 0, Seq.empty, Seq.empty)
-  var headers: Map[String, (EncryBlockHeader, Int)] = Map.empty
+  var headers: Map[String, (Header, Int)] = Map.empty
   var payloads: Map[String, (EncryBlockPayload, Int)] = Map.empty
   var nonCompletedBlocks: Map[String, String] = Map.empty
   var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
@@ -36,7 +36,7 @@ class ModifiersHolder extends PersistentActor with Logging {
   override def receiveRecover: Receive = if (settings.levelDb.exists(_.enableRestore)) receiveRecoverEnabled else receiveRecoverDisabled
 
   def receiveRecoverEnabled: Receive = {
-    case header: EncryBlockHeader =>
+    case header: Header =>
       updateHeaders(header)
       logDebug(s"Header ${header.height} is recovered from leveldb.")
     case payload: EncryBlockPayload =>
@@ -87,7 +87,7 @@ class ModifiersHolder extends PersistentActor with Logging {
     })
 
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
-    case header: EncryBlockHeader =>
+    case header: Header =>
       if (!headers.contains(Algos.encode(header.id)))
         persist(header) { header =>
           logDebug(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully.")
@@ -113,8 +113,8 @@ class ModifiersHolder extends PersistentActor with Logging {
     case x: Any => logError(s"Strange input $x.")
   }
 
-  def updateHeaders(header: EncryBlockHeader): Unit = {
-    val prevValue: (EncryBlockHeader, Int) = headers.getOrElse(Algos.encode(header.id), (header, -1))
+  def updateHeaders(header: Header): Unit = {
+    val prevValue: (Header, Int) = headers.getOrElse(Algos.encode(header.id), (header, -1))
     headers += Algos.encode(header.id) -> (prevValue._1, prevValue._2 + 1)
     if (!nonCompletedBlocks.contains(Algos.encode(header.payloadId)))
       nonCompletedBlocks += Algos.encode(header.payloadId) -> Algos.encode(header.id)
@@ -169,7 +169,7 @@ object ModifiersHolder {
   }
 
   case object Statistics {
-    def apply(headers: Map[String, (EncryBlockHeader, Int)],
+    def apply(headers: Map[String, (Header, Int)],
               payloads: Map[String, (EncryBlockPayload, Int)],
               nonCompletedBlocks: Map[String, String],
               completedBlocks: SortedMap[Int, EncryBlock]): Statistics =

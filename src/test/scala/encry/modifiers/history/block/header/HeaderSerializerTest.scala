@@ -4,7 +4,7 @@ import encry.utils.EncryGenerator
 import org.scalatest.{Matchers, PropSpec}
 
 
-class EncryBlockHeaderSerializerTest extends PropSpec with Matchers with EncryGenerator{
+class HeaderSerializerTest extends PropSpec with Matchers with EncryGenerator{
 
   property("testToBytes & testParseBytes") {
 

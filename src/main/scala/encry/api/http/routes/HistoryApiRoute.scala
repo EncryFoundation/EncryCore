@@ -6,7 +6,7 @@ import akka.pattern.ask
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
 import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.Header
 import encry.settings.{EncryAppSettings, RESTApiSettings}
 import encry.view.EncryViewReadersHolder.GetDataFromHistory
 import encry.view.history.EncryHistoryReader
@@ -48,7 +48,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
     }
 
   private def getFullBlockByHeaderId(headerId: ModifierId): Future[Option[EncryBlock]] = getHistory.map { history =>
-    history.typedModifierById[EncryBlockHeader](headerId).flatMap(history.getBlock)
+    history.typedModifierById[Header](headerId).flatMap(history.getBlock)
   }
 
   def getBlocksR: Route = (pathEndOrSingleSlash & get & paging) { (offset, limit) => getHeaderIds(offset, limit).okJson() }

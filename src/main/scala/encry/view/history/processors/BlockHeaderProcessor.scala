@@ -8,7 +8,7 @@ import encry.consensus.{ModifierSemanticValidity, _}
 import encry.local.explorer.BlockListener.NewOrphaned
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
+import encry.modifiers.history.block.header.{Header, EncryHeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.history.block.{Block, EncryBlock}
 import encry.settings.Constants._
@@ -30,7 +30,7 @@ trait BlockHeaderProcessor extends Logging {
   protected val timeProvider: NetworkTimeProvider
   private val difficultyController: PowLinearController.type = PowLinearController
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
-  protected val BestHeaderKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(EncryBlockHeader.modifierTypeId))
+  protected val BestHeaderKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(Header.modifierTypeId))
   protected val BestBlockKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(-1))
   protected val historyStorage: HistoryStorage
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(nodeSettings)
@@ -43,7 +43,7 @@ trait BlockHeaderProcessor extends Logging {
     def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] = {
       if (acc.lengthCompare(howMany) >= 0) acc
       else {
-        headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[EncryBlockHeader](id)) match {
+        headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[Header](id)) match {
           case Some(bestHeaderAtThisHeight) =>
             val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
               .filter(m => !excluding.exists(_ sameElements m._2))
@@ -62,7 +62,7 @@ trait BlockHeaderProcessor extends Logging {
   }
 
   /** Checks, whether it's time to download full chain and return toDownload modifiers */
-  protected def toDownload(header: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] =
+  protected def toDownload(header: Header): Seq[(ModifierTypeId, ModifierId)] =
     if (!nodeSettings.verifyTransactions) Seq.empty // Regime that do not download and verify transaction
     else if (header.height >= blockDownloadProcessor.minimalBlockHeight)
       requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
@@ -74,19 +74,19 @@ trait BlockHeaderProcessor extends Logging {
       Seq.empty
     } else Seq.empty
 
-  private def requiredModifiersForHeader(h: EncryBlockHeader): Seq[(ModifierTypeId, ModifierId)] =
+  private def requiredModifiersForHeader(h: Header): Seq[(ModifierTypeId, ModifierId)] =
     if (!nodeSettings.verifyTransactions) Seq.empty
     else if (nodeSettings.stateMode.isDigest)
       Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId))
     else Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
 
-  private def isNewHeader(header: EncryBlockHeader): Boolean =
+  private def isNewHeader(header: Header): Boolean =
     timeProvider.estimatedTime - header.timestamp <
       Constants.Chain.DesiredBlockInterval.toMillis * Constants.Chain.NewHeaderTimeMultiplier
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
-  def realDifficulty(h: EncryBlockHeader): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
+  def realDifficulty(h: Header): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
 
   protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
 
@@ -113,12 +113,12 @@ trait BlockHeaderProcessor extends Logging {
 
   def bestBlockHeight: Int = bestBlockIdOpt.flatMap(id => heightOf(id)).getOrElse(Constants.Chain.PreGenesisHeight)
 
-  protected def process(h: EncryBlockHeader): ProgressInfo[EncryPersistentModifier] = getHeaderInfoUpdate(h) match {
+  protected def process(h: Header): ProgressInfo[EncryPersistentModifier] = getHeaderInfoUpdate(h) match {
     case Some(dataToUpdate) =>
       historyStorage.bulkInsert(ByteArrayWrapper(h.id), dataToUpdate._1, Seq(dataToUpdate._2))
       bestHeaderIdOpt match {
         case Some(bestHeaderId) =>
-          val toProcess: Seq[EncryBlockHeader] =
+          val toProcess: Seq[Header] =
             if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
           ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
         case None =>
@@ -128,7 +128,7 @@ trait BlockHeaderProcessor extends Logging {
     case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
 
-  private def getHeaderInfoUpdate(h: EncryBlockHeader):
+  private def getHeaderInfoUpdate(h: Header):
   Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier)] = {
     val difficulty: Difficulty = h.difficulty
     if (h.isGenesis) {
@@ -164,11 +164,11 @@ trait BlockHeaderProcessor extends Logging {
 
   /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
     * header ids at this height */
-  private def bestBlockHeaderIdsRow(h: EncryBlockHeader): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
+  private def bestBlockHeaderIdsRow(h: Header): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
     val self: (ByteArrayWrapper, ByteArrayWrapper) =
       heightIdsKey(h.height) -> ByteArrayWrapper((Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray)
-    val parentHeaderOpt: Option[EncryBlockHeader] = typedModifierById[EncryBlockHeader](h.parentId)
-    val forkHeaders: Seq[EncryBlockHeader] = parentHeaderOpt.toSeq
+    val parentHeaderOpt: Option[Header] = typedModifierById[Header](h.parentId)
+    val forkHeaders: Seq[Header] = parentHeaderOpt.toSeq
       .flatMap(parent => headerChainBack(h.height, parent, h => isInBestChain(h)).headers)
       .filter(h => !isInBestChain(h))
     val forkIds: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = forkHeaders.map { header =>
@@ -179,14 +179,14 @@ trait BlockHeaderProcessor extends Logging {
   }
 
   /** Row to storage, that put this orphaned block id to the end of header ids at this height */
-  private def orphanedBlockHeaderIdsRow(h: EncryBlockHeader, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
+  private def orphanedBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
     logInfo(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
     Seq(heightIdsKey(h.height) -> ByteArrayWrapper((headerIdsAtHeight(h.height) :+ h.id).flatten.toArray))
   }
 
-  protected def validate(header: EncryBlockHeader): Try[Unit] = HeaderValidator.validate(header).toTry
+  protected def validate(header: Header): Try[Unit] = HeaderValidator.validate(header).toTry
 
-  protected def reportInvalid(header: EncryBlockHeader): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
+  protected def reportInvalid(header: Header): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
     val payloadModifiers: Seq[ByteArrayWrapper] =
       Seq(header.payloadId, header.adProofsId).filter(id => historyStorage.containsObject(id))
       .map(id => ByteArrayWrapper(id))
@@ -203,7 +203,7 @@ trait BlockHeaderProcessor extends Logging {
   def isInBestChain(id: ModifierId): Boolean = heightOf(id).flatMap(h => bestHeaderIdAtHeight(h))
     .exists(_ sameElements id)
 
-  def isInBestChain(h: EncryBlockHeader): Boolean = bestHeaderIdAtHeight(h.height).exists(_ sameElements h.id)
+  def isInBestChain(h: Header): Boolean = bestHeaderIdAtHeight(h.height).exists(_ sameElements h.id)
 
   private def bestHeaderIdAtHeight(h: Int): Option[ModifierId] = headerIdsAtHeight(h).headOption
 
@@ -230,13 +230,13 @@ trait BlockHeaderProcessor extends Logging {
     * @return at most limit header back in history starting from startHeader and when condition until is not satisfied
     *         Note now it includes one header satisfying until condition!
     */
-  protected def headerChainBack(limit: Int, startHeader: EncryBlockHeader,
-                                until: EncryBlockHeader => Boolean): EncryHeaderChain = {
+  protected def headerChainBack(limit: Int, startHeader: Header,
+                                until: Header => Boolean): EncryHeaderChain = {
     @tailrec
-    def loop(header: EncryBlockHeader, acc: Seq[EncryBlockHeader]): Seq[EncryBlockHeader] = {
+    def loop(header: Header, acc: Seq[Header]): Seq[Header] = {
       if (acc.length == limit || until(header)) acc
-      else typedModifierById[EncryBlockHeader](header.parentId) match {
-        case Some(parent: EncryBlockHeader) => loop(parent, acc :+ parent)
+      else typedModifierById[Header](header.parentId) match {
+        case Some(parent: Header) => loop(parent, acc :+ parent)
         case None if acc.contains(header) => acc
         case _ => acc :+ header
       }
@@ -254,22 +254,22 @@ trait BlockHeaderProcessor extends Logging {
     * @return found header
     */
   @tailrec
-  protected final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[EncryBlockHeader] = {
-    headerIdsAtHeight(height).find(id => p(id)).flatMap(id => typedModifierById[EncryBlockHeader](id)) match {
+  protected final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = {
+    headerIdsAtHeight(height).find(id => p(id)).flatMap(id => typedModifierById[Header](id)) match {
       case Some(header) => Some(header)
       case None if height > Constants.Chain.GenesisHeight => loopHeightDown(height - 1, p)
       case None => None
     }
   }
 
-  def requiredDifficultyAfter(parent: EncryBlockHeader): Difficulty = {
+  def requiredDifficultyAfter(parent: Header): Difficulty = {
     val parentHeight: Block.Height = parent.height
     val requiredHeights: Seq[Height] =
       difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
         .ensuring(_.last == parentHeight, "Incorrect heights sequence!")
     val chain: EncryHeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1,
-      parent, (_: EncryBlockHeader) => false)
-    val requiredHeaders: immutable.IndexedSeq[(Int, EncryBlockHeader)] = (requiredHeights.min to requiredHeights.max)
+      parent, (_: Header) => false)
+    val requiredHeaders: immutable.IndexedSeq[(Int, Header)] = (requiredHeights.min to requiredHeights.max)
       .zip(chain.headers).filter(p => requiredHeights.contains(p._1))
     assert(requiredHeights.length == requiredHeaders.length,
       s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}")
@@ -278,15 +278,15 @@ trait BlockHeaderProcessor extends Logging {
 
   object HeaderValidator extends ModifierValidator {
 
-    def validate(header: EncryBlockHeader): ValidationResult =
+    def validate(header: Header): ValidationResult =
       if (header.isGenesis) validateGenesisBlockHeader(header)
-      else typedModifierById[EncryBlockHeader](header.parentId).map { parent =>
+      else typedModifierById[Header](header.parentId).map { parent =>
         validateChildBlockHeader(header, parent)
       } getOrElse error(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
 
-    private def validateGenesisBlockHeader(header: EncryBlockHeader): ValidationResult =
+    private def validateGenesisBlockHeader(header: Header): ValidationResult =
       accumulateErrors
-        .validateEqualIds(header.parentId, EncryBlockHeader.GenesisParentId) { detail =>
+        .validateEqualIds(header.parentId, Header.GenesisParentId) { detail =>
           fatal(s"Genesis block should have genesis parent id. $detail")
         }
         .validate(bestHeaderIdOpt.isEmpty) {
@@ -297,7 +297,7 @@ trait BlockHeaderProcessor extends Logging {
         }
         .result
 
-    private def validateChildBlockHeader(header: EncryBlockHeader, parent: EncryBlockHeader): ValidationResult = {
+    private def validateChildBlockHeader(header: Header, parent: Header): ValidationResult = {
       failFast
         .validate(header.timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift) {
           error(s"Header timestamp ${header.timestamp} is too far in future from now ${timeProvider.estimatedTime}")

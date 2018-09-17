@@ -23,22 +23,22 @@ import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
 import scala.util.Try
 
-case class EncryBlockHeader(override val version: Version,
-                            override val parentId: ModifierId,
-                            override val adProofsRoot: Digest32,
-                            override val stateRoot: ADDigest, // 32 bytes + 1 (tree height)
-                            override val transactionsRoot: Digest32,
-                            override val timestamp: Timestamp,
-                            override val height: Height,
-                            nonce: Long,
-                            difficulty: Difficulty,
-                            equihashSolution: EquihashSolution) extends EncryBaseBlockHeader {
+case class Header(version: Version,
+                  override val parentId: ModifierId,
+                  adProofsRoot: Digest32,
+                  stateRoot: ADDigest, // 32 bytes + 1 (tree height)
+                  transactionsRoot: Digest32,
+                  timestamp: Timestamp,
+                  height: Height,
+                  nonce: Long,
+                  difficulty: Difficulty,
+                  equihashSolution: EquihashSolution) extends EncryPersistentModifier {
 
-  import EncryBlockHeader._
+  import Header._
 
-  override type M = EncryBlockHeader
+  override type M = Header
 
-  override val modifierTypeId: ModifierTypeId = EncryBlockHeader.modifierTypeId
+  override val modifierTypeId: ModifierTypeId = Header.modifierTypeId
 
   lazy val powHash: Digest32 = getPowHash(this)
 
@@ -85,10 +85,10 @@ case class HeaderDBVersion(id: String,
                            feesTotal: Long,
                            txsSize: Int,
                            bestChain: Boolean) {
-  def toHeader: Try[EncryBlockHeader] = {
+  def toHeader: Try[Header] = {
     (Base16.decode(parentId), Base16.decode(proofsRoot), Base16.decode(stateRoot), Base16.decode(transactionsRoot)).mapN {
       case (decodedParentId, decodedProofsRoot, decodedStateRoot, decodeTxRoot) =>
-        EncryBlockHeader(
+        Header(
           version,
           ModifierId @@ decodedParentId,
           Digest32 @@ decodedProofsRoot,
@@ -130,7 +130,7 @@ object HeaderDBVersion {
     )
   }
 
-  def apply(header: EncryBlockHeader): HeaderDBVersion = {
+  def apply(header: Header): HeaderDBVersion = {
     HeaderDBVersion(
       Base16.encode(header.id),
       Base16.encode(header.parentId),
@@ -161,13 +161,13 @@ object HeaderDBVersion {
 
 }
 
-object EncryBlockHeader {
+object Header {
 
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (101: Byte)
 
   lazy val GenesisParentId: ModifierId = ModifierId @@ Array.fill(Constants.DigestLength)(0: Byte)
 
-  implicit val jsonEncoder: Encoder[EncryBlockHeader] = (h: EncryBlockHeader) => Map(
+  implicit val jsonEncoder: Encoder[Header] = (h: Header) => Map(
     "id" -> Algos.encode(h.id).asJson,
     "hash" -> Base16.encode(h.id).asJson,
     "parentId" -> Algos.encode(h.parentId).asJson,
@@ -179,7 +179,7 @@ object EncryBlockHeader {
     "difficulty" -> h.difficulty.toString.asJson,
   ).asJson
 
-  def getPowHash(header: EncryBlockHeader): Digest32 = {
+  def getPowHash(header: Header): Digest32 = {
     val digest: Blake2bDigest = new Blake2bDigest(256)
     val bytes: Array[Byte] = EncryBlockHeaderSerializer.bytesWithoutPow(header)
     digest.update(bytes, 0, bytes.length)
@@ -197,9 +197,9 @@ object EncryBlockHeader {
   }
 }
 
-object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
+object EncryBlockHeaderSerializer extends Serializer[Header] {
 
-  def bytesWithoutPow(h: EncryBlockHeader): Array[Byte] =
+  def bytesWithoutPow(h: Header): Array[Byte] =
     Bytes.concat(
       Array(h.version),
       h.parentId,
@@ -211,7 +211,7 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
       h.difficulty.toByteArray,
       Ints.toByteArray(h.height))
 
-  override def toBytes(obj: EncryBlockHeader): Array[Byte] =
+  override def toBytes(obj: Header): Array[Byte] =
     Bytes.concat(
       Array(obj.version),
       obj.parentId,
@@ -226,7 +226,7 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
       obj.equihashSolution.bytes
     )
 
-  override def parseBytes(bytes: Array[Byte]): Try[EncryBlockHeader] = Try {
+  override def parseBytes(bytes: Array[Byte]): Try[Header] = Try {
     val version: Version = bytes.head
     val parentId: ModifierId = ModifierId @@ bytes.slice(1, 33)
     val adProofsRoot: Digest32 = Digest32 @@ bytes.slice(33, 65)
@@ -237,8 +237,9 @@ object EncryBlockHeaderSerializer extends Serializer[EncryBlockHeader] {
     val nonce: Long = Longs.fromByteArray(bytes.slice(142, 150))
     val diificultySize: Int = Ints.fromByteArray(bytes.slice(150, 154))
     val difficulty: Difficulty = Difficulty @@ BigInt(bytes.slice(154, 154 + diificultySize))
-    val equihashSolution: EquihashSolution = EquihashSolutionsSerializer.parseBytes(bytes.slice(154 + diificultySize, bytes.length)).get
+    val equihashSolution: EquihashSolution =
+      EquihashSolutionsSerializer.parseBytes(bytes.slice(154 + diificultySize, bytes.length)).get
 
-    EncryBlockHeader(version, parentId, adProofsRoot, stateRoot, txsRoot, timestamp, height, nonce, difficulty, equihashSolution)
+    Header(version, parentId, adProofsRoot, stateRoot, txsRoot, timestamp, height, nonce, difficulty, equihashSolution)
   }
 }

@@ -1,6 +1,6 @@
 package encry.view.history.processors
 
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.Header
 import encry.settings.{Constants, NodeSettings}
 
 /** Class that keeps and calculates minimal height for full blocks starting from which we need to download these full
@@ -17,12 +17,12 @@ case class BlockDownloadProcessor(nodeSettings: NodeSettings) {
     *
     * @param header - header of new best full block
     * @return minimal height to process best full block */
-  def updateBestBlock(header: EncryBlockHeader): Int = {
+  def updateBestBlock(header: Header): Int = {
     minimalBlockHeightVar = minimalBlockHeightAfter(header)
     minimalBlockHeightVar
   }
 
-  private def minimalBlockHeightAfter(header: EncryBlockHeader): Int = {
+  private def minimalBlockHeightAfter(header: Header): Int = {
     if (!nodeSettings.verifyTransactions) Int.MaxValue // we do not verify transactions at any height
     else if (minimalBlockHeightVar == Int.MaxValue) {
       // just synced with the headers chain - determine first full block to apply

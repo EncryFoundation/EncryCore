@@ -8,7 +8,7 @@ import akka.actor.Actor
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.block.header.Header
 import encry.stats.StatsSender._
 import encry.view.history
 import encry.stats.LoggingActor.LogMessage
@@ -60,7 +60,7 @@ class StatsSender extends Actor {
     case HeightStatistics(bestHeaderHeight, bestBlockHeight) =>
       influxDB.write(InfluxPort,
         s"chainStat,nodeName=${nodeName} value=$bestHeaderHeight,bestBlockHeight=$bestBlockHeight")
-    case BestHeaderInChain(fb: EncryBlockHeader) =>
+    case BestHeaderInChain(fb: Header) =>
       influxDB.write(InfluxPort, util.Arrays.asList(
         s"difficulty,nodeName=${nodeName} diff=${fb.difficulty.toString},height=${fb.height}",
         s"height,nodeName=${nodeName},header=${Algos.encode(fb.id)} height=${fb.height}",
@@ -73,7 +73,7 @@ class StatsSender extends Actor {
       )
       )
 
-    case MiningEnd(blockHeader: EncryBlockHeader, workerIdx: Int, workersQty: Int) =>
+    case MiningEnd(blockHeader: Header, workerIdx: Int, workersQty: Int) =>
       timeProvider
         .time()
         .map { time =>
@@ -140,11 +140,11 @@ object StatsSender {
 
   case class EndOfApplyingModif(modifierId: ModifierId)
 
-  case class MiningEnd(blockHeader: EncryBlockHeader, workerIdx: Int, workersQty: Int)
+  case class MiningEnd(blockHeader: Header, workerIdx: Int, workersQty: Int)
 
   case class MiningTime(time: Long)
 
-  case class BestHeaderInChain(bestHeader: EncryBlockHeader)
+  case class BestHeaderInChain(bestHeader: Header)
 
   case class SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
 
