@@ -18,7 +18,7 @@ trait Directive extends BytesSerializable {
 
   def boxes(digest: Digest32, idx: Int): Seq[EncryBaseBox]
 
-  def toDbVersion(txId: ModifierId): DirectiveDBVersion
+  def toDbVersion(txId: ModifierId, numberInTx: Int): DirectiveDBVersion
 }
 
 object Directive {
@@ -48,6 +48,7 @@ object Directive {
 }
 
 case class DirectiveDBVersion(txId: String,
+                              numberInTx: Int,
                               dTypeId: DTypeId,
                               isValid: Boolean,
                               contractHash: String,
