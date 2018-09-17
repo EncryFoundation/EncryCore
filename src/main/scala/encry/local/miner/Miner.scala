@@ -204,9 +204,9 @@ class Miner extends Actor with Logging {
       val candidate: CandidateEnvelope =
         if ((bestHeaderOpt.isDefined && (syncingDone || view.history.isFullChainSynced)) || settings.node.offlineGeneration) {
           logInfo(s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
-          if (settings.node.sendStat) system.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
+          if (settings.node.sendStat) context.actorSelection("/user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
           val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
-          if (settings.node.sendStat) system.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
+          if (settings.node.sendStat) context.actorSelection("/user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
           envelope
         } else CandidateEnvelope.empty
       candidate
