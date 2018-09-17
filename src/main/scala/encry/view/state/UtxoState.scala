@@ -54,7 +54,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
       txs.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, tx) =>
         t.flatMap { _ =>
           val res: Try[Unit] = validate(tx, allowedOutputDelta)
-          //if (res.isFailure) println(s"transaction denied $res, ${tx.timestamp} ${tx.id}")
+          if (res.isFailure) println(s"transaction denied $res, ${tx.timestamp} ${tx.id}")
           res.flatMap { _ =>
             extractStateChanges(tx).operations.map(ADProofs.toModification)
               .foldLeft[Try[Option[ADValue]]](Success(None)) { case (tIn, m) =>
@@ -125,7 +125,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
       throw new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}")
     persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
   }.flatten.recoverWith[(SerializedAdProof, ADDigest)] { case e =>
-    logWarn(s"Failed to generate ADProof cause $e")
+    println(s"Failed to generate ADProof cause $e")
     Failure(e)
   }
 
@@ -155,7 +155,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, rootHash)
 
       val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap{input => val a: Option[ADValue] = persistentProver.unauthenticatedLookup(input.boxId)
-      //if(a.isEmpty) println("non valid")
+      if(a.isEmpty) println("non valid")
       a
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, input.boxId.head))
         .map(_.toOption -> input)}.foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
@@ -187,7 +187,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         }
       }
 
-      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx"); //println(s"non valid transaction! Non-positive balance in $tx")
+      if (!validBalance) println(s"non valid transaction! Non-positive balance in $tx")//throw TransactionValidationException(s"Non-positive balance in $tx");
     }
 
   def isValid(tx: Transaction, allowedOutputDelta: Amount = 0L): Boolean = validate(tx, allowedOutputDelta).isSuccess
