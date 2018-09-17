@@ -33,7 +33,7 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   override def preStart(): Unit = logInfo(s"ModifiersHolder actor is started.")
 
-  override def receiveRecover: Receive = if (settings.levelDb.enableRestore) receiveRecoverEnabled else receiveRecoverDisabled
+  override def receiveRecover: Receive = if (settings.levelDb.exists(_.enableRestore)) receiveRecoverEnabled else receiveRecoverDisabled
 
   def receiveRecoverEnabled: Receive = {
     case header: EncryBlockHeader =>
@@ -64,8 +64,13 @@ class ModifiersHolder extends PersistentActor with Logging {
       }
       else context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
     case SendBlocks =>
-      val blocksToSend: Seq[EncryBlock] = completedBlocks.take(settings.levelDb.batchSize).values.toSeq
-      completedBlocks = completedBlocks.drop(settings.levelDb.batchSize)
+      val blocksToSend: Seq[EncryBlock] = completedBlocks.take(settings.levelDb
+        .map(_.batchSize)
+        .getOrElse(throw new RuntimeException("batchsize not specified"))).values.toSeq
+
+      completedBlocks = completedBlocks.drop(settings.levelDb
+        .map(_.batchSize)
+        .getOrElse(throw new RuntimeException("batchsize not specified")))
       nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend)
 
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
