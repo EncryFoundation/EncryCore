@@ -22,10 +22,6 @@ class WalletStorageHolder extends Actor {
         _.vault.walletStorage.allBoxes }
   }
 
-  system.scheduler.schedule(15 second, 125 second) {
-    //println(buffer.size)
-  }
-
   override def receive: Receive = {
     case GetAllBoxes() =>
       val a: Seq[EncryBaseBox] = buffer.takeRight(900)
