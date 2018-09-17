@@ -2,9 +2,8 @@ package encry.view.wallet
 
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.InstanceFactory
-import encry.modifiers.history.block.Block
-import encry.modifiers.history.block.header.Header
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.{Block, Header}
+import encry.modifiers.history.block.payload.Payload
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.{AssetBox, MonetaryBox}
 import encry.settings.{Constants, EncryAppSettings}
@@ -43,11 +42,11 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
       }
     }
 
-    val blockPayload: EncryBlockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
+    val blockPayload: Payload = Payload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
 
     val firstBlock: Block = Block(genHeader, blockPayload, None)
 
-    val blockPayloadWithSpentTx: EncryBlockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), Seq(spentTx))
+    val blockPayloadWithSpentTx: Payload = Payload(ModifierId @@ Array.fill(32)(19: Byte), Seq(spentTx))
 
     val secondBlock: Block = Block(genHeader, blockPayloadWithSpentTx, None)
 
@@ -76,7 +75,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val validTxs: Seq[Transaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.mandatoryAccount.publicImage.address.address)
 
-    val blockPayload: EncryBlockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
+    val blockPayload: Payload = Payload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
 
     val block: Block = Block(blockHeader, blockPayload, None)
 

@@ -1,6 +1,6 @@
 package encry.view.history.processors
 
-import encry.modifiers.history.block.header.Header
+import encry.modifiers.history.Header
 import encry.settings.{Constants, NodeSettings}
 
 /** Class that keeps and calculates minimal height for full blocks starting from which we need to download these full

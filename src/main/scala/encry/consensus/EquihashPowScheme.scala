@@ -4,17 +4,16 @@ import com.google.common.primitives.Chars
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.crypto.equihash.{Equihash, EquihashSolution}
-import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.Block
-import encry.modifiers.history.block.header.Header
-import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.history.block.Block.Version
+import encry.modifiers.history.{ADProofs, Block, Header}
+import encry.modifiers.history.block.payload.Payload
+import encry.modifiers.history.Block.Version
 import encry.modifiers.mempool.Transaction
 import encry.settings.Constants
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.SerializedAdProof
 import scorex.crypto.hash.Digest32
+
 import scala.annotation.tailrec
 import scala.math.BigInt
 
@@ -70,7 +69,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
     possibleHeader.flatMap(header => {
       if (verify(header)) {
         val adProofs = ADProofs(header.id, candidateBlock.adProofBytes)
-        val payload = EncryBlockPayload(header.id, candidateBlock.transactions)
+        val payload = Payload(header.id, candidateBlock.transactions)
         Some(Block(header, payload, Some(adProofs)))
       } else None
     })
@@ -91,7 +90,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
     val version: Version = Constants.Chain.Version
     val parentId: ModifierId = parentOpt.map(_.id).getOrElse(Header.GenesisParentId)
     val adProofsRoot: Digest32 = ADProofs.proofDigest(adProofBytes)
-    val txsRoot: Digest32 = EncryBlockPayload.rootHash(transactions.map(_.id))
+    val txsRoot: Digest32 = Payload.rootHash(transactions.map(_.id))
     val height: Int = parentOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1
 
     (version, parentId, adProofsRoot, txsRoot, height)

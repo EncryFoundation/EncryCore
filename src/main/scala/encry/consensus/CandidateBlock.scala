@@ -1,8 +1,8 @@
 package encry.consensus
 
 import encry.consensus.ConsensusTaggedTypes.Difficulty
-import encry.modifiers.history.block.Block.{Timestamp, Version}
-import encry.modifiers.history.block.header.Header
+import encry.modifiers.history.Block.{Timestamp, Version}
+import encry.modifiers.history.Header
 import encry.modifiers.mempool.Transaction
 import io.circe.Encoder
 import io.circe.syntax._

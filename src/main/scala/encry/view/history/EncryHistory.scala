@@ -1,13 +1,13 @@
 package encry.view.history
 
 import java.io.File
+
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.Block
-import encry.modifiers.history.block.header.{Header, HeaderChain}
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.{ADProofs, Block, Header}
+import encry.modifiers.history.block.header.HeaderChain
+import encry.modifiers.history.block.payload.Payload
 import encry.settings._
 import encry.utils.NetworkTimeProvider
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
@@ -15,6 +15,7 @@ import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStatePro
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.encryfoundation.common.Algos
+
 import scala.util.Try
 
 /** History implementation. It is processing persistent modifiers generated locally or received from the network.
@@ -40,7 +41,7 @@ trait EncryHistory extends EncryHistoryReader {
     Try {
       modifier match {
         case header: Header => (this, process(header))
-        case payload: EncryBlockPayload => (this, process(payload))
+        case payload: Payload => (this, process(payload))
         case adProofs: ADProofs => (this, process(adProofs))
       }
     }
@@ -64,7 +65,7 @@ trait EncryHistory extends EncryHistoryReader {
     case header: Header => Some(header)
     case block: Block => Some(block.header)
     case proof: ADProofs => typedModifierById[Header](proof.headerId)
-    case payload: EncryBlockPayload => typedModifierById[Header](payload.headerId)
+    case payload: Payload => typedModifierById[Header](payload.headerId)
     case _ => None
   }
 

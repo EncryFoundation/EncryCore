@@ -8,13 +8,13 @@ import doobie.Fragments.{in, whereAndOpt}
 import doobie.postgres.implicits._
 import doobie.implicits._
 import doobie.util.log.{ExecFailure, LogHandler, ProcessingFailure, Success}
-import encry.modifiers.history.block.Block
-import encry.modifiers.history.block.header.{Header, HeaderDBVersion}
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.{Block, Header, HeaderDBVersion}
+import encry.modifiers.history.HeaderDBVersion
+import encry.modifiers.history.block.payload.Payload
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.utils.Logging
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, TransactionDBVersion, Transaction}
+import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, Transaction, TransactionDBVersion}
 import scorex.crypto.encode.Base16
 
 protected[database] object QueryRepository extends Logging {
@@ -85,7 +85,7 @@ protected[database] object QueryRepository extends Logging {
     Update[TransactionDBVersion](query).updateMany(txs.toList)
   }
 
-  private def insertInputsQuery(p: EncryBlockPayload): ConnectionIO[Int] = {
+  private def insertInputsQuery(p: Payload): ConnectionIO[Int] = {
     val inputs: Seq[InputDBVersion] = p.transactions.flatMap(InputDBVersion(_))
     val query: String =
       """
@@ -95,7 +95,7 @@ protected[database] object QueryRepository extends Logging {
     Update[InputDBVersion](query).updateMany(inputs.toList)
   }
 
-  private def insertOutputsQuery(p: EncryBlockPayload): ConnectionIO[Int] = {
+  private def insertOutputsQuery(p: Payload): ConnectionIO[Int] = {
     val outputs: Seq[OutputDBVersion] = p.transactions.flatMap(OutputDBVersion(_))
     val query: String =
       """

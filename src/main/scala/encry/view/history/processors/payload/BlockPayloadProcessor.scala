@@ -2,10 +2,8 @@ package encry.view.history.processors.payload
 
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.Block
-import encry.modifiers.history.block.header.Header
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.{ADProofs, Block, Header}
+import encry.modifiers.history.block.payload.Payload
 import encry.view.history.processors.BlockProcessor
 import encry.view.history.storage.HistoryStorage
 
@@ -17,19 +15,19 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
 
   protected val adState: Boolean
 
-  override protected def process(payload: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] =
+  override protected def process(payload: Payload): ProgressInfo[EncryPersistentModifier] =
     getBlockByPayload(payload).map(block => processBlock(block, payload)).getOrElse(putToHistory(payload))
 
-  private def getBlockByPayload(payload: EncryBlockPayload): Option[Block] =
+  private def getBlockByPayload(payload: Payload): Option[Block] =
     typedModifierById[Header](payload.headerId).flatMap { h =>
       if (!adState) Some(Block(h, payload, None))
       else typedModifierById[ADProofs](h.adProofsId).map(ps => Block(h, payload, Some(ps)))
     }
 
-  override protected def validate(m: EncryBlockPayload): Try[Unit] =
+  override protected def validate(m: Payload): Try[Unit] =
     modifierValidation(m, typedModifierById[Header](m.headerId))
 
-  private def putToHistory(payload: EncryBlockPayload): ProgressInfo[EncryPersistentModifier] = {
+  private def putToHistory(payload: Payload): ProgressInfo[EncryPersistentModifier] = {
     historyStorage.insertObjects(Seq(payload))
     ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }

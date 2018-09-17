@@ -1,17 +1,17 @@
 package encry.view.state
 
 import java.io.File
+
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.Block
-import encry.modifiers.history.block.header.Header
+import encry.modifiers.history.{ADProofs, Block, Header}
 import encry.modifiers.mempool.Transaction
 import encry.settings.{Constants, NodeSettings}
 import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+
 import scala.util.{Failure, Success, Try}
 
 /** Minimal state variant which is storing only digest of UTXO authenticated as a dynamic dictionary. */

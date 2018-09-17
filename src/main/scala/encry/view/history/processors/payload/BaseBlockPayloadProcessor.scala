@@ -2,13 +2,13 @@ package encry.view.history.processors.payload
 
 import encry.consensus.History
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.block.payload.Payload
 
 import scala.util.Try
 
 trait  BaseBlockPayloadProcessor {
 
-  protected def process(payload: EncryBlockPayload): History.ProgressInfo[EncryPersistentModifier]
+  protected def process(payload: Payload): History.ProgressInfo[EncryPersistentModifier]
 
-  protected def validate(payload: EncryBlockPayload): Try[Unit]
+  protected def validate(payload: Payload): Try[Unit]
 }

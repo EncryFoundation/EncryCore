@@ -13,29 +13,29 @@ import org.encryfoundation.common.utils.TaggedTypes.LeafData
 import scorex.crypto.hash.Digest32
 import scala.util.Try
 
-case class EncryBlockPayload(override val headerId: ModifierId, txs: Seq[Transaction])
+case class Payload(override val headerId: ModifierId, txs: Seq[Transaction])
   extends TransactionsCarryingPersistentNodeViewModifier[EncryProposition, Transaction]
     with EncryPersistentModifier
     with ModifierWithDigest {
 
   assert(txs.nonEmpty, "Block should contain at least 1 coinbase-like transaction")
 
-  override val modifierTypeId: ModifierTypeId = EncryBlockPayload.modifierTypeId
+  override val modifierTypeId: ModifierTypeId = Payload.modifierTypeId
 
-  override type M = EncryBlockPayload
+  override type M = Payload
 
   override val transactions: Seq[Transaction] = txs
 
-  override lazy val digest: Digest32 = EncryBlockPayload.rootHash(txs.map(_.id))
+  override lazy val digest: Digest32 = Payload.rootHash(txs.map(_.id))
 
-  override def serializer: Serializer[EncryBlockPayload] = EncryBlockPayloadSerializer
+  override def serializer: Serializer[Payload] = EncryBlockPayloadSerializer
 
   override def toString: String = s"Payload(headerId=${Algos.encode(headerId)}, txsQty=${transactions.size})"
 }
 
-object EncryBlockPayload {
+object Payload {
 
-  implicit val jsonEncoder: Encoder[EncryBlockPayload] = (bp: EncryBlockPayload) => Map(
+  implicit val jsonEncoder: Encoder[Payload] = (bp: Payload) => Map(
     "headerId" -> Algos.encode(bp.headerId).asJson,
     "transactions" -> bp.txs.map(_.asJson).asJson
   ).asJson
@@ -45,16 +45,16 @@ object EncryBlockPayload {
   def rootHash(ids: Seq[ModifierId]): Digest32 = Algos.merkleTreeRoot(LeafData !@@ ids)
 }
 
-object EncryBlockPayloadSerializer extends Serializer[EncryBlockPayload] {
+object EncryBlockPayloadSerializer extends Serializer[Payload] {
 
-  override def toBytes(obj: EncryBlockPayload): Array[Byte] =
+  override def toBytes(obj: Payload): Array[Byte] =
     Bytes.concat(
       obj.headerId,
       Ints.toByteArray(obj.transactions.size),
       obj.transactions.map(tx => Ints.toByteArray(tx.bytes.length) ++ tx.bytes).reduceLeft(_ ++ _)
     )
 
-  override def parseBytes(bytes: Array[Byte]): Try[EncryBlockPayload] = Try {
+  override def parseBytes(bytes: Array[Byte]): Try[Payload] = Try {
     val headerId: Array[Byte] = bytes.slice(0, 32)
     val txQty: Int = Ints.fromByteArray(bytes.slice(32, 36))
     val leftBytes: Array[Byte] = bytes.drop(36)
@@ -64,6 +64,6 @@ object EncryBlockPayloadSerializer extends Serializer[EncryBlockPayload] {
         .parseBytes(leftBytes.slice(shift + 4, shift + 4 + len)).map(d => (acc :+ d, shift + 4 + len))
         .getOrElse(throw new Exception("Serialization failed."))
     }._1
-    EncryBlockPayload(ModifierId @@ headerId, txs)
+    Payload(ModifierId @@ headerId, txs)
   }
 }

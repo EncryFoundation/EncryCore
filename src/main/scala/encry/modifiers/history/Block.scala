@@ -1,23 +1,22 @@
-package encry.modifiers.history.block
+package encry.modifiers.history
 
 import com.google.common.primitives.{Bytes, Ints}
-import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.modifiers.{EncryPersistentModifier, TransactionsCarryingPersistentNodeViewModifier}
-import encry.modifiers.history.block.header.{EncryBlockHeaderSerializer, Header}
-import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
-import encry.modifiers.history.{ADProofSerializer, ADProofs}
-import encry.modifiers.mempool.directive.TransferDirective
+import encry.modifiers.history.block.payload.{EncryBlockPayloadSerializer, Payload}
 import encry.modifiers.mempool.Transaction
+import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.state.box.EncryProposition
+import encry.modifiers.{EncryPersistentModifier, TransactionsCarryingPersistentNodeViewModifier}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.validation.{ModifierValidator, ValidationResult}
 import io.circe.Encoder
 import io.circe.syntax._
 import org.encryfoundation.common.serialization.Serializer
 import scorex.crypto.encode.Base16
+
 import scala.util.Try
 
 case class Block(header: Header,
-                 payload: EncryBlockPayload,
+                 payload: Payload,
                  adProofsOpt: Option[ADProofs])
   extends TransactionsCarryingPersistentNodeViewModifier[EncryProposition, Transaction]
     with EncryPersistentModifier with ModifierValidator {
@@ -108,7 +107,7 @@ object EncryBlockSerializer extends Serializer[Block] {
     val header: Try[Header] = EncryBlockHeaderSerializer.parseBytes(bytes.slice(pointer, pointer + headerSize))
     pointer += headerSize
     val payloadSize: Int = Ints.fromByteArray(bytes.slice(pointer, pointer + 4))
-    val payload: Try[EncryBlockPayload] =
+    val payload: Try[Payload] =
       EncryBlockPayloadSerializer.parseBytes(bytes.slice(pointer + 4, pointer + 4 + payloadSize))
     pointer += payloadSize + 4
     val aDProofsSize: Int = Ints.fromByteArray(bytes.slice(pointer, pointer + 4))

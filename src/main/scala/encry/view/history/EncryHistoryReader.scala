@@ -4,10 +4,9 @@ import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History._
 import encry.consensus.ModifierSemanticValidity
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.Block
-import encry.modifiers.history.block.header.{Header, HeaderChain}
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.{ADProofs, Block, Header}
+import encry.modifiers.history.block.header.HeaderChain
+import encry.modifiers.history.block.payload.Payload
 import encry.settings.{Constants, NodeSettings}
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BaseBlockPayloadProcessor
@@ -16,6 +15,7 @@ import encry.EncryApp.settings
 import encry.utils.Logging
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
+
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
@@ -117,7 +117,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
 
   def testApplicable(modifier: EncryPersistentModifier): Try[Unit] = modifier match {
     case header: Header => validate(header)
-    case payload: EncryBlockPayload => validate(payload)
+    case payload: Payload => validate(payload)
     case adProofs: ADProofs => validate(adProofs)
     case mod: Any => Failure(new Exception(s"Modifier $mod is of incorrect type."))
   }
@@ -138,7 +138,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
   }
 
   def getBlock(header: Header): Option[Block] =
-    (typedModifierById[EncryBlockPayload](header.payloadId), typedModifierById[ADProofs](header.adProofsId)) match {
+    (typedModifierById[Payload](header.payloadId), typedModifierById[ADProofs](header.adProofsId)) match {
       case (Some(txs), Some(proofs)) => Some(Block(header, txs, Some(proofs)))
       case (Some(txs), None) if !nodeSettings.stateMode.isDigest => Some(Block(header, txs, None))
       case _ => None

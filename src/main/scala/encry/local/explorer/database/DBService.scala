@@ -7,12 +7,13 @@ import doobie.hikari.HikariTransactor
 import QueryRepository._
 import com.zaxxer.hikari.HikariDataSource
 import encry.EncryApp.settings
+import encry.modifiers.history.{Block, Header, HeaderDBVersion}
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.modifiers.history.block.Block
-import encry.modifiers.history.block.header.{Header, HeaderDBVersion}
+import encry.modifiers.history.HeaderDBVersion
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, TransactionDBVersion}
 import encry.utils.Logging
+
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.control.NonFatal

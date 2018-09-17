@@ -1,10 +1,11 @@
 package encry.utils
 
 import java.io.File
+
 import akka.actor.ActorRef
 import encry.avltree._
 import encry.crypto.equihash.EquihashSolution
-import encry.modifiers.history.block.header.Header
+import encry.modifiers.history.Header
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, MonetaryBox}
@@ -22,6 +23,7 @@ import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue}
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
+
 import scala.util.{Random => ScRand}
 
 trait EncryGenerator {

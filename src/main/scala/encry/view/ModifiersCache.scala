@@ -2,10 +2,12 @@ package encry.view
 
 import java.lang
 import java.util.concurrent.ConcurrentHashMap
+
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.block.header.Header
+import encry.modifiers.history.Header
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
+
 import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable

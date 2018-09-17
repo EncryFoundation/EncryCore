@@ -1,8 +1,7 @@
 package encry.modifiers.history
 
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.block.header.{Header, EncryBlockHeaderSerializer}
-import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
+import encry.modifiers.history.block.payload.{Payload, EncryBlockPayloadSerializer}
 import org.encryfoundation.common.serialization.Serializer
 import scala.util.{Failure, Try}
 
@@ -13,8 +12,8 @@ object HistoryModifierSerializer extends Serializer[EncryPersistentModifier] {
       Header.modifierTypeId +: EncryBlockHeaderSerializer.toBytes(m)
     case m: ADProofs =>
       ADProofs.modifierTypeId +: ADProofSerializer.toBytes(m)
-    case m: EncryBlockPayload =>
-      EncryBlockPayload.modifierTypeId +: EncryBlockPayloadSerializer.toBytes(m)
+    case m: Payload =>
+      Payload.modifierTypeId +: EncryBlockPayloadSerializer.toBytes(m)
     case m =>
       throw new Exception(s"Serialization for unknown modifier: $m")
   }
@@ -25,7 +24,7 @@ object HistoryModifierSerializer extends Serializer[EncryPersistentModifier] {
         EncryBlockHeaderSerializer.parseBytes(bytes.tail)
       case ADProofs.`modifierTypeId` =>
         ADProofSerializer.parseBytes(bytes.tail)
-      case EncryBlockPayload.`modifierTypeId` =>
+      case Payload.`modifierTypeId` =>
         EncryBlockPayloadSerializer.parseBytes(bytes.tail)
       case m =>
         Failure(new Exception(s"Deserialization for unknown type byte: $m"))

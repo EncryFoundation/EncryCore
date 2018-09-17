@@ -5,9 +5,8 @@ import akka.testkit.{ImplicitSender, TestKit}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.local.explorer.BlockListener.{ChainSwitching, NewOrphaned}
 import encry.local.explorer.database.DBService
-import encry.modifiers.history.block.Block
-import encry.modifiers.history.block.header.Header
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.{Block, Header}
+import encry.modifiers.history.block.payload.Payload
 import encry.modifiers.mempool.Transaction
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.utils.EncryGenerator
@@ -15,6 +14,7 @@ import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import org.mockito.Mockito._
 import org.mockito.ArgumentMatchers.{eq => eq_}
+
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -56,7 +56,7 @@ class BlockListenerSpec extends TestKit(ActorSystem("BlockListenerSpec")) with I
     val actor: ActorRef = system.actorOf(Props(new BlockListener(dbServiceMock)))
     val sampleHeader: Header = genHeader
     val sampleTxs: Seq[Transaction] = genValidPaymentTxs(100)
-    val samplePayload: EncryBlockPayload = EncryBlockPayload(sampleHeader.id, sampleTxs)
+    val samplePayload: Payload = Payload(sampleHeader.id, sampleTxs)
     val sampleBlock: Block = Block(sampleHeader, samplePayload, None)
     val sampleModifier: SemanticallySuccessfulModifier[Block] = SemanticallySuccessfulModifier(sampleBlock)
     val sampleNewOrphaned: NewOrphaned = NewOrphaned(sampleHeader)

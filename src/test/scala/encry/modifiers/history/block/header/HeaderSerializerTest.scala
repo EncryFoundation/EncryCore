@@ -1,5 +1,6 @@
 package encry.modifiers.history.block.header
 
+import encry.modifiers.history.EncryBlockHeaderSerializer
 import encry.utils.EncryGenerator
 import org.scalatest.{Matchers, PropSpec}
 

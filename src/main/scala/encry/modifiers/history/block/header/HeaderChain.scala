@@ -1,5 +1,7 @@
 package encry.modifiers.history.block.header
 
+import encry.modifiers.history.Header
+
 case class HeaderChain(headers: IndexedSeq[Header]) {
   headers.indices.foreach { i =>
     if (i > 0) require(headers(i).parentId sameElements headers(i - 1).id)

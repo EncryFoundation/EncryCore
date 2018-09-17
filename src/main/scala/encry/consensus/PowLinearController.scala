@@ -1,7 +1,7 @@
 package encry.consensus
 
 import encry.consensus.ConsensusTaggedTypes.Difficulty
-import encry.modifiers.history.block.header.Header
+import encry.modifiers.history.Header
 import encry.settings.Constants
 import encry.view.history.History.Height
 import supertagged.@@

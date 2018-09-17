@@ -3,11 +3,12 @@ package encry.view.history
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.SyncInfo
 import encry.EncryApp.settings
-import encry.modifiers.history.block.header.Header
 import encry.consensus.History.ModifierIds
 import encry.modifiers.NodeViewModifier
+import encry.modifiers.history.Header
 import encry.network.message.SyncInfoMessageSpec
 import org.encryfoundation.common.serialization.Serializer
+
 import scala.util.Try
 
 case class EncrySyncInfo(lastHeaderIds: Seq[ModifierId]) extends SyncInfo {

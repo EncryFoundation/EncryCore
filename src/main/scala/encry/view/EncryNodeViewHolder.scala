@@ -9,12 +9,11 @@ import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
 import encry.modifiers._
-import encry.modifiers.history.block.Block
-import encry.modifiers.history.block.header.{Header, EncryBlockHeaderSerializer}
-import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
-import encry.modifiers.history.{ADProofSerializer, ADProofs}
+import encry.modifiers.history.EncryBlockHeaderSerializer
+import encry.modifiers.history.block.payload.{EncryBlockPayloadSerializer, Payload}
+import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
-import encry.modifiers.state.box.{AssetBox, EncryProposition}
+import encry.modifiers.state.box.EncryProposition
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
@@ -50,7 +49,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   val modifiersCache: EncryModifiersCache = EncryModifiersCache(1000)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     Header.modifierTypeId -> EncryBlockHeaderSerializer,
-    EncryBlockPayload.modifierTypeId -> EncryBlockPayloadSerializer,
+    Payload.modifierTypeId -> EncryBlockPayloadSerializer,
     ADProofs.modifierTypeId -> ADProofSerializer,
     Transaction.ModifierTypeId -> TransactionSerializer
   )

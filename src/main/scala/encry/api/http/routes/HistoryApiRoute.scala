@@ -5,8 +5,7 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
-import encry.modifiers.history.block.Block
-import encry.modifiers.history.block.header.Header
+import encry.modifiers.history.{Block, Header}
 import encry.settings.{EncryAppSettings, RESTApiSettings}
 import encry.view.EncryViewReadersHolder.GetDataFromHistory
 import encry.view.history.EncryHistoryReader
@@ -14,6 +13,7 @@ import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
+
 import scala.concurrent.Future
 
 case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings: EncryAppSettings,

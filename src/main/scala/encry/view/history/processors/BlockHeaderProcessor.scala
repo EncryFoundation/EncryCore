@@ -7,10 +7,9 @@ import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
 import encry.local.explorer.BlockListener.NewOrphaned
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.header.{Header, HeaderChain}
-import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.history.block.Block
+import encry.modifiers.history.{ADProofs, Block, Header}
+import encry.modifiers.history.block.header.HeaderChain
+import encry.modifiers.history.block.payload.Payload
 import encry.settings.Constants._
 import encry.settings.{Constants, NodeSettings}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
@@ -20,6 +19,7 @@ import encry.view.history.History.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
+
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
@@ -77,8 +77,8 @@ trait BlockHeaderProcessor extends Logging {
   private def requiredModifiersForHeader(h: Header): Seq[(ModifierTypeId, ModifierId)] =
     if (!nodeSettings.verifyTransactions) Seq.empty
     else if (nodeSettings.stateMode.isDigest)
-      Seq((EncryBlockPayload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId))
-    else Seq((EncryBlockPayload.modifierTypeId, h.payloadId))
+      Seq((Payload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId))
+    else Seq((Payload.modifierTypeId, h.payloadId))
 
   private def isNewHeader(header: Header): Boolean =
     timeProvider.estimatedTime - header.timestamp <

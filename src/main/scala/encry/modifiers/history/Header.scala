@@ -1,20 +1,18 @@
-package encry.modifiers.history.block.header
+package encry.modifiers.history
 
+import cats.implicits._
 import com.google.common.primitives.{Ints, _}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
-import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.crypto.equihash.{Equihash, EquihashSolution, EquihashSolutionsSerializer}
-import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.Block
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.Block.{Height, Timestamp, Version}
+import encry.modifiers.history.block.payload.Payload
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
 import encry.settings.Constants
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import io.circe.Encoder
 import io.circe.syntax._
-import cats.implicits._
-import encry.modifiers.history.block.Block.{Height, Timestamp, Version}
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
@@ -50,7 +48,7 @@ case class Header(version: Version,
   lazy val isGenesis: Boolean = height == Constants.Chain.GenesisHeight
 
   lazy val payloadId: ModifierId =
-    ModifierWithDigest.computeId(EncryBlockPayload.modifierTypeId, id, transactionsRoot)
+    ModifierWithDigest.computeId(Payload.modifierTypeId, id, transactionsRoot)
 
   lazy val adProofsId: ModifierId = ModifierWithDigest.computeId(ADProofs.modifierTypeId, id, adProofsRoot)
 
@@ -58,7 +56,7 @@ case class Header(version: Version,
 
   def isRelated(mod: EncryPersistentModifier): Boolean = mod match {
     case p: ADProofs => adProofsRoot sameElements p.digest
-    case t: EncryBlockPayload => transactionsRoot sameElements t.digest
+    case t: Payload => transactionsRoot sameElements t.digest
     case _ => false
   }
 
