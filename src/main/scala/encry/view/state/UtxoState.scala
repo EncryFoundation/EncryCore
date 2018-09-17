@@ -9,7 +9,7 @@ import encry.avltree.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, 
 import encry.consensus.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.header.Header
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.mempool.Transaction.TransactionValidationException
@@ -78,7 +78,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
 
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
 
-    case block: EncryBlock =>
+    case block: Block =>
       logInfo(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
 

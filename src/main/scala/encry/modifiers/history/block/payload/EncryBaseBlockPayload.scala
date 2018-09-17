@@ -6,9 +6,7 @@ import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest, Transaction
 import encry.modifiers.state.box.EncryProposition
 
 trait EncryBaseBlockPayload
-  extends TransactionsCarryingPersistentNodeViewModifier[EncryProposition, Transaction]
-    with EncryPersistentModifier
-    with ModifierWithDigest {
+   {
 
   val headerId: ModifierId
 }

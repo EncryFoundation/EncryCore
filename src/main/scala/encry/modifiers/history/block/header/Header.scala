@@ -5,8 +5,7 @@ import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.crypto.equihash.{Equihash, EquihashSolution, EquihashSolutionsSerializer}
 import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.Block._
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.mempool.directive.TransferDirective
@@ -15,12 +14,14 @@ import encry.settings.Constants
 import io.circe.Encoder
 import io.circe.syntax._
 import cats.implicits._
+import encry.modifiers.history.block.Block.{Height, Timestamp, Version}
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
+
 import scala.util.Try
 
 case class Header(version: Version,
@@ -105,7 +106,7 @@ case class HeaderDBVersion(id: String,
 }
 
 object HeaderDBVersion {
-  def apply(block: EncryBlock): HeaderDBVersion = {
+  def apply(block: Block): HeaderDBVersion = {
     val (minerAddress: String, minerReward: Long) = minerInfo(block.payload.transactions.last)
     HeaderDBVersion(
       Base16.encode(block.header.id),

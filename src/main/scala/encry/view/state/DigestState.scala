@@ -4,7 +4,7 @@ import java.io.File
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.header.Header
 import encry.modifiers.mempool.Transaction
 import encry.settings.{Constants, NodeSettings}
@@ -28,7 +28,7 @@ class DigestState protected(override val version: VersionTag,
   override val maxRollbackDepth: Int = stateStore.rollbackVersions().size
 
   def validate(mod: EncryPersistentModifier): Try[Unit] = mod match {
-    case block: EncryBlock =>
+    case block: Block =>
       Try {
         if (!ADProofs.proofDigest(block.adProofsOpt.get.proofBytes).sameElements(block.header.adProofsRoot))
           Failure(new Exception(s"Got invalid Proof for block: $block"))
@@ -60,7 +60,7 @@ class DigestState protected(override val version: VersionTag,
 
   //todo: utxo snapshot could go here
   override def applyModifier(mod: EncryPersistentModifier): Try[DigestState] = mod match {
-    case block: EncryBlock if settings.verifyTransactions =>
+    case block: Block if settings.verifyTransactions =>
       logInfo(s"Got new full block with id ${block.encodedId} with root ${Algos.encoder.encode(block.header.stateRoot)}")
       this.validate(block).flatMap(_ => update(VersionTag !@@ block.header.id, block.header.stateRoot))
 

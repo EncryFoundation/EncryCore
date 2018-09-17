@@ -5,7 +5,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.local.explorer.BlockListener.{ChainSwitching, NewOrphaned}
 import encry.local.explorer.database.DBService
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.header.Header
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.Transaction
@@ -57,8 +57,8 @@ class BlockListenerSpec extends TestKit(ActorSystem("BlockListenerSpec")) with I
     val sampleHeader: Header = genHeader
     val sampleTxs: Seq[Transaction] = genValidPaymentTxs(100)
     val samplePayload: EncryBlockPayload = EncryBlockPayload(sampleHeader.id, sampleTxs)
-    val sampleBlock: EncryBlock = EncryBlock(sampleHeader, samplePayload, None)
-    val sampleModifier: SemanticallySuccessfulModifier[EncryBlock] = SemanticallySuccessfulModifier(sampleBlock)
+    val sampleBlock: Block = Block(sampleHeader, samplePayload, None)
+    val sampleModifier: SemanticallySuccessfulModifier[Block] = SemanticallySuccessfulModifier(sampleBlock)
     val sampleNewOrphaned: NewOrphaned = NewOrphaned(sampleHeader)
     val sampleSwitchedIds: List[ModifierId] = sampleTxs.map(_.id).toList
     val sampleChainSwitching: ChainSwitching = ChainSwitching(sampleSwitchedIds)

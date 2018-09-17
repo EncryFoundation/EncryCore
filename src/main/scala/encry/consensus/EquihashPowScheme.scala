@@ -5,7 +5,7 @@ import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.crypto.equihash.{Equihash, EquihashSolution}
 import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.header.Header
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.history.block.Block.Version
@@ -25,7 +25,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
 
   override def verifyCandidate(candidateBlock: CandidateBlock,
                                finishingNonce: Long,
-                               startingNonce: Long): Option[EncryBlock] = {
+                               startingNonce: Long): Option[Block] = {
     require(finishingNonce >= startingNonce)
 
     val difficulty: Difficulty = candidateBlock.difficulty
@@ -71,7 +71,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
       if (verify(header)) {
         val adProofs = ADProofs(header.id, candidateBlock.adProofBytes)
         val payload = EncryBlockPayload(header.id, candidateBlock.transactions)
-        Some(EncryBlock(header, payload, Some(adProofs)))
+        Some(Block(header, payload, Some(adProofs)))
       } else None
     })
   }

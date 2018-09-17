@@ -2,7 +2,7 @@ package encry.view.wallet
 
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.InstanceFactory
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.header.Header
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.Transaction
@@ -45,11 +45,11 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val blockPayload: EncryBlockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
 
-    val firstBlock: EncryBlock = EncryBlock(genHeader, blockPayload, None)
+    val firstBlock: Block = Block(genHeader, blockPayload, None)
 
     val blockPayloadWithSpentTx: EncryBlockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), Seq(spentTx))
 
-    val secondBlock: EncryBlock = EncryBlock(genHeader, blockPayloadWithSpentTx, None)
+    val secondBlock: Block = Block(genHeader, blockPayloadWithSpentTx, None)
 
     wallet.scanPersistent(firstBlock)
 
@@ -78,7 +78,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val blockPayload: EncryBlockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
 
-    val block: EncryBlock = EncryBlock(blockHeader, blockPayload, None)
+    val block: Block = Block(blockHeader, blockPayload, None)
 
     wallet.scanPersistent(block)
 

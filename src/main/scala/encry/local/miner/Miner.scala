@@ -7,7 +7,7 @@ import encry.EncryApp._
 import encry.consensus.{CandidateBlock, EncrySupplyController}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.local.miner.Worker.NextChallenge
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.header.Header
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
@@ -48,7 +48,7 @@ class Miner extends Actor with Logging {
 
   def killAllWorkers(): Unit = context.children.foreach(context.stop)
 
-  def needNewCandidate(b: EncryBlock): Boolean =
+  def needNewCandidate(b: Block): Boolean =
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))
 
   override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
@@ -107,7 +107,7 @@ class Miner extends Actor with Logging {
   }
 
   def receiveSemanticallySuccessfulModifier: Receive = {
-    case SemanticallySuccessfulModifier(mod: EncryBlock) if needNewCandidate(mod) =>
+    case SemanticallySuccessfulModifier(mod: Block) if needNewCandidate(mod) =>
       logInfo(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
         s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       produceCandidate()
@@ -211,7 +211,7 @@ object Miner {
 
   case object GetMinerStatus
 
-  case class MinedBlock(block: EncryBlock, workerIdx: Int)
+  case class MinedBlock(block: Block, workerIdx: Int)
 
   case class MinerStatus(isMining: Boolean, candidateBlock: Option[CandidateBlock]) {
     lazy val json: Json = Map(

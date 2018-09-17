@@ -5,7 +5,7 @@ import akka.persistence.RecoveryCompleted
 import encry.EncryApp.{nodeViewHolder, peerManager, settings}
 import encry.utils.Logging
 import encry.local.explorer.database.DBService
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.header.HeaderDBVersion
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.directive.DirectiveDBVersion
@@ -40,7 +40,7 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
   def startRecovery(): Future[Unit] = heightFuture.flatMap { height =>
     settings.postgres.flatMap(_.restoreBatchSize) match {
       case Some(step) =>
-        (0 to height).sliding(step, step).foldLeft(Future.successful(List[EncryBlock]())) { case (prevBlocks, slide) =>
+        (0 to height).sliding(step, step).foldLeft(Future.successful(List[Block]())) { case (prevBlocks, slide) =>
           val from: Int = slide.head
           val to: Int = slide.last
           prevBlocks.flatMap { retrievedBlocks =>
@@ -57,7 +57,7 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
     }
   }
 
-  private def selectBlocksByRange(from: Int, to: Int): Future[List[EncryBlock]] = {
+  private def selectBlocksByRange(from: Int, to: Int): Future[List[Block]] = {
     val headersFuture: Future[List[HeaderDBVersion]] = dbService.headersByRange(from, to)
     val txsFuture: Future[List[TransactionDBVersion]] = dbService.txsByRange(from, to)
     for {
@@ -82,7 +82,7 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
         }
       }
       headers.map { header =>
-        EncryBlock(header, EncryBlockPayload(header.id, txsWithIO.getOrElse(Base16.encode(header.id), Seq.empty)), None)
+        Block(header, EncryBlockPayload(header.id, txsWithIO.getOrElse(Base16.encode(header.id), Seq.empty)), None)
       }
     }
   }

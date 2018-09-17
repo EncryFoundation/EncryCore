@@ -3,7 +3,7 @@ package encry.network
 import akka.persistence._
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp._
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.header.Header
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
@@ -21,7 +21,7 @@ class ModifiersHolder extends PersistentActor with Logging {
   var headers: Map[String, (Header, Int)] = Map.empty
   var payloads: Map[String, (EncryBlockPayload, Int)] = Map.empty
   var nonCompletedBlocks: Map[String, String] = Map.empty
-  var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
+  var completedBlocks: SortedMap[Int, Block] = SortedMap.empty
 
   context.system.scheduler.schedule(10.second, 30.second) {
     logDebug(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
@@ -42,7 +42,7 @@ class ModifiersHolder extends PersistentActor with Logging {
     case payload: EncryBlockPayload =>
       updatePayloads(payload)
       logDebug(s"Payload ${Algos.encode(payload.headerId)} is recovered from leveldb.")
-    case block: EncryBlock =>
+    case block: Block =>
       updateCompletedBlocks(block)
       logDebug(s"Block ${block.header.height} is recovered from leveldb.")
     case RecoveryCompleted if completedBlocks.isEmpty =>
@@ -64,7 +64,7 @@ class ModifiersHolder extends PersistentActor with Logging {
       }
       else context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
     case SendBlocks =>
-      val blocksToSend: Seq[EncryBlock] = completedBlocks.take(settings.levelDb
+      val blocksToSend: Seq[Block] = completedBlocks.take(settings.levelDb
         .map(_.batchSize)
         .getOrElse(throw new RuntimeException("batchsize not specified"))).values.toSeq
 
@@ -81,7 +81,7 @@ class ModifiersHolder extends PersistentActor with Logging {
   def createBlockIfPossible(payloadId: ModifierId): Unit =
     nonCompletedBlocks.get(Algos.encode(payloadId)).foreach(headerId => headers.get(headerId).foreach { header =>
       payloads.get(Algos.encode(payloadId)).foreach { payload =>
-        completedBlocks += header._1.height -> EncryBlock(header._1, payload._1, None)
+        completedBlocks += header._1.height -> Block(header._1, payload._1, None)
         nonCompletedBlocks -= Algos.encode(payloadId)
       }
     })
@@ -104,7 +104,7 @@ class ModifiersHolder extends PersistentActor with Logging {
         s"${
           nonCompletedBlocks.get(Algos.encode(payload.id)).map(headerId =>
             headers.get(headerId).map(header => s"for header $headerId height: ${header._1.height}"))}")
-    case block: EncryBlock =>
+    case block: Block =>
       if (!completedBlocks.values.toSeq.contains(block))
         persist(block) { block =>
           logDebug(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} is persisted successfully.")
@@ -132,7 +132,7 @@ class ModifiersHolder extends PersistentActor with Logging {
     else createBlockIfPossible(payload.id)
   }
 
-  def updateCompletedBlocks(block: EncryBlock): Unit = completedBlocks += block.header.height -> block
+  def updateCompletedBlocks(block: Block): Unit = completedBlocks += block.header.height -> block
 
   override def persistenceId: String = "persistent actor"
 
@@ -172,7 +172,7 @@ object ModifiersHolder {
     def apply(headers: Map[String, (Header, Int)],
               payloads: Map[String, (EncryBlockPayload, Int)],
               nonCompletedBlocks: Map[String, String],
-              completedBlocks: SortedMap[Int, EncryBlock]): Statistics =
+              completedBlocks: SortedMap[Int, Block]): Statistics =
       Statistics(
         headers.size,
         payloads.size,

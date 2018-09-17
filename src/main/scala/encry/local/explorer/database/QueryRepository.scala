@@ -8,7 +8,7 @@ import doobie.Fragments.{in, whereAndOpt}
 import doobie.postgres.implicits._
 import doobie.implicits._
 import doobie.util.log.{ExecFailure, LogHandler, ProcessingFailure, Success}
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.header.{Header, HeaderDBVersion}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.directive.DirectiveDBVersion
@@ -19,7 +19,7 @@ import scorex.crypto.encode.Base16
 
 protected[database] object QueryRepository extends Logging {
 
-  def processBlockQuery(block: EncryBlock): ConnectionIO[Int] =
+  def processBlockQuery(block: Block): ConnectionIO[Int] =
     for {
       headerR <- insertHeaderQuery(block)
       txsR    <- insertTransactionsQuery(block)
@@ -33,7 +33,7 @@ protected[database] object QueryRepository extends Logging {
     Update[String](query).updateMany(ids.map(Base16.encode))
   }
 
-  def insertHeaderQuery(block: EncryBlock): ConnectionIO[Int] = {
+  def insertHeaderQuery(block: Block): ConnectionIO[Int] = {
     val headerDB: HeaderDBVersion = HeaderDBVersion(block)
     val query: String =
       """
@@ -75,7 +75,7 @@ protected[database] object QueryRepository extends Logging {
     (fr"SELECT * FROM public.directives "
       ++ whereAndOpt(NonEmptyList.fromList(ids.toList).map(nel => in(fr"tx_id", nel)))).query[DirectiveDBVersion].to[List]
 
-  private def insertTransactionsQuery(block: EncryBlock): ConnectionIO[Int] = {
+  private def insertTransactionsQuery(block: Block): ConnectionIO[Int] = {
     val txs: Seq[TransactionDBVersion] = TransactionDBVersion(block)
     val query: String =
       """

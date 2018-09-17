@@ -9,7 +9,7 @@ import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
 import encry.modifiers._
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.header.{Header, EncryBlockHeaderSerializer}
 import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
@@ -238,7 +238,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     }
   }
 
-  def pmodModifyRecovery(block: EncryBlock): Try[Unit] = if (!nodeView.history.contains(block.id)) Try {
+  def pmodModifyRecovery(block: Block): Try[Unit] = if (!nodeView.history.contains(block.id)) Try {
     logInfo(s"Trying to apply block ${block.encodedId} from recovery")
     pmodModify(block.header)
     nodeView.history.blockDownloadProcessor.updateBestBlock(block.header)
@@ -391,7 +391,7 @@ object EncryNodeViewHolder {
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    case class BlocksFromLocalPersistence(blocks: Seq[EncryBlock], allBlocksSent: Boolean = true)
+    case class BlocksFromLocalPersistence(blocks: Seq[Block], allBlocksSent: Boolean = true)
 
     case class ModifiersFromRemote(modTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
 

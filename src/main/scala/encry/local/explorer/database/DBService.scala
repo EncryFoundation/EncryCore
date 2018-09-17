@@ -8,7 +8,7 @@ import QueryRepository._
 import com.zaxxer.hikari.HikariDataSource
 import encry.EncryApp.settings
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.header.{Header, HeaderDBVersion}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, TransactionDBVersion}
@@ -19,7 +19,7 @@ import scala.util.control.NonFatal
 
 class DBService extends Logging {
 
-  def processBlock(block: EncryBlock): Future[Int] = runAsync(processBlockQuery(block))
+  def processBlock(block: Block): Future[Int] = runAsync(processBlockQuery(block))
 
   def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] = runAsync(markAsRemovedFromMainChainQuery(ids))
 

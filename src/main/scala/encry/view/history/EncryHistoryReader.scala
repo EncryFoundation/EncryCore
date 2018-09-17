@@ -5,7 +5,7 @@ import encry.consensus.History._
 import encry.consensus.ModifierSemanticValidity
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.header.{Header, HeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings.{Constants, NodeSettings}
@@ -39,7 +39,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
     * Complete block of the best chain with transactions.
     * Always None for an SPV mode, Some(fullBLock) for fullnode regime after initial bootstrap.
     */
-  def bestBlockOpt: Option[EncryBlock] =
+  def bestBlockOpt: Option[Block] =
     bestBlockIdOpt.flatMap(id => typedModifierById[Header](id)).flatMap(getBlock)
 
   /** @return ids of count headers starting from offset */
@@ -137,10 +137,10 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
     case _ => None
   }
 
-  def getBlock(header: Header): Option[EncryBlock] =
+  def getBlock(header: Header): Option[Block] =
     (typedModifierById[EncryBlockPayload](header.payloadId), typedModifierById[ADProofs](header.adProofsId)) match {
-      case (Some(txs), Some(proofs)) => Some(EncryBlock(header, txs, Some(proofs)))
-      case (Some(txs), None) if !nodeSettings.stateMode.isDigest => Some(EncryBlock(header, txs, None))
+      case (Some(txs), Some(proofs)) => Some(Block(header, txs, Some(proofs)))
+      case (Some(txs), None) if !nodeSettings.stateMode.isDigest => Some(Block(header, txs, None))
       case _ => None
     }
 

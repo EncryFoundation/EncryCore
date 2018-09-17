@@ -5,7 +5,7 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.header.Header
 import encry.settings.{EncryAppSettings, RESTApiSettings}
 import encry.view.EncryViewReadersHolder.GetDataFromHistory
@@ -47,7 +47,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
       _.getHeaderIds(limit, offset).map(Algos.encode).asJson
     }
 
-  private def getFullBlockByHeaderId(headerId: ModifierId): Future[Option[EncryBlock]] = getHistory.map { history =>
+  private def getFullBlockByHeaderId(headerId: ModifierId): Future[Option[Block]] = getHistory.map { history =>
     history.typedModifierById[Header](headerId).flatMap(history.getBlock)
   }
 

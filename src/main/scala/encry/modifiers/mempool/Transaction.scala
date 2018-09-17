@@ -1,8 +1,7 @@
 package encry.modifiers.mempool
 
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.modifiers.history.block.Block.Timestamp
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.NodeViewModifier
 import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
 import encry.modifiers.state.box.Box.Amount
@@ -25,6 +24,7 @@ import scorex.crypto.hash.Digest32
 import scala.util.{Success, Try}
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
+import encry.modifiers.history.block.Block.Timestamp
 import encry.validation.ModifierValidator
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
@@ -191,7 +191,7 @@ case class TransactionDBVersion(id: String, fee: Long, blockId: String, isCoinba
                                 timestamp: Timestamp, proof: Option[String])
 
 case object TransactionDBVersion {
-  def apply(block: EncryBlock): Seq[TransactionDBVersion] = {
+  def apply(block: Block): Seq[TransactionDBVersion] = {
     if (block.payload.transactions.nonEmpty) {
       val transactions: Seq[TransactionDBVersion] = block.payload.transactions.map { tx =>
         val id: String = Base16.encode(tx.id)

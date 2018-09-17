@@ -5,7 +5,7 @@ import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.header.{Header, HeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.settings._
@@ -62,7 +62,7 @@ trait EncryHistory extends EncryHistoryReader {
   /** @return header, that corresponds to modifier */
   protected def correspondingHeader(modifier: EncryPersistentModifier): Option[Header] = modifier match {
     case header: Header => Some(header)
-    case block: EncryBlock => Some(block.header)
+    case block: Block => Some(block.header)
     case proof: ADProofs => typedModifierById[Header](proof.headerId)
     case payload: EncryBlockPayload => typedModifierById[Header](payload.headerId)
     case _ => None
@@ -101,12 +101,12 @@ trait EncryHistory extends EncryHistoryReader {
               historyStorage.insert(validityKey(modifier.id), Seq(BestHeaderKey -> ByteArrayWrapper(newBestHeader.id)))
               ProgressInfo[EncryPersistentModifier](None, Seq.empty, Seq.empty, Seq.empty)
             } else {
-              val invalidatedChain: Seq[EncryBlock] = bestBlockOpt.toSeq
+              val invalidatedChain: Seq[Block] = bestBlockOpt.toSeq
                 .flatMap(f => headerChainBack(bestBlockHeight + 1, f.header, h => !invalidatedHeaders.contains(h)).headers)
                 .flatMap(h => getBlock(h))
                 .ensuring(_.lengthCompare(1) > 0, "invalidatedChain should contain at least bestFullBlock and parent")
-              val branchPoint: EncryBlock = invalidatedChain.head
-              val validChain: Seq[EncryBlock] =
+              val branchPoint: Block = invalidatedChain.head
+              val validChain: Seq[Block] =
                 continuationHeaderChains(branchPoint.header, h => getBlock(h).isDefined && !invalidatedHeaders.contains(h))
                   .maxBy(chain => scoreOf(chain.last.id).getOrElse(BigInt(0)))
                   .flatMap(h => getBlock(h))
@@ -131,7 +131,7 @@ trait EncryHistory extends EncryHistoryReader {
     */
   private def markModifierValid(modifier: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] =
     modifier match {
-      case block: EncryBlock =>
+      case block: Block =>
         val nonMarkedIds: Seq[ModifierId] = (Seq(block.header.id, block.payload.id) ++ block.adProofsOpt.map(_.id))
           .filter(id => historyStorage.get(validityKey(id)).isEmpty)
         if (nonMarkedIds.nonEmpty) historyStorage.
@@ -145,7 +145,7 @@ trait EncryHistory extends EncryHistoryReader {
           val chainBack: HeaderChain = headerChainBack(limit, bestFullHeader, h => h.parentId sameElements block.header.id)
             .ensuring(_.headOption.isDefined, s"Should have next block to apply, failed for ${block.header}")
           // Block in the best chain that is linked to this header.
-          val toApply: Option[EncryBlock] = chainBack.headOption.flatMap(opt => getBlock(opt))
+          val toApply: Option[Block] = chainBack.headOption.flatMap(opt => getBlock(opt))
             .ensuring(_.isDefined, s"Should be able to get full block for header ${chainBack.headOption}")
             .ensuring(_.get.header.parentId sameElements block.header.id,
               s"Block to appy should link to current block. Failed for ${chainBack.headOption} and ${block.header}")

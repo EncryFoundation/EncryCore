@@ -10,7 +10,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.ADProofs
 import encry.modifiers.history.block.header.{Header, HeaderChain}
 import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.history.block.{Block, EncryBlock}
+import encry.modifiers.history.block.Block
 import encry.settings.Constants._
 import encry.settings.{Constants, NodeSettings}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
@@ -105,7 +105,7 @@ trait BlockHeaderProcessor extends Logging {
 
   def contains(id: ModifierId): Boolean
 
-  def bestBlockOpt: Option[EncryBlock]
+  def bestBlockOpt: Option[Block]
 
   def bestBlockIdOpt: Option[ModifierId]
 

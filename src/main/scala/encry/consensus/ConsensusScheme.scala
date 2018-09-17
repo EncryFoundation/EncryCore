@@ -2,7 +2,7 @@ package encry.consensus
 
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.history.block.header.Header
 import encry.modifiers.mempool.Transaction
 import org.encryfoundation.common.utils.TaggedTypes.SerializedAdProof
@@ -11,10 +11,10 @@ import scala.math.BigInt
 
 trait ConsensusScheme {
 
-  def verifyCandidate(candidateBlock: CandidateBlock, nonce: Long): Option[EncryBlock] =
+  def verifyCandidate(candidateBlock: CandidateBlock, nonce: Long): Option[Block] =
     verifyCandidate(candidateBlock, nonce, nonce)
 
-  def verifyCandidate(candidateBlock: CandidateBlock, finishingNonce: Long, startingNonce: Long): Option[EncryBlock]
+  def verifyCandidate(candidateBlock: CandidateBlock, finishingNonce: Long, startingNonce: Long): Option[Block]
 
   def realDifficulty(header: Header): BigInt
 

@@ -3,7 +3,7 @@ package encry.view.wallet
 import java.io.File
 import com.google.common.primitives.Longs
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.block.EncryBlock
+import encry.modifiers.history.block.Block
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
@@ -31,7 +31,7 @@ case class EncryWallet(walletStore: Store, accountManager: AccountManager)
   override def scanOffchain(txs: Seq[Transaction]): EncryWallet = this
 
   override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = modifier match {
-    case block: EncryBlock =>
+    case block: Block =>
       val (newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]) =
         block.transactions.foldLeft(Seq[EncryBaseBox](), Seq[EncryBaseBox]()) {
           case ((nBxs, sBxs), tx: Transaction) =>
