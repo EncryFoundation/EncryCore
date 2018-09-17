@@ -53,7 +53,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
     .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + appSettings.network.bindAddress.getPort)
 
   private def storageInfo: String = (appSettings.levelDb, appSettings.postgres) match {
-    case (Some(LevelDbSettings(levelDbSave, levelDbRestore, _)), Some(PostgresSettings(_, _, _, pgSave, pgRestore, _))) =>
+    case (Some(LevelDbSettings(levelDbSave, levelDbRestore, _)), Some(PostgresSettings(_, _, _, _, pgSave, pgRestore, _))) =>
       if ((levelDbSave || levelDbRestore) && (pgSave || pgRestore))
         s"LevelDb(${if (levelDbSave) "write" else ""} ${if (levelDbRestore) "read" else ""}), " +
           s"Postgres(${if (pgSave) "write" else ""} ${if (pgRestore) "read" else ""})"
