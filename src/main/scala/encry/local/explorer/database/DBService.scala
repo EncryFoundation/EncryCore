@@ -19,21 +19,31 @@ import scala.util.control.NonFatal
 
 class DBService extends Logging {
 
-  def processBlock(block: EncryBlock): Future[Int] = runAsync(processBlockQuery(block))
+  def processBlock(block: EncryBlock): Future[Int] = runAsync(processBlockQuery(block), "processBlock")
 
-  def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] = runAsync(markAsRemovedFromMainChainQuery(ids))
+  def processHeader(block: EncryBlock): Future[Int] = runAsync(insertHeaderQuery(block), "processHeader")
 
-  def processOrphanedHeader(header: EncryBlockHeader): Future[Int] = runAsync(insertOrphanedHeaderQuery(header))
+  def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] =
+    runAsync(markAsRemovedFromMainChainQuery(ids), "markAsRemovedFromMainChain")
 
-  def selectHeight: Future[Int] = runAsync(heightQuery)
+  def processOrphanedHeader(header: EncryBlockHeader): Future[Int] =
+    runAsync(insertOrphanedHeaderQuery(header), "processOrphanedHeader")
 
-  def headersByRange(from: Int, to: Int): Future[List[HeaderDBVersion]] = runAsync(headersByRangeQuery(from, to))
+  def selectHeight: Future[Int] = runAsync(heightQuery, "selectHeight")
 
-  def txsByRange(from: Int, to: Int): Future[List[TransactionDBVersion]] = runAsync(txsByRangeQuery(from, to))
+  def selectHeightOpt: Future[Option[Int]] = runAsync(heightOptQuery, "selectHeightOpt")
 
-  def directivesByTxIds(ids: Seq[String]): Future[List[DirectiveDBVersion]] = runAsync(directivesByTransactionIdsQuery(ids))
+  def headersByRange(from: Int, to: Int): Future[List[HeaderDBVersion]] =
+    runAsync(headersByRangeQuery(from, to), "headersByRange")
 
-  def inputsByTxIds(ids: Seq[String]): Future[List[InputDBVersion]] = runAsync(inputsByTransactionIdsQuery(ids))
+  def txsByRange(from: Int, to: Int): Future[List[TransactionDBVersion]] =
+    runAsync(txsByRangeQuery(from, to), "txsByRange")
+
+  def directivesByTxIds(ids: Seq[String]): Future[List[DirectiveDBVersion]] =
+    runAsync(directivesByTransactionIdsQuery(ids), "directivesByTxIds")
+
+  def inputsByTxIds(ids: Seq[String]): Future[List[InputDBVersion]] =
+    runAsync(inputsByTransactionIdsQuery(ids), "inputsByTxIds")
 
   private lazy val dataSource = new HikariDataSource
   if (settings.postgres.exists(_.enableSave) || settings.postgres.exists(_.enableRestore)) {
@@ -43,16 +53,22 @@ class DBService extends Logging {
     dataSource.setMaximumPoolSize(5)
   }
 
+  private def shutdown(): Unit = {
+    logInfo("Shutting down dataSource")
+    dataSource.close()
+  }
+  sys.addShutdownHook(shutdown())
+
   private lazy val pgTransactor: HikariTransactor[IO] = HikariTransactor[IO](dataSource)
 
-  private def runAsync[A](io: ConnectionIO[A]): Future[A] =
+  private def runAsync[A](io: ConnectionIO[A], queryName: String): Future[A] =
     (for {
       res <- io.transact(pgTransactor)
     } yield res)
       .unsafeToFuture()
       .recoverWith {
         case NonFatal(th) =>
-          logWarn(s"Failed to perform db operation with exception ${th.getLocalizedMessage}")
+          logWarn(s"Failed to perform $queryName query with exception ${th.getLocalizedMessage}")
           Future.failed(th)
       }
 }

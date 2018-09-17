@@ -243,6 +243,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     pmodModify(block.header)
     nodeView.history.blockDownloadProcessor.updateBestBlock(block.header)
     pmodModify(block.payload)
+    block.adProofsOpt.foreach(pmodModify(_))
   } else Success(Unit)
 
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
@@ -260,7 +261,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
           if (settings.influxDB.isDefined)
-            context.actorSelection("user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
+            context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
           newStateTry match {
             case Success(newMinState) =>
               val newMemPool: EncryMempool = updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)

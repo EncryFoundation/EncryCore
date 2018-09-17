@@ -84,7 +84,8 @@ case class HeaderDBVersion(id: String,
                            minerReward: Long,
                            feesTotal: Long,
                            txsSize: Int,
-                           bestChain: Boolean) {
+                           bestChain: Boolean,
+                           adProofOpt: Option[String]) {
   def toHeader: Try[EncryBlockHeader] = {
     (Base16.decode(parentId), Base16.decode(proofsRoot), Base16.decode(stateRoot), Base16.decode(transactionsRoot)).mapN {
       case (decodedParentId, decodedProofsRoot, decodedStateRoot, decodeTxRoot) =>
@@ -126,7 +127,8 @@ object HeaderDBVersion {
       minerReward,
       block.payload.transactions.map(_.fee).sum,
       block.payload.transactions.map(_.bytes.length).sum,
-      bestChain = true
+      bestChain = true,
+      block.adProofsOpt.map(_.bytes).map(Base16.encode)
     )
   }
 
@@ -150,7 +152,8 @@ object HeaderDBVersion {
       0L,
       0,
       0,
-      bestChain = false
+      bestChain = false,
+      None
     )
   }
 
