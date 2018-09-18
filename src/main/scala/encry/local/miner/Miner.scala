@@ -2,7 +2,6 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
-
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus.{CandidateBlock, EncrySupplyController}
@@ -31,7 +30,6 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
-
 import scala.collection._
 import scala.concurrent.duration._
 
@@ -55,9 +53,17 @@ class Miner extends Actor with Logging {
 
   def killAllWorkers(): Unit = context.children.foreach(context.stop)
 
-  def needNewCandidate(b: EncryBlock): Boolean =
+  def needNewCandidate(b: EncryBlock): Boolean = {
+    logInfo(s"Going to check newCand cond for block: ${b.asJson}\n " +
+      s"!candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id)): " +
+      s"${!candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))}\n " +
+      s"candidateOpt.exists(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height):\n " +
+      s"Candidate parent opt is: ${candidateOpt.map(_.parentOpt.map(_.asJson))}\n " +
+      s"Block header: ${b.header.asJson}" +
+      s"${candidateOpt.exists(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height))}")
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id)) &&
       candidateOpt.exists(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height))
+  }
 
   override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
 
