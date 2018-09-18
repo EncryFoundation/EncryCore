@@ -223,7 +223,19 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
 
   private def bestHeaderIdAtHeight(h: Int): Option[ModifierId] = headerIdsAtHeight(h).headOption
 
-  protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))
+  protected def scoreOf(id: ModifierId): Option[BigInt] = {
+    typedModifierById[EncryBlockHeader](id).flatMap(header => {
+        logInfo(s"Header: ${header.asJson}")
+        typedModifierById[EncryBlockHeader](header.parentId).map(parent => {
+          logInfo(s"Parent is: ${parent.asJson}")
+          header.difficulty + parent.difficulty
+        }
+        )
+      }
+    )
+
+    historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))
+  }
 
   def heightOf(id: ModifierId): Option[Height] = historyStorage.get(headerHeightKey(id))
     .map(d => Height @@ Ints.fromByteArray(d))
