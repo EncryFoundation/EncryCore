@@ -1,7 +1,7 @@
 package encry.settings
 
 import encry.consensus.ConsensusTaggedTypes.Difficulty
-import encry.modifiers.history.block.Block.Version
+import encry.modifiers.history.Block.Version
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey

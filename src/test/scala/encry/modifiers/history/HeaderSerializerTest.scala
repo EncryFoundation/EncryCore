@@ -1,18 +1,17 @@
-package encry.modifiers.history.block.header
+package encry.modifiers.history
 
 import encry.utils.EncryGenerator
 import org.scalatest.{Matchers, PropSpec}
 
-
-class EncryBlockHeaderSerializerTest extends PropSpec with Matchers with EncryGenerator{
+class HeaderSerializerTest extends PropSpec with Matchers with EncryGenerator{
 
   property("testToBytes & testParseBytes") {
 
     val blockHeader = genHeader
 
-    val blockHeaderSerialized = EncryBlockHeaderSerializer.toBytes(blockHeader)
+    val blockHeaderSerialized = HeaderSerializer.toBytes(blockHeader)
 
-    val blockHeaderDeserialized = EncryBlockHeaderSerializer.parseBytes(blockHeaderSerialized)
+    val blockHeaderDeserialized = HeaderSerializer.parseBytes(blockHeaderSerialized)
 
     blockHeaderDeserialized.isSuccess shouldBe true
 

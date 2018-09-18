@@ -1,17 +1,17 @@
 package encry.view.state
 
 import java.io.File
+
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.{ADProofs, Block, Header}
 import encry.modifiers.mempool.Transaction
 import encry.settings.{Constants, NodeSettings}
 import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+
 import scala.util.{Failure, Success, Try}
 
 /** Minimal state variant which is storing only digest of UTXO authenticated as a dynamic dictionary. */
@@ -28,7 +28,7 @@ class DigestState protected(override val version: VersionTag,
   override val maxRollbackDepth: Int = stateStore.rollbackVersions().size
 
   def validate(mod: EncryPersistentModifier): Try[Unit] = mod match {
-    case block: EncryBlock =>
+    case block: Block =>
       Try {
         if (!ADProofs.proofDigest(block.adProofsOpt.get.proofBytes).sameElements(block.header.adProofsRoot))
           Failure(new Exception(s"Got invalid Proof for block: $block"))
@@ -60,11 +60,11 @@ class DigestState protected(override val version: VersionTag,
 
   //todo: utxo snapshot could go here
   override def applyModifier(mod: EncryPersistentModifier): Try[DigestState] = mod match {
-    case block: EncryBlock if settings.verifyTransactions =>
+    case block: Block if settings.verifyTransactions =>
       logInfo(s"Got new full block with id ${block.encodedId} with root ${Algos.encoder.encode(block.header.stateRoot)}")
       this.validate(block).flatMap(_ => update(VersionTag !@@ block.header.id, block.header.stateRoot))
 
-    case header: EncryBlockHeader if !settings.verifyTransactions =>
+    case header: Header if !settings.verifyTransactions =>
       logInfo(s"Got new Header ${header.encodedId} with root ${Algos.encoder.encode(header.stateRoot)}")
       update(VersionTag !@@ header.id, header.stateRoot)
 

@@ -1,12 +1,9 @@
-package encry.modifiers.history.block
+package encry.modifiers.history
 
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.crypto.equihash.EquihashSolution
-import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.history.block.payload.EncryBlockPayload
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.Constants
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.{EncryGenerator, TestHelper}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
@@ -14,11 +11,11 @@ import org.scalatest.FunSuite
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
 
-class EncryBlockSerializerTest extends FunSuite with EncryGenerator {
+class BlockSerializerTest extends FunSuite with EncryGenerator {
 
   test("testToBytes $ testFromBytes") {
 
-    val blockHeader = EncryBlockHeader(
+    val blockHeader = Header(
       99: Byte,
       ModifierId @@ Random.randomBytes(),
       Digest32 @@ Random.randomBytes(),
@@ -43,15 +40,15 @@ class EncryBlockSerializerTest extends FunSuite with EncryGenerator {
         timestamp, useBoxes, randomAddress, factory.Props.boxValue)
     }
 
-    val blockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), txs)
+    val blockPayload = Payload(ModifierId @@ Array.fill(32)(19: Byte), txs)
 
     val adProofs = ADProofs(ModifierId @@ Random.randomBytes(), SerializedAdProof @@ Random.randomBytes())
 
-    val block = EncryBlock(blockHeader,blockPayload,Option(adProofs))
+    val block = Block(blockHeader,blockPayload,Option(adProofs))
 
-    val blockSererialized = EncryBlockSerializer.toBytes(block)
+    val blockSererialized = BlockSerializer.toBytes(block)
 
-    val blockDeserealized = EncryBlockSerializer.parseBytes(blockSererialized).get
+    val blockDeserealized = BlockSerializer.parseBytes(blockSererialized).get
 
     assert(block.adProofsOpt.get.bytes sameElements blockDeserealized.adProofsOpt.get.bytes,"ADProofs bytes mismatch.")
 

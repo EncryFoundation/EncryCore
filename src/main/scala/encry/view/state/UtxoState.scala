@@ -1,6 +1,7 @@
 package encry.view.state
 
 import java.io.File
+
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import encry.utils.CoreTaggedTypes.VersionTag
@@ -8,9 +9,7 @@ import encry.EncryApp.{settings, system}
 import encry.avltree.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import encry.consensus.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.{ADProofs, Block, Header}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.mempool.Transaction.TransactionValidationException
 import encry.modifiers.state.StateModifierDeserializer
@@ -26,6 +25,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.Algos.HF
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
+
 import scala.util.{Failure, Success, Try}
 
 class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
@@ -78,7 +78,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
 
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
 
-    case block: EncryBlock =>
+    case block: Block =>
       logInfo(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
 
@@ -108,7 +108,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         Failure(e)
       }
 
-    case header: EncryBlockHeader =>
+    case header: Header =>
       Success(new UtxoState(persistentProver, VersionTag !@@ header.id, height, stateStore, lastBlockTimestamp, nodeViewHolderRef))
 
     case _ => Failure(new Exception("Got Modifier of unknown type."))

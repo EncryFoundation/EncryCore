@@ -1,10 +1,7 @@
 package encry.view.history.processors.proofs
 
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.{ADProofs, Block, Header, Payload}
 import encry.view.history.processors.BlockProcessor
 import encry.consensus.History.ProgressInfo
 
@@ -20,11 +17,11 @@ trait FullProofProcessor extends BaseADProofProcessor with BlockProcessor {
       ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
     }
 
-  private def getBlockByProofs(proofs: ADProofs): Option[EncryBlock] =
-    typedModifierById[EncryBlockHeader](proofs.headerId).flatMap { h =>
-      typedModifierById[EncryBlockPayload](h.payloadId).map(p => EncryBlock(h, p, if (adState) Some(proofs) else None))
+  private def getBlockByProofs(proofs: ADProofs): Option[Block] =
+    typedModifierById[Header](proofs.headerId).flatMap { h =>
+      typedModifierById[Payload](h.payloadId).map(p => Block(h, p, if (adState) Some(proofs) else None))
     }
 
   override protected def validate(m: ADProofs): Try[Unit] =
-    modifierValidation(m, typedModifierById[EncryBlockHeader](m.headerId))
+    modifierValidation(m, typedModifierById[Header](m.headerId))
 }

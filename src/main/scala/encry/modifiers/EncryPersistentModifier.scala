@@ -4,5 +4,5 @@ import encry.utils.CoreTaggedTypes.ModifierId
 
 trait EncryPersistentModifier extends PersistentNodeViewModifier {
 
-  override def parentId: ModifierId = null //scalastyle:ignore
+  override def parentId: ModifierId = null
 }

@@ -4,8 +4,7 @@ import akka.actor.Actor
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.local.explorer.BlockListener.{ChainSwitching, NewOrphaned}
 import encry.local.explorer.database.DBService
-import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.{Block, Header}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.utils.Logging
 import scala.concurrent.Future
@@ -32,14 +31,16 @@ class BlockListener(dBService: DBService) extends Actor with Logging {
   }
 
   override def receive: Receive = {
-    case SemanticallySuccessfulModifier(block: EncryBlock) =>
+    case SemanticallySuccessfulModifier(block: Block) => dBService.processBlock(block)
+    case NewOrphaned(header: Header) => dBService.processOrphanedHeader(header)
+    case SemanticallySuccessfulModifier(block: Block) =>
       currentHeightOptFuture.map(heightOpt => if(heightOpt.forall(_ < block.header.height)) dBService.processBlock(block))
-    case NewOrphaned(header: EncryBlockHeader) => dBService.processOrphanedHeader(header)
+    case NewOrphaned(header: Header) => dBService.processOrphanedHeader(header)
     case ChainSwitching(ids) => dBService.markAsRemovedFromMainChain(ids.toList)
   }
 }
 
 object BlockListener {
   case class ChainSwitching(switchedIds: Seq[ModifierId])
-  case class NewOrphaned(header: EncryBlockHeader)
+  case class NewOrphaned(header: Header)
 }

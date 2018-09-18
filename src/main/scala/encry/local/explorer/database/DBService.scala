@@ -7,9 +7,9 @@ import doobie.hikari.HikariTransactor
 import QueryRepository._
 import com.zaxxer.hikari.HikariDataSource
 import encry.EncryApp.settings
+import encry.modifiers.history.{Block, Header}
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.{EncryBlockHeader, HeaderDBVersion}
+import encry.modifiers.history.HeaderDBVersion
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, TransactionDBVersion}
 import encry.utils.Logging
@@ -19,14 +19,12 @@ import scala.util.control.NonFatal
 
 class DBService extends Logging {
 
-  def processBlock(block: EncryBlock): Future[Int] = runAsync(processBlockQuery(block), "processBlock")
-
-  def processHeader(block: EncryBlock): Future[Int] = runAsync(insertHeaderQuery(block), "processHeader")
+  def processBlock(block: Block): Future[Int] = runAsync(processBlockQuery(block), "processBlock")
 
   def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] =
     runAsync(markAsRemovedFromMainChainQuery(ids), "markAsRemovedFromMainChain")
 
-  def processOrphanedHeader(header: EncryBlockHeader): Future[Int] =
+  def processOrphanedHeader(header: Header): Future[Int] =
     runAsync(insertOrphanedHeaderQuery(header), "processOrphanedHeader")
 
   def selectHeight: Future[Int] = runAsync(heightQuery, "selectHeight")
