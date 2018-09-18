@@ -2,6 +2,7 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
+
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus.{CandidateBlock, EncrySupplyController}
@@ -27,8 +28,10 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
+
 import scala.collection._
 import scala.concurrent.duration._
 
@@ -54,7 +57,7 @@ class Miner extends Actor with Logging {
 
   def needNewCandidate(b: EncryBlock): Boolean =
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id)) ||
-      candidateOpt.flatMap(_.parentOpt).exists(_.height + 1 < b.header.height)
+      candidateOpt.exists(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height))
 
   override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
 
@@ -79,6 +82,10 @@ class Miner extends Actor with Logging {
       candidateOpt = None
       context.become(miningDisabled)
     case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
+      logInfo(s"MINED BLOCK on worker: $workerIdx with id: " +
+        s"${Algos.encode(block.header.id)} on height " +
+        s"${block.header.height} " +
+        s"with candidate on height: ${candidateOpt.map(_.parentOpt.map(_.height))}")
       logInfo(s"Going to propagate new block $block from worker $workerIdx")
       killAllWorkers()
       nodeViewHolder ! LocallyGeneratedModifier(block.header)
@@ -151,7 +158,6 @@ class Miner extends Actor with Logging {
                       bestHeaderOpt: Option[EncryBlockHeader]): CandidateBlock = {
     val timestamp: Time = timeProvider.estimatedTime
     val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
-
     // `txsToPut` - valid, non-conflicting txs with respect to their fee amount.
     // `txsToDrop` - invalidated txs to be dropped from mempool.
     val (txsToPut: Seq[Transaction], txsToDrop: Seq[Transaction], _) = view.pool.takeAll.toSeq.sortBy(_.fee).reverse
