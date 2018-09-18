@@ -155,6 +155,8 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
         headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(Constants.Chain.GenesisHeight)),
         headerScoreKey(h.id) -> ByteArrayWrapper(difficulty.toByteArray)), h)
     } else {
+      logInfo(s"Going to calculate score for header: ${h.asJson}")
+      logInfo(s"Score of header is: ${scoreOf(h.parentId)}")
       scoreOf(h.parentId).map { parentScore =>
         val score: Difficulty = Difficulty @@ (parentScore + difficulty)
         val betterScore: Boolean = bestHeaderIdOpt
