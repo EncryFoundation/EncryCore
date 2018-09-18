@@ -62,7 +62,7 @@ class Miner extends Actor with Logging {
       s"Block header: ${b.header.asJson}" +
       s"${candidateOpt.exists(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height))}")
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id)) &&
-      candidateOpt.exists(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height))
+      candidateOpt.forall(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height))
   }
 
   override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
