@@ -316,7 +316,8 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
     private def validateChildBlockHeader(header: EncryBlockHeader, parent: EncryBlockHeader): ValidationResult = {
       failFast
         .validate(header.timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift) {
-          error(s"Header timestamp ${header.timestamp} is too far in future from now ${timeProvider.estimatedTime}")
+          error(s"Header timestamp ${header.timestamp} " +
+            s"is too far in future from now ${timeProvider.estimatedTime}")
         }
         .validate(header.timestamp > parent.timestamp) {
           fatal(s"Header timestamp ${header.timestamp} is not greater than parents ${parent.timestamp}")
@@ -328,7 +329,12 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
           fatal("Header is already in history")
         }
         .validate(realDifficulty(header) >= header.requiredDifficulty) {
-          fatal(s"Block difficulty ${realDifficulty(header)} is less than required ${header.requiredDifficulty}")
+          fatal(s"Block difficulty ${realDifficulty(header)} is " +
+            s"less than required ${header.requiredDifficulty}")
+        }
+        .validate(header.difficulty >= requiredDifficultyAfter(parent)){
+          fatal(s"Incorrect required difficulty in header: " +
+            s"${Algos.encode(header.id)} on height ${header.height}")
         }
         .validate(heightOf(header.parentId).exists(h => bestHeaderHeight - h < Constants.Chain.MaxRollbackDepth)) {
           fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
