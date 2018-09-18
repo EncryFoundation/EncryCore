@@ -65,7 +65,7 @@ object EncryApp extends App with Logging {
   if (settings.kafka.exists(_.sendToKafka)) system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
   if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
   lazy val dbService: DBService = DBService()
-  if (settings.postgres.exists(_.enableSave)) system.actorOf(Props(classOf[BlockListener], dbService), "blockListener")
+  if (settings.postgres.exists(_.enableSave)) system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")
   if (settings.node.mining) miner ! StartMining
   if (settings.levelDb.exists(_.enableSave)) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
   else if (settings.postgres.exists(_.enableRestore)) system.actorOf(Props(classOf[PostgresRestore], dbService), "postgresRestore") ! StartRecovery

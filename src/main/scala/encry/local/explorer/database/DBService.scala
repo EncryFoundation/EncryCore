@@ -53,11 +53,10 @@ class DBService extends Logging {
     dataSource.setMaximumPoolSize(5)
   }
 
-  private def shutdown(): Unit = {
+  sys.addShutdownHook {
     logInfo("Shutting down dataSource")
     dataSource.close()
   }
-  sys.addShutdownHook(shutdown())
 
   private lazy val pgTransactor: HikariTransactor[IO] = HikariTransactor[IO](dataSource)
 
