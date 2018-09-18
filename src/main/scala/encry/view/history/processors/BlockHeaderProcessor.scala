@@ -160,8 +160,11 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
       scoreOf(h.parentId).map { parentScore =>
         val score: Difficulty = Difficulty @@ (parentScore + difficulty)
         val betterScore: Boolean = bestHeaderIdOpt
-          .flatMap(scoreOf)
-          .exists(_ <= score)
+          .flatMap(header => {
+            val scoreOhHeader = scoreOf(header)
+            logInfo(s"Score of header: ${Algos.encode(h.id)} on height ${h.height} is $score and score of best header ${}")
+            scoreOhHeader.map(_ <= score)
+          }).getOrElse(false)
         val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
           if (betterScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
         val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
