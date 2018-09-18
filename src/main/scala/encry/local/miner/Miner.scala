@@ -27,11 +27,9 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 import scala.collection._
-import scala.concurrent.duration._
 
 class Miner extends Actor with Logging {
 
@@ -44,26 +42,15 @@ class Miner extends Actor with Logging {
   var syncingDone: Boolean = false
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
 
-  override def preStart(): Unit = {
-    context.system.scheduler.schedule(10.second, 30.second) (self ! Heartbeat)
+  override def preStart(): Unit =
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
-  }
 
   override def postStop(): Unit = killAllWorkers()
 
   def killAllWorkers(): Unit = context.children.foreach(context.stop)
 
-  def needNewCandidate(b: EncryBlock): Boolean = {
-    logInfo(s"Going to check newCand cond for block: ${b.asJson}\n " +
-      s"!candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id)): " +
-      s"${!candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))}\n " +
-      s"candidateOpt.exists(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height):\n " +
-      s"Candidate parent opt is: ${candidateOpt.map(_.parentOpt.map(_.asJson))}\n " +
-      s"Block header: ${b.header.asJson}" +
-      s"${candidateOpt.exists(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height))}")
-    !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id)) &&
-      candidateOpt.forall(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height))
-  }
+  def needNewCandidate(b: EncryBlock): Boolean = !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id)) &&
+    candidateOpt.forall(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height))
 
   override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
 
@@ -88,11 +75,6 @@ class Miner extends Actor with Logging {
       candidateOpt = None
       context.become(miningDisabled)
     case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
-      logInfo(s"MINED BLOCK on worker: $workerIdx with id: " +
-        s"${Algos.encode(block.header.id)} on height " +
-        s"${block.header.height} " +
-        s"with candidate on height: ${candidateOpt.map(_.parentOpt.map(_.height))}")
-      logInfo(s"Going to propagate new block $block from worker $workerIdx")
       killAllWorkers()
       nodeViewHolder ! LocallyGeneratedModifier(block.header)
       nodeViewHolder ! LocallyGeneratedModifier(block.payload)
@@ -105,8 +87,6 @@ class Miner extends Actor with Logging {
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
-    case Heartbeat =>
-      logInfo(s"Mining enabled! Current cond opt: ${candidateOpt.map(_.asJson).getOrElse("No cond opt!")}")
       if (candidateOpt.isEmpty) self ! StartMining
     case _ =>
   }
@@ -119,7 +99,6 @@ class Miner extends Actor with Logging {
       unknownMessage
 
   def miningDisabled: Receive = {
-    case Heartbeat => logInfo("Mining disabled!")
     case EnableMining =>
       context.become(miningEnabled)
       self ! StartMining
@@ -208,7 +187,6 @@ class Miner extends Actor with Logging {
       val producingStartTime: Time = System.currentTimeMillis()
       startTime = producingStartTime
       val bestHeaderOpt: Option[EncryBlockHeader] = view.history.bestBlockOpt.map(_.header)
-      logInfo(s"Best header during block creation is: ${bestHeaderOpt.asJson}")
       bestHeaderOpt match {
         case Some(h) => logInfo(s"Best header at height ${h.height}")
         case None => logInfo(s"No best header opt")
@@ -226,8 +204,6 @@ class Miner extends Actor with Logging {
 }
 
 object Miner {
-
-  case object Heartbeat
 
   case object DisableMining
 

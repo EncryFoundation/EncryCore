@@ -39,14 +39,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
     * Complete block of the best chain with transactions.
     * Always None for an SPV mode, Some(fullBLock) for fullnode regime after initial bootstrap.
     */
-  def bestBlockOpt: Option[EncryBlock] =
-    bestBlockIdOpt.flatMap(id => {
-      val modifier = typedModifierById[EncryBlockHeader](id)
-      logInfo(s"Going to get " +
-        s"bestBlock by id: ${Algos.encode(id)} and get modifier: " +
-        s"${modifier.map(header => Algos.encode(header.id) + " on height: " + header.height)}")
-      modifier
-    }).flatMap(getBlock)
+  def bestBlockOpt: Option[EncryBlock] = bestBlockIdOpt.flatMap(typedModifierById[EncryBlockHeader]).flatMap(getBlock)
 
   /** @return ids of count headers starting from offset */
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))

@@ -9,8 +9,6 @@ import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
 import encry.utils.Logging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.Algos
-
 import scala.util.{Failure, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with Logging {
@@ -18,11 +16,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   import BlockProcessor._
 
   /** Id of header that contains transactions and proofs */
-  override def bestBlockIdOpt: Option[ModifierId] = {
-    val modifierId = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
-    logInfo(s"Get modifier by key BestBlockKey and it id is: ${modifierId.map(Algos.encode)}")
-    modifierId
-  }
+  override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
 
   protected def getBlock(h: EncryBlockHeader): Option[EncryBlock]
 
@@ -61,10 +55,6 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def processBetterChain: BlockProcessing = {
     case toProcess@ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterBlock(fullBlock) =>
-      logInfo(s"Going to process better chain with: ${Algos.encode(fullBlock.id)}." +
-        s"\nNewmodRow: ${Algos.encode(newModRow.id)}" +
-        s"\nnewBestHeader: ${Algos.encode(newBestHeader.id)} at heigth ${newBestHeader.height}" +
-        s"\nBlocksToKeep: ${blocksToKeep}")
       val prevBest: EncryBlock = bestBlockOpt.get
       val (prevChain: EncryHeaderChain, newChain: EncryHeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
       val toRemove: Seq[EncryBlock] = prevChain.tail.headers.flatMap(getBlock)
@@ -110,13 +100,8 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
 
   private def calculateBestFullChain(block: EncryBlock): Seq[EncryBlock] = {
     val continuations: Seq[Seq[EncryBlockHeader]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
-    logInfo(s"Going to calculate bestFullChain. Continuations: ${continuations.map(_.map(_.height).mkString(",")).mkString("|")}")
     val chains: Seq[Seq[EncryBlock]] = continuations.map(_.map(getBlock).takeWhile(_.nonEmpty).flatten)
-    logInfo(s"Chains: ${chains.map(_.map(_.header.height).mkString(",")).mkString("|")}")
-    chains.map(block +: _).maxBy{c =>
-      logInfo(s"Count score to chain: ${c.map(_.header.height).mkString(",")} and it is: ${scoreOf(c.last.id).getOrElse(BigInt(0))}")
-      scoreOf(c.last.id).getOrElse(BigInt(0))
-    }
+    chains.map(block +: _).maxBy(c => scoreOf(c.last.id).getOrElse(BigInt(0)))
   }
 
   private def clipBlockDataAt(heights: Seq[Int]): Try[Unit] = Try {
@@ -129,7 +114,6 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
 
   private def updateStorage(newModRow: EncryPersistentModifier, bestFullHeaderId: ModifierId): Unit = {
     val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeaderId)
-    logInfo(s"Set: ${Algos.encode(bestFullHeaderId)} to best block")
     val bestBlockData: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = Seq(BestBlockKey -> bestFullHeaderIdWrapped)
     historyStorage.bulkInsert(storageVersion(newModRow), bestBlockData, Seq(newModRow))
   }

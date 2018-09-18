@@ -22,7 +22,6 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
 import io.circe.syntax._
-import io.circe.{Encoder, Json}
 import scala.collection.immutable
 import scala.util.Try
 
@@ -45,34 +44,20 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
     def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] = {
       if (acc.lengthCompare(howMany) >= 0) acc
       else {
-        headerIdsAtHeight(height).map{modifierId =>
-          logInfo(s"Going to calculate necessary modifiers: ${Algos.encode(modifierId)}")
-          modifierId
-        }.headOption.flatMap(id => {
-          logInfo(s"Header by this id is: ${typedModifierById[EncryBlockHeader](id).asJson}")
-          typedModifierById[EncryBlockHeader](id)
-        }) match {
+        headerIdsAtHeight(height).headOption.flatMap(typedModifierById[EncryBlockHeader]) match {
           case Some(bestHeaderAtThisHeight) =>
-            logInfo(s"Best header on height $height is ${bestHeaderAtThisHeight.asJson}")
             val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
               .filter(m => !excluding.exists(_ sameElements m._2))
               .filter(m => !contains(m._2))
-            logInfo(s"Need to download: ${toDownload.map(_._2).map(Algos.encode).mkString(",")}")
             continuation(Height @@ (height + 1), acc ++ toDownload)
           case None => acc
         }
       }
     }
 
-    logInfo(s"Going to download modifiers. BestBlockOpt is: ${bestBlockOpt.map(_.asJson)}")
-
     bestBlockOpt match {
-      case _ if !isHeadersChainSynced =>
-        logInfo("Header chain is not sync!")
-        Seq.empty
-      case Some(fb) =>
-        logInfo("Looks like bestBlockOpt exist!")
-        continuation(Height @@ (fb.header.height + 1), Seq.empty)
+      case _ if !isHeadersChainSynced => Seq.empty
+      case Some(fb) => continuation(Height @@ (fb.header.height + 1), Seq.empty)
       case None => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
@@ -155,16 +140,11 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
         headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(Constants.Chain.GenesisHeight)),
         headerScoreKey(h.id) -> ByteArrayWrapper(difficulty.toByteArray)), h)
     } else {
-      logInfo(s"Going to calculate score for header: ${h.asJson}")
-      logInfo(s"Score of header is: ${scoreOf(h.parentId)}")
       scoreOf(h.parentId).map { parentScore =>
         val score: Difficulty = Difficulty @@ (parentScore + difficulty)
         val betterScore: Boolean = bestHeaderIdOpt
-          .flatMap(header => {
-            val scoreOhHeader = scoreOf(header)
-            logInfo(s"Score of header: ${Algos.encode(h.id)} on height ${h.height} is $score and score of best header ${}")
-            scoreOhHeader.map(_ <= score)
-          }).getOrElse(false)
+          .flatMap(scoreOf)
+          .exists(_ <= score)
         val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
           if (betterScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
         val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
@@ -229,14 +209,10 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
   private def bestHeaderIdAtHeight(h: Int): Option[ModifierId] = headerIdsAtHeight(h).headOption
 
   protected def scoreOf(id: ModifierId): Option[BigInt] = {
-    typedModifierById[EncryBlockHeader](id).flatMap(header => {
-        logInfo(s"Header: ${header.asJson}")
-        typedModifierById[EncryBlockHeader](header.parentId).map(parent => {
-          logInfo(s"Parent is: ${parent.asJson}")
+    typedModifierById[EncryBlockHeader](id).flatMap(header =>
+        typedModifierById[EncryBlockHeader](header.parentId).map(parent =>
           header.difficulty + parent.difficulty
-        }
         )
-      }
     )
 
     historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))
