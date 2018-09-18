@@ -5,6 +5,7 @@ import scala.concurrent.duration._
 import encry.EncryApp.system
 import encry.api.http.routes.GetAllBoxes
 import encry.modifiers.state.box.EncryBaseBox
+import encry.stats.StatsSender.CurrentUtxosQtyInIOdb
 import encry.view.history.EncryHistory
 import encry.view.mempool.EncryMempool
 import encry.view.state.UtxoState
@@ -23,9 +24,9 @@ class WalletStorageHolder extends Actor {
   }
 
   override def receive: Receive = {
-    case GetAllBoxes() => val a = buffer.takeRight(buffer.size / 2)
-      sender() ! a
-      buffer = buffer.diff(a)
+    case GetAllBoxes() => sender() ! buffer.takeRight(1000)
+      buffer = buffer.dropRight(1000)
     case seq: Seq[EncryBaseBox] => buffer = seq
+      system.actorSelection("user/statsSender") ! CurrentUtxosQtyInIOdb(seq.size)
   }
 }

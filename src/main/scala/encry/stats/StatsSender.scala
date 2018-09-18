@@ -46,8 +46,8 @@ class StatsSender extends Actor {
       influxDB.write(settings.influxDB.udpPort, s"workedTime,nodeName=$nodeName value=$a,size=$b")
     case TxsInBlock(txsNum) =>
       influxDB.write(settings.influxDB.udpPort, s"txsInEachBlock,nodeName=$nodeName value=$txsNum")
-    case TxsInBlockchain(qty) =>
-      influxDB.write(settings.influxDB.udpPort, s"txsInBlocks,nodeName=$nodeName value=$qty")
+    case CurrentUtxosQtyInIOdb(utxosQty) =>
+      influxDB.write(settings.influxDB.udpPort, s"utxosQty,nodeName=$nodeName value=$utxosQty")
     case DiffBtwMempoolAndLastBlockTxs(num) =>
       influxDB.write(settings.influxDB.udpPort, s"txsDiff,nodeName=$nodeName value=$num")
     case MempoolStat(size) =>
@@ -169,11 +169,11 @@ object StatsSender {
 
   case class DiffBtwMempoolAndLastBlockTxs(diff: Int)
 
-  case class TxsInBlockchain(qty: Int)
-
   case class TxsInBlock(txsNum: Int)
 
   case class WorkedTime(time: Long, size: Int)
 
   case class GetAllTiming(time: Long, size: Int)
+
+  case class CurrentUtxosQtyInIOdb(utxosQty: Int)
 }

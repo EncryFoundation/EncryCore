@@ -76,10 +76,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       system.actorSelection("user/statsSender") ! DiffBtwMempoolAndLastBlockTxs(diffBtw)
     }
   }
-  system.scheduler.schedule(5 second, 10 second) {
-    system.actorSelection("user/statsSender") ! TxsInBlockchain(txsInBlocks)
-    txsInBlocks = 0
-  }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     reason.printStackTrace()

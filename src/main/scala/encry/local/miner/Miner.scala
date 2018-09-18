@@ -165,7 +165,7 @@ class Miner extends Actor with Logging {
     val txs: Seq[Transaction] = txsToPut.sortBy(_.timestamp) :+ coinbase
 
     val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
-      .getOrElse(throw new Exception("ADProof generation failed"))
+      .getOrElse(throw new RuntimeException("ADProof generation failed"))
 
     val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
       .getOrElse(Constants.Chain.InitialDifficulty)
