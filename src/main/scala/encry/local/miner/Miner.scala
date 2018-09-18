@@ -56,7 +56,7 @@ class Miner extends Actor with Logging {
   def killAllWorkers(): Unit = context.children.foreach(context.stop)
 
   def needNewCandidate(b: EncryBlock): Boolean =
-    !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id)) ||
+    !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id)) &&
       candidateOpt.exists(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height))
 
   override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
