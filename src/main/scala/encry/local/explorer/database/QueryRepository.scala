@@ -6,18 +6,16 @@ import doobie.util.update.Update
 import doobie.postgres.implicits._
 import doobie.implicits._
 import doobie.util.log.{ExecFailure, LogHandler, ProcessingFailure, Success}
-import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.{EncryBlockHeader, HeaderDBVersion}
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.{Block, Header, HeaderDBVersion, Payload}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.utils.Logging
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, TransactionDBVersion, Transaction}
+import encry.modifiers.mempool.{InputDBVersion, OutputDBVersion, Transaction, TransactionDBVersion}
 import scorex.crypto.encode.Base16
 
 protected[database] object QueryRepository extends Logging {
 
-  def processBlockQuery(block: EncryBlock): ConnectionIO[Int] =
+  def processBlockQuery(block: Block): ConnectionIO[Int] =
     for {
       headerR <- insertHeaderQuery(block)
       txsR    <- insertTransactionsQuery(block)
@@ -31,7 +29,7 @@ protected[database] object QueryRepository extends Logging {
     Update[String](query).updateMany(ids.map(Base16.encode))
   }
 
-  def insertHeaderQuery(block: EncryBlock): ConnectionIO[Int] = {
+  def insertHeaderQuery(block: Block): ConnectionIO[Int] = {
     val headerDB: HeaderDBVersion = HeaderDBVersion(block)
     val query: String =
       """
@@ -42,7 +40,7 @@ protected[database] object QueryRepository extends Logging {
     Update[HeaderDBVersion](query).run(headerDB)
   }
 
-  def insertOrphanedHeaderQuery(header: EncryBlockHeader): ConnectionIO[Int] = {
+  def insertOrphanedHeaderQuery(header: Header): ConnectionIO[Int] = {
     val headerDB: HeaderDBVersion = HeaderDBVersion(header)
     val query: String =
       """
@@ -78,7 +76,7 @@ protected[database] object QueryRepository extends Logging {
          |SELECT * FROM public.directives WHERE tx_id = ANY(SELECT unnest(k) FROM tmp)
        """.stripMargin.query[DirectiveDBVersion].to[List]
 
-  private def insertTransactionsQuery(block: EncryBlock): ConnectionIO[Int] = {
+  private def insertTransactionsQuery(block: Block): ConnectionIO[Int] = {
     val txs: Seq[TransactionDBVersion] = TransactionDBVersion(block)
     val query: String =
       """
@@ -88,7 +86,7 @@ protected[database] object QueryRepository extends Logging {
     Update[TransactionDBVersion](query).updateMany(txs.toList)
   }
 
-  private def insertInputsQuery(p: EncryBlockPayload): ConnectionIO[Int] = {
+  private def insertInputsQuery(p: Payload): ConnectionIO[Int] = {
     val inputs: Seq[InputDBVersion] = p.transactions.flatMap(InputDBVersion(_))
     val query: String =
       """
@@ -98,7 +96,7 @@ protected[database] object QueryRepository extends Logging {
     Update[InputDBVersion](query).updateMany(inputs.toList)
   }
 
-  private def insertOutputsQuery(p: EncryBlockPayload): ConnectionIO[Int] = {
+  private def insertOutputsQuery(p: Payload): ConnectionIO[Int] = {
     val outputs: Seq[OutputDBVersion] = p.transactions.flatMap(OutputDBVersion(_))
     val query: String =
       """

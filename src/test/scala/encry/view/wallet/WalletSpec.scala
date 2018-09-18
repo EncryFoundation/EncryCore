@@ -2,9 +2,7 @@ package encry.view.wallet
 
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.InstanceFactory
-import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.{AssetBox, MonetaryBox}
 import encry.settings.{Constants, EncryAppSettings}
@@ -43,13 +41,13 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
       }
     }
 
-    val blockPayload: EncryBlockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
+    val blockPayload: Payload = Payload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
 
-    val firstBlock: EncryBlock = EncryBlock(genHeader, blockPayload, None)
+    val firstBlock: Block = Block(genHeader, blockPayload, None)
 
-    val blockPayloadWithSpentTx: EncryBlockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), Seq(spentTx))
+    val blockPayloadWithSpentTx: Payload = Payload(ModifierId @@ Array.fill(32)(19: Byte), Seq(spentTx))
 
-    val secondBlock: EncryBlock = EncryBlock(genHeader, blockPayloadWithSpentTx, None)
+    val secondBlock: Block = Block(genHeader, blockPayloadWithSpentTx, None)
 
     wallet.scanPersistent(firstBlock)
 
@@ -64,7 +62,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val txsQty: Int = 4
 
-    val blockHeader: EncryBlockHeader = genHeader
+    val blockHeader: Header = genHeader
 
     val walletStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
 
@@ -76,9 +74,9 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val validTxs: Seq[Transaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.mandatoryAccount.publicImage.address.address)
 
-    val blockPayload: EncryBlockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
+    val blockPayload: Payload = Payload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
 
-    val block: EncryBlock = EncryBlock(blockHeader, blockPayload, None)
+    val block: Block = Block(blockHeader, blockPayload, None)
 
     wallet.scanPersistent(block)
 

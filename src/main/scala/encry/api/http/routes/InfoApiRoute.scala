@@ -5,8 +5,8 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
-import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.Block
+import encry.modifiers.history.Header
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
 import encry.settings._
@@ -53,7 +53,8 @@ case class InfoApiRoute(readersHolder: ActorRef,
     .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + appSettings.network.bindAddress.getPort)
 
   private def storageInfo: String = (appSettings.levelDb, appSettings.postgres) match {
-    case (Some(LevelDbSettings(levelDbSave, levelDbRestore, _)), Some(PostgresSettings(_, _, _, _, pgSave, pgRestore, _))) =>
+    case (Some(LevelDbSettings(levelDbSave, levelDbRestore, _)),
+    Some(PostgresSettings(_, _, _, _, pgSave, pgRestore, _))) =>
       if ((levelDbSave || levelDbRestore) && (pgSave || pgRestore))
         s"LevelDb(${if (levelDbSave) "write" else ""} ${if (levelDbRestore) "read" else ""}), " +
           s"Postgres(${if (pgSave) "write" else ""} ${if (pgRestore) "read" else ""})"
@@ -84,8 +85,8 @@ object InfoApiRoute {
                    nodeUptime: Long,
                    connectWithOnlyKnownPeer: Boolean): Json = {
     val stateVersion: Option[String] = readers.s.map(_.version).map(Algos.encode)
-    val bestHeader: Option[EncryBlockHeader] = readers.h.flatMap(_.bestHeaderOpt)
-    val bestFullBlock: Option[EncryBlock] = readers.h.flatMap(_.bestBlockOpt)
+    val bestHeader: Option[Header] = readers.h.flatMap(_.bestHeaderOpt)
+    val bestFullBlock: Option[Block] = readers.h.flatMap(_.bestBlockOpt)
     val unconfirmedCount: Int = readers.m.map(_.size).getOrElse(0)
     Map(
       "name" -> nodeName.asJson,

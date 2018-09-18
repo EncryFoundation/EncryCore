@@ -4,13 +4,9 @@ import encry.settings.Constants
 
 object ConsensusSchemeReaders {
 
-  val readers: Seq[ConsensusSchemeReader[_ <: ConsensusScheme]] = Seq(
-    EquihashPowSchemeReader
-  )
-
   val consensusScheme: ConsensusScheme = {
     val schemeName = Constants.Chain.ConsensusScheme
-    readers.find(_.schemeName == schemeName)
+    Seq(EquihashPowSchemeReader).find(_.schemeName == schemeName)
       .getOrElse(EquihashPowSchemeReader)
       .read
   }
