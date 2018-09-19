@@ -68,7 +68,8 @@ object EncryApp extends App with Logging {
   lazy val dbService: DBService = DBService()
   if (settings.postgres.exists(_.enableSave)) system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")
   if (settings.node.mining) miner ! StartMining
-  if (settings.levelDb.exists(_.enableSave)) system.actorOf(Props[ModifiersHolder], "modifiersHolder")
+  if (settings.levelDb.exists(_.enableSave) || settings.levelDb.exists(_.enableRestore))
+    system.actorOf(Props[ModifiersHolder], "modifiersHolder")
   else if (settings.postgres.exists(_.enableRestore))
     system.actorOf(Props(classOf[PostgresRestore], dbService), "postgresRestore") ! StartRecovery
   if (settings.node.enableCLI) {

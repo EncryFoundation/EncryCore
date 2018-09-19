@@ -42,7 +42,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
-  var receivedAll: Boolean = !settings.postgres.exists(_.enableRestore)
+  var receivedAll: Boolean = !(settings.postgres.exists(_.enableRestore) || settings.levelDb.exists(_.enableRestore))
   var triedToDownload: Boolean = !settings.postgres.exists(_.enableRestore)
   val modifiersCache: EncryModifiersCache = EncryModifiersCache(1000)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
@@ -87,7 +87,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         logInfo(s"Received all blocks from recovery")
         peerManager ! RecoveryCompleted
       }
-      if (applicationsSuccessful && settings.levelDb.exists(_.enableRestore)) sender ! SendBlocks
+      if (applicationsSuccessful && settings.levelDb.exists(_.enableRestore) && !receivedAll) sender ! SendBlocks
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
       if (modifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
       modifierSerializers.get(modifierTypeId).foreach { companion =>
