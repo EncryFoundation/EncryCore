@@ -82,6 +82,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             peerManager ! RecoveryCompleted
         }
       }
+      if (settings.levelDb.exists(_.enableSave)) {
+        context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(Header.modifierTypeId, blocks.map(_.header))
+        context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(Payload.modifierTypeId, blocks.map(_.payload))
+        context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(ADProofs.modifierTypeId, blocks.flatMap(_.adProofsOpt))
+      }
       receivedAll = allSent
       if (receivedAll) {
         logInfo(s"Received all blocks from recovery")
