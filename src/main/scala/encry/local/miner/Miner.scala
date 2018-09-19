@@ -87,7 +87,6 @@ class Miner extends Actor with Logging {
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
-      if (candidateOpt.isEmpty) self ! StartMining
     case _ =>
   }
 
