@@ -21,7 +21,7 @@ class PostgresRestore(dbService: DBService) extends Actor with Logging {
 
   val heightFuture: Future[Int] = dbService.selectHeight
 
-  override def postStop(): Unit = dbService.shutdown()
+  override def postStop(): Unit = if (settings.postgres.exists(_.enableSave)) Unit else dbService.shutdown()
 
   heightFuture.onComplete {
     case Success(height) => logInfo(s"Going to download $height blocks from postgres")
