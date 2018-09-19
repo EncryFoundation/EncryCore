@@ -66,8 +66,7 @@ object EncryApp extends App with Logging {
     system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
   if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
   lazy val dbService: DBService = DBService()
-  if (settings.postgres.exists(_.enableSave))
-    system.actorOf(Props(classOf[BlockListener], dbService), "blockListener")
+  if (settings.postgres.exists(_.enableSave)) system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")
   if (settings.node.mining) miner ! StartMining
   if (settings.levelDb.exists(_.enableSave) || settings.levelDb.exists(_.enableRestore))
     system.actorOf(Props[ModifiersHolder], "modifiersHolder")
@@ -117,4 +116,6 @@ object EncryApp extends App with Logging {
     withinTimeRange = 60 seconds) {
     case _ => Restart
   }
+
+  sys.addShutdownHook(system.terminate)
 }
