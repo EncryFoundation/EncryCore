@@ -22,6 +22,8 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
 
   val heightFuture: Future[Int] = dbService.selectHeight
 
+  override def postStop(): Unit = if (settings.postgres.exists(_.enableSave)) Unit else dbService.shutdown()
+
   heightFuture.onComplete {
     case Success(_) =>
       logInfo(s"Going to download blocks from postgres")
