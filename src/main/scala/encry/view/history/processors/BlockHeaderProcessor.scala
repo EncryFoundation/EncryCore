@@ -21,11 +21,10 @@ import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
-import io.circe.syntax._
 import scala.collection.immutable
 import scala.util.Try
 
-trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
+trait BlockHeaderProcessor extends Logging {
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider
@@ -208,15 +207,11 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
 
   private def bestHeaderIdAtHeight(h: Int): Option[ModifierId] = headerIdsAtHeight(h).headOption
 
-  protected def scoreOf(id: ModifierId): Option[BigInt] = {
-    typedModifierById[EncryBlockHeader](id).flatMap(header =>
-        typedModifierById[EncryBlockHeader](header.parentId).map(parent =>
-          header.difficulty + parent.difficulty
-        )
-    )
-
-    historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))
-  }
+  protected def scoreOf(id: ModifierId): Option[BigInt] = typedModifierById[EncryBlockHeader](id).flatMap(header =>
+      typedModifierById[EncryBlockHeader](header.parentId).map(parent =>
+        header.difficulty + parent.difficulty
+      )
+  )
 
   def heightOf(id: ModifierId): Option[Height] = historyStorage.get(headerHeightKey(id))
     .map(d => Height @@ Ints.fromByteArray(d))
