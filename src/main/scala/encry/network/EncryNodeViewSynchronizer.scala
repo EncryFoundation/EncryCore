@@ -92,7 +92,6 @@ class EncryNodeViewSynchronizer(syncInfoSpec: EncrySyncInfoMessageSpec.type) ext
         logDebug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
           s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
         logDebug(s"Peer: ${remote.socketAddress} requested for modifiers of type ${invData._1}.")
-        if (invData._1 != EncryBlockPayload.modifierTypeId)
         self ! ResponseFromLocal(remote, invData._1, objs)
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
