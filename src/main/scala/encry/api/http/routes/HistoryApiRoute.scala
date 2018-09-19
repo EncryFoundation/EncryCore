@@ -32,7 +32,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
 
   override val settings: RESTApiSettings = appSettings.restApi
 
-  private def getHistory: Future[EncryHistoryReader] = (readersHolder ? GetDataFromHistory[EncryHistoryReader](r => r)).mapTo[EncryHistoryReader]
+  private def getHistory: Future[EncryHistoryReader] = (readersHolder ? GetDataFromHistory).mapTo[EncryHistoryReader]
 
   private def getHeaderIdsAtHeight(h: Int): Future[Json] = getHistory.map {
     _.headerIdsAtHeight(h).map(Algos.encode).asJson
