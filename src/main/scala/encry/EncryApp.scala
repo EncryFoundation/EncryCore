@@ -114,4 +114,6 @@ object EncryApp extends App with Logging {
     withinTimeRange = 60 seconds) {
     case _ => Restart
   }
+
+  sys.addShutdownHook(system.terminate)
 }
