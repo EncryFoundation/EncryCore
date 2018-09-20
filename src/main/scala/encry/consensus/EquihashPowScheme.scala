@@ -4,17 +4,15 @@ import com.google.common.primitives.Chars
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.crypto.equihash.{Equihash, EquihashSolution}
-import encry.modifiers.history.ADProofs
-import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.history.block.payload.EncryBlockPayload
-import encry.modifiers.history.block.Block.Version
+import encry.modifiers.history.{ADProofs, Block, Header, Payload}
+import encry.modifiers.history.Block.Version
 import encry.modifiers.mempool.Transaction
 import encry.settings.Constants
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.SerializedAdProof
 import scorex.crypto.hash.Digest32
+
 import scala.annotation.tailrec
 import scala.math.BigInt
 
@@ -25,7 +23,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
 
   override def verifyCandidate(candidateBlock: CandidateBlock,
                                finishingNonce: Long,
-                               startingNonce: Long): Option[EncryBlock] = {
+                               startingNonce: Long): Option[Block] = {
     require(finishingNonce >= startingNonce)
 
     val difficulty: Difficulty = candidateBlock.difficulty
@@ -37,7 +35,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
     val wordsPerHash = 512 / n
 
     val digest = new Blake2bDigest(null, bytesPerWord * wordsPerHash, null, seed) // scalastyle:ignore
-    val h = EncryBlockHeader(
+    val h = Header(
       version,
       parentId,
       adProofsRoot,
@@ -51,7 +49,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
     )
 
     @tailrec
-    def generateHeader(nonce: Long): Option[EncryBlockHeader] = {
+    def generateHeader(nonce: Long): Option[Header] = {
       val currentDigest = new Blake2bDigest(digest)
       Equihash.hashNonce(currentDigest, nonce)
       val solutions = Equihash.gbpBasic(currentDigest, n, k)
@@ -70,13 +68,13 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
     possibleHeader.flatMap(header => {
       if (verify(header)) {
         val adProofs = ADProofs(header.id, candidateBlock.adProofBytes)
-        val payload = EncryBlockPayload(header.id, candidateBlock.transactions)
-        Some(EncryBlock(header, payload, Some(adProofs)))
+        val payload = Payload(header.id, candidateBlock.transactions)
+        Some(Block(header, payload, Some(adProofs)))
       } else None
     })
   }
 
-  def verify(header: EncryBlockHeader): Boolean =
+  def verify(header: Header): Boolean =
     Equihash.validateSolution(
       n,
       k,
@@ -85,19 +83,19 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
       header.equihashSolution.indexedSeq
     )
 
-  override def getDerivedHeaderFields(parentOpt: Option[EncryBlockHeader],
+  override def getDerivedHeaderFields(parentOpt: Option[Header],
                                       adProofBytes: SerializedAdProof,
                                       transactions: Seq[Transaction]): (Byte, ModifierId, Digest32, Digest32, Int) = {
     val version: Version = Constants.Chain.Version
-    val parentId: ModifierId = parentOpt.map(_.id).getOrElse(EncryBlockHeader.GenesisParentId)
+    val parentId: ModifierId = parentOpt.map(_.id).getOrElse(Header.GenesisParentId)
     val adProofsRoot: Digest32 = ADProofs.proofDigest(adProofBytes)
-    val txsRoot: Digest32 = EncryBlockPayload.rootHash(transactions.map(_.id))
+    val txsRoot: Digest32 = Payload.rootHash(transactions.map(_.id))
     val height: Int = parentOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1
 
     (version, parentId, adProofsRoot, txsRoot, height)
   }
 
-  override def realDifficulty(header: EncryBlockHeader): Difficulty = {
+  override def realDifficulty(header: Header): Difficulty = {
     Difficulty @@ (Constants.Chain.MaxTarget / BigInt(1, header.powHash))
   }
 

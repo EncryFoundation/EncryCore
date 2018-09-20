@@ -5,8 +5,7 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
-import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.{Block, Header}
 import encry.settings.{EncryAppSettings, RESTApiSettings}
 import encry.view.EncryViewReadersHolder.GetDataFromHistory
 import encry.view.history.EncryHistoryReader
@@ -14,6 +13,7 @@ import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
+
 import scala.concurrent.Future
 
 case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings: EncryAppSettings,
@@ -32,7 +32,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
 
   override val settings: RESTApiSettings = appSettings.restApi
 
-  private def getHistory: Future[EncryHistoryReader] = (readersHolder ? GetDataFromHistory[EncryHistoryReader](r => r)).mapTo[EncryHistoryReader]
+  private def getHistory: Future[EncryHistoryReader] = (readersHolder ? GetDataFromHistory).mapTo[EncryHistoryReader]
 
   private def getHeaderIdsAtHeight(h: Int): Future[Json] = getHistory.map {
     _.headerIdsAtHeight(h).map(Algos.encode).asJson
@@ -47,8 +47,8 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
       _.getHeaderIds(limit, offset).map(Algos.encode).asJson
     }
 
-  private def getFullBlockByHeaderId(headerId: ModifierId): Future[Option[EncryBlock]] = getHistory.map { history =>
-    history.typedModifierById[EncryBlockHeader](headerId).flatMap(history.getBlock)
+  private def getFullBlockByHeaderId(headerId: ModifierId): Future[Option[Block]] = getHistory.map { history =>
+    history.typedModifierById[Header](headerId).flatMap(history.getBlock)
   }
 
   def getBlocksR: Route = (pathEndOrSingleSlash & get & paging) { (offset, limit) => getHeaderIds(offset, limit).okJson() }

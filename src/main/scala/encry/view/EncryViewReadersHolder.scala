@@ -28,14 +28,14 @@ class EncryViewReadersHolder extends Actor {
     case ChangedMempool(reader: EncryMempoolReader@unchecked) if reader.isInstanceOf[EncryMempoolReader] =>
       mempoolReaderOpt = Some(reader)
     case GetReaders => sender ! Readers(historyReaderOpt, stateReaderOpt, mempoolReaderOpt)
-    case GetDataFromHistory(f) => historyReaderOpt.foreach(sender ! f(_))
+    case GetDataFromHistory => historyReaderOpt.foreach(sender ! _)
     case _ =>
   }
 }
 
 object EncryViewReadersHolder {
 
-  case class GetDataFromHistory[A](f: EncryHistoryReader => A)
+  case object GetDataFromHistory
 
   case object GetReaders
 

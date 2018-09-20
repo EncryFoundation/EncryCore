@@ -1,12 +1,12 @@
-package encry.modifiers.history.block.payload
+package encry.modifiers.history
 
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.TestHelper
-import org.scalatest.FunSuite
 import encry.view.history.History.Height
+import org.scalatest.FunSuite
 
-class EncryBlockPayloadSerializerTest extends FunSuite {
+class PayloadSerializerTest extends FunSuite {
 
   test("testParseBytes & testToBytes") {
 
@@ -19,11 +19,11 @@ class EncryBlockPayloadSerializerTest extends FunSuite {
       TransactionFactory.coinbaseTransactionScratch(k.publicImage, timestamp, 10L, 0, Height @@ 100)
     }
 
-    val blockPayload = EncryBlockPayload(ModifierId @@ Array.fill(32)(19: Byte), txs)
+    val blockPayload = Payload(ModifierId @@ Array.fill(32)(19: Byte), txs)
 
-    val blockPayloadSerialized = EncryBlockPayloadSerializer.toBytes(blockPayload)
+    val blockPayloadSerialized = PayloadSerializer.toBytes(blockPayload)
 
-    val blockPayloadDeserialized = EncryBlockPayloadSerializer.parseBytes(blockPayloadSerialized)
+    val blockPayloadDeserialized = PayloadSerializer.parseBytes(blockPayloadSerialized)
 
     assert(blockPayloadDeserialized.isSuccess, "Deserialization failed.")
 

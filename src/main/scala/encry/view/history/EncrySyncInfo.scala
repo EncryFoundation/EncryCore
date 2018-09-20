@@ -3,18 +3,19 @@ package encry.view.history
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.SyncInfo
 import encry.EncryApp.settings
-import encry.modifiers.history.block.header.EncryBlockHeader
 import encry.consensus.History.ModifierIds
 import encry.modifiers.NodeViewModifier
+import encry.modifiers.history.Header
 import encry.network.message.SyncInfoMessageSpec
 import org.encryfoundation.common.serialization.Serializer
+
 import scala.util.Try
 
 case class EncrySyncInfo(lastHeaderIds: Seq[ModifierId]) extends SyncInfo {
 
   override type M = EncrySyncInfo
 
-  override def startingPoints: ModifierIds = lastHeaderIds.map(id => EncryBlockHeader.modifierTypeId -> id)
+  override def startingPoints: ModifierIds = lastHeaderIds.map(id => Header.modifierTypeId -> id)
 
   override lazy val serializer: Serializer[M] = EncrySyncInfoSerializer
 }

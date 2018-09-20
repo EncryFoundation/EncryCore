@@ -3,7 +3,7 @@ package encry.view
 import java.lang
 import java.util.concurrent.ConcurrentHashMap
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.Header
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
 import scala.annotation.tailrec
@@ -12,11 +12,6 @@ import scala.collection.mutable
 import scala.util.{Failure, Success}
 import encry.utils.Logging
 
-/**
-  * A cache which is storing persistent modifiers not applied to history yet.
-  *
-  * @tparam PMOD - type of a persistent node view modifier (or a family of modifiers).
-  */
 trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
 
   type K = mutable.WrappedArray[Byte]
@@ -171,7 +166,7 @@ case class EncryModifiersCache(override val maxSize: Int)
 
     history
       .headerIdsAtHeight(history.bestBlockHeight + 1)
-      .flatMap(id => history.typedModifierById[EncryBlockHeader](id))
+      .flatMap(id => history.typedModifierById[Header](id))
       .flatMap(_.partsIds.map(id => mutable.WrappedArray.make[Byte](id)))
       .flatMap(id => cache.get(id).map(v => id -> v))
       .find(p => tryToApply(p._1, p._2)).map(_._1)
@@ -179,7 +174,7 @@ case class EncryModifiersCache(override val maxSize: Int)
         // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
         cache.find { case (k, v) =>
           v match {
-            case h: EncryBlockHeader if h.height > headersHeight + 1 => false
+            case h: Header if h.height > headersHeight + 1 => false
             case _ => tryToApply(k, v)
           }
         }.map { case (k, _) => k }
