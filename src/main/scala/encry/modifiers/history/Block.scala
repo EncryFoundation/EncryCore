@@ -1,13 +1,11 @@
-package encry.modifiers.history.block
+package encry.modifiers.history
 
 import com.google.common.primitives.{Bytes, Ints}
-import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.block.header.{EncryBlockHeader, EncryBlockHeaderSerializer}
-import encry.modifiers.history.block.payload.{EncryBlockPayload, EncryBlockPayloadSerializer}
-import encry.modifiers.history.{ADProofSerializer, ADProofs}
-import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.mempool.Transaction
+import encry.modifiers.mempool.directive.TransferDirective
+import encry.modifiers.state.box.EncryProposition
+import encry.modifiers.{EncryPersistentModifier, TransactionsCarryingPersistentNodeViewModifier}
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.validation.{ModifierValidator, ValidationResult}
 import io.circe.Encoder
 import io.circe.syntax._
@@ -15,17 +13,19 @@ import org.encryfoundation.common.serialization.Serializer
 import scorex.crypto.encode.Base16
 import scala.util.Try
 
-case class EncryBlock(override val header: EncryBlockHeader,
-                      override val payload: EncryBlockPayload,
-                      adProofsOpt: Option[ADProofs]) extends EncryBaseBlock with ModifierValidator {
+case class Block(header: Header,
+                 payload: Payload,
+                 adProofsOpt: Option[ADProofs])
+  extends TransactionsCarryingPersistentNodeViewModifier[EncryProposition, Transaction]
+    with EncryPersistentModifier with ModifierValidator {
 
-  override type M = EncryBlock
+  override type M = Block
 
-  override val toSeq: Seq[EncryPersistentModifier] = Seq(header, payload) ++ adProofsOpt.toSeq
+  val toSeq: Seq[EncryPersistentModifier] = Seq(header, payload) ++ adProofsOpt.toSeq
 
   override def transactions: Seq[Transaction] = payload.transactions
 
-  override def semanticValidity: Try[Unit] = validateSemantically.toTry
+  def semanticValidity: Try[Unit] = validateSemantically.toTry
 
   def validateSemantically: ValidationResult =
     accumulateErrors
@@ -34,11 +34,11 @@ case class EncryBlock(override val header: EncryBlockHeader,
 
   override def parentId: ModifierId = header.parentId
 
-  override val modifierTypeId: ModifierTypeId = EncryBlock.modifierTypeId
+  override val modifierTypeId: ModifierTypeId = Block.modifierTypeId
 
   override lazy val id: ModifierId = header.id
 
-  override def serializer: Serializer[EncryBlock] = EncryBlockSerializer
+  override def serializer: Serializer[Block] = BlockSerializer
 
   def dataString: String = {
     val encodedId: String = Base16.encode(id)
@@ -61,25 +61,34 @@ case class EncryBlock(override val header: EncryBlockHeader,
     case TransferDirective(address, amount, tokenIdOpt) if tokenIdOpt.isEmpty => address -> amount
     case _ => "unknown" -> 0
   }
+
+  override def toString: String = s"<Block height=${header.height} timestamp=${header.timestamp} " +
+    s"txQty=${payload.transactions.size} id=${header.encodedId}>"
+
 }
 
-object EncryBlock {
+object Block {
+
+  type Timestamp = Long
+  type Version = Byte
+  type Height = Int
 
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (100: Byte)
 
-  implicit val jsonEncoder: Encoder[EncryBlock] = (b: EncryBlock) => Map(
+  implicit val jsonEncoder: Encoder[Block] = (b: Block) => Map(
     "header" -> b.header.asJson,
     "payload" -> b.payload.asJson,
     "adProofs" -> b.adProofsOpt.map(_.asJson).getOrElse(Map.empty[String, String].asJson)
   ).asJson
 }
 
-object EncryBlockSerializer extends Serializer[EncryBlock] {
+object BlockSerializer extends Serializer[Block] {
 
-  override def toBytes(obj: EncryBlock): Array[Byte] = {
+  override def toBytes(obj: Block): Array[Byte] = {
     val headerBytes: Array[Byte] = obj.header.serializer.toBytes(obj.header)
     val payloadBytes: Array[Byte] = obj.payload.serializer.toBytes(obj.payload)
-    val aDProofsBytes: Array[Byte] = obj.adProofsOpt.map(_.serializer.toBytes(obj.adProofsOpt.get)).getOrElse(Array.emptyByteArray)
+    val aDProofsBytes: Array[Byte] =
+      obj.adProofsOpt.map(_.serializer.toBytes(obj.adProofsOpt.get)).getOrElse(Array.emptyByteArray)
     Bytes.concat(
       Ints.toByteArray(headerBytes.length),
       headerBytes,
@@ -90,16 +99,17 @@ object EncryBlockSerializer extends Serializer[EncryBlock] {
     )
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[EncryBlock] = Try{
+  override def parseBytes(bytes: Array[Byte]): Try[Block] = Try {
     var pointer: Int = 4
     val headerSize: Int = Ints.fromByteArray(bytes.slice(0, pointer))
-    val header: Try[EncryBlockHeader] = EncryBlockHeaderSerializer.parseBytes(bytes.slice(pointer, pointer + headerSize))
+    val header: Try[Header] = HeaderSerializer.parseBytes(bytes.slice(pointer, pointer + headerSize))
     pointer += headerSize
     val payloadSize: Int = Ints.fromByteArray(bytes.slice(pointer, pointer + 4))
-    val payload: Try[EncryBlockPayload] = EncryBlockPayloadSerializer.parseBytes(bytes.slice(pointer + 4, pointer + 4 + payloadSize))
+    val payload: Try[Payload] =
+      PayloadSerializer.parseBytes(bytes.slice(pointer + 4, pointer + 4 + payloadSize))
     pointer += payloadSize + 4
     val aDProofsSize: Int = Ints.fromByteArray(bytes.slice(pointer, pointer + 4))
     val aDProofs: Try[ADProofs] = ADProofSerializer.parseBytes(bytes.slice(pointer + 4, pointer + 4 + aDProofsSize))
-    new EncryBlock(header.get, payload.get, Option(aDProofs.get))
+    new Block(header.get, payload.get, Option(aDProofs.get))
   }
 }

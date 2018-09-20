@@ -4,8 +4,7 @@ import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.consensus.ModifierSemanticValidity.Invalid
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.{EncryBlockHeader, EncryHeaderChain}
+import encry.modifiers.history.{Block, Header, HeaderChain}
 import encry.utils.Logging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
@@ -18,13 +17,13 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   /** Id of header that contains transactions and proofs */
   override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
 
-  protected def getBlock(h: EncryBlockHeader): Option[EncryBlock]
+  protected def getBlock(h: Header): Option[Block]
 
-  protected def commonBlockThenSuffixes(header1: EncryBlockHeader,
-                                        header2: EncryBlockHeader): (EncryHeaderChain, EncryHeaderChain)
+  protected def commonBlockThenSuffixes(header1: Header,
+                                        header2: Header): (HeaderChain, HeaderChain)
 
-  protected[history] def continuationHeaderChains(header: EncryBlockHeader,
-                                                  filterCond: EncryBlockHeader => Boolean): Seq[Seq[EncryBlockHeader]]
+  protected[history] def continuationHeaderChains(header: Header,
+                                                  filterCond: Header => Boolean): Seq[Seq[Header]]
 
   /** Process full block when we have one.
     *
@@ -32,10 +31,10 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     * @param modToApply - new part of the block we want to apply
     * @return ProgressInfo required for State to process to be consistent with History
     */
-  protected def processBlock(fullBlock: EncryBlock,
+  protected def processBlock(fullBlock: Block,
                              modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
-    val bestFullChain: Seq[EncryBlock] = calculateBestFullChain(fullBlock)
-    val newBestHeader: EncryBlockHeader = bestFullChain.last.header
+    val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
+    val newBestHeader: Header = bestFullChain.last.header
     processing(ToProcess(fullBlock, modToApply, newBestHeader, bestFullChain, nodeSettings.blocksToKeep))
   }
 
@@ -55,10 +54,10 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def processBetterChain: BlockProcessing = {
     case toProcess@ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterBlock(fullBlock) =>
-      val prevBest: EncryBlock = bestBlockOpt.get
-      val (prevChain: EncryHeaderChain, newChain: EncryHeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
-      val toRemove: Seq[EncryBlock] = prevChain.tail.headers.flatMap(getBlock)
-      val toApply: Seq[EncryBlock] = newChain.tail.headers
+      val prevBest: Block = bestBlockOpt.get
+      val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
+      val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
+      val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
 
       //block have higher score but is not linkable to full chain
@@ -80,10 +79,10 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       }
   }
 
-  protected def isValidFirstBlock(header: EncryBlockHeader): Boolean =
+  protected def isValidFirstBlock(header: Header): Boolean =
     header.height == blockDownloadProcessor.minimalBlockHeight && bestBlockIdOpt.isEmpty
 
-  private def isBetterBlock(block: EncryBlock): Boolean =
+  private def isBetterBlock(block: Block): Boolean =
     (if (block.header.height == bestHeaderHeight && !bestHeaderIdOpt.exists(_ sameElements block.id)) bestHeaderIdOpt
     else bestBlockIdOpt)
       .flatMap(scoreOf)
@@ -98,16 +97,16 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
 
-  private def calculateBestFullChain(block: EncryBlock): Seq[EncryBlock] = {
-    val continuations: Seq[Seq[EncryBlockHeader]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
-    val chains: Seq[Seq[EncryBlock]] = continuations.map(_.map(getBlock).takeWhile(_.nonEmpty).flatten)
+  private def calculateBestFullChain(block: Block): Seq[Block] = {
+    val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
+    val chains: Seq[Seq[Block]] = continuations.map(_.map(getBlock).takeWhile(_.nonEmpty).flatten)
     chains.map(block +: _).maxBy(c => scoreOf(c.last.id).getOrElse(BigInt(0)))
   }
 
   private def clipBlockDataAt(heights: Seq[Int]): Try[Unit] = Try {
     val toRemove: Seq[ModifierId] = heights
       .flatMap(h => headerIdsAtHeight(h))
-      .flatMap(id => typedModifierById[EncryBlockHeader](id))
+      .flatMap(id => typedModifierById[Header](id))
       .flatMap(h => Seq(h.adProofsId, h.payloadId))
     historyStorage.removeObjects(toRemove)
   }
@@ -120,16 +119,16 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
 
   private def storageVersion(newModRow: EncryPersistentModifier) = ByteArrayWrapper(newModRow.id)
 
-  protected def modifierValidation(m: EncryPersistentModifier, headerOpt: Option[EncryBlockHeader]): Try[Unit] = {
+  protected def modifierValidation(m: EncryPersistentModifier, headerOpt: Option[Header]): Try[Unit] = {
     val minimalHeight: Int = blockDownloadProcessor.minimalBlockHeight
     headerOpt.map(header => PayloadValidator.validate(m, header, minimalHeight).toTry)
       .getOrElse(Failure(RecoverableModifierError(s"Header for modifier $m is not defined")))
   }
 
-  private def logStatus(toRemove: Seq[EncryBlock],
-                        toApply: Seq[EncryBlock],
-                        appliedBlock: EncryBlock,
-                        prevBest: Option[EncryBlock]): Unit = {
+  private def logStatus(toRemove: Seq[Block],
+                        toApply: Seq[Block],
+                        appliedBlock: Block,
+                        prevBest: Option[Block]): Unit = {
     val toRemoveStr: String = if (toRemove.isEmpty) "" else s" and to remove ${toRemove.length}"
     val newStatusStr: String = if (toApply.isEmpty) "" else {
       s" New best block is ${toApply.last.header.encodedId} " +
@@ -144,7 +143,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   /** Validator for `BlockPayload` and `AdProofs` */
   object PayloadValidator extends ModifierValidator {
 
-    def validate(m: EncryPersistentModifier, header: EncryBlockHeader, minimalHeight: Int): ValidationResult = {
+    def validate(m: EncryPersistentModifier, header: Header, minimalHeight: Int): ValidationResult = {
       failFast
         .validate(!historyStorage.containsObject(m.id)) {
           fatal(s"Modifier ${m.encodedId} is already in history")
@@ -168,10 +167,10 @@ object BlockProcessor {
 
   type BlockProcessing = PartialFunction[ToProcess, ProgressInfo[EncryPersistentModifier]]
 
-  case class ToProcess(fullBlock: EncryBlock,
+  case class ToProcess(fullBlock: Block,
                        newModRow: EncryPersistentModifier,
-                       newBestHeader: EncryBlockHeader,
-                       newBestChain: Seq[EncryBlock],
+                       newBestHeader: Header,
+                       newBestChain: Seq[Block],
                        blocksToKeep: Int)
 
 }

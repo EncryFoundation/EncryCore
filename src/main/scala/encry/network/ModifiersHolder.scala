@@ -3,14 +3,13 @@ package encry.network
 import akka.persistence._
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp._
-import encry.modifiers.history.block.EncryBlock
-import encry.modifiers.history.block.header.EncryBlockHeader
-import encry.modifiers.history.block.payload.EncryBlockPayload
+import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, LocallyGeneratedModifier}
 import org.encryfoundation.common.Algos
 import encry.utils.Logging
+
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -18,10 +17,10 @@ import scala.language.postfixOps
 class ModifiersHolder extends PersistentActor with Logging {
 
   var stat: Statistics = Statistics(0, 0, 0, 0, 0, Seq.empty, Seq.empty)
-  var headers: Map[String, (EncryBlockHeader, Int)] = Map.empty
-  var payloads: Map[String, (EncryBlockPayload, Int)] = Map.empty
+  var headers: Map[String, (Header, Int)] = Map.empty
+  var payloads: Map[String, (Payload, Int)] = Map.empty
   var nonCompletedBlocks: Map[String, String] = Map.empty
-  var completedBlocks: SortedMap[Int, EncryBlock] = SortedMap.empty
+  var completedBlocks: SortedMap[Int, Block] = SortedMap.empty
 
   context.system.scheduler.schedule(10.second, 30.second) {
     logDebug(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
@@ -31,23 +30,30 @@ class ModifiersHolder extends PersistentActor with Logging {
     if (completedBlocks.nonEmpty) self ! SendBlocks
   }
 
+  def notifyRecoveryCompleted(): Unit = if (settings.postgres.exists(_.enableRestore)) {
+    logInfo("Recovery from levelDb completed, going to download rest of the blocks from postgres")
+    context.system.actorSelection("/user/postgresRestore") ! StartRecovery
+  } else {
+    logInfo("Recovery completed")
+    peerManager ! RecoveryCompleted
+  }
+
   override def preStart(): Unit = logInfo(s"ModifiersHolder actor is started.")
 
-  override def receiveRecover: Receive = if (settings.levelDb.enableRestore) receiveRecoverEnabled else receiveRecoverDisabled
+  override def receiveRecover: Receive = if (settings.levelDb.exists(_.enableRestore)) receiveRecoverEnabled else receiveRecoverDisabled
 
   def receiveRecoverEnabled: Receive = {
-    case header: EncryBlockHeader =>
+    case header: Header =>
       updateHeaders(header)
       logDebug(s"Header ${header.height} is recovered from leveldb.")
-    case payload: EncryBlockPayload =>
+    case payload: Payload =>
       updatePayloads(payload)
       logDebug(s"Payload ${Algos.encode(payload.headerId)} is recovered from leveldb.")
-    case block: EncryBlock =>
+    case block: Block =>
       updateCompletedBlocks(block)
       logDebug(s"Block ${block.header.height} is recovered from leveldb.")
     case RecoveryCompleted if completedBlocks.isEmpty =>
-      logInfo("Recovery completed.")
-      peerManager ! RecoveryCompleted
+      notifyRecoveryCompleted()
     case RecoveryCompleted =>
       context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
   }
@@ -58,15 +64,17 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   override def receiveCommand: Receive = {
     case CheckAllBlocksSent =>
-      if (completedBlocks.isEmpty) {
-        logInfo("Recovery completed.")
-        peerManager ! RecoveryCompleted
-      }
+      if (completedBlocks.isEmpty) notifyRecoveryCompleted()
       else context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
     case SendBlocks =>
-      val blocksToSend: Seq[EncryBlock] = completedBlocks.take(settings.levelDb.batchSize).values.toSeq
-      completedBlocks = completedBlocks.drop(settings.levelDb.batchSize)
-      nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend)
+      val blocksToSend: Seq[Block] = completedBlocks.take(settings.levelDb
+        .map(_.batchSize)
+        .getOrElse(throw new RuntimeException("batchsize not specified"))).values.toSeq
+
+      completedBlocks = completedBlocks.drop(settings.levelDb
+        .map(_.batchSize)
+        .getOrElse(throw new RuntimeException("batchsize not specified")))
+      nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend, completedBlocks.isEmpty)
 
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
@@ -76,20 +84,20 @@ class ModifiersHolder extends PersistentActor with Logging {
   def createBlockIfPossible(payloadId: ModifierId): Unit =
     nonCompletedBlocks.get(Algos.encode(payloadId)).foreach(headerId => headers.get(headerId).foreach { header =>
       payloads.get(Algos.encode(payloadId)).foreach { payload =>
-        completedBlocks += header._1.height -> EncryBlock(header._1, payload._1, None)
+        completedBlocks += header._1.height -> Block(header._1, payload._1, None)
         nonCompletedBlocks -= Algos.encode(payloadId)
       }
     })
 
   def updateModifiers(modsTypeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit = modifiers.foreach {
-    case header: EncryBlockHeader =>
+    case header: Header =>
       if (!headers.contains(Algos.encode(header.id)))
         persist(header) { header =>
           logDebug(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully.")
         }
       updateHeaders(header)
       logDebug(s"Got header ${Algos.encode(header.id)} on height ${header.height}")
-    case payload: EncryBlockPayload =>
+    case payload: Payload =>
       if (!payloads.contains(Algos.encode(payload.id)))
         persist(payload) { payload =>
           logDebug(s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully.")
@@ -99,7 +107,7 @@ class ModifiersHolder extends PersistentActor with Logging {
         s"${
           nonCompletedBlocks.get(Algos.encode(payload.id)).map(headerId =>
             headers.get(headerId).map(header => s"for header $headerId height: ${header._1.height}"))}")
-    case block: EncryBlock =>
+    case block: Block =>
       if (!completedBlocks.values.toSeq.contains(block))
         persist(block) { block =>
           logDebug(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} is persisted successfully.")
@@ -108,8 +116,8 @@ class ModifiersHolder extends PersistentActor with Logging {
     case x: Any => logError(s"Strange input $x.")
   }
 
-  def updateHeaders(header: EncryBlockHeader): Unit = {
-    val prevValue: (EncryBlockHeader, Int) = headers.getOrElse(Algos.encode(header.id), (header, -1))
+  def updateHeaders(header: Header): Unit = {
+    val prevValue: (Header, Int) = headers.getOrElse(Algos.encode(header.id), (header, -1))
     headers += Algos.encode(header.id) -> (prevValue._1, prevValue._2 + 1)
     if (!nonCompletedBlocks.contains(Algos.encode(header.payloadId)))
       nonCompletedBlocks += Algos.encode(header.payloadId) -> Algos.encode(header.id)
@@ -120,14 +128,14 @@ class ModifiersHolder extends PersistentActor with Logging {
     }
   }
 
-  def updatePayloads(payload: EncryBlockPayload): Unit = {
-    val prevValue: (EncryBlockPayload, Int) = payloads.getOrElse(Algos.encode(payload.id), (payload, -1))
+  def updatePayloads(payload: Payload): Unit = {
+    val prevValue: (Payload, Int) = payloads.getOrElse(Algos.encode(payload.id), (payload, -1))
     payloads += Algos.encode(payload.id) -> (prevValue._1, prevValue._2 + 1)
     if (!nonCompletedBlocks.contains(Algos.encode(payload.id))) nonCompletedBlocks += Algos.encode(payload.id) -> ""
     else createBlockIfPossible(payload.id)
   }
 
-  def updateCompletedBlocks(block: EncryBlock): Unit = completedBlocks += block.header.height -> block
+  def updateCompletedBlocks(block: Block): Unit = completedBlocks += block.header.height -> block
 
   override def persistenceId: String = "persistent actor"
 
@@ -164,10 +172,10 @@ object ModifiersHolder {
   }
 
   case object Statistics {
-    def apply(headers: Map[String, (EncryBlockHeader, Int)],
-              payloads: Map[String, (EncryBlockPayload, Int)],
+    def apply(headers: Map[String, (Header, Int)],
+              payloads: Map[String, (Payload, Int)],
               nonCompletedBlocks: Map[String, String],
-              completedBlocks: SortedMap[Int, EncryBlock]): Statistics =
+              completedBlocks: SortedMap[Int, Block]): Statistics =
       Statistics(
         headers.size,
         payloads.size,

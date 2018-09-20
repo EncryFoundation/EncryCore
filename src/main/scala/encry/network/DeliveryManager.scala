@@ -89,7 +89,7 @@ class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor
       val modifiers: Map[ModifierId, Array[Byte]] = data._2
       val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
         modifiers partition { case (id, _) => isSpam(id) }
-      if (settings.node.sendStat)
+      if (settings.influxDB.isDefined)
         context.actorSelection("/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
       logInfo(s"Got modifiers (${modifiers.size}) of type $typeId from remote connected peer: $remote")
       for ((id, _) <- modifiers) receive(typeId, id, remote)
@@ -203,7 +203,7 @@ class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     val msg: Message[(ModifierTypeId, Seq[ModifierId])] =
       Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
-    if (settings.node.sendStat)
+    if (settings.influxDB.isDefined)
       context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
     statusTracker.statuses.keys.foreach(peer => {
       expect(peer, modifierTypeId, modifierIds)

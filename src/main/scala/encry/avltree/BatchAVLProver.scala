@@ -1,7 +1,6 @@
 package encry.avltree
 
 import com.google.common.primitives.Ints
-import encry.EncryApp.{settings, system}
 import encry.utils.Logging
 import org.encryfoundation.common.utils.TaggedTypes._
 import scorex.crypto.hash.{Blake2b256, CryptographicHash, Digest}

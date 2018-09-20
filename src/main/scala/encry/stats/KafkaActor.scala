@@ -19,16 +19,17 @@ class KafkaActor extends Actor {
     " - " + level + " - " + message
 
   val kafkaParams: Properties = new Properties
-  kafkaParams.put("bootstrap.servers", settings.kafka.kafkaBrokers)
+  kafkaParams.put("bootstrap.servers", settings.kafka.map(_.kafkaBrokers))
   kafkaParams.put("key.serializer", classOf[StringSerializer])
   kafkaParams.put("value.serializer", classOf[StringSerializer])
-  kafkaParams.put("group.id", settings.kafka.groupId)
+  kafkaParams.put("group.id", settings.kafka.map(_.groupId))
 
   val producer: KafkaProducer[String,String] = new KafkaProducer[String,String](kafkaParams)
 
   override def receive: Receive = {
     case KafkaMessage(level: String, message: String) =>
-      producer.send(new ProducerRecord[String,String](settings.kafka.topicName, java.util.UUID.randomUUID().toString,
+      producer.send(new ProducerRecord[String,String](settings.kafka.map(_.topicName)
+        .getOrElse(throw new RuntimeException("topicName not specified")), java.util.UUID.randomUUID().toString,
         assembleFullMessage(level, message)))
   }
 }

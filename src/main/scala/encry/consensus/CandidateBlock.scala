@@ -1,15 +1,15 @@
 package encry.consensus
 
 import encry.consensus.ConsensusTaggedTypes.Difficulty
-import encry.modifiers.history.block.Block.{Timestamp, Version}
-import encry.modifiers.history.block.header.EncryBlockHeader
+import encry.modifiers.history.Block.{Timestamp, Version}
+import encry.modifiers.history.Header
 import encry.modifiers.mempool.Transaction
 import io.circe.Encoder
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 
-case class CandidateBlock(parentOpt: Option[EncryBlockHeader],
+case class CandidateBlock(parentOpt: Option[Header],
                           adProofBytes: SerializedAdProof,
                           stateRoot: ADDigest,
                           version: Version,
