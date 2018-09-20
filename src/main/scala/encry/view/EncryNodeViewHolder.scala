@@ -60,7 +60,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   system.scheduler.schedule(5 second, 1 second) {
-    if (settings.node.sendStat) {
+    if (settings.influxDB.isDefined) {
       val txsInLastBlock: Int = nodeView.history.bestBlockOpt.map(x => x.payload.transactions.size).getOrElse(0)
       val txsInMempool: Int = nodeView.mempool.unconfirmed.values.size
       val diffBtw: Int = txsInMempool - txsInLastBlock

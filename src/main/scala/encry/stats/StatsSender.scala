@@ -48,19 +48,19 @@ class StatsSender extends Actor {
 
   override def receive: Receive = {
     case GetAllTiming(a,b) =>
-      influxDB.write(settings.influxDB.udpPort, s"getAllTiming,nodeName=$nodeName value=$a,size=$b")
+      influxDB.write(InfluxPort, s"getAllTiming,nodeName=$nodeName value=$a,size=$b")
     case WorkedTime(a,b) =>
-      influxDB.write(settings.influxDB.udpPort, s"workedTime,nodeName=$nodeName value=$a,size=$b")
+      influxDB.write(InfluxPort, s"workedTime,nodeName=$nodeName value=$a,size=$b")
     case TxsInBlock(txsNum) =>
-      influxDB.write(settings.influxDB.udpPort, s"txsInEachBlock,nodeName=$nodeName value=$txsNum")
+      influxDB.write(InfluxPort, s"txsInEachBlock,nodeName=$nodeName value=$txsNum")
     case CurrentUtxosQtyInIOdb(utxosQty) =>
-      influxDB.write(settings.influxDB.udpPort, s"utxosQty,nodeName=$nodeName value=$utxosQty")
+      influxDB.write(InfluxPort, s"utxosQty,nodeName=$nodeName value=$utxosQty")
     case DiffBtwMempoolAndLastBlockTxs(num) =>
-      influxDB.write(settings.influxDB.udpPort, s"txsDiff,nodeName=$nodeName value=$num")
+      influxDB.write(InfluxPort, s"txsDiff,nodeName=$nodeName value=$num")
     case MempoolStat(size) =>
-      influxDB.write(settings.influxDB.udpPort, s"txsInMempool,nodeName=$nodeName value=$size")
+      influxDB.write(InfluxPort, s"txsInMempool,nodeName=$nodeName value=$size")
     case TransactionsStatMessage(num, height) =>
-      influxDB.write(settings.influxDB.udpPort, s"numOfTxsInBlock,nodeName=$nodeName value=$num,height=$height")
+      influxDB.write(InfluxPort, s"numOfTxsInBlock,nodeName=$nodeName value=$num,height=$height")
     case LogMessage(logLevel, logMessage, logTime) => influxDB.write(InfluxPort,
       s"""logsFromNode,nodeName=${nodeName},logLevel=${
         logLevel match {
