@@ -1,14 +1,15 @@
 package encry.view.history.processors
 
+import encry.EncryApp.{settings, system}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.consensus.ModifierSemanticValidity.Invalid
+import encry.local.explorer.BlockListener.NewBestBlock
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{Block, Header, HeaderChain}
 import encry.utils.Logging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
-
 import scala.util.{Failure, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with Logging {
@@ -70,7 +71,8 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
 
         updateStorage(newModRow, newBestHeader.id)
-
+        if (settings.postgres.exists(_.enableSave))
+          system.actorSelection("/user/blockListener") ! NewBestBlock(fullBlock)
         if (blocksToKeep >= 0) {
           val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)
           val bestHeight: Int = toApply.last.header.height

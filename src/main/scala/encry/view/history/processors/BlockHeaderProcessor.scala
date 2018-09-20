@@ -1,7 +1,7 @@
 package encry.view.history.processors
 
 import com.google.common.primitives.Ints
-import encry.EncryApp
+import encry.EncryApp.{settings, system, forceStopApplication}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
@@ -17,7 +17,6 @@ import encry.view.history.History.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
-
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
@@ -121,7 +120,7 @@ trait BlockHeaderProcessor extends Logging {
           ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
         case None =>
           logError("Should always have best header after header application")
-          EncryApp.forceStopApplication()
+          forceStopApplication()
       }
     case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
@@ -152,7 +151,7 @@ trait BlockHeaderProcessor extends Logging {
             s"old height: $bestHeaderHeight")
           bestBlockHeaderIdsRow(h)
         } else {
-          EncryApp.system.actorSelection("/user/blockListener") ! NewOrphaned(h)
+          if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(h)
           orphanedBlockHeaderIdsRow(h, score)
         }
         (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, h)

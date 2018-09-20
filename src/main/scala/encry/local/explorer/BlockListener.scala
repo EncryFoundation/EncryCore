@@ -2,10 +2,10 @@ package encry.local.explorer
 
 import akka.actor.{Actor, ActorRef}
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.local.explorer.BlockListener.{ChainSwitching, NewOrphaned, UploadToDbOnHeight}
+import encry.local.explorer.BlockListener.{ChainSwitching, NewBestBlock, NewOrphaned, UploadToDbOnHeight}
 import encry.local.explorer.database.DBService
 import encry.modifiers.history.{Block, Header}
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{ChangedHistory, SemanticallySuccessfulModifier}
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.ChangedHistory
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetNodeViewChanges
 import encry.view.history.EncryHistoryReader
@@ -15,10 +15,7 @@ import scala.util.{Failure, Success}
 
 class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolder: ActorRef) extends Actor with Logging {
 
-  override def preStart(): Unit = {
-    logInfo(s"Start listening to new blocks.")
-    context.system.eventStream.subscribe(context.self, classOf[SemanticallySuccessfulModifier[_]])
-  }
+  override def preStart(): Unit = logInfo(s"Start listening to new blocks.")
 
   override def postStop(): Unit = dbService.shutdown()
 
@@ -35,7 +32,7 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
   }
 
   override def receive: Receive = {
-    case SemanticallySuccessfulModifier(block: Block) =>
+    case NewBestBlock(block: Block) =>
       currentDbHeightFuture.map(dbHeight => if(dbHeight < block.header.height || block.header.height == 0) dbService.processBlock(block))
     case NewOrphaned(header: Header) => dbService.processOrphanedHeader(header)
     case ChainSwitching(ids) => dbService.markAsRemovedFromMainChain(ids.toList)
@@ -65,6 +62,7 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
 }
 
 object BlockListener {
+  case class NewBestBlock(block: Block)
   case class ChainSwitching(switchedIds: Seq[ModifierId])
   case class NewOrphaned(header: Header)
   case class UploadToDbOnHeight(height: Int)
