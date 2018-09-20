@@ -24,8 +24,8 @@ class WalletStorageHolder extends Actor {
   }
 
   override def receive: Receive = {
-    case GetAllBoxes() => sender() ! buffer.takeRight(1000)
-      buffer = buffer.dropRight(1000)
+    case GetAllBoxes() => sender() ! buffer.takeRight(500)
+      buffer = buffer.dropRight(500)
     case seq: Seq[EncryBaseBox] => buffer = seq
       system.actorSelection("user/statsSender") ! CurrentUtxosQtyInIOdb(seq.size)
   }

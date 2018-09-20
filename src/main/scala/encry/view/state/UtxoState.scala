@@ -53,9 +53,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     def applyTry(txs: Seq[Transaction], allowedOutputDelta: Amount = 0L): Try[Unit] =
       txs.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, tx) =>
         t.flatMap { _ =>
-          val res: Try[Unit] = validate(tx, allowedOutputDelta)
-          if (res.isFailure) println(s"transaction denied $res, ${tx.timestamp} ${tx.id}")
-          res.flatMap { _ =>
+          validate(tx, allowedOutputDelta).flatMap { _ =>
             extractStateChanges(tx).operations.map(ADProofs.toModification)
               .foldLeft[Try[Option[ADValue]]](Success(None)) { case (tIn, m) =>
               tIn.flatMap(_ => persistentProver.performOneOperation(m))
@@ -120,17 +118,12 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
   def generateProofs(txs: Seq[Transaction]): Try[(SerializedAdProof, ADDigest)] = Try {
     logInfo(s"Generating proof for ${txs.length} transactions ...")
     val rootHash: ADDigest = persistentProver.digest
-    if (txs.isEmpty) {
-      logWarn("Got empty transaction sequence")
-      throw new Exception("Got empty transaction sequence")
-    }
-    else if (!storage.version.exists(_.sameElements(rootHash))) {
-      logWarn(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}")
+    if (txs.isEmpty) throw new Exception("Got empty transaction sequence")
+    else if (!storage.version.exists(_.sameElements(rootHash)))
       throw new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}")
-    }
     persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
   }.flatten.recoverWith[(SerializedAdProof, ADDigest)] { case e =>
-    println(s"Failed to generate ADProof cause $e")
+    logWarn(s"Failed to generate ADProof cause $e")
     Failure(e)
   }
 
@@ -159,11 +152,10 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
 
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, rootHash)
 
-      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap { input =>
-        val tmpOpt: Option[ADValue] = persistentProver.unauthenticatedLookup(input.boxId)
-        if (tmpOpt.isEmpty) println("non valid: tmpOpt is empty")
-        tmpOpt.map(bytes => StateModifierDeserializer.parseBytes(bytes, input.boxId.head)).map(_.toOption -> input) }
-        .foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) => (bxOpt, tx.defaultProofOpt) match {
+      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => persistentProver.unauthenticatedLookup(input.boxId)
+        .map(bytes => StateModifierDeserializer.parseBytes(bytes, input.boxId.head))
+        .map(_.toOption -> input)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
+        (bxOpt, tx.defaultProofOpt) match {
           // If no `proofs` provided, then `defaultProof` is used.
           case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
             if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
@@ -190,8 +182,8 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           else debitB.getOrElse(tokenId, 0L) >= amount
         }
       }
-
-      if (!validBalance) println(s"non valid transaction! Non-positive balance in $tx") //throw TransactionValidationException(s"Non-positive balance in $tx");
+       //println(s"non valid transaction! Non-positive balance in $tx")
+      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
     }
 
   def isValid(tx: Transaction, allowedOutputDelta: Amount = 0L): Boolean = validate(tx, allowedOutputDelta).isSuccess
