@@ -16,10 +16,8 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
                    settings: EncryAppSettings, timeProvider: NetworkTimeProvider, system: ActorSystem)
   extends MemoryPool[Transaction, EncryMempool] with EncryMempoolReader with AutoCloseable {
 
-  private def removeExpired(): EncryMempool = filter { tx =>
-      if ((timeProvider.estimatedTime - tx.timestamp) <= settings.node.utxMaxAge.toMillis) println(s"removed due time")
-      (timeProvider.estimatedTime - tx.timestamp) > settings.node.utxMaxAge.toMillis
-    }
+  private def removeExpired(): EncryMempool =
+    filter(tx => (timeProvider.estimatedTime - tx.timestamp) > settings.node.utxMaxAge.toMillis)
 
   private val cleanup: Cancellable =
     system.scheduler.schedule(settings.node.mempoolCleanupInterval, settings.node.mempoolCleanupInterval)(removeExpired)
