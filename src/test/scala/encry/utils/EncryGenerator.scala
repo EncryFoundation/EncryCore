@@ -121,7 +121,7 @@ trait EncryGenerator {
       ADDigest @@ Random.randomBytes(33),
       Digest32 @@ Random.randomBytes(),
       random.nextLong(),
-      random.nextInt(),
+      random.nextInt(100000),
       random.nextLong(),
       Constants.Chain.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
