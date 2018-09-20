@@ -35,12 +35,11 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
   }
 
   override def receive: Receive = {
-    case StartRecovery(enableFull) if enableFull => startRecovery(0).map { _ =>
+    case StartRecovery => nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
+    case ChangedHistory(history) => startRecovery(history.bestBlockOpt.map(_.header.height).getOrElse(0)).map { _ =>
       logInfo(s"All blocks restored from postgres")
       context.stop(self)
     }
-    case StartRecovery(_) => nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
-    case ChangedHistory(history) => startRecovery(history.bestBlockOpt.map(_.header.height).getOrElse(0))
   }
 
   def startRecovery(startFrom: Int): Future[Unit] = heightFuture.flatMap { height =>
@@ -108,4 +107,4 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
 
 }
 
-case class StartRecovery(fullRecovery: Boolean)
+case object StartRecovery
