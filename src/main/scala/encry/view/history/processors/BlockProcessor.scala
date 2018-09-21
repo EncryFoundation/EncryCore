@@ -48,6 +48,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def processValidFirstBlock: BlockProcessing = {
     case ToProcess(fullBlock, newModRow, newBestHeader, newBestChain, _)
       if isValidFirstBlock(fullBlock.header) =>
+      logInfo(s"Appending ${fullBlock.encodedId} as a valid first block")
       logStatus(Seq(), newBestChain, fullBlock, None)
       updateStorage(newModRow, newBestHeader.id)
       ProgressInfo(None, Seq.empty, newBestChain, Seq.empty)
@@ -67,6 +68,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
         //application of this block leads to full chain with higher score
+        logInfo(s"Appending ${fullBlock.encodedId} as a better chain")
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
 
@@ -96,6 +98,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def nonBestBlock: BlockProcessing = {
     case params =>
       //Orphaned block or full chain is not initialized yet
+      logInfo(s"Appending ${params.fullBlock.encodedId} as a non best block")
       logStatus(Seq(), Seq(), params.fullBlock, None)
       historyStorage.bulkInsert(storageVersion(params.newModRow), Seq.empty, Seq(params.newModRow))
       ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
