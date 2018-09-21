@@ -118,9 +118,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       logInfo(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
+      logInfo(s"Previous root hash: ${Algos.encode(nodeView.state.rootHash)}")
       pmodModify(lm.pmod)
       (lm.pmod.modifierTypeId, nodeView.state) match {
         case (Payload.modifierTypeId, state: UtxoState) =>
+          logInfo(s"Going to update stateRoot to id: ${Algos.encode(nodeView.state.rootHash)} with" +
+            s" version: ${Algos.encode(nodeView.state.version)}")
           miner ! UpdateMinerView(CurrentView(nodeView.history, state, nodeView.wallet, nodeView.mempool))
         case _ =>
       }
