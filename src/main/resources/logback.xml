@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration scan="true" scanPeriod="10 seconds">
 
+    <appender name="SYSLOG" class="ch.qos.logback.classic.net.SyslogAppender">
+        <syslogHost>localhost</syslogHost>
+        <facility>SYSLOG</facility>
+        <port>12345</port>
+        <suffixPattern>[%thread] %logger %msg</suffixPattern>
+    </appender>
+
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
@@ -25,7 +32,7 @@
     </appender>
 
     <root>
-        <appender-ref ref="FILE"/>
+        <appender-ref ref="SYSLOG"/>
     </root>
 
 </configuration>
