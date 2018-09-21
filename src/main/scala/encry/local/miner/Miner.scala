@@ -236,7 +236,7 @@ class Miner extends Actor with Logging {
               .fromCandidate(createCandidate(previousHeader.map(_._2).getOrElse(nodeView), previousHeader.map(_._1)))
           if (settings.influxDB.isDefined)
             context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
-          logInfo(s"Generating candidate: ${envelope.c.map(_)}" +
+          logInfo(s"Generating candidate: ${envelope.c}" +
             s"for state with state root: ${previousHeader.map(op => Algos.encode(op._2.state.rootHash))}")
           envelope
         } else CandidateEnvelope.empty
