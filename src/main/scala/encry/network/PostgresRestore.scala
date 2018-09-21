@@ -36,10 +36,12 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
 
   override def receive: Receive = {
     case StartRecovery => nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
-    case ChangedHistory(history) => startRecovery(history.bestBlockOpt.map(_.header.height).getOrElse(0)).map { _ =>
-      logInfo(s"All blocks restored from postgres")
-      context.stop(self)
-    }
+    case ChangedHistory(history) =>
+      val currentNodeHeight = history.bestBlockOpt.map(_.header.height).getOrElse(0)
+      startRecovery(if (currentNodeHeight == 0) 0 else currentNodeHeight + 1).map { _ =>
+        logInfo(s"All blocks restored from postgres")
+        context.stop(self)
+      }
   }
 
   def startRecovery(startFrom: Int): Future[Unit] = heightFuture.flatMap { height =>
