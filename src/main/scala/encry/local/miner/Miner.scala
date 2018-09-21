@@ -43,6 +43,7 @@ class Miner extends Actor with Logging {
   var candidateOpt: Option[CandidateBlock] = None
   var lastSelfMinedHeader: Option[Header] = None
   var syncingDone: Boolean = false
+  var minerView: Option[CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool]] = None
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
 
   override def preStart(): Unit =
@@ -102,6 +103,8 @@ class Miner extends Actor with Logging {
       logInfo(s"Generate block and set lastSelfMinedHeader to: $lastSelfMinedHeader and candOpt to $candidateOpt")
       sleepTime = System.currentTimeMillis()
       self ! StartMining
+    case UpdateMinerView(newView) =>
+      minerView = Some(CurrentView(newView.history, newView.state, newView.vault, newView.pool))
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
     case _ =>
   }
@@ -203,30 +206,36 @@ class Miner extends Actor with Logging {
   }
 
   def produceCandidate(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { view =>
+    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] { nodeView =>
       val producingStartTime: Time = System.currentTimeMillis()
       startTime = producingStartTime
-      val bestHeaderOpt: Option[Header] = view.history.bestBlockOpt.map(_.header)
+      val bestHeaderOpt: Option[Header] = nodeView.history.bestBlockOpt.map(_.header)
       bestHeaderOpt match {
         case Some(h) => logInfo(s"Best header at height ${h.height}")
         case None => logInfo(s"No best header opt")
       }
       val candidate: CandidateEnvelope =
-        if ((bestHeaderOpt.isDefined && (syncingDone || view.history.isFullChainSynced)) || settings.node.offlineGeneration) {
+        if ((bestHeaderOpt.isDefined && (syncingDone || nodeView.history.isFullChainSynced)) || settings.node.offlineGeneration) {
           logInfo(s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
-          if (settings.influxDB.isDefined) context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
+          if (settings.influxDB.isDefined)
+            context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
           logInfo("Going to calculate last block:")
-          val previousHeader: Option[Header] =
+          val previousHeader = {
             bestHeaderOpt.flatMap(bestHeader =>
-              lastSelfMinedHeader.map { selfMinedHeader =>
+              lastSelfMinedHeader.flatMap { selfMinedHeader =>
                 logInfo(s"bestHeader.height is: ${bestHeader.asJson} " +
                   s"and selfMinedHeader.height is: ${selfMinedHeader.asJson}")
-                if (selfMinedHeader.height > bestHeader.height) selfMinedHeader
-                else bestHeader
+                if (selfMinedHeader.height > bestHeader.height)
+                  minerView.map(mView => selfMinedHeader -> mView)
+                else Some(bestHeader -> nodeView)
               }
             )
-          val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, previousHeader))
-          if (settings.influxDB.isDefined) context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
+          }
+          val envelope: CandidateEnvelope =
+            CandidateEnvelope
+              .fromCandidate(createCandidate(previousHeader.map(_._2).getOrElse(nodeView), previousHeader.map(_._1)))
+          if (settings.influxDB.isDefined)
+            context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
           envelope
         } else CandidateEnvelope.empty
       candidate
@@ -242,6 +251,8 @@ object Miner {
   case object StartMining
 
   case object GetMinerStatus
+
+  case class UpdateMinerView(newView: CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool])
 
   case class MinedBlock(block: Block, workerIdx: Int)
 
