@@ -38,6 +38,7 @@ class Miner extends Actor with Logging {
   var startTime: Long = System.currentTimeMillis()
   var sleepTime: Long = System.currentTimeMillis()
   var candidateOpt: Option[CandidateBlock] = None
+  var lastSelfMinedHeader: Option[Header] = None
   var syncingDone: Boolean = false
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
 
@@ -84,8 +85,10 @@ class Miner extends Actor with Logging {
       }
       if (settings.node.stateMode == StateMode.Digest)
         block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
+      lastSelfMinedHeader = Some(block.header)
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
+      self ! StartMining
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
     case _ =>
   }
@@ -195,7 +198,14 @@ class Miner extends Actor with Logging {
         if ((bestHeaderOpt.isDefined && (syncingDone || view.history.isFullChainSynced)) || settings.node.offlineGeneration) {
           logInfo(s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
           if (settings.influxDB.isDefined) context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
-          val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, bestHeaderOpt))
+          val previousHeader: Option[Header] =
+            bestHeaderOpt.flatMap(bestHeader =>
+              lastSelfMinedHeader.map(selfMinedHeader =>
+                if (selfMinedHeader.height > bestHeader.height) selfMinedHeader
+                else bestHeader
+              )
+            )
+          val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, previousHeader))
           if (settings.influxDB.isDefined) context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
           envelope
         } else CandidateEnvelope.empty
