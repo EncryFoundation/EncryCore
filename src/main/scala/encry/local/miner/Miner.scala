@@ -2,6 +2,7 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
+
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus.{CandidateBlock, EncrySupplyController}
@@ -26,8 +27,10 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
+
 import scala.collection._
 
 class Miner extends Actor with Logging {
@@ -49,8 +52,17 @@ class Miner extends Actor with Logging {
 
   def killAllWorkers(): Unit = context.children.foreach(context.stop)
 
-  def needNewCandidate(b: Block): Boolean = !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id)) &&
-    candidateOpt.forall(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height))
+  def needNewCandidate(b: Block): Boolean = {
+    logInfo(s"!candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id)): " +
+      s"${!candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id))}\n " +
+      s"andidateOpt.forall(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height)): " +
+      s"${candidateOpt.forall(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height))}\n " +
+      s"candidate opt parent header: ${candidateOpt.map(cand => Algos.encode(cand.parentOpt.map(_.id).getOrElse(Array.emptyByteArray)))}\n " +
+      s"b.header.height: ${b.header.height}")
+
+    !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id)) &&
+      candidateOpt.forall(candidate => candidate.parentOpt.exists(_.height + 1 < b.header.height))
+  }
 
   override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
 
@@ -113,10 +125,14 @@ class Miner extends Actor with Logging {
   }
 
   def receiveSemanticallySuccessfulModifier: Receive = {
-    case SemanticallySuccessfulModifier(mod: Block) if needNewCandidate(mod) =>
-      logInfo(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
-        s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
-      produceCandidate()
+    case SemanticallySuccessfulModifier(mod: Block) =>
+      logInfo(s"Got block: ${mod.asJson}")
+      logInfo(s"needNewCandidate(mod): ${needNewCandidate(mod)}")
+      if (needNewCandidate(mod)) {
+        logInfo(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
+          s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+        produceCandidate()
+      }
     case SemanticallySuccessfulModifier(_) =>
   }
 
@@ -203,8 +219,8 @@ class Miner extends Actor with Logging {
           val previousHeader: Option[Header] =
             bestHeaderOpt.flatMap(bestHeader =>
               lastSelfMinedHeader.map { selfMinedHeader =>
-                logInfo(s"bestHeader.height is: ${bestHeader.height} " +
-                  s"and selfMinedHeader.height is: ${selfMinedHeader.height}")
+                logInfo(s"bestHeader.height is: ${bestHeader.asJson} " +
+                  s"and selfMinedHeader.height is: ${selfMinedHeader.asJson}")
                 if (selfMinedHeader.height > bestHeader.height) selfMinedHeader
                 else bestHeader
               }
