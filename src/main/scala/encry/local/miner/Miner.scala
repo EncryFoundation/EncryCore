@@ -87,6 +87,7 @@ class Miner extends Actor with Logging {
         block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
       lastSelfMinedHeader = Some(block.header)
       candidateOpt = None
+      logInfo(s"Generate block and set lastSelfMinedHeader to: $lastSelfMinedHeader and candOpt to $candidateOpt")
       sleepTime = System.currentTimeMillis()
       self ! StartMining
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
@@ -198,12 +199,15 @@ class Miner extends Actor with Logging {
         if ((bestHeaderOpt.isDefined && (syncingDone || view.history.isFullChainSynced)) || settings.node.offlineGeneration) {
           logInfo(s"Starting candidate generation at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
           if (settings.influxDB.isDefined) context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
+          logInfo("Going to calculate last block:")
           val previousHeader: Option[Header] =
             bestHeaderOpt.flatMap(bestHeader =>
-              lastSelfMinedHeader.map(selfMinedHeader =>
+              lastSelfMinedHeader.map { selfMinedHeader =>
+                logInfo(s"bestHeader.height is: ${bestHeader.height} " +
+                  s"and selfMinedHeader.height is: ${selfMinedHeader.height}")
                 if (selfMinedHeader.height > bestHeader.height) selfMinedHeader
                 else bestHeader
-              )
+              }
             )
           val envelope: CandidateEnvelope = CandidateEnvelope.fromCandidate(createCandidate(view, previousHeader))
           if (settings.influxDB.isDefined) context.actorSelection("user/statsSender") ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
