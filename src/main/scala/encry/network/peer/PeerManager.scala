@@ -66,7 +66,10 @@ class PeerManager extends Actor with Logging {
 
       if (connectedPeers.size + connectingPeers.size <= settings.network.maxConnections)
         randomPeer.filter(address => !connectedPeers.exists(_._1 == address) &&
-          !connectingPeers.exists(_.getHostName == address.getHostName) && checkPossibilityToAddPeerWRecovery(address))
+          !connectingPeers.exists(_.getHostName == address.getHostName) &&
+          checkPossibilityToAddPeerWRecovery(address) &&
+          checkDuplicateIP(address)
+        )
           .foreach { address => sender() ! ConnectTo(address) }
     case RecoveryCompleted =>
       logInfo("Received RecoveryCompleted")
@@ -88,10 +91,14 @@ class PeerManager extends Actor with Logging {
       .map { time =>
         settings.network.knownPeers
           .filterNot(isSelf(_, None))
+          .filter(checkDuplicateIP)
           .foreach(PeerDatabase.addOrUpdateKnownPeer(_, PeerInfo(time, None)))
         Unit
       }
   } else Future.successful(Unit)
+
+  def checkDuplicateIP(address: InetSocketAddress): Boolean =
+    !connectedPeers.map(_._1.getAddress).toSeq.contains(address.getAddress)
 
   def checkPossibilityToAddPeerWRecovery(address: InetSocketAddress): Boolean =
     checkPossibilityToAddPeer(address) && recoveryCompleted
