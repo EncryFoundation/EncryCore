@@ -119,9 +119,9 @@ trait EncryGenerator {
     Header(
       1.toByte,
       ModifierId @@ Random.randomBytes(),
-      Digest32 @@ Random.randomBytes(),
+      Digest32 @@ Random.randomBytes(32),
       ADDigest @@ Random.randomBytes(33),
-      Digest32 @@ Random.randomBytes(),
+      Digest32 @@ Random.randomBytes(32),
       random.nextLong(),
       random.nextInt(1000),
       random.nextLong(),
