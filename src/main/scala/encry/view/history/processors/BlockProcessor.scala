@@ -82,12 +82,15 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   protected def isValidFirstBlock(header: Header): Boolean =
     header.height == blockDownloadProcessor.minimalBlockHeight && bestBlockIdOpt.isEmpty
 
-  private def isBetterBlock(block: Block): Boolean =
-    (if (block.header.height == bestHeaderHeight && !bestHeaderIdOpt.exists(_ sameElements block.id)) bestHeaderIdOpt
-    else bestBlockIdOpt)
-      .flatMap(scoreOf)
-      .flatMap(bestScore => scoreOf(block.id).map(_ > bestScore))
-      .getOrElse(false)
+  private def isBetterBlock(block: Block): Boolean = {
+    val isBetter: Option[Boolean] = for {
+      bestFullBlockId <- bestBlockIdOpt
+      prevBestScore <- scoreOf(bestFullBlockId)
+      score <- scoreOf(block.id)
+    } yield score > prevBestScore
+
+    isBetter getOrElse false
+  }
 
   private def nonBestBlock: BlockProcessing = {
     case params =>
