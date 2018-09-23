@@ -215,8 +215,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
     stateToApplyTry match {
       case Success(stateToApply) =>
-        logInfo(s"Got state to apply. StateRoot: ${Algos.encode(stateToApply.rootHash)} with" +
-          s" version ${Algos.encode(stateToApply.version)}")
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
@@ -257,7 +255,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       .actorSelection("user/statsSender") ! StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
-        logInfo(s"ProgressInfo: ${progressInfo}")
         if (settings.influxDB.isDefined)
           context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
         logInfo(s"Going to apply modifications to the state: $progressInfo")

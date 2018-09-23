@@ -39,7 +39,6 @@ class Miner extends Actor with Logging {
   var startTime: Long = System.currentTimeMillis()
   var sleepTime: Long = System.currentTimeMillis()
   var candidateOpt: Option[CandidateBlock] = None
-  var lastSelfMinedHeader: Option[Header] = None
   var syncingDone: Boolean = false
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
 
@@ -87,11 +86,8 @@ class Miner extends Actor with Logging {
       }
       if (settings.node.stateMode == StateMode.Digest)
         block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
-      lastSelfMinedHeader = Some(block.header)
       candidateOpt = None
-      logInfo(s"Generate block and set lastSelfMinedHeader to: $lastSelfMinedHeader and candOpt to $candidateOpt")
       sleepTime = System.currentTimeMillis()
-      self ! StartMining
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
     case _ =>
   }
@@ -115,12 +111,10 @@ class Miner extends Actor with Logging {
   }
 
   def receiveSemanticallySuccessfulModifier: Receive = {
-    case SemanticallySuccessfulModifier(mod: Block) =>
-      if (needNewCandidate(mod)) {
-        logInfo(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
-          s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
-        produceCandidate()
-      }
+    case SemanticallySuccessfulModifier(mod: Block) if needNewCandidate(mod) =>
+      logInfo(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
+        s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+      produceCandidate()
     case SemanticallySuccessfulModifier(_) =>
   }
 
@@ -174,9 +168,6 @@ class Miner extends Actor with Logging {
       .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, view.state.height)
 
     val txs: Seq[Transaction] = txsToPut.sortBy(_.timestamp) :+ coinbase
-
-    logInfo(s"Generating candidate from state with root: ${Algos.encode(view.state.rootHash)}," +
-      s"height: ${view.state.height}, prover root: ${Algos.encode(view.state.persistentProver.digest)}")
 
     val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
       .getOrElse(throw new Exception("ADProof generation failed"))
