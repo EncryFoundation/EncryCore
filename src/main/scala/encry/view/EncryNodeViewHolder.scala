@@ -116,7 +116,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       logInfo(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
-      logInfo(s"Previous root hash: ${Algos.encode(nodeView.state.rootHash)}")
       pmodModify(lm.pmod)
       if (settings.levelDb.exists(_.enableSave)) context.actorSelection("/user/modifiersHolder") ! lm
     case GetDataFromCurrentView(f) =>
@@ -205,19 +204,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
     requestDownloads(progressInfo)
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
-    logInfo(s"Branch point: ${branchingPointOpt.map(Algos.encode)}")
     val (stateToApplyTry: Try[StateType], suffixTrimmed: IndexedSeq[EncryPersistentModifier]) =
       if (progressInfo.chainSwitchingNeeded) {
         branchingPointOpt.map { branchPoint =>
-          if (!state.version.sameElements(branchPoint)) {
-            logInfo("!state.version.sameElements(branchPoint) = false")
-            logInfo(s"Going to rollback state to: ${Algos.encode(branchPoint)}")
-            logInfo(s"Trim chain suffix is: " +
-              s"${trimChainSuffix(suffixApplied, ModifierId !@@ branchPoint)
-                .map(modifier => Algos.encode(modifier.id))
-                .mkString(",")}")
+          if (!state.version.sameElements(branchPoint))
             state.rollbackTo(branchPoint) -> trimChainSuffix(suffixApplied, ModifierId !@@ branchPoint)
-          }
           else Success(state) -> IndexedSeq()
         }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty")))
       } else Success(state) -> suffixApplied
@@ -231,15 +222,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
           if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
             case Success(stateAfterApply) =>
-              logInfo(s"stateAfterApply: rootHash - ${Algos.encode(stateAfterApply.rootHash)} version - " +
-                s"${Algos.encode(stateAfterApply.version)}")
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
-              logInfo(s"New history: headersHeight - ${newHis.bestHeaderHeight}, full height: ${newHis.bestBlockHeight}," +
-                s"bestHeader: ${newHis.bestHeaderOpt.map(_.asJson)}, best block: ${newHis.bestBlockIdOpt.map(Algos.encode)}")
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Failure(e) =>
-              logInfo(s"Ops, fail! ${e.getMessage}")
               val (newHis: EncryHistory, newProgressInfo: ProgressInfo[EncryPersistentModifier]) =
                 history.reportModifierIsInvalid(modToApply, progressInfo)
               nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
@@ -269,7 +255,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     logInfo(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
     if (settings.influxDB.isDefined) context.system
       .actorSelection("user/statsSender") ! StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
-    logInfo(s"Going to append modifier: ${Algos.encode(pmod.id)}")
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
         logInfo(s"ProgressInfo: ${progressInfo}")
