@@ -49,7 +49,7 @@ class DBService extends Logging {
     dataSource.setJdbcUrl(settings.postgres.map(_.host).getOrElse(throw new RuntimeException("host not specified")))
     dataSource.setUsername(settings.postgres.map(_.user).getOrElse(throw new RuntimeException("user not specified")))
     dataSource.setPassword(settings.postgres.map(_.password).getOrElse(throw new RuntimeException("password not specified")))
-    dataSource.setMaximumPoolSize(5)
+    dataSource.setMaximumPoolSize(settings.postgres.map(_.maxPoolSize).getOrElse(1))
   }
 
   private lazy val pgTransactor: HikariTransactor[IO] = HikariTransactor[IO](dataSource)
