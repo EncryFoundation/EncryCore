@@ -60,9 +60,8 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
 
-      if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess) //block have higher score but is not linkable to full chain
+      if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
-        //application of this block leads to full chain with higher score
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
         val updateBestHeader: Boolean =
@@ -117,7 +116,9 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     historyStorage.removeObjects(toRemove)
   }
 
-  private def updateStorage(newModRow: EncryPersistentModifier, bestFullHeaderId: ModifierId, updateHeaderInfo: Boolean = false): Unit = {
+  private def updateStorage(newModRow: EncryPersistentModifier,
+                            bestFullHeaderId: ModifierId,
+                            updateHeaderInfo: Boolean = false): Unit = {
     val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeaderId)
     val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
       if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)

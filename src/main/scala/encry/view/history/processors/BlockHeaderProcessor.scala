@@ -125,7 +125,8 @@ trait BlockHeaderProcessor extends Logging {
     case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
 
-  private def getHeaderInfoUpdate(h: Header): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier)] = {
+  private def getHeaderInfoUpdate(h: Header): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)],
+                                                      EncryPersistentModifier)] = {
     val difficulty: Difficulty = h.difficulty
     if (h.isGenesis) {
       logInfo(s"Initialize header chain with genesis header ${h.encodedId}")
@@ -139,12 +140,14 @@ trait BlockHeaderProcessor extends Logging {
         val score = Difficulty @@ (parentScore + difficulty)
         val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
           if (score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
-        val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
-        val heightRow: (ByteArrayWrapper, ByteArrayWrapper) = headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
+        val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) =
+          headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
+        val heightRow: (ByteArrayWrapper, ByteArrayWrapper) =
+          headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
         val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (score > bestHeadersChainScore) {
           bestBlockHeaderIdsRow(h, score)
         } else {
-          EncryApp.system.actorSelection("/user/blockListener") ! NewOrphaned(h) // TODO: Remove direct system import when possible.
+          EncryApp.system.actorSelection("/user/blockListener") ! NewOrphaned(h)
           orphanedBlockHeaderIdsRow(h, score)
         }
         (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, h)
@@ -156,7 +159,8 @@ trait BlockHeaderProcessor extends Logging {
     * header ids at this height */
   private def bestBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
     val prevHeight = bestHeaderHeight
-    logInfo(s"New best header ${h.encodedId} with score: $score. New height: ${h.height}, old height: $prevHeight")
+    logInfo(s"New best header ${h.encodedId} with score: $score." +
+      s" New height: ${h.height}, old height: $prevHeight")
     val self: (ByteArrayWrapper, ByteArrayWrapper) =
       heightIdsKey(h.height) -> ByteArrayWrapper((Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray)
     val parentHeaderOpt: Option[Header] = typedModifierById[Header](h.parentId)
@@ -179,7 +183,8 @@ trait BlockHeaderProcessor extends Logging {
   protected def validate(header: Header): Try[Unit] = HeaderValidator.validate(header).toTry
 
   protected def reportInvalid(header: Header): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
-    val payloadModifiers: Seq[ByteArrayWrapper] = Seq(header.payloadId, header.adProofsId).filter(id => historyStorage.containsObject(id))
+    val payloadModifiers: Seq[ByteArrayWrapper] = Seq(header.payloadId, header.adProofsId)
+      .filter(id => historyStorage.containsObject(id))
       .map(id => ByteArrayWrapper(id))
     val toRemove: Seq[ByteArrayWrapper] = Seq(headerScoreKey(header.id), ByteArrayWrapper(header.id)) ++ payloadModifiers
     val bestHeaderKeyUpdate: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
@@ -292,7 +297,8 @@ trait BlockHeaderProcessor extends Logging {
     private def validateChildBlockHeader(header: Header, parent: Header): ValidationResult = {
       failFast
         .validate(header.timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift) {
-          error(s"Header timestamp ${header.timestamp} is too far in future from now ${timeProvider.estimatedTime}")
+          error(s"Header timestamp ${header.timestamp} is too far in future from now " +
+            s"${timeProvider.estimatedTime}")
         }
         .validate(header.timestamp > parent.timestamp) {
           fatal(s"Header timestamp ${header.timestamp} is not greater than parents ${parent.timestamp}")
@@ -304,7 +310,8 @@ trait BlockHeaderProcessor extends Logging {
           fatal("Header is already in history")
         }
         .validate(realDifficulty(header) >= header.requiredDifficulty) {
-          fatal(s"Block difficulty ${realDifficulty(header)} is less than required ${header.requiredDifficulty}")
+          fatal(s"Block difficulty ${realDifficulty(header)} is less than required " +
+            s"${header.requiredDifficulty}")
         }
         .validate(header.difficulty >= requiredDifficultyAfter(parent)){
           fatal(s"Incorrect required difficulty in header: " +
