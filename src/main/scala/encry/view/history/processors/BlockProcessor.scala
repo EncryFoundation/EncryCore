@@ -66,8 +66,12 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
         //application of this block leads to full chain with higher score
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
-
-        updateStorage(newModRow, newBestHeader.id)
+        val updateBestHeader: Boolean =
+          !isInBestChain(fullBlock.id) &&
+            scoreOf(fullBlock.id)
+              .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
+              .getOrElse(false)
+        updateStorage(newModRow, newBestHeader.id, updateBestHeader)
 
         if (blocksToKeep >= 0) {
           val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)
@@ -114,10 +118,14 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     historyStorage.removeObjects(toRemove)
   }
 
-  private def updateStorage(newModRow: EncryPersistentModifier, bestFullHeaderId: ModifierId): Unit = {
+  private def updateStorage(newModRow: EncryPersistentModifier,
+                            bestFullHeaderId: ModifierId,
+                            updateHeaderInfo: Boolean = false): Unit = {
     val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeaderId)
-    val bestBlockData: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = Seq(BestBlockKey -> bestFullHeaderIdWrapped)
-    historyStorage.bulkInsert(storageVersion(newModRow), bestBlockData, Seq(newModRow))
+    val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
+      if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)
+      else Seq(BestBlockKey -> bestFullHeaderIdWrapped)
+    historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
   }
 
   private def storageVersion(newModRow: EncryPersistentModifier) = ByteArrayWrapper(newModRow.id)
