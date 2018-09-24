@@ -30,7 +30,8 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     * @param modToApply - new part of the block we want to apply
     * @return ProgressInfo required for State to process to be consistent with History
     */
-  protected def processBlock(fullBlock: Block, modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
+  protected def processBlock(fullBlock: Block,
+                             modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
     val newBestAfterThis: Header = bestFullChain.last.header
     processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, nodeSettings.blocksToKeep))

@@ -17,7 +17,10 @@ import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
-trait EncryHistoryReader extends BlockHeaderProcessor with BlockPayloadProcessor with BaseADProofProcessor with Logging {
+trait EncryHistoryReader extends BlockHeaderProcessor
+  with BlockPayloadProcessor
+  with BaseADProofProcessor
+  with Logging {
 
   protected val nodeSettings: NodeSettings
 
@@ -104,7 +107,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BlockPayloadProcessor
         val updatedChains: Seq[Seq[Header]] = nextLevelHeaders.flatMap { h =>
           acc.find(chain => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(h +: _)
         }
-        val nonUpdatedChains: Seq[Seq[Header]] = acc.filter(chain => !nextLevelHeaders.exists(_.parentId sameElements chain.head.id))
+        val nonUpdatedChains: Seq[Seq[Header]] = acc.filter(chain =>
+          !nextLevelHeaders.exists(_.parentId sameElements chain.head.id))
         loop(currentHeight + 1, updatedChains ++ nonUpdatedChains)
       }
     }
