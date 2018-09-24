@@ -149,7 +149,7 @@ trait BlockHeaderProcessor extends Logging {
         val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (betterScore) {
           logInfo(s"New best header ${h.encodedId} with score: $score. New height: ${h.height}, " +
             s"old height: $bestHeaderHeight")
-          bestBlockHeaderIdsRow(h)
+          bestBlockHeaderIdsRow(h, score)
         } else {
           EncryApp.system.actorSelection("/user/blockListener") ! NewOrphaned(h)
           orphanedBlockHeaderIdsRow(h, score)
@@ -161,7 +161,9 @@ trait BlockHeaderProcessor extends Logging {
 
   /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
     * header ids at this height */
-  private def bestBlockHeaderIdsRow(h: Header): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
+  private def bestBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
+    val prevHeight = bestHeaderHeight
+    logInfo(s"New best header ${h.encodedId} with score: $score. New height: ${h.height}, old height: $prevHeight")
     val self: (ByteArrayWrapper, ByteArrayWrapper) =
       heightIdsKey(h.height) -> ByteArrayWrapper((Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray)
     val parentHeaderOpt: Option[Header] = typedModifierById[Header](h.parentId)
