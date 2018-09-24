@@ -5,7 +5,7 @@
         <syslogHost>localhost</syslogHost>
         <port>12345</port>
         <facility>SYSLOG</facility>
-        <suffixPattern>[%thread] %logger %msg</suffixPattern>
+        <suffixPattern>[%-5level] >> %d{yyyy-MM-dd HH:mm:ss} >> %msg</suffixPattern>
     </appender>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
