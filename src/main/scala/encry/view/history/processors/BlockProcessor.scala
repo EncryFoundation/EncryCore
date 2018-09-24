@@ -8,8 +8,6 @@ import encry.modifiers.history.{Block, Header, HeaderChain}
 import encry.utils.Logging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
-import io.circe.syntax._
-import org.encryfoundation.common.Algos
 
 import scala.util.{Failure, Try}
 
@@ -22,31 +20,20 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
 
   protected def getBlock(h: Header): Option[Block]
 
-  protected def commonBlockThenSuffixes(header1: Header,
-                                        header2: Header): (HeaderChain, HeaderChain)
+  protected def commonBlockThenSuffixes(header1: Header, header2: Header): (HeaderChain, HeaderChain)
 
-  protected[history] def continuationHeaderChains(header: Header,
-                                                  filterCond: Header => Boolean): Seq[Seq[Header]]
+  protected[history] def continuationHeaderChains(header: Header, filterCond: Header => Boolean): Seq[Seq[Header]]
 
   /** Process full block when we have one.
     *
-    * @param fullBlock  - block to process
+    * @param fullBlock - block to process
     * @param modToApply - new part of the block we want to apply
     * @return ProgressInfo required for State to process to be consistent with History
     */
-  protected def processBlock(fullBlock: Block,
-                             modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
-    logInfo(s"Going to process block: ${fullBlock.asJson}")
+  protected def processBlock(fullBlock: Block, modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
-    logInfo(s"Best full chain: " +
-      s"${bestFullChain.map(block => Algos.encode(block.id) + ":" + block.header.height)}")
-    val newBestHeader: Header = bestFullChain.last.header
-    logInfo(s"NewBest header: ${Algos.encode(newBestHeader.id)}")
-    logInfo(s"fullBlock: ${Algos.encode(fullBlock.id)}")
-    logInfo(s"modToApply: ${Algos.encode(modToApply.id)}")
-    logInfo(s"Best full chain: " +
-      s"${bestFullChain.map(block => Algos.encode(block.id) + ":" + block.header.height).mkString(",")}")
-    processing(ToProcess(fullBlock, modToApply, newBestHeader, bestFullChain, nodeSettings.blocksToKeep))
+    val newBestAfterThis: Header = bestFullChain.last.header
+    processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, nodeSettings.blocksToKeep))
   }
 
   private def processing: BlockProcessing =
@@ -63,20 +50,16 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   }
 
   private def processBetterChain: BlockProcessing = {
-    case toProcess@ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
-      if bestBlockOpt.nonEmpty && isBetterBlock(fullBlock) =>
+    case toProcess @ ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
+      if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
+
       val prevBest: Block = bestBlockOpt.get
-      logInfo(s"prevBest: ${Algos.encode(prevBest.id)}")
-      val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, fullBlock.header)
-      logInfo(s"PrevChain: ${prevChain.headers.map(header => Algos.encode(header.id) + ":" + header.height).mkString(",")}")
-      logInfo(s"newChain: ${newChain.headers.map(header => Algos.encode(header.id) + ":" + header.height).mkString(",")}")
+      val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
-      logInfo(s"toRemove: ${toRemove.map(block => Algos.encode(block.id) + ":" + block.header.height).mkString(",")}")
-      logInfo(s"toApply: ${toApply.map(block => Algos.encode(block.id) + ":" + block.header.height).mkString(",")}")
-      //block have higher score but is not linkable to full chain
-      if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
+
+      if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess) //block have higher score but is not linkable to full chain
       else {
         //application of this block leads to full chain with higher score
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
@@ -101,11 +84,11 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   protected def isValidFirstBlock(header: Header): Boolean =
     header.height == blockDownloadProcessor.minimalBlockHeight && bestBlockIdOpt.isEmpty
 
-  private def isBetterBlock(block: Block): Boolean = {
+  private def isBetterChain(id: ModifierId): Boolean = {
     val isBetter: Option[Boolean] = for {
       bestFullBlockId <- bestBlockIdOpt
       prevBestScore <- scoreOf(bestFullBlockId)
-      score <- scoreOf(block.id)
+      score <- scoreOf(id)
     } yield score > prevBestScore
 
     isBetter getOrElse false
@@ -133,9 +116,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     historyStorage.removeObjects(toRemove)
   }
 
-  private def updateStorage(newModRow: EncryPersistentModifier,
-                            bestFullHeaderId: ModifierId,
-                            updateHeaderInfo: Boolean = false): Unit = {
+  private def updateStorage(newModRow: EncryPersistentModifier, bestFullHeaderId: ModifierId, updateHeaderInfo: Boolean = false): Unit = {
     val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeaderId)
     val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
       if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)

@@ -7,16 +7,17 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history._
 import encry.settings.{Constants, NodeSettings}
 import encry.view.history.processors.BlockHeaderProcessor
-import encry.view.history.processors.payload.BaseBlockPayloadProcessor
+import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
 import encry.EncryApp.settings
 import encry.utils.Logging
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
+
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
-trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProcessor with BaseADProofProcessor with Logging {
+trait EncryHistoryReader extends BlockHeaderProcessor with BlockPayloadProcessor with BaseADProofProcessor with Logging {
 
   protected val nodeSettings: NodeSettings
 
@@ -36,7 +37,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
     * Complete block of the best chain with transactions.
     * Always None for an SPV mode, Some(fullBLock) for fullnode regime after initial bootstrap.
     */
-  def bestBlockOpt: Option[Block] = bestBlockIdOpt.flatMap(typedModifierById[Header]).flatMap(getBlock)
+  def bestBlockOpt: Option[Block] =
+    bestBlockIdOpt.flatMap(id => typedModifierById[Header](id)).flatMap(getBlock)
 
   /** @return ids of count headers starting from offset */
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
