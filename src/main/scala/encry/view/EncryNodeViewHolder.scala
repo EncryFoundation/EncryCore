@@ -276,7 +276,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                 context.actorSelection("/user/blockListener") ! ChainSwitching(progressInfo.toRemove.map(_.id))
               if (settings.influxDB.isDefined)
                 newHistory.bestHeaderOpt.foreach(header =>
-                  context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
+                  context.actorSelection("/user/statsSender") ! BestHeaderInChain(header, System.currentTimeMillis()))
               if (newHistory.isFullChainSynced && receivedAll) Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
