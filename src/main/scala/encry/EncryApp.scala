@@ -104,8 +104,9 @@ object EncryApp extends App with Logging {
       StateInfoApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
       WalletInfoApiRoute(nodeViewHolder, settings.restApi)
     )
-    val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
-    Http().bindAndHandle(combinedRoute, settings.restApi.bindAddress.getAddress.getHostAddress,
+    Http().bindAndHandle(
+      CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute,
+      settings.restApi.bindAddress.getAddress.getHostAddress,
       settings.restApi.bindAddress.getPort)
   }
 
