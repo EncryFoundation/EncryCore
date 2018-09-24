@@ -66,11 +66,15 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     case toProcess@ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterBlock(fullBlock) =>
       val prevBest: Block = bestBlockOpt.get
+      logInfo(s"prevBest: ${Algos.encode(prevBest.id)}")
       val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, fullBlock.header)
+      logInfo(s"PrevChain: ${prevChain.headers.map(header => Algos.encode(header.id) + ":" + header.height).mkString(",")}")
+      logInfo(s"newChain: ${newChain.headers.map(header => Algos.encode(header.id) + ":" + header.height).mkString(",")}")
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
-
+      logInfo(s"toRemove: ${toRemove.map(block => Algos.encode(block.id) + ":" + block.header.height).mkString(",")}")
+      logInfo(s"toApply: ${toApply.map(block => Algos.encode(block.id) + ":" + block.header.height).mkString(",")}")
       //block have higher score but is not linkable to full chain
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
