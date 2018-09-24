@@ -17,6 +17,7 @@ protected[database] object QueryRepository extends Logging {
 
   def processBlockQuery(block: Block): ConnectionIO[Int] =
     for {
+      _       <- markAsRemovedFromMainChainQuery(block.header.height)
       headerR <- insertHeaderQuery(block)
       txsR    <- insertTransactionsQuery(block)
       dirR    <- insertDirectivesQuery(block.payload.transactions)
@@ -27,6 +28,11 @@ protected[database] object QueryRepository extends Logging {
   def markAsRemovedFromMainChainQuery(ids: List[ModifierId]): ConnectionIO[Int] = {
     val query: String = s"UPDATE public.headers SET best_chain = FALSE WHERE id = ?"
     Update[String](query).updateMany(ids.map(Base16.encode))
+  }
+
+  def markAsRemovedFromMainChainQuery(height: Int): ConnectionIO[Int] = {
+    val query: String = s"UPDATE public.headers SET best_chain = FALSE WHERE height = ?"
+    Update[Int](query).run(height)
   }
 
   def insertHeaderQuery(block: Block): ConnectionIO[Int] = {
