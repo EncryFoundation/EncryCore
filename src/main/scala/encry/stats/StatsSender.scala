@@ -158,4 +158,6 @@ object StatsSender {
 
   case class TransactionGeneratorStat(txsQty: Int, generationTime: Long)
 
+  case class dbSyncTime(time: Long)
+
 }
