@@ -108,6 +108,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProce
       }
     }
 
+    logInfo(s"Start from header: ${Algos.encode(header.id)}")
+
     loop(heightOf(header.id), Seq(Seq(header)))
   }
 

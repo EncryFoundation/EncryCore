@@ -8,6 +8,9 @@ import encry.modifiers.history.{Block, Header, HeaderChain}
 import encry.utils.Logging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
+import io.circe.syntax._
+import org.encryfoundation.common.Algos
+
 import scala.util.{Failure, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with Logging {
@@ -33,8 +36,16 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     */
   protected def processBlock(fullBlock: Block,
                              modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
+    logInfo(s"Going to process block: ${fullBlock.asJson}")
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
+    logInfo(s"Best full chain: " +
+      s"${bestFullChain.map(block => Algos.encode(block.id) + ":" + block.header.height)}")
     val newBestHeader: Header = bestFullChain.last.header
+    logInfo(s"NewBest header: ${Algos.encode(newBestHeader.id)}")
+    logInfo(s"fullBlock: ${Algos.encode(fullBlock.id)}")
+    logInfo(s"modToApply: ${Algos.encode(modToApply.id)}")
+    logInfo(s"Best full chain: " +
+      s"${bestFullChain.map(block => Algos.encode(block.id) + ":" + block.header.height).mkString(",")}")
     processing(ToProcess(fullBlock, modToApply, newBestHeader, bestFullChain, nodeSettings.blocksToKeep))
   }
 
