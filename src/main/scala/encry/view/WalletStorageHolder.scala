@@ -2,7 +2,7 @@ package encry.view
 
 import akka.actor.Actor
 import scala.concurrent.duration._
-import encry.EncryApp.system
+import encry.EncryApp.{settings, system}
 import encry.api.http.routes.GetAllBoxes
 import encry.modifiers.state.box.EncryBaseBox
 import encry.stats.StatsSender.CurrentUtxosQtyInIOdb
@@ -17,10 +17,11 @@ class WalletStorageHolder extends Actor {
 
   var buffer = Seq.empty[EncryBaseBox]
 
-  system.scheduler.schedule(10 second, 60 second) {
-    system.actorSelection("user/nodeViewHolder") !
-      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Seq[EncryBaseBox]] {
-        _.vault.walletStorage.allBoxes }
+  if (settings.influxDB.isDefined) { system.scheduler.schedule(10 second, 60 second) {
+      system.actorSelection("user/nodeViewHolder") !
+        GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Seq[EncryBaseBox]] {
+          _.vault.walletStorage.allBoxes }
+    }
   }
 
   override def receive: Receive = {

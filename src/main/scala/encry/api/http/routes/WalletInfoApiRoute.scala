@@ -1,6 +1,6 @@
 package encry.api.http.routes
 
-import akka.actor.{ActorRef, ActorRefFactory}
+import akka.actor.{ActorRef, ActorRefFactory, Props}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
@@ -15,14 +15,15 @@ import io.circe.syntax._
 import org.encryfoundation.common.Algos
 import scala.concurrent.Future
 import encry.EncryApp.system
+import encry.view.WalletStorageHolder
 
 case class WalletInfoApiRoute(nodeViewHolderRef: ActorRef,
                               restApiSettings: RESTApiSettings)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
-  override val route: Route = pathPrefix("wallet") {
-    infoR ~ getUtxosR
-  }
+  val walletStorageHolder: ActorRef = system.actorOf(Props[WalletStorageHolder], "walletStorageHolder")
+
+  override val route: Route = pathPrefix("wallet") { infoR ~ getUtxosR }
 
   override val settings: RESTApiSettings = restApiSettings
 
@@ -30,8 +31,7 @@ case class WalletInfoApiRoute(nodeViewHolderRef: ActorRef,
     GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, EncryWallet](_.vault))
     .mapTo[EncryWallet]
 
-  private def getBoxes: Future[Seq[EncryBaseBox]] =
-    (system.actorSelection("user/WalletStorageHolder") ? GetAllBoxes()).mapTo[Seq[EncryBaseBox]]
+  private def getBoxes: Future[Seq[EncryBaseBox]] = (walletStorageHolder ? GetAllBoxes()).mapTo[Seq[EncryBaseBox]]
 
   def infoR: Route = (path("info") & get) {
     getWallet.map { w =>
@@ -42,9 +42,8 @@ case class WalletInfoApiRoute(nodeViewHolderRef: ActorRef,
       }.okJson()
   }
 
-  def getUtxosR: Route = (path("utxos") & get) {
-    getBoxes.map(_.asJson).okJson()
-  }
+  def getUtxosR: Route = (path("utxos") & get) { getBoxes.map(_.asJson).okJson() }
+
 }
 
 case class GetAllBoxes()

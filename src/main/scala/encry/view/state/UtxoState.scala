@@ -182,7 +182,6 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           else debitB.getOrElse(tokenId, 0L) >= amount
         }
       }
-       //println(s"non valid transaction! Non-positive balance in $tx")
       if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
     }
 

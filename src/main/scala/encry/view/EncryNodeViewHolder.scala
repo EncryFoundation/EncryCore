@@ -53,14 +53,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   )
   var txsInBlocks: Int = 0
 
-  system.scheduler.schedule(5.second, 5.second) {
-    if (settings.influxDB.isDefined)
+  if (settings.influxDB.isDefined) { context.system.scheduler.schedule(5 second, 5 second) {
       system.actorSelection("user/statsSender") !
-        HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
+        HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight) }
   }
 
-  system.scheduler.schedule(5 second, 1 second) {
-    if (settings.influxDB.isDefined) {
+  if (settings.influxDB.isDefined) { context.system.scheduler.schedule(5 second, 1 second) {
       val txsInLastBlock: Int = nodeView.history.bestBlockOpt.map(x => x.payload.transactions.size).getOrElse(0)
       val txsInMempool: Int = nodeView.mempool.unconfirmed.values.size
       val diffBtw: Int = txsInMempool - txsInLastBlock

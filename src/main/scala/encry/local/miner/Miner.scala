@@ -14,7 +14,7 @@ import encry.modifiers.state.box.Box.Amount
 import encry.network.DeliveryManager.FullBlockChainSynced
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
-import encry.stats.StatsSender.{CandidateProducingTime, MiningEnd, MiningTime, SleepTime}
+import encry.stats.StatsSender._
 import encry.utils.Logging
 import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.CurrentView
