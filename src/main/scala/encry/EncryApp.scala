@@ -37,6 +37,7 @@ object EncryApp extends App with Logging {
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
+  lazy val dbService: DBService = DBService()
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
   val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName
     .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)).take(5)
@@ -59,14 +60,13 @@ object EncryApp extends App with Logging {
     .withDispatcher("network-dispatcher"), "networkController")
   lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
   lazy val nodeViewSynchronizer: ActorRef =
-    system.actorOf(Props(classOf[EncryNodeViewSynchronizer], EncrySyncInfoMessageSpec), "nodeViewSynchronizer")
+    system.actorOf(Props(classOf[EncryNodeViewSynchronizer]), "nodeViewSynchronizer")
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
   if (settings.influxDB.isDefined) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.kafka.exists(_.sendToKafka))
     system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
-  if (settings.node.mining && settings.node.offlineGeneration) miner ! StartMining
-  lazy val dbService: DBService = DBService()
-  if (settings.postgres.exists(_.enableSave)) system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")
+  if (settings.postgres.exists(_.enableSave))
+    system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")
   if (settings.node.mining) miner ! StartMining
   if (settings.levelDb.exists(_.enableSave) || settings.levelDb.exists(_.enableRestore))
     system.actorOf(Props[ModifiersHolder], "modifiersHolder")
@@ -104,8 +104,9 @@ object EncryApp extends App with Logging {
       StateInfoApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
       WalletInfoApiRoute(nodeViewHolder, settings.restApi)
     )
-    val combinedRoute: Route = CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute
-    Http().bindAndHandle(combinedRoute, settings.restApi.bindAddress.getAddress.getHostAddress,
+    Http().bindAndHandle(
+      CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute,
+      settings.restApi.bindAddress.getAddress.getHostAddress,
       settings.restApi.bindAddress.getPort)
   }
 
