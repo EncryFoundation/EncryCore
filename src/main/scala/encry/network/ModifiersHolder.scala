@@ -30,6 +30,14 @@ class ModifiersHolder extends PersistentActor with Logging {
     if (completedBlocks.nonEmpty) self ! SendBlocks
   }
 
+  def notifyRecoveryCompleted(): Unit = if (settings.postgres.exists(_.enableRestore)) {
+    logInfo("Recovery from levelDb completed, going to download rest of the blocks from postgres")
+    context.system.actorSelection("/user/postgresRestore") ! StartRecovery
+  } else {
+    logInfo("Recovery completed")
+    peerManager ! RecoveryCompleted
+  }
+
   override def preStart(): Unit = logInfo(s"ModifiersHolder actor is started.")
 
   override def receiveRecover: Receive = if (settings.levelDb.exists(_.enableRestore)) receiveRecoverEnabled else receiveRecoverDisabled
@@ -45,8 +53,7 @@ class ModifiersHolder extends PersistentActor with Logging {
       updateCompletedBlocks(block)
       logDebug(s"Block ${block.header.height} is recovered from leveldb.")
     case RecoveryCompleted if completedBlocks.isEmpty =>
-      logInfo("Recovery completed.")
-      peerManager ! RecoveryCompleted
+      notifyRecoveryCompleted()
     case RecoveryCompleted =>
       context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
   }
@@ -57,10 +64,7 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   override def receiveCommand: Receive = {
     case CheckAllBlocksSent =>
-      if (completedBlocks.isEmpty) {
-        logInfo("Recovery completed.")
-        peerManager ! RecoveryCompleted
-      }
+      if (completedBlocks.isEmpty) notifyRecoveryCompleted()
       else context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
     case SendBlocks =>
       val blocksToSend: Seq[Block] = completedBlocks.take(settings.levelDb
@@ -70,7 +74,7 @@ class ModifiersHolder extends PersistentActor with Logging {
       completedBlocks = completedBlocks.drop(settings.levelDb
         .map(_.batchSize)
         .getOrElse(throw new RuntimeException("batchsize not specified")))
-      nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend)
+      nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend, completedBlocks.isEmpty)
 
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))

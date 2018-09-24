@@ -6,6 +6,7 @@ import doobie.implicits._
 import doobie.hikari.HikariTransactor
 import QueryRepository._
 import com.zaxxer.hikari.HikariDataSource
+import doobie.hikari.implicits._
 import encry.EncryApp.settings
 import encry.modifiers.history.{Block, Header}
 import encry.utils.CoreTaggedTypes.ModifierId
@@ -51,13 +52,12 @@ class DBService extends Logging {
     dataSource.setMaximumPoolSize(5)
   }
 
-  private def shutdown(): Unit = {
-    logInfo("Shutting down dataSource")
-    dataSource.close()
-  }
-  sys.addShutdownHook(shutdown())
-
   private lazy val pgTransactor: HikariTransactor[IO] = HikariTransactor[IO](dataSource)
+
+  def shutdown(): Future[Unit] = {
+    logInfo("Shutting down dbService")
+    pgTransactor.shutdown.unsafeToFuture
+  }
 
   private def runAsync[A](io: ConnectionIO[A], queryName: String): Future[A] =
     (for {

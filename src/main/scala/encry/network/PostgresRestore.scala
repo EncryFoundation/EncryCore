@@ -1,15 +1,16 @@
 package encry.network
 
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef}
 import akka.persistence.RecoveryCompleted
-import encry.EncryApp.{nodeViewHolder, peerManager, settings}
+import encry.EncryApp.{peerManager, settings}
 import encry.utils.Logging
 import encry.local.explorer.database.DBService
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.history.{Block, HeaderDBVersion, Payload}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, Transaction, TransactionDBVersion}
-import encry.view.EncryNodeViewHolder.ReceivableMessages.BlocksFromLocalPersistence
+import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.ChangedHistory
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, GetNodeViewChanges}
 import org.encryfoundation.common.transaction.ProofSerializer
 import scorex.crypto.encode.Base16
 import scala.concurrent.Future
@@ -17,29 +18,35 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
-class PostgresRestore(dbService: DBService) extends Actor with Logging {
+class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Actor with Logging {
 
   val heightFuture: Future[Int] = dbService.selectHeight
 
+  override def postStop(): Unit = if (settings.postgres.exists(_.enableSave)) Unit else dbService.shutdown()
+
   heightFuture.onComplete {
-    case Success(height) => logInfo(s"Going to download $height blocks from postgres")
+    case Success(_) =>
+      logInfo(s"Going to download blocks from postgres")
     case Failure(_) =>
+      logWarn("Failed to connect to postgres")
       peerManager ! RecoveryCompleted
       nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true)
       context.stop(self)
   }
 
   override def receive: Receive = {
-    case StartRecovery => startRecovery().map { _ =>
+    case StartRecovery => nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
+    case ChangedHistory(history) => startRecovery(history.bestBlockOpt.map(_.header.height).getOrElse(0)).map { _ =>
       logInfo(s"All blocks restored from postgres")
       context.stop(self)
     }
   }
 
-  def startRecovery(): Future[Unit] = heightFuture.flatMap { height =>
+  def startRecovery(startFrom: Int): Future[Unit] = heightFuture.flatMap { height =>
     settings.postgres.flatMap(_.restoreBatchSize) match {
       case Some(step) =>
-        (0 to height).sliding(step, step).foldLeft(Future.successful(List[Block]())) { case (prevBlocks, slide) =>
+        logInfo(s"Going to download blocks from postgres starting from $startFrom")
+        (startFrom to height).sliding(step, step).foldLeft(Future.successful(List[Block]())) { case (prevBlocks, slide) =>
           val from: Int = slide.head
           val to: Int = slide.last
           prevBlocks.flatMap { retrievedBlocks =>
