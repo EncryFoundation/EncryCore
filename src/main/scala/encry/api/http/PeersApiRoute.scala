@@ -4,29 +4,30 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import akka.pattern.ask
 import encry.api.http.PeersApiRoute.PeerInfoResponse
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.peer.PeerInfo
+import encry.network.NetworkController.ReceivableMessages.ConnectTo
+import encry.network.peer.PeerManager.ReceivableMessages.{GetAllPeers, GetConnectedPeers}
 import encry.settings.RESTApiSettings
 import io.circe.Encoder
 import io.circe.generic.semiauto._
+import scala.collection.immutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.matching.Regex
 
 case class PeersApiRoute(peerManager: ActorRef,
                          networkController: ActorRef,
-                         override val settings: RESTApiSettings)(implicit val context: ActorRefFactory)
-  extends ApiRoute {
-
-  import encry.network.NetworkController.ReceivableMessages.ConnectTo
-  import encry.network.peer.PeerManager.ReceivableMessages.{GetAllPeers, GetConnectedPeers}
+                         override val settings: RESTApiSettings)(implicit val context: ActorRefFactory) extends ApiRoute {
 
   override lazy val route: Route = pathPrefix("peers") { allPeers ~ connectedPeers ~ connect }
   private val addressAndPortRegexp: Regex = "\\w+:\\d{1,5}".r
 
   def allPeers: Route = (path("all") & get) {
-    val result = askActor[Map[InetSocketAddress, PeerInfo]](peerManager, GetAllPeers).map {
+    val result: Future[immutable.Iterable[PeerInfoResponse]] =
+      (peerManager ? GetAllPeers).mapTo[Map[InetSocketAddress, PeerInfo]].map {
       _.map { case (address, peerInfo) =>
         PeerInfoResponse.fromAddressAndInfo(address, peerInfo)
       }
@@ -35,7 +36,7 @@ case class PeersApiRoute(peerManager: ActorRef,
   }
 
   def connectedPeers: Route = (path("connected") & get) {
-    val result: Future[Seq[PeerInfoResponse]] = askActor[Seq[ConnectedPeer]](peerManager, GetConnectedPeers).map {
+    val result: Future[Seq[PeerInfoResponse]] = (peerManager ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map {
       _.map { peer =>
         PeerInfoResponse(
           address = peer.socketAddress.toString,
@@ -46,7 +47,7 @@ case class PeersApiRoute(peerManager: ActorRef,
     onSuccess(result) { r => complete(r) }
   }
 
-  def connect: Route = (path("connect") & post & withAuth & entity(as[String])) { body =>
+  def connect: Route = (path("connect") & post & entity(as[String])) { body =>
     complete {
       if (addressAndPortRegexp.findFirstMatchIn(body).isDefined) {
         val Array(host, port) = body.split(":")
