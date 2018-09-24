@@ -188,7 +188,8 @@ trait BlockHeaderProcessor extends Logging {
     val payloadModifiers: Seq[ByteArrayWrapper] =
       Seq(header.payloadId, header.adProofsId).filter(id => historyStorage.containsObject(id))
       .map(id => ByteArrayWrapper(id))
-    val toRemove: Seq[ByteArrayWrapper] = Seq(headerScoreKey(header.id), ByteArrayWrapper(header.id)) ++ payloadModifiers
+    val toRemove: Seq[ByteArrayWrapper] = Seq(headerScoreKey(header.id), ByteArrayWrapper(header.id)) ++
+      payloadModifiers
     val bestHeaderKeyUpdate: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
       if (bestHeaderIdOpt.exists(_ sameElements header.id)) Seq(BestHeaderKey -> ByteArrayWrapper(header.parentId))
       else Seq()
@@ -298,10 +299,12 @@ trait BlockHeaderProcessor extends Logging {
     private def validateChildBlockHeader(header: Header, parent: Header): ValidationResult = {
       failFast
         .validate(header.timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift) {
-          error(s"Header timestamp ${header.timestamp} is too far in future from now ${timeProvider.estimatedTime}")
+          error(s"Header timestamp ${header.timestamp} is too " +
+            s"far in future from now ${timeProvider.estimatedTime}")
         }
         .validate(header.timestamp > parent.timestamp) {
-          fatal(s"Header timestamp ${header.timestamp} is not greater than parents ${parent.timestamp}")
+          fatal(s"Header timestamp ${header.timestamp} is not " +
+            s"greater than parents ${parent.timestamp}")
         }
         .validate(header.height == parent.height + 1) {
           fatal(s"Header height ${header.height} is not greater by 1 than parents ${parent.height}")
@@ -310,7 +313,8 @@ trait BlockHeaderProcessor extends Logging {
           fatal("Header is already in history")
         }
         .validate(realDifficulty(header) >= header.requiredDifficulty) {
-          fatal(s"Block difficulty ${realDifficulty(header)} is less than required ${header.requiredDifficulty}")
+          fatal(s"Block difficulty ${realDifficulty(header)} is less than " +
+            s"required ${header.requiredDifficulty}")
         }
         .validate(heightOf(header.parentId).exists(h => bestHeaderHeight - h < Constants.Chain.MaxRollbackDepth)) {
           fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")

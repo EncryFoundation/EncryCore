@@ -16,7 +16,10 @@ import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
-trait EncryHistoryReader extends BlockHeaderProcessor with BaseBlockPayloadProcessor with BaseADProofProcessor with Logging {
+trait EncryHistoryReader extends BlockHeaderProcessor
+  with BaseBlockPayloadProcessor
+  with BaseADProofProcessor
+  with Logging {
 
   protected val nodeSettings: NodeSettings
 
