@@ -17,17 +17,18 @@ class WalletStorageHolder extends Actor {
 
   var buffer = Seq.empty[EncryBaseBox]
 
-  if (settings.influxDB.isDefined) { system.scheduler.schedule(10 second, 60 second) {
-      system.actorSelection("user/nodeViewHolder") !
-        GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Seq[EncryBaseBox]] {
-          _.vault.walletStorage.allBoxes }
-    }
+  system.scheduler.schedule(10 second, 15 second) {
+    system.actorSelection("user/nodeViewHolder") !
+      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Seq[EncryBaseBox]] {
+        _.vault.walletStorage.allBoxes
+      }
   }
 
   override def receive: Receive = {
     case GetAllBoxes() => sender() ! buffer.takeRight(500)
       buffer = buffer.dropRight(500)
     case seq: Seq[EncryBaseBox] => buffer = seq
-      system.actorSelection("user/statsSender") ! CurrentUtxosQtyInIOdb(seq.size)
+      if (settings.influxDB.isDefined)
+        system.actorSelection("user/statsSender") ! CurrentUtxosQtyInIOdb(seq.size)
   }
 }

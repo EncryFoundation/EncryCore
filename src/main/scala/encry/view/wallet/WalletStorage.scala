@@ -27,8 +27,11 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
     val endStoreGetAllTime: Amount = System.nanoTime() - startTime
     system.actorSelection("user/statsSender") ! GetAllTiming(endStoreGetAllTime, storeGetAllSeq.size)
 
-    val outputs: Seq[EncryBaseBox] = store.getAll.filter { x => x._2 != balancesKey }.foldLeft(Seq[EncryBaseBox]()) {
-      case (acc, id) => getBoxById(ADKey @@ id._1.data).map { bx => acc :+ bx }.getOrElse(acc) }
+    val outputs: Seq[EncryBaseBox] = store.getAll.foldLeft(Seq[EncryBaseBox]()) {
+      case (acc, (key, value)) if value != balancesKey =>
+        getBoxById(ADKey @@ key.data).map(bx => acc :+ bx).getOrElse(acc)
+      case (acc, _) => acc
+    }
 
     val endAllBoxesTime = System.nanoTime() - startTime
 

@@ -32,10 +32,11 @@ import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import io.circe.syntax._
 import scala.annotation.tailrec
-import scala.collection.{IndexedSeq, Seq, mutable}
+import scala.collection.{mutable, IndexedSeq, Seq}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
+import scala.util.control.NonFatal
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging {
 
@@ -54,12 +55,15 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   )
   var txsInBlocks: Int = 0
 
-  if (settings.influxDB.isDefined) { context.system.scheduler.schedule(5 second, 5 second) {
+  if (settings.influxDB.isDefined) {
+    context.system.scheduler.schedule(5 second, 5 second) {
       system.actorSelection("user/statsSender") !
-        HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight) }
+        HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
+    }
   }
 
-  if (settings.influxDB.isDefined) { context.system.scheduler.schedule(5 second, 1 second) {
+  if (settings.influxDB.isDefined) {
+    context.system.scheduler.schedule(5 second, 1 second) {
       val txsInLastBlock: Int = nodeView.history.bestBlockOpt.map(x => x.payload.transactions.size).getOrElse(0)
       val txsInMempool: Int = nodeView.mempool.unconfirmed.values.size
       val diffBtw: Int = txsInMempool - txsInLastBlock
@@ -132,7 +136,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
         logInfo(s"Cache after(${modifiersCache.size})")
       }
-    case lt: Test[EncryProposition, Transaction] => lt.tx.foreach(txModify)
+    case lt: putTxsInMempool[EncryProposition, Transaction] =>
+      val txsInMempool: (Vector[Transaction], Vector[Transaction]) =
+        lt.tx.foldLeft(Vector.empty[Transaction], Vector.empty[Transaction]) { case ((successList, unsuccessList), tx) =>
+          txModify(tx) match {
+            case Success(_) => (tx +: successList, unsuccessList)
+            case Failure(_) => (successList, tx +: unsuccessList) }
+      }
+      sender() ! ResponseForTxsInMempool(txsInMempool._1, txsInMempool._2)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       logInfo(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
@@ -321,13 +332,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     }
   } else logWarn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
 
-  def txModify(tx: Transaction): Unit = nodeView.mempool.put(tx) match {
-    case Success(newPool) =>
+  def txModify(tx: Transaction): Try[Unit] = nodeView.mempool.put(tx).map { newPool =>
       val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, Transaction](tx)
-    case Failure(e) => logWarn(s"Failed to put tx ${tx.id} to mempool" +
-      s" with exception ${e.getLocalizedMessage}")
+  }.recoverWith {
+    case NonFatal(ex) =>
+      logWarn(s"Failed to put tx ${tx.id} to mempool with exception ${ex.getLocalizedMessage}")
+      Failure(ex)
   }
 
   def genesisState: NodeView = {
@@ -433,7 +445,9 @@ object EncryNodeViewHolder {
     case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentNodeViewModifier]
     (pmod: EncryPersistentModifier)
 
-    case class Test[P <: Proposition, EncryBaseTransaction](tx: List[EncryBaseTransaction])
+    case class putTxsInMempool[P <: Proposition, EncryBaseTransaction](tx: List[EncryBaseTransaction])
+
+    case class ResponseForTxsInMempool(successful: Vector[Transaction], failed: Vector[Transaction])
 
   }
 

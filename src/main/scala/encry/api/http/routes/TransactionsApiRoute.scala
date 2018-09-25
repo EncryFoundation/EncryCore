@@ -11,13 +11,17 @@ import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
 import encry.view.mempool.EncryMempoolReader
 import encry.view.state.StateMode
 import io.circe.Json
+import io.circe.generic.auto._
 import io.circe.syntax._
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{LocallyGeneratedTransaction, Test}
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{putTxsInMempool, ResponseForTxsInMempool}
 import encry.settings.RESTApiSettings
 import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
-case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: ActorRef,
-                                restApiSettings: RESTApiSettings, stateMode: StateMode)(implicit val context: ActorRefFactory)
+case class TransactionsApiRoute(readersHolder: ActorRef,
+                                nodeViewActorRef: ActorRef,
+                                restApiSettings: RESTApiSettings,
+                                stateMode: StateMode)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
   override val route: Route = pathPrefix("transactions") {
@@ -33,11 +37,13 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
   }.map(_.map(_.asJson).asJson)
 
   def defaultTransferTransactionR: Route = path("send") {
-    post(entity(as[List[Transaction]]) {
-      txs => complete { nodeViewActorRef ! Test[EncryProposition, Transaction](txs)
-          StatusCodes.OK
-        }
-    })
+    post(entity(as[List[Transaction]]) { txs => onComplete {
+      (nodeViewActorRef ? putTxsInMempool[EncryProposition, Transaction](txs))
+        .mapTo[ResponseForTxsInMempool].map(_.asJson)
+    } {
+      case Success(value) => complete(value)
+      case Failure(_) => complete(StatusCodes.InternalServerError) }
+  })
   }
 
   def getUnconfirmedTransactionsR: Route = (path("unconfirmed") & get & paging) { (offset, limit) =>
