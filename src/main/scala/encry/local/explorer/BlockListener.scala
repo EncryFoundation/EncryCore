@@ -22,7 +22,6 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
 
   val currentDbHeightFuture: Future[Int] = dbService.selectHeightOpt.map(_.getOrElse(0))
   val writingGap: Int = 20
-  var existingGapUploaded: Boolean = false
 
   currentDbHeightFuture.onComplete {
     case Success(height) =>
