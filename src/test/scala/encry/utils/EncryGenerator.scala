@@ -1,9 +1,5 @@
 package encry.utils
 
-import java.io.File
-
-import akka.actor.ActorRef
-import encry.avltree._
 import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.history.Header
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
@@ -12,14 +8,10 @@ import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, Mone
 import encry.settings.Constants
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.TestHelper.Props
-import encry.view.state.{BoxHolder, EncryState, UtxoState}
-import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.Algos
-import org.encryfoundation.common.Algos.HF
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.transaction.EncryAddress.Address
 import org.encryfoundation.common.transaction.Pay2PubKeyAddress
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey}
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
@@ -123,7 +115,7 @@ trait EncryGenerator {
       ADDigest @@ Random.randomBytes(33),
       Digest32 @@ Random.randomBytes(32),
       random.nextLong(),
-      random.nextInt(1000),
+      Math.abs(random.nextInt()),
       random.nextLong(),
       Constants.Chain.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
