@@ -20,8 +20,6 @@ case object PeerDatabase {
     whitelistPersistence.keys.flatMap(k => whitelistPersistence.get(k).map(v => k -> v)).toMap
 
   def isEmpty: Boolean = whitelistPersistence.isEmpty
-
-  def remove(address: InetSocketAddress): Unit = whitelistPersistence -= address
 }
 
 case class PeerInfo(lastSeen: Long, nodeName: Option[String] = None, connectionType: Option[ConnectionType] = None)
