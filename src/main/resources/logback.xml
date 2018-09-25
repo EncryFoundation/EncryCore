@@ -2,7 +2,7 @@
 <configuration scan="true" scanPeriod="10 seconds">
 
     <appender name="SYSLOG" class="ch.qos.logback.classic.net.SyslogAppender">
-        <syslogHost>localhost</syslogHost>
+        <syslogHost>192.168.30.145</syslogHost>
         <port>12345</port>
         <facility>SYSLOG</facility>
         <suffixPattern>[%-5level] >> %d{yyyy-MM-dd HH:mm:ss} >> %msg</suffixPattern>
