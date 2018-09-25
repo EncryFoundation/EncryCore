@@ -2,15 +2,12 @@ package encry.utils
 
 import java.net.InetAddress
 import encry.utils.NetworkTime.Time
-import encry.EncryApp.settings
 import org.apache.commons.net.ntp.{NTPUDPClient, TimeInfo}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.util.Left
 import scala.util.control.NonFatal
-import encry.EncryApp.system
-import encry.stats.LoggingActor.LogMessage
 
 object NetworkTime {
   def localWithOffset(offset: Long): Long = System.currentTimeMillis() + offset
@@ -25,6 +22,9 @@ case class NetworkTimeProviderSettings(server: String, updateEvery: FiniteDurati
 
 class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) extends Logging {
 
+  private var state: State = Right(NetworkTime(0L, 0L))
+  private var delta: Time = 0L
+
   private type State = Either[(NetworkTime, Future[NetworkTime]), NetworkTime]
 
   private def updateOffSet(): Option[NetworkTime.Offset] = {
@@ -36,8 +36,7 @@ class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) extends Logg
       info.computeDetails()
       Option(info.getOffset)
     } catch {
-      case t: Throwable =>
-        None
+      case t: Throwable => None
     } finally {
       client.close()
     }
@@ -66,11 +65,9 @@ class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) extends Logg
           }
     }
 
-  private var state: State = Right(NetworkTime(0L, 0L))
-  private var delta: Time = 0L
-
   def estimatedTime: Time = state match {
-    case Right(nt) if NetworkTime.localWithOffset(nt.offset) <= nt.lastUpdate + ntpSettings.updateEvery.toMillis => NetworkTime.localWithOffset(nt.offset)
+    case Right(nt) if NetworkTime.localWithOffset(nt.offset) <= nt.lastUpdate + ntpSettings.updateEvery.toMillis =>
+      NetworkTime.localWithOffset(nt.offset)
     case _ => System.currentTimeMillis() + delta
   }
 
