@@ -63,20 +63,21 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
       else context.become(operating(newHistory, pending))
   }
 
-  def uploadGap(history: EncryHistoryReader, currentHeight: Int, pending: Vector[Int] = Vector()): Receive = orphanedAndChainSwitching.orElse {
-    case UploadToDbOnHeight(height) if height <= currentHeight =>
-      bestBlockOptAtHeight(history, height).foreach { block =>
-        dbService.processBlock(block).onComplete {
-          case Success(_) =>
-            self ! UploadToDbOnHeight(height + 1)
-          case Failure(_) =>
-            self ! UploadToDbOnHeight(height)
+  def uploadGap(history: EncryHistoryReader, currentHeight: Int, pending: Vector[Int] = Vector()): Receive =
+    orphanedAndChainSwitching.orElse {
+      case UploadToDbOnHeight(height) if height <= currentHeight =>
+        bestBlockOptAtHeight(history, height).foreach { block =>
+          dbService.processBlock(block).onComplete {
+            case Success(_) =>
+              self ! UploadToDbOnHeight(height + 1)
+            case Failure(_) =>
+              self ! UploadToDbOnHeight(height)
+          }
         }
-      }
-    case UploadToDbOnHeight(_) => nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
-    case ChangedHistory(newHistory) => context.become(operating(newHistory, pending))
-    case NewBestBlock(height) => context.become(uploadGap(history, currentHeight, pending :+ height))
-  }
+      case UploadToDbOnHeight(_) => nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
+      case ChangedHistory(newHistory) => context.become(operating(newHistory, pending))
+      case NewBestBlock(height) => context.become(uploadGap(history, currentHeight, pending :+ height))
+    }
 
   def bestBlockOptAtHeight(history: EncryHistoryReader, height: Int): Option[Block] =
     history.headerIdsAtHeight(height)
@@ -85,14 +86,15 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
       .flatMap(history.getBlock)
 
   def tryToUploadPending(history: EncryHistoryReader, pending: Vector[Int]): Vector[Int] =
-    pending.map(height => (bestBlockOptAtHeight(history, height), height)).foldLeft(Vector[Int]()) { case (notFound, (blockOpt, height)) =>
-      blockOpt match {
-        case Some(block) =>
-          dbService.processBlock(block)
-          notFound
-        case None => notFound :+ height
+    pending.map(height => (bestBlockOptAtHeight(history, height), height)).foldLeft(Vector[Int]()) {
+      case (notFound, (blockOpt, height)) =>
+        blockOpt match {
+          case Some(block) =>
+            dbService.processBlock(block)
+            notFound
+          case None => notFound :+ height
+        }
       }
-    }
 
 }
 
