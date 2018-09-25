@@ -60,7 +60,7 @@ class BlockListenerSpec extends TestKit(ActorSystem("BlockListenerSpec")) with I
     val sampleTxs: Seq[Transaction] = genValidPaymentTxs(100)
     val samplePayload: Payload = Payload(sampleHeader.id, sampleTxs)
     val sampleBlock: Block = Block(sampleHeader, samplePayload, None)
-    val sampleModifier: NewBestBlock = NewBestBlock(sampleBlock)
+    val sampleModifier: NewBestBlock = NewBestBlock(1)
     val sampleNewOrphaned: NewOrphaned = NewOrphaned(sampleHeader)
     val sampleSwitchedIds: List[ModifierId] = sampleTxs.map(_.id).toList
     val sampleChainSwitching: ChainSwitching = ChainSwitching(sampleSwitchedIds)
