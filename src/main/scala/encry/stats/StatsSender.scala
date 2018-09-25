@@ -29,7 +29,8 @@ class StatsSender extends Actor {
 
   val InfluxLogin: String = settings.influxDB.map(_.login).getOrElse(throw new RuntimeException("login not specified"))
 
-  val InfluxPassword: String = settings.influxDB.map(_.password).getOrElse(throw new RuntimeException("password not specified"))
+  val InfluxPassword: String =
+    settings.influxDB.map(_.password).getOrElse(throw new RuntimeException("password not specified"))
 
   val InfluxPort: Int = settings.influxDB.map(_.udpPort).getOrElse(throw new RuntimeException("udp port not specified"))
 
@@ -46,22 +47,29 @@ class StatsSender extends Actor {
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
   override def receive: Receive = {
-    case GetAllTiming(a,b) =>
-      influxDB.write(InfluxPort, s"getAllTiming,nodeName=$nodeName value=$a,size=$b")
-    case WorkedTime(a,b) =>
-      influxDB.write(InfluxPort, s"workedTime,nodeName=$nodeName value=$a,size=$b")
+    case GetAllTiming(time, size) =>
+      influxDB.write(InfluxPort, s"getAllTiming,nodeName=$nodeName value=$time,size=$size")
+
+    case WorkedTime(time, size) =>
+      influxDB.write(InfluxPort, s"workedTime,nodeName=$nodeName value=$time,size=$size")
+
     case TxsInBlock(txsNum) =>
       influxDB.write(InfluxPort, s"txsInEachBlock,nodeName=$nodeName value=$txsNum")
+
     case CurrentUtxosQtyInIOdb(utxosQty) =>
       influxDB.write(InfluxPort, s"utxosQty,nodeName=$nodeName value=$utxosQty")
+
     case DiffBtwMempoolAndLastBlockTxs(num) =>
       influxDB.write(InfluxPort, s"txsDiff,nodeName=$nodeName value=$num")
+
     case MempoolStat(size) =>
       influxDB.write(InfluxPort, s"txsInMempool,nodeName=$nodeName value=$size")
+
     case TransactionsStatMessage(num, height) =>
       influxDB.write(InfluxPort, s"numOfTxsInBlock,nodeName=$nodeName value=$num,height=$height")
+
     case LogMessage(logLevel, logMessage, logTime) => influxDB.write(InfluxPort,
-      s"""logsFromNode,nodeName=${nodeName},logLevel=${
+      s"""logsFromNode,nodeName=$nodeName,logLevel=${
         logLevel match {
           case "Info" => 1
           case "Debug" => 2
@@ -70,14 +78,16 @@ class StatsSender extends Actor {
           case _ => 4
         }
       } value="[${sdf.format(logTime)}] $logMessage"""")
+
     case HeightStatistics(bestHeaderHeight, bestBlockHeight) =>
       influxDB.write(InfluxPort,
-        s"chainStat,nodeName=${nodeName} value=$bestHeaderHeight,bestBlockHeight=$bestBlockHeight")
+        s"chainStat,nodeName=$nodeName value=$bestHeaderHeight,bestBlockHeight=$bestBlockHeight")
+
     case BestHeaderInChain(fb: Header, applyTime: Long) =>
       influxDB.write(InfluxPort, util.Arrays.asList(
-        s"difficulty,nodeName=${nodeName} diff=${fb.difficulty.toString},height=${fb.height}",
-        s"""height,nodeName=${nodeName},header=${Algos.encode(fb.id)} height=${fb.height},value="[${sdf.format(applyTime)}]"""",
-        s"stateWeight,nodeName=${nodeName},height=${fb.height} " +
+        s"difficulty,nodeName=$nodeName diff=${fb.difficulty.toString},height=${fb.height}",
+        s"""height,nodeName=$nodeName,header=${Algos.encode(fb.id)} height=${fb.height},value="[${sdf.format(applyTime)}]"""",
+        s"stateWeight,nodeName=$nodeName,height=${fb.height} " +
           s"value=${new File("encry/data/state/").listFiles.foldLeft(0L)(_ + _.length())}",
         s"historyWeight,nodeName=$nodeName,height=${fb.height} " +
           s"value=${new File("encry/data/history/").listFiles.foldLeft(0L)(_ + _.length())}",
@@ -106,35 +116,37 @@ class StatsSender extends Actor {
 
     case EndOfApplyingModif(modifierId) =>
       modifiersToApply.get(Algos.encode(modifierId)).foreach { modInfo =>
-        influxDB.write(InfluxPort, s"modifApplying,nodeName=${nodeName}," +
+        influxDB.write(InfluxPort, s"modifApplying,nodeName=$nodeName," +
           s"modType=${modInfo._1} value=${System.currentTimeMillis() - modInfo._2}")
         modifiersToApply -= Algos.encode(modifierId)
       }
 
     case TransactionGeneratorStat(txsQty: Int, generationTime: Long) =>
-      influxDB.write(InfluxPort, s"transactionGenerator,nodeName=${nodeName} txsQty=$txsQty,generationTime=$generationTime")
+      influxDB.write(InfluxPort,
+        s"transactionGenerator,nodeName=$nodeName txsQty=$txsQty,generationTime=$generationTime")
 
     case SleepTime(time: Long) =>
-      influxDB.write(InfluxPort, s"sleepTime,nodeName=${nodeName} value=$time")
+      influxDB.write(InfluxPort, s"sleepTime,nodeName=$nodeName value=$time")
 
     case MiningTime(time: Long) =>
-      influxDB.write(InfluxPort, s"miningTime,nodeName=${nodeName} value=$time")
+      influxDB.write(InfluxPort, s"miningTime,nodeName=$nodeName value=$time")
 
     case CandidateProducingTime(time: Long) =>
-      influxDB.write(InfluxPort, s"candidateProducing,nodeName=${nodeName} value=$time")
+      influxDB.write(InfluxPort, s"candidateProducing,nodeName=$nodeName value=$time")
 
     case StateUpdating(time: Long) =>
-      influxDB.write(InfluxPort, s"stateUpdatingTime,nodeName=${nodeName} value=$time")
+      influxDB.write(InfluxPort, s"stateUpdatingTime,nodeName=$nodeName value=$time")
 
     case SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
-      modifiersToDownload = modifiersToDownload ++ modifiers.map(mod => (Algos.encode(mod), (modifierTypeId, System.currentTimeMillis())))
+      modifiersToDownload = modifiersToDownload ++
+        modifiers.map(mod => (Algos.encode(mod), (modifierTypeId, System.currentTimeMillis())))
 
     case GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
       modifiers.foreach(downloadedModifierId =>
         modifiersToDownload.get(Algos.encode(downloadedModifierId)).foreach { dowloadInfo =>
           influxDB.write(
             InfluxPort,
-            s"modDownloadStat,nodeName=${nodeName},modId=${Algos.encode(downloadedModifierId)}," +
+            s"modDownloadStat,nodeName=$nodeName,modId=${Algos.encode(downloadedModifierId)}," +
               s"modType=${dowloadInfo._1} value=${System.currentTimeMillis() - dowloadInfo._2}"
           )
           modifiersToDownload = modifiersToDownload - Algos.encode(downloadedModifierId)
