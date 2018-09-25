@@ -3,7 +3,6 @@ package encry.api.http
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCode
 import io.circe.Json
-
 import scala.language.implicitConversions
 
 trait ScorexApiResponse {
