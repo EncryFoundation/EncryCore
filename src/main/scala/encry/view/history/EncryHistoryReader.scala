@@ -7,7 +7,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history._
 import encry.settings.{Constants, NodeSettings}
 import encry.view.history.processors.BlockHeaderProcessor
-import encry.view.history.processors.payload.BaseBlockPayloadProcessor
+import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
 import encry.EncryApp.settings
 import encry.utils.Logging
@@ -17,7 +17,7 @@ import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
 trait EncryHistoryReader extends BlockHeaderProcessor
-  with BaseBlockPayloadProcessor
+  with BlockPayloadProcessor
   with BaseADProofProcessor
   with Logging {
 
@@ -96,8 +96,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   protected[history] def continuationHeaderChains(header: Header,
                                                   filterCond: Header => Boolean): Seq[Seq[Header]] = {
     @tailrec
-    def loop(currentHeightOpt: Option[Int], acc: Seq[Seq[Header]]): Seq[Seq[Header]] = {
-      val nextLevelHeaders: Seq[Header] = currentHeightOpt.toSeq
+    def loop(currentHeight: Int, acc: Seq[Seq[Header]]): Seq[Seq[Header]] = {
+      val nextLevelHeaders: Seq[Header] = Seq(currentHeight)
         .flatMap { h => headerIdsAtHeight(h + 1) }
         .flatMap { id => typedModifierById[Header](id) }
         .filter(filterCond)
@@ -106,13 +106,13 @@ trait EncryHistoryReader extends BlockHeaderProcessor
         val updatedChains: Seq[Seq[Header]] = nextLevelHeaders.flatMap { h =>
           acc.find(chain => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(h +: _)
         }
-        val nonUpdatedChains: Seq[Seq[Header]] =
-          acc.filter(chain => !nextLevelHeaders.exists(_.parentId sameElements chain.head.id))
-        loop(currentHeightOpt.map(_ + 1), updatedChains ++ nonUpdatedChains)
+        val nonUpdatedChains: Seq[Seq[Header]] = acc.filter(chain =>
+          !nextLevelHeaders.exists(_.parentId sameElements chain.head.id))
+        loop(currentHeight + 1, updatedChains ++ nonUpdatedChains)
       }
     }
 
-    loop(heightOf(header.id), Seq(Seq(header)))
+    loop(header.height, Seq(Seq(header)))
   }
 
   def testApplicable(modifier: EncryPersistentModifier): Try[Unit] = modifier match {

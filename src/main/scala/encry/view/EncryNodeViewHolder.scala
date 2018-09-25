@@ -30,6 +30,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+import io.circe.syntax._
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -84,11 +85,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def receive: Receive = {
-    case BlocksFromLocalPersistence(blocks, allSent) if settings.levelDb.exists(_.enableRestore) || settings.postgres.exists(_.enableRestore) =>
+    case BlocksFromLocalPersistence(blocks, allSent)
+      if settings.levelDb.exists(_.enableRestore) || settings.postgres.exists(_.enableRestore) =>
       blocks.foreach { block =>
         pmodModifyRecovery(block) match {
           case Success(_) =>
-            logInfo(s"Block ${block.encodedId} on height ${block.header.height} from recovery applied successfully")
+            logInfo(s"Block ${block.encodedId} on height" +
+              s" ${block.header.height} from recovery applied successfully")
           case Failure(th) =>
             logWarn(s"Failed to apply block ${block.encodedId} on height ${block.header.height} " +
               s"from recovery caused $th")
@@ -97,9 +100,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
       }
       if (settings.levelDb.exists(_.enableSave)) {
-        context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(Header.modifierTypeId, blocks.map(_.header))
-        context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(Payload.modifierTypeId, blocks.map(_.payload))
-        context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(ADProofs.modifierTypeId, blocks.flatMap(_.adProofsOpt))
+        context.actorSelection("/user/modifiersHolder") !
+          RequestedModifiers(Header.modifierTypeId, blocks.map(_.header))
+        context.actorSelection("/user/modifiersHolder") !
+          RequestedModifiers(Payload.modifierTypeId, blocks.map(_.payload))
+        context.actorSelection("/user/modifiersHolder") !
+          RequestedModifiers(ADProofs.modifierTypeId, blocks.flatMap(_.adProofsOpt))
       }
       receivedAll = allSent
       if (receivedAll) {
@@ -265,7 +271,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
     logInfo(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
     if (settings.influxDB.isDefined) context.system
-      .actorSelection("user/statsSender") ! StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
+      .actorSelection("user/statsSender") !
+      StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
         if (settings.influxDB.isDefined)
@@ -280,18 +287,22 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
           newStateTry match {
             case Success(newMinState) =>
-              val newMemPool: EncryMempool = updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)
+              val newMemPool: EncryMempool =
+                updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)
               val newVault: EncryWallet = if (progressInfo.chainSwitchingNeeded)
                 nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
               else nodeView.wallet
               blocksApplied.foreach(newVault.scanPersistent)
               logInfo(s"Persistent modifier ${pmod.encodedId} applied successfully")
               if (progressInfo.chainSwitchingNeeded)
-                context.actorSelection("/user/blockListener") ! ChainSwitching(progressInfo.toRemove.map(_.id))
+                context.actorSelection("/user/blockListener") !
+                  ChainSwitching(progressInfo.toRemove.map(_.id))
               if (settings.influxDB.isDefined)
                 newHistory.bestHeaderOpt.foreach(header =>
-                  context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
-              if (newHistory.isFullChainSynced && receivedAll) Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
+                  context.actorSelection("/user/statsSender") !
+                    BestHeaderInChain(header, System.currentTimeMillis()))
+              if (newHistory.isFullChainSynced && receivedAll)
+                Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
               logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
@@ -304,7 +315,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Failure(e) =>
-        logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) to history caused $e")
+        logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
+          s" to history caused $e")
         nodeViewSynchronizer ! SyntacticallyFailedModification(pmod, e)
     }
   } else logWarn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
@@ -314,7 +326,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, Transaction](tx)
-    case Failure(e) => logWarn(s"Failed to put tx ${tx.id} to mempool with exception ${e.getLocalizedMessage}")
+    case Failure(e) => logWarn(s"Failed to put tx ${tx.id} to mempool" +
+      s" with exception ${e.getLocalizedMessage}")
   }
 
   def genesisState: NodeView = {
@@ -372,15 +385,18 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         logInfo(s"State and history have the same version ${Algos.encode(stateId)}, no recovery needed.")
         stateIn
       case (_, None, _) =>
-        logInfo(s"State and history are inconsistent. History is empty on startup, rollback state to genesis.")
+        logInfo(s"State and history are inconsistent." +
+          s" History is empty on startup, rollback state to genesis.")
         getRecreatedState()
       case (_, Some(bestBlock), _: DigestState) =>
-        logInfo(s"State and history are inconsistent. Going to switch state to version ${bestBlock.encodedId}")
+        logInfo(s"State and history are inconsistent." +
+          s" Going to switch state to version ${bestBlock.encodedId}")
         getRecreatedState(Some(VersionTag !@@ bestBlock.id), Some(bestBlock.header.stateRoot))
       case (stateId, Some(historyBestBlock), state: StateType@unchecked) =>
         val stateBestHeaderOpt = history.typedModifierById[Header](ModifierId !@@ stateId)
         val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
-        logInfo(s"State and history are inconsistent. Going to rollback to ${rollbackId.map(Algos.encode)} and " +
+        logInfo(s"State and history are inconsistent." +
+          s" Going to rollback to ${rollbackId.map(Algos.encode)} and " +
           s"apply ${newChain.length} modifiers")
         val startState = rollbackId.map(id => state.rollbackTo(VersionTag !@@ id).get)
           .getOrElse(getRecreatedState())
@@ -414,7 +430,8 @@ object EncryNodeViewHolder {
 
     case class LocallyGeneratedTransaction[P <: Proposition, EncryBaseTransaction](tx: EncryBaseTransaction)
 
-    case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentNodeViewModifier](pmod: EncryPersistentModifier)
+    case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentNodeViewModifier]
+    (pmod: EncryPersistentModifier)
 
     case class Test[P <: Proposition, EncryBaseTransaction](tx: List[EncryBaseTransaction])
 

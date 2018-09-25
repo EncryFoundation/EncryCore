@@ -126,8 +126,8 @@ trait BlockHeaderProcessor extends Logging {
     case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
 
-  private def getHeaderInfoUpdate(h: Header):
-  Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)], EncryPersistentModifier)] = {
+  private def getHeaderInfoUpdate(h: Header): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)],
+                                                      EncryPersistentModifier)] = {
     val difficulty: Difficulty = h.difficulty
     if (h.isGenesis) {
       logInfo(s"Initialize header chain with genesis header ${h.encodedId}")
@@ -138,19 +138,15 @@ trait BlockHeaderProcessor extends Logging {
         headerScoreKey(h.id) -> ByteArrayWrapper(difficulty.toByteArray)), h)
     } else {
       scoreOf(h.parentId).map { parentScore =>
-        val score: Difficulty = Difficulty @@ (parentScore + difficulty)
-        val betterScore: Boolean = bestHeaderIdOpt
-          .flatMap(scoreOf)
-          .exists(_ < score)
+        val score = Difficulty @@ (parentScore + difficulty)
         val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-          if (betterScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
-        val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) = headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
+          if (score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
+        val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) =
+          headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
         val heightRow: (ByteArrayWrapper, ByteArrayWrapper) =
           headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
-        val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (betterScore) {
-          logInfo(s"New best header ${h.encodedId} with score: $score. New height: ${h.height}, " +
-            s"old height: $bestHeaderHeight")
-          bestBlockHeaderIdsRow(h)
+        val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (score > bestHeadersChainScore) {
+          bestBlockHeaderIdsRow(h, score)
         } else {
           EncryApp.system.actorSelection("/user/blockListener") ! NewOrphaned(h)
           orphanedBlockHeaderIdsRow(h, score)
@@ -162,7 +158,10 @@ trait BlockHeaderProcessor extends Logging {
 
   /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
     * header ids at this height */
-  private def bestBlockHeaderIdsRow(h: Header): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
+  private def bestBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
+    val prevHeight = bestHeaderHeight
+    logInfo(s"New best header ${h.encodedId} with score: $score." +
+      s" New height: ${h.height}, old height: $prevHeight")
     val self: (ByteArrayWrapper, ByteArrayWrapper) =
       heightIdsKey(h.height) -> ByteArrayWrapper((Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray)
     val parentHeaderOpt: Option[Header] = typedModifierById[Header](h.parentId)
@@ -185,11 +184,10 @@ trait BlockHeaderProcessor extends Logging {
   protected def validate(header: Header): Try[Unit] = HeaderValidator.validate(header).toTry
 
   protected def reportInvalid(header: Header): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
-    val payloadModifiers: Seq[ByteArrayWrapper] =
-      Seq(header.payloadId, header.adProofsId).filter(id => historyStorage.containsObject(id))
+    val payloadModifiers: Seq[ByteArrayWrapper] = Seq(header.payloadId, header.adProofsId)
+      .filter(id => historyStorage.containsObject(id))
       .map(id => ByteArrayWrapper(id))
-    val toRemove: Seq[ByteArrayWrapper] = Seq(headerScoreKey(header.id), ByteArrayWrapper(header.id)) ++
-      payloadModifiers
+    val toRemove: Seq[ByteArrayWrapper] = Seq(headerScoreKey(header.id), ByteArrayWrapper(header.id)) ++ payloadModifiers
     val bestHeaderKeyUpdate: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
       if (bestHeaderIdOpt.exists(_ sameElements header.id)) Seq(BestHeaderKey -> ByteArrayWrapper(header.parentId))
       else Seq()
@@ -205,6 +203,8 @@ trait BlockHeaderProcessor extends Logging {
   def isInBestChain(h: Header): Boolean = bestHeaderIdAtHeight(h.height).exists(_ sameElements h.id)
 
   private def bestHeaderIdAtHeight(h: Int): Option[ModifierId] = headerIdsAtHeight(h).headOption
+
+  private def bestHeadersChainScore: BigInt = scoreOf(bestHeaderIdOpt.get).get
 
   protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))
 
@@ -229,8 +229,7 @@ trait BlockHeaderProcessor extends Logging {
     * @return at most limit header back in history starting from startHeader and when condition until is not satisfied
     *         Note now it includes one header satisfying until condition!
     */
-  protected def headerChainBack(limit: Int, startHeader: Header,
-                                until: Header => Boolean): HeaderChain = {
+  protected def headerChainBack(limit: Int, startHeader: Header, until: Header => Boolean): HeaderChain = {
     @tailrec
     def loop(header: Header, acc: Seq[Header]): Seq[Header] = {
       if (acc.length == limit || until(header)) acc
@@ -299,12 +298,11 @@ trait BlockHeaderProcessor extends Logging {
     private def validateChildBlockHeader(header: Header, parent: Header): ValidationResult = {
       failFast
         .validate(header.timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift) {
-          error(s"Header timestamp ${header.timestamp} is too " +
-            s"far in future from now ${timeProvider.estimatedTime}")
+          error(s"Header timestamp ${header.timestamp} is too far in future from now " +
+            s"${timeProvider.estimatedTime}")
         }
         .validate(header.timestamp > parent.timestamp) {
-          fatal(s"Header timestamp ${header.timestamp} is not " +
-            s"greater than parents ${parent.timestamp}")
+          fatal(s"Header timestamp ${header.timestamp} is not greater than parents ${parent.timestamp}")
         }
         .validate(header.height == parent.height + 1) {
           fatal(s"Header height ${header.height} is not greater by 1 than parents ${parent.height}")
@@ -313,8 +311,12 @@ trait BlockHeaderProcessor extends Logging {
           fatal("Header is already in history")
         }
         .validate(realDifficulty(header) >= header.requiredDifficulty) {
-          fatal(s"Block difficulty ${realDifficulty(header)} is less than " +
-            s"required ${header.requiredDifficulty}")
+          fatal(s"Block difficulty ${realDifficulty(header)} is less than required " +
+            s"${header.requiredDifficulty}")
+        }
+        .validate(header.difficulty >= requiredDifficultyAfter(parent)){
+          fatal(s"Incorrect required difficulty in header: " +
+            s"${Algos.encode(header.id)} on height ${header.height}")
         }
         .validate(heightOf(header.parentId).exists(h => bestHeaderHeight - h < Constants.Chain.MaxRollbackDepth)) {
           fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
