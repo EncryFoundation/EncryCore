@@ -2,15 +2,11 @@
 
 [![Build Status](https://travis-ci.org/EncryFoundation/EncryCore.svg?branch=master)](https://travis-ci.org/EncryFoundation/EncryCore)
 
-Reference implementation of the EncryCore node. Encry is a distributed digital asset platform supporting smart contracts (non turing-complete)
-and custom asset issuing.
-
-* [Protocol specification](https://github.com/EncryFoundation/EncryCore/blob/master/docs/design/ProtocolSpec.md) (in progress)
+Encry is a distributed digital asset platform supporting smart contracts in non turing-complete Prism language (https://github.com/EncryFoundation/PrismLang) and custom asset issuing.
 
 ## Related projects
 
-* [EncryScript](https://github.com/EncryFoundation/EncryScript) - Contract-oriented scripting language designed specially for EncryCore.
-* [EncryTypeLang](https://github.com/EncryFoundation/EncryTypeLang) - Language for arbitrary data structures description (At early development stage, currently).
+* Prism language (https://github.com/EncryFoundation/PrismLang) - Contract-oriented scripting language designed specially for EncryCore.
 
 ## Installation
 
