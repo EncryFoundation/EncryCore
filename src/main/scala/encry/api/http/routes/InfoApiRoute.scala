@@ -54,7 +54,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
 
   private def storageInfo: String = (appSettings.levelDb, appSettings.postgres) match {
     case (Some(LevelDbSettings(levelDbSave, levelDbRestore, _)),
-    Some(PostgresSettings(_, _, _, _, pgSave, pgRestore, _))) =>
+    Some(PostgresSettings(_, _, _, _, pgSave, pgRestore, _, _))) =>
       if ((levelDbSave || levelDbRestore) && (pgSave || pgRestore))
         s"LevelDb(${if (levelDbSave) "write" else ""} ${if (levelDbRestore) "read" else ""}), " +
           s"Postgres(${if (pgSave) "write" else ""} ${if (pgRestore) "read" else ""})"

@@ -1,6 +1,7 @@
 package encry.local.explorer
 
 import akka.actor.{Actor, ActorRef}
+import encry.EncryApp.settings
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.local.explorer.BlockListener.{ChainSwitching, NewBestBlock, NewOrphaned, UploadToDbOnHeight}
 import encry.local.explorer.database.DBService
@@ -21,7 +22,10 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
   override def postStop(): Unit = dbService.shutdown()
 
   val currentDbHeightFuture: Future[Int] = dbService.selectHeightOpt.map(_.getOrElse(0))
-  val writingGap: Int = 20
+  val writingGap: Int = settings.postgres.flatMap(_.writingGap).getOrElse {
+    context.stop(self)
+    0
+  }
 
   currentDbHeightFuture.onComplete {
     case Success(height) =>
@@ -60,7 +64,7 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
       }
     case ChangedHistory(newHistory) =>
       if (pending.nonEmpty) context.become(operating(newHistory, tryToUploadPending(newHistory,pending)))
-      else context.become(operating(newHistory, pending))
+      else context.become(operating(newHistory))
   }
 
   def uploadGap(history: EncryHistoryReader, currentHeight: Int, pending: Vector[Int] = Vector()): Receive =
