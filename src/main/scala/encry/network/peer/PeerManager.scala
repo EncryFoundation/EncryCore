@@ -98,7 +98,7 @@ class PeerManager extends Actor with Logging {
   } else Future.successful(Unit)
 
   def checkDuplicateIP(address: InetSocketAddress): Boolean =
-    !connectedPeers.map(_._1.getAddress).toSeq.contains(address.getAddress)
+    !connectedPeers.map(_._1.getAddress).toSet.contains(address.getAddress)
 
   def checkPossibilityToAddPeerWRecovery(address: InetSocketAddress): Boolean =
     checkPossibilityToAddPeer(address) && recoveryCompleted
