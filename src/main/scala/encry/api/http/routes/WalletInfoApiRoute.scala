@@ -1,6 +1,6 @@
 package encry.api.http.routes
 
-import akka.actor.{ActorRef, ActorRefFactory, Props}
+import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
@@ -14,14 +14,11 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
 import scala.concurrent.Future
-import encry.EncryApp.system
-import encry.view.WalletStorageHolder
+import encry.EncryApp.walletStorageHolder
 
 case class WalletInfoApiRoute(nodeViewHolderRef: ActorRef,
                               restApiSettings: RESTApiSettings)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
-
-  val walletStorageHolder: ActorRef = system.actorOf(Props[WalletStorageHolder], "walletStorageHolder")
 
   override val route: Route = pathPrefix("wallet") { infoR ~ getUtxosR }
 
