@@ -16,6 +16,7 @@ import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
 import scala.concurrent.Future
+import scala.util.control.NonFatal
 
 case class InfoApiRoute(readersHolder: ActorRef,
                         miner: ActorRef,
@@ -79,7 +80,6 @@ case class InfoApiRoute(readersHolder: ActorRef,
         else ""
       case _ => ""
     }
-  }
 
   private def restoreInfo: Future[Boolean] = (peerManager ? GetRecoveryStatus).mapTo[Boolean]
 

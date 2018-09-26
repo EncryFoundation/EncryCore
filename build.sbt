@@ -1,5 +1,5 @@
 name := "EncryCore"
-version := "0.9.1"
+version := "0.9.2"
 organization := "org.encryfoundation"
 scalaVersion := "2.12.6"
 
@@ -24,7 +24,8 @@ val apiDependencies = Seq(
 val loggingDependencies = Seq(
   "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
   "ch.qos.logback" % "logback-classic" % logbackVersion,
-  "ch.qos.logback" % "logback-core" % logbackVersion
+  "ch.qos.logback" % "logback-core" % logbackVersion,
+  "net.logstash.logback" % "logstash-logback-encoder" % "1.0"
 )
 
 val testingDependencies = Seq(

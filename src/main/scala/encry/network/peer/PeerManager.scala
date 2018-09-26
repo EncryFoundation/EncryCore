@@ -10,7 +10,7 @@ import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, 
 import encry.network.PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages._
 import encry.network.peer.PeerManager._
-import encry.network.{Handshake, SendingStrategy}
+import encry.network.SendingStrategy
 import encry.utils.Logging
 import scala.concurrent.Future
 import scala.language.postfixOps

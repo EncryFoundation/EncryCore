@@ -2,7 +2,6 @@ package encry.api.http
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.server.{Directives, Route}
-
 import scala.language.implicitConversions
 
 case class ApiError(statusCode: StatusCode, reason: String = "") {

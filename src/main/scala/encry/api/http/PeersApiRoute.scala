@@ -47,7 +47,7 @@ case class PeersApiRoute(peerManager: ActorRef,
     onSuccess(result) { r => complete(r) }
   }
 
-  def connect: Route = (path("connect") & post & withAuth & entity(as[String])) { body =>
+  def connect: Route = (path("connect") & post & entity(as[String])) { body =>
     complete {
       if (addressAndPortRegexp.findFirstMatchIn(body).isDefined) {
         val Array(host, port) = body.split(":")
