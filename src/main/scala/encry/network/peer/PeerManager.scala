@@ -27,6 +27,7 @@ class PeerManager extends Actor with Logging {
   override def receive: Receive = {
     case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
     case GetAllPeers => sender() ! PeerDatabase.knownPeers()
+    case GetRecoveryStatus => sender() ! recoveryCompleted
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
       if (!isSelf(address, None)) timeProvider
         .time()
@@ -106,6 +107,8 @@ object PeerManager {
     case class AddOrUpdatePeer(address: InetSocketAddress, peerName: Option[String], direction: Option[ConnectionType])
 
     case class RandomPeers(howMany: Int)
+
+    case class GetRecoveryStatus(state: Boolean)
 
     case class FilterPeers(sendingStrategy: SendingStrategy)
 

@@ -8,7 +8,7 @@ import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
 import encry.modifiers.history.Block
 import encry.modifiers.history.Header
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.network.peer.PeerManager.ReceivableMessages.GetConnectedPeers
+import encry.network.peer.PeerManager.ReceivableMessages.{GetConnectedPeers, GetRecoveryStatus}
 import encry.settings._
 import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
@@ -39,9 +39,10 @@ case class InfoApiRoute(readersHolder: ActorRef,
       readers <- readersF
       currentTime <- timeProvider.time()
       launchTime <- launchTimeFuture
+      storage <- storageInfo
       nodeUptime = currentTime - launchTime
     } yield InfoApiRoute.makeInfoJson(nodeId, minerInfo, connectedPeers, readers, getStateType, getNodeName,
-      getAddress, storageInfo, nodeUptime, getConnectionWithPeers)
+      getAddress, storage, nodeUptime, getConnectionWithPeers)
       ).okJson()
   }
 
@@ -52,18 +53,24 @@ case class InfoApiRoute(readersHolder: ActorRef,
   private def getNodeName: String = appSettings.network.nodeName
     .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + appSettings.network.bindAddress.getPort)
 
-  private def storageInfo: String = (appSettings.levelDb, appSettings.postgres) match {
-    case (Some(LevelDbSettings(levelDbSave, levelDbRestore, _)),
-    Some(PostgresSettings(_, _, _, _, pgSave, pgRestore, _))) =>
-      if ((levelDbSave || levelDbRestore) && (pgSave || pgRestore))
-        s"LevelDb(${if (levelDbSave) "write" else ""} ${if (levelDbRestore) "read" else ""}), " +
-          s"Postgres(${if (pgSave) "write" else ""} ${if (pgRestore) "read" else ""})"
-      else if ((levelDbSave || levelDbRestore) && (!pgSave || !pgRestore))
-        s"LevelDb(${if (levelDbSave) "write" else ""} ${if (levelDbRestore) "read" else ""})"
-      else if ((!levelDbSave || !levelDbRestore) && (pgSave || pgRestore))
-        s"Postgres(${if (pgSave) "write" else ""} ${if (pgRestore) "read" else ""})"
-      else ""
+  private def storageInfo: Future[String] = for {
+    recoveryStatus <- restoreInfo
+  } yield {
+    (appSettings.levelDb, appSettings.postgres) match {
+      case (Some(LevelDbSettings(levelDbSave, levelDbRestore, _)),
+      Some(PostgresSettings(_, _, _, _, pgSave, pgRestore, _))) =>
+        if ((levelDbSave || (levelDbRestore && (!recoveryStatus))) && (pgSave || (pgRestore && (!recoveryStatus))))
+          s"LevelDb(${if (levelDbSave) "write" else ""} ${if (levelDbRestore && (!recoveryStatus)) "read" else ""}), " +
+            s"Postgres(${if (pgSave) "write" else ""} ${if (pgRestore && (!recoveryStatus)) "read" else ""})"
+        else if (levelDbSave || (levelDbRestore && (!recoveryStatus)))
+          s"LevelDb(${if (levelDbSave) "write" else ""} ${if (levelDbRestore && (!recoveryStatus)) "read" else ""})"
+        else if (pgSave || (pgRestore && (!recoveryStatus)))
+          s"Postgres(${if (pgSave) "write" else ""} ${if (pgRestore && (!recoveryStatus)) "read" else ""})"
+        else ""
+    }
   }
+
+  private def restoreInfo: Future[Boolean] = (peerManager ? GetRecoveryStatus).mapTo[Boolean]
 
   private def getAddress: Seq[InetSocketAddress] = appSettings.network.knownPeers
 
