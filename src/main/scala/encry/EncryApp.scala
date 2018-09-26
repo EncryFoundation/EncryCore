@@ -83,8 +83,6 @@ object EncryApp extends App with Logging {
     system.actorOf(Props[Zombie], "zombie")
   }
 
-  system.actorOf(Props[WalletStorageHolder], "WalletStorageHolder")
-
   if (settings.restApi.enabled.getOrElse(false)) {
     import akka.http.scaladsl.model.StatusCodes._
     import akka.http.scaladsl.server.Directives._
@@ -111,6 +109,8 @@ object EncryApp extends App with Logging {
       settings.restApi.bindAddress.getAddress.getHostAddress,
       settings.restApi.bindAddress.getPort)
   }
+
+  val walletStorageHolder: ActorRef = system.actorOf(Props[WalletStorageHolder], "WalletStorageHolder")
 
   def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
 

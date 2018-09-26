@@ -25,7 +25,9 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
     val startTime: Amount = System.nanoTime()
     val storeGetAllSeq: Iterator[(K, V)] = store.getAll
     val endStoreGetAllTime: Amount = System.nanoTime() - startTime
-    system.actorSelection("user/statsSender") ! GetAllTiming(endStoreGetAllTime, storeGetAllSeq.size)
+
+    if (settings.influxDB.isDefined)
+      system.actorSelection("user/statsSender") ! GetAllTiming(endStoreGetAllTime, storeGetAllSeq.size)
 
     val outputs: Seq[EncryBaseBox] = store.getAll.foldLeft(Seq[EncryBaseBox]()) {
       case (acc, (key, value)) if value != balancesKey =>
@@ -46,7 +48,7 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
   def getTokenBalanceById(id: TokenId): Option[Amount] = getBalances.find(_._1 sameElements id).map(_._2)
 
   def getBalances: Map[TokenId, Amount] = store.get(balancesKey).map {
-      _.data.sliding(40, 40).map(ch => ch.take(32) -> Longs.fromByteArray(ch.takeRight(8))) }
+    _.data.sliding(40, 40).map(ch => ch.take(32) -> Longs.fromByteArray(ch.takeRight(8))) }
     .map(_.toMap)
     .getOrElse(Map.empty)
 }
