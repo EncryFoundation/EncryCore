@@ -137,11 +137,8 @@ class DeliveryManager extends Actor with Logging {
             }
           } else notRequested
       }
-      if (notRequestedIds.nonEmpty) {
-        logDebug(s"Ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mtid with ids: " +
-          s"${notRequestedIds.map(id => Algos.encode(id) + "|" + id).mkString(",")}")
-        cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
-      }
+      if (notRequestedIds.nonEmpty) cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
+
       notRequestedIds.foreach { id =>
         val cancellable: Cancellable = context.system.scheduler
           .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
