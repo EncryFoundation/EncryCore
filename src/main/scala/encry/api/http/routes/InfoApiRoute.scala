@@ -80,6 +80,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
         else ""
       case _ => ""
     }
+  }
 
   private def restoreInfo: Future[Boolean] = (peerManager ? GetRecoveryStatus).mapTo[Boolean]
 
