@@ -69,7 +69,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
       else if (save && !restore) "LevelDb(write)"
       else if (!save && restore) "LevelDb(read)"
       else ""
-    case (None, Some(PostgresSettings(_, _, _, _, save, restore, _))) if save || restore =>
+    case (None, Some(PostgresSettings(_, _, _, _, save, restore, _, _))) if save || restore =>
       if (save && restore) "Postgres(read, write)"
       else if (save && !restore) "Postgres(write)"
       else if (!save && restore) "Postgres(read)"
