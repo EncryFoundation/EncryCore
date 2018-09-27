@@ -32,10 +32,8 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
       case (acc, _) => acc
     }
 
-    val endAllBoxesTime = System.nanoTime() - startTime
-
     if (settings.influxDB.isDefined)
-      system.actorSelection("user/statsSender") ! WorkedTime(endAllBoxesTime, outputs.size)
+      system.actorSelection("user/statsSender") ! WorkedTime(System.nanoTime() - startTime, outputs.size)
 
     outputs
   }
