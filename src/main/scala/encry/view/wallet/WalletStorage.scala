@@ -5,11 +5,10 @@ import encry.modifiers.state.StateModifierDeserializer
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box._
-import encry.stats.StatsSender.{GetAllTiming, WorkedTime}
+import encry.stats.StatsSender.WorkedTime
 import encry.storage.EncryStorage
 import encry.EncryApp.{settings, system}
 import io.iohk.iodb.{ByteArrayWrapper, Store}
-import io.iohk.iodb.Store.{K, V}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
@@ -19,22 +18,15 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
 
   def allBoxes: Seq[EncryBaseBox] = {
     val startTime: Amount = System.nanoTime()
-    val storeGetAllSeq: Iterator[(K, V)] = store.getAll
-    val endStoreGetAllTime: Amount = System.nanoTime() - startTime
-
-    if (settings.influxDB.isDefined)
-      system.actorSelection("user/statsSender") ! GetAllTiming(endStoreGetAllTime, storeGetAllSeq.size)
-
     val outputs: Vector[EncryBaseBox] = store.getAll.foldLeft(Vector[EncryBaseBox]()) {
-      case (acc, pair) if pair._1 != balancesKey =>
-        StateModifierDeserializer.parseBytes(pair._2.data, pair._1.data.head)
+      case (acc, id) if id._1 != balancesKey =>
+        StateModifierDeserializer.parseBytes(id._2.data, id._1.data.head)
           .map(boxes => acc :+ boxes).getOrElse(acc)
-      case (acc, _) => acc
+      case (acc, _) =>
+        acc
     }
-
     if (settings.influxDB.isDefined)
       system.actorSelection("user/statsSender") ! WorkedTime(System.nanoTime() - startTime, outputs.size)
-
     outputs
   }
 

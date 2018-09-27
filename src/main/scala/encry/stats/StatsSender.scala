@@ -47,8 +47,6 @@ class StatsSender extends Actor {
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
   override def receive: Receive = {
-    case GetAllTiming(time, size) =>
-      influxDB.write(InfluxPort, s"getAllTiming,nodeName=$nodeName value=$time,size=$size")
 
     case WorkedTime(time, size) =>
       influxDB.write(InfluxPort, s"workedTime,nodeName=$nodeName value=$time,size=$size")
@@ -190,8 +188,6 @@ object StatsSender {
   case class TxsInBlock(txsNum: Int)
 
   case class WorkedTime(time: Long, size: Int)
-
-  case class GetAllTiming(time: Long, size: Int)
 
   case class CurrentUtxosQtyInIOdb(utxosQty: Int)
 }
