@@ -1,7 +1,6 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import encry.utils.CoreTaggedTypes.VersionTag
@@ -26,7 +25,6 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.Algos.HF
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
-
 import scala.util.{Failure, Success, Try}
 
 class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
@@ -41,7 +39,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
 
   override def rootHash: ADDigest = persistentProver.digest
 
-  override def maxRollbackDepth: Int = Constants.Chain.MaxRollbackDepth
+  def maxRollbackDepth: Int = Constants.Chain.MaxRollbackDepth
 
   private def onAdProofGenerated(proof: ADProofs): Unit = {
     if (nodeViewHolderRef.isEmpty) logWarn(s"Got proof while nodeViewHolderRef is empty")
