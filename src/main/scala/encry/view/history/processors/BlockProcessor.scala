@@ -8,7 +8,8 @@ import encry.modifiers.history.{Block, Header, HeaderChain}
 import encry.utils.Logging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
-
+import org.encryfoundation.common.Algos
+import io.circe.syntax._
 import scala.util.{Failure, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with Logging {
@@ -34,6 +35,9 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
                              modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
     val newBestAfterThis: Header = bestFullChain.last.header
+    logInfo(s"Going to process block: ${fullBlock.asJson}")
+    logInfo(s"bestFullChain: ${bestFullChain.map(block => Algos.encode(block.id)).mkString(",")}")
+    logInfo(s"newBestAfterThis: ${newBestAfterThis.asJson}")
     processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, nodeSettings.blocksToKeep))
   }
 
@@ -53,8 +57,9 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def processBetterChain: BlockProcessing = {
     case toProcess @ ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
-
+      logInfo(s"bestBlockOpt.nonEmpty = true and isBetterChain(newBestHeader.id) = true for: ${fullBlock.asJson}")
       val prevBest: Block = bestBlockOpt.get
+      logInfo(s"prevBest: ${prevBest.asJson}")
       val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[Block] = newChain.tail.headers
@@ -64,11 +69,23 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       else {
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
+        logInfo(s"!isInBestChain(fullBlock.id) = ${!isInBestChain(fullBlock.id)}")
+        logInfo(s"scoreOf(fullBlock.id).flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))." +
+          s"getOrElse(false) = ${scoreOf(fullBlock.id)
+            .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => {
+              logInfo(s"Score of bestHeader ${Algos.encode(id)} = ${scoreOf(id)}")
+              logInfo(s"Score of bestBlock ${fullBlock.asJson} is ${fbScore}")
+              scoreOf(id).map(_ < fbScore)
+            }))
+            .getOrElse(false)}")
         val updateBestHeader: Boolean =
           !isInBestChain(fullBlock.id) &&
             scoreOf(fullBlock.id)
               .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
               .getOrElse(false)
+        logInfo(s"newModRow: ${Algos.encode(newModRow.id)}")
+        logInfo(s"newBestHeader.id: ${Algos.encode(newBestHeader.id)}")
+        logInfo(s"updateBestHeader: $updateBestHeader")
         updateStorage(newModRow, newBestHeader.id, updateBestHeader)
 
         if (blocksToKeep >= 0) {
@@ -85,12 +102,21 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     header.height == blockDownloadProcessor.minimalBlockHeight && bestBlockIdOpt.isEmpty
 
   private def isBetterChain(id: ModifierId): Boolean = {
+    logInfo(s"Going to process: ${Algos.encode(id)}")
     val isBetter: Option[Boolean] = for {
-      bestFullBlockId <- bestBlockIdOpt
-      prevBestScore <- scoreOf(bestFullBlockId)
-      score <- scoreOf(id)
+      bestFullBlockId <- {
+        logInfo(s"BestBlockOpt is: ${bestBlockOpt.map(_.asJson)}")
+        bestBlockIdOpt
+      }
+      prevBestScore <- {
+        logInfo(s"Score of ${Algos.encode(bestFullBlockId)} is: ${scoreOf(bestFullBlockId)}")
+        scoreOf(bestFullBlockId)
+      }
+      score <- {
+        logInfo(s"Score of ${Algos.encode(id)} is ${scoreOf(id)}")
+        scoreOf(id)
+      }
     } yield score > prevBestScore
-
     isBetter getOrElse false
   }
 

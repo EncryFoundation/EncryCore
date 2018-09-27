@@ -18,10 +18,11 @@ import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
+import io.circe.syntax._
 import scala.collection.immutable
 import scala.util.Try
 
-trait BlockHeaderProcessor extends Logging {
+trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider
@@ -138,6 +139,8 @@ trait BlockHeaderProcessor extends Logging {
     } else {
       scoreOf(h.parentId).map { parentScore =>
         val score = Difficulty @@ (parentScore + difficulty)
+        logInfo(s"Score of ${h.asJson} is ${score}")
+        logInfo(s"Best header is ${bestHeaderIdOpt.map(Algos.encode)} and his score is: ${bestHeadersChainScore}")
         val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
           if (score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
         val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) =
@@ -205,7 +208,10 @@ trait BlockHeaderProcessor extends Logging {
 
   private def bestHeadersChainScore: BigInt = scoreOf(bestHeaderIdOpt.get).get
 
-  protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))
+  protected def scoreOf(id: ModifierId): Option[BigInt] = {
+    logInfo(s"Going to get score of ${Algos.encode(id)} and it is: ${historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))}")
+    historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))
+  }
 
   def heightOf(id: ModifierId): Option[Height] = historyStorage.get(headerHeightKey(id))
     .map(d => Height @@ Ints.fromByteArray(d))
