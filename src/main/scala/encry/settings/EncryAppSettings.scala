@@ -14,7 +14,8 @@ case class EncryAppSettings(directory: String,
                             ntp: NetworkTimeProviderSettings,
                             postgres: Option[PostgresSettings],
                             influxDB: Option[InfluxDBSettings],
-                            levelDb: Option[LevelDbSettings])
+                            levelDb: Option[LevelDbSettings],
+                            walletStorageHolder: Option[WalletStorageHolderSettings])
 
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader {
 
@@ -30,4 +31,6 @@ case class LevelDbSettings(enableSave: Boolean, enableRestore: Boolean, batchSiz
 case class KafkaSettings(sendToKafka: Boolean, topicName: String, groupId: String, kafkaBrokers: String)
 
 case class InfluxDBSettings(url: String, login: String, password: String, udpPort: Int)
+
+case class WalletStorageHolderSettings(startTime: Int, askTime: Int, boxesQty: Int)
 

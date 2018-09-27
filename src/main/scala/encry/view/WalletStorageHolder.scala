@@ -15,20 +15,25 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 
 class WalletStorageHolder extends Actor {
 
-  var buffer = Seq.empty[EncryBaseBox]
-
-  system.scheduler.schedule(10 second, 15 second) {
+  system.scheduler.schedule(settings.walletStorageHolder.map(_.startTime.second).getOrElse(10 second),
+    settings.walletStorageHolder.map(_.askTime.second).getOrElse(15 second)) {
     system.actorSelection("user/nodeViewHolder") !
       GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Seq[EncryBaseBox]] {
         _.vault.walletStorage.allBoxes
       }
   }
 
-  override def receive: Receive = {
-    case GetAllBoxes() => sender() ! buffer.takeRight(500)
-      buffer = buffer.dropRight(500)
-    case seq: Seq[EncryBaseBox] => buffer = seq
+  override def receive: Receive =  changeCollection()
+
+  def changeCollection(boxes: Seq[EncryBaseBox] = Seq()): Receive = {
+    case GetAllBoxes() =>
+      val boxesForSend: Seq[EncryBaseBox] = boxes.takeRight(settings.walletStorageHolder.map(_.boxesQty).getOrElse(500))
+      sender() ! boxesForSend
+      context.become(changeCollection(boxes.diff(boxesForSend)))
+    case seq: Seq[EncryBaseBox] =>
       if (settings.influxDB.isDefined)
         system.actorSelection("user/statsSender") ! CurrentUtxosQtyInIOdb(seq.size)
+      context.become(changeCollection(seq))
+    case _ =>
   }
 }
