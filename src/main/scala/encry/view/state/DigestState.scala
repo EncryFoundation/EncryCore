@@ -1,7 +1,6 @@
 package encry.view.state
 
 import java.io.File
-
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{ADProofs, Block, Header}
@@ -11,21 +10,18 @@ import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
-
 import scala.util.{Failure, Success, Try}
 
-/** Minimal state variant which is storing only digest of UTXO authenticated as a dynamic dictionary. */
 class DigestState protected(override val version: VersionTag,
                             override val rootHash: ADDigest,
                             val stateStore: Store,
                             settings: NodeSettings)
-  extends EncryState[DigestState]
-    with ModifierValidation[EncryPersistentModifier] with Logging {
+  extends EncryState[DigestState] with ModifierValidation[EncryPersistentModifier] with Logging {
 
   stateStore.lastVersionID
     .foreach(id => assert(version sameElements id.data, "`version` should always be equal to store.lastVersionID"))
 
-  override val maxRollbackDepth: Int = stateStore.rollbackVersions().size
+  val maxRollbackDepth: Int = stateStore.rollbackVersions().size
 
   def validate(mod: EncryPersistentModifier): Try[Unit] = mod match {
     case block: Block =>
@@ -58,10 +54,10 @@ class DigestState protected(override val version: VersionTag,
     new DigestState(newVersion, newRootHash, stateStore, settings)
   }
 
-  //todo: utxo snapshot could go here
   override def applyModifier(mod: EncryPersistentModifier): Try[DigestState] = mod match {
     case block: Block if settings.verifyTransactions =>
-      logInfo(s"Got new full block with id ${block.encodedId} with root ${Algos.encoder.encode(block.header.stateRoot)}")
+      logInfo(s"Got new full block with id ${block.encodedId} " +
+        s"with root ${Algos.encoder.encode(block.header.stateRoot)}")
       this.validate(block).flatMap(_ => update(VersionTag !@@ block.header.id, block.header.stateRoot))
 
     case header: Header if !settings.verifyTransactions =>
@@ -79,7 +75,8 @@ class DigestState protected(override val version: VersionTag,
     Try(stateStore.rollback(wrappedVersion)).map { _ =>
       stateStore.clean(Constants.DefaultKeepVersions)
       val rootHash: ADDigest = ADDigest @@ stateStore.get(wrappedVersion).get.data
-      logInfo(s"Rollback to version ${Algos.encoder.encode(version)} with roothash ${Algos.encoder.encode(rootHash)}")
+      logInfo(s"Rollback to version ${Algos.encoder.encode(version)} with roothash " +
+        s"${Algos.encoder.encode(rootHash)}")
       new DigestState(version, rootHash, stateStore, settings)
     }
   }
