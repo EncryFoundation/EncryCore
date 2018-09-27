@@ -15,6 +15,8 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 
 class WalletStorageHolder extends Actor {
 
+  val txsQty: Int = settings.walletStorageHolder.map(_.boxesQty).getOrElse(500)
+
   system.scheduler.schedule(settings.walletStorageHolder.map(_.startTime.second).getOrElse(10 second),
     settings.walletStorageHolder.map(_.askTime.second).getOrElse(15 second)) {
     system.actorSelection("user/nodeViewHolder") !
@@ -27,9 +29,8 @@ class WalletStorageHolder extends Actor {
 
   def changeCollection(boxes: Seq[EncryBaseBox] = Seq()): Receive = {
     case GetAllBoxes() =>
-      val boxesForSend: Seq[EncryBaseBox] = boxes.takeRight(settings.walletStorageHolder.map(_.boxesQty).getOrElse(500))
-      sender() ! boxesForSend
-      context.become(changeCollection(boxes.diff(boxesForSend)))
+      sender() ! boxes.takeRight(txsQty)
+      context.become(changeCollection(boxes.dropRight(txsQty)))
     case seq: Seq[EncryBaseBox] =>
       if (settings.influxDB.isDefined)
         system.actorSelection("user/statsSender") ! CurrentUtxosQtyInIOdb(seq.size)

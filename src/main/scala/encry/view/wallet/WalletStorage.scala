@@ -29,7 +29,7 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
     if (settings.influxDB.isDefined)
       system.actorSelection("user/statsSender") ! GetAllTiming(endStoreGetAllTime, storeGetAllSeq.size)
 
-    val outputs: Seq[EncryBaseBox] = store.getAll.foldLeft(Seq[EncryBaseBox]()) {
+    val outputs: Vector[EncryBaseBox] = store.getAll.foldLeft(Vector[EncryBaseBox]()) {
       case (acc, (key, value)) if value != balancesKey =>
         getBoxById(ADKey @@ key.data).map(bx => acc :+ bx).getOrElse(acc)
       case (acc, _) => acc
