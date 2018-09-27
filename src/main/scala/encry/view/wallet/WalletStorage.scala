@@ -13,13 +13,9 @@ import io.iohk.iodb.Store.{K, V}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
+import WalletStorage._
 
 case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends EncryStorage {
-
-  import WalletStorage._
-
-  def getBoxById(id: ADKey): Option[EncryBaseBox] = store.get(keyByBoxId(id))
-    .flatMap(d => StateModifierDeserializer.parseBytes(d.data, id.head).toOption)
 
   def allBoxes: Seq[EncryBaseBox] = {
     val startTime: Amount = System.nanoTime()
@@ -30,8 +26,9 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
       system.actorSelection("user/statsSender") ! GetAllTiming(endStoreGetAllTime, storeGetAllSeq.size)
 
     val outputs: Vector[EncryBaseBox] = store.getAll.foldLeft(Vector[EncryBaseBox]()) {
-      case (acc, (key, value)) if value != balancesKey =>
-        getBoxById(ADKey @@ key.data).map(bx => acc :+ bx).getOrElse(acc)
+      case (acc, pair) if pair._1 != balancesKey =>
+        StateModifierDeserializer.parseBytes(pair._2.data, pair._1.data.head)
+          .map(boxes => acc :+ boxes).getOrElse(acc)
       case (acc, _) => acc
     }
 
@@ -43,14 +40,16 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
     outputs
   }
 
+  def getBoxById(id: ADKey): Option[EncryBaseBox] = store.get(keyByBoxId(id))
+    .flatMap(d => StateModifierDeserializer.parseBytes(d.data, id.head).toOption)
+
   def containsBox(id: ADKey): Boolean = getBoxById(id).isDefined
 
   def getTokenBalanceById(id: TokenId): Option[Amount] = getBalances.find(_._1 sameElements id).map(_._2)
 
   def getBalances: Map[TokenId, Amount] = store.get(balancesKey).map {
     _.data.sliding(40, 40).map(ch => ch.take(32) -> Longs.fromByteArray(ch.takeRight(8))) }
-    .map(_.toMap)
-    .getOrElse(Map.empty)
+    .map(_.toMap).getOrElse(Map.empty)
 }
 
 object WalletStorage {
