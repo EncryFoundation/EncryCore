@@ -18,16 +18,7 @@ import scala.concurrent.duration._
 class BlockListenerSpec extends TestKit(ActorSystem("BlockListenerSpec")) with ImplicitSender
   with FlatSpecLike with Matchers with BeforeAndAfterAll with MockitoSugar with EncryGenerator {
 
-  "BlockListener" should "process valid blocks" in new BlockListenerSpecWiring {
-    when(dbServiceMock.processBlock(sampleBlock)).thenReturn(Future.successful(100))
-
-    actor ! sampleModifier
-    expectNoMsg(1 second)
-    verify(dbServiceMock).selectHeightOpt
-    verify(dbServiceMock).processBlock(eq_(sampleBlock))
-  }
-
-  it should "process valid chain switching msg" in new BlockListenerSpecWiring {
+  "BlockListener" should "process valid chain switching msg" in new BlockListenerSpecWiring {
     when(dbServiceMock.markAsRemovedFromMainChain(sampleSwitchedIds)).thenReturn(Future.successful(100))
 
     actor ! sampleChainSwitching
