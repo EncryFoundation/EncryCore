@@ -163,7 +163,7 @@ class DeliveryManager extends Actor with Logging {
         }
       } else {
         cancellables -= midAsKey
-        val peersToRequest: Seq[ConnectedPeer] = peers.getOrElse(midAsKey, statusTracker.statuses.filter(_._2 == Older).keys.toSeq)
+        val peersToRequest: Seq[ConnectedPeer] = peers.getOrElse(midAsKey, statusTracker.statuses.keys.toSeq)
         peersToRequest.headOption.foreach { nextPeer =>
           peers = peers.updated(midAsKey, peersToRequest.filter(_ != nextPeer))
           expect(nextPeer, mtid, Seq(mid))
