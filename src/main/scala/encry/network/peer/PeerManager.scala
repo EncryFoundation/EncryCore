@@ -108,7 +108,7 @@ object PeerManager {
 
     case class RandomPeers(howMany: Int)
 
-    case class GetRecoveryStatus()
+    case object GetRecoveryStatus
 
     case class FilterPeers(sendingStrategy: SendingStrategy)
 
