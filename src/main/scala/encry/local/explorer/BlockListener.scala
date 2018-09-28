@@ -59,7 +59,9 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
 
       bestBlockOptAtHeight(history, newHeight - writingGap) match {
         case Some(block) => dbService.processBlock(block)
-        case None if newHeight >= writingGap => context.become(operating(history, pending :+ newHeight - writingGap))
+        case None if newHeight - writingGap >= 0 =>
+          logInfo(s"Block on height ${newHeight - writingGap} ")
+          context.become(operating(history, pending :+ newHeight - writingGap))
         case None =>
       }
     case ChangedHistory(newHistory) =>

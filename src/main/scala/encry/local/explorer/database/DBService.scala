@@ -21,14 +21,16 @@ import scala.util.control.NonFatal
 class DBService extends Logging {
 
   def processBlock(block: Block): Future[Int] = runAsync(processBlockQuery(block), "processBlock")
+    .map { count =>
+      logInfo(s"Successfully wrote block on height ${block.header.height} as best chain")
+      count
+    }
 
   def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] =
     runAsync(markAsRemovedFromMainChainQuery(ids), "markAsRemovedFromMainChain")
 
   def processOrphanedHeader(header: Header): Future[Int] =
     runAsync(insertOrphanedHeaderQuery(header), "processOrphanedHeader")
-
-  def selectHeight: Future[Int] = runAsync(heightQuery, "selectHeight")
 
   def selectHeightOpt: Future[Option[Int]] = runAsync(heightOptQuery, "selectHeightOpt")
 

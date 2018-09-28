@@ -20,13 +20,16 @@ import scala.util.{Failure, Success, Try}
 
 class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Actor with Logging {
 
-  val heightFuture: Future[Int] = dbService.selectHeight
+  val heightFuture: Future[Int] = dbService.selectHeightOpt.map(_.getOrElse(0))
 
   override def postStop(): Unit = if (settings.postgres.exists(_.enableSave)) Unit else dbService.shutdown()
 
   heightFuture.onComplete {
-    case Success(_) =>
-      logInfo(s"Going to download blocks from postgres")
+    case Success(0) =>
+      logInfo("Seems like postgres is empty")
+      context.stop(self)
+    case Success(height) =>
+      logInfo(s"Going to download $height blocks from postgres")
     case Failure(_) =>
       logWarn("Failed to connect to postgres")
       peerManager ! RecoveryCompleted
