@@ -74,6 +74,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       logInfo(s"toApply.lengthCompare(newChain.length - 1) != 0: ${toApply.lengthCompare(newChain.length - 1) != 0}")
       logInfo(s"toApply.length: ${toApply.length}")
       logInfo(s"toRemove.length: ${toRemove.length}")
+      logInfo(s"Diff: ${toApply.map(_.header.height).diff(newChain.headers.map(_.height)).mkString(",")}")
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
