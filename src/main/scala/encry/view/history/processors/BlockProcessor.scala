@@ -57,14 +57,22 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def processBetterChain: BlockProcessing = {
     case toProcess @ ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
+      logInfo(s"BestFullHeight: ${bestBlockHeight}")
+      logInfo(s"BestBlock: ${bestBlockOpt.map(_.asJson)}")
       logInfo(s"bestBlockOpt.nonEmpty = true and isBetterChain(newBestHeader.id) = true for: ${fullBlock.asJson}")
       val prevBest: Block = bestBlockOpt.get
       logInfo(s"prevBest: ${prevBest.asJson}")
       val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
+      logInfo(s"prevChain: ${prevChain.headers.map(header => Algos.encode(header.id) + "|" + header.height).mkString(",")}")
+      logInfo(s"newChain: ${newChain.headers.map(header => Algos.encode(header.id) + "|" + header.height).mkString(",")}")
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
+      logInfo(s"toRemove: ${toRemove.map(block => Algos.encode(block.id) + "|" + block.header.height).mkString(",")}")
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
-
+      logInfo(s"toApply: ${toApply.map(block => Algos.encode(block.id) + "|" + block.header.height).mkString(",")}")
+      logInfo(s"toApply.lengthCompare(newChain.length - 1) != 0: ${toApply.lengthCompare(newChain.length - 1) != 0}")
+      logInfo(s"toApply.length: ${toApply.length}")
+      logInfo(s"toRemove.length: ${toRemove.length}")
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
@@ -124,6 +132,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     case params =>
       //Orphaned block or full chain is not initialized yet
       logStatus(Seq(), Seq(), params.fullBlock, None)
+      logInfo(s"Process block ${Algos.encode(params.fullBlock.id)} on height ${params.fullBlock.header.height} as non-best")
       historyStorage.bulkInsert(storageVersion(params.newModRow), Seq.empty, Seq(params.newModRow))
       ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
