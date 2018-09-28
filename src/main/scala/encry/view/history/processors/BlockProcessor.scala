@@ -66,6 +66,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       logInfo(s"prevChain: ${prevChain.headers.map(header => Algos.encode(header.id) + "|" + header.height).mkString(",")}")
       logInfo(s"newChain: ${newChain.headers.map(header => Algos.encode(header.id) + "|" + header.height).mkString(",")}")
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
+      logInfo(s"newChain.length = ${newChain.length}")
       logInfo(s"toRemove: ${toRemove.map(block => Algos.encode(block.id) + "|" + block.header.height).mkString(",")}")
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
