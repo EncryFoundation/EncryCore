@@ -136,14 +136,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
         logInfo(s"Cache after(${modifiersCache.size})")
       }
-    case lt: putTxsInMempool[EncryProposition, Transaction] =>
-      val txsInMempool: (Vector[Transaction], Vector[Transaction]) =
-        lt.tx.foldLeft(Vector.empty[Transaction], Vector.empty[Transaction]) { case ((successList, unsuccessList), tx) =>
-          txModify(tx) match {
-            case Success(_) => (tx +: successList, unsuccessList)
-            case Failure(_) => (successList, tx +: unsuccessList) }
-      }
-      sender() ! ResponseForTxsInMempool(txsInMempool._1, txsInMempool._2)
+    case lt: putTxsInMempool[EncryProposition, Transaction] => lt.tx.foreach(txModify)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       logInfo(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
@@ -332,14 +325,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     }
   } else logWarn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
 
-  def txModify(tx: Transaction): Try[Unit] = nodeView.mempool.put(tx).map { newPool =>
+  def txModify(tx: Transaction): Unit = nodeView.mempool.put(tx) match {
+    case Success(newPool) =>
       val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, Transaction](tx)
-  }.recoverWith {
-    case NonFatal(ex) =>
-      logWarn(s"Failed to put tx ${tx.id} to mempool with exception ${ex.getLocalizedMessage}")
-      Failure(ex)
+    case Failure(e) => logWarn(s"Failed to put tx ${tx.id} to mempool" +
+      s" with exception ${e.getLocalizedMessage}")
   }
 
   def genesisState: NodeView = {

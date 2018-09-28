@@ -37,13 +37,11 @@ case class TransactionsApiRoute(readersHolder: ActorRef,
   }.map(_.map(_.asJson).asJson)
 
   def defaultTransferTransactionR: Route = path("send") {
-    post(entity(as[List[Transaction]]) { txs => onComplete {
-      (nodeViewActorRef ? putTxsInMempool[EncryProposition, Transaction](txs))
-        .mapTo[ResponseForTxsInMempool].map(_.asJson)
-    } {
-      case Success(value) => complete(value)
-      case Failure(_) => complete(StatusCodes.InternalServerError) }
-  })
+    post(entity(as[List[Transaction]]) {
+      txs => complete { nodeViewActorRef ! putTxsInMempool[EncryProposition, Transaction](txs)
+        StatusCodes.OK
+      }
+    })
   }
 
   def getUnconfirmedTransactionsR: Route = (path("unconfirmed") & get & paging) { (offset, limit) =>

@@ -92,8 +92,6 @@ val opts = Seq(
   "-XX:+ParallelRefProcEnabled",
   "-XX:+UseStringDeduplication")
 
-javaOptions += "-Xss4M"
-
 javaOptions in run ++= opts
 
 assemblyJarName in assembly := "core.jar"
