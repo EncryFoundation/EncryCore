@@ -67,11 +67,20 @@ class DeliveryManager extends Actor with Logging {
         case Younger => sendExtension(remote, status, extOpt)
         case _ =>
       }
-    case HandshakedPeer(remote) => statusTracker.updateStatus(remote, Unknown)
+    case HandshakedPeer(remote) =>
+      logInfo(s"Get peer: $remote")
+      statusTracker.updateStatus(remote, Unknown)
     case DisconnectedPeer(remote) => statusTracker.clearStatus(remote)
     case CheckDelivery(peer, modifierTypeId, modifierId) =>
-      if (peerWhoDelivered(modifierId).contains(peer)) delete(modifierId)
-      else reexpect(peer, modifierTypeId, modifierId)
+      logInfo(s"Going to check delivery of ${Algos.encode(modifierId)} with type: $modifierTypeId from peer: $peer")
+      if (peerWhoDelivered(modifierId).contains(peer)) {
+        logInfo("We get this modifier. So delete it from delivered")
+        delete(modifierId)
+      }
+      else {
+        logInfo("Reexpect it")
+        reexpect(peer, modifierTypeId, modifierId)
+      }
     case CheckModifiersToDownload =>
       historyReaderOpt.foreach { h =>
         val currentQueue: Iterable[ModifierId] = cancellables.keys.map(ModifierId @@ _.toArray)
@@ -125,31 +134,49 @@ class DeliveryManager extends Actor with Logging {
   )
 
   def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mids: Seq[ModifierId]): Unit = tryWithLogging {
+    logInfo(s"Going to expect delivery modifiers of type $mids from $cp: ${mids.map(Algos.encode).mkString(",")}")
     if ((mtid == 2 && isBlockChainSynced && isMining) || mtid != 2) {
       val notRequestedIds: Seq[ModifierId] = mids.foldLeft(Seq[ModifierId]()) {
         case (notRequested, modId) =>
           val modifierKey: ModifierIdAsKey = key(modId)
-          if (historyReaderOpt.forall(history => !history.contains(modId) && !delivered.contains(key(modId)))) {
+          if (historyReaderOpt.forall(history => {
+            logInfo(s"History contains ${Algos.encode(modId)}: ${history.contains(modId)}")
+            logInfo(s"Delivered contains ${Algos.encode(modId)}: ${delivered.contains(key(modId))}")
+            !history.contains(modId) && !delivered.contains(key(modId))
+          })) {
+            logInfo(s"cancellables.contains(${Algos.encode(modId)}): ${cancellables.contains(modifierKey)}")
             if (!cancellables.contains(modifierKey)) notRequested :+ modId
             else {
+              logInfo("Add peer to peers")
               peers = peers.updated(modifierKey, (peers.getOrElse(modifierKey, Seq()) :+ cp).distinct)
+              logInfo(s"Update peers. Now: ${peers.map(modifier => s"Can download ${Algos.encode(modifier._1.toArray)} " +
+                s"from ${modifier._2.map(_.toString).mkString(",")}")}")
               notRequested
             }
           } else notRequested
       }
-      if (notRequestedIds.nonEmpty) cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
+      if (notRequestedIds.nonEmpty) {
+        logInfo(s"Send modifier request of: ${notRequestedIds.map(Algos.encode).mkString(",")} to $cp")
+        cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
+      }
 
       notRequestedIds.foreach { id =>
         val cancellable: Cancellable = context.system.scheduler
           .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
         cancellables = cancellables.updated(key(id), (cp, (cancellable, 0)))
       }
+    } else {
+      logInfo("")
     }
   }
 
   def reexpect(cp: ConnectedPeer, mtid: ModifierTypeId, mid: ModifierId): Unit = tryWithLogging {
     val midAsKey: ModifierIdAsKey = key(mid)
-    cancellables.get(midAsKey).foreach(peerInfo =>
+    logInfo(s"cancellables.get(midAsKey): ${cancellables.getOrElse(midAsKey, None)}")
+    cancellables.get(midAsKey).foreach { peerInfo =>
+      logInfo(s"peerInfo._2._2: ${peerInfo._2._2}")
+      logInfo(s"statusTracker.statuses.exists(peer =>peer._1.socketAddress == cp.socketAddress): ${statusTracker.statuses.exists(peer =>
+        peer._1.socketAddress == cp.socketAddress)}")
       if (peerInfo._2._2 < settings.network.maxDeliveryChecks && statusTracker.statuses.exists(peer =>
         peer._1.socketAddress == cp.socketAddress)) {
         statusTracker.statuses.find(peer => peer._1.socketAddress == cp.socketAddress).foreach { peer =>
@@ -163,13 +190,18 @@ class DeliveryManager extends Actor with Logging {
         }
       } else {
         cancellables -= midAsKey
+        logInfo(s"Look's like we should delete id ${Algos.encode(mid)} from cancellables")
         val peersToRequest: Seq[ConnectedPeer] = peers.getOrElse(midAsKey, statusTracker.statuses.keys.toSeq)
+        logInfo(s"peersToRequest: ${peersToRequest.map(_.toString)}")
         peersToRequest.headOption.foreach { nextPeer =>
+          logInfo(s"nextPeer: $nextPeer")
           peers = peers.updated(midAsKey, peersToRequest.filter(_ != nextPeer))
+          logInfo(s"Update peers. Now: ${peers.map(modifier => s"Can download ${Algos.encode(modifier._1.toArray)} " +
+            s"from ${modifier._2.map(_.toString).mkString(",")}")}")
           expect(nextPeer, mtid, Seq(mid))
         }
       }
-    )
+    }
   }
 
   def isExpecting(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Boolean =
