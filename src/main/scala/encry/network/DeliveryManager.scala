@@ -3,7 +3,7 @@ package encry.network
 import akka.actor.{Actor, Cancellable}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
-import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
+import encry.consensus.History.{HistoryComparisonResult, Older, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
@@ -163,12 +163,11 @@ class DeliveryManager extends Actor with Logging {
         }
       } else {
         cancellables -= midAsKey
-        peers.get(midAsKey).foreach(downloadPeers =>
-          downloadPeers.headOption.foreach { nextPeer =>
-            peers = peers.updated(midAsKey, downloadPeers.filter(_ != nextPeer))
-            expect(nextPeer, mtid, Seq(mid))
-          }
-        )
+        val peersToRequest: Seq[ConnectedPeer] = peers.getOrElse(midAsKey, statusTracker.statuses.filter(_._2 == Older).keys.toSeq)
+        peersToRequest.headOption.foreach { nextPeer =>
+          peers = peers.updated(midAsKey, peersToRequest.filter(_ != nextPeer))
+          expect(nextPeer, mtid, Seq(mid))
+        }
       }
     )
   }
