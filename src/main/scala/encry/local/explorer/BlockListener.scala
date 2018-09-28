@@ -60,7 +60,7 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
       bestBlockOptAtHeight(history, newHeight - writingGap) match {
         case Some(block) => dbService.processBlock(block)
         case None if newHeight - writingGap >= 0 =>
-          logInfo(s"Block on height ${newHeight - writingGap} not found")
+          logInfo(s"Block on height ${newHeight - writingGap} not found, adding to pending list")
           context.become(operating(history, pending :+ newHeight - writingGap))
         case None =>
       }
@@ -96,6 +96,7 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
       case (notFound, (blockOpt, height)) =>
         blockOpt match {
           case Some(block) =>
+            logInfo(s"Pending block on height $height found, writing to postgres")
             dbService.processBlock(block)
             notFound
           case None => notFound :+ height
