@@ -48,7 +48,10 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
   }
 
   def startRecovery(startFrom: Int): Future[Unit] = heightFuture.flatMap { height =>
-    settings.postgres.flatMap(_.restoreBatchSize) match {
+    if (height <= startFrom) {
+      nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true)
+      Future.unit
+    } else settings.postgres.flatMap(_.restoreBatchSize) match {
       case Some(step) =>
         logInfo(s"Going to download blocks from postgres starting from $startFrom")
         (startFrom to height).sliding(step, step).foldLeft(Future.successful(List[Block]())) { case (prevBlocks, slide) =>
