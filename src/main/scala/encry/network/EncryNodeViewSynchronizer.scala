@@ -99,7 +99,8 @@ class EncryNodeViewSynchronizer extends Actor with Logging {
         s"${invData._2.map(Algos.encode).mkString(",")}")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
-      logDebug( s"Got modifiers from ${remote.socketAddress} with modTypeID: ${data._1}.")
+      logDebug( s"Got modifiers from ${remote.socketAddress} with modTypeID: ${data._1} and " +
+        s"ids: ${data._2.keys.map(Algos.encode).mkString(",")}")
       deliveryManager ! DataFromPeer(spec, data: ModifiersData@unchecked, remote)
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       deliveryManager ! RequestFromLocal(peer, modifierTypeId, modifierIds)
