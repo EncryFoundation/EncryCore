@@ -13,8 +13,11 @@ import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.generic.auto._
 import io.circe.syntax._
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{putTxsInMempool, ResponseForTxsInMempool}
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{ResponseForTxsInMempool, putTxsInMempool}
 import encry.settings.RESTApiSettings
+import encry.utils.Logging
+import org.encryfoundation.common.Algos
+
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
@@ -22,7 +25,7 @@ case class TransactionsApiRoute(readersHolder: ActorRef,
                                 nodeViewActorRef: ActorRef,
                                 restApiSettings: RESTApiSettings,
                                 stateMode: StateMode)(implicit val context: ActorRefFactory)
-  extends EncryBaseApiRoute with FailFastCirceSupport {
+  extends EncryBaseApiRoute with FailFastCirceSupport with Logging {
 
   override val route: Route = pathPrefix("transactions") {
     getUnconfirmedTransactionsR ~ defaultTransferTransactionR
@@ -38,7 +41,9 @@ case class TransactionsApiRoute(readersHolder: ActorRef,
 
   def defaultTransferTransactionR: Route = path("send") {
     post(entity(as[List[Transaction]]) {
-      txs => complete { nodeViewActorRef ! putTxsInMempool[EncryProposition, Transaction](txs)
+      txs =>
+        txs.foreach(x =>logWarn(s"txs ${Algos.encode(x.id)} income"))
+        complete { nodeViewActorRef ! putTxsInMempool[EncryProposition, Transaction](txs)
         StatusCodes.OK
       }
     })
