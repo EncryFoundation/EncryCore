@@ -165,27 +165,27 @@ case class EncryModifiersCache(override val maxSize: Int)
 
     val headersHeight = history.bestHeaderHeight
 
-    logInfo("Trying to find candidate.")
+    //logInfo("Trying to find candidate.")
 
     history
       .headerIdsAtHeight({
-        logInfo(s"trying to get headers at height: ${history.bestBlockHeight + 1}")
+        //logInfo(s"trying to get headers at height: ${history.bestBlockHeight + 1}")
         history.bestBlockHeight + 1
       })
       .flatMap(id => {
-        logInfo(s"Id at height ${history.bestBlockHeight + 1} ${Algos.encode(id)}")
+        //logInfo(s"Id at height ${history.bestBlockHeight + 1} ${Algos.encode(id)}")
         history.typedModifierById[Header](id)
       })
       .flatMap{modifier =>
-        logInfo(s"Get modifier: ${modifier.asJson}")
-        logInfo(s"modifier.partsIds: ${modifier.partsIds.map(Algos.encode).mkString(",")}")
+//        logInfo(s"Get modifier: ${modifier.asJson}")
+//        logInfo(s"modifier.partsIds: ${modifier.partsIds.map(Algos.encode).mkString(",")}")
         modifier.partsIds.map(id => mutable.WrappedArray.make[Byte](id))
       }.flatMap(id => {
-      logInfo(s"Going to get from cache key: ${Algos.encode(id.toArray)}")
+      //logInfo(s"Going to get from cache key: ${Algos.encode(id.toArray)}")
       cache.get(id).map(v => id -> v)
     })
       .find(p => {
-        logInfo(s"Going to apply: ${Algos.encode(p._1.toArray)}")
+        //logInfo(s"Going to apply: ${Algos.encode(p._1.toArray)}")
         tryToApply(p._1, p._2)
       }).map(_._1)
       .orElse {
@@ -193,7 +193,7 @@ case class EncryModifiersCache(override val maxSize: Int)
         cache.find { case (k, v) =>
           v match {
             case h: Header =>
-              logInfo(s"Get header: ${h.asJson}. ${h.height} > $headersHeight + 1: ${h.height > headersHeight + 1}")
+              //logInfo(s"Get header: ${h.asJson}. ${h.height} > $headersHeight + 1: ${h.height > headersHeight + 1}")
               if (h.height > headersHeight + 1) false
               else tryToApply(k, v)
             case _ => tryToApply(k, v)

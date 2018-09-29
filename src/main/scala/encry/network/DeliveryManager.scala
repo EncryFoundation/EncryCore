@@ -134,29 +134,29 @@ class DeliveryManager extends Actor with Logging {
   )
 
   def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mids: Seq[ModifierId]): Unit = tryWithLogging {
-    logInfo(s"Going to expect delivery modifiers of type $mids from $cp: ${mids.map(Algos.encode).mkString(",")}")
+    //logInfo(s"Going to expect delivery modifiers of type $mids from $cp: ${mids.map(Algos.encode).mkString(",")}")
     if ((mtid == 2 && isBlockChainSynced && isMining) || mtid != 2) {
       val notRequestedIds: Seq[ModifierId] = mids.foldLeft(Seq[ModifierId]()) {
         case (notRequested, modId) =>
           val modifierKey: ModifierIdAsKey = key(modId)
           if (historyReaderOpt.forall(history => {
-            logInfo(s"History contains ${Algos.encode(modId)}: ${history.contains(modId)}")
-            logInfo(s"Delivered contains ${Algos.encode(modId)}: ${delivered.contains(key(modId))}")
+            //logInfo(s"History contains ${Algos.encode(modId)}: ${history.contains(modId)}")
+            //logInfo(s"Delivered contains ${Algos.encode(modId)}: ${delivered.contains(key(modId))}")
             !history.contains(modId) && !delivered.contains(key(modId))
           })) {
-            logInfo(s"cancellables.contains(${Algos.encode(modId)}): ${cancellables.contains(modifierKey)}")
+            //logInfo(s"cancellables.contains(${Algos.encode(modId)}): ${cancellables.contains(modifierKey)}")
             if (!cancellables.contains(modifierKey)) notRequested :+ modId
             else {
-              logInfo("Add peer to peers")
+              //logInfo("Add peer to peers")
               peers = peers.updated(modifierKey, (peers.getOrElse(modifierKey, Seq()) :+ cp).distinct)
-              logInfo(s"Update peers. Now: ${peers.map(modifier => s"Can download ${Algos.encode(modifier._1.toArray)} " +
-                s"from ${modifier._2.map(_.toString).mkString(",")}")}")
+//              logInfo(s"Update peers. Now: ${peers.map(modifier => s"Can download ${Algos.encode(modifier._1.toArray)} " +
+//                s"from ${modifier._2.map(_.toString).mkString(",")}")}")
               notRequested
             }
           } else notRequested
       }
       if (notRequestedIds.nonEmpty) {
-        logInfo(s"Send modifier request of: ${notRequestedIds.map(Algos.encode).mkString(",")} to $cp")
+        //logInfo(s"Send modifier request of: ${notRequestedIds.map(Algos.encode).mkString(",")} to $cp")
         cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
       }
 
@@ -190,14 +190,14 @@ class DeliveryManager extends Actor with Logging {
         }
       } else {
         cancellables -= midAsKey
-        logInfo(s"Look's like we should delete id ${Algos.encode(mid)} from cancellables")
+        //logInfo(s"Look's like we should delete id ${Algos.encode(mid)} from cancellables")
         val peersToRequest: Seq[ConnectedPeer] = peers.getOrElse(midAsKey, statusTracker.statuses.keys.toSeq)
-        logInfo(s"peersToRequest: ${peersToRequest.map(_.toString)}")
+        //logInfo(s"peersToRequest: ${peersToRequest.map(_.toString)}")
         peersToRequest.headOption.foreach { nextPeer =>
-          logInfo(s"nextPeer: $nextPeer")
+          //logInfo(s"nextPeer: $nextPeer")
           peers = peers.updated(midAsKey, peersToRequest.filter(_ != nextPeer))
-          logInfo(s"Update peers. Now: ${peers.map(modifier => s"Can download ${Algos.encode(modifier._1.toArray)} " +
-            s"from ${modifier._2.map(_.toString).mkString(",")}")}")
+//          logInfo(s"Update peers. Now: ${peers.map(modifier => s"Can download ${Algos.encode(modifier._1.toArray)} " +
+//            s"from ${modifier._2.map(_.toString).mkString(",")}")}")
           expect(nextPeer, mtid, Seq(mid))
         }
       }

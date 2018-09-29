@@ -35,9 +35,9 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
                              modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
     val newBestAfterThis: Header = bestFullChain.last.header
-    logInfo(s"Going to process block: ${fullBlock.asJson}")
-    logInfo(s"bestFullChain: ${bestFullChain.map(block => Algos.encode(block.id)).mkString(",")}")
-    logInfo(s"newBestAfterThis: ${newBestAfterThis.asJson}")
+//    logInfo(s"Going to process block: ${fullBlock.asJson}")
+//    logInfo(s"bestFullChain: ${bestFullChain.map(block => Algos.encode(block.id)).mkString(",")}")
+//    logInfo(s"newBestAfterThis: ${newBestAfterThis.asJson}")
     processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, nodeSettings.blocksToKeep))
   }
 

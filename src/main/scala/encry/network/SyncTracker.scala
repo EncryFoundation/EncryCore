@@ -77,8 +77,8 @@ case class SyncTracker(deliveryManager: ActorRef,
     else nonOutdated.filter(p => (System.currentTimeMillis() - lastSyncSentTime.getOrElse(p, 0L))
       .millis >= networkSettings.syncInterval)
     peers.foreach(updateLastSyncSentTime)
-    logDebug(s"Trying to get nodes to sync and they are: ${peers.map(_.socketAddress).mkString(",")} and " +
-      s"handler are: ${peers.map(_.handlerRef).mkString(",")}")
+//    logDebug(s"Trying to get nodes to sync and they are: ${peers.map(_.socketAddress).mkString(",")} and " +
+//      s"handler are: ${peers.map(_.handlerRef).mkString(",")}")
     peers
   }
 }

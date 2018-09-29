@@ -145,7 +145,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             nodeView.history.contains(mid) || modifiersCache.contains(key(mid))
           })
       }
-      logInfo(s"Need to get ${ids.map(Algos.encode).mkString(",")} of type: $modifierTypeId")
+      //logInfo(s"Need to get ${ids.map(Algos.encode).mkString(",")} of type: $modifierTypeId")
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case a: Any =>
       logError(s"Strange input: $a")
