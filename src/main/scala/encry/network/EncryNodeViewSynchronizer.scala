@@ -95,6 +95,8 @@ class EncryNodeViewSynchronizer extends Actor with Logging {
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
       logDebug(s"Got inv message from ${remote.socketAddress}.")
+      logInfo(s"Inv message contains modifiers of type ${invData._1} with modifiers: " +
+        s"${invData._2.map(Algos.encode).mkString(",")}")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       logDebug( s"Got modifiers from ${remote.socketAddress} with modTypeID: ${data._1}.")

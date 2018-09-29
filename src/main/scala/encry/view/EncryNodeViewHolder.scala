@@ -113,10 +113,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                 context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
             }
         }
-        logInfo(s"Cache before(${modifiersCache.size})")
+        logInfo(s"Cache before(${modifiersCache.size}): $modifiersCache")
         computeApplications()
         if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
-        logInfo(s"Cache after(${modifiersCache.size})")
+        logInfo(s"Cache after(${modifiersCache.size}); $modifiersCache")
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
@@ -136,8 +136,16 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] = modifierTypeId match {
         case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
-        case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
+        case _ =>
+          logInfo("Going to vilter modifiers.")
+          modifierIds.filterNot(mid => {
+            logInfo(s"Going to check modifier: ${Algos.encode(mid)}." +
+              s"nodeView.history.contains(mid): ${nodeView.history.contains(mid)}." +
+              s"modifiersCache.contains(key(mid)): ${modifiersCache.contains(key(mid))}")
+            nodeView.history.contains(mid) || modifiersCache.contains(key(mid))
+          })
       }
+      logInfo(s"Need to get ${ids.map(Algos.encode).mkString(",")} of type: $modifierTypeId")
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case a: Any =>
       logError(s"Strange input: $a")

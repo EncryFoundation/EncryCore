@@ -11,6 +11,7 @@ import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
 import encry.utils.Logging
+import org.encryfoundation.common.Algos
 
 trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
 
@@ -81,6 +82,8 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
   def popCandidate(history: H): Option[V] = synchronized {
     findCandidateKey(history).flatMap(k => remove(k))
   }
+
+  override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
 }
 
 trait LRUCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader] extends ModifiersCache[PMOD, HR] {
