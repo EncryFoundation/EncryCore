@@ -83,7 +83,7 @@ class DeliveryManager extends Actor with Logging {
         } else context.become(syncCycle)
       }
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
-      if (modifierIds.nonEmpty && modifierTypeId != 2) expect(peer, modifierTypeId, modifierIds)
+      if (modifierIds.nonEmpty) expect(peer, modifierTypeId, modifierIds)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       val typeId: ModifierTypeId = data._1
       val modifiers: Map[ModifierId, Array[Byte]] = data._2
@@ -125,6 +125,7 @@ class DeliveryManager extends Actor with Logging {
   )
 
   def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mids: Seq[ModifierId]): Unit = tryWithLogging {
+    if ((mtid == 2 && isBlockChainSynced && isMining) || mtid != 2) {
       val notRequestedIds: Seq[ModifierId] = mids.foldLeft(Seq[ModifierId]()) {
         case (notRequested, modId) =>
           val modifierKey: ModifierIdAsKey = key(modId)
@@ -143,6 +144,7 @@ class DeliveryManager extends Actor with Logging {
           .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
         cancellables = cancellables.updated(key(id), (cp, (cancellable, 0)))
       }
+    }
   }
 
   def reexpect(cp: ConnectedPeer, mtid: ModifierTypeId, mid: ModifierId): Unit = tryWithLogging {
