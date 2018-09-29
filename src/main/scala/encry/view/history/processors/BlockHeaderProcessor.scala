@@ -281,11 +281,13 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
 
   object HeaderValidator extends ModifierValidator {
 
-    def validate(header: Header): ValidationResult =
+    def validate(header: Header): ValidationResult = {
+      logInfo(s"Going to validate: ${header.id}")
       if (header.isGenesis) validateGenesisBlockHeader(header)
       else typedModifierById[Header](header.parentId).map { parent =>
         validateChildBlockHeader(header, parent)
       } getOrElse error(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
+    }
 
     private def validateGenesisBlockHeader(header: Header): ValidationResult =
       accumulateErrors

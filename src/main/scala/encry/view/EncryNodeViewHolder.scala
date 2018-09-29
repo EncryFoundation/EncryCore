@@ -151,13 +151,18 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       logError(s"Strange input: $a")
   }
 
-  def computeApplications(): Unit =
+  def computeApplications(): Unit = {
+    logInfo("Going to pop candidate from cache")
     modifiersCache.popCandidate(nodeView.history) match {
       case Some(mod) =>
+        logInfo(s"Candidate is: ${Algos.encode(mod.id)}")
         pmodModify(mod)
         computeApplications()
-      case None => Unit
+      case None =>
+        logInfo("Candidate is None")
+        Unit
     }
+  }
 
   def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
