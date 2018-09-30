@@ -14,12 +14,12 @@ import scala.util.{Failure, Success}
 import encry.utils.Logging
 import org.encryfoundation.common.Algos
 
-trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
+trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] extends Logging {
 
   type K = mutable.WrappedArray[Byte]
   type V = PMOD
 
-  protected val cache: TrieMap[K, V] = TrieMap[K, V]()
+  val cache: TrieMap[K, V] = TrieMap[K, V]()
 
   def size: Int = cache.size
 
@@ -57,6 +57,8 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
   def contains(key: K): Boolean = cache.contains(key) || rememberedKeys.contains(key)
 
   def put(key: K, value: V): Unit = {
+    logInfo(s"In modifiers cache: ${Algos.encode(key.toArray)}")
+    logInfo(s"Contains: ${Algos.encode(key.toArray)}: ${contains(key)}")
     if (!contains(key)) {
       onPut(key)
       cache.put(key, value)
@@ -108,7 +110,7 @@ trait LRUCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader] extend
 }
 
 class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader]
-(override val maxSize: Int) extends ModifiersCache[PMOD, HR] with LRUCache[PMOD, HR] with Logging {
+(override val maxSize: Int) extends LRUCache[PMOD, HR] with Logging {
 
   /**
     * Default implementation is just about to scan. Not efficient at all and should be probably rewritten in a
@@ -154,27 +156,27 @@ case class EncryModifiersCache(override val maxSize: Int)
 
     val headersHeight = history.bestHeaderHeight
 
-    //logInfo("Trying to find candidate.")
+    logInfo("Trying to find candidate.")
 
     history
       .headerIdsAtHeight({
-        //logInfo(s"trying to get headers at height: ${history.bestBlockHeight + 1}")
+        logInfo(s"trying to get headers at height: ${history.bestBlockHeight + 1}")
         history.bestBlockHeight + 1
       })
       .flatMap(id => {
-        //logInfo(s"Id at height ${history.bestBlockHeight + 1} ${Algos.encode(id)}")
+        logInfo(s"Id at height ${history.bestBlockHeight + 1} ${Algos.encode(id)}")
         history.typedModifierById[Header](id)
       })
       .flatMap{modifier =>
-//        logInfo(s"Get modifier: ${modifier.asJson}")
-//        logInfo(s"modifier.partsIds: ${modifier.partsIds.map(Algos.encode).mkString(",")}")
+        logInfo(s"Get modifier: ${modifier.asJson}")
+        logInfo(s"modifier.partsIds: ${modifier.partsIds.map(Algos.encode).mkString(",")}")
         modifier.partsIds.map(id => mutable.WrappedArray.make[Byte](id))
       }.flatMap(id => {
-      //logInfo(s"Going to get from cache key: ${Algos.encode(id.toArray)}")
+      logInfo(s"Going to get from cache key: ${Algos.encode(id.toArray)}")
       cache.get(id).map(v => id -> v)
     })
       .find(p => {
-        //logInfo(s"Going to apply: ${Algos.encode(p._1.toArray)}")
+        logInfo(s"Going to apply: ${Algos.encode(p._1.toArray)}")
         tryToApply(p._1, p._2)
       }).map(_._1)
       .orElse {
@@ -182,7 +184,7 @@ case class EncryModifiersCache(override val maxSize: Int)
         cache.find { case (k, v) =>
           v match {
             case h: Header =>
-              //logInfo(s"Get header: ${h.asJson}. ${h.height} > $headersHeight + 1: ${h.height > headersHeight + 1}")
+              logInfo(s"Get header: ${h.asJson}. ${h.height} > $headersHeight + 1: ${h.height > headersHeight + 1}")
               if (h.height > headersHeight + 1) false
               else tryToApply(k, v)
             case _ => tryToApply(k, v)

@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, Props}
 import akka.pattern._
 import akka.persistence.RecoveryCompleted
@@ -12,7 +13,7 @@ import encry.modifiers._
 import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
 import encry.modifiers.state.box.EncryProposition
-import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
+import encry.network.DeliveryManager.{CleanDelivered, ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -31,6 +32,7 @@ import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import io.circe.syntax._
+
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -105,9 +107,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
+            logInfo(s"Get modifier in nvh: ${Algos.encode(pmod.id)}")
             if (nodeView.history.contains(pmod.id) || modifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
+              logInfo(s"Going to put ${Algos.encode(pmod.id)} to cache")
               modifiersCache.put(key(pmod.id), pmod)
               if (settings.levelDb.exists(_.enableSave))
                 context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
@@ -116,6 +120,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         logInfo(s"Cache before(${modifiersCache.size}): $modifiersCache")
         computeApplications()
         if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
+        nodeViewSynchronizer ! CleanDelivered(modifiersCache.cache.keys.toSeq)
         logInfo(s"Cache after(${modifiersCache.size}); $modifiersCache")
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
@@ -137,7 +142,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       val ids: Seq[ModifierId] = modifierTypeId match {
         case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
         case _ =>
-          logInfo("Going to vilter modifiers.")
+          logInfo("Going to filter modifiers.")
           modifierIds.filterNot(mid => {
             logInfo(s"Going to check modifier: ${Algos.encode(mid)}." +
               s"nodeView.history.contains(mid): ${nodeView.history.contains(mid)}." +

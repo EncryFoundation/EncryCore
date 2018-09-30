@@ -5,7 +5,7 @@ import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
 import encry.consensus.History.{HistoryComparisonResult, Older, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
-import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
+import encry.network.DeliveryManager.{CleanDelivered, ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToNetwork}
 import encry.network.PeerConnectionHandler._
@@ -18,6 +18,7 @@ import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec
 import encry.view.mempool.EncryMempool
 import encry.utils.Logging
 import org.encryfoundation.common.Algos
+
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Try}
@@ -92,6 +93,17 @@ class DeliveryManager extends Actor with Logging {
           case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) => requestDownload(modId, ids.map(_._2))
         } else context.become(syncCycle)
       }
+    case CleanDelivered(modifiersInCache: Seq[mutable.WrappedArray[Byte]]) =>
+      logInfo("Get clean delivered")
+      logInfo(s"Cache contains: ${modifiersInCache.map(mod => Algos.encode(mod.toArray)).mkString(",")}")
+      logInfo(s"Delivered contains: ${delivered.keys.map(mod => Algos.encode(mod.toArray)).mkString(",")}")
+      val newDelivered: Seq[ModifierIdAsKey] =
+        delivered.keys.filter(modId =>
+          historyReaderOpt.exists(_.contains(ModifierId @@ modId.toArray)) ||
+            modifiersInCache.contains(modId)).toSeq
+      logInfo(s"NewDelivered contains: ${newDelivered.map(mod => Algos.encode(mod.toArray)).mkString(",")}")
+      delivered = delivered.filter(mod => newDelivered.contains(mod._1))
+      logInfo(s"Delivered contains after filter: ${delivered.keys.map(key => Algos.encode(key.toArray)).mkString(",")}")
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       if (modifierIds.nonEmpty && modifierTypeId != 2) expect(peer, modifierTypeId, modifierIds)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
@@ -101,13 +113,15 @@ class DeliveryManager extends Actor with Logging {
         modifiers partition { case (id, _) => isSpam(id) }
       if (settings.influxDB.isDefined)
         context.actorSelection("/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
-      logInfo(s"Got modifiers (${modifiers.size}) of type $typeId from remote connected peer: $remote")
+      logInfo(s"Got modifiers (${modifiers.size}): ${modifiers.keys.map(Algos.encode).mkString(",")} " +
+        s"of type $typeId from remote connected peer: $remote")
       for ((id, _) <- modifiers) receive(typeId, id, remote)
       if (spam.nonEmpty) {
         logInfo(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
           s": ${spam.keys.map(Algos.encode)}")
         deleteSpam(spam.keys.toSeq)
       }
+      logInfo(s"fm contains: ${fm.keys.map(Algos.encode).mkString(",")}")
       if (fm.nonEmpty) nodeViewHolder ! ModifiersFromRemote(typeId, fm.values.toSeq)
       historyReaderOpt.foreach { h =>
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
@@ -135,27 +149,28 @@ class DeliveryManager extends Actor with Logging {
   )
 
   def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mids: Seq[ModifierId]): Unit = tryWithLogging {
-    //logInfo(s"Going to expect delivery modifiers of type $mids from $cp: ${mids.map(Algos.encode).mkString(",")}")
+    logInfo(s"Going to expect delivery modifiers of type $mids from $cp: ${mids.map(Algos.encode).mkString(",")}")
     if ((mtid == 2 && isBlockChainSynced && isMining) || mtid != 2) {
       val notRequestedIds: Seq[ModifierId] = mids.foldLeft(Seq[ModifierId]()) {
         case (notRequested, modId) =>
           val modifierKey: ModifierIdAsKey = key(modId)
           if (historyReaderOpt.forall(history => {
-            //logInfo(s"History contains ${Algos.encode(modId)}: ${history.contains(modId)}")
-            //logInfo(s"Delivered contains ${Algos.encode(modId)}: ${delivered.contains(key(modId))}")
+            logInfo(s"History contains ${Algos.encode(modId)}: ${history.contains(modId)}")
+            logInfo(s"Delivered contains ${Algos.encode(modId)}: ${delivered.contains(key(modId))}")
             !history.contains(modId) && !delivered.contains(key(modId))
           })) {
-            //logInfo(s"cancellables.contains(${Algos.encode(modId)}): ${cancellables.contains(modifierKey)}")
+            logInfo(s"cancellables.contains(${Algos.encode(modId)}): ${cancellables.contains(modifierKey)}")
             if (!cancellables.contains(modifierKey)) notRequested :+ modId
             else {
-              //logInfo("Add peer to peers")
+              logInfo("Add peer to peers")
               peers = peers.updated(modifierKey, (peers.getOrElse(modifierKey, Seq()) :+ cp).distinct)
-//              logInfo(s"Update peers. Now: ${peers.map(modifier => s"Can download ${Algos.encode(modifier._1.toArray)} " +
-//                s"from ${modifier._2.map(_.toString).mkString(",")}")}")
+              logInfo(s"Update peers. Now: ${peers.map(modifier => s"Can download ${Algos.encode(modifier._1.toArray)} " +
+                s"from ${modifier._2.map(_.toString).mkString(",")}")}")
               notRequested
             }
           } else notRequested
       }
+      logInfo(s"notRequestedIds.nonEmpty: ${notRequestedIds.nonEmpty}")
       if (notRequestedIds.nonEmpty) {
         logInfo(s"Send modifier request of: ${notRequestedIds.map(Algos.encode).mkString(",")} to $cp")
         cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
@@ -165,6 +180,7 @@ class DeliveryManager extends Actor with Logging {
         val cancellable: Cancellable = context.system.scheduler
           .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
         cancellables = cancellables.updated(key(id), (cp, (cancellable, 0)))
+        logInfo(s"Update cancellables! Now contains: ${cancellables.keys.map(key => Algos.encode(key.toArray)).mkString(",")}")
       }
     } else {
       logInfo("")
@@ -236,12 +252,15 @@ class DeliveryManager extends Actor with Logging {
       context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
     logInfo(s"statusTracker.statuses: ${statusTracker.statuses.keys.mkString(",")}")
     statusTracker.statuses.keys.foreach(peer => {
+      logInfo(s"Expect ${modifierIds.map(Algos.encode).mkString(",")} from $peer")
       expect(peer, modifierTypeId, modifierIds)
     })
   }
 
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = tryWithLogging {
+    logInfo(s"Receive: ${Algos.encode(mid)}")
     if (isExpecting(mtid, mid, cp)) {
+      logInfo(s"Add to delivered: ${Algos.encode(mid)}")
       delivered = delivered.updated(key(mid), cp)
       cancellables.get(key(mid)).foreach(_._2._1.cancel())
       cancellables -= key(mid)
@@ -252,6 +271,8 @@ class DeliveryManager extends Actor with Logging {
 }
 
 object DeliveryManager {
+
+  case class CleanDelivered(modifiersInCache: Seq[mutable.WrappedArray[Byte]])
 
   case object FullBlockChainSynced
 

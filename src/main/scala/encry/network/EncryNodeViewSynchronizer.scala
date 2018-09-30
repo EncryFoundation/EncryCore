@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.{Actor, ActorRef, Props}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.EncryApp._
@@ -10,7 +11,7 @@ import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.history.{ADProofs, Header, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
-import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
+import encry.network.DeliveryManager.{CleanDelivered, ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -25,6 +26,8 @@ import encry.utils.Logging
 import encry.utils.Utils._
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.Proposition
+
+import scala.collection.mutable
 
 class EncryNodeViewSynchronizer extends Actor with Logging {
 
@@ -48,6 +51,7 @@ class EncryNodeViewSynchronizer extends Actor with Logging {
       if (mod.isInstanceOf[Header] || mod.isInstanceOf[Payload] || mod.isInstanceOf[ADProofs]) &&
         historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
     case SyntacticallySuccessfulModifier(mod) =>
+    case CleanDelivered(modIds: Seq[mutable.WrappedArray[Byte]]) => deliveryManager ! CleanDelivered(modIds)
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
       deliveryManager ! DownloadRequest(modifierTypeId, modifierId)
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
