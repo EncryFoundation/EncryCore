@@ -39,23 +39,39 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
   def modifiersToDownload(howMany: Int, excluding: Iterable[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
     @tailrec
     def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] = {
+      logInfo(s"acc.length: ${acc.length}")
+      logInfo(s"howMany.length: $howMany")
+      logInfo(s"acc.lengthCompare(howMany) >= 0: ${acc.lengthCompare(howMany) >= 0}")
       if (acc.lengthCompare(howMany) >= 0) acc
       else {
+        logInfo(s"headerIdsAtHeight(height): ${headerIdsAtHeight(height).map(Algos.encode).mkString(",")}")
         headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[Header](id)) match {
           case Some(bestHeaderAtThisHeight) =>
+            logInfo(s"Get header: ${bestHeaderAtThisHeight.asJson}")
+            logInfo(s"requiredModifiersForHeader(bestHeaderAtThisHeight): " +
+              s"${requiredModifiersForHeader(bestHeaderAtThisHeight).map(modifier => Algos.encode(modifier._2)).mkString(",")}")
             val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
               .filter(m => !excluding.exists(_ sameElements m._2))
               .filter(m => !contains(m._2))
+            logInfo(s"After filter: ${toDownload.map(mod => Algos.encode(mod._2))}")
             continuation(Height @@ (height + 1), acc ++ toDownload)
           case None => acc
         }
       }
     }
 
+    logInfo(s"bestBlockOpt: ${bestBlockOpt.map(_.asJson)}")
+    logInfo(s"isHeadersChainSynced: $isHeadersChainSynced")
     bestBlockOpt match {
       case _ if !isHeadersChainSynced => Seq.empty
       case Some(fb) => continuation(Height @@ (fb.header.height + 1), Seq.empty)
       case None => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
+      case Some(fb) =>
+        logInfo(s"Calculate modifiers from: ${fb.header.height + 1}")
+        continuation(Height @@ (fb.header.height + 1), Seq.empty)
+      case None =>
+        logInfo(s"Calculate modifiers from: ${blockDownloadProcessor.minimalBlockHeightVar}")
+        continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
 
