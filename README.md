@@ -20,6 +20,8 @@ Linux/MacOS/Windows:
 
 `$ cd EncryCore`
 
+`$ git checkout master`
+
 `$ sbt run`
     
 ## Running tests
