@@ -22,10 +22,7 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
   override def postStop(): Unit = dbService.shutdown()
 
   val currentDbHeightFuture: Future[Int] = dbService.selectHeightOpt.map(_.getOrElse(0))
-  val writingGap: Int = settings.postgres.flatMap(_.writingGap).getOrElse {
-    context.stop(self)
-    0
-  }
+  val writingGap: Int = settings.postgres.flatMap(_.writingGap).getOrElse(20)
 
   currentDbHeightFuture.onComplete {
     case Success(height) =>
