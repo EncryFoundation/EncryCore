@@ -21,11 +21,16 @@ import scala.util.{Failure, Success, Try}
 
 class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Actor with Logging {
 
-  val heightFuture: Future[Int] = dbService.selectHeight
+  val heightFuture: Future[Int] = dbService.selectHeightOpt.map(_.getOrElse(0))
 
   override def postStop(): Unit = if (settings.postgres.exists(_.enableSave)) Unit else dbService.shutdown()
 
   heightFuture.onComplete {
+    case Success(0) =>
+      logInfo("Seems like postgres is empty")
+      context.stop(self)
+    case Success(height) =>
+      logInfo(s"Going to download $height blocks from postgres")
     case Success(_) =>
       logInfo(s"Going to download blocks from postgres")
       if (settings.influxDB.isDefined)
@@ -43,6 +48,12 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
 
   override def receive: Receive = {
     case StartRecovery => nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
+    case ChangedHistory(history) =>
+      val currentNodeHeight = history.bestBlockOpt.map(_.header.height).getOrElse(0)
+      startRecovery(if (currentNodeHeight == 0) 0 else currentNodeHeight + 1).map { _ =>
+        logInfo(s"All blocks restored from postgres")
+        context.stop(self)
+      }
     case ChangedHistory(history) => startRecovery(history.bestBlockOpt.map(_.header.height).getOrElse(0)).map { _ =>
       logInfo(s"All blocks restored from postgres")
       if (settings.influxDB.isDefined)
@@ -52,7 +63,10 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
   }
 
   def startRecovery(startFrom: Int): Future[Unit] = heightFuture.flatMap { height =>
-    settings.postgres.flatMap(_.restoreBatchSize) match {
+    if (height <= startFrom) {
+      nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true)
+      Future.unit
+    } else settings.postgres.flatMap(_.restoreBatchSize) match {
       case Some(step) =>
         logInfo(s"Going to download blocks from postgres starting from $startFrom")
         (startFrom to height).sliding(step, step).foldLeft(Future.successful(List[Block]())) { case (prevBlocks, slide) =>

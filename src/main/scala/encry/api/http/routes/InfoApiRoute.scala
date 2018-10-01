@@ -59,7 +59,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
   } yield {
     (appSettings.levelDb, appSettings.postgres) match {
       case (Some(LevelDbSettings(levelDbSave, levelDbRestore, _)),
-      Some(PostgresSettings(_, _, _, _, pgSave, pgRestore, _))) =>
+      Some(PostgresSettings(_, _, _, _, pgSave, pgRestore, _, _))) =>
         if ((levelDbSave || (levelDbRestore && (!recoveryStatus))) && (pgSave || (pgRestore && (!recoveryStatus))))
           s"LevelDb(${if (levelDbSave) "write" else ""} ${if (levelDbRestore && (!recoveryStatus)) "read" else ""}), " +
             s"Postgres(${if (pgSave) "write" else ""} ${if (pgRestore && (!recoveryStatus)) "read" else ""})"
@@ -73,7 +73,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
         else if (save && !restore) "LevelDb(write)"
         else if (!save && (restore && !recoveryStatus)) "LevelDb(read)"
         else ""
-      case (None, Some(PostgresSettings(_, _, _, _, save, restore, _))) if save || restore =>
+      case (None, Some(PostgresSettings(_, _, _, _, save, restore, _, _))) if save || restore =>
         if (save && (restore && !recoveryStatus)) "Postgres(read, write)"
         else if (save && !restore) "Postgres(write)"
         else if (!save && (restore && !recoveryStatus)) "Postgres(read)"
