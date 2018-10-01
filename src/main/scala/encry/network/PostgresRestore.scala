@@ -31,8 +31,6 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
       context.stop(self)
     case Success(height) =>
       logInfo(s"Going to download $height blocks from postgres")
-    case Success(_) =>
-      logInfo(s"Going to download blocks from postgres")
       if (settings.influxDB.isDefined)
         context.actorSelection("/user/statsSender") ! SuccessPostgresSyncTime(System.nanoTime())
     case Failure(_) =>
