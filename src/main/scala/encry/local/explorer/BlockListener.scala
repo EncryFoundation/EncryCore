@@ -3,7 +3,7 @@ package encry.local.explorer
 import akka.actor.{Actor, ActorRef}
 import encry.EncryApp.settings
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.local.explorer.BlockListener.{ChainSwitching, NewBestBlock, NewOrphaned, UploadToDbOnHeight}
+import encry.local.explorer.BlockListener._
 import encry.local.explorer.database.DBService
 import encry.modifiers.history.Block.Height
 import encry.modifiers.history.{Block, Header}
@@ -48,25 +48,36 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
       if (dbHeight <= currentHistoryHeight && currentHistoryHeight >= writingGap) {
         context.become(uploadGap(history, history.bestBlockOpt.map(_.header.height).getOrElse(0) - writingGap))
         self ! UploadToDbOnHeight(if (dbHeight == 0) 0 else dbHeight + 1)
-      } else context.become(operating(history))
+      } else context.become(operating(history, Vector.empty, dbHeight))
     }
     case NewBestBlock(_) =>
   }
 
-  def operating(history: EncryHistoryReader, pending: Vector[Int] = Vector()): Receive = orphanedAndChainSwitching.orElse {
-    case NewBestBlock(newHeight) =>
-      nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
+  def operating(history: EncryHistoryReader, pending: Vector[Int] = Vector(), lastUploaded: Int): Receive =
+    orphanedAndChainSwitching.orElse {
+      case NewBestBlock(newHeight) =>
+        nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
 
-      bestBlockOptAtHeight(history, newHeight - writingGap) match {
-        case Some(block) => dbService.processBlock(block)
-        case None if newHeight - writingGap >= 0 =>
-          logInfo(s"Block on height ${newHeight - writingGap} not found, adding to pending list")
-          context.become(operating(history, pending :+ newHeight - writingGap))
-        case None =>
-      }
-    case ChangedHistory(newHistory) =>
-      if (pending.nonEmpty) context.become(operating(newHistory, tryToUploadPending(newHistory,pending)))
-      else context.become(operating(newHistory))
+        val newPending: Seq[Height] =
+          if (newHeight != 0 && newHeight - writingGap - lastUploaded > 1) (lastUploaded + 1 until (newHeight - writingGap)).toVector
+          else Vector[Int]()
+
+        bestBlockOptAtHeight(history, newHeight - writingGap) match {
+          case Some(block) if newPending.isEmpty => dbService.processBlock(block).foreach { _ =>
+            self ! LastUploaded(newHeight - writingGap)
+          }
+          case Some(block) =>
+            dbService.processBlock(block).foreach(_ => self ! LastUploaded(newHeight - writingGap))
+            context.become(operating(history, pending ++ newPending, lastUploaded))
+          case None if newHeight - writingGap >= 0 =>
+            logInfo(s"Block on height ${newHeight - writingGap} not found, adding to pending list")
+            context.become(operating(history, (pending :+ (newHeight - writingGap)) ++ newPending, lastUploaded))
+          case None =>
+        }
+      case ChangedHistory(newHistory) =>
+        if (pending.nonEmpty) context.become(operating(newHistory, tryToUploadPending(newHistory,pending), lastUploaded))
+        else context.become(operating(newHistory, pending, lastUploaded))
+      case LastUploaded(h) => context.become(operating(history, pending, h))
   }
 
   def uploadGap(history: EncryHistoryReader, currentHeight: Int, pending: Vector[Int] = Vector()): Receive =
@@ -81,7 +92,7 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
           }
         }
       case UploadToDbOnHeight(_) => nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
-      case ChangedHistory(newHistory) => context.become(operating(newHistory, pending))
+      case ChangedHistory(newHistory) => context.become(operating(newHistory, pending, newHistory.bestBlockOpt.map(_.header.height).getOrElse(0)))
       case NewBestBlock(height) => context.become(uploadGap(history, currentHeight, pending :+ height))
     }
 
@@ -110,4 +121,5 @@ object BlockListener {
   case class ChainSwitching(switchedIds: Seq[ModifierId])
   case class NewOrphaned(header: Header)
   case class UploadToDbOnHeight(height: Int)
+  case class LastUploaded(height: Int)
 }
