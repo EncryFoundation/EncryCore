@@ -31,13 +31,11 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
       context.stop(self)
     case Success(height) =>
       logInfo(s"Going to download $height blocks from postgres")
-      if (settings.influxDB.isDefined)
-        context.actorSelection("/user/statsSender") ! SuccessPostgresSyncTime(System.nanoTime())
     case Failure(_) =>
       logWarn("Failed to connect to postgres")
       if (settings.influxDB.isDefined) {
-        context.actorSelection("/user/statsSender") ! UnsuccessPostgresSyncTime(System.nanoTime())
-        context.actorSelection("/user/statsSender") ! StartRecoveryFromNetwork(System.nanoTime())
+        context.actorSelection("/user/statsSender") ! UnsuccessPostgresSyncTime(System.currentTimeMillis())
+        context.actorSelection("/user/statsSender") ! StartRecoveryFromNetwork(System.currentTimeMillis())
       }
       peerManager ! RecoveryCompleted
       nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true)
@@ -47,6 +45,8 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
   override def receive: Receive = {
     case StartRecovery => nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
     case ChangedHistory(history) =>
+      if (settings.influxDB.isDefined)
+        context.actorSelection("/user/statsSender") ! SuccessPostgresSyncTime(System.currentTimeMillis())
       val currentNodeHeight = history.bestBlockOpt.map(_.header.height).getOrElse(0)
       startRecovery(if (currentNodeHeight == 0) 0 else currentNodeHeight + 1).map { _ =>
         logInfo(s"All blocks restored from postgres")
@@ -55,7 +55,8 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
     case ChangedHistory(history) => startRecovery(history.bestBlockOpt.map(_.header.height).getOrElse(0)).map { _ =>
       logInfo(s"All blocks restored from postgres")
       if (settings.influxDB.isDefined)
-        context.actorSelection("/user/statsSender") ! SuccessfullyFinishedSyncFromPostgres(System.nanoTime())
+        context.actorSelection("/user/statsSender") !
+          SuccessfullyFinishedSyncFromPostgres(System.currentTimeMillis())
       context.stop(self)
     }
   }

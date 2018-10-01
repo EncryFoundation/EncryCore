@@ -32,10 +32,10 @@ class ModifiersHolder extends PersistentActor with Logging {
   }
 
   def notifyRecoveryCompleted(): Unit = if (settings.postgres.exists(_.enableRestore)) {
-    logInfo("Recovery from levelDb completed, going to download rest of the blocks from postgres")
-    context.system.actorSelection("/user/postgresRestore") ! StartRecovery
     if (settings.influxDB.isDefined)
       system.actorSelection("user/statsSender") ! FinishRecoveryFromLevelDb(System.currentTimeMillis())
+    logInfo("Recovery from levelDb completed, going to download rest of the blocks from postgres")
+    context.system.actorSelection("/user/postgresRestore") ! StartRecovery
   } else {
     logInfo("Recovery completed")
     peerManager ! RecoveryCompleted

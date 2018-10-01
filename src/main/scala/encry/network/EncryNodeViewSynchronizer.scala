@@ -43,7 +43,7 @@ class EncryNodeViewSynchronizer extends Actor with Logging {
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
     nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = true)
     if (settings.network.knownPeers.nonEmpty && !settings.node.offlineGeneration && settings.influxDB.isDefined &&
-      settings.levelDb.exists(x => x.enableRestore) && settings.postgres.exists(x => x.enableRestore))
+      settings.levelDb.exists(x => !x.enableRestore) && settings.postgres.exists(x => !x.enableRestore))
       context.actorSelection("/user/statsSender") ! StartRecoveryFromNetwork(System.currentTimeMillis())
   }
 
