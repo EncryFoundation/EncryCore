@@ -6,6 +6,7 @@ import encry.EncryApp._
 import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
+import encry.stats.StatsSender.{FinishRecoveryFromLevelDb, StartRecoveryFromLevelDb, StartRecoveryFromNetwork}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, LocallyGeneratedModifier}
 import org.encryfoundation.common.Algos
 import encry.utils.Logging
@@ -33,14 +34,24 @@ class ModifiersHolder extends PersistentActor with Logging {
   def notifyRecoveryCompleted(): Unit = if (settings.postgres.exists(_.enableRestore)) {
     logInfo("Recovery from levelDb completed, going to download rest of the blocks from postgres")
     context.system.actorSelection("/user/postgresRestore") ! StartRecovery
+    if (settings.influxDB.isDefined)
+      system.actorSelection("user/statsSender") ! FinishRecoveryFromLevelDb(System.currentTimeMillis())
   } else {
     logInfo("Recovery completed")
     peerManager ! RecoveryCompleted
+    if (settings.influxDB.isDefined) {
+      system.actorSelection("user/statsSender") ! FinishRecoveryFromLevelDb(System.currentTimeMillis())
+      system.actorSelection("user/statsSender") ! StartRecoveryFromNetwork(System.currentTimeMillis())
+    }
   }
 
   override def preStart(): Unit = logInfo(s"ModifiersHolder actor is started.")
 
-  override def receiveRecover: Receive = if (settings.levelDb.exists(_.enableRestore)) receiveRecoverEnabled else receiveRecoverDisabled
+  override def receiveRecover: Receive = if (settings.levelDb.exists(_.enableRestore)) {
+    if(settings.influxDB.isDefined){
+      system.actorSelection("user/statsSender") ! StartRecoveryFromLevelDb(System.currentTimeMillis())}
+    receiveRecoverEnabled
+  } else receiveRecoverDisabled
 
   def receiveRecoverEnabled: Receive = {
     case header: Header =>

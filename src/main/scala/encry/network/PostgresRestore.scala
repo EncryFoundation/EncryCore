@@ -10,6 +10,7 @@ import encry.modifiers.history.{Block, HeaderDBVersion, Payload}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, Transaction, TransactionDBVersion}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.ChangedHistory
+import encry.stats.StatsSender.{StartRecoveryFromNetwork, SuccessPostgresSyncTime, SuccessfullyFinishedSyncFromPostgres, UnsuccessPostgresSyncTime}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, GetNodeViewChanges}
 import org.encryfoundation.common.transaction.ProofSerializer
 import scorex.crypto.encode.Base16
@@ -27,8 +28,14 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
   heightFuture.onComplete {
     case Success(_) =>
       logInfo(s"Going to download blocks from postgres")
+      if (settings.influxDB.isDefined)
+        context.actorSelection("/user/statsSender") ! SuccessPostgresSyncTime(System.nanoTime())
     case Failure(_) =>
       logWarn("Failed to connect to postgres")
+      if (settings.influxDB.isDefined) {
+        context.actorSelection("/user/statsSender") ! UnsuccessPostgresSyncTime(System.nanoTime())
+        context.actorSelection("/user/statsSender") ! StartRecoveryFromNetwork(System.nanoTime())
+      }
       peerManager ! RecoveryCompleted
       nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true)
       context.stop(self)
@@ -38,6 +45,8 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
     case StartRecovery => nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
     case ChangedHistory(history) => startRecovery(history.bestBlockOpt.map(_.header.height).getOrElse(0)).map { _ =>
       logInfo(s"All blocks restored from postgres")
+      if (settings.influxDB.isDefined)
+        context.actorSelection("/user/statsSender") ! SuccessfullyFinishedSyncFromPostgres(System.nanoTime())
       context.stop(self)
     }
   }

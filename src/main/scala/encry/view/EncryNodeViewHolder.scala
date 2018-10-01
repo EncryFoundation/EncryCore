@@ -52,6 +52,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     ADProofs.modifierTypeId -> ADProofSerializer,
     Transaction.ModifierTypeId -> TransactionSerializer
   )
+  var isSend: Boolean = false
 
   system.scheduler.schedule(5.second, 5.second) {
     if (settings.influxDB.isDefined)
@@ -115,6 +116,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
         logInfo(s"Cache before(${modifiersCache.size})")
         computeApplications()
+        if (nodeView.history.isFullChainSynced && settings.influxDB.isDefined && !isSend) {
+          context.actorSelection("/user/statsSender")! FinishRecoveryFromNetwork(System.currentTimeMillis())
+          isSend = true
+        }
         if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
         logInfo(s"Cache after(${modifiersCache.size})")
       }
