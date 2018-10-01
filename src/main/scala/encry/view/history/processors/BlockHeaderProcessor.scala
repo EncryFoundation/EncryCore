@@ -1,7 +1,7 @@
 package encry.view.history.processors
 
 import com.google.common.primitives.Ints
-import encry.EncryApp
+import encry.EncryApp.{settings, system, forceStopApplication}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ModifierSemanticValidity, _}
@@ -120,7 +120,7 @@ trait BlockHeaderProcessor extends Logging {
           ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
         case None =>
           logError("Should always have best header after header application")
-          EncryApp.forceStopApplication()
+          forceStopApplication()
       }
     case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
@@ -147,7 +147,7 @@ trait BlockHeaderProcessor extends Logging {
         val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (score > bestHeadersChainScore) {
           bestBlockHeaderIdsRow(h, score)
         } else {
-          EncryApp.system.actorSelection("/user/blockListener") ! NewOrphaned(h)
+          if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(h)
           orphanedBlockHeaderIdsRow(h, score)
         }
         (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, h)

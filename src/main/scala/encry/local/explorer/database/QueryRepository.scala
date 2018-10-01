@@ -17,6 +17,7 @@ protected[database] object QueryRepository extends Logging {
 
   def processBlockQuery(block: Block): ConnectionIO[Int] =
     for {
+      _       <- markAsRemovedFromMainChainQuery(block.header.height)
       headerR <- insertHeaderQuery(block)
       txsR    <- insertTransactionsQuery(block)
       dirR    <- insertDirectivesQuery(block.payload.transactions)
@@ -29,13 +30,18 @@ protected[database] object QueryRepository extends Logging {
     Update[String](query).updateMany(ids.map(Base16.encode))
   }
 
+  def markAsRemovedFromMainChainQuery(height: Int): ConnectionIO[Int] = {
+    val query: String = s"UPDATE public.headers SET best_chain = FALSE WHERE height = ?"
+    Update[Int](query).run(height)
+  }
+
   def insertHeaderQuery(block: Block): ConnectionIO[Int] = {
     val headerDB: HeaderDBVersion = HeaderDBVersion(block)
     val query: String =
       """
         |INSERT INTO public.headers (id, parent_id, version, height, ad_proofs_root, state_root, transactions_root, ts, nonce, difficulty,
         |      block_size, equihash_solution, ad_proofs, tx_qty, miner_address, miner_reward, fees_total, txs_size, best_chain, block_ad_proofs)
-        |VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING
+        |VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET best_chain = TRUE
       """.stripMargin
     Update[HeaderDBVersion](query).run(headerDB)
   }
@@ -50,8 +56,6 @@ protected[database] object QueryRepository extends Logging {
       """.stripMargin
     Update[HeaderDBVersion](query).run(headerDB)
   }
-
-  def heightQuery: ConnectionIO[Int] = sql"""SELECT MAX(height) FROM headers WHERE id IN (SELECT DISTINCT block_id FROM transactions);""".query[Int].unique
 
   def heightOptQuery: ConnectionIO[Option[Int]] =
     sql"SELECT MAX(height) FROM headers WHERE id IN (SELECT DISTINCT block_id FROM transactions);".query[Option[Int]].unique
