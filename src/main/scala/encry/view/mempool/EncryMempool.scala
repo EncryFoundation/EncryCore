@@ -5,10 +5,8 @@ import akka.actor.{ActorSystem, Cancellable}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.Transaction
 import encry.settings.EncryAppSettings
-import encry.utils.{Logging, NetworkTimeProvider}
+import encry.utils.NetworkTimeProvider
 import encry.view.mempool.EncryMempool._
-import org.encryfoundation.common.Algos
-
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -16,7 +14,7 @@ import scala.util.{Failure, Success, Try}
 
 class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
                    settings: EncryAppSettings, timeProvider: NetworkTimeProvider, system: ActorSystem)
-  extends MemoryPool[Transaction, EncryMempool] with EncryMempoolReader with AutoCloseable with Logging {
+  extends MemoryPool[Transaction, EncryMempool] with EncryMempoolReader with AutoCloseable {
 
   private def removeExpired(): EncryMempool =
     filter(tx => (timeProvider.estimatedTime - tx.timestamp) > settings.node.utxMaxAge.toMillis)
@@ -30,14 +28,7 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
 
   override def put(txs: Iterable[Transaction]): Try[EncryMempool] = {
     val validTxs: Iterable[Transaction] = txs
-      .filter{tx =>
-        logWarn(s"${Algos.encode(tx.id)} semanticValid - ${tx.semanticValidity.isSuccess}  unconf - ${!unconfirmed.contains(key(tx.id))}")
-        println(s"${Algos.encode(tx.id)} semantic valid - ${tx.semanticValidity.isSuccess}  unconf - ${!unconfirmed.contains(key(tx.id))}")
-        println(s"${tx.semanticValidity match {
-          case Failure(exception) => exception
-          case _ => "all is good"
-        }}")
-        tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id))}
+      .filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
     if (validTxs.nonEmpty) {
       if ((size + validTxs.size) <= settings.node.mempoolMaxCapacity) {
         Success(putWithoutCheck(validTxs))
@@ -46,9 +37,7 @@ class EncryMempool(val unconfirmed: TrieMap[TxKey, Transaction],
         val overflow: Int = (size + validTxs.size) - settings.node.mempoolMaxCapacity
         Success(putWithoutCheck(validTxs.take(validTxs.size - overflow)))
       }
-    } else {
-      logWarn("Failed to put transaction into pool cause all invalid")
-      Failure(new Exception("Failed to put transaction into pool"))}
+    } else Failure(new Exception("Failed to put transaction into pool"))
   }
 
   override def putWithoutCheck(txs: Iterable[Transaction]): EncryMempool = {
