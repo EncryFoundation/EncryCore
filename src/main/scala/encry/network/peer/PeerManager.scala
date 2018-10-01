@@ -28,7 +28,9 @@ class PeerManager extends Actor with Logging {
     case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
     case GetAllPeers => sender() ! PeerDatabase.knownPeers()
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
-      if (!isSelf(address, None)) timeProvider
+      if (!isSelf(address, None) &&
+        checkPossibilityToAddPeer(address) &&
+        checkDuplicateIP(address)) timeProvider
         .time()
         .map { time =>
           PeerDatabase.addOrUpdateKnownPeer(address, PeerInfo(time, peerNameOpt, connTypeOpt))
@@ -84,6 +86,7 @@ class PeerManager extends Actor with Logging {
       settings.network.declaredAddress.contains(address) ||
       (InetAddress.getLocalHost.getAddress sameElements address.getAddress.getAddress) ||
       (InetAddress.getLoopbackAddress.getAddress sameElements address.getAddress.getAddress)
+
 
   def addKnownPeersToPeersDatabase(): Future[Unit] = if (PeerDatabase.isEmpty) {
     timeProvider
