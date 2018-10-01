@@ -23,6 +23,8 @@ Linux/MacOS/Windows:
 `$ git checkout master`
 
 `$ sbt run`
+
+Description of node's api can be found here: https://github.com/EncryFoundation/EncryCore/blob/release/docs/design/NodeRoutes.md
     
 ## Running tests
 
