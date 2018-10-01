@@ -22,7 +22,7 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Try}
 
-class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor with Logging {
+class DeliveryManager extends Actor with Logging {
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
@@ -121,7 +121,7 @@ class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor
   }
 
   def sendSync(syncInfo: EncrySyncInfo): Unit = statusTracker.peersToSyncWith().foreach(peer =>
-    peer.handlerRef ! Message(syncInfoSpec, Right(syncInfo), None)
+    peer.handlerRef ! Message(EncrySyncInfoMessageSpec, Right(syncInfo), None)
   )
 
   def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mids: Seq[ModifierId]): Unit = tryWithLogging {
@@ -137,11 +137,8 @@ class DeliveryManager(syncInfoSpec: EncrySyncInfoMessageSpec.type) extends Actor
             }
           } else notRequested
       }
-      if (notRequestedIds.nonEmpty) {
-        logDebug(s"Ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mtid with ids: " +
-          s"${notRequestedIds.map(id => Algos.encode(id) + "|" + id).mkString(",")}")
-        cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
-      }
+      if (notRequestedIds.nonEmpty) cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
+
       notRequestedIds.foreach { id =>
         val cancellable: Cancellable = context.system.scheduler
           .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, id))

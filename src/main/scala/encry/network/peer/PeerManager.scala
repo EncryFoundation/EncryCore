@@ -10,7 +10,7 @@ import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, 
 import encry.network.PeerConnectionHandler._
 import encry.network.peer.PeerManager.ReceivableMessages._
 import encry.network.peer.PeerManager._
-import encry.network.{Handshake, SendingStrategy}
+import encry.network.SendingStrategy
 import encry.utils.Logging
 import scala.concurrent.Future
 import scala.language.postfixOps
@@ -27,6 +27,7 @@ class PeerManager extends Actor with Logging {
   override def receive: Receive = {
     case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
     case GetAllPeers => sender() ! PeerDatabase.knownPeers()
+    case GetRecoveryStatus => sender() ! recoveryCompleted
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
       if (!isSelf(address, None)) timeProvider
         .time()
@@ -106,6 +107,8 @@ object PeerManager {
     case class AddOrUpdatePeer(address: InetSocketAddress, peerName: Option[String], direction: Option[ConnectionType])
 
     case class RandomPeers(howMany: Int)
+
+    case object GetRecoveryStatus
 
     case class FilterPeers(sendingStrategy: SendingStrategy)
 
