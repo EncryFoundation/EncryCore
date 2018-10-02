@@ -1,7 +1,6 @@
 package encry
 
 import java.net.InetAddress
-
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
@@ -23,7 +22,6 @@ import encry.stats.{KafkaActor, LoggingActor, StatsSender, Zombie}
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import org.encryfoundation.common.Algos
-
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.io.Source
@@ -60,7 +58,7 @@ object EncryApp extends App with Logging {
     .withDispatcher("network-dispatcher"), "networkController")
   lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
   lazy val nodeViewSynchronizer: ActorRef =
-    system.actorOf(Props(classOf[EncryNodeViewSynchronizer]), "nodeViewSynchronizer")
+    system.actorOf(Props(classOf[NodeViewSynchronizer]), "nodeViewSynchronizer")
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
   if (settings.influxDB.isDefined) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.kafka.exists(_.sendToKafka))

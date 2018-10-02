@@ -4,7 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.Actor
 import akka.persistence.RecoveryCompleted
 import encry.EncryApp._
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
 import encry.network.PeerConnectionHandler._

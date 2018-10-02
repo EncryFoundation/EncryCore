@@ -21,7 +21,8 @@ class PeerSynchronizer extends Actor with Logging {
     super.preStart()
     networkController ! RegisterMessagesHandler(Seq(GetPeersSpec, PeersSpec), self)
     val msg: Message[Unit] = Message[Unit](GetPeersSpec, Right(Unit), None)
-    context.system.scheduler.schedule(2.seconds, settings.network.syncInterval)(networkController ! SendToNetwork(msg, SendToRandom))
+    context.system.scheduler
+      .schedule(2.seconds, settings.network.syncInterval)(networkController ! SendToNetwork(msg, SendToRandom))
   }
 
   override def receive: Receive = {
