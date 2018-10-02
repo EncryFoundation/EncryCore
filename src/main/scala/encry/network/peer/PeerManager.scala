@@ -93,8 +93,7 @@ class PeerManager extends Actor with Logging {
       .time()
       .map { time =>
         settings.network.knownPeers
-          .filterNot(isSelf(_, None))
-          .filter(checkDuplicateIP)
+          .filterNot(address => isSelf(address, None) && !checkDuplicateIP(address))
           .foreach(PeerDatabase.addOrUpdateKnownPeer(_, PeerInfo(time, None)))
         Unit
       }
