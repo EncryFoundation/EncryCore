@@ -2,7 +2,8 @@ package encry.local.miner
 
 import java.util.Date
 import akka.actor.Actor
-import encry.EncryApp.miner
+import encry.EncryApp._
+import scala.concurrent.duration._
 import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
 import encry.local.miner.Miner.MinedBlock
 import encry.local.miner.Worker.{MineBlock, NextChallenge}
@@ -33,7 +34,9 @@ class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with Logging {
       challengeStartTime = new Date(System.currentTimeMillis())
       logInfo(s"Start next challenge on worker: $myIdx at height " +
         s"${candidate.parentOpt.map(_.height + 1).getOrElse(Constants.Chain.PreGenesisHeight.toString)} at ${sdf.format(challengeStartTime)}")
-      self ! MineBlock(candidate, Long.MaxValue / numberOfWorkers * myIdx)
+      context.system.scheduler.scheduleOnce(5 seconds){
+        self ! MineBlock(candidate, Long.MaxValue / numberOfWorkers * myIdx)
+      }
   }
 
 }
