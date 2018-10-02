@@ -241,7 +241,10 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
     *         First id is always from the best headers chain.
     */
   def headerIdsAtHeight(height: Int): Seq[ModifierId] =
-    ModifierId @@ historyStorage.store.get(heightIdsKey(height: Int)).map(_.data).getOrElse(Array()).grouped(32).toSeq
+    ModifierId @@ historyStorage.store.get(heightIdsKey(height: Int)).map(_.data).getOrElse(Array()).grouped(32).map(elem => {
+      logInfo(s"Elem: ${Algos.encode(elem)}")
+      elem
+    }).toSeq
 
   /**
     * @param limit       - maximum length of resulting HeaderChain
