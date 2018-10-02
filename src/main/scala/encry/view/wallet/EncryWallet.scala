@@ -1,7 +1,6 @@
 package encry.view.wallet
 
 import java.io.File
-
 import com.google.common.primitives.Longs
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.Block
@@ -14,11 +13,9 @@ import encry.utils.CoreTaggedTypes.{ModifierId, VersionTag}
 import encry.utils.{BalanceCalculator, BoxFilter}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.crypto.PublicKey25519
-
 import scala.util.Try
 
-case class EncryWallet(walletStore: Store, accountManager: AccountManager)
-  extends Vault[EncryProposition, Transaction, EncryPersistentModifier, EncryWallet] {
+case class EncryWallet(walletStore: Store, accountManager: AccountManager) {
 
   import WalletStorage._
 
@@ -28,11 +25,11 @@ case class EncryWallet(walletStore: Store, accountManager: AccountManager)
 
   def propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes))
 
-  override def scanOffchain(tx: Transaction): EncryWallet = this
+  def scanOffchain(tx: Transaction): EncryWallet = this
 
-  override def scanOffchain(txs: Seq[Transaction]): EncryWallet = this
+  def scanOffchain(txs: Seq[Transaction]): EncryWallet = this
 
-  override def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = modifier match {
+  def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = modifier match {
     case block: Block =>
       val (newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]) =
         block.transactions.foldLeft(Seq[EncryBaseBox](), Seq[EncryBaseBox]()) {
@@ -55,7 +52,7 @@ case class EncryWallet(walletStore: Store, accountManager: AccountManager)
     case _ => this
   }
 
-  override def rollback(to: VersionTag): Try[EncryWallet] = Try(walletStore.rollback(ByteArrayWrapper(to))).map(_ => this)
+  def rollback(to: VersionTag): Try[EncryWallet] = Try(walletStore.rollback(ByteArrayWrapper(to))).map(_ => this)
 
   private def calculateNewBalance(bxsToInsert: Seq[EncryBaseBox], bxsToRemove: Seq[EncryBaseBox]): ByteArrayWrapper = {
     val balancesToInsert: Map[ByteArrayWrapper, Amount] = BalanceCalculator.balanceSheet(bxsToInsert)
