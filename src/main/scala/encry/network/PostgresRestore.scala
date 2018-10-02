@@ -45,43 +45,41 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
   override def receive: Receive = {
     case StartRecovery => nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
     case ChangedHistory(history) =>
-      if (settings.influxDB.isDefined)
-        context.actorSelection("/user/statsSender") ! SuccessPostgresSyncTime(System.currentTimeMillis())
       val currentNodeHeight = history.bestBlockOpt.map(_.header.height).getOrElse(0)
       startRecovery(if (currentNodeHeight == 0) 0 else currentNodeHeight + 1).map { _ =>
         logInfo(s"All blocks restored from postgres")
+        if (settings.influxDB.isDefined)
+          context.actorSelection("/user/statsSender") !
+            SuccessfullyFinishedSyncFromPostgres(System.currentTimeMillis())
         context.stop(self)
       }
-    case ChangedHistory(history) => startRecovery(history.bestBlockOpt.map(_.header.height).getOrElse(0)).map { _ =>
-      logInfo(s"All blocks restored from postgres")
-      if (settings.influxDB.isDefined)
-        context.actorSelection("/user/statsSender") !
-          SuccessfullyFinishedSyncFromPostgres(System.currentTimeMillis())
-      context.stop(self)
-    }
   }
 
-  def startRecovery(startFrom: Int): Future[Unit] = heightFuture.flatMap { height =>
-    if (height <= startFrom) {
-      nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true)
-      Future.unit
-    } else settings.postgres.flatMap(_.restoreBatchSize) match {
-      case Some(step) =>
-        logInfo(s"Going to download blocks from postgres starting from $startFrom")
-        (startFrom to height).sliding(step, step).foldLeft(Future.successful(List[Block]())) { case (prevBlocks, slide) =>
-          val from: Int = slide.head
-          val to: Int = slide.last
-          prevBlocks.flatMap { retrievedBlocks =>
-            nodeViewHolder ! BlocksFromLocalPersistence(retrievedBlocks, to == height)
-            selectBlocksByRange(from, to)
-              .recoverWith {
-                case NonFatal(th) =>
-                  logWarn(s"Failure during restore: ${th.getLocalizedMessage}")
-                  Future.failed(th)
-              }
-          }
-        }.map(_ => Unit)
-      case None => Future.unit
+  def startRecovery(startFrom: Int): Future[Unit] = {
+    if (settings.influxDB.isDefined)
+      context.actorSelection("/user/statsSender") ! SuccessPostgresSyncTime(System.currentTimeMillis())
+    heightFuture.flatMap { height =>
+      if (height <= startFrom) {
+        nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true)
+        Future.unit
+      } else settings.postgres.flatMap(_.restoreBatchSize) match {
+        case Some(step) =>
+          logInfo(s"Going to download blocks from postgres starting from $startFrom")
+          (startFrom to height).sliding(step, step).foldLeft(Future.successful(List[Block]())) { case (prevBlocks, slide) =>
+            val from: Int = slide.head
+            val to: Int = slide.last
+            prevBlocks.flatMap { retrievedBlocks =>
+              nodeViewHolder ! BlocksFromLocalPersistence(retrievedBlocks, to == height)
+              selectBlocksByRange(from, to)
+                .recoverWith {
+                  case NonFatal(th) =>
+                    logWarn(s"Failure during restore: ${th.getLocalizedMessage}")
+                    Future.failed(th)
+                }
+            }
+          }.map(_ => Unit)
+        case None => Future.unit
+      }
     }
   }
 
@@ -89,14 +87,14 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
     val headersFuture: Future[List[HeaderDBVersion]] = dbService.headersByRange(from, to)
     val txsFuture: Future[List[TransactionDBVersion]] = dbService.txsByRange(from, to)
     for {
-      headers    <- headersFuture
+      headers <- headersFuture
         .map {
           _.map(h => (h.toHeader, parseAdProofs(h.adProofOpt))).collect {
             case (Success(header), Success(proofs)) => Try((header, proofs))
           }.map(Future.fromTry)
         }.flatMap(fs => Future.sequence(fs))
-      txs        <- txsFuture
-      inputs     <- dbService.inputsByTxIds(txs.map(_.id))
+      txs <- txsFuture
+      inputs <- dbService.inputsByTxIds(txs.map(_.id))
       directives <- dbService.directivesByTxIds(txs.map(_.id))
     } yield {
       val groupedInputs: Map[String, List[InputDBVersion]] = inputs.groupBy(_.txId)

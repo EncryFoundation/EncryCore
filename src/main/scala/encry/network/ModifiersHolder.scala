@@ -32,17 +32,17 @@ class ModifiersHolder extends PersistentActor with Logging {
   }
 
   def notifyRecoveryCompleted(): Unit = if (settings.postgres.exists(_.enableRestore)) {
-    if (settings.influxDB.isDefined)
-      system.actorSelection("user/statsSender") ! FinishRecoveryFromLevelDb(System.currentTimeMillis())
+    if(settings.influxDB.isDefined)
+      system.actorSelection("/user/statsSender") ! FinishRecoveryFromLevelDb(System.currentTimeMillis())
     logInfo("Recovery from levelDb completed, going to download rest of the blocks from postgres")
     context.system.actorSelection("/user/postgresRestore") ! StartRecovery
   } else {
     logInfo("Recovery completed")
-    peerManager ! RecoveryCompleted
     if (settings.influxDB.isDefined) {
       system.actorSelection("user/statsSender") ! FinishRecoveryFromLevelDb(System.currentTimeMillis())
       system.actorSelection("user/statsSender") ! StartRecoveryFromNetwork(System.currentTimeMillis())
     }
+    peerManager ! RecoveryCompleted
   }
 
   override def preStart(): Unit = logInfo(s"ModifiersHolder actor is started.")
@@ -85,7 +85,8 @@ class ModifiersHolder extends PersistentActor with Logging {
       completedBlocks = completedBlocks.drop(settings.levelDb
         .map(_.batchSize)
         .getOrElse(throw new RuntimeException("batchsize not specified")))
-      nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend, completedBlocks.isEmpty && !settings.postgres.exists(_.enableRestore))
+      nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend,
+        completedBlocks.isEmpty && !settings.postgres.exists(_.enableRestore))
 
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))

@@ -117,7 +117,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         logInfo(s"Cache before(${modifiersCache.size})")
         computeApplications()
         if (nodeView.history.isFullChainSynced && settings.influxDB.isDefined && !isSend) {
-          context.actorSelection("/user/statsSender")! FinishRecoveryFromNetwork(System.currentTimeMillis())
+          context.actorSelection("/user/statsSender") ! FinishRecoveryFromNetwork(System.currentTimeMillis())
           isSend = true
         }
         if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
