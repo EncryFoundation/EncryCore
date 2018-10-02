@@ -82,15 +82,9 @@ class PeerManager extends Actor with Logging {
       (InetAddress.getLocalHost.getAddress sameElements address.getAddress.getAddress) ||
       (InetAddress.getLoopbackAddress.getAddress sameElements address.getAddress.getAddress)
 
-  def addKnownPeersToPeersDatabase(): Future[Unit] = if (isEmpty) {
-    timeProvider
-      .time()
-      .map { time =>
-        settings.network.knownPeers
-          .filterNot(isSelf(_, None))
-          .foreach(addOrUpdateKnownPeer(_, PeerInfo(time, None)))
-        Unit
-      }
+  def addKnownPeersToPeersDatabase(): Future[Unit] = if (nodes.isEmpty) timeProvider.time().map { time =>
+    settings.network.knownPeers.filterNot(isSelf(_, None)).foreach(addOrUpdateKnownPeer(_, PeerInfo(time, None)))
+    Unit
   } else Future.successful(Unit)
 
   def checkPossibilityToAddPeerWRecovery(address: InetSocketAddress): Boolean =
@@ -105,10 +99,7 @@ class PeerManager extends Actor with Logging {
     nodes += (address -> updatedPeerInfo)
   }
 
-  def knownPeers(): Map[InetSocketAddress, PeerInfo] =
-    nodes.keys.flatMap(k => nodes.get(k).map(v => k -> v)).toMap
-
-  def isEmpty: Boolean = nodes.isEmpty
+  def knownPeers(): Map[InetSocketAddress, PeerInfo] = nodes.keys.flatMap(k => nodes.get(k).map(v => k -> v)).toMap
 }
 
 object PeerManager {
