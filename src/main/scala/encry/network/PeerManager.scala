@@ -1,6 +1,7 @@
-package encry.network.peer
+package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.Actor
 import akka.persistence.RecoveryCompleted
 import encry.EncryApp._
@@ -8,10 +9,10 @@ import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedP
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
 import encry.network.PeerConnectionHandler._
-import encry.network.peer.PeerManager.ReceivableMessages._
-import encry.network.peer.PeerManager._
-import encry.network.SendingStrategy
+import encry.network.PeerManager.ReceivableMessages._
+import encry.network.PeerManager._
 import encry.utils.Logging
+
 import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.util.Random
@@ -128,3 +129,24 @@ object PeerManager {
     (settings.network.connectOnlyWithKnownPeers.getOrElse(false) && settings.network.knownPeers.contains(address)) ||
       !settings.network.connectOnlyWithKnownPeers.getOrElse(false)
 }
+
+case object PeerDatabase {
+
+  private var whitelistPersistence: Map[InetSocketAddress, PeerInfo] = Map.empty
+
+  def addOrUpdateKnownPeer(address: InetSocketAddress, peerInfo: PeerInfo): Unit = {
+    val updatedPeerInfo: PeerInfo = whitelistPersistence.get(address).fold(peerInfo) { dbPeerInfo =>
+      val nodeNameOpt: Option[String] = peerInfo.nodeName orElse dbPeerInfo.nodeName
+      val connTypeOpt: Option[ConnectionType] = peerInfo.connectionType orElse dbPeerInfo.connectionType
+      PeerInfo(peerInfo.lastSeen, nodeNameOpt, connTypeOpt)
+    }
+    whitelistPersistence += (address -> updatedPeerInfo)
+  }
+
+  def knownPeers(): Map[InetSocketAddress, PeerInfo] =
+    whitelistPersistence.keys.flatMap(k => whitelistPersistence.get(k).map(v => k -> v)).toMap
+
+  def isEmpty: Boolean = whitelistPersistence.isEmpty
+}
+
+case class PeerInfo(lastSeen: Long, nodeName: Option[String] = None, connectionType: Option[ConnectionType] = None)

@@ -1,6 +1,7 @@
 package encry
 
 import java.net.InetAddress
+
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
@@ -16,13 +17,13 @@ import encry.local.explorer.database.DBService
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network.message._
-import encry.network.peer.PeerManager
-import encry.network._
+import encry.network.{PeerManager, _}
 import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, LoggingActor, StatsSender, Zombie}
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import org.encryfoundation.common.Algos
+
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.io.Source

@@ -7,8 +7,8 @@ import akka.util.Timeout
 import encry.EncryApp._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.message.{GetPeersSpec, Message, PeersSpec}
-import encry.network.peer.PeerManager._
-import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
+import PeerManager._
+import PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
 import encry.utils.Logging
 import scala.concurrent.duration._
 import scala.language.postfixOps

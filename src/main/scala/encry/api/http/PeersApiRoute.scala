@@ -1,18 +1,20 @@
 package encry.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.api.http.PeersApiRoute.PeerInfoResponse
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.network.peer.PeerInfo
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
-import encry.network.peer.PeerManager.ReceivableMessages.{GetAllPeers, GetConnectedPeers}
+import encry.network.PeerInfo
+import encry.network.PeerManager.ReceivableMessages.{GetAllPeers, GetConnectedPeers}
 import encry.settings.RESTApiSettings
 import io.circe.Encoder
 import io.circe.generic.semiauto._
+
 import scala.collection.immutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

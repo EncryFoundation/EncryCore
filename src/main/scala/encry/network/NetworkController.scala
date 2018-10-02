@@ -10,9 +10,9 @@ import encry.EncryApp._
 import encry.network.NetworkController.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
 import encry.network.message.Message.MessageCode
-import encry.network.peer.PeerManager._
+import PeerManager._
 import encry.network.message.{Message, MessageHandler}
-import encry.network.peer.PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
+import PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import encry.settings.NetworkSettings
 import encry.view.history.EncrySyncInfoMessageSpec
 import scala.collection.JavaConverters._
