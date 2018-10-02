@@ -70,12 +70,12 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
 //      logInfo(s"toRemove: ${toRemove.map(block => Algos.encode(block.id) + "|" + block.header.height).mkString(",")}")
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
-//      logInfo(s"toApply: ${toApply.map(block => Algos.encode(block.id) + "|" + block.header.height).mkString(",")}")
-//      logInfo(s"toApply.lengthCompare(newChain.length - 1) != 0: ${toApply.lengthCompare(newChain.length - 1) != 0}")
-//      logInfo(s"toApply.length: ${toApply.length}")
-//      logInfo(s"toRemove.length: ${toRemove.length}")
-//      logInfo(s"toApply Heights: ${toApply.map(_.header.height).mkString(",")}")
-//      logInfo(s"newChain Heights: ${newChain.headers.map(_.height).mkString(",")}")
+      logInfo(s"toApply: ${toApply.map(block => Algos.encode(block.id) + "|" + block.header.height).mkString(",")}")
+      logInfo(s"toApply.lengthCompare(newChain.length - 1) != 0: ${toApply.lengthCompare(newChain.length - 1) != 0}")
+      logInfo(s"toApply.length: ${toApply.length}")
+      logInfo(s"toRemove.length: ${toRemove.length}")
+      logInfo(s"toApply Heights: ${toApply.map(_.header.height).mkString(",")}")
+      logInfo(s"newChain Heights: ${newChain.headers.map(_.height).mkString(",")}")
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
@@ -157,6 +157,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def updateStorage(newModRow: EncryPersistentModifier,
                             bestFullHeaderId: ModifierId,
                             updateHeaderInfo: Boolean = false): Unit = {
+    logInfo(s"updateHeaderInfo: ${updateHeaderInfo}")
     val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeaderId)
     val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
       if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)
