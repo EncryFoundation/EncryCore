@@ -1,7 +1,6 @@
 package encry.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
-
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
@@ -14,7 +13,6 @@ import encry.network.PeerManager.ReceivableMessages.{GetAllPeers, GetConnectedPe
 import encry.settings.RESTApiSettings
 import io.circe.Encoder
 import io.circe.generic.semiauto._
-
 import scala.collection.immutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -63,9 +61,7 @@ case class PeersApiRoute(peerManager: ActorRef,
 
 object PeersApiRoute {
 
-  case class PeerInfoResponse(address: String,
-                              name: Option[String],
-                              connectionType: Option[String])
+  case class PeerInfoResponse(address: String, name: Option[String], connectionType: Option[String])
 
   object PeerInfoResponse {
 
