@@ -34,9 +34,7 @@ class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with Logging {
       challengeStartTime = new Date(System.currentTimeMillis())
       logInfo(s"Start next challenge on worker: $myIdx at height " +
         s"${candidate.parentOpt.map(_.height + 1).getOrElse(Constants.Chain.PreGenesisHeight.toString)} at ${sdf.format(challengeStartTime)}")
-      context.system.scheduler.scheduleOnce(5 seconds){
         self ! MineBlock(candidate, Long.MaxValue / numberOfWorkers * myIdx)
-      }
   }
 
 }
