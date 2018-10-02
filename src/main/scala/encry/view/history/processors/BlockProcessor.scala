@@ -95,7 +95,6 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
             }))
             .getOrElse(false)}")
         val updateBestHeader: Boolean =
-          !isInBestChain(fullBlock.id) &&
             scoreOf(fullBlock.id)
               .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
               .getOrElse(false)
