@@ -3,33 +3,22 @@ package encry.local.explorer
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.local.explorer.BlockListener.{ChainSwitching, NewOrphaned}
+import encry.local.explorer.BlockListener.{ChainSwitching, NewBestBlock, NewOrphaned}
 import encry.local.explorer.database.DBService
 import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.mempool.Transaction
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.utils.EncryGenerator
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import org.mockito.Mockito._
 import org.mockito.ArgumentMatchers.{eq => eq_}
-
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class BlockListenerSpec extends TestKit(ActorSystem("BlockListenerSpec")) with ImplicitSender
   with FlatSpecLike with Matchers with BeforeAndAfterAll with MockitoSugar with EncryGenerator {
 
-  "BlockListener" should "process valid blocks" in new BlockListenerSpecWiring {
-    when(dbServiceMock.processBlock(sampleBlock)).thenReturn(Future.successful(100))
-
-    actor ! sampleModifier
-    expectNoMsg(1 second)
-    verify(dbServiceMock).selectHeightOpt
-    verify(dbServiceMock).processBlock(eq_(sampleBlock))
-  }
-
-  it should "process valid chain switching msg" in new BlockListenerSpecWiring {
+  "BlockListener" should "process valid chain switching msg" in new BlockListenerSpecWiring {
     when(dbServiceMock.markAsRemovedFromMainChain(sampleSwitchedIds)).thenReturn(Future.successful(100))
 
     actor ! sampleChainSwitching
@@ -62,7 +51,7 @@ class BlockListenerSpec extends TestKit(ActorSystem("BlockListenerSpec")) with I
     val sampleTxs: Seq[Transaction] = genValidPaymentTxs(100)
     val samplePayload: Payload = Payload(sampleHeader.id, sampleTxs)
     val sampleBlock: Block = Block(sampleHeader, samplePayload, None)
-    val sampleModifier: SemanticallySuccessfulModifier[Block] = SemanticallySuccessfulModifier(sampleBlock)
+    val sampleModifier: NewBestBlock = NewBestBlock(1)
     val sampleNewOrphaned: NewOrphaned = NewOrphaned(sampleHeader)
     val sampleSwitchedIds: List[ModifierId] = sampleTxs.map(_.id).toList
     val sampleChainSwitching: ChainSwitching = ChainSwitching(sampleSwitchedIds)

@@ -75,7 +75,7 @@ class ModifiersHolder extends PersistentActor with Logging {
       completedBlocks = completedBlocks.drop(settings.levelDb
         .map(_.batchSize)
         .getOrElse(throw new RuntimeException("batchsize not specified")))
-      nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend, completedBlocks.isEmpty)
+      nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend, completedBlocks.isEmpty && !settings.postgres.exists(_.enableRestore))
 
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))

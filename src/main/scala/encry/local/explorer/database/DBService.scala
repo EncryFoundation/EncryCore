@@ -21,14 +21,16 @@ import scala.util.control.NonFatal
 class DBService extends Logging {
 
   def processBlock(block: Block): Future[Int] = runAsync(processBlockQuery(block), "processBlock")
+    .map { count =>
+      logInfo(s"Successfully wrote block on height ${block.header.height} as best chain")
+      count
+    }
 
   def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] =
     runAsync(markAsRemovedFromMainChainQuery(ids), "markAsRemovedFromMainChain")
 
   def processOrphanedHeader(header: Header): Future[Int] =
     runAsync(insertOrphanedHeaderQuery(header), "processOrphanedHeader")
-
-  def selectHeight: Future[Int] = runAsync(heightQuery, "selectHeight")
 
   def selectHeightOpt: Future[Option[Int]] = runAsync(heightOptQuery, "selectHeightOpt")
 
@@ -49,7 +51,7 @@ class DBService extends Logging {
     dataSource.setJdbcUrl(settings.postgres.map(_.host).getOrElse(throw new RuntimeException("host not specified")))
     dataSource.setUsername(settings.postgres.map(_.user).getOrElse(throw new RuntimeException("user not specified")))
     dataSource.setPassword(settings.postgres.map(_.password).getOrElse(throw new RuntimeException("password not specified")))
-    dataSource.setMaximumPoolSize(5)
+    dataSource.setMaximumPoolSize(settings.postgres.map(_.maxPoolSize).getOrElse(1))
   }
 
   private lazy val pgTransactor: HikariTransactor[IO] = HikariTransactor[IO](dataSource)
