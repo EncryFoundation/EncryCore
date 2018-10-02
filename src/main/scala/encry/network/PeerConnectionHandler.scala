@@ -11,7 +11,7 @@ import encry.EncryApp.settings
 import encry.EncryApp._
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle, _}
 import encry.network.message.MessageHandler
-import encry.network.peer.PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
+import PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
 import encry.utils.Logging
 import scala.annotation.tailrec
 import scala.concurrent.duration._

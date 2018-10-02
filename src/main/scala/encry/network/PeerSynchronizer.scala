@@ -7,8 +7,8 @@ import akka.util.Timeout
 import encry.EncryApp._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.message.{GetPeersSpec, Message, PeersSpec}
-import encry.network.peer.PeerManager._
-import encry.network.peer.PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
+import PeerManager._
+import PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
 import encry.utils.Logging
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -21,7 +21,8 @@ class PeerSynchronizer extends Actor with Logging {
     super.preStart()
     networkController ! RegisterMessagesHandler(Seq(GetPeersSpec, PeersSpec), self)
     val msg: Message[Unit] = Message[Unit](GetPeersSpec, Right(Unit), None)
-    context.system.scheduler.schedule(2.seconds, settings.network.syncInterval)(networkController ! SendToNetwork(msg, SendToRandom))
+    context.system.scheduler
+      .schedule(2.seconds, settings.network.syncInterval)(networkController ! SendToNetwork(msg, SendToRandom))
   }
 
   override def receive: Receive = {

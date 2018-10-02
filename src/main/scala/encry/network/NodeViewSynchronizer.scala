@@ -11,7 +11,7 @@ import encry.modifiers.history.{ADProofs, Header, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
+import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
@@ -26,7 +26,7 @@ import encry.utils.Utils._
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.Proposition
 
-class EncryNodeViewSynchronizer extends Actor with Logging {
+class NodeViewSynchronizer extends Actor with Logging {
 
   var historyReaderOpt: Option[EncryHistory] = None
   var mempoolReaderOpt: Option[EncryMempool] = None
@@ -119,7 +119,7 @@ class EncryNodeViewSynchronizer extends Actor with Logging {
     networkController ! SendToNetwork(Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None), Broadcast)
 }
 
-object EncryNodeViewSynchronizer {
+object NodeViewSynchronizer {
 
   object ReceivableMessages {
 
