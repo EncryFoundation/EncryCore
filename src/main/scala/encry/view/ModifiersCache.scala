@@ -143,14 +143,7 @@ class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryR
 
 case class EncryModifiersCache(override val maxSize: Int)
   extends DefaultModifiersCache[EncryPersistentModifier, EncryHistory](maxSize) {
-
-  override def put(key: K, value: V): Unit =
-    if (!contains(key)) {
-      onPut(key)
-      cache.put(key, value)
-    }
-
-
+  
   override def findCandidateKey(history: EncryHistory): Option[K] = {
     def tryToApply(k: K, v: EncryPersistentModifier): Boolean = {
       history.testApplicable(v) match {
