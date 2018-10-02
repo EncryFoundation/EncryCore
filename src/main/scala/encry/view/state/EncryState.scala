@@ -26,10 +26,9 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 
   /** Extracts `state changes` from the given sequence of transactions. */
   def extractStateChanges(txs: Seq[Transaction]): EncryBoxStateChanges = {
-    EncryBoxStateChanges(
-      txs.flatMap { tx =>
-        tx.inputs.map(u => Removal(u.boxId)) ++ tx.newBoxes.map(bx => Insertion(bx))
-      }
+    EncryBoxStateChanges(txs.flatMap { tx =>
+      tx.inputs.map(u => Removal(u.boxId)) ++ tx.newBoxes.map(bx => Insertion(bx))
+    }
     )
   }
 

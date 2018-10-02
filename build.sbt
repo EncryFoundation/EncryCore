@@ -94,7 +94,7 @@ val opts = Seq(
 
 javaOptions in run ++= opts
 
-assemblyJarName in assembly := "core.jar"
+assemblyJarName in assembly := "EncryCore.jar"
 
 mainClass in assembly := Some("encry.EncryApp")
 

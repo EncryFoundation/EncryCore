@@ -113,9 +113,9 @@ trait EncryGenerator {
       ModifierId @@ Random.randomBytes(),
       Digest32 @@ Random.randomBytes(32),
       ADDigest @@ Random.randomBytes(33),
-      Digest32 @@ Random.randomBytes(32),
-      random.nextLong(),
-      Math.abs(random.nextInt()),
+      Digest32 @@ Random.randomBytes(),
+      Math.abs(random.nextLong()),
+      Math.abs(random.nextInt(10000)),
       random.nextLong(),
       Constants.Chain.InitialDifficulty,
       EquihashSolution(Seq(1, 3))

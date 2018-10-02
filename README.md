@@ -2,31 +2,29 @@
 
 [![Build Status](https://travis-ci.org/EncryFoundation/EncryCore.svg?branch=master)](https://travis-ci.org/EncryFoundation/EncryCore)
 
-Reference implementation of the EncryCore node. Encry is a distributed digital asset platform supporting smart contracts (non turing-complete)
-and custom asset issuing.
-
-* [Protocol specification](https://github.com/EncryFoundation/EncryCore/blob/master/docs/design/ProtocolSpec.md) (in progress)
+Encry is a distributed digital asset platform supporting smart contracts in non turing-complete Prism language (https://github.com/EncryFoundation/PrismLang) and custom asset issuing.
 
 ## Related projects
 
-* [EncryScript](https://github.com/EncryFoundation/EncryScript) - Contract-oriented scripting language designed specially for EncryCore.
-* [EncryTypeLang](https://github.com/EncryFoundation/EncryTypeLang) - Language for arbitrary data structures description (At early development stage, currently).
+* Prism language (https://github.com/EncryFoundation/PrismLang) - Contract-oriented scripting language designed specially for EncryCore.
 
 ## Installation
 
 #### Compiling from source
-To run EncryCore node you need JRE 1.8 (64-bit version) and SBT to be installed. 
-Default configuration file and templates could be found in `src/main/resources/`.
+To run EncryCore node you need JRE 1.8+ (64-bit version) and sbt(Scala build tool) to be installed. 
+Configuration file is `src/main/resources/application.conf`.
 
-MacOS and Linux:
+Linux/MacOS/Windows:
 
 `$ git clone https://github.com/EncryFoundation/EncryCore.git`
 
 `$ cd EncryCore`
 
-`$ chmod +x startup.sh`
+`$ git checkout master`
 
-`$ ./startup.sh <optional_path_to_your_application.conf>`
+`$ sbt run`
+
+Description of node's api can be found here: https://github.com/EncryFoundation/EncryCore/blob/release/docs/design/NodeRoutes.md
     
 ## Running tests
 
