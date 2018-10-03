@@ -11,7 +11,7 @@ import encry.modifiers.history.{Block, Header}
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.network.DeliveryManager.FullBlockChainSynced
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
+import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
 import encry.stats.StatsSender._
 import encry.utils.Logging

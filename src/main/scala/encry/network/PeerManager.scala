@@ -1,16 +1,15 @@
-package encry.network.peer
+package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.Actor
 import akka.persistence.RecoveryCompleted
 import encry.EncryApp._
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
 import encry.network.PeerConnectionHandler._
-import encry.network.peer.PeerManager.ReceivableMessages._
-import encry.network.peer.PeerManager._
-import encry.network.SendingStrategy
+import encry.network.PeerManager.ReceivableMessages._
+import encry.network.PeerManager._
 import encry.utils.Logging
 import scala.concurrent.Future
 import scala.language.postfixOps
@@ -21,20 +20,22 @@ class PeerManager extends Actor with Logging {
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
   var connectingPeers: Set[InetSocketAddress] = Set.empty
   var recoveryCompleted: Boolean = !(settings.levelDb.exists(_.enableRestore) || settings.postgres.exists(_.enableRestore))
+  var nodes: Map[InetSocketAddress, PeerInfo] = Map.empty
 
   addKnownPeersToPeersDatabase()
 
   override def receive: Receive = {
     case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
-    case GetAllPeers => sender() ! PeerDatabase.knownPeers()
+    case GetAllPeers => sender() ! knownPeers()
     case GetRecoveryStatus => sender() ! recoveryCompleted
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
-      if (!isSelf(address, None)) timeProvider
+      if (!isSelf(address, None) &&
+        checkPossibilityToAddPeer(address) &&
+        checkDuplicateIP(address)) timeProvider
         .time()
-        .map { time =>
-          PeerDatabase.addOrUpdateKnownPeer(address, PeerInfo(time, peerNameOpt, connTypeOpt))
+        .map { time => addOrUpdateKnownPeer(address, PeerInfo(time, peerNameOpt, connTypeOpt))
         }
-    case RandomPeers(howMany: Int) => sender() ! Random.shuffle(PeerDatabase.knownPeers().keys.toSeq).take(howMany)
+    case RandomPeers(howMany: Int) => sender() ! Random.shuffle(knownPeers().keys.toSeq).take(howMany)
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
     case DoConnecting(remote, direction) =>
       if (connectingPeers.contains(remote) && direction != Incoming) {
@@ -60,14 +61,17 @@ class PeerManager extends Actor with Logging {
       nodeViewSynchronizer ! DisconnectedPeer(remote)
     case CheckPeers =>
       def randomPeer: Option[InetSocketAddress] = {
-        val peers: Seq[InetSocketAddress] = PeerDatabase.knownPeers().keys.toSeq
+        val peers: Seq[InetSocketAddress] = knownPeers().keys.toSeq
         if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
         else None
       }
 
       if (connectedPeers.size + connectingPeers.size <= settings.network.maxConnections)
         randomPeer.filter(address => !connectedPeers.exists(_._1 == address) &&
-          !connectingPeers.exists(_.getHostName == address.getHostName) && checkPossibilityToAddPeerWRecovery(address))
+          !connectingPeers.exists(_.getHostName == address.getHostName) &&
+          checkPossibilityToAddPeerWRecovery(address) &&
+          checkDuplicateIP(address)
+        )
           .foreach { address => sender() ! ConnectTo(address) }
     case RecoveryCompleted =>
       logInfo("Received RecoveryCompleted")
@@ -83,19 +87,27 @@ class PeerManager extends Actor with Logging {
       (InetAddress.getLocalHost.getAddress sameElements address.getAddress.getAddress) ||
       (InetAddress.getLoopbackAddress.getAddress sameElements address.getAddress.getAddress)
 
-  def addKnownPeersToPeersDatabase(): Future[Unit] = if (PeerDatabase.isEmpty) {
-    timeProvider
-      .time()
-      .map { time =>
-        settings.network.knownPeers
-          .filterNot(isSelf(_, None))
-          .foreach(PeerDatabase.addOrUpdateKnownPeer(_, PeerInfo(time, None)))
-        Unit
-      }
+  def addKnownPeersToPeersDatabase(): Future[Unit] = if (nodes.isEmpty) timeProvider.time().map { time =>
+    settings.network.knownPeers.filterNot(isSelf(_, None)).foreach(addOrUpdateKnownPeer(_, PeerInfo(time, None)))
+    Unit
   } else Future.successful(Unit)
+
+  def checkDuplicateIP(address: InetSocketAddress): Boolean =
+    !connectedPeers.map(_._1.getAddress).toSet.contains(address.getAddress)
 
   def checkPossibilityToAddPeerWRecovery(address: InetSocketAddress): Boolean =
     checkPossibilityToAddPeer(address) && recoveryCompleted
+
+  def addOrUpdateKnownPeer(address: InetSocketAddress, peerInfo: PeerInfo): Unit = {
+    val updatedPeerInfo: PeerInfo = nodes.get(address).fold(peerInfo) { dbPeerInfo =>
+      val nodeNameOpt: Option[String] = peerInfo.nodeName orElse dbPeerInfo.nodeName
+      val connTypeOpt: Option[ConnectionType] = peerInfo.connectionType orElse dbPeerInfo.connectionType
+      PeerInfo(peerInfo.lastSeen, nodeNameOpt, connTypeOpt)
+    }
+    nodes += (address -> updatedPeerInfo)
+  }
+
+  def knownPeers(): Map[InetSocketAddress, PeerInfo] = nodes.keys.flatMap(k => nodes.get(k).map(v => k -> v)).toMap
 }
 
 object PeerManager {
@@ -128,3 +140,5 @@ object PeerManager {
     (settings.network.connectOnlyWithKnownPeers.getOrElse(false) && settings.network.knownPeers.contains(address)) ||
       !settings.network.connectOnlyWithKnownPeers.getOrElse(false)
 }
+
+case class PeerInfo(lastSeen: Long, nodeName: Option[String] = None, connectionType: Option[ConnectionType] = None)
