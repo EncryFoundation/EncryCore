@@ -8,7 +8,7 @@ import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
 import encry.modifiers.history.Block
 import encry.modifiers.history.Header
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.network.peer.PeerManager.ReceivableMessages.{GetConnectedPeers, GetRecoveryStatus}
+import encry.network.PeerManager.ReceivableMessages.{GetConnectedPeers, GetRecoveryStatus}
 import encry.settings._
 import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}

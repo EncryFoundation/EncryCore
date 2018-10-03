@@ -17,7 +17,8 @@ class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with Logging {
 
   val initialNonce: Long = Long.MaxValue / numberOfWorkers * myIdx
 
-  override def preRestart(reason: Throwable, message: Option[Any]): Unit = logWarn(s"Worker $myIdx is restarting because of: $reason")
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit =
+    logWarn(s"Worker $myIdx is restarting because of: $reason")
 
   override def receive: Receive = {
     case MineBlock(candidate: CandidateBlock, nonce: Long) =>
@@ -32,7 +33,8 @@ class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with Logging {
     case NextChallenge(candidate: CandidateBlock) =>
       challengeStartTime = new Date(System.currentTimeMillis())
       logInfo(s"Start next challenge on worker: $myIdx at height " +
-        s"${candidate.parentOpt.map(_.height + 1).getOrElse(Constants.Chain.PreGenesisHeight.toString)} at ${sdf.format(challengeStartTime)}")
+        s"${candidate.parentOpt.map(_.height + 1).getOrElse(Constants.Chain.PreGenesisHeight.toString)} " +
+        s"at ${sdf.format(challengeStartTime)}")
       self ! MineBlock(candidate, Long.MaxValue / numberOfWorkers * myIdx)
   }
 
