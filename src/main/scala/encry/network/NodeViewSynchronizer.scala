@@ -16,6 +16,7 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, Registe
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.message._
+import encry.stats.StatsSender.StartRecoveryFromNetwork
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.history.{EncryHistory, EncryHistoryReader, EncrySyncInfo, EncrySyncInfoMessageSpec}
@@ -41,6 +42,9 @@ class NodeViewSynchronizer extends Actor with Logging {
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
     nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = true)
+    if (!settings.node.offlineGeneration && settings.influxDB.isDefined &&
+      settings.levelDb.forall(x => !x.enableRestore) && settings.postgres.forall(x => !x.enableRestore))
+      context.actorSelection("/user/statsSender") ! StartRecoveryFromNetwork(System.currentTimeMillis())
   }
 
   override def receive: Receive = {
@@ -97,7 +101,7 @@ class NodeViewSynchronizer extends Actor with Logging {
       logDebug(s"Got inv message from ${remote.socketAddress}.")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
-      logDebug( s"Got modifiers from ${remote.socketAddress} with modTypeID: ${data._1}.")
+      logDebug(s"Got modifiers from ${remote.socketAddress} with modTypeID: ${data._1}.")
       deliveryManager ! DataFromPeer(spec, data: ModifiersData@unchecked, remote)
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       deliveryManager ! RequestFromLocal(peer, modifierTypeId, modifierIds)

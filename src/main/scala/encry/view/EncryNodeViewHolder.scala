@@ -52,6 +52,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     ADProofs.modifierTypeId -> ADProofSerializer,
     Transaction.ModifierTypeId -> TransactionSerializer
   )
+  var isSend: Boolean = false
 
   system.scheduler.schedule(5.second, 5.second) {
     if (settings.influxDB.isDefined)
@@ -71,7 +72,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def receive: Receive = {
-    case BlocksFromLocalPersistence(blocks, allSent)
+    case BlocksFromLocalPersistence(blocks, allSent, messageSender)
       if settings.levelDb.exists(_.enableRestore) || settings.postgres.exists(_.enableRestore) =>
       blocks.foreach { block =>
         pmodModifyRecovery(block) match {
@@ -95,6 +96,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       }
       receivedAll = allSent
       if (receivedAll) {
+        messageSender match {
+          case "postgres" if settings.influxDB.isDefined =>
+            context.actorSelection("/user/statsSender") !
+              SuccessfullyFinishedSyncFromPostgres(System.currentTimeMillis())
+          case "leveldb" if settings.influxDB.isDefined =>
+            context.actorSelection("/user/statsSender") ! StartRecoveryFromNetwork(System.currentTimeMillis())
+        }
         logInfo(s"Received all blocks from recovery")
         peerManager ! RecoveryCompleted
       }
@@ -115,6 +123,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
         logInfo(s"Cache before(${modifiersCache.size})")
         computeApplications()
+        if (nodeView.history.isFullChainSynced && settings.influxDB.isDefined && !isSend) {
+          context.actorSelection("/user/statsSender") ! FinishRecoveryFromNetwork(System.currentTimeMillis())
+          isSend = true
+        }
         if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
         logInfo(s"Cache after(${modifiersCache.size})")
       }
@@ -410,7 +422,7 @@ object EncryNodeViewHolder {
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    case class BlocksFromLocalPersistence(blocks: Seq[Block], allBlocksSent: Boolean = true)
+    case class BlocksFromLocalPersistence(blocks: Seq[Block], allBlocksSent: Boolean = true, messageSender: String)
 
     case class ModifiersFromRemote(modTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
 

@@ -6,6 +6,7 @@ import encry.EncryApp._
 import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
+import encry.stats.StatsSender.{FinishRecoveryFromLevelDb, StartRecoveryFromLevelDb, SuccessPostgresSyncTime}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, LocallyGeneratedModifier}
 import org.encryfoundation.common.Algos
 import encry.utils.Logging
@@ -20,6 +21,7 @@ class ModifiersHolder extends PersistentActor with Logging {
   var payloads: Map[String, (Payload, Int)] = Map.empty
   var nonCompletedBlocks: Map[String, String] = Map.empty
   var completedBlocks: SortedMap[Int, Block] = SortedMap.empty
+  var isSentFinishRecovery = false
 
   context.system.scheduler.schedule(10.second, 30.second) {
     logDebug(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
@@ -39,7 +41,11 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   override def preStart(): Unit = logInfo(s"ModifiersHolder actor is started.")
 
-  override def receiveRecover: Receive = if (settings.levelDb.exists(_.enableRestore)) receiveRecoverEnabled else receiveRecoverDisabled
+  override def receiveRecover: Receive = if (settings.levelDb.exists(_.enableRestore)) {
+    if(settings.influxDB.isDefined)
+      system.actorSelection("user/statsSender") ! StartRecoveryFromLevelDb(System.currentTimeMillis())
+    receiveRecoverEnabled
+  } else receiveRecoverDisabled
 
   def receiveRecoverEnabled: Receive = {
     case header: Header =>
@@ -69,11 +75,16 @@ class ModifiersHolder extends PersistentActor with Logging {
       val blocksToSend: Seq[Block] = completedBlocks.take(settings.levelDb
         .map(_.batchSize)
         .getOrElse(throw new RuntimeException("batchsize not specified"))).values.toSeq
-
+      if (completedBlocks.values.size < settings.levelDb.map(_.batchSize).getOrElse(settings.network.networkChunkSize)
+        && settings.influxDB.isDefined && !isSentFinishRecovery) {
+        isSentFinishRecovery = true
+        context.actorSelection("/user/statsSender") ! FinishRecoveryFromLevelDb(System.currentTimeMillis())
+      }
       completedBlocks = completedBlocks.drop(settings.levelDb
         .map(_.batchSize)
         .getOrElse(throw new RuntimeException("batchsize not specified")))
-      nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend, completedBlocks.isEmpty && !settings.postgres.exists(_.enableRestore))
+      nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend,
+        completedBlocks.isEmpty && !settings.postgres.exists(_.enableRestore), "leveldb")
 
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))

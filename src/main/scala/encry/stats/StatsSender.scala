@@ -126,6 +126,30 @@ class StatsSender extends Actor {
           modifiersToDownload = modifiersToDownload - Algos.encode(downloadedModifierId)
         }
       )
+
+    case SuccessPostgresSyncTime(startTime) =>
+      influxDB.write(InfluxPort,
+        s"""startPostgresRecovery,nodeName=$nodeName,process=startRecoveryFromPostgres value="[${sdf.format(startTime)}]"""")
+
+    case SuccessfullyFinishedSyncFromPostgres(finishTime) =>
+      influxDB.write(InfluxPort,
+        s"""finishPostgresRecovery,nodeName=$nodeName,process=finishRecoveryFromPostgres value="[${sdf.format(finishTime)}]"""")
+
+    case StartRecoveryFromNetwork(finishTime) =>
+      influxDB.write(InfluxPort,
+        s"""startNetworkRecovery,nodeName=$nodeName,process=startRecoveryFromNetwork value="[${sdf.format(finishTime)}]"""")
+
+    case FinishRecoveryFromNetwork(finishTime) =>
+      influxDB.write(InfluxPort,
+        s"""finishNetworkRecovery,nodeName=$nodeName,process=finishRecoveryFromNetwork value="[${sdf.format(finishTime)}]"""")
+
+    case StartRecoveryFromLevelDb(startTime) =>
+      influxDB.write(InfluxPort,
+        s"""startLevelDbRecovery,nodeName=$nodeName,process=startRecoveryFromLevelDB value="[${sdf.format(startTime)}]"""")
+
+    case FinishRecoveryFromLevelDb(finishTime) =>
+      influxDB.write(InfluxPort,
+        s"""finishLevelDbRecovery,nodeName=$nodeName,process=finishRecoveryFromLevelDB value="[${sdf.format(finishTime)}]"""")
   }
 }
 
@@ -155,4 +179,15 @@ object StatsSender {
 
   case class TransactionGeneratorStat(txsQty: Int, generationTime: Long)
 
+  case class SuccessPostgresSyncTime(time: Long)
+
+  case class SuccessfullyFinishedSyncFromPostgres(time: Long)
+
+  case class StartRecoveryFromNetwork(time: Long)
+
+  case class FinishRecoveryFromNetwork(time: Long)
+
+  case class StartRecoveryFromLevelDb(time: Long)
+
+  case class FinishRecoveryFromLevelDb(time: Long)
 }
