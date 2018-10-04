@@ -229,8 +229,6 @@ object Miner {
 
   case object GetMinerStatus
 
-  case object CheckHistory
-
   case class MinedBlock(block: Block, workerIdx: Int)
 
   case class MinerStatus(isMining: Boolean, candidateBlock: Option[CandidateBlock]) {

@@ -97,7 +97,6 @@ class DeliveryManager extends Actor with Logging {
           s": ${spam.keys.map(Algos.encode)}")
         deleteSpam(spam.keys.toSeq)
       }
-      logInfo(s"fm contains: ${fm.keys.map(Algos.encode).mkString(",")}")
       if (fm.nonEmpty) nodeViewHolder ! ModifiersFromRemote(typeId, fm.values.toSeq)
       historyReaderOpt.foreach { h =>
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
@@ -129,7 +128,7 @@ class DeliveryManager extends Actor with Logging {
       val notRequestedIds: Seq[ModifierId] = mids.foldLeft(Seq[ModifierId]()) {
         case (notRequested, modId) =>
           val modifierKey: ModifierIdAsKey = key(modId)
-          if (historyReaderOpt.forall(history => history.contains(modId) && !delivered.contains(key(modId)))) {
+          if (historyReaderOpt.forall(history => !history.contains(modId) && !delivered.contains(key(modId)))) {
             if (!cancellables.contains(modifierKey)) notRequested :+ modId
             else {
               peers = peers.updated(modifierKey, (peers.getOrElse(modifierKey, Seq()) :+ cp).distinct)
@@ -199,11 +198,7 @@ class DeliveryManager extends Actor with Logging {
       Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
     if (settings.influxDB.isDefined)
       context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
-    logInfo(s"statusTracker.statuses: ${statusTracker.statuses.keys.mkString(",")}")
-    statusTracker.statuses.keys.foreach(peer => {
-      logInfo(s"Expect ${modifierIds.map(Algos.encode).mkString(",")} from $peer")
-      expect(peer, modifierTypeId, modifierIds)
-    })
+    statusTracker.statuses.keys.foreach(expect(_, modifierTypeId, modifierIds))
   }
 
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = tryWithLogging {
