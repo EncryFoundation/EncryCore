@@ -1,7 +1,6 @@
 package encry.network
 
 import encry.network.PeerConnectionHandler.ConnectedPeer
-
 import scala.util.Random
 
 trait SendingStrategy {

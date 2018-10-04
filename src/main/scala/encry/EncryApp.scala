@@ -16,8 +16,7 @@ import encry.local.explorer.database.DBService
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network.message._
-import encry.network.peer.PeerManager
-import encry.network._
+import encry.network.{PeerManager, _}
 import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, LoggingActor, StatsSender, Zombie}
 import encry.utils.{Logging, NetworkTimeProvider}
@@ -59,7 +58,7 @@ object EncryApp extends App with Logging {
     .withDispatcher("network-dispatcher"), "networkController")
   lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
   lazy val nodeViewSynchronizer: ActorRef =
-    system.actorOf(Props(classOf[EncryNodeViewSynchronizer]), "nodeViewSynchronizer")
+    system.actorOf(Props(classOf[NodeViewSynchronizer]), "nodeViewSynchronizer")
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
   if (settings.influxDB.isDefined) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.kafka.exists(_.sendToKafka))

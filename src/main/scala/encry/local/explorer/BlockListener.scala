@@ -7,7 +7,7 @@ import encry.local.explorer.BlockListener._
 import encry.local.explorer.database.DBService
 import encry.modifiers.history.Block.Height
 import encry.modifiers.history.{Block, Header}
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.ChangedHistory
+import encry.network.NodeViewSynchronizer.ReceivableMessages.ChangedHistory
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetNodeViewChanges
 import encry.view.history.EncryHistoryReader

@@ -4,7 +4,6 @@ import encry.modifiers.history.PayloadSerializer
 import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
 import akka.serialization.{Serializer => AkkaSerializer}
-
 import scala.util.{Failure, Success}
 
 case class EncryDeserializationException(th: Throwable) extends RuntimeException(th.getLocalizedMessage)

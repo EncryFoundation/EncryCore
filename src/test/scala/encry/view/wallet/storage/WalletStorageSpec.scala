@@ -5,7 +5,8 @@ import encry.view.wallet.WalletStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.scalatest.{Matchers, PropSpec}
-import scala.util.Random
+
+import scala.util.{Random, Try}
 
 class WalletStorageSpec extends PropSpec with Matchers {
 
@@ -22,7 +23,16 @@ class WalletStorageSpec extends PropSpec with Matchers {
 
     walletStorage.store.update(Random.nextLong(), Seq(), Seq(key -> packedValues))
 
-    val valuesUnpacked: Seq[Array[Byte]] = walletStorage.readComplexValue(key, 32).get
+    def parseComplexValue(bytes: Array[Byte], unitLen: Int): Try[Seq[Array[Byte]]] = Try {
+      bytes.sliding(unitLen, unitLen).foldLeft(Seq[Array[Byte]]())(_ :+ _)
+        .ensuring(bytes.length % unitLen == 0, "Value is inconsistent.")
+    }
+
+    def readComplexValue(key: ByteArrayWrapper, unitLen: Int): Option[Seq[Array[Byte]]] =
+      store.get(key).flatMap { v => parseComplexValue(v.data, unitLen).toOption
+      }
+
+    val valuesUnpacked: Seq[Array[Byte]] = readComplexValue(key, 32).get
 
     values.size shouldEqual valuesUnpacked.size
 

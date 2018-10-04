@@ -10,7 +10,6 @@ import encry.stats.StatsSender.{FinishRecoveryFromLevelDb, StartRecoveryFromLeve
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, LocallyGeneratedModifier}
 import org.encryfoundation.common.Algos
 import encry.utils.Logging
-
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 import scala.language.postfixOps
