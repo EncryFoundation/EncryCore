@@ -10,8 +10,6 @@ import encry.modifiers.history.{Block, Header, HeaderChain}
 import encry.utils.Logging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.Algos
-import io.circe.syntax._
 import scala.util.{Failure, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with Logging {
@@ -93,8 +91,8 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
 
   private def isBetterChain(id: ModifierId): Boolean = {
     val isBetter: Option[Boolean] = for {
-      bestFullBlockId <- {bestBlockIdOpt}
-      prevBestScore <- {scoreOf(bestFullBlockId)}
+      bestFullBlockId <- bestBlockIdOpt
+      prevBestScore <- scoreOf(bestFullBlockId)
       score <- scoreOf(id)
     } yield score > prevBestScore
     isBetter getOrElse false

@@ -18,11 +18,10 @@ import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import scala.annotation.tailrec
-import io.circe.syntax._
 import scala.collection.immutable
 import scala.util.Try
 
-trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
+trait BlockHeaderProcessor extends Logging {
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider

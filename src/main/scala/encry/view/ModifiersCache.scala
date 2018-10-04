@@ -13,7 +13,7 @@ import scala.util.{Failure, Success}
 import encry.utils.Logging
 import org.encryfoundation.common.Algos
 
-trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] extends Logging {
+trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
 
   type K = mutable.WrappedArray[Byte]
   type V = PMOD
@@ -147,8 +147,6 @@ case class EncryModifiersCache(override val maxSize: Int)
     }
 
     val headersHeight = history.bestHeaderHeight
-
-    logInfo("Trying to find candidate.")
 
     history
       .headerIdsAtHeight(history.bestBlockHeight + 1)

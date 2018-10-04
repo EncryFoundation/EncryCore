@@ -107,7 +107,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             if (nodeView.history.contains(pmod.id) || modifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
-              logInfo(s"Going to put ${Algos.encode(pmod.id)} to cache")
               modifiersCache.put(key(pmod.id), pmod)
               if (settings.levelDb.exists(_.enableSave))
                 context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
@@ -149,8 +148,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       case Some(mod) =>
         pmodModify(mod)
         computeApplications()
-      case None =>
-        Unit
+      case None => Unit
     }
 
   def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
