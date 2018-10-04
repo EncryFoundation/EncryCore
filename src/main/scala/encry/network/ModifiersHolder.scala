@@ -75,11 +75,10 @@ class ModifiersHolder extends PersistentActor with Logging {
       val blocksToSend: Seq[Block] = completedBlocks.take(settings.levelDb
         .map(_.batchSize)
         .getOrElse(throw new RuntimeException("batchsize not specified"))).values.toSeq
-      if (completedBlocks.values.size < settings.levelDb.map(_.batchSize).getOrElse(1000)
+      if (completedBlocks.values.size < settings.levelDb.map(_.batchSize).getOrElse(settings.network.networkChunkSize)
         && settings.influxDB.isDefined && !isSentFinishRecovery) {
         isSentFinishRecovery = true
         context.actorSelection("/user/statsSender") ! FinishRecoveryFromLevelDb(System.currentTimeMillis())
-        println("done")
       }
       completedBlocks = completedBlocks.drop(settings.levelDb
         .map(_.batchSize)
