@@ -34,7 +34,6 @@ class ModifiersHolder extends PersistentActor with Logging {
   def notifyRecoveryCompleted(): Unit = if (settings.postgres.exists(_.enableRestore)) {
     logInfo("Recovery from levelDb completed, going to download rest of the blocks from postgres")
     context.system.actorSelection("/user/postgresRestore") ! StartRecovery
-    context.system.actorSelection("/user/statsSender") ! SuccessPostgresSyncTime(System.currentTimeMillis())
   } else {
     logInfo("Recovery completed")
     peerManager ! RecoveryCompleted
@@ -77,9 +76,10 @@ class ModifiersHolder extends PersistentActor with Logging {
         .map(_.batchSize)
         .getOrElse(throw new RuntimeException("batchsize not specified"))).values.toSeq
       if (completedBlocks.values.size < settings.levelDb.map(_.batchSize).getOrElse(1000)
-        && settings.influxDB.isDefined && isSentFinishRecovery) {
+        && settings.influxDB.isDefined && !isSentFinishRecovery) {
         isSentFinishRecovery = true
         context.actorSelection("/user/statsSender") ! FinishRecoveryFromLevelDb(System.currentTimeMillis())
+        println("done")
       }
       completedBlocks = completedBlocks.drop(settings.levelDb
         .map(_.batchSize)
