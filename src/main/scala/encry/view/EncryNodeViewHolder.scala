@@ -135,7 +135,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         logInfo(s"Cache before(${modifiersCache.size}): $modifiersCache")
         computeApplications()
         if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
-        nodeViewSynchronizer ! CleanDelivered(modifiersCache.cache.keys.toSeq)
+        //nodeViewSynchronizer ! CleanDelivered(modifiersCache.cache.keys.toSeq)
         logInfo(s"Cache after(${modifiersCache.size}); $modifiersCache")
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)

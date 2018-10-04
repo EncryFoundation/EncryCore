@@ -85,23 +85,23 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
         logInfo(s"Appending ${fullBlock.encodedId} as a better chain")
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
-//        logInfo(s"!isInBestChain(fullBlock.id) = ${!isInBestChain(fullBlock.id)}")
-//        logInfo(s"scoreOf(fullBlock.id).flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))." +
-//          s"getOrElse(false) = ${scoreOf(fullBlock.id)
-//            .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => {
-//              logInfo(s"Score of bestHeader ${Algos.encode(id)} = ${scoreOf(id)}")
-//              logInfo(s"Score of bestBlock ${fullBlock.asJson} is ${fbScore}")
-//              scoreOf(id).map(_ < fbScore)
-//            }))
-//            .getOrElse(false)}")
+        logInfo(s"!isInBestChain(fullBlock.id) = ${!isInBestChain(fullBlock.id)}")
+        logInfo(s"scoreOf(fullBlock.id).flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))." +
+          s"getOrElse(false) = ${scoreOf(fullBlock.id)
+            .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => {
+              logInfo(s"Score of bestHeader ${Algos.encode(id)} = ${scoreOf(id)}")
+              logInfo(s"Score of bestBlock ${fullBlock.asJson} is ${fbScore}")
+              scoreOf(id).map(_ < fbScore)
+            }))
+            .getOrElse(false)}")
         val updateBestHeader: Boolean =
           (fullBlock.header.height > bestHeaderHeight) ||
             scoreOf(fullBlock.id)
               .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
               .getOrElse(false)
-//        logInfo(s"newModRow: ${Algos.encode(newModRow.id)}")
-//        logInfo(s"newBestHeader.id: ${Algos.encode(newBestHeader.id)}")
-//        logInfo(s"updateBestHeader: $updateBestHeader")
+        logInfo(s"newModRow: ${Algos.encode(newModRow.id)}")
+        logInfo(s"newBestHeader.id: ${Algos.encode(newBestHeader.id)}")
+        logInfo(s"updateBestHeader: $updateBestHeader")
         updateStorage(newModRow, newBestHeader.id, updateBestHeader)
 
         if (settings.postgres.exists(_.enableSave))

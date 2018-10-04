@@ -51,7 +51,7 @@ class EncryNodeViewSynchronizer extends Actor with Logging {
       if (mod.isInstanceOf[Header] || mod.isInstanceOf[Payload] || mod.isInstanceOf[ADProofs]) &&
         historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
     case SyntacticallySuccessfulModifier(mod) =>
-    case CleanDelivered(modIds: Seq[mutable.WrappedArray[Byte]]) => deliveryManager ! CleanDelivered(modIds)
+    //case CleanDelivered(modIds: Seq[mutable.WrappedArray[Byte]]) => deliveryManager ! CleanDelivered(modIds)
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
       deliveryManager ! DownloadRequest(modifierTypeId, modifierId)
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)

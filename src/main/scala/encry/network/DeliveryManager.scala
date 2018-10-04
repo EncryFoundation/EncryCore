@@ -93,17 +93,17 @@ class DeliveryManager extends Actor with Logging {
           case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) => requestDownload(modId, ids.map(_._2))
         } else context.become(syncCycle)
       }
-    case CleanDelivered(modifiersInCache: Seq[mutable.WrappedArray[Byte]]) =>
-      logInfo("Get clean delivered")
-      logInfo(s"Cache contains: ${modifiersInCache.map(mod => Algos.encode(mod.toArray)).mkString(",")}")
-      logInfo(s"Delivered contains: ${delivered.keys.map(mod => Algos.encode(mod.toArray)).mkString(",")}")
-      val newDelivered: Seq[ModifierIdAsKey] =
-        delivered.keys.filter(modId =>
-          historyReaderOpt.exists(_.contains(ModifierId @@ modId.toArray)) ||
-            modifiersInCache.contains(modId)).toSeq
-      logInfo(s"NewDelivered contains: ${newDelivered.map(mod => Algos.encode(mod.toArray)).mkString(",")}")
-      delivered = delivered.filter(mod => newDelivered.contains(mod._1))
-      logInfo(s"Delivered contains after filter: ${delivered.keys.map(key => Algos.encode(key.toArray)).mkString(",")}")
+//    case CleanDelivered(modifiersInCache: Seq[mutable.WrappedArray[Byte]]) =>
+//      logInfo("Get clean delivered")
+//      logInfo(s"Cache contains: ${modifiersInCache.map(mod => Algos.encode(mod.toArray)).mkString(",")}")
+//      logInfo(s"Delivered contains: ${delivered.keys.map(mod => Algos.encode(mod.toArray)).mkString(",")}")
+//      val newDelivered: Seq[ModifierIdAsKey] =
+//        delivered.keys.filter(modId =>
+//          historyReaderOpt.exists(_.contains(ModifierId @@ modId.toArray)) ||
+//            modifiersInCache.contains(modId)).toSeq
+//      logInfo(s"NewDelivered contains: ${newDelivered.map(mod => Algos.encode(mod.toArray)).mkString(",")}")
+//      delivered = delivered.filter(mod => newDelivered.contains(mod._1))
+//      logInfo(s"Delivered contains after filter: ${delivered.keys.map(key => Algos.encode(key.toArray)).mkString(",")}")
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       if (modifierIds.nonEmpty && modifierTypeId != 2) expect(peer, modifierTypeId, modifierIds)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
