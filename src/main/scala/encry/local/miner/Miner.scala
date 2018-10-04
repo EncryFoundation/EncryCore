@@ -2,9 +2,10 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
+
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
-import encry.consensus.{CandidateBlock, EncrySupplyController}
+import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.history.{Block, Header}
@@ -29,6 +30,7 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
+
 import scala.collection._
 
 class Miner extends Actor with Logging {
@@ -41,6 +43,7 @@ class Miner extends Actor with Logging {
   var candidateOpt: Option[CandidateBlock] = None
   var syncingDone: Boolean = false
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
+  val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
 
   override def preStart(): Unit =
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
@@ -51,7 +54,9 @@ class Miner extends Actor with Logging {
 
   def needNewCandidate(b: Block): Boolean =
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id)) &&
-      candidateOpt.forall(candidate => candidate.parentOpt.exists(_.height < b.header.height))
+      (candidateOpt.forall(candidate => candidate.parentOpt.exists(_.height < b.header.height)) ||
+        candidateOpt.exists(_.parentOpt.exists(parentHeader =>
+          powScheme.realDifficulty(parentHeader) < powScheme.realDifficulty(b.header))))
 
   override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
 
@@ -188,6 +193,7 @@ class Miner extends Actor with Logging {
   def produceCandidate(): Unit =
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] {
       nodeView =>
+        logInfo("Test")
         val producingStartTime: Time = System.currentTimeMillis()
         startTime = producingStartTime
         val bestHeaderOpt: Option[Header] = nodeView.history.bestBlockOpt.map(_.header)
@@ -196,8 +202,7 @@ class Miner extends Actor with Logging {
           case None => logInfo(s"No best header opt")
         }
         val candidate: CandidateEnvelope =
-          if ((bestHeaderOpt.isDefined &&
-            (syncingDone || nodeView.history.isFullChainSynced)) || settings.node.offlineGeneration) {
+          if (true) {
             logInfo(s"Starting candidate generation at " +
               s"${dateFormat.format(new Date(System.currentTimeMillis()))}")
             if (settings.influxDB.isDefined)
@@ -224,6 +229,8 @@ object Miner {
   case object StartMining
 
   case object GetMinerStatus
+
+  case object CheckHistory
 
   case class MinedBlock(block: Block, workerIdx: Int)
 
