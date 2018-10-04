@@ -9,14 +9,12 @@ import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
-import encry.local.miner.Miner.CheckHistory
 import encry.modifiers._
 import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
 import encry.modifiers.state.box.EncryProposition
-import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
-import encry.network.DeliveryManager.{CleanDelivered, ContinueSync, FullBlockChainSynced, StopSync}
+import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
@@ -33,8 +31,6 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
-import io.circe.syntax._
-
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -122,7 +118,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         logInfo(s"Cache before(${modifiersCache.size}): $modifiersCache")
         computeApplications()
         if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
-        //nodeViewSynchronizer ! CleanDelivered(modifiersCache.cache.keys.toSeq)
         logInfo(s"Cache after(${modifiersCache.size}); $modifiersCache")
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
@@ -152,7 +147,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             nodeView.history.contains(mid) || modifiersCache.contains(key(mid))
           })
       }
-      //logInfo(s"Need to get ${ids.map(Algos.encode).mkString(",")} of type: $modifierTypeId")
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case a: Any =>
       logError(s"Strange input: $a")

@@ -2,7 +2,6 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
-
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
 import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme}
@@ -30,7 +29,6 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
-
 import scala.collection._
 
 class Miner extends Actor with Logging {
