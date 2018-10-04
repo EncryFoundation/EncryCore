@@ -6,7 +6,7 @@ import encry.EncryApp._
 import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
-import encry.stats.StatsSender.{FinishRecoveryFromLevelDb, StartRecoveryFromLevelDb}
+import encry.stats.StatsSender.{FinishRecoveryFromLevelDb, StartRecoveryFromLevelDb, SuccessPostgresSyncTime}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, LocallyGeneratedModifier}
 import org.encryfoundation.common.Algos
 import encry.utils.Logging
@@ -21,6 +21,7 @@ class ModifiersHolder extends PersistentActor with Logging {
   var payloads: Map[String, (Payload, Int)] = Map.empty
   var nonCompletedBlocks: Map[String, String] = Map.empty
   var completedBlocks: SortedMap[Int, Block] = SortedMap.empty
+  var isSentFinishRecovery = false
 
   context.system.scheduler.schedule(10.second, 30.second) {
     logDebug(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
@@ -33,6 +34,7 @@ class ModifiersHolder extends PersistentActor with Logging {
   def notifyRecoveryCompleted(): Unit = if (settings.postgres.exists(_.enableRestore)) {
     logInfo("Recovery from levelDb completed, going to download rest of the blocks from postgres")
     context.system.actorSelection("/user/postgresRestore") ! StartRecovery
+    context.system.actorSelection("/user/statsSender") ! SuccessPostgresSyncTime(System.currentTimeMillis())
   } else {
     logInfo("Recovery completed")
     peerManager ! RecoveryCompleted
@@ -74,8 +76,11 @@ class ModifiersHolder extends PersistentActor with Logging {
       val blocksToSend: Seq[Block] = completedBlocks.take(settings.levelDb
         .map(_.batchSize)
         .getOrElse(throw new RuntimeException("batchsize not specified"))).values.toSeq
-      if (completedBlocks.values.size < settings.levelDb.map(_.batchSize).getOrElse(1000) && settings.influxDB.isDefined)
+      if (completedBlocks.values.size < settings.levelDb.map(_.batchSize).getOrElse(1000)
+        && settings.influxDB.isDefined && isSentFinishRecovery) {
+        isSentFinishRecovery = true
         context.actorSelection("/user/statsSender") ! FinishRecoveryFromLevelDb(System.currentTimeMillis())
+      }
       completedBlocks = completedBlocks.drop(settings.levelDb
         .map(_.batchSize)
         .getOrElse(throw new RuntimeException("batchsize not specified")))
