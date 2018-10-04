@@ -9,7 +9,6 @@ import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.history.{Block, HeaderDBVersion, Payload}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, Transaction, TransactionDBVersion}
-import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.ChangedHistory
 import encry.stats.StatsSender.{StartRecoveryFromNetwork, SuccessPostgresSyncTime}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.ChangedHistory
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, GetNodeViewChanges}
