@@ -74,19 +74,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     nodeView.state.closeStorage()
   }
 
-  def checkHistory(height: Int): Unit = {
-    logInfo(s"Going to check difficulty on height: $height")
-    val headersId: Seq[ModifierId] = nodeView.history.headerIdsAtHeight(height)
-    logInfo(s"Get headers at height $height: ${headersId.map(Algos.encode).mkString(",")}")
-    val headers: Seq[Header] = headersId.flatMap(nodeView.history.typedModifierById[Header])
-    headers.foreach{header =>
-      logInfo(s"Check difficulty for header withId: ${Algos.encode(header.id)}\n " +
-        s"Result (diff: ${header.difficulty}, realDiff: ${nodeView.history.realDifficulty(header)}). " +
-        s"res: ${header.difficulty <= nodeView.history.realDifficulty(header)}")
-    }
-    if (height < nodeView.history.bestHeaderHeight) checkHistory(height + 1)
-  }
-
   override def receive: Receive = {
     case BlocksFromLocalPersistence(blocks, allSent)
       if settings.levelDb.exists(_.enableRestore) || settings.postgres.exists(_.enableRestore) =>
@@ -116,7 +103,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         peerManager ! RecoveryCompleted
       }
       if (applicationsSuccessful && settings.levelDb.exists(_.enableRestore) && !receivedAll) sender ! SendBlocks
-    case CheckHistory => checkHistory(23555)
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
       if (modifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
       modifierSerializers.get(modifierTypeId).foreach { companion =>
