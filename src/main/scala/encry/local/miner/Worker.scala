@@ -18,7 +18,8 @@ class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with Logging {
 
   val initialNonce: Long = Long.MaxValue / numberOfWorkers * myIdx
 
-  override def preRestart(reason: Throwable, message: Option[Any]): Unit = logWarn(s"Worker $myIdx is restarting because of: $reason")
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit =
+    logWarn(s"Worker $myIdx is restarting because of: $reason")
 
   override def receive: Receive = {
     case MineBlock(candidate: CandidateBlock, nonce: Long) =>

@@ -7,9 +7,9 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.api.http.PeersApiRoute.PeerInfoResponse
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.network.peer.PeerInfo
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
-import encry.network.peer.PeerManager.ReceivableMessages.{GetAllPeers, GetConnectedPeers}
+import encry.network.PeerInfo
+import encry.network.PeerManager.ReceivableMessages.{GetAllPeers, GetConnectedPeers}
 import encry.settings.RESTApiSettings
 import io.circe.Encoder
 import io.circe.generic.semiauto._
@@ -61,9 +61,7 @@ case class PeersApiRoute(peerManager: ActorRef,
 
 object PeersApiRoute {
 
-  case class PeerInfoResponse(address: String,
-                              name: Option[String],
-                              connectionType: Option[String])
+  case class PeerInfoResponse(address: String, name: Option[String], connectionType: Option[String])
 
   object PeerInfoResponse {
 

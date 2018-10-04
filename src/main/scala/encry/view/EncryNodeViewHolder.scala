@@ -14,6 +14,8 @@ import encry.modifiers._
 import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
 import encry.modifiers.state.box.EncryProposition
+import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
+import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.DeliveryManager.{CleanDelivered, ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages._
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
