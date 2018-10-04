@@ -6,7 +6,7 @@ import encry.EncryApp._
 import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
-import encry.stats.StatsSender.{FinishRecoveryFromLevelDb, StartRecoveryFromLevelDb, StartRecoveryFromNetwork}
+import encry.stats.StatsSender.{FinishRecoveryFromLevelDb, StartRecoveryFromLevelDb}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, LocallyGeneratedModifier}
 import org.encryfoundation.common.Algos
 import encry.utils.Logging
@@ -35,8 +35,6 @@ class ModifiersHolder extends PersistentActor with Logging {
     context.system.actorSelection("/user/postgresRestore") ! StartRecovery
   } else {
     logInfo("Recovery completed")
-    if (settings.influxDB.isDefined)
-      system.actorSelection("user/statsSender") ! StartRecoveryFromNetwork(System.currentTimeMillis())
     peerManager ! RecoveryCompleted
   }
 
@@ -76,7 +74,8 @@ class ModifiersHolder extends PersistentActor with Logging {
       val blocksToSend: Seq[Block] = completedBlocks.take(settings.levelDb
         .map(_.batchSize)
         .getOrElse(throw new RuntimeException("batchsize not specified"))).values.toSeq
-
+      if (completedBlocks.values.size < settings.levelDb.map(_.batchSize).getOrElse(1000) && settings.influxDB.isDefined)
+        context.actorSelection("/user/statsSender") ! FinishRecoveryFromLevelDb(System.currentTimeMillis())
       completedBlocks = completedBlocks.drop(settings.levelDb
         .map(_.batchSize)
         .getOrElse(throw new RuntimeException("batchsize not specified")))

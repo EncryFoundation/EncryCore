@@ -97,15 +97,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       receivedAll = allSent
       if (receivedAll) {
         messageSender match {
-          case "postgres" if settings.influxDB.isDefined && settings.levelDb.exists(x => x.enableRestore) =>
-            context.actorSelection("/user/statsSender") !
-              SuccessfullyFinishedSyncFromPostgres(System.currentTimeMillis())
-              context.actorSelection("/user/statsSender") ! FinishRecoveryFromLevelDb(System.currentTimeMillis())
-          case "postgres" if settings.influxDB.isDefined && settings.levelDb.forall(x => !x.enableRestore) =>
+          case "postgres" if settings.influxDB.isDefined =>
             context.actorSelection("/user/statsSender") !
               SuccessfullyFinishedSyncFromPostgres(System.currentTimeMillis())
           case "leveldb" if settings.influxDB.isDefined =>
-            context.actorSelection("/user/statsSender") ! FinishRecoveryFromLevelDb(System.currentTimeMillis())
+            context.actorSelection("/user/statsSender") ! StartRecoveryFromNetwork(System.currentTimeMillis())
         }
         logInfo(s"Received all blocks from recovery")
         peerManager ! RecoveryCompleted
