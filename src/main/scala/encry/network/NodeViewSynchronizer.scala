@@ -81,8 +81,6 @@ class NodeViewSynchronizer extends Actor with Logging {
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == RequestModifierSpec.MessageCode =>
       if (invData._1 != Payload.modifierTypeId) {
-        logInfo(s"Got requestMsg from ${remote.socketAddress}. TypeID:${invData._1}." +
-          s" Modifiers: ${invData._2.foldLeft("|")((str, id) => str + "|" + Algos.encode(id))}")
         historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
           val objs: Seq[NodeViewModifier] = invData._1 match {
             case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)

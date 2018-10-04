@@ -38,40 +38,23 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
 
   def modifiersToDownload(howMany: Int, excluding: Iterable[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
     @tailrec
-    def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] = {
-      logInfo(s"acc.length: ${acc.length}")
-      logInfo(s"howMany.length: $howMany")
-      logInfo(s"acc.lengthCompare(howMany) >= 0: ${acc.lengthCompare(howMany) >= 0}")
+    def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] =
       if (acc.lengthCompare(howMany) >= 0) acc
       else {
-        logInfo(s"headerIdsAtHeight(height): ${headerIdsAtHeight(height).map(Algos.encode).mkString(",")}")
         headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[Header](id)) match {
           case Some(bestHeaderAtThisHeight) =>
-            logInfo(s"Get header: ${bestHeaderAtThisHeight.asJson}")
-            logInfo(s"requiredModifiersForHeader(bestHeaderAtThisHeight): " +
-              s"${requiredModifiersForHeader(bestHeaderAtThisHeight).map(modifier => Algos.encode(modifier._2)).mkString(",")}")
             val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
               .filter(m => !excluding.exists(_ sameElements m._2))
               .filter(m => !contains(m._2))
-            logInfo(s"After filter: ${toDownload.map(mod => Algos.encode(mod._2))}")
             continuation(Height @@ (height + 1), acc ++ toDownload)
           case None => acc
         }
       }
-    }
 
-    logInfo(s"bestBlockOpt: ${bestBlockOpt.map(_.asJson)}")
-    logInfo(s"isHeadersChainSynced: $isHeadersChainSynced")
     bestBlockOpt match {
       case _ if !isHeadersChainSynced => Seq.empty
       case Some(fb) => continuation(Height @@ (fb.header.height + 1), Seq.empty)
       case None => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
-      case Some(fb) =>
-        logInfo(s"Calculate modifiers from: ${fb.header.height + 1}")
-        continuation(Height @@ (fb.header.height + 1), Seq.empty)
-      case None =>
-        logInfo(s"Calculate modifiers from: ${blockDownloadProcessor.minimalBlockHeightVar}")
-        continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
 
@@ -155,8 +138,6 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
     } else {
       scoreOf(h.parentId).map { parentScore =>
         val score = Difficulty @@ (parentScore + difficulty)
-        logInfo(s"Score of ${h.asJson} is ${score}")
-        logInfo(s"Best header is ${bestHeaderIdOpt.map(Algos.encode)} and his score is: ${bestHeadersChainScore}")
         val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
           if (score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
         val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) =
@@ -224,10 +205,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
 
   private def bestHeadersChainScore: BigInt = scoreOf(bestHeaderIdOpt.get).get
 
-  protected def scoreOf(id: ModifierId): Option[BigInt] = {
-    logInfo(s"Going to get score of ${Algos.encode(id)} and it is: ${historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))}")
-    historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))
-  }
+  protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))
 
   def heightOf(id: ModifierId): Option[Height] = historyStorage.get(headerHeightKey(id))
     .map(d => Height @@ Ints.fromByteArray(d))
@@ -241,10 +219,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
     *         First id is always from the best headers chain.
     */
   def headerIdsAtHeight(height: Int): Seq[ModifierId] =
-    ModifierId @@ historyStorage.store.get(heightIdsKey(height: Int)).map(_.data).getOrElse(Array()).grouped(32).map(elem => {
-      logInfo(s"Elem: ${Algos.encode(elem)}")
-      elem
-    }).toSeq
+    ModifierId @@ historyStorage.store.get(heightIdsKey(height: Int)).map(_.data).getOrElse(Array()).grouped(32).toSeq
 
   /**
     * @param limit       - maximum length of resulting HeaderChain
@@ -300,13 +275,11 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
 
   object HeaderValidator extends ModifierValidator {
 
-    def validate(header: Header): ValidationResult = {
-      logInfo(s"Going to validate: ${header.id}")
+    def validate(header: Header): ValidationResult =
       if (header.isGenesis) validateGenesisBlockHeader(header)
       else typedModifierById[Header](header.parentId).map { parent =>
         validateChildBlockHeader(header, parent)
       } getOrElse error(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
-    }
 
     private def validateGenesisBlockHeader(header: Header): ValidationResult =
       accumulateErrors

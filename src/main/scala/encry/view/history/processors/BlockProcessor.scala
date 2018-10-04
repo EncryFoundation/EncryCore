@@ -37,9 +37,6 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
                              modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
     val newBestAfterThis: Header = bestFullChain.last.header
-    logInfo(s"Going to process block: ${fullBlock.asJson}")
-    logInfo(s"bestFullChain: ${bestFullChain.map(block => Algos.encode(block.id)).mkString(",")}")
-    logInfo(s"newBestAfterThis: ${newBestAfterThis.asJson}")
     processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, nodeSettings.blocksToKeep))
   }
 
@@ -60,48 +57,22 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def processBetterChain: BlockProcessing = {
     case toProcess @ ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
-      logInfo(s"BestFullHeight: $bestBlockHeight")
-      logInfo(s"BestBlock: ${bestBlockOpt.map(_.asJson)}")
-      logInfo(s"bestBlockOpt.nonEmpty = true and isBetterChain(newBestHeader.id) = true for: ${fullBlock.asJson}")
       val prevBest: Block = bestBlockOpt.get
-      logInfo(s"prevBest: ${prevBest.asJson}")
       val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
-      logInfo(s"prevChain: ${prevChain.headers.map(header => Algos.encode(header.id) + "|" + header.height).mkString(",")}")
-      logInfo(s"newChain: ${newChain.headers.map(header => Algos.encode(header.id) + "|" + header.height).mkString(",")}")
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
-      logInfo(s"newChain.length = ${newChain.length}")
-      logInfo(s"toRemove: ${toRemove.map(block => Algos.encode(block.id) + "|" + block.header.height).mkString(",")}")
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
-      logInfo(s"toApply: ${toApply.map(block => Algos.encode(block.id) + "|" + block.header.height).mkString(",")}")
-      logInfo(s"toApply.lengthCompare(newChain.length - 1) != 0: ${toApply.lengthCompare(newChain.length - 1) != 0}")
-      logInfo(s"toApply.length: ${toApply.length}")
-      logInfo(s"toRemove.length: ${toRemove.length}")
-      logInfo(s"toApply Heights: ${toApply.map(_.header.height).mkString(",")}")
-      logInfo(s"newChain Heights: ${newChain.headers.map(_.height).mkString(",")}")
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
         //application of this block leads to full chain with higher score
         logInfo(s"Appending ${fullBlock.encodedId} as a better chain")
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
-        logInfo(s"!isInBestChain(fullBlock.id) = ${!isInBestChain(fullBlock.id)}")
-        logInfo(s"scoreOf(fullBlock.id).flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))." +
-          s"getOrElse(false) = ${scoreOf(fullBlock.id)
-            .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => {
-              logInfo(s"Score of bestHeader ${Algos.encode(id)} = ${scoreOf(id)}")
-              logInfo(s"Score of bestBlock ${fullBlock.asJson} is ${fbScore}")
-              scoreOf(id).map(_ < fbScore)
-            }))
-            .getOrElse(false)}")
         val updateBestHeader: Boolean =
           (fullBlock.header.height > bestHeaderHeight) ||
             scoreOf(fullBlock.id)
               .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
               .getOrElse(false)
-        logInfo(s"newModRow: ${Algos.encode(newModRow.id)}")
-        logInfo(s"newBestHeader.id: ${Algos.encode(newBestHeader.id)}")
-        logInfo(s"updateBestHeader: $updateBestHeader")
         updateStorage(newModRow, newBestHeader.id, updateBestHeader)
 
         if (settings.postgres.exists(_.enableSave))
@@ -121,20 +92,10 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     header.height == blockDownloadProcessor.minimalBlockHeight && bestBlockIdOpt.isEmpty
 
   private def isBetterChain(id: ModifierId): Boolean = {
-    logInfo(s"Going to process: ${Algos.encode(id)}")
     val isBetter: Option[Boolean] = for {
-      bestFullBlockId <- {
-        logInfo(s"BestBlockOpt is: ${bestBlockOpt.map(_.asJson)}")
-        bestBlockIdOpt
-      }
-      prevBestScore <- {
-        logInfo(s"Score of ${Algos.encode(bestFullBlockId)} is: ${scoreOf(bestFullBlockId)}")
-        scoreOf(bestFullBlockId)
-      }
-      score <- {
-        logInfo(s"Score of ${Algos.encode(id)} is ${scoreOf(id)}")
-        scoreOf(id)
-      }
+      bestFullBlockId <- {bestBlockIdOpt}
+      prevBestScore <- {scoreOf(bestFullBlockId)}
+      score <- scoreOf(id)
     } yield score > prevBestScore
     isBetter getOrElse false
   }
@@ -144,7 +105,6 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       //Orphaned block or full chain is not initialized yet
       logInfo(s"Appending ${params.fullBlock.encodedId} as a non best block")
       logStatus(Seq(), Seq(), params.fullBlock, None)
-      logInfo(s"Process block ${Algos.encode(params.fullBlock.id)} on height ${params.fullBlock.header.height} as non-best")
       historyStorage.bulkInsert(storageVersion(params.newModRow), Seq.empty, Seq(params.newModRow))
       ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
@@ -166,7 +126,6 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def updateStorage(newModRow: EncryPersistentModifier,
                             bestFullHeaderId: ModifierId,
                             updateHeaderInfo: Boolean = false): Unit = {
-    logInfo(s"updateHeaderInfo: ${updateHeaderInfo}")
     val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeaderId)
     val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
       if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)

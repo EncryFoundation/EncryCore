@@ -30,7 +30,7 @@ class PeerSynchronizer extends Actor with Logging {
       if spec.messageCode == PeersSpec.messageCode =>
       peers.filter(checkPossibilityToAddPeer).foreach(isa =>
         peerManager ! AddOrUpdatePeer(isa, None, Some(remote.direction)))
-      //logDebug(s"Got new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
+      logDebug(s"Got new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
     case DataFromPeer(spec, _, remote) if spec.messageCode == GetPeersSpec.messageCode =>
       (peerManager ? RandomPeers(3))
         .mapTo[Seq[InetSocketAddress]]
@@ -39,9 +39,9 @@ class PeerSynchronizer extends Actor with Logging {
             if (remote.socketAddress.getAddress.isSiteLocalAddress) true
             else !address.getAddress.isSiteLocalAddress && address != remote.socketAddress
           })
-          //logInfo(s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
+          logInfo(s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
           networkController ! SendToNetwork(Message(PeersSpec, Right(correctPeers), None), SendToPeer(remote))
-          //logDebug(s"Send to ${remote.socketAddress} peers message which contains next peers: ${peers.mkString(",")}")
+          logDebug(s"Send to ${remote.socketAddress} peers message which contains next peers: ${peers.mkString(",")}")
         }
     case nonsense: Any => logWarn(s"PeerSynchronizer: got something strange $nonsense")
   }

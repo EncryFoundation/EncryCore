@@ -1,7 +1,6 @@
 package encry.view
 
 import java.io.File
-
 import akka.actor.{Actor, Props}
 import akka.pattern._
 import akka.persistence.RecoveryCompleted
@@ -105,7 +104,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
-            logInfo(s"Get modifier in nvh: ${Algos.encode(pmod.id)}")
             if (nodeView.history.contains(pmod.id) || modifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
@@ -115,10 +113,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                 context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
             }
         }
-        logInfo(s"Cache before(${modifiersCache.size}): $modifiersCache")
+        logInfo(s"Cache before(${modifiersCache.size})")
         computeApplications()
         if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
-        logInfo(s"Cache after(${modifiersCache.size}); $modifiersCache")
+        logInfo(s"Cache after(${modifiersCache.size})")
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
@@ -139,31 +137,21 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       val ids: Seq[ModifierId] = modifierTypeId match {
         case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
         case _ =>
-          logInfo("Going to filter modifiers.")
-          modifierIds.filterNot(mid => {
-            logInfo(s"Going to check modifier: ${Algos.encode(mid)}." +
-              s"nodeView.history.contains(mid): ${nodeView.history.contains(mid)}." +
-              s"modifiersCache.contains(key(mid)): ${modifiersCache.contains(key(mid))}")
-            nodeView.history.contains(mid) || modifiersCache.contains(key(mid))
-          })
+          modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       }
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case a: Any =>
       logError(s"Strange input: $a")
   }
 
-  def computeApplications(): Unit = {
-    logInfo("Going to pop candidate from cache")
+  def computeApplications(): Unit =
     modifiersCache.popCandidate(nodeView.history) match {
       case Some(mod) =>
-        logInfo(s"Candidate is: ${Algos.encode(mod.id)}")
         pmodModify(mod)
         computeApplications()
       case None =>
-        logInfo("Candidate is None")
         Unit
     }
-  }
 
   def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
