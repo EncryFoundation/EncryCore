@@ -33,12 +33,10 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
       logInfo(s"Going to download $height blocks from postgres")
     case Failure(_) =>
       logWarn("Failed to connect to postgres")
-      if (settings.influxDB.isDefined) {
-        context.actorSelection("/user/statsSender") ! UnsuccessPostgresSyncTime(System.currentTimeMillis())
+      if (settings.influxDB.isDefined)
         context.actorSelection("/user/statsSender") ! StartRecoveryFromNetwork(System.currentTimeMillis())
-      }
       peerManager ! RecoveryCompleted
-      nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true)
+      nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true, "postgres")
       context.stop(self)
   }
 
@@ -48,9 +46,6 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
       val currentNodeHeight = history.bestBlockOpt.map(_.header.height).getOrElse(0)
       startRecovery(if (currentNodeHeight == 0) 0 else currentNodeHeight + 1).map { _ =>
         logInfo(s"All blocks restored from postgres")
-        if (settings.influxDB.isDefined)
-          context.actorSelection("/user/statsSender") !
-            SuccessfullyFinishedSyncFromPostgres(System.currentTimeMillis())
         context.stop(self)
       }
   }
@@ -60,7 +55,7 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
       context.actorSelection("/user/statsSender") ! SuccessPostgresSyncTime(System.currentTimeMillis())
     heightFuture.flatMap { height =>
       if (height <= startFrom) {
-        nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true)
+        nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true, "postgres")
         Future.unit
       } else settings.postgres.flatMap(_.restoreBatchSize) match {
         case Some(step) =>
@@ -69,7 +64,7 @@ class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Ac
             val from: Int = slide.head
             val to: Int = slide.last
             prevBlocks.flatMap { retrievedBlocks =>
-              nodeViewHolder ! BlocksFromLocalPersistence(retrievedBlocks, to == height)
+              nodeViewHolder ! BlocksFromLocalPersistence(retrievedBlocks, to == height, "postgres")
               selectBlocksByRange(from, to)
                 .recoverWith {
                   case NonFatal(th) =>
