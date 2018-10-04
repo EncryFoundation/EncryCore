@@ -10,7 +10,7 @@ import encry.modifiers.history.{Block, HeaderDBVersion, Payload}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, Transaction, TransactionDBVersion}
 import encry.network.EncryNodeViewSynchronizer.ReceivableMessages.ChangedHistory
-import encry.stats.StatsSender.{StartRecoveryFromNetwork, SuccessPostgresSyncTime, SuccessfullyFinishedSyncFromPostgres, UnsuccessPostgresSyncTime}
+import encry.stats.StatsSender.{StartRecoveryFromNetwork, SuccessPostgresSyncTime}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, GetNodeViewChanges}
 import org.encryfoundation.common.transaction.ProofSerializer
 import scorex.crypto.encode.Base16

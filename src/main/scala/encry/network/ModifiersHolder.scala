@@ -36,18 +36,16 @@ class ModifiersHolder extends PersistentActor with Logging {
     context.system.actorSelection("/user/postgresRestore") ! StartRecovery
   } else {
     logInfo("Recovery completed")
-    if (settings.influxDB.isDefined) {
-      system.actorSelection("user/statsSender") ! FinishRecoveryFromLevelDb(System.currentTimeMillis())
+    if (settings.influxDB.isDefined)
       system.actorSelection("user/statsSender") ! StartRecoveryFromNetwork(System.currentTimeMillis())
-    }
     peerManager ! RecoveryCompleted
   }
 
   override def preStart(): Unit = logInfo(s"ModifiersHolder actor is started.")
 
   override def receiveRecover: Receive = if (settings.levelDb.exists(_.enableRestore)) {
-    if(settings.influxDB.isDefined){
-      system.actorSelection("user/statsSender") ! StartRecoveryFromLevelDb(System.currentTimeMillis())}
+    if(settings.influxDB.isDefined)
+      system.actorSelection("user/statsSender") ! StartRecoveryFromLevelDb(System.currentTimeMillis())
     receiveRecoverEnabled
   } else receiveRecoverDisabled
 

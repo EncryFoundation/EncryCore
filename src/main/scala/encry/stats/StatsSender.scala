@@ -131,10 +131,6 @@ class StatsSender extends Actor {
       influxDB.write(InfluxPort,
         s"""startPostgresRecovery,nodeName=$nodeName,process=startRecoveryFromPostgres value="[${sdf.format(startTime)}]"""")
 
-    case UnsuccessPostgresSyncTime(failTime) =>
-      influxDB.write(InfluxPort,
-        s"""failPostgresRecovery,nodeName=$nodeName,process=failedRecoveryFromPostgres value="[${sdf.format(failTime)}]"""")
-
     case SuccessfullyFinishedSyncFromPostgres(finishTime) =>
       influxDB.write(InfluxPort,
         s"""finishPostgresRecovery,nodeName=$nodeName,process=finishRecoveryFromPostgres value="[${sdf.format(finishTime)}]"""")
@@ -184,8 +180,6 @@ object StatsSender {
   case class TransactionGeneratorStat(txsQty: Int, generationTime: Long)
 
   case class SuccessPostgresSyncTime(time: Long)
-
-  case class UnsuccessPostgresSyncTime(time: Long)
 
   case class SuccessfullyFinishedSyncFromPostgres(time: Long)
 
