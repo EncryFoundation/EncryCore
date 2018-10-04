@@ -80,7 +80,6 @@ class NodeViewSynchronizer extends Actor with Logging {
         case _ =>
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == RequestModifierSpec.MessageCode =>
-      if (invData._1 != Payload.modifierTypeId) {
         historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
           val objs: Seq[NodeViewModifier] = invData._1 match {
             case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
@@ -90,7 +89,6 @@ class NodeViewSynchronizer extends Actor with Logging {
             s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
           self ! ResponseFromLocal(remote, invData._1, objs)
         }
-      }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
       logDebug(s"Got inv message from ${remote.socketAddress}.")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
