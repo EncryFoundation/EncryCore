@@ -135,7 +135,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       if (mempool) sender() ! ChangedMempool(nodeView.mempool)
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] = modifierTypeId match {
-        case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
+        case Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       }
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)

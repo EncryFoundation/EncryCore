@@ -5,6 +5,7 @@ import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
 import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
+import encry.modifiers.mempool.Transaction
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToNetwork}
@@ -124,54 +125,80 @@ class DeliveryManager extends Actor with Logging {
     peer.handlerRef ! Message(EncrySyncInfoMessageSpec, Right(syncInfo), None)
   )
 
-  def expect(cp: ConnectedPeer, mtid: ModifierTypeId, mids: Seq[ModifierId]): Unit = tryWithLogging {
-    if ((mtid == 2 && isBlockChainSynced && isMining) || mtid != 2) {
-      val notRequestedIds: Seq[ModifierId] = mids.foldLeft(Seq[ModifierId]()) {
-        case (notRequested, modId) =>
+  def expect(peer: ConnectedPeer, mTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = tryWithLogging {
+    if ((mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining) || mTypeId != Transaction.ModifierTypeId) {
+      val notYetRequestedIds: Seq[ModifierId] = modifierIds.foldLeft(Vector[ModifierId]()) {
+        case (notYetRequested, modId) =>
           val modifierKey: ModifierIdAsKey = key(modId)
           if (historyReaderOpt.forall(history => !history.contains(modId) && !delivered.contains(key(modId)))) {
-            if (!cancellables.contains(modifierKey)) notRequested :+ modId
+            if (!cancellables.contains(modifierKey)) notYetRequested :+ modId
             else {
-              peers = peers.updated(modifierKey, (peers.getOrElse(modifierKey, Seq()) :+ cp).distinct)
-              notRequested
+              peers = peers.updated(modifierKey, (peers.getOrElse(modifierKey, Seq()) :+ peer).distinct)
+              notYetRequested
             }
-          } else notRequested
+          } else notYetRequested
       }
-      if (notRequestedIds.nonEmpty) cp.handlerRef ! Message(requestModifierSpec, Right(mtid -> notRequestedIds), None)
+      if (notYetRequestedIds.nonEmpty) peer.handlerRef ! Message(requestModifierSpec, Right(mTypeId -> notYetRequestedIds), None)
 
-      notRequestedIds.foreach { id =>
+      notYetRequestedIds.foreach { id =>
         val cancellable: Cancellable = context.system.scheduler
-          .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, id))
-        cancellables = cancellables.updated(key(id), (cp, (cancellable, 0)))
+          .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(peer, mTypeId, id))
+        cancellables = cancellables.updated(key(id), (peer, (cancellable, 0)))
       }
     }
   }
 
-  def reexpect(cp: ConnectedPeer, mtid: ModifierTypeId, mid: ModifierId): Unit = tryWithLogging {
-    val midAsKey: ModifierIdAsKey = key(mid)
-    cancellables.get(midAsKey).foreach(peerInfo =>
-      if (peerInfo._2._2 < settings.network.maxDeliveryChecks && statusTracker.statuses.exists(peer =>
-        peer._1.socketAddress == cp.socketAddress)) {
-        statusTracker.statuses.find(peer => peer._1.socketAddress == cp.socketAddress).foreach { peer =>
-          logDebug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mtid with id: " +
-            s"${Algos.encode(mid)}")
-          peer._1.handlerRef ! Message(requestModifierSpec, Right(mtid -> Seq(mid)), None)
+  def reexpect(cp: ConnectedPeer, mTypeId: ModifierTypeId, modifierId: ModifierId): Unit = tryWithLogging {
+    val modifierKey: ModifierIdAsKey = key(modifierId)
+    val peerAndHistoryOpt: Option[(ConnectedPeer, HistoryComparisonResult)] =
+      statusTracker.statuses.find(peer => peer._1.socketAddress == cp.socketAddress)
+    cancellables.get(modifierKey) match {
+      case Some(peerInfo) if peerInfo._2._2 < settings.network.maxDeliveryChecks && peerAndHistoryOpt.isDefined =>
+        peerAndHistoryOpt.foreach { case (peer, _) =>
+          logDebug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mTypeId with id: " +
+            s"${Algos.encode(modifierId)}")
+          peer.handlerRef ! Message(requestModifierSpec, Right(mTypeId -> Seq(modifierId)), None)
           val cancellable: Cancellable = context.system.scheduler
-            .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, mid))
+            .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mTypeId, modifierId))
           peerInfo._2._1.cancel()
-          cancellables = cancellables.updated(midAsKey, peer._1 -> (cancellable, peerInfo._2._2 + 1))
+          cancellables = cancellables.updated(modifierKey, peer -> (cancellable, peerInfo._2._2 + 1))
         }
-      } else {
-        cancellables -= midAsKey
-        peers.get(midAsKey).foreach(downloadPeers =>
+      case Some(_) =>
+        cancellables -= modifierKey
+        peers.get(modifierKey).foreach { downloadPeers =>
           downloadPeers.headOption.foreach { nextPeer =>
-            peers = peers.updated(midAsKey, downloadPeers.filter(_ != nextPeer))
-            expect(nextPeer, mtid, Seq(mid))
+            peers = peers.updated(modifierKey, downloadPeers.filter(_ != nextPeer))
+            expect(nextPeer, mTypeId, Seq(modifierId))
           }
-        )
-      }
-    )
+        }
+      case None =>
+    }
   }
+
+  //def reexpect(cp: ConnectedPeer, mTypeId: ModifierTypeId, modifierId: ModifierId): Unit = tryWithLogging {
+  //  val modifierKey: ModifierIdAsKey = key(modifierId)
+  //  cancellables.get(modifierKey).foreach { peerInfo =>
+  //    if (peerInfo._2._2 < settings.network.maxDeliveryChecks && statusTracker.statuses.exists(_._1.socketAddress == cp.socketAddress)) {
+  //      statusTracker.statuses.find(peer => peer._1.socketAddress == cp.socketAddress).foreach { peer =>
+  //        logDebug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mTypeId with id: " +
+  //          s"${Algos.encode(modifierId)}")
+  //        peer._1.handlerRef ! Message(requestModifierSpec, Right(mTypeId -> Seq(modifierId)), None)
+  //        val cancellable: Cancellable = context.system.scheduler
+  //          .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mTypeId, modifierId))
+  //        peerInfo._2._1.cancel()
+  //        cancellables = cancellables.updated(modifierKey, peer._1 -> (cancellable, peerInfo._2._2 + 1))
+  //      }
+  //    } else {
+  //      cancellables -= modifierKey
+  //      peers.get(modifierKey).foreach(downloadPeers =>
+  //        downloadPeers.headOption.foreach { nextPeer =>
+  //          peers = peers.updated(modifierKey, downloadPeers.filter(_ != nextPeer))
+  //          expect(nextPeer, mTypeId, Seq(modifierId))
+  //        }
+  //      )
+  //    }
+  //  }
+  //}
 
   def isExpecting(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Boolean =
     cancellables.get(key(mid)).exists(_._1 == cp)

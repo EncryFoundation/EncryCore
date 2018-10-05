@@ -21,7 +21,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
 
-trait BlockHeaderProcessor extends Logging {
+trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider
