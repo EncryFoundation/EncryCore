@@ -158,9 +158,7 @@ case class EncryModifiersCache(override val maxSize: Int)
         // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
         cache.find { case (k, v) =>
           v match {
-            case h: Header =>
-              if (h.height > headersHeight + 1) false
-              else tryToApply(k, v)
+            case h: Header if h.height > headersHeight + 1 => false
             case _ => tryToApply(k, v)
           }
         }.map { case (k, _) => k }
