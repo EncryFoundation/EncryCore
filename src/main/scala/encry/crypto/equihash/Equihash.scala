@@ -89,7 +89,8 @@ object Equihash {
       var xC: Vector[(Array[Byte], Seq[Int])] = Vector.empty[(Array[Byte], Seq[Int])]
       while (x.nonEmpty) {
         val xSize: Int = x.size
-        val j: Int = (1 until xSize).find(j => !hasCollision(x.last._1, x(xSize - 1 - j)._1, i, collisionLength)).getOrElse(xSize)
+        val j: Int = (1 until xSize).find(j => !hasCollision(x.last._1, x(xSize - 1 - j)._1, i, collisionLength))
+          .getOrElse(xSize)
         for {
           l <- 0 until j - 1
           m <- l + 1 until j
@@ -117,7 +118,8 @@ object Equihash {
       } {
         val res: Array[Byte] = xor(x(XSize - 1 - l)._1, x(XSize - 1 - m)._1)
         if (countLeadingZeroes(res) == 8 * hashLength && distinctIndices(x(XSize - 1 - l)._2, x(XSize - 1 - m)._2)) {
-          val p: Seq[Int] = if (x(XSize - 1 - l)._2.head < x(XSize - 1 - m)._2.head) x(XSize - 1 - l)._2 ++ x(XSize - 1 - m)._2
+          val p: Seq[Int] =
+            if (x(XSize - 1 - l)._2.head < x(XSize - 1 - m)._2.head) x(XSize - 1 - l)._2 ++ x(XSize - 1 - m)._2
           else x(XSize - 1 - m)._2 ++ x(XSize - 1 - l)._2
           solns = solns :+ EquihashSolution(p)
         }
@@ -163,7 +165,8 @@ object Equihash {
     * @return Return True if solution is valid, False if not.
     */
   @SuppressWarnings(Array("NullParameter"))
-  def validateSolution(n: Char, k: Char, personal: Array[Byte], header: Array[Byte], solutionIndices: IndexedSeq[Int]): Boolean = {
+  def validateSolution(n: Char, k: Char, personal: Array[Byte],
+                       header: Array[Byte], solutionIndices: IndexedSeq[Int]): Boolean = {
 
     assert(n > 1)
     assert(k >= 3)

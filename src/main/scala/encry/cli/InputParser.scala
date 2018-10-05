@@ -1,7 +1,6 @@
 package encry.cli
 
 import fastparse.{all, core}
-
 import scala.util.{Failure, Success, Try}
 
 object InputParser {
