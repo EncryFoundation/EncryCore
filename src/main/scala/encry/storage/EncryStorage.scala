@@ -16,6 +16,7 @@ trait EncryStorage extends AutoCloseable with Logging {
   def remove(version: ByteArrayWrapper, toRemove: Seq[ByteArrayWrapper]): Unit =
     store.update(version, toRemove, Seq.empty)
 
+
   def update(version: ByteArrayWrapper,
              toRemove: Seq[ByteArrayWrapper],
              toUpdate: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit = {

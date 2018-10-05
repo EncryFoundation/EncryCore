@@ -1,6 +1,7 @@
 package encry.view.wallet
 
 import java.io.File
+
 import com.google.common.primitives.Longs
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.Block
@@ -14,6 +15,9 @@ import encry.utils.{BalanceCalculator, BoxFilter}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.crypto.PublicKey25519
 import scala.util.Try
+import encry.EncryApp.system
+import encry.view.wallet.WalletHolder.UpdateCurrentState
+import akka.util.ByteString
 
 case class EncryWallet(walletStore: Store, accountManager: AccountManager) {
 
@@ -34,10 +38,10 @@ case class EncryWallet(walletStore: Store, accountManager: AccountManager) {
       val (newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]) =
         block.transactions.foldLeft(Seq[EncryBaseBox](), Seq[EncryBaseBox]()) {
           case ((nBxs, sBxs), tx: Transaction) =>
-            val newBxsL: Seq[EncryBaseBox] = tx.newBoxes
-              .foldLeft(Seq[EncryBaseBox]()) { case (nBxs2, bx) =>
+            val newBxsL: Seq[EncryBaseBox] = tx.newBoxes.foldLeft(Seq[EncryBaseBox]()) {
+              case (nBxs2, bx) =>
                 if (propositions.exists(_.contractHash sameElements bx.proposition.contractHash)) nBxs2 :+ bx else nBxs2
-              }
+            }
             val spendBxsIdsL: Seq[EncryBaseBox] = tx.inputs
               .filter(input => walletStorage.containsBox(input.boxId))
               .foldLeft(Seq.empty[EncryBaseBox]) { case (boxes, input) =>
@@ -54,7 +58,7 @@ case class EncryWallet(walletStore: Store, accountManager: AccountManager) {
 
   def rollback(to: VersionTag): Try[EncryWallet] = Try(walletStore.rollback(ByteArrayWrapper(to))).map(_ => this)
 
-  private def calculateNewBalance(bxsToInsert: Seq[EncryBaseBox], bxsToRemove: Seq[EncryBaseBox]): ByteArrayWrapper = {
+  private def calculateNewBalance(bxsToInsert: Seq[EncryBaseBox], bxsToRemove: Seq[EncryBaseBox]): Array[Byte] = {
     val balancesToInsert: Map[ByteArrayWrapper, Amount] = BalanceCalculator.balanceSheet(bxsToInsert)
       .map(elt => ByteArrayWrapper(elt._1) -> elt._2)
     val balancesToRemove: Map[ByteArrayWrapper, Amount] = BalanceCalculator.balanceSheet(bxsToRemove)
@@ -68,11 +72,26 @@ case class EncryWallet(walletStore: Store, accountManager: AccountManager) {
         balanceMap.updated(tokenInfo._1, tokenInfo._2.foldLeft(0L)((tokenSum, token) => tokenSum + token._2))
       }
       .map(tokenInfo => tokenInfo._1 -> (tokenInfo._2 - balancesToRemove.filter(_._1 == tokenInfo._1).values.sum))
-    ByteArrayWrapper(
+
       newBalances.foldLeft(Array.empty[Byte]) { case (acc, (ByteArrayWrapper(id), balance)) =>
         acc ++ id ++ Longs.toByteArray(balance)
       }
-    )
+
+  }
+
+  private def calculateNewBalance1(bxsToInsert: Seq[EncryBaseBox], bxsToRemove: Seq[EncryBaseBox]): ByteString = {
+    val balanceToInsert: Map[TokenId, Amount] = BalanceCalculator.balanceSheet(bxsToInsert)
+    val balanceToRemove: Map[TokenId, Amount] = BalanceCalculator.balanceSheet(bxsToRemove)
+    val oldBalance =
+  }
+
+  def updateWallet1(modifierId: ModifierId, newBoxes: Seq[EncryBaseBox], spentBoxes: Seq[EncryBaseBox]): Unit = {
+
+    val boxesToInsert: Seq[EncryBaseBox] = newBoxes.diff(spentBoxes)
+    val newBalance =
+
+      system.actorSelection("user/walletHolder") !
+        UpdateCurrentState(toRemoveSummary, toInsertSummary)
   }
 
   private def updateWallet(modifierId: ModifierId, newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]): Unit = {
@@ -84,6 +103,7 @@ case class EncryWallet(walletStore: Store, accountManager: AccountManager) {
     val toRemoveSummary: Seq[ByteArrayWrapper] = spentBxs.map(bx => keyByBoxId(bx.id))
     val toInsertSummary: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = (balancesKey, newBalances) +:
       BoxFilter.filterAmountCarryingBxs(bxsToInsert).map(bx => keyByBoxId(bx.id) -> ByteArrayWrapper(bx.bytes))
+
     walletStorage.update(ByteArrayWrapper(modifierId), toRemoveSummary, toInsertSummary)
   }
 

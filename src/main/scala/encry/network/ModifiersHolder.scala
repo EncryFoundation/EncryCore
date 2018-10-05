@@ -61,7 +61,7 @@ class ModifiersHolder extends PersistentActor with Logging {
     case _ =>
   }
 
-  override def receiveCommand: Receive = {
+  override def receiveCommand(): Receive = {
     case CheckAllBlocksSent =>
       if (completedBlocks.isEmpty) notifyRecoveryCompleted()
       else context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
