@@ -70,7 +70,6 @@ object EncryApp extends App with Logging {
       system.actorOf(Props(classOf[PostgresRestore], dbService, nodeViewHolder), "postgresRestore")
   }
   if (settings.levelDb.isDefined) {
-    if (settings.levelDb.exists(_.enableSave) || settings.levelDb.exists(_.enableRestore))
       system.actorOf(Props[ModifiersHolder], "modifiersHolder")
     if (!settings.levelDb.exists(_.enableRestore)) system.actorSelection("/user/postgresRestore") ! StartRecovery
   }
