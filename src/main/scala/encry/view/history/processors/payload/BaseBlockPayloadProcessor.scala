@@ -6,7 +6,7 @@ import encry.modifiers.history.Payload
 
 import scala.util.Try
 
-trait  BaseBlockPayloadProcessor {
+trait BaseBlockPayloadProcessor {
 
   protected def process(payload: Payload): History.ProgressInfo[EncryPersistentModifier]
 
