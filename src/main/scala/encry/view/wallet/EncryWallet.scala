@@ -18,7 +18,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Try
 import encry.EncryApp.system
-import encry.view.wallet.WalletHolder.{GetCurrentBalanceRequest, UpdateCurrentState}
+import encry.view.wallet.WalletHolder.{CheckIfContainsBox, GetCurrentBalanceRequest, UpdateCurrentState}
 import akka.util.ByteString
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scala.concurrent.Future
@@ -40,16 +40,16 @@ case class EncryWallet(walletStore: Store, accountManager: AccountManager) {
       val (newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]) =
         block.transactions.foldLeft(Seq[EncryBaseBox](), Seq[EncryBaseBox]()) {
           case ((nBxs, sBxs), tx: Transaction) =>
-            val newBxsL: Seq[EncryBaseBox] = tx.newBoxes.foldLeft(Seq[EncryBaseBox]()) {
+            val newBoxes: Seq[EncryBaseBox] = tx.newBoxes.foldLeft(Seq[EncryBaseBox]()) {
               case (nBxs2, bx) =>
-                if (propositions.exists(_.contractHash sameElements bx.proposition.contractHash)) nBxs2 :+ bx else nBxs2
+                if (propositions.exists(_.contractHash sameElements bx.proposition.contractHash)) nBxs2 :+ bx
+                else nBxs2
             }
-            val spendBxsIdsL: Seq[EncryBaseBox] = tx.inputs
-              .filter(input => walletStorage.containsBox(input.boxId))
-              .foldLeft(Seq.empty[EncryBaseBox]) { case (boxes, input) =>
-                walletStorage.getBoxById(input.boxId).map(bx => boxes :+ bx).getOrElse(boxes)
-              }
-            (nBxs ++ newBxsL) -> (sBxs ++ spendBxsIdsL)
+            val spentBoxes: Future[Seq[EncryBaseBox]] =
+              (system.actorSelection("user/WalletHolder") ? CheckIfContainsBox(tx.inputs)) (5.seconds)
+                .mapTo[Seq[EncryBaseBox]]
+
+            (nBxs ++ newBoxes) -> (sBxs ++ spentBoxes.value.flatMap(_.getOrElse(Seq())))
         }
 
       updateWallet(newBxs, spentBxs)
@@ -66,16 +66,18 @@ case class EncryWallet(walletStore: Store, accountManager: AccountManager) {
     val balancesToRemove: Map[ByteString, Amount] = BalanceCalculator.balanceSheet(bxsToRemove)
       .map(elem => ByteString.fromArray(elem._1) -> elem._2)
     val oldBalances: Future[Map[ByteString, Amount]] =
-      (system.actorSelection("/user/walletHolder") ? GetCurrentBalanceRequest()) (5.seconds)
+      (system.actorSelection("user/walletHolder") ? GetCurrentBalanceRequest()) (5.seconds)
         .mapTo[Map[ByteString, Amount]]
     val newBalances: Future[Map[ByteString, Amount]] = oldBalances.map { old =>
-      (old.toSeq ++ balancesToInsert.toSeq).groupBy(_._1).foldLeft(Map[ByteString, Amount]()) { case (balanceMap, tokenInfo) =>
-        balanceMap.updated(tokenInfo._1, tokenInfo._2.foldLeft(0L)((tokenSum, token) => tokenSum + token._2))
-      }.map(tokenInfo => tokenInfo._1 -> (tokenInfo._2 - balancesToRemove.filter(_._1 == tokenInfo._1).values.sum))
+      (old.toSeq ++ balancesToInsert.toSeq).groupBy(_._1)
+        .foldLeft(Map[ByteString, Amount]()) { case (balanceMap, tokenInfo) =>
+          balanceMap.updated(tokenInfo._1, tokenInfo._2.foldLeft(0L)((tokenSum, token) => tokenSum + token._2))
+        }.map(tokenInfo => tokenInfo._1 -> (tokenInfo._2 - balancesToRemove.filter(_._1 == tokenInfo._1).values.sum))
     }
 
-    newBalances.map(balances => balances.foldLeft(ByteString.empty) { case (acc, (id, balance)) =>
-      acc ++ id ++ Longs.toByteArray(balance)
+    newBalances.map (
+      _.foldLeft(ByteString.empty) { case (acc, (id, balance)) =>
+        acc ++ id ++ Longs.toByteArray(balance)
     }).value.map(x => x.getOrElse(ByteString.empty)).getOrElse(ByteString.empty)
   }
 
@@ -96,7 +98,7 @@ case class EncryWallet(walletStore: Store, accountManager: AccountManager) {
 
   def filterAmountCarryingBxs(bxs: Seq[EncryBaseBox]): Seq[MonetaryBox] =
     bxs.foldLeft(Seq[MonetaryBox]())((acc, bx) => bx match {
-      case acbx: MonetaryBox => acc :+ acbx
+      case box: MonetaryBox => acc :+ box
       case _ => acc
     })
 }

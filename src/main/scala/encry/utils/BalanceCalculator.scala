@@ -7,8 +7,6 @@ import encry.settings.Constants
 
 object BalanceCalculator {
 
-  //TODO: try to redone 'cache.get(tokenId)...'
-
   def balanceSheet(bxs: Traversable[EncryBaseBox], excludeTokenIssuance: Boolean = false): Map[TokenId, Amount] =
     bxs.foldLeft(Map.empty[ByteStr, Amount]) {
       case (cache, bx: AssetBox) =>
