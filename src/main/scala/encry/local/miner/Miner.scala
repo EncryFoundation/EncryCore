@@ -196,8 +196,7 @@ class Miner extends Actor with Logging {
           case None => logInfo(s"No best header opt")
         }
         val candidate: CandidateEnvelope =
-          if ((bestHeaderOpt.isDefined &&
-            (syncingDone || nodeView.history.isFullChainSynced)) || settings.node.offlineGeneration) {
+          if ((bestHeaderOpt.isDefined && nodeView.history.isFullChainSynced) || settings.node.offlineGeneration) {
             logInfo(s"Starting candidate generation at " +
               s"${dateFormat.format(new Date(System.currentTimeMillis()))}")
             if (settings.influxDB.isDefined)
