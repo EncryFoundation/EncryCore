@@ -100,9 +100,7 @@ trait LRUCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader] extend
 
   override protected def onRemove(key: K): Unit = {}
 
-  def keyToRemove(): K = {
-    evictionCandidate()
-  }
+  def keyToRemove(): K = evictionCandidate()
 }
 
 class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader]
