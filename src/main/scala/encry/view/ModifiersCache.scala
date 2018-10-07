@@ -20,6 +20,10 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
 
   val cache: TrieMap[K, V] = TrieMap[K, V]()
 
+  private var cleaning: Boolean = false
+
+  def enableCleaning: Unit = cleaning = true
+
   def size: Int = cache.size
 
   def isEmpty: Boolean = size == 0
@@ -59,6 +63,7 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
     if (!contains(key)) {
       onPut(key)
       cache.put(key, value)
+      if (size > maxSize && cleaning) remove(keyToRemove())
     }
 
   def remove(key: K): Option[V] = {

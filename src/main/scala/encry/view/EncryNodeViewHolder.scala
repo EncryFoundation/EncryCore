@@ -96,6 +96,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       if (receivedAll) {
         logInfo(s"Received all blocks from recovery")
         peerManager ! RecoveryCompleted
+        modifiersCache.enableCleaning
       }
       if (applicationsSuccessful && settings.levelDb.exists(_.enableRestore) && !receivedAll) sender ! SendBlocks
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
