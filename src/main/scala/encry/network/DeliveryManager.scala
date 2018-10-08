@@ -63,6 +63,7 @@ class DeliveryManager extends Actor with Logging {
   def netMessages: Receive = {
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       statusTracker.updateStatus(remote, status)
+      logInfo(s"$remote status is $status")
       status match {
         case Unknown => logInfo("Peer status is still unknown")
         case Younger => sendExtension(remote, status, extOpt)
@@ -133,7 +134,6 @@ class DeliveryManager extends Actor with Logging {
   )
 
   def expect(peer: ConnectedPeer, mTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = tryWithLogging {
-    logInfo(s"Going to expect ${modifierIds.map(Algos.encode).mkString(",")} of type $mTypeId from $peer")
     if ((mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining) || mTypeId != Transaction.ModifierTypeId) {
       val notYetRequestedIds: Seq[ModifierId] = modifierIds.foldLeft(Vector[ModifierId]()) {
         case (notYetRequested, modId) =>
@@ -228,7 +228,10 @@ class DeliveryManager extends Actor with Logging {
                     extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit = extOpt match {
     case None => logInfo(s"extOpt is empty for: $remote. Its status is: $status.")
     case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
-      case (mid, mods) => networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
+      case (mid, mods) => {
+        logDebug(s"Sending to $remote modifiers of type $mid:\n${mods}")
+        networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
+      }
     }
   }
 
