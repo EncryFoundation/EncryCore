@@ -128,6 +128,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
   private def getHeaderInfoUpdate(h: Header): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)],
                                                       EncryPersistentModifier)] = {
     val difficulty: Difficulty = h.difficulty
+    logInfo(s"Header ${h.encodedId} difficulty is $difficulty")
     if (h.isGenesis) {
       logInfo(s"Initialize header chain with genesis header ${h.encodedId}")
       Option(Seq(
@@ -138,6 +139,9 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
     } else {
       scoreOf(h.parentId).map { parentScore =>
         val score = Difficulty @@ (parentScore + difficulty)
+        logInfo(s"Header ${h.encodedId} parent score is $parentScore")
+        logInfo(s"Header ${h.encodedId} score is $score")
+        logInfo(s"Header ${h.encodedId} bestHeadersChainScore is $bestHeadersChainScore")
         val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
           if (score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
         val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) =

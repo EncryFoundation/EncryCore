@@ -45,7 +45,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
   var receivedAll: Boolean = !(settings.postgres.exists(_.enableRestore) || settings.levelDb.exists(_.enableRestore))
   var triedToDownload: Boolean = !settings.postgres.exists(_.enableRestore)
-  val modifiersCache: EncryModifiersCache = EncryModifiersCache(1000)
+  val modifiersCache: EncryModifiersCache = EncryModifiersCache(3000)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     Header.modifierTypeId -> HeaderSerializer,
     Payload.modifierTypeId -> PayloadSerializer,
@@ -138,6 +138,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         case Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       }
+      logDebug(s"Number of modifiers in cache: ${modifierIds.filter(modifiersCache.contains(_)).size}") //todo remove after task completion
+      logDebug(s"Number of modifiers in history: ${modifierIds.filter(nodeView.history.contains(_)).size}")
+      logDebug(s"Requesting from $peer ids: ${ids.map(Algos.encode)}")
+      val headersInCahhe = modifiersCache.cache.values.toList.filter(_.modifierTypeId == Header.modifierTypeId).map(_.asInstanceOf[Header]).map(_.height)
+      //println(headersInCahhe)
+      if (headersInCahhe.nonEmpty)logDebug(s"Height in cache: min ${headersInCahhe.min}, max ${headersInCahhe.max}, while header height is ${nodeView.history.bestHeaderHeight}")
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case a: Any =>
       logError(s"Strange input: $a")
