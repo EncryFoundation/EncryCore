@@ -4,6 +4,7 @@ import java.lang
 import java.util.concurrent.ConcurrentHashMap
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.Header
+import encry.EncryApp.settings
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
 import scala.annotation.tailrec
@@ -20,7 +21,8 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
 
   val cache: TrieMap[K, V] = TrieMap[K, V]()
 
-  private var cleaning: Boolean = false
+  private var cleaning: Boolean = settings.postgres.forall(postgres => !postgres.enableRestore) &&
+    settings.levelDb.forall(levelDb => !levelDb.enableRestore)
 
   def enableCleaning: Unit = cleaning = true
 
