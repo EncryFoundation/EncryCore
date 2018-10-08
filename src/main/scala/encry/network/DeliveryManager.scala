@@ -3,11 +3,12 @@ package encry.network
 import akka.actor.{Actor, Cancellable}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
-import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
+import encry.consensus.History.{HistoryComparisonResult, Older, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.mempool.Transaction
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
+import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToNetwork}
 import encry.network.PeerConnectionHandler._
 import encry.network.message.BasicMsgDataTypes.ModifiersData
@@ -243,9 +244,7 @@ class DeliveryManager extends Actor with Logging {
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     if (settings.influxDB.isDefined)
       context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
-    statusTracker.statuses.keys.foreach(peer => {
-      expect(peer, modifierTypeId, modifierIds)
-    })
+    statusTracker.statuses.keys.foreach(expect(_, modifierTypeId, modifierIds))
   }
 
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = tryWithLogging {

@@ -75,7 +75,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
         val updateBestHeader: Boolean =
-          !isInBestChain(fullBlock.id) &&
+          (fullBlock.header.height > bestHeaderHeight) ||
             scoreOf(fullBlock.id)
               .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
               .getOrElse(false)
@@ -103,7 +103,6 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       prevBestScore <- scoreOf(bestFullBlockId)
       score <- scoreOf(id)
     } yield score > prevBestScore
-
     isBetter getOrElse false
   }
 
