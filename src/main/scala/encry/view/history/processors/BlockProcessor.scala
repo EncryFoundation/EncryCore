@@ -55,13 +55,11 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def processBetterChain: BlockProcessing = {
     case toProcess @ ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
-
       val prevBest: Block = bestBlockOpt.get
       val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
-
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
         //application of this block leads to full chain with higher score
@@ -69,7 +67,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
         val updateBestHeader: Boolean =
-          !isInBestChain(fullBlock.id) &&
+          (fullBlock.header.height > bestHeaderHeight) ||
             scoreOf(fullBlock.id)
               .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
               .getOrElse(false)
@@ -97,7 +95,6 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       prevBestScore <- scoreOf(bestFullBlockId)
       score <- scoreOf(id)
     } yield score > prevBestScore
-
     isBetter getOrElse false
   }
 

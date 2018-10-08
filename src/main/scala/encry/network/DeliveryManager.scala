@@ -3,10 +3,10 @@ package encry.network
 import akka.actor.{Actor, Cancellable}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
-import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
+import encry.consensus.History.{HistoryComparisonResult, Older, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
-import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
+import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToNetwork}
 import encry.network.PeerConnectionHandler._
 import encry.network.message.BasicMsgDataTypes.ModifiersData
@@ -91,7 +91,6 @@ class DeliveryManager extends Actor with Logging {
         modifiers partition { case (id, _) => isSpam(id) }
       if (settings.influxDB.isDefined)
         context.actorSelection("/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
-      logInfo(s"Got modifiers (${modifiers.size}) of type $typeId from remote connected peer: $remote")
       for ((id, _) <- modifiers) receive(typeId, id, remote)
       if (spam.nonEmpty) {
         logInfo(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
@@ -149,12 +148,10 @@ class DeliveryManager extends Actor with Logging {
 
   def reexpect(cp: ConnectedPeer, mtid: ModifierTypeId, mid: ModifierId): Unit = tryWithLogging {
     val midAsKey: ModifierIdAsKey = key(mid)
-    cancellables.get(midAsKey).foreach(peerInfo =>
+    cancellables.get(midAsKey).foreach { peerInfo =>
       if (peerInfo._2._2 < settings.network.maxDeliveryChecks && statusTracker.statuses.exists(peer =>
         peer._1.socketAddress == cp.socketAddress)) {
         statusTracker.statuses.find(peer => peer._1.socketAddress == cp.socketAddress).foreach { peer =>
-          logDebug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mtid with id: " +
-            s"${Algos.encode(mid)}")
           peer._1.handlerRef ! Message(requestModifierSpec, Right(mtid -> Seq(mid)), None)
           val cancellable: Cancellable = context.system.scheduler
             .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mtid, mid))
@@ -163,14 +160,13 @@ class DeliveryManager extends Actor with Logging {
         }
       } else {
         cancellables -= midAsKey
-        peers.get(midAsKey).foreach(downloadPeers =>
-          downloadPeers.headOption.foreach { nextPeer =>
-            peers = peers.updated(midAsKey, downloadPeers.filter(_ != nextPeer))
-            expect(nextPeer, mtid, Seq(mid))
-          }
-        )
+        val peersToRequest: Seq[ConnectedPeer] = peers.getOrElse(midAsKey, statusTracker.statuses.keys.toSeq)
+        peersToRequest.headOption.foreach { nextPeer =>
+          peers = peers.updated(midAsKey, peersToRequest.filter(_ != nextPeer))
+          expect(nextPeer, mtid, Seq(mid))
+        }
       }
-    )
+    }
   }
 
   def isExpecting(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Boolean =
@@ -202,9 +198,7 @@ class DeliveryManager extends Actor with Logging {
       Message(requestModifierSpec, Right(modifierTypeId -> modifierIds), None)
     if (settings.influxDB.isDefined)
       context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
-    statusTracker.statuses.keys.foreach(peer => {
-      expect(peer, modifierTypeId, modifierIds)
-    })
+    statusTracker.statuses.keys.foreach(expect(_, modifierTypeId, modifierIds))
   }
 
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = tryWithLogging {
