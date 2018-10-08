@@ -132,7 +132,7 @@ class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryR
           false
         case Failure(e: MalformedModifierError) =>
           logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
-          remove(k, rememberKey = true)
+          remove(k)
           false
         case Failure(e) =>
           logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
