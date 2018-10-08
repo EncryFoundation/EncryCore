@@ -97,6 +97,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
                                                   filterCond: Header => Boolean): Seq[Seq[Header]] = {
     @tailrec
     def loop(currentHeight: Int, acc: Seq[Seq[Header]]): Seq[Seq[Header]] = {
+      logInfo(s"Loop on height: ${currentHeight}")
       val nextLevelHeaders: Seq[Header] = Seq(currentHeight)
         .flatMap { h => headerIdsAtHeight(h + 1) }
         .flatMap { id => typedModifierById[Header](id) }

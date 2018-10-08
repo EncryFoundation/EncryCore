@@ -97,7 +97,8 @@ class NodeViewSynchronizer extends Actor with Logging {
       logDebug(s"Got inv message from ${remote.socketAddress}.")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
-      logDebug( s"Got modifiers from ${remote.socketAddress} with modTypeID: ${data._1}.")
+      logDebug( s"Got modifiers from ${remote.socketAddress} with modTypeID: ${data._1} " +
+        s"with id: ${data._2.keys.map(Algos.encode).mkString(",")}")
       deliveryManager ! DataFromPeer(spec, data: ModifiersData@unchecked, remote)
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       deliveryManager ! RequestFromLocal(peer, modifierTypeId, modifierIds)

@@ -100,6 +100,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       }
       if (applicationsSuccessful && settings.levelDb.exists(_.enableRestore) && !receivedAll) sender ! SendBlocks
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
+      logInfo(s"Get modifiers from remote of type $modifierTypeId")
+      logInfo(s"modifiersCache.isEmpty: ${modifiersCache.isEmpty}")
+      logInfo(s"nodeView.history.isHeadersChainSynced: ${nodeView.history.isHeadersChainSynced}")
       if (modifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
@@ -115,6 +118,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
         logInfo(s"Cache before(${modifiersCache.size})")
         computeApplications()
+        logInfo(s"modifiersCache.isEmpty: ${modifiersCache.isEmpty}")
+        logInfo(s"!nodeView.history.isHeadersChainSynced: ${!nodeView.history.isHeadersChainSynced}")
         if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
         logInfo(s"Cache after(${modifiersCache.size})")
       }
@@ -146,7 +151,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   def computeApplications(): Unit =
     modifiersCache.popCandidate(nodeView.history) match {
       case Some(mod) =>
+        logInfo(s"Process: ${Algos.encode(mod.id)}")
+        val startTime = System.currentTimeMillis()
         pmodModify(mod)
+        logInfo(s"Type of applying ${Algos.encode(mod.id)}: ${System.currentTimeMillis() - startTime}")
         computeApplications()
       case None => Unit
     }
@@ -261,6 +269,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
+        logInfo("Looks like success")
         if (settings.influxDB.isDefined)
           context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
         logInfo(s"Going to apply modifications to the state: $progressInfo")
@@ -297,6 +306,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               nodeViewSynchronizer ! SemanticallyFailedModification(pmod, e)
           }
         } else {
+          logInfo(s"But toDownload contains: ${progressInfo.toDownload.map(td => Algos.encode(td._2)).mkString(",")}")
           requestDownloads(progressInfo)
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }

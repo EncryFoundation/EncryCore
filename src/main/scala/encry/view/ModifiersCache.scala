@@ -2,15 +2,19 @@ package encry.view
 
 import java.lang
 import java.util.concurrent.ConcurrentHashMap
+
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.Header
+import encry.modifiers.history.{Header, Payload}
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
+
 import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
 import encry.utils.Logging
+import org.encryfoundation.common.Algos
 
 trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
 
@@ -18,6 +22,8 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
   type V = PMOD
 
   protected val cache: TrieMap[K, V] = TrieMap[K, V]()
+
+  //protected val cacheSorted: mutable.SortedMap[K, V] =
 
   def size: Int = cache.size
 
@@ -128,7 +134,12 @@ class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryR
   override def findCandidateKey(history: HR): Option[K] = {
     cache.find { case (k, v) =>
       history.testApplicable(v) match {
-        case Failure(_: RecoverableModifierError) =>
+        case Failure(e: RecoverableModifierError) =>
+          logInfo(s"Error: $e")
+          false
+        case Failure(e: MalformedModifierError) =>
+          logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
+          remove(k, rememberKey = true)
           false
         case Failure(e) =>
           logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
@@ -144,19 +155,18 @@ class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryR
 case class EncryModifiersCache(override val maxSize: Int)
   extends DefaultModifiersCache[EncryPersistentModifier, EncryHistory](maxSize) {
 
-  override def put(key: K, value: V): Unit =
-    if (!contains(key)) {
-      onPut(key)
-      cache.put(key, value)
-    }
-
-
   override def findCandidateKey(history: EncryHistory): Option[K] = {
     def tryToApply(k: K, v: EncryPersistentModifier): Boolean = {
       history.testApplicable(v) match {
+        case Failure(e: RecoverableModifierError) =>
+          logInfo(s"Error: $e")
+          false
         case Failure(e: MalformedModifierError) =>
           logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
           remove(k, rememberKey = true)
+          false
+        case Failure(exception) =>
+          logWarn(s"Exception during apply modifier ${Algos.encode(v.id)} $exception")
           false
         case m => m.isSuccess
       }

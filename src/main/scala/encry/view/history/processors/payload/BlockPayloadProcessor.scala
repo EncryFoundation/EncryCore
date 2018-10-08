@@ -5,6 +5,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{ADProofs, Block, Header, Payload}
 import encry.view.history.processors.BlockProcessor
 import encry.view.history.storage.HistoryStorage
+import encry.EncryApp.settings.network
 
 import scala.util.Try
 
@@ -15,7 +16,15 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
   protected val adState: Boolean
 
   override protected def process(payload: Payload): ProgressInfo[EncryPersistentModifier] =
-    getBlockByPayload(payload).map(block => processBlock(block, payload)).getOrElse(putToHistory(payload))
+//    getBlockByPayload(payload).map(block => {
+//      logInfo(s"Processing block at height: ${block.header.height}")
+//      processBlock(block, payload)
+//    }).getOrElse(putToHistory(payload))
+    getBlockByPayload(payload)
+      .flatMap { block =>
+        if (block.header.height - bestBlockHeight >= 2 + network.maxInvObjects) None
+        else Some(processBlock(block, payload))
+      }.getOrElse(putToHistory(payload))
 
   private def getBlockByPayload(payload: Payload): Option[Block] =
     typedModifierById[Header](payload.headerId).flatMap { h =>
