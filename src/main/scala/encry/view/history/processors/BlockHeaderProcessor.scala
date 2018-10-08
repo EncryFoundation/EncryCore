@@ -142,7 +142,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
         logInfo(s"Header ${h.encodedId} score is $score")
         logInfo(s"Header ${h.encodedId} bestHeadersChainScore is $bestHeadersChainScore")
         val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-          if (score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
+          if (h.height > bestHeaderHeight || score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
         val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) =
           headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
         val heightRow: (ByteArrayWrapper, ByteArrayWrapper) =
