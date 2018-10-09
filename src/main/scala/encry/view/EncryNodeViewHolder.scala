@@ -142,14 +142,19 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] = modifierTypeId match {
         case Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
-        case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
+        case _ => modifierIds.filterNot{mid =>
+          logInfo(s"nodeView.history.contains(mid) ${Algos.encode(mid)}: ${nodeView.history.contains(mid)}")
+          logInfo(s"modifiersCache.contains(key(mid)) ${Algos.encode(mid)}: ${modifiersCache.contains(key(mid))}")
+          nodeView.history.contains(mid) || modifiersCache.contains(key(mid))
+        }
       }
       logDebug(s"Number of modifiers in cache: ${modifierIds.filter(modifiersCache.contains(_)).size}") //todo remove after task completion
       logDebug(s"Number of modifiers in history: ${modifierIds.filter(nodeView.history.contains(_)).size}")
       logDebug(s"Requesting from $peer ids: ${ids.map(Algos.encode)}")
-      val headersInCahhe = modifiersCache.cache.values.toList.filter(_.modifierTypeId == Header.modifierTypeId).map(_.asInstanceOf[Header]).map(_.height)
+      val headersInCahhe = modifiersCache.cache.values.toList.filter(_.modifierTypeId == Header.modifierTypeId).map(_.asInstanceOf[Header])
+      logInfo(headersInCahhe.map(h => (h.encodedId, h.height)).mkString(", "))
       //println(headersInCahhe)
-      if (headersInCahhe.nonEmpty)logDebug(s"Height in cache: min ${headersInCahhe.min}, max ${headersInCahhe.max}, while header height is ${nodeView.history.bestHeaderHeight}")
+      //if (headersInCahhe.nonEmpty)logDebug(s"Height in cache: min ${headersInCahhe.min}, max ${headersInCahhe.max}, while header height is ${nodeView.history.bestHeaderHeight}")
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case a: Any =>
       logError(s"Strange input: $a")

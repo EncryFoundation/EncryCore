@@ -59,8 +59,14 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
   /**
     * A cache element replacement strategy method, which defines a key to remove from cache when it is overfull
     */
-  protected def keyToRemove(history: EncryHistory): K =
-    cache.find(elem => history.testApplicable(elem._2).isFailure).map(_._1).getOrElse(keyToRemove(history))
+  protected def keyToRemove(history: EncryHistory): Option[K] = cache.find {
+    case (_, value) => history.testApplicable(value) match {
+      case Success(_) => false
+      case Failure(_: RecoverableModifierError) => false
+      case _ => true
+    }
+  }.map(_._1)
+  //cache.find(elem => history.testApplicable(elem._2).isFailure).map(_._1).getOrElse(keyToRemove(history))
 
   def contains(key: K): Boolean = cache.contains(key) || rememberedKeys.contains(key)
 
@@ -71,7 +77,7 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
       logInfo(s"Add elem ${Algos.encode(key.toArray)} to cache")
       cache.put(key, value)
       logInfo(s"Size: $size ? $maxSize and $cleaning")
-      if (size > maxSize && cleaning) remove(keyToRemove(history))
+      if (size > maxSize && cleaning) keyToRemove(history).map(remove)
     }
   }
 

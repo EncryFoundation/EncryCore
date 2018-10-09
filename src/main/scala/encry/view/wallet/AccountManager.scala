@@ -62,9 +62,9 @@ case class AccountManager(store: Store) extends Logging {
 
   private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, settings.wallet.map(_.password)
     .getOrElse(throw new RuntimeException("password not specified"))))
-    .fold(e => { 
-      logError(s"AccountManager: decryption failed cause ${e.getCause}"); 
-      EncryApp.forceStopApplication(500) 
+    .fold(e => {
+      logError(s"AccountManager: decryption failed cause ${e.getCause}")
+      EncryApp.forceStopApplication(500)
     }, r => r)
 
   private def saveAccount(privateKey: PrivateKey, publicKey: PublicKey): Unit =
@@ -72,7 +72,7 @@ case class AccountManager(store: Store) extends Logging {
       scala.util.Random.nextLong(),
       Seq.empty,
 
-      Seq((ByteArrayWrapper(AccountManager.AccountPrefix +: publicKey), 
+      Seq((ByteArrayWrapper(AccountManager.AccountPrefix +: publicKey),
         ByteArrayWrapper(AES.encrypt(privateKey, settings.wallet.map(_.password)
         .getOrElse(throw new RuntimeException("password not specified"))))))
 
