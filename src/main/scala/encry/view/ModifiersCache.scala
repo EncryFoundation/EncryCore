@@ -17,7 +17,7 @@ import scala.util.{Failure, Success}
 import encry.utils.Logging
 import org.encryfoundation.common.Algos
 
-trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
+trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] extends Logging {
 
   type K = mutable.WrappedArray[Byte]
   type V = PMOD
@@ -59,21 +59,25 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
   /**
     * A cache element replacement strategy method, which defines a key to remove from cache when it is overfull
     */
-  protected def keyToRemove(): K
-
+  protected def keyToRemove(history: EncryHistory): K =
+    cache.find(elem => history.testApplicable(elem._2).isFailure).map(_._1).getOrElse(keyToRemove(history))
 
   def contains(key: K): Boolean = cache.contains(key) || rememberedKeys.contains(key)
 
-  def put(key: K, value: V): Unit =
+  def put(key: K, value: V, history: EncryHistory): Unit = {
+    logInfo(s"Trying to put: ${Algos.encode(key.toArray)} to cahce. ${!contains(key)}")
     if (!contains(key)) {
-      onPut(key)
+      //onPut(key)
+      logInfo(s"Add elem ${Algos.encode(key.toArray)} to cache")
       cache.put(key, value)
-      if (size > maxSize && cleaning) remove(keyToRemove())
+      logInfo(s"Size: $size ? $maxSize and $cleaning")
+      if (size > maxSize && cleaning) remove(keyToRemove(history))
     }
+  }
 
   def remove(key: K): Option[V] = {
     cache.remove(key).map { removed =>
-      onRemove(key)
+      //onRemove(key)
       removed
     }
   }
@@ -85,68 +89,41 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
   override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
 }
 
-trait LRUCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader] extends ModifiersCache[PMOD, HR] {
-
-  private val evictionQueue = mutable.Queue[K]()
-
-  // The eviction queue can contain elements already removed, as we're not removing a key from it when
-  // the key is got removed from the cache. When size of eviction queue exceeds maximum size of the cache by
-  // the value below(so the queue contains at least "cleaningThreshold" keys aleady removed from the cache),
-  // complete scan and cleaning of removed keys happen.
-  private val cleaningThreshold = 50
-
-  @tailrec
-  private def evictionCandidate(): K = {
-    val k = evictionQueue.dequeue()
-    if (cache.contains(k)) k else evictionCandidate()
-  }
-
-  override protected def onPut(key: K): Unit = {
-    evictionQueue.enqueue(key)
-    if (evictionQueue.size > maxSize + cleaningThreshold) {
-      evictionQueue.dequeueAll(k => !cache.contains(k))
-    }
-  }
-
-  override protected def onRemove(key: K): Unit = {}
-
-  def keyToRemove(): K = evictionCandidate()
-}
-
-class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader]
-(override val maxSize: Int) extends LRUCache[PMOD, HR] with Logging {
-
-  /**
-    * Default implementation is just about to scan. Not efficient at all and should be probably rewritten in a
-    * concrete application.
-    *
-    * @param history - an interface to history which could be needed to define a candidate
-    * @return - candidate if it is found
-    */
-  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
-  override def findCandidateKey(history: HR): Option[K] = {
-    cache.find { case (k, v) =>
-      history.testApplicable(v) match {
-        case Failure(e: RecoverableModifierError) =>
-          logInfo(s"Error: $e")
-          false
-        case Failure(e: MalformedModifierError) =>
-          logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
-          remove(k)
-          false
-        case Failure(e) =>
-          logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
-          remove(k)
-          false
-        case Success(_) =>
-          true
-      }
-    }.map { case (k, _) => k }
-  }
-}
+//trait LRUCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader] extends ModifiersCache[PMOD, HR] {
+//
+//  private val evictionQueue = mutable.Queue[K]()
+//
+//  // The eviction queue can contain elements already removed, as we're not removing a key from it when
+//  // the key is got removed from the cache. When size of eviction queue exceeds maximum size of the cache by
+//  // the value below(so the queue contains at least "cleaningThreshold" keys aleady removed from the cache),
+//  // complete scan and cleaning of removed keys happen.
+//  private val cleaningThreshold = 50
+//
+//  @tailrec
+//  private def evictionCandidate(): K = {
+//    val k = evictionQueue.dequeue()
+//    if (cache.contains(k)) k else evictionCandidate()
+//  }
+//
+//  override protected def onPut(key: K): Unit = {
+//    logInfo(s"Add ${Algos.encode(key.toArray)} to queue")
+//    logInfo(s"Before queue size: ${evictionQueue.size}")
+//    evictionQueue.enqueue(key)
+//    logInfo(s"After queue size: ${evictionQueue.size}")
+//    logInfo(s"maxSize + cleaningThreshold: ${maxSize + cleaningThreshold}")
+//    if (evictionQueue.size > maxSize + cleaningThreshold) {
+//      evictionQueue.dequeueAll(k => !cache.contains(k))
+//      logInfo(s"After cleaning queue contains: ${evictionQueue.size}")
+//    }
+//  }
+//
+//  override protected def onRemove(key: K): Unit = {}
+//
+//  def keyToRemove(): K = evictionCandidate()
+//}
 
 case class EncryModifiersCache(override val maxSize: Int)
-  extends DefaultModifiersCache[EncryPersistentModifier, EncryHistory](maxSize) {
+  extends ModifiersCache[EncryPersistentModifier, EncryHistory] {
 
   override def findCandidateKey(history: EncryHistory): Option[K] = {
     def tryToApply(k: K, v: EncryPersistentModifier): Boolean = {
@@ -177,7 +154,7 @@ case class EncryModifiersCache(override val maxSize: Int)
         // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
         cache.find { case (k, v) =>
           v match {
-            case h: Header if h.height > headersHeight + 1 => false
+            //case h: Header if h.height > headersHeight + 1 => false
             case _ => tryToApply(k, v)
           }
         }.map { case (k, _) => k }
