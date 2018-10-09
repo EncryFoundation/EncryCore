@@ -17,7 +17,7 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.message._
 import encry.view.EncryNodeViewHolder.DownloadRequest
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, NodeSynced}
 import encry.view.history.{EncryHistory, EncryHistoryReader, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.{EncryMempool, MempoolReader}
 import encry.view.state.StateReader
@@ -34,6 +34,7 @@ class NodeViewSynchronizer extends Actor with Logging {
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
   val deliveryManager: ActorRef =
     context.actorOf(Props(classOf[DeliveryManager]), "deliveryManager")
+  var isSend: Boolean = false
 
   override def preStart(): Unit = {
     val messageSpecs: Seq[MessageSpec[_]] = Seq(invSpec, requestModifierSpec, ModifiersSpec, EncrySyncInfoMessageSpec)
@@ -76,6 +77,10 @@ class NodeViewSynchronizer extends Actor with Logging {
           logInfo(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}")
           if (!(extensionOpt.nonEmpty || comparison != Younger)) logWarn("Extension is empty while comparison is younger")
+          if (comparison == Equal && !isSend) {
+            isSend = true
+            context.actorSelection("/user/nodeViewHolder") ! NodeSynced
+          }
           deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
       }

@@ -45,7 +45,16 @@ class StatsSender extends Actor {
 
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
+  var currentHeadersHeight: Int = 0
+  var currentBlocksHeight: Int = 0
+
   override def receive: Receive = {
+    case WayOfSync(blockHeight, headerHeight) =>
+        influxDB.write(InfluxPort, s"wayOfSync,nodeName=$nodeName value=${blockHeight - currentBlocksHeight}" +
+          s",headers=${headerHeight - currentHeadersHeight}")
+        currentBlocksHeight = blockHeight
+        currentHeadersHeight = headerHeight
+
     case LogMessage(logLevel, logMessage, logTime) => influxDB.write(InfluxPort,
       s"""logsFromNode,nodeName=${nodeName},logLevel=${
         logLevel match {
@@ -154,5 +163,7 @@ object StatsSender {
   case class StateUpdating(time: Long)
 
   case class TransactionGeneratorStat(txsQty: Int, generationTime: Long)
+
+  case class WayOfSync(blockHeight: Int, headerHeight: Int)
 
 }

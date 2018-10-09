@@ -58,6 +58,16 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
   }
 
+  var isSynced: Boolean = false
+  if (settings.influxDB.isDefined) {
+    system.scheduler.schedule(5.seconds, 30.seconds) {
+      if (!isSynced) {
+        context.system.actorSelection("/user/statsSender") !
+          WayOfSync(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
+      }
+    }
+  }
+
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     reason.printStackTrace()
     System.exit(100)
@@ -70,6 +80,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def receive: Receive = {
+    case NodeSynced => isSynced = true
     case BlocksFromLocalPersistence(blocks, allSent)
       if settings.levelDb.exists(_.enableRestore) || settings.postgres.exists(_.enableRestore) =>
       blocks.foreach { block =>
@@ -419,6 +430,8 @@ object EncryNodeViewHolder {
 
     case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentNodeViewModifier]
     (pmod: EncryPersistentModifier)
+
+    case class NodeSynced()
 
   }
 
