@@ -8,7 +8,8 @@ import akka.actor.Actor
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
-import encry.modifiers.history.Header
+import encry.modifiers.history.{Block, Header, Payload}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.stats.StatsSender._
 import encry.stats.LoggingActor.LogMessage
 import encry.view.history.History.Height
@@ -16,6 +17,7 @@ import org.encryfoundation.common.Algos
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
 class StatsSender extends Actor {
 
@@ -40,20 +42,40 @@ class StatsSender extends Actor {
 
   val modifiersToApply: mutable.Map[String, (ModifierTypeId, Long)] = mutable.Map[String, (ModifierTypeId, Long)]()
 
-  override def preStart(): Unit =
+  override def preStart(): Unit = {
+    context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
     influxDB.write(InfluxPort, s"""nodesStartTime value="$nodeName"""")
+  }
 
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
-  var currentHeadersHeight: Int = 0
-  var currentBlocksHeight: Int = 0
+  var currentHeadersQty: Int = 0
+  var currentPayloadsQty: Int = 0
+  var currentBlocksQty: Int = 0
+  var isSynced: Boolean = false
+
+  context.system.scheduler.schedule(5.seconds, 15.seconds) {
+    println(isSynced, currentHeadersQty, currentPayloadsQty, currentBlocksQty)
+    if (!isSynced) self ! WayOfSync(currentHeadersQty, currentPayloadsQty, currentBlocksQty)
+    currentHeadersQty = 0
+    currentPayloadsQty = 0
+    currentBlocksQty = 0
+  }
 
   override def receive: Receive = {
-    case WayOfSync(blockHeight, headerHeight) =>
-        influxDB.write(InfluxPort, s"wayOfSync,nodeName=$nodeName value=${blockHeight - currentBlocksHeight}" +
-          s",headers=${headerHeight - currentHeadersHeight}")
-        currentBlocksHeight = blockHeight
-        currentHeadersHeight = headerHeight
+    case NodeSynced => isSynced = true
+
+    case SemanticallySuccessfulModifier(mod) => mod match {
+      case header: Header => currentHeadersQty += 1
+      case payload: Payload => currentPayloadsQty += 1
+      case block: Block if settings.postgres.forall(x => x.enableRestore) ||
+        settings.levelDb.forall(x => x.enableRestore) => currentBlocksQty += 1
+      case _ =>
+    }
+
+    case WayOfSync(payloadsQty, headersQty, blocksQty) =>
+        influxDB.write(InfluxPort,
+          s"wayOfSync,nodeName=$nodeName value=$payloadsQty,headers=$headersQty,blocks=$blocksQty")
 
     case LogMessage(logLevel, logMessage, logTime) => influxDB.write(InfluxPort,
       s"""logsFromNode,nodeName=${nodeName},logLevel=${
@@ -164,6 +186,8 @@ object StatsSender {
 
   case class TransactionGeneratorStat(txsQty: Int, generationTime: Long)
 
-  case class WayOfSync(blockHeight: Int, headerHeight: Int)
+  case class WayOfSync(payloadsQty: Int, headersQty: Int, blocksQty: Int)
+
+  case object NodeSynced
 
 }
