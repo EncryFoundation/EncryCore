@@ -80,7 +80,7 @@ class NodeViewSynchronizer extends Actor with Logging {
           if (!(extensionOpt.nonEmpty || comparison != Younger)) logWarn("Extension is empty while comparison is younger")
           if (comparison == Equal && !isSynced) {
             isSynced = true
-            context.actorSelection("/user/nodeViewHolder") ! NodeSynced
+            context.actorSelection("/user/statsSender") ! NodeSynced
           }
           deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
