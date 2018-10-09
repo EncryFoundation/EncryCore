@@ -147,9 +147,10 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
           headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
         val heightRow: (ByteArrayWrapper, ByteArrayWrapper) =
           headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
-        val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (score > bestHeadersChainScore) {
+        val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
+          if (h.height > bestHeaderHeight || score > bestHeadersChainScore) {
           bestBlockHeaderIdsRow(h, score)
-        } else {
+          } else {
           if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(h)
           orphanedBlockHeaderIdsRow(h, score)
         }
