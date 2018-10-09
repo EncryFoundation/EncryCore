@@ -151,8 +151,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       logDebug(s"Number of modifiers in cache: ${modifierIds.filter(modifiersCache.contains(_)).size}") //todo remove after task completion
       logDebug(s"Number of modifiers in history: ${modifierIds.filter(nodeView.history.contains(_)).size}")
       logDebug(s"Requesting from $peer ids: ${ids.map(Algos.encode)}")
-      val headersInCahhe = modifiersCache.cache.values.toList.filter(_.modifierTypeId == Header.modifierTypeId).map(_.asInstanceOf[Header])
-      logInfo(headersInCahhe.map(h => (h.encodedId, h.height)).mkString(", "))
+      //val headersInCahhe = modifiersCache.cache.values.toList.filter(_.modifierTypeId == Header.modifierTypeId).map(_.asInstanceOf[Header])
+      //logInfo(headersInCahhe.map(h => (h.encodedId, h.height)).mkString(", "))
       //println(headersInCahhe)
       //if (headersInCahhe.nonEmpty)logDebug(s"Height in cache: min ${headersInCahhe.min}, max ${headersInCahhe.max}, while header height is ${nodeView.history.bestHeaderHeight}")
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
@@ -318,7 +318,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               nodeViewSynchronizer ! SemanticallyFailedModification(pmod, e)
           }
         } else {
-          logInfo(s"But toDownload contains: ${progressInfo.toDownload.map(td => Algos.encode(td._2)).mkString(",")}")
+          //logInfo(s"But toDownload contains: ${progressInfo.toDownload.map(td => Algos.encode(td._2)).mkString(",")}")
           requestDownloads(progressInfo)
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }

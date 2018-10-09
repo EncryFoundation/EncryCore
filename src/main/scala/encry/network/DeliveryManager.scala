@@ -230,7 +230,7 @@ class DeliveryManager extends Actor with Logging {
     case None => logInfo(s"extOpt is empty for: $remote. Its status is: $status.")
     case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
       case (mid, mods) => {
-        logDebug(s"Sending to $remote modifiers of type $mid:\n${mods}")
+        //logDebug(s"Sending to $remote modifiers of type $mid:\n${mods}")
         networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
       }
     }
