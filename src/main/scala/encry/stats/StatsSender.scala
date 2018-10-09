@@ -54,8 +54,7 @@ class StatsSender extends Actor {
   var currentBlocksQty: Int = 0
   var isSynced: Boolean = false
 
-  context.system.scheduler.schedule(5.seconds, 15.seconds) {
-    println(isSynced, currentHeadersQty, currentPayloadsQty, currentBlocksQty)
+  context.system.scheduler.schedule(5.seconds, 60.seconds) {
     if (!isSynced) self ! WayOfSync(currentHeadersQty, currentPayloadsQty, currentBlocksQty)
     currentHeadersQty = 0
     currentPayloadsQty = 0
