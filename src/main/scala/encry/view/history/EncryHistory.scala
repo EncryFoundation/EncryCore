@@ -176,7 +176,6 @@ object EncryHistory {
 
     val historyIndexDir: File = getHistoryIndexDir(settings)
     val historyObjectsDir: File = getHistoryObjectsDir(settings)
-
     val indexStore: LSMStore = new LSMStore(historyIndexDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(historyObjectsDir, keepVersions = 0)
     val storage: HistoryStorage = new HistoryStorage(indexStore, objectsStore)

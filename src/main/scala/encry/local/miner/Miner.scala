@@ -4,7 +4,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import akka.actor.{Actor, Props}
 import encry.EncryApp._
-import encry.consensus.{CandidateBlock, EncrySupplyController}
+import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.history.{Block, Header}
@@ -41,6 +41,7 @@ class Miner extends Actor with Logging {
   var candidateOpt: Option[CandidateBlock] = None
   var syncingDone: Boolean = false
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
+  val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
 
   override def preStart(): Unit =
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
@@ -51,7 +52,9 @@ class Miner extends Actor with Logging {
 
   def needNewCandidate(b: Block): Boolean =
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id)) &&
-      candidateOpt.forall(candidate => candidate.parentOpt.exists(_.height < b.header.height))
+      (candidateOpt.forall(candidate => candidate.parentOpt.exists(_.height < b.header.height)) ||
+        candidateOpt.exists(_.parentOpt.exists(parentHeader =>
+          powScheme.realDifficulty(parentHeader) < powScheme.realDifficulty(b.header))))
 
   override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
 

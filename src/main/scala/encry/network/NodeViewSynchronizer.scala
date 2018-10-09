@@ -10,8 +10,8 @@ import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.history.{ADProofs, Header, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
-import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
+import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
@@ -75,29 +75,24 @@ class NodeViewSynchronizer extends Actor with Logging {
           val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
           logInfo(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}")
-          logInfo(s"Extension ids: ${idsToString(ext)}")
           if (!(extensionOpt.nonEmpty || comparison != Younger)) logWarn("Extension is empty while comparison is younger")
           deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == RequestModifierSpec.MessageCode =>
-      logInfo(s"Got requestMsg from ${remote.socketAddress}. TypeID:${invData._1}." +
-        s" Modifiers: ${invData._2.foldLeft("|")((str, id) => str + "|" + Algos.encode(id))}")
-      historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
-        val objs: Seq[NodeViewModifier] = invData._1 match {
-          case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
-          case _: ModifierTypeId => invData._2.flatMap(id => readers._1.modifierById(id))
+        historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
+          val objs: Seq[NodeViewModifier] = invData._1 match {
+            case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
+            case _: ModifierTypeId => invData._2.flatMap(id => readers._1.modifierById(id))
+          }
+          logDebug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
+            s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
+          self ! ResponseFromLocal(remote, invData._1, objs)
         }
-        logDebug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
-          s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
-        logDebug(s"Peer: ${remote.socketAddress} requested for modifiers of type ${invData._1}.")
-        self ! ResponseFromLocal(remote, invData._1, objs)
-      }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
       logDebug(s"Got inv message from ${remote.socketAddress}.")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
-      logDebug( s"Got modifiers from ${remote.socketAddress} with modTypeID: ${data._1}.")
       deliveryManager ! DataFromPeer(spec, data: ModifiersData@unchecked, remote)
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       deliveryManager ! RequestFromLocal(peer, modifierTypeId, modifierIds)

@@ -4,6 +4,7 @@ import java.lang
 import java.util.concurrent.ConcurrentHashMap
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.Header
+import encry.EncryApp.settings
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
 import scala.annotation.tailrec
@@ -11,13 +12,19 @@ import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
 import encry.utils.Logging
+import org.encryfoundation.common.Algos
 
 trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
 
   type K = mutable.WrappedArray[Byte]
   type V = PMOD
 
-  protected val cache: TrieMap[K, V] = TrieMap[K, V]()
+  val cache: TrieMap[K, V] = TrieMap[K, V]()
+
+  private var cleaning: Boolean = settings.postgres.forall(postgres => !postgres.enableRestore) &&
+    settings.levelDb.forall(levelDb => !levelDb.enableRestore)
+
+  def enableCleaning: Unit = cleaning = true
 
   def size: Int = cache.size
 
@@ -44,7 +51,7 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
 
   protected def onPut(key: K): Unit = {}
 
-  protected def onRemove(key: K, rememberKey: Boolean): Unit = {}
+  protected def onRemove(key: K): Unit = {}
 
   /**
     * A cache element replacement strategy method, which defines a key to remove from cache when it is overfull
@@ -54,26 +61,16 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
 
   def contains(key: K): Boolean = cache.contains(key) || rememberedKeys.contains(key)
 
-  def put(key: K, value: V): Unit = {
+  def put(key: K, value: V): Unit =
     if (!contains(key)) {
       onPut(key)
       cache.put(key, value)
-      if (size > maxSize) remove(keyToRemove())
+      if (size > maxSize && cleaning) remove(keyToRemove())
     }
-  }
 
-  /**
-    * Remove an element from the cache.
-    *
-    * @param key         - modifier's key
-    * @param rememberKey - whether to remember the key as belonging to cache. E.g. invalid modifiers are
-    *                    to be remembered (for not to be requested from the network again).
-    * @return
-    */
-  def remove(key: K, rememberKey: Boolean = false): Option[V] = synchronized {
+  def remove(key: K): Option[V] = {
     cache.remove(key).map { removed =>
-      onRemove(key, rememberKey)
-      if (rememberKey) rememberedKeys.add(key)
+      onRemove(key)
       removed
     }
   }
@@ -81,6 +78,8 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
   def popCandidate(history: H): Option[V] = synchronized {
     findCandidateKey(history).flatMap(k => remove(k))
   }
+
+  override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
 }
 
 trait LRUCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader] extends ModifiersCache[PMOD, HR] {
@@ -106,16 +105,13 @@ trait LRUCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader] extend
     }
   }
 
-  override protected def onRemove(key: K, rememberKey: Boolean): Unit = {
-  }
+  override protected def onRemove(key: K): Unit = {}
 
-  def keyToRemove(): K = {
-    evictionCandidate()
-  }
+  def keyToRemove(): K = evictionCandidate()
 }
 
 class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader]
-(override val maxSize: Int) extends ModifiersCache[PMOD, HR] with LRUCache[PMOD, HR] with Logging {
+(override val maxSize: Int) extends LRUCache[PMOD, HR] with Logging {
 
   /**
     * Default implementation is just about to scan. Not efficient at all and should be probably rewritten in a
@@ -132,7 +128,7 @@ class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryR
           false
         case Failure(e) =>
           logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
-          remove(k, rememberKey = true)
+          remove(k)
           false
         case Success(_) =>
           true
@@ -144,19 +140,12 @@ class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryR
 case class EncryModifiersCache(override val maxSize: Int)
   extends DefaultModifiersCache[EncryPersistentModifier, EncryHistory](maxSize) {
 
-  override def put(key: K, value: V): Unit =
-    if (!contains(key)) {
-      onPut(key)
-      cache.put(key, value)
-    }
-
-
   override def findCandidateKey(history: EncryHistory): Option[K] = {
     def tryToApply(k: K, v: EncryPersistentModifier): Boolean = {
       history.testApplicable(v) match {
         case Failure(e: MalformedModifierError) =>
           logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
-          remove(k, rememberKey = true)
+          remove(k)
           false
         case m => m.isSuccess
       }
