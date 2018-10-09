@@ -431,7 +431,7 @@ object EncryNodeViewHolder {
     case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentNodeViewModifier]
     (pmod: EncryPersistentModifier)
 
-    case class NodeSynced()
+    case object NodeSynced
 
   }
 
