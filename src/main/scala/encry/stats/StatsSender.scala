@@ -9,12 +9,13 @@ import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
 import encry.modifiers.history.{Block, Header, Payload}
-import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallySuccessfulModifier}
 import encry.stats.StatsSender._
 import encry.stats.LoggingActor.LogMessage
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
 import org.influxdb.{InfluxDB, InfluxDBFactory}
+
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -42,10 +43,8 @@ class StatsSender extends Actor {
 
   val modifiersToApply: mutable.Map[String, (ModifierTypeId, Long)] = mutable.Map[String, (ModifierTypeId, Long)]()
 
-  override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
+  override def preStart(): Unit =
     influxDB.write(InfluxPort, s"""nodesStartTime value="$nodeName"""")
-  }
 
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
@@ -64,7 +63,7 @@ class StatsSender extends Actor {
   override def receive: Receive = {
     case NodeSynced => isSynced = true
 
-    case SemanticallySuccessfulModifier(mod) => mod match {
+    case SyntacticallySuccessfulModifier(mod) => mod match {
       case header: Header => currentHeadersQty += 1
       case payload: Payload => currentPayloadsQty += 1
       case block: Block if settings.postgres.forall(x => x.enableRestore) ||
