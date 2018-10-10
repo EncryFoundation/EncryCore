@@ -100,9 +100,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       }
       if (applicationsSuccessful && settings.levelDb.exists(_.enableRestore) && !receivedAll) sender ! SendBlocks
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
-      logInfo(s"Get modifiers from remote of type $modifierTypeId")
-      logInfo(s"modifiersCache.isEmpty: ${modifiersCache.isEmpty}")
-      logInfo(s"nodeView.history.isHeadersChainSynced: ${nodeView.history.isHeadersChainSynced}")
+      //logInfo(s"Get modifiers from remote of type $modifierTypeId")
+      //logInfo(s"modifiersCache.isEmpty: ${modifiersCache.isEmpty}")
+      //logInfo(s"nodeView.history.isHeadersChainSynced: ${nodeView.history.isHeadersChainSynced}")
       if (modifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
