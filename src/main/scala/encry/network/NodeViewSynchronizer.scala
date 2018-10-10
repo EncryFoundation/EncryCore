@@ -85,8 +85,8 @@ class NodeViewSynchronizer extends Actor with Logging {
             case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
             case _: ModifierTypeId => invData._2.flatMap(id => readers._1.modifierById(id))
           }
-          //logDebug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
-          //  s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
+          logDebug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
+            s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
           self ! ResponseFromLocal(remote, invData._1, objs)
         }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>

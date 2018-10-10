@@ -97,8 +97,8 @@ class DeliveryManager extends Actor with Logging {
         modifiers partition { case (id, _) => isSpam(id) }
       if (settings.influxDB.isDefined)
         context.actorSelection("/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
-      logInfo(s"Got modifiers (${modifiers.size}) of type $typeId with id: " +
-        s"${data._2.keys.map(Algos.encode).mkString(",")}from remote connected peer: $remote")
+      //logInfo(s"Got modifiers (${modifiers.size}) of type $typeId with id: " +
+      //  s"${data._2.keys.map(Algos.encode).mkString(",")}from remote connected peer: $remote")
       for ((id, _) <- modifiers) receive(typeId, id, remote)
       if (spam.nonEmpty) {
         logInfo(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +

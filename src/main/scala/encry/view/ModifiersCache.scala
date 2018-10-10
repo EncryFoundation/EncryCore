@@ -79,7 +79,6 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
       logInfo(s"Size: $size ? $maxSize and $cleaning")
       if (size > maxSize && cleaning) keyToRemove(history).map(remove)
     }
-  }
 
   def remove(key: K): Option[V] = {
     cache.remove(key).map { removed =>
