@@ -100,9 +100,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       }
       if (applicationsSuccessful && settings.levelDb.exists(_.enableRestore) && !receivedAll) sender ! SendBlocks
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
-      //logInfo(s"Get modifiers from remote of type $modifierTypeId")
-      //logInfo(s"modifiersCache.isEmpty: ${modifiersCache.isEmpty}")
-      //logInfo(s"nodeView.history.isHeadersChainSynced: ${nodeView.history.isHeadersChainSynced}")
       if (modifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
@@ -111,7 +108,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             if (nodeView.history.contains(pmod.id) || modifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
-              logInfo(s"Modifier: ${Algos.encode(pmod.id)} not in history")
               modifiersCache.put(key(pmod.id), pmod, nodeView.history)
               if (settings.levelDb.exists(_.enableSave))
                 context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
@@ -119,8 +115,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
         logInfo(s"Cache before(${modifiersCache.size})")
         computeApplications()
-        logInfo(s"modifiersCache.isEmpty: ${modifiersCache.isEmpty}")
-        logInfo(s"!nodeView.history.isHeadersChainSynced: ${!nodeView.history.isHeadersChainSynced}")
         if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
         logInfo(s"Cache after(${modifiersCache.size})")
       }
@@ -142,19 +136,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] = modifierTypeId match {
         case Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
-        case _ => modifierIds.filterNot{mid =>
-          logInfo(s"nodeView.history.contains(mid) ${Algos.encode(mid)}: ${nodeView.history.contains(mid)}")
-          logInfo(s"modifiersCache.contains(key(mid)) ${Algos.encode(mid)}: ${modifiersCache.contains(key(mid))}")
-          nodeView.history.contains(mid) || modifiersCache.contains(key(mid))
-        }
+        case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       }
-      logDebug(s"Number of modifiers in cache: ${modifierIds.filter(modifiersCache.contains(_)).size}") //todo remove after task completion
-      logDebug(s"Number of modifiers in history: ${modifierIds.filter(nodeView.history.contains(_)).size}")
-      logDebug(s"Requesting from $peer ids: ${ids.map(Algos.encode)}")
-      //val headersInCahhe = modifiersCache.cache.values.toList.filter(_.modifierTypeId == Header.modifierTypeId).map(_.asInstanceOf[Header])
-      //logInfo(headersInCahhe.map(h => (h.encodedId, h.height)).mkString(", "))
-      //println(headersInCahhe)
-      //if (headersInCahhe.nonEmpty)logDebug(s"Height in cache: min ${headersInCahhe.min}, max ${headersInCahhe.max}, while header height is ${nodeView.history.bestHeaderHeight}")
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case a: Any =>
       logError(s"Strange input: $a")
@@ -164,9 +147,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     modifiersCache.popCandidate(nodeView.history) match {
       case Some(mod) =>
         logInfo(s"Process: ${Algos.encode(mod.id)}")
-        val startTime = System.currentTimeMillis()
+        val startTime = System.nanoTime()
         pmodModify(mod)
-        logInfo(s"Type of applying ${Algos.encode(mod.id)}: ${System.currentTimeMillis() - startTime}")
+        logInfo(s"Applying time ${Algos.encode(mod.id)}: ${System.nanoTime() - startTime}")
         computeApplications()
       case None => Unit
     }
@@ -281,7 +264,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
-        logInfo("Looks like success")
         if (settings.influxDB.isDefined)
           context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
         logInfo(s"Going to apply modifications to the state: $progressInfo")
@@ -318,7 +300,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               nodeViewSynchronizer ! SemanticallyFailedModification(pmod, e)
           }
         } else {
-          //logInfo(s"But toDownload contains: ${progressInfo.toDownload.map(td => Algos.encode(td._2)).mkString(",")}")
           requestDownloads(progressInfo)
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }

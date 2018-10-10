@@ -11,7 +11,6 @@ import encry.utils.Logging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
-
 import scala.util.{Failure, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with Logging {
@@ -35,11 +34,8 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     */
   protected def processBlock(fullBlock: Block,
                              modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
-    logInfo(s"Process block1: ${Algos.encode(fullBlock.id)}")
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
-    logInfo("Get best")
     val newBestAfterThis: Header = bestFullChain.last.header
-    logInfo("Create progress info")
     processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, nodeSettings.blocksToKeep))
   }
 
@@ -61,13 +57,10 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
     case toProcess @ ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
       val prevBest: Block = bestBlockOpt.get
-      //println(fullBlock.header.height)
       val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
-      //println(toApply.map(_.header.encodedId).mkString(", "))
-      //println(toApply.lengthCompare(newChain.length - 1) != 0)
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
         //application of this block leads to full chain with higher score
@@ -116,9 +109,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   }
 
   private def calculateBestFullChain(block: Block): Seq[Block] = {
-    logInfo(s"Calculating bestFullChain for: ${Algos.encode(block.id)}")
     val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
-    logInfo("Create chains")
     val chains: Seq[Seq[Block]] = continuations.map(_.map(getBlock).takeWhile(_.nonEmpty).flatten)
     chains.map(c => block +: c).maxBy(c => scoreOf(c.last.id).get)
   }

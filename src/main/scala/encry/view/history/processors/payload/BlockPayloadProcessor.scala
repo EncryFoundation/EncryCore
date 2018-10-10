@@ -16,10 +16,6 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
   protected val adState: Boolean
 
   override protected def process(payload: Payload): ProgressInfo[EncryPersistentModifier] =
-//    getBlockByPayload(payload).map(block => {
-//      logInfo(s"Processing block at height: ${block.header.height}")
-//      processBlock(block, payload)
-//    }).getOrElse(putToHistory(payload))
     getBlockByPayload(payload)
       .flatMap { block =>
         if (block.header.height - bestBlockHeight >= 2 + network.maxInvObjects) None

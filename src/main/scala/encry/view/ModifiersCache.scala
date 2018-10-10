@@ -95,39 +95,6 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
   override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
 }
 
-//trait LRUCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader] extends ModifiersCache[PMOD, HR] {
-//
-//  private val evictionQueue = mutable.Queue[K]()
-//
-//  // The eviction queue can contain elements already removed, as we're not removing a key from it when
-//  // the key is got removed from the cache. When size of eviction queue exceeds maximum size of the cache by
-//  // the value below(so the queue contains at least "cleaningThreshold" keys aleady removed from the cache),
-//  // complete scan and cleaning of removed keys happen.
-//  private val cleaningThreshold = 50
-//
-//  @tailrec
-//  private def evictionCandidate(): K = {
-//    val k = evictionQueue.dequeue()
-//    if (cache.contains(k)) k else evictionCandidate()
-//  }
-//
-//  override protected def onPut(key: K): Unit = {
-//    logInfo(s"Add ${Algos.encode(key.toArray)} to queue")
-//    logInfo(s"Before queue size: ${evictionQueue.size}")
-//    evictionQueue.enqueue(key)
-//    logInfo(s"After queue size: ${evictionQueue.size}")
-//    logInfo(s"maxSize + cleaningThreshold: ${maxSize + cleaningThreshold}")
-//    if (evictionQueue.size > maxSize + cleaningThreshold) {
-//      evictionQueue.dequeueAll(k => !cache.contains(k))
-//      logInfo(s"After cleaning queue contains: ${evictionQueue.size}")
-//    }
-//  }
-//
-//  override protected def onRemove(key: K): Unit = {}
-//
-//  def keyToRemove(): K = evictionCandidate()
-//}
-
 case class EncryModifiersCache(override val maxSize: Int)
   extends ModifiersCache[EncryPersistentModifier, EncryHistory] {
 
