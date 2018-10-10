@@ -140,8 +140,8 @@ class DeliveryManager extends Actor with Logging {
         case (notYetRequested, modId) =>
           val modifierKey: ModifierIdAsKey = key(modId)
           if (historyReaderOpt.forall(history => {
-            logInfo(s"For ${Algos.encode(modId)} !history.contains(modId): ${!history.contains(modId)} | " +
-              s"!delivered.contains(key(modId)): ${!delivered.contains(key(modId))}")
+            //logInfo(s"For ${Algos.encode(modId)} !history.contains(modId): ${!history.contains(modId)} | " +
+            //  s"!delivered.contains(key(modId)): ${!delivered.contains(key(modId))}")
             !history.contains(modId) && !delivered.contains(key(modId))
           })) {
             logInfo(s"!cancellables.contains(modifierKey): ${!cancellables.contains(modifierKey)}")
