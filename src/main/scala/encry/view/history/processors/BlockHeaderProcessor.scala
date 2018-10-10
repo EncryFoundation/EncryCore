@@ -37,7 +37,7 @@ trait BlockHeaderProcessor extends Logging {
 
   def modifiersToDownload(howMany: Int, excluding: Iterable[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
     @tailrec
-    def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] = {
+    def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] =
       if (acc.lengthCompare(howMany) >= 0) acc
       else {
         headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[Header](id)) match {
@@ -49,7 +49,6 @@ trait BlockHeaderProcessor extends Logging {
           case None => acc
         }
       }
-    }
 
     bestBlockOpt match {
       case _ if !isHeadersChainSynced => Seq.empty
