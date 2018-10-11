@@ -2,20 +2,16 @@ package encry.view
 
 import java.lang
 import java.util.concurrent.ConcurrentHashMap
-
+import encry.EncryApp.settings
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.Header
-import encry.EncryApp.settings
-import encry.modifiers.history.{Header, Payload}
-import encry.utils.CoreTaggedTypes.ModifierId
+import encry.utils.Logging
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
-import scala.annotation.tailrec
+import org.encryfoundation.common.Algos
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
-import scala.util.{Failure, Success}
-import encry.utils.Logging
-import org.encryfoundation.common.Algos
+import scala.util.Failure
 
 trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] extends Logging {
 
@@ -23,6 +19,8 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
   type V = PMOD
 
   val cache: TrieMap[K, V] = TrieMap[K, V]()
+
+  val headersQueue: mutable.SortedMap[Int, K] = mutable.SortedMap.empty[Int, K]
 
   private var cleaning: Boolean = settings.postgres.forall(postgres => !postgres.enableRestore) &&
     settings.levelDb.forall(levelDb => !levelDb.enableRestore)
@@ -59,31 +57,27 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
   /**
     * A cache element replacement strategy method, which defines a key to remove from cache when it is overfull
     */
-  protected def keyToRemove(history: EncryHistory): Option[K] = cache.find {
-    case (_, value) => history.testApplicable(value) match {
-      case Success(_) => false
-      case Failure(_: RecoverableModifierError) => false
-      case _ => true
-    }
-  }.map(_._1)
-  //cache.find(elem => history.testApplicable(elem._2).isFailure).map(_._1).getOrElse(keyToRemove(history))
+  protected def keyToRemove(history: EncryHistory): K =
+    cache.find(elem => history.testApplicable(elem._2).isFailure).map(_._1).getOrElse(keyToRemove(history))
 
   def contains(key: K): Boolean = cache.contains(key) || rememberedKeys.contains(key)
 
   def put(key: K, value: V, history: EncryHistory): Unit = {
     logInfo(s"Trying to put: ${Algos.encode(key.toArray)} to cahce. ${!contains(key)}")
     if (!contains(key)) {
-      //onPut(key)
       logInfo(s"Add elem ${Algos.encode(key.toArray)} to cache")
       cache.put(key, value)
+      value match {
+        case header: Header => headersQueue += (header.height -> key)
+        case _ =>
+      }
       logInfo(s"Size: $size ? $maxSize and $cleaning")
-      if (size > maxSize && cleaning) keyToRemove(history).map(remove)
+      if (size > maxSize && cleaning) remove(keyToRemove(history))
     }
   }
 
   def remove(key: K): Option[V] = {
     cache.remove(key).map { removed =>
-      //onRemove(key)
       removed
     }
   }
@@ -127,7 +121,6 @@ case class EncryModifiersCache(override val maxSize: Int)
         // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
         cache.find { case (k, v) =>
           v match {
-            //case h: Header if h.height > headersHeight + 1 => false
             case _ => tryToApply(k, v)
           }
         }.map { case (k, _) => k }
