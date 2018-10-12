@@ -83,7 +83,7 @@ class DeliveryManager extends Actor with Logging {
         } else context.become(syncCycle)
       }
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
-      if (modifierIds.nonEmpty && modifierTypeId != 2) expect(peer, modifierTypeId, modifierIds)
+      if (modifierIds.nonEmpty) expect(peer, modifierTypeId, modifierIds)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       val typeId: ModifierTypeId = data._1
       val modifiers: Map[ModifierId, Array[Byte]] = data._2
