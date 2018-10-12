@@ -93,7 +93,6 @@ case class EncryModifiersCache(override val maxSize: Int)
     def tryToApply(k: K, v: EncryPersistentModifier): Boolean = {
       history.testApplicable(v) match {
         case Failure(e: RecoverableModifierError) =>
-          logInfo(s"Error: $e")
           false
         case Failure(e: MalformedModifierError) =>
           logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
