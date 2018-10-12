@@ -64,7 +64,6 @@ class DeliveryManager extends Actor with Logging {
   def netMessages: Receive = {
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       statusTracker.updateStatus(remote, status)
-      logInfo(s"$remote status is $status")
       status match {
         case Unknown => logInfo("Peer status is still unknown")
         case Younger => sendExtension(remote, status, extOpt)
@@ -76,14 +75,11 @@ class DeliveryManager extends Actor with Logging {
       if (peerWhoDelivered(modifierId).contains(peer)) delete(modifierId)
       else reexpect(peer, modifierTypeId, modifierId)
     case CheckModifiersToDownload =>
-      logInfo("Get check modifiers to download.")
       historyReaderOpt.foreach { h =>
         val currentQueue: Iterable[ModifierId] = cancellables.keys.map(ModifierId @@ _.toArray)
-        logInfo(s"Current queue contains ${currentQueue.size} elements")
         val newIds: Seq[(ModifierTypeId, ModifierId)] =
           h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
             .filter(modId => !cancellables.keySet.contains(key(modId._2)))
-        logInfo(s"New ids contains ${newIds.size} elements")
         if (newIds.nonEmpty) newIds.groupBy(_._1).foreach {
           case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) => requestDownload(modId, ids.map(_._2))
         } else context.become(syncCycle)
@@ -142,7 +138,6 @@ class DeliveryManager extends Actor with Logging {
             }
           } else notYetRequested
       }
-      logInfo(s"Not notYetRequestedIds contains ${notYetRequestedIds.size} elements")
       if (notYetRequestedIds.nonEmpty) peer.handlerRef ! Message(requestModifierSpec, Right(mTypeId -> notYetRequestedIds), None)
       notYetRequestedIds.foreach { id =>
         val cancellable: Cancellable = context.system.scheduler

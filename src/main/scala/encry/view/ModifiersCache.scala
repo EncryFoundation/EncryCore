@@ -63,15 +63,12 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
   def contains(key: K): Boolean = cache.contains(key) || rememberedKeys.contains(key)
 
   def put(key: K, value: V, history: EncryHistory): Unit = {
-    logInfo(s"Trying to put: ${Algos.encode(key.toArray)} to cahce. ${!contains(key)}")
     if (!contains(key)) {
-      logInfo(s"Add elem ${Algos.encode(key.toArray)} to cache")
       cache.put(key, value)
       value match {
         case header: Header => headersQueue += (header.height -> key)
         case _ =>
       }
-      logInfo(s"Size: $size ? $maxSize and $cleaning")
       if (size > maxSize && cleaning) remove(keyToRemove(history))
     }
   }

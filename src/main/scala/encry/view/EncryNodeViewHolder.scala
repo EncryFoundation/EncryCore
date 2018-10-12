@@ -146,10 +146,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   def computeApplications(): Unit =
     modifiersCache.popCandidate(nodeView.history) match {
       case Some(mod) =>
-        logInfo(s"Process: ${Algos.encode(mod.id)}")
-        val startTime = System.nanoTime()
         pmodModify(mod)
-        logInfo(s"Applying time ${Algos.encode(mod.id)}: ${System.nanoTime() - startTime}")
         computeApplications()
       case None => Unit
     }
