@@ -29,6 +29,7 @@ object Directive {
     case td: TransferDirective => TransferDirective.jsonEncoder(td)
     case aid: AssetIssuingDirective => AssetIssuingDirective.jsonEncoder(aid)
     case sad: ScriptedAssetDirective => ScriptedAssetDirective.jsonEncoder(sad)
+    case dad: DataDirective => DataDirective.jsonEncoder(dad)
     case _ => throw new Exception("Incorrect directive type")
   }
 
@@ -39,6 +40,7 @@ object Directive {
           case TransferDirective.TypeId => TransferDirective.jsonDecoder(c)
           case AssetIssuingDirective.TypeId => AssetIssuingDirective.jsonDecoder(c)
           case ScriptedAssetDirective.TypeId => ScriptedAssetDirective.jsonDecoder(c)
+          case DataDirective.TypeId => DataDirective.jsonDecoder(c)
           case _ => Left(DecodingFailure("Incorrect directive typeID", c.history))
         }
         case Left(_) => Left(DecodingFailure("None typeId", c.history))
