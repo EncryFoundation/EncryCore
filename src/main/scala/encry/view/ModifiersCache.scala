@@ -2,13 +2,15 @@ package encry.view
 
 import java.lang
 import java.util.concurrent.ConcurrentHashMap
+
 import encry.EncryApp.settings
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.Header
+import encry.modifiers.history.{Header, Payload}
 import encry.utils.Logging
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
 import org.encryfoundation.common.Algos
+
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
@@ -20,7 +22,9 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
 
   val cache: TrieMap[K, V] = TrieMap[K, V]()
 
-  val headersQueue: mutable.SortedMap[Int, K] = mutable.SortedMap.empty[Int, K]
+  val headersQueue: mutable.SortedMap[Int, Seq[K]] = mutable.SortedMap.empty[Int, Seq[K]]
+
+  var possibleApplicableHeader: Option[Header] = None
 
   private var cleaning: Boolean = settings.postgres.forall(postgres => !postgres.enableRestore) &&
     settings.levelDb.forall(levelDb => !levelDb.enableRestore)
@@ -71,7 +75,13 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
     if (!contains(key)) {
       cache.put(key, value)
       value match {
-        case header: Header => headersQueue += (header.height -> key)
+        case header: Header =>
+          if (history.bestHeaderHeight == header.height + 1)
+            possibleApplicableHeader = Some(header)
+          headersQueue.update(
+            header.height,
+            headersQueue.getOrElse(header.height, Seq.empty) :+ new mutable.WrappedArray.ofByte(header.id)
+          )
         case _ =>
       }
       if (size > maxSize && cleaning) keyToRemove(history).map(remove)
@@ -79,6 +89,15 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
   }
 
   def remove(key: K): Option[V] = {
+    cache.get(key).foreach {
+      case header: Header =>
+        possibleApplicableHeader = None
+        headersQueue.update(
+          header.height,
+          headersQueue.getOrElse(header.height, Seq.empty).diff(new mutable.WrappedArray.ofByte(header.id))
+        )
+      case _ =>
+    }
     cache.remove(key).map { removed =>
       removed
     }
@@ -95,36 +114,51 @@ case class EncryModifiersCache(override val maxSize: Int)
   extends ModifiersCache[EncryPersistentModifier, EncryHistory] {
 
   override def findCandidateKey(history: EncryHistory): Option[K] = {
-    def tryToApply(k: K, v: EncryPersistentModifier): Boolean = {
-      history.testApplicable(v) match {
-        case Failure(e: RecoverableModifierError) =>
-          false
-        case Failure(e: MalformedModifierError) =>
-          logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
-          remove(k)
-          false
-        case Failure(exception) =>
-          logWarn(s"Exception during apply modifier ${Algos.encode(v.id)} $exception")
-          false
-        case m => m.isSuccess
-      }
+    def tryToApply(k: K): Boolean = {
+      cache.get(k).exists(modifier =>
+        history.testApplicable(modifier) match {
+          case Failure(e: RecoverableModifierError) =>
+            //logWarn(e.toString)
+            false
+          case Failure(e: MalformedModifierError) =>
+            //logWarn(s"Modifier ${modifier.encodedId} is permanently invalid and will be removed from cache caused $e")
+            remove(k)
+            false
+          case Failure(exception) =>
+            //logWarn(s"Exception during apply modifier ${Algos.encode(modifier.id)} $exception")
+            false
+          case m => m.isSuccess
+        }
+      )
     }
 
-    val headersHeight = history.bestHeaderHeight
+    val headersHeight = history.bestHeaderOpt.map(_.height).getOrElse(0)
 
     history
       .headerIdsAtHeight(history.bestBlockHeight + 1)
       .flatMap(id => history.typedModifierById[Header](id))
       .flatMap(_.partsIds.map(id => mutable.WrappedArray.make[Byte](id)))
       .flatMap(id => cache.get(id).map(v => id -> v))
-      .find(p => tryToApply(p._1, p._2)).map(_._1)
+      .find(p => tryToApply(p._1)).map(_._1)
       .orElse {
         // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
-        cache.find { case (k, v) =>
-          v match {
-            case _ => tryToApply(k, v)
-          }
-        }.map { case (k, _) => k }
+        val possibleHeaders: Seq[K] = headersQueue.get(headersHeight + 1).map(headersKey =>
+          headersKey.filter(tryToApply)
+        ).getOrElse(Seq.empty)
+        if (possibleApplicableHeader.nonEmpty)
+          possibleApplicableHeader.map(header => new mutable.WrappedArray.ofByte(header.id))
+        else {
+          if (possibleHeaders.nonEmpty) Some(possibleHeaders.head)
+          else
+            cache.find { case (k, v) =>
+              v match {
+                case _: Header if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) =>
+                  true
+                case _ =>
+                  tryToApply(k)
+              }
+            }.map { case (k, _) => k }
+        }
       }
   }
 }
