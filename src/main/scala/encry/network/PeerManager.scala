@@ -71,8 +71,7 @@ class PeerManager extends Actor with Logging {
           !connectingPeers.exists(_.getHostName == address.getHostName) &&
           checkPossibilityToAddPeerWRecovery(address) &&
           checkDuplicateIP(address)
-        )
-          .foreach { address => sender() ! ConnectTo(address) }
+        ).foreach { address => sender() ! ConnectTo(address) }
     case RecoveryCompleted =>
       logInfo("Received RecoveryCompleted")
       recoveryCompleted = true

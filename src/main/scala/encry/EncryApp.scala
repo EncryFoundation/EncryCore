@@ -2,7 +2,7 @@ package encry
 
 import java.net.InetAddress
 import akka.actor.SupervisorStrategy.Restart
-import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
+import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props, Terminated}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.ExceptionHandler
@@ -22,7 +22,7 @@ import encry.stats.{KafkaActor, LoggingActor, StatsSender, Zombie}
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import org.encryfoundation.common.Algos
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
 import scala.io.Source
 import scala.language.postfixOps
@@ -110,7 +110,13 @@ object EncryApp extends App with Logging {
       settings.restApi.bindAddress.getPort)
   }
 
-  def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
+  def forceStopApplication(code: Int = 0): Nothing = {
+    system.registerOnTermination {
+      println("Actor system terminated")
+    }
+    Await.ready(system.terminate(), 2 minutes)
+    sys.exit(code)
+  }
 
   def commonSupervisorStrategy: OneForOneStrategy = OneForOneStrategy(
     maxNrOfRetries = 5,
@@ -118,5 +124,4 @@ object EncryApp extends App with Logging {
     case _ => Restart
   }
 
-  sys.addShutdownHook(system.terminate)
 }
