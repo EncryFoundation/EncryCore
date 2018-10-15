@@ -2,16 +2,15 @@ package encry.view
 
 import java.lang
 import java.util.concurrent.ConcurrentHashMap
-
 import encry.EncryApp.settings
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.{Header, Payload}
+import encry.modifiers.history.Header
 import encry.utils.Logging
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
 import org.encryfoundation.common.Algos
-
 import scala.collection.concurrent.TrieMap
+import scala.collection.immutable.SortedMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
 
@@ -22,7 +21,7 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
 
   val cache: TrieMap[K, V] = TrieMap[K, V]()
 
-  val headersQueue: mutable.SortedMap[Int, Seq[K]] = mutable.SortedMap.empty[Int, Seq[K]]
+  protected var headersQueue: SortedMap[Int, Seq[K]] = SortedMap.empty[Int, Seq[K]]
 
   def possibleApplicableHeader(history: EncryHistory): Option[K] = headersQueue.get(history.bestHeaderHeight + 1).flatMap(_.headOption)
 
@@ -76,7 +75,7 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
       cache.put(key, value)
       value match {
         case header: Header =>
-          headersQueue.update(
+          headersQueue = headersQueue.updated(
             header.height,
             headersQueue.getOrElse(header.height, Seq.empty) :+ new mutable.WrappedArray.ofByte(header.id)
           )
@@ -89,7 +88,7 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
   def remove(key: K): Option[V] = {
     cache.get(key).foreach {
       case header: Header =>
-        headersQueue.update(
+        headersQueue = headersQueue.updated(
           header.height,
           headersQueue.getOrElse(header.height, Seq.empty).diff(new mutable.WrappedArray.ofByte(header.id))
         )
