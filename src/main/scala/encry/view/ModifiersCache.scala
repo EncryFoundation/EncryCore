@@ -24,7 +24,7 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
 
   val headersQueue: mutable.SortedMap[Int, Seq[K]] = mutable.SortedMap.empty[Int, Seq[K]]
 
-  var possibleApplicableHeader: Option[Header] = None
+  def possibleApplicableHeader(history: EncryHistory): Option[K] = headersQueue.get(history.bestHeaderHeight + 1).flatMap(_.headOption)
 
   private var cleaning: Boolean = settings.postgres.forall(postgres => !postgres.enableRestore) &&
     settings.levelDb.forall(levelDb => !levelDb.enableRestore)
@@ -76,8 +76,6 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
       cache.put(key, value)
       value match {
         case header: Header =>
-          if (history.bestHeaderHeight == header.height + 1)
-            possibleApplicableHeader = Some(header)
           headersQueue.update(
             header.height,
             headersQueue.getOrElse(header.height, Seq.empty) :+ new mutable.WrappedArray.ofByte(header.id)
@@ -91,7 +89,6 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
   def remove(key: K): Option[V] = {
     cache.get(key).foreach {
       case header: Header =>
-        possibleApplicableHeader = None
         headersQueue.update(
           header.height,
           headersQueue.getOrElse(header.height, Seq.empty).diff(new mutable.WrappedArray.ofByte(header.id))
@@ -145,9 +142,7 @@ case class EncryModifiersCache(override val maxSize: Int)
         val possibleHeaders: Seq[K] = headersQueue.get(headersHeight + 1).map(headersKey =>
           headersKey.filter(tryToApply)
         ).getOrElse(Seq.empty)
-        if (possibleApplicableHeader.nonEmpty)
-          possibleApplicableHeader.map(header => new mutable.WrappedArray.ofByte(header.id))
-        else {
+        possibleApplicableHeader(history).orElse {
           if (possibleHeaders.nonEmpty) Some(possibleHeaders.head)
           else
             cache.find { case (k, v) =>
