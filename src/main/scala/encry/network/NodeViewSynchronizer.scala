@@ -90,7 +90,7 @@ class NodeViewSynchronizer extends Actor with Logging {
           self ! ResponseFromLocal(remote, invData._1, objs)
         }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
-      logDebug(s"Got inv message from ${remote.socketAddress}.")
+      logDebug(s"Got inv message from ${remote.socketAddress}")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       deliveryManager ! DataFromPeer(spec, data: ModifiersData@unchecked, remote)
@@ -112,6 +112,7 @@ class NodeViewSynchronizer extends Actor with Logging {
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
     networkController ! SendToNetwork(Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None), Broadcast)
+
 }
 
 object NodeViewSynchronizer {

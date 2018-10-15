@@ -44,7 +44,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
   var receivedAll: Boolean = !(settings.postgres.exists(_.enableRestore) || settings.levelDb.exists(_.enableRestore))
   var triedToDownload: Boolean = !settings.postgres.exists(_.enableRestore)
-  val modifiersCache: EncryModifiersCache = EncryModifiersCache(1000)
+  val modifiersCache: EncryModifiersCache = EncryModifiersCache(3000)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     Header.modifierTypeId -> HeaderSerializer,
     Payload.modifierTypeId -> PayloadSerializer,
@@ -108,7 +108,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             if (nodeView.history.contains(pmod.id) || modifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
-              modifiersCache.put(key(pmod.id), pmod)
+              modifiersCache.put(key(pmod.id), pmod, nodeView.history)
               if (settings.levelDb.exists(_.enableSave))
                 context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
             }
@@ -135,9 +135,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       if (mempool) sender() ! ChangedMempool(nodeView.mempool)
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] = modifierTypeId match {
-        case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
-        case _ =>
-          modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
+        case Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
+        case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
       }
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case a: Any =>

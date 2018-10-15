@@ -10,6 +10,7 @@ import encry.modifiers.history.{Block, Header, HeaderChain}
 import encry.utils.Logging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.Algos
 import scala.util.{Failure, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with Logging {

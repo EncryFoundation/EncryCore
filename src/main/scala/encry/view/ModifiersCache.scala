@@ -2,24 +2,28 @@ package encry.view
 
 import java.lang
 import java.util.concurrent.ConcurrentHashMap
+import encry.EncryApp.settings
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.Header
-import encry.EncryApp.settings
+import encry.utils.Logging
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
-import scala.annotation.tailrec
+import org.encryfoundation.common.Algos
 import scala.collection.concurrent.TrieMap
+import scala.collection.immutable.SortedMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
-import encry.utils.Logging
-import org.encryfoundation.common.Algos
 
-trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
+trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] extends Logging {
 
   type K = mutable.WrappedArray[Byte]
   type V = PMOD
 
   val cache: TrieMap[K, V] = TrieMap[K, V]()
+
+  protected var headersQueue: SortedMap[Int, Seq[K]] = SortedMap.empty[Int, Seq[K]]
+
+  def possibleApplicableHeader(history: EncryHistory): Option[K] = headersQueue.get(history.bestHeaderHeight + 1).flatMap(_.headOption)
 
   private var cleaning: Boolean = settings.postgres.forall(postgres => !postgres.enableRestore) &&
     settings.levelDb.forall(levelDb => !levelDb.enableRestore)
@@ -56,21 +60,41 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
   /**
     * A cache element replacement strategy method, which defines a key to remove from cache when it is overfull
     */
-  protected def keyToRemove(): K
-
+  protected def keyToRemove(history: EncryHistory): Option[K] = cache.find {
+    case (_, value) => history.testApplicable(value) match {
+      case Success(_) => false
+      case Failure(_: RecoverableModifierError) => false
+      case _ => true
+    }
+  }.map(_._1)
 
   def contains(key: K): Boolean = cache.contains(key) || rememberedKeys.contains(key)
 
-  def put(key: K, value: V): Unit =
+  def put(key: K, value: V, history: EncryHistory): Unit = {
     if (!contains(key)) {
-      onPut(key)
       cache.put(key, value)
-      if (size > maxSize && cleaning) remove(keyToRemove())
+      value match {
+        case header: Header =>
+          headersQueue = headersQueue.updated(
+            header.height,
+            headersQueue.getOrElse(header.height, Seq.empty) :+ new mutable.WrappedArray.ofByte(header.id)
+          )
+        case _ =>
+      }
+      if (size > maxSize && cleaning) keyToRemove(history).map(remove)
     }
+  }
 
   def remove(key: K): Option[V] = {
+    cache.get(key).foreach {
+      case header: Header =>
+        headersQueue = headersQueue.updated(
+          header.height,
+          headersQueue.getOrElse(header.height, Seq.empty).diff(new mutable.WrappedArray.ofByte(header.id))
+        )
+      case _ =>
+    }
     cache.remove(key).map { removed =>
-      onRemove(key)
       removed
     }
   }
@@ -82,91 +106,48 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] {
   override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
 }
 
-trait LRUCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader] extends ModifiersCache[PMOD, HR] {
-
-  private val evictionQueue = mutable.Queue[K]()
-
-  // The eviction queue can contain elements already removed, as we're not removing a key from it when
-  // the key is got removed from the cache. When size of eviction queue exceeds maximum size of the cache by
-  // the value below(so the queue contains at least "cleaningThreshold" keys aleady removed from the cache),
-  // complete scan and cleaning of removed keys happen.
-  private val cleaningThreshold = 50
-
-  @tailrec
-  private def evictionCandidate(): K = {
-    val k = evictionQueue.dequeue()
-    if (cache.contains(k)) k else evictionCandidate()
-  }
-
-  override protected def onPut(key: K): Unit = {
-    evictionQueue.enqueue(key)
-    if (evictionQueue.size > maxSize + cleaningThreshold) {
-      evictionQueue.dequeueAll(k => !cache.contains(k))
-    }
-  }
-
-  override protected def onRemove(key: K): Unit = {}
-
-  def keyToRemove(): K = evictionCandidate()
-}
-
-class DefaultModifiersCache[PMOD <: EncryPersistentModifier, HR <: EncryHistoryReader]
-(override val maxSize: Int) extends LRUCache[PMOD, HR] with Logging {
-
-  /**
-    * Default implementation is just about to scan. Not efficient at all and should be probably rewritten in a
-    * concrete application.
-    *
-    * @param history - an interface to history which could be needed to define a candidate
-    * @return - candidate if it is found
-    */
-  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
-  override def findCandidateKey(history: HR): Option[K] = {
-    cache.find { case (k, v) =>
-      history.testApplicable(v) match {
-        case Failure(_: RecoverableModifierError) =>
-          false
-        case Failure(e) =>
-          logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
-          remove(k)
-          false
-        case Success(_) =>
-          true
-      }
-    }.map { case (k, _) => k }
-  }
-}
-
 case class EncryModifiersCache(override val maxSize: Int)
-  extends DefaultModifiersCache[EncryPersistentModifier, EncryHistory](maxSize) {
+  extends ModifiersCache[EncryPersistentModifier, EncryHistory] {
 
   override def findCandidateKey(history: EncryHistory): Option[K] = {
-    def tryToApply(k: K, v: EncryPersistentModifier): Boolean = {
-      history.testApplicable(v) match {
-        case Failure(e: MalformedModifierError) =>
-          logWarn(s"Modifier ${v.encodedId} is permanently invalid and will be removed from cache caused $e")
-          remove(k)
-          false
-        case m => m.isSuccess
-      }
+    def tryToApply(k: K): Boolean = {
+      cache.get(k).exists(modifier =>
+        history.testApplicable(modifier) match {
+          case Failure(_: RecoverableModifierError) => false
+          case Failure(_: MalformedModifierError) =>
+            remove(k)
+            false
+          case Failure(_) => false
+          case m => m.isSuccess
+        }
+      )
     }
 
-    val headersHeight = history.bestHeaderHeight
+    val headersHeight = history.bestHeaderOpt.map(_.height).getOrElse(0)
 
     history
       .headerIdsAtHeight(history.bestBlockHeight + 1)
       .flatMap(id => history.typedModifierById[Header](id))
       .flatMap(_.partsIds.map(id => mutable.WrappedArray.make[Byte](id)))
       .flatMap(id => cache.get(id).map(v => id -> v))
-      .find(p => tryToApply(p._1, p._2)).map(_._1)
+      .find(p => tryToApply(p._1)).map(_._1)
       .orElse {
         // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
-        cache.find { case (k, v) =>
-          v match {
-            case h: Header if h.height > headersHeight + 1 => false
-            case _ => tryToApply(k, v)
-          }
-        }.map { case (k, _) => k }
+        val possibleHeaders: Seq[K] = headersQueue.get(headersHeight + 1).map(headersKey =>
+          headersKey.filter(tryToApply)
+        ).getOrElse(Seq.empty)
+        possibleApplicableHeader(history).orElse {
+          if (possibleHeaders.nonEmpty) Some(possibleHeaders.head)
+          else
+            cache.find { case (k, v) =>
+              v match {
+                case _: Header if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) =>
+                  true
+                case _ =>
+                  tryToApply(k)
+              }
+            }.map { case (k, _) => k }
+        }
       }
   }
 }
