@@ -138,7 +138,8 @@ class DeliveryManager extends Actor with Logging {
             }
           } else notYetRequested
       }
-      if (notYetRequestedIds.nonEmpty) peer.handlerRef ! Message(requestModifierSpec, Right(mTypeId -> notYetRequestedIds), None)
+      if (notYetRequestedIds.nonEmpty)
+        peer.handlerRef ! Message(requestModifierSpec, Right(mTypeId -> notYetRequestedIds), None)
       notYetRequestedIds.foreach { id =>
         val cancellable: Cancellable = context.system.scheduler
           .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(peer, mTypeId, id))
@@ -154,8 +155,8 @@ class DeliveryManager extends Actor with Logging {
     cancellables.get(modifierKey) match {
       case Some(peerInfo) if peerInfo._2._2 < settings.network.maxDeliveryChecks && peerAndHistoryOpt.isDefined =>
         peerAndHistoryOpt.foreach { case (peer, _) =>
-          logDebug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: $mTypeId with id: " +
-            s"${Algos.encode(modifierId)}")
+          logDebug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: " +
+            s"$mTypeId with id: ${Algos.encode(modifierId)}")
           peer.handlerRef ! Message(requestModifierSpec, Right(mTypeId -> Seq(modifierId)), None)
           val cancellable: Cancellable = context.system.scheduler
             .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mTypeId, modifierId))
