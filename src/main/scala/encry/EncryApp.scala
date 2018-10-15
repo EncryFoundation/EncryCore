@@ -22,7 +22,7 @@ import encry.stats.{KafkaActor, LoggingActor, StatsSender, Zombie}
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
 import org.encryfoundation.common.Algos
-import scala.concurrent.{Await, ExecutionContextExecutor, Future}
+import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
 import scala.io.Source
 import scala.language.postfixOps
