@@ -113,16 +113,11 @@ case class EncryModifiersCache(override val maxSize: Int)
     def tryToApply(k: K): Boolean = {
       cache.get(k).exists(modifier =>
         history.testApplicable(modifier) match {
-          case Failure(e: RecoverableModifierError) =>
-            //logWarn(e.toString)
-            false
-          case Failure(e: MalformedModifierError) =>
-            //logWarn(s"Modifier ${modifier.encodedId} is permanently invalid and will be removed from cache caused $e")
+          case Failure(_: RecoverableModifierError) => false
+          case Failure(_: MalformedModifierError) =>
             remove(k)
             false
-          case Failure(exception) =>
-            //logWarn(s"Exception during apply modifier ${Algos.encode(modifier.id)} $exception")
-            false
+          case Failure(_) => false
           case m => m.isSuccess
         }
       )
