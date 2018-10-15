@@ -243,7 +243,7 @@ object OutputDBVersion {
       val id: String = Base16.encode(bx.id)
       val (monetaryValue: Long, coinId: String, dataOpt: Option[Array[Byte]@unchecked]) = bx match {
         case ab: AssetBox => (ab.amount, Base16.encode(ab.tokenIdOpt.getOrElse(Constants.IntrinsicTokenId)), None)
-        case db: DataBox => (0L, Base16.encode(Constants.IntrinsicTokenId), db.data)
+        case db: DataBox => (0L, Base16.encode(Constants.IntrinsicTokenId), Some(db.data))
         case _ => (0L, Base16.encode(Constants.IntrinsicTokenId), None)
       }
       val data: String = dataOpt.map(Base16.encode).getOrElse("")
