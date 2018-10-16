@@ -8,6 +8,7 @@ import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
+import encry.local.miner.Miner.DisableMining
 import encry.modifiers._
 import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
@@ -289,6 +290,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                     BestHeaderInChain(header, System.currentTimeMillis()))
               if (newHistory.isFullChainSynced && receivedAll)
                 Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
+              else miner ! DisableMining
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
               logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
