@@ -170,14 +170,17 @@ object Header {
 
   implicit val jsonEncoder: Encoder[Header] = (h: Header) => Map(
     "id" -> Algos.encode(h.id).asJson,
-    "hash" -> Base16.encode(h.id).asJson,
+    "version" -> h.version.asJson,
     "parentId" -> Algos.encode(h.parentId).asJson,
+    "adProofsRoot" -> Algos.encode(h.adProofsRoot).asJson,
     "payloadId" -> Algos.encode(h.payloadId).asJson,
     "stateRoot" -> Algos.encode(h.stateRoot).asJson,
     "txRoot" -> Algos.encode(h.transactionsRoot).asJson,
+    "nonce" -> h.nonce.asJson,
     "timestamp" -> h.timestamp.asJson,
     "height" -> h.height.asJson,
     "difficulty" -> h.difficulty.toString.asJson,
+    "equihashSolution" -> h.equihashSolution.asJson
   ).asJson
 
   def getPowHash(header: Header): Digest32 = {
