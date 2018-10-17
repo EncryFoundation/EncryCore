@@ -63,13 +63,13 @@ object EncryApp extends App with Logging {
   if (settings.influxDB.isDefined) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.kafka.exists(_.sendToKafka))
     system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
-  if (settings.postgres.isDefined) {
+  if (settings.postgres.exists(_.enableSave) || settings.postgres.exists(_.enableRestore) ) {
     if (settings.postgres.exists(_.enableSave))
       system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")
     if (settings.postgres.exists(_.enableRestore))
       system.actorOf(Props(classOf[PostgresRestore], dbService, nodeViewHolder), "postgresRestore")
   }
-  if (settings.levelDb.isDefined) {
+  if (settings.levelDb.exists(_.enableSave) || settings.levelDb.exists(_.enableRestore) ) {
       system.actorOf(Props[ModifiersHolder], "modifiersHolder")
     if (!settings.levelDb.exists(_.enableRestore)) system.actorSelection("/user/postgresRestore") ! StartRecovery
   }
