@@ -7,21 +7,21 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.Header
 import encry.utils.Logging
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
-import encry.view.history.{EncryHistory, EncryHistoryReader}
+import encry.view.history.EncryHistory
 import org.encryfoundation.common.Algos
 import scala.collection.concurrent.TrieMap
 import scala.collection.immutable.SortedMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
 
-trait ModifiersCache extends Logging {
+case class ModifiersCache(maxSize: Int) extends Logging {
 
   type K = mutable.WrappedArray[Byte]
   type V = EncryPersistentModifier
 
   val cache: TrieMap[K, V] = TrieMap[K, V]()
 
-  protected var headersQueue: SortedMap[Int, Seq[K]] = SortedMap.empty[Int, Seq[K]]
+  private var headersQueue: SortedMap[Int, Seq[K]] = SortedMap.empty[Int, Seq[K]]
 
   def possibleApplicableHeader(history: EncryHistory): Option[K] =
     headersQueue.get(history.bestHeaderHeight + 1).flatMap(_.headOption)
@@ -33,10 +33,6 @@ trait ModifiersCache extends Logging {
 
   def size: Int = cache.size
 
-  def isEmpty: Boolean = size == 0
-
-  def maxSize: Int
-
   /**
     * Keys to simulate objects residing a cache. So if key is stored here,
     * the membership check (contains()) shows that the key is in the cache,
@@ -45,14 +41,6 @@ trait ModifiersCache extends Logging {
     * which are unquestionably invalid.
     */
   protected val rememberedKeys: ConcurrentHashMap.KeySetView[K, lang.Boolean] = ConcurrentHashMap.newKeySet[K]()
-
-  /**
-    * Defines a best (and application-specific) candidate to be applied.
-    *
-    * @param history - an interface to history which could be needed to define a candidate
-    * @return - candidate if it is found
-    */
-  def findCandidateKey(history: EncryHistory): Option[K]
 
   protected def onPut(key: K): Unit = {}
 
@@ -105,11 +93,8 @@ trait ModifiersCache extends Logging {
   }
 
   override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
-}
 
-case class EncryModifiersCache(override val maxSize: Int) extends ModifiersCache {
-
-  override def findCandidateKey(history: EncryHistory): Option[K] = {
+  def findCandidateKey(history: EncryHistory): Option[K] = {
     def tryToApply(k: K): Boolean = {
       cache.get(k).exists(modifier =>
         history.testApplicable(modifier) match {
