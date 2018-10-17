@@ -23,15 +23,16 @@ case class ModifiersCache(maxSize: Int) extends Logging {
 
   private var headersQueue: SortedMap[Int, Seq[K]] = SortedMap.empty[Int, Seq[K]]
 
-  def possibleApplicableHeader(history: EncryHistory): Option[K] =
-    headersQueue.get(history.bestHeaderHeight + 1).flatMap(_.headOption)
-
   private var cleaning: Boolean = settings.postgres.forall(postgres => !postgres.enableRestore) &&
     settings.levelDb.forall(levelDb => !levelDb.enableRestore)
+
+  protected val rememberedKeys: ConcurrentHashMap.KeySetView[K, lang.Boolean] = ConcurrentHashMap.newKeySet[K]()
 
   def enableCleaning: Unit = cleaning = true
 
   def size: Int = cache.size
+
+  def isEmpty: Boolean = size == 0
 
   /**
     * Keys to simulate objects residing a cache. So if key is stored here,
@@ -40,7 +41,6 @@ case class ModifiersCache(maxSize: Int) extends Logging {
     * to have this structure is to avoid repeatedly downloading modifiers
     * which are unquestionably invalid.
     */
-  protected val rememberedKeys: ConcurrentHashMap.KeySetView[K, lang.Boolean] = ConcurrentHashMap.newKeySet[K]()
 
   protected def onPut(key: K): Unit = {}
 
@@ -59,8 +59,7 @@ case class ModifiersCache(maxSize: Int) extends Logging {
 
   def contains(key: K): Boolean = cache.contains(key) || rememberedKeys.contains(key)
 
-  def put(key: K, value: V, history: EncryHistory): Unit = {
-    if (!contains(key)) {
+  def put(key: K, value: V, history: EncryHistory): Unit = if (!contains(key)) {
       cache.put(key, value)
       value match {
         case header: Header =>
@@ -72,7 +71,7 @@ case class ModifiersCache(maxSize: Int) extends Logging {
       }
       if (size > maxSize && cleaning) keyToRemove(history).map(remove)
     }
-  }
+
 
   def remove(key: K): Option[V] = {
     cache.get(key).foreach {
@@ -95,33 +94,29 @@ case class ModifiersCache(maxSize: Int) extends Logging {
   override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
 
   def findCandidateKey(history: EncryHistory): Option[K] = {
-    def tryToApply(k: K): Boolean = {
-      cache.get(k).exists(modifier =>
-        history.testApplicable(modifier) match {
-          case Failure(_: RecoverableModifierError) => false
-          case Failure(_: MalformedModifierError) =>
-            remove(k)
-            false
-          case Failure(_) => false
-          case m => m.isSuccess
-        }
-      )
+
+    def tryToApply(k: K): Boolean = cache.get(k).exists(modifier => history.testApplicable(modifier) match {
+      case Failure(_: RecoverableModifierError) => false
+      case Failure(_: MalformedModifierError) =>
+        remove(k)
+        false
+      case Failure(_) => false
+      case m => m.isSuccess
     }
+    )
 
-    val headersHeight = history.bestHeaderOpt.map(_.height).getOrElse(0)
-
-    history
-      .headerIdsAtHeight(history.bestBlockHeight + 1)
+    history.headerIdsAtHeight(history.bestBlockHeight + 1)
       .flatMap(id => history.typedModifierById[Header](id))
       .flatMap(_.partsIds.map(id => mutable.WrappedArray.make[Byte](id)))
       .flatMap(id => cache.get(id).map(v => id -> v))
       .find(p => tryToApply(p._1)).map(_._1)
       .orElse {
         // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
-        val possibleHeaders: Seq[K] = headersQueue.get(headersHeight + 1).map(headersKey =>
+        val possibleHeaders: Seq[K] =
+          headersQueue.get(history.bestHeaderOpt.map(_.height).getOrElse(0) + 1).map(headersKey =>
           headersKey.filter(tryToApply)
         ).getOrElse(Seq.empty)
-        possibleApplicableHeader(history).orElse {
+        headersQueue.get(history.bestHeaderHeight + 1).flatMap(_.headOption).orElse {
           if (possibleHeaders.nonEmpty) Some(possibleHeaders.head)
           else
             cache.find { case (k, v) =>

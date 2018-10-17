@@ -45,7 +45,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
   var receivedAll: Boolean = !(settings.postgres.exists(_.enableRestore) || settings.levelDb.exists(_.enableRestore))
   var triedToDownload: Boolean = !settings.postgres.exists(_.enableRestore)
-  val modifiersCache: EncryModifiersCache = EncryModifiersCache(3000)
+  val modifiersCache: ModifiersCache = ModifiersCache(3000)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     Header.modifierTypeId -> HeaderSerializer,
     Payload.modifierTypeId -> PayloadSerializer,
