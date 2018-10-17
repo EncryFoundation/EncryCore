@@ -7,7 +7,7 @@ import akka.pattern.ask
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.EncryProposition
-import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
+import encry.view.ReadersHolder.{GetReaders, Readers}
 import encry.view.mempool.MempoolReader
 import encry.view.state.StateMode
 import io.circe.Json
