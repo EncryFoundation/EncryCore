@@ -2,7 +2,7 @@ package encry
 
 import java.net.InetAddress
 import akka.actor.SupervisorStrategy.Restart
-import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props, Terminated}
+import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.ExceptionHandler

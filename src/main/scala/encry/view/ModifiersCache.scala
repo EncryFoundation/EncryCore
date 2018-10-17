@@ -14,16 +14,17 @@ import scala.collection.immutable.SortedMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
 
-trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] extends Logging {
+trait ModifiersCache extends Logging {
 
   type K = mutable.WrappedArray[Byte]
-  type V = PMOD
+  type V = EncryPersistentModifier
 
   val cache: TrieMap[K, V] = TrieMap[K, V]()
 
   protected var headersQueue: SortedMap[Int, Seq[K]] = SortedMap.empty[Int, Seq[K]]
 
-  def possibleApplicableHeader(history: EncryHistory): Option[K] = headersQueue.get(history.bestHeaderHeight + 1).flatMap(_.headOption)
+  def possibleApplicableHeader(history: EncryHistory): Option[K] =
+    headersQueue.get(history.bestHeaderHeight + 1).flatMap(_.headOption)
 
   private var cleaning: Boolean = settings.postgres.forall(postgres => !postgres.enableRestore) &&
     settings.levelDb.forall(levelDb => !levelDb.enableRestore)
@@ -51,7 +52,7 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
     * @param history - an interface to history which could be needed to define a candidate
     * @return - candidate if it is found
     */
-  def findCandidateKey(history: H): Option[K]
+  def findCandidateKey(history: EncryHistory): Option[K]
 
   protected def onPut(key: K): Unit = {}
 
@@ -99,15 +100,14 @@ trait ModifiersCache[PMOD <: EncryPersistentModifier, H <: EncryHistoryReader] e
     }
   }
 
-  def popCandidate(history: H): Option[V] = synchronized {
+  def popCandidate(history: EncryHistory): Option[V] = synchronized {
     findCandidateKey(history).flatMap(k => remove(k))
   }
 
   override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
 }
 
-case class EncryModifiersCache(override val maxSize: Int)
-  extends ModifiersCache[EncryPersistentModifier, EncryHistory] {
+case class EncryModifiersCache(override val maxSize: Int) extends ModifiersCache {
 
   override def findCandidateKey(history: EncryHistory): Option[K] = {
     def tryToApply(k: K): Boolean = {
