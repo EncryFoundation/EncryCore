@@ -45,7 +45,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
   var receivedAll: Boolean = !(settings.postgres.exists(_.enableRestore) || settings.levelDb.exists(_.enableRestore))
   var triedToDownload: Boolean = !settings.postgres.exists(_.enableRestore)
-  val modifiersCache: ModifiersCache = ModifiersCache(3000)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     Header.modifierTypeId -> HeaderSerializer,
     Payload.modifierTypeId -> PayloadSerializer,
@@ -97,27 +96,27 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       if (receivedAll) {
         logInfo(s"Received all blocks from recovery")
         peerManager ! RecoveryCompleted
-        modifiersCache.enableCleaning
+        ModifiersCache.setCleaningToTrue()
       }
       if (applicationsSuccessful && settings.levelDb.exists(_.enableRestore) && !receivedAll) sender ! SendBlocks
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
-      if (modifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
+      if (ModifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
-            if (nodeView.history.contains(pmod.id) || modifiersCache.contains(key(pmod.id)))
+            if (nodeView.history.contains(pmod.id) || ModifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
-              modifiersCache.put(key(pmod.id), pmod, nodeView.history)
+              ModifiersCache.put(key(pmod.id), pmod, nodeView.history)
               if (settings.levelDb.exists(_.enableSave))
                 context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
             }
         }
-        logInfo(s"Cache before(${modifiersCache.size})")
+        logInfo(s"Cache before(${ModifiersCache.size})")
         computeApplications()
-        if (modifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
-        logInfo(s"Cache after(${modifiersCache.size})")
+        if (ModifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
+        logInfo(s"Cache after(${ModifiersCache.size})")
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
@@ -137,7 +136,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] = modifierTypeId match {
         case Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
-        case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || modifiersCache.contains(key(mid)))
+        case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case a: Any =>
@@ -145,7 +144,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   def computeApplications(): Unit =
-    modifiersCache.popCandidate(nodeView.history) match {
+    ModifiersCache.popCandidate(nodeView.history) match {
       case Some(mod) =>
         pmodModify(mod)
         computeApplications()

@@ -1,6 +1,5 @@
 package encry.view
 
-import java.lang
 import java.util.concurrent.ConcurrentHashMap
 import encry.EncryApp.settings
 import encry.modifiers.EncryPersistentModifier
@@ -14,66 +13,43 @@ import scala.collection.immutable.SortedMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
 
-case class ModifiersCache(maxSize: Int) extends Logging {
+object ModifiersCache extends Logging {
 
-  type K = mutable.WrappedArray[Byte]
-  type V = EncryPersistentModifier
+  private type Key = mutable.WrappedArray[Byte]
 
-  val cache: TrieMap[K, V] = TrieMap[K, V]()
-
-  private var headersQueue: SortedMap[Int, Seq[K]] = SortedMap.empty[Int, Seq[K]]
-
+  private val cache: TrieMap[Key, EncryPersistentModifier] = TrieMap[Key, EncryPersistentModifier]()
+  private var headersQueue: SortedMap[Int, Seq[Key]] = SortedMap.empty[Int, Seq[Key]]
   private var cleaning: Boolean = settings.postgres.forall(postgres => !postgres.enableRestore) &&
     settings.levelDb.forall(levelDb => !levelDb.enableRestore)
 
-  protected val rememberedKeys: ConcurrentHashMap.KeySetView[K, lang.Boolean] = ConcurrentHashMap.newKeySet[K]()
-
-  def enableCleaning: Unit = cleaning = true
+  def setCleaningToTrue(): Unit = cleaning = true
 
   def size: Int = cache.size
 
   def isEmpty: Boolean = size == 0
 
-  /**
-    * Keys to simulate objects residing a cache. So if key is stored here,
-    * the membership check (contains()) shows that the key is in the cache,
-    * but the value corresponding to the key is not stored. The motivation
-    * to have this structure is to avoid repeatedly downloading modifiers
-    * which are unquestionably invalid.
-    */
+  def contains(key: Key): Boolean = cache.contains(key) || ConcurrentHashMap.newKeySet[Key]().contains(key)
 
-  protected def onPut(key: K): Unit = {}
-
-  protected def onRemove(key: K): Unit = {}
-
-  /**
-    * A cache element replacement strategy method, which defines a key to remove from cache when it is overfull
-    */
-  protected def keyToRemove(history: EncryHistory): Option[K] = cache.find {
-    case (_, value) => history.testApplicable(value) match {
-      case Success(_) => false
-      case Failure(_: RecoverableModifierError) => false
-      case _ => true
+  def put(key: Key, value: EncryPersistentModifier, history: EncryHistory): Unit = if (!contains(key)) {
+    cache.put(key, value)
+    value match {
+      case header: Header =>
+        headersQueue = headersQueue.updated(
+          header.height,
+          headersQueue.getOrElse(header.height, Seq.empty) :+ new mutable.WrappedArray.ofByte(header.id)
+        )
+      case _ =>
     }
-  }.map(_._1)
-
-  def contains(key: K): Boolean = cache.contains(key) || rememberedKeys.contains(key)
-
-  def put(key: K, value: V, history: EncryHistory): Unit = if (!contains(key)) {
-      cache.put(key, value)
-      value match {
-        case header: Header =>
-          headersQueue = headersQueue.updated(
-            header.height,
-            headersQueue.getOrElse(header.height, Seq.empty) :+ new mutable.WrappedArray.ofByte(header.id)
-          )
-        case _ =>
+    if (size > settings.node.modifiersCacheSize && cleaning) cache.find {
+      case (_, value) => history.testApplicable(value) match {
+        case Success(_) => false
+        case Failure(_: RecoverableModifierError) => false
+        case _ => true
       }
-      if (size > maxSize && cleaning) keyToRemove(history).map(remove)
-    }
+    }.map(_._1).map(remove)
+  }
 
-
-  def remove(key: K): Option[V] = {
+  def remove(key: Key): Option[EncryPersistentModifier] = {
     cache.get(key).foreach {
       case header: Header =>
         headersQueue = headersQueue.updated(
@@ -87,18 +63,18 @@ case class ModifiersCache(maxSize: Int) extends Logging {
     }
   }
 
-  def popCandidate(history: EncryHistory): Option[V] = synchronized {
+  def popCandidate(history: EncryHistory): Option[EncryPersistentModifier] = synchronized {
     findCandidateKey(history).flatMap(k => remove(k))
   }
 
   override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
 
-  def findCandidateKey(history: EncryHistory): Option[K] = {
+  def findCandidateKey(history: EncryHistory): Option[Key] = {
 
-    def tryToApply(k: K): Boolean = cache.get(k).exists(modifier => history.testApplicable(modifier) match {
+    def tryToApply(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier) match {
       case Failure(_: RecoverableModifierError) => false
       case Failure(_: MalformedModifierError) =>
-        remove(k)
+        remove(key)
         false
       case Failure(_) => false
       case m => m.isSuccess
@@ -112,10 +88,10 @@ case class ModifiersCache(maxSize: Int) extends Logging {
       .find(p => tryToApply(p._1)).map(_._1)
       .orElse {
         // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
-        val possibleHeaders: Seq[K] =
+        val possibleHeaders: Seq[Key] =
           headersQueue.get(history.bestHeaderOpt.map(_.height).getOrElse(0) + 1).map(headersKey =>
-          headersKey.filter(tryToApply)
-        ).getOrElse(Seq.empty)
+            headersKey.filter(tryToApply)
+          ).getOrElse(Seq.empty)
         headersQueue.get(history.bestHeaderHeight + 1).flatMap(_.headOption).orElse {
           if (possibleHeaders.nonEmpty) Some(possibleHeaders.head)
           else
@@ -131,4 +107,3 @@ case class ModifiersCache(maxSize: Int) extends Logging {
       }
   }
 }
-
