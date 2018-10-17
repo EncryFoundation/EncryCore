@@ -17,7 +17,7 @@ import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
-import encry.view.mempool.EncryMempool
+import encry.view.mempool.Mempool
 import encry.utils.Logging
 import org.encryfoundation.common.Algos
 import scala.collection.mutable
@@ -32,7 +32,7 @@ class DeliveryManager extends Actor with Logging {
   var deliveredSpam: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty
   var peers: Map[ModifierIdAsKey, Seq[ConnectedPeer]] = Map.empty
   var cancellables: Map[ModifierIdAsKey, (ConnectedPeer, (Cancellable, Int))] = Map.empty
-  var mempoolReaderOpt: Option[EncryMempool] = None
+  var mempoolReaderOpt: Option[Mempool] = None
   var historyReaderOpt: Option[EncryHistory] = None
   var isBlockChainSynced: Boolean = false
   var isMining: Boolean = settings.node.mining
@@ -115,7 +115,7 @@ class DeliveryManager extends Actor with Logging {
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       historyReaderOpt = Some(reader)
-    case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] => mempoolReaderOpt = Some(reader)
+    case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] => mempoolReaderOpt = Some(reader)
     case ContinueSync =>
       context.become(syncCycle)
       self ! SendLocalSyncInfo

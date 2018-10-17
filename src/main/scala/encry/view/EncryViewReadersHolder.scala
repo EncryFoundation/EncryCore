@@ -6,7 +6,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, Ch
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetNodeViewChanges
 import encry.view.EncryViewReadersHolder.{GetDataFromHistory, GetReaders, Readers}
 import encry.view.history.EncryHistoryReader
-import encry.view.mempool.EncryMempoolReader
+import encry.view.mempool.MempoolReader
 import encry.view.state.UtxoStateReader
 
 class EncryViewReadersHolder extends Actor {
@@ -18,14 +18,14 @@ class EncryViewReadersHolder extends Actor {
 
   var historyReaderOpt: Option[EncryHistoryReader] = None
   var stateReaderOpt: Option[UtxoStateReader] = None
-  var mempoolReaderOpt: Option[EncryMempoolReader] = None
+  var mempoolReaderOpt: Option[MempoolReader] = None
 
   override def receive: Receive = {
     case ChangedHistory(reader: EncryHistoryReader@unchecked) if reader.isInstanceOf[EncryHistoryReader] =>
       historyReaderOpt = Some(reader)
     case ChangedState(reader: UtxoStateReader@unchecked) if reader.isInstanceOf[UtxoStateReader] =>
       stateReaderOpt = Some(reader)
-    case ChangedMempool(reader: EncryMempoolReader@unchecked) if reader.isInstanceOf[EncryMempoolReader] =>
+    case ChangedMempool(reader: MempoolReader@unchecked) if reader.isInstanceOf[MempoolReader] =>
       mempoolReaderOpt = Some(reader)
     case GetReaders => sender ! Readers(historyReaderOpt, stateReaderOpt, mempoolReaderOpt)
     case GetDataFromHistory => historyReaderOpt.foreach(sender ! _)
@@ -39,6 +39,6 @@ object EncryViewReadersHolder {
 
   case object GetReaders
 
-  case class Readers(h: Option[EncryHistoryReader], s: Option[UtxoStateReader], m: Option[EncryMempoolReader])
+  case class Readers(h: Option[EncryHistoryReader], s: Option[UtxoStateReader], m: Option[MempoolReader])
 
 }

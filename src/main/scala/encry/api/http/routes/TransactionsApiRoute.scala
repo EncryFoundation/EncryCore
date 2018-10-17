@@ -8,7 +8,7 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.EncryProposition
 import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
-import encry.view.mempool.EncryMempoolReader
+import encry.view.mempool.MempoolReader
 import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
@@ -26,7 +26,7 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
 
   override val settings: RESTApiSettings = restApiSettings
 
-  private def getMempool: Future[EncryMempoolReader] = (readersHolder ? GetReaders).mapTo[Readers].map(_.m.get)
+  private def getMempool: Future[MempoolReader] = (readersHolder ? GetReaders).mapTo[Readers].map(_.m.get)
 
   private def getUnconfirmedTransactions(limit: Int, offset: Int = 0): Future[Json] = getMempool.map {
     _.unconfirmed.values.slice(offset, offset + limit)

@@ -20,7 +20,7 @@ import encry.view.EncryNodeViewHolder.CurrentView
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.EncryHistory
 import encry.view.history.History.Height
-import encry.view.mempool.EncryMempool
+import encry.view.mempool.Mempool
 import encry.view.state.{StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
@@ -144,7 +144,7 @@ class Miner extends Actor with Logging {
     self ! StartMining
   }
 
-  def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool],
+  def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet, Mempool],
                       bestHeaderOpt: Option[Header]): CandidateBlock = {
     val timestamp: Time = timeProvider.estimatedTime
     val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
@@ -189,7 +189,7 @@ class Miner extends Actor with Logging {
   }
 
   def produceCandidate(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, CandidateEnvelope] {
+    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Mempool, CandidateEnvelope] {
       nodeView =>
         val producingStartTime: Time = System.currentTimeMillis()
         startTime = producingStartTime

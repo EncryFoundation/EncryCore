@@ -23,7 +23,7 @@ import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
-import encry.view.mempool.EncryMempool
+import encry.view.mempool.Mempool
 import encry.view.state._
 import encry.view.wallet.EncryWallet
 import org.apache.commons.io.FileUtils
@@ -39,7 +39,7 @@ import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging {
 
-  case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: EncryMempool)
+  case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: Mempool)
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
@@ -156,7 +156,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   def updateNodeView(updatedHistory: Option[EncryHistory] = None,
                      updatedState: Option[StateType] = None,
                      updatedVault: Option[EncryWallet] = None,
-                     updatedMempool: Option[EncryMempool] = None): Unit = {
+                     updatedMempool: Option[Mempool] = None): Unit = {
     val newNodeView: NodeView = NodeView(updatedHistory.getOrElse(nodeView.history),
       updatedState.getOrElse(nodeView.state),
       updatedVault.getOrElse(nodeView.wallet),
@@ -173,7 +173,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   def updateMemPool(blocksRemoved: Seq[EncryPersistentModifier], blocksApplied: Seq[EncryPersistentModifier],
-                    memPool: EncryMempool, state: StateType): EncryMempool = {
+                    memPool: Mempool, state: StateType): Mempool = {
     val rolledBackTxs: Seq[Transaction] = blocksRemoved.flatMap(extractTransactions)
     val appliedTxs: Seq[Transaction] = blocksApplied.flatMap(extractTransactions)
     memPool.putWithoutCheck(rolledBackTxs).filter { tx =>
@@ -273,7 +273,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
           newStateTry match {
             case Success(newMinState) =>
-              val newMemPool: EncryMempool =
+              val newMemPool: Mempool =
                 updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)
               val newVault: EncryWallet = if (progressInfo.chainSwitchingNeeded)
                 nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
@@ -327,7 +327,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     }.asInstanceOf[StateType]
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
-    val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider, system)
+    val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
     NodeView(history, state, wallet, memPool)
   }
 
@@ -335,7 +335,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     try {
       val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
-      val memPool: EncryMempool = EncryMempool.empty(settings, timeProvider, system)
+      val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
       val state: StateType =
         restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
       Some(NodeView(history, state, wallet, memPool))
