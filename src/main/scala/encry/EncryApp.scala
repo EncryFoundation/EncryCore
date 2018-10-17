@@ -2,7 +2,7 @@ package encry
 
 import java.net.InetAddress
 import akka.actor.SupervisorStrategy.Restart
-import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props, Terminated}
+import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.ExceptionHandler
@@ -20,7 +20,7 @@ import encry.network.{PeerManager, _}
 import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, LoggingActor, StatsSender, Zombie}
 import encry.utils.{Logging, NetworkTimeProvider}
-import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
+import encry.view.{EncryNodeViewHolder, ReadersHolder}
 import org.encryfoundation.common.Algos
 import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
@@ -53,7 +53,7 @@ object EncryApp extends App with Logging {
 
   lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props()
     .withDispatcher("nvh-dispatcher").withMailbox("nvh-mailbox"), "nodeViewHolder")
-  val readersHolder: ActorRef = system.actorOf(Props[EncryViewReadersHolder], "readersHolder")
+  val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
     .withDispatcher("network-dispatcher"), "networkController")
   lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
@@ -63,13 +63,13 @@ object EncryApp extends App with Logging {
   if (settings.influxDB.isDefined) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.kafka.exists(_.sendToKafka))
     system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
-  if (settings.postgres.isDefined) {
+  if (settings.postgres.exists(_.enableSave) || settings.postgres.exists(_.enableRestore) ) {
     if (settings.postgres.exists(_.enableSave))
       system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")
     if (settings.postgres.exists(_.enableRestore))
       system.actorOf(Props(classOf[PostgresRestore], dbService, nodeViewHolder), "postgresRestore")
   }
-  if (settings.levelDb.isDefined) {
+  if (settings.levelDb.exists(_.enableSave) || settings.levelDb.exists(_.enableRestore) ) {
       system.actorOf(Props[ModifiersHolder], "modifiersHolder")
     if (!settings.levelDb.exists(_.enableRestore)) system.actorSelection("/user/postgresRestore") ! StartRecovery
   }
