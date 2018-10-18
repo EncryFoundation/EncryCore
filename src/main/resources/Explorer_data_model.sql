@@ -69,52 +69,7 @@ CREATE TABLE directives(
 
 CREATE INDEX tx_id_directives_index ON directives (tx_id);
 
-CREATE TABLE chainFromNodeOne(
+CREATE TABLE chainfromnodeone(
   id VARCHAR(64) PRIMARY KEY,
-  height INTEGER NOT NULL,
-);
-
-CREATE TABLE chainFromNodeTwo(
-  id VARCHAR(64) PRIMARY KEY,
-  height INTEGER NOT NULL,
-);
-
-CREATE TABLE chainFromNodeThree(
-  id VARCHAR(64) PRIMARY KEY,
-  height INTEGER NOT NULL,
-);
-
-CREATE TABLE chainFromNodeFour(
-  id VARCHAR(64) PRIMARY KEY,
-  height INTEGER NOT NULL,
-);
-
-CREATE TABLE chainFromNodeFive(
-  id VARCHAR(64) PRIMARY KEY,
-  height INTEGER NOT NULL,
-);
-
-CREATE TABLE chainFromNodeSix(
-  id VARCHAR(64) PRIMARY KEY,
-  height INTEGER NOT NULL,
-);
-
-CREATE TABLE chainFromNodeSeven(
-  id VARCHAR(64) PRIMARY KEY,
-  height INTEGER NOT NULL,
-);
-
-CREATE TABLE chainFromNodeEight(
-  id VARCHAR(64) PRIMARY KEY,
-  height INTEGER NOT NULL,
-);
-
-CREATE TABLE chainFromNodeNine(
-  id VARCHAR(64) PRIMARY KEY,
-  height INTEGER NOT NULL,
-);
-
-CREATE TABLE chainFromNodeTen(
-  id VARCHAR(64) PRIMARY KEY,
-  height INTEGER NOT NULL,
+  height INTEGER NOT NULL
 );

@@ -27,10 +27,10 @@ class DBService extends Logging {
       count
     }
 
-  def insertHeadersFromNode(headers: List[HeaderForDBForks]): Future[Int] =
-    runAsync(processHeadersForForksQuery(headers), "processHeadersForForksQuery")
+  def insertHeadersFromNode(header: HeaderForDBForks): Future[Int] =
+    runAsync(processHeadersForForksQuery(header), "processHeadersForForksQuery")
       .map { count =>
-        logInfo(s"Successfully wrote headers. Last height is ${headers.lastOption.get.height} as best chain")
+        logInfo(s"Successfully wrote headers. Last height is ${header.height} as best chain")
         count
       }
 
@@ -41,6 +41,8 @@ class DBService extends Logging {
     runAsync(insertOrphanedHeaderQuery(header), "processOrphanedHeader")
 
   def selectHeightOpt: Future[Option[Int]] = runAsync(heightOptQuery, "selectHeightOpt")
+
+  def selectHeightFromFork: Future[Option[Int]] = runAsync(getCurrentHeightInForksChain, "heightFromFork")
 
   def headersByRange(from: Int, to: Int): Future[List[HeaderDBVersion]] =
     runAsync(headersByRangeQuery(from, to), "headersByRange")

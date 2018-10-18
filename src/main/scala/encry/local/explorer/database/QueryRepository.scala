@@ -26,9 +26,9 @@ protected[database] object QueryRepository extends Logging {
       insR <- insertInputsQuery(block.payload)
     } yield txsR + headerR + outsR + insR + dirR
 
-  def processHeadersForForksQuery(headers: List[HeaderForDBForks]): ConnectionIO[Int] =
+  def processHeadersForForksQuery(header: HeaderForDBForks): ConnectionIO[Int] =
     for {
-      headerDB <- insertHeadersFOrForks(headers)
+      headerDB <- insertHeadersFOrForks(header)
     } yield headerDB
 
   def markAsRemovedFromMainChainQuery(ids: List[ModifierId]): ConnectionIO[Int] = {
@@ -63,6 +63,9 @@ protected[database] object QueryRepository extends Logging {
     Update[HeaderDBVersion](query).run(headerDB)
   }
 
+  def getCurrentHeightInForksChain: ConnectionIO[Option[Int]] =
+    sql"SELECT MAX(height) FROM chainfromnodeone;".query[Option[Int]].unique
+
   def heightOptQuery: ConnectionIO[Option[Int]] =
     sql"SELECT MAX(height) FROM headers WHERE id IN (SELECT DISTINCT block_id FROM transactions);".query[Option[Int]].unique
 
@@ -86,13 +89,13 @@ protected[database] object QueryRepository extends Logging {
          |SELECT * FROM public.directives WHERE tx_id = ANY(SELECT unnest(k) FROM tmp)
        """.stripMargin.query[DirectiveDBVersion].to[List]
 
-  private def insertHeadersFOrForks(headers: List[HeaderForDBForks]): ConnectionIO[Int] = {
+  private def insertHeadersFOrForks(header: HeaderForDBForks): ConnectionIO[Int] = {
     val query: String =
       """
-        |INSERT INTO public.chainFromNodeOne (id, height)
+        |INSERT INTO public.chainfromnodeone (id, height)
         |VALUES (?, ?) ON CONFLICT DO NOTHING;
       """.stripMargin
-    Update[HeaderForDBForks](query).updateMany(headers)
+    Update[HeaderForDBForks](query).run(header)
   }
 
   private def insertTransactionsQuery(block: Block): ConnectionIO[Int] = {

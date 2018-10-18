@@ -1,6 +1,7 @@
 package encry
 
 import java.net.InetAddress
+
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props, Terminated}
 import akka.http.scaladsl.Http
@@ -11,7 +12,7 @@ import encry.api.http.routes._
 import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
 import encry.cli.ConsoleListener
 import encry.cli.ConsoleListener.StartListening
-import encry.local.explorer.BlockListener
+import encry.local.explorer.{BestChainWriter, BlockListener}
 import encry.local.explorer.database.DBService
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
@@ -68,6 +69,8 @@ object EncryApp extends App with Logging {
       system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")
     if (settings.postgres.exists(_.enableRestore))
       system.actorOf(Props(classOf[PostgresRestore], dbService, nodeViewHolder), "postgresRestore")
+    if (settings.postgres.exists(_.enableSave))
+      system.actorOf(Props(classOf[BestChainWriter], dbService), "bestChainWriter")
   }
   if (settings.levelDb.isDefined) {
       system.actorOf(Props[ModifiersHolder], "modifiersHolder")

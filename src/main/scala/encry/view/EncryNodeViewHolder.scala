@@ -265,6 +265,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
         logInfo(s"Going to apply modifications to the state: $progressInfo")
         nodeViewSynchronizer ! SyntacticallySuccessfulModifier(pmod)
+        pmod match {
+          case header: Header =>
+            context.actorSelection("/user/bestChainWriter") ! SyntacticallySuccessfulModifier(header)
+          case _ =>
+        }
         if (progressInfo.toApply.nonEmpty) {
           val startPoint: Long = System.currentTimeMillis()
           val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
