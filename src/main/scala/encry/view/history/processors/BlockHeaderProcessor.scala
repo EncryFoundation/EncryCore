@@ -144,7 +144,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
         val heightRow: (ByteArrayWrapper, ByteArrayWrapper) =
           headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
         val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-          if (h.height > bestHeaderHeight || score > bestHeadersChainScore) {
+          if ((h.height > bestHeaderHeight || score > bestHeadersChainScore) && (h.height < bestBlockHeight)) {
           bestBlockHeaderIdsRow(h, score)
           } else {
           if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(h)
@@ -180,7 +180,12 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
     Seq(heightIdsKey(h.height) -> ByteArrayWrapper((headerIdsAtHeight(h.height) :+ h.id).flatten.toArray))
   }
 
-  protected def validate(header: Header): Try[Unit] = HeaderValidator.validate(header).toTry
+  protected def validate(header: Header): Try[Unit] = {
+
+    val result = HeaderValidator.validate(header).toTry
+    logInfo(s"Going to validate: ${Algos.encode(header.id)} result is: ${result}")
+    result
+  }
 
   protected def reportInvalid(header: Header): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
     val payloadModifiers: Seq[ByteArrayWrapper] = Seq(header.payloadId, header.adProofsId)
