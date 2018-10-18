@@ -180,12 +180,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
     Seq(heightIdsKey(h.height) -> ByteArrayWrapper((headerIdsAtHeight(h.height) :+ h.id).flatten.toArray))
   }
 
-  protected def validate(header: Header): Try[Unit] = {
-
-    val result = HeaderValidator.validate(header).toTry
-    logInfo(s"Going to validate: ${Algos.encode(header.id)} result is: ${result}")
-    result
-  }
+  protected def validate(header: Header): Try[Unit] = HeaderValidator.validate(header).toTry
 
   protected def reportInvalid(header: Header): (Seq[ByteArrayWrapper], Seq[(ByteArrayWrapper, ByteArrayWrapper)]) = {
     val payloadModifiers: Seq[ByteArrayWrapper] = Seq(header.payloadId, header.adProofsId)
