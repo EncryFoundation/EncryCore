@@ -47,7 +47,7 @@ object Constants {
 
     val InitialEmissionAmount: Int = 2 * 1000000000
 
-    val EmissionDivider = 0.05
+    val EmissionDecay = 0.05
 
     val EmissionEpochLength: Int = 25000
 
