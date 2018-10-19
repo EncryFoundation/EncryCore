@@ -55,7 +55,8 @@ libraryDependencies ++= Seq(
   "org.influxdb" % "influxdb-java" % "2.10",
   "org.apache.commons" % "commons-io" % "1.3.2",
   "org.apache.kafka" % "kafka-clients" % "2.0.0",
-  "commons-net" % "commons-net" % "3.6"
+  "commons-net" % "commons-net" % "3.6",
+  "com.github.pathikrit" %% "better-files" % "3.6.0"
 ) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
