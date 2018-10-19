@@ -6,7 +6,7 @@ import encry.view.history.History.Height
 
 object EncrySupplyController {
 
-  def supplyAt(height: Height): Amount = if (height > Constants.Chain.EmissionEpochLength ){
+  def supplyAt(height: Height): Amount = if (height > Constants.Chain.EmissionEpochLength){
     val multiptlyIterQty: Int =
       if (height % Constants.Chain.EmissionEpochLength == 0)
         Math.round(height / Constants.Chain.EmissionEpochLength) +  1
