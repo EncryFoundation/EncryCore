@@ -26,7 +26,6 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 import scala.collection._
@@ -52,10 +51,6 @@ class Miner extends Actor with Logging {
 
   def needNewCandidate(b: Block): Boolean =
     candidateOpt.flatMap(_.parentOpt).exists(parent => parent.height + 200 < b.header.height) || candidateOpt.isEmpty
-  //!candidateOpt.flatMap(_.parentOpt).map(_.id).exists(_.sameElements(b.header.id)) //&&
-//      (candidateOpt.forall(candidate => candidate.parentOpt.exists(_.height < b.header.height)) ||
-//        candidateOpt.exists(_.parentOpt.exists(parentHeader =>
-//          powScheme.realDifficulty(parentHeader) < powScheme.realDifficulty(b.header))))
 
   override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
 
