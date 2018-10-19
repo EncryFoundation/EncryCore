@@ -47,14 +47,10 @@ object Constants {
 
     val InitialEmissionAmount: Int = 2 * 1000000000
 
-    val DeflationInterval: Int = 3
-
-    val DeflationFactor: Double = 0.9998
-
-    val EmissionEpochLength: Int = 10000
+    val EmissionEpochLength: Int = 25000
 
     // Desired time interval between blocks
-    val DesiredBlockInterval: FiniteDuration = 30.seconds
+    val DesiredBlockInterval: FiniteDuration = 120.seconds
 
     val NewHeaderTimeMultiplier: Int = 5
 
