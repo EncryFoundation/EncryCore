@@ -5,7 +5,9 @@ import doobie.free.connection.ConnectionIO
 import doobie.util.update.Update
 import doobie.postgres.implicits._
 import doobie.implicits._
+import doobie.util.fragment.Fragment
 import doobie.util.log.{ExecFailure, LogHandler, ProcessingFailure, Success}
+import doobie.util.query.Query
 import encry.local.explorer.BestChainWriter.HeaderForDBForks
 import encry.modifiers.history.{Block, Header, HeaderDBVersion, Payload}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
@@ -26,9 +28,9 @@ protected[database] object QueryRepository extends Logging {
       insR <- insertInputsQuery(block.payload)
     } yield txsR + headerR + outsR + insR + dirR
 
-  def processHeadersForForksQuery(header: HeaderForDBForks): ConnectionIO[Int] =
+  def processHeadersForForksQuery(header: HeaderForDBForks, nodeName: String): ConnectionIO[Int] =
     for {
-      headerDB <- insertHeadersFOrForks(header)
+      headerDB <- insertHeadersFOrForks(header, nodeName)
     } yield headerDB
 
   def markAsRemovedFromMainChainQuery(ids: List[ModifierId]): ConnectionIO[Int] = {
@@ -63,8 +65,8 @@ protected[database] object QueryRepository extends Logging {
     Update[HeaderDBVersion](query).run(headerDB)
   }
 
-  def getCurrentHeightInForksChain: ConnectionIO[Option[Int]] =
-    sql"SELECT MAX(height) FROM chainfromnodeone;".query[Option[Int]].unique
+  def getCurrentHeightInForksChain(nodeName: String): ConnectionIO[Option[Int]] =
+    Fragment.const(s"SELECT MAX(height) FROM chain$nodeName;").query[Option[Int]].unique
 
   def heightOptQuery: ConnectionIO[Option[Int]] =
     sql"SELECT MAX(height) FROM headers WHERE id IN (SELECT DISTINCT block_id FROM transactions);".query[Option[Int]].unique
@@ -89,10 +91,10 @@ protected[database] object QueryRepository extends Logging {
          |SELECT * FROM public.directives WHERE tx_id = ANY(SELECT unnest(k) FROM tmp)
        """.stripMargin.query[DirectiveDBVersion].to[List]
 
-  private def insertHeadersFOrForks(header: HeaderForDBForks): ConnectionIO[Int] = {
+  private def insertHeadersFOrForks(header: HeaderForDBForks, nodeName: String): ConnectionIO[Int] = {
     val query: String =
-      """
-        |INSERT INTO public.chainfromnodeone (id, height)
+      s"""
+        |INSERT INTO public.chain$nodeName (id, height)
         |VALUES (?, ?) ON CONFLICT DO NOTHING;
       """.stripMargin
     Update[HeaderForDBForks](query).run(header)

@@ -69,7 +69,47 @@ CREATE TABLE directives(
 
 CREATE INDEX tx_id_directives_index ON directives (tx_id);
 
-CREATE TABLE chainfromnodeone(
+CREATE TABLE chaintestnet01(
+  id VARCHAR(64) PRIMARY KEY,
+  height INTEGER NOT NULL
+);
+
+CREATE TABLE chaintestnet02(
+  id VARCHAR(64) PRIMARY KEY,
+  height INTEGER NOT NULL
+);
+
+CREATE TABLE chaintestnet03(
+  id VARCHAR(64) PRIMARY KEY,
+  height INTEGER NOT NULL
+);
+
+CREATE TABLE chaintestnet04(
+  id VARCHAR(64) PRIMARY KEY,
+  height INTEGER NOT NULL
+);
+
+CREATE TABLE chaintestnet05(
+  id VARCHAR(64) PRIMARY KEY,
+  height INTEGER NOT NULL
+);
+
+CREATE TABLE chaintestnet07(
+  id VARCHAR(64) PRIMARY KEY,
+  height INTEGER NOT NULL
+);
+
+CREATE TABLE chaintestnet08(
+  id VARCHAR(64) PRIMARY KEY,
+  height INTEGER NOT NULL
+);
+
+CREATE TABLE chaintestnet09(
+  id VARCHAR(64) PRIMARY KEY,
+  height INTEGER NOT NULL
+);
+
+CREATE TABLE chaintestnet10(
   id VARCHAR(64) PRIMARY KEY,
   height INTEGER NOT NULL
 );
