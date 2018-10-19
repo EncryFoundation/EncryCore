@@ -49,7 +49,7 @@ object Constants {
 
     val EmissionDecay = 0.05
 
-    val EmissionEpochLength: Int = 25000
+    val EmissionEpochLength: Int = 10080
 
     // Desired time interval between blocks
     val DesiredBlockInterval: FiniteDuration = 120.seconds
