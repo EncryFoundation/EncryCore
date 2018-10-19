@@ -45,7 +45,7 @@ object Constants {
 
     val Version: Version = 0: Byte
 
-    val InitialEmissionAmount: Int = 2 * 1000000000
+    val InitialEmissionAmount: Int = 1000000000
 
     val EmissionDecay = 0.05
 
