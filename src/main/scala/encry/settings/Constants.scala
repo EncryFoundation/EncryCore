@@ -47,6 +47,8 @@ object Constants {
 
     val InitialEmissionAmount: Int = 2 * 1000000000
 
+    val EmissionDivider = 0.05
+
     val EmissionEpochLength: Int = 25000
 
     // Desired time interval between blocks

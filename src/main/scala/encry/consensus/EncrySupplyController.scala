@@ -8,8 +8,9 @@ object EncrySupplyController {
 
   def supplyAt(height: Height): Amount = {
     val multiptlyIterQty: Int =
-      if (height % Constants.Chain.EmissionEpochLength == 0) Math.round(height / Constants.Chain.EmissionEpochLength) + 1
+      if (height % Constants.Chain.EmissionEpochLength == 0)
+        Math.round(height / Constants.Chain.EmissionEpochLength) + 1
       else Math.round(height / Constants.Chain.EmissionEpochLength)
-    (Constants.Chain.InitialEmissionAmount * Math.pow(0.95, multiptlyIterQty)).toLong
+    (Constants.Chain.InitialEmissionAmount * Math.pow(1 - Constants.Chain.EmissionDivider, multiptlyIterQty)).toLong
   }
 }
