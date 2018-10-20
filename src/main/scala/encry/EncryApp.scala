@@ -66,15 +66,15 @@ object EncryApp extends App with Logging {
   if (settings.postgres.exists(_.enableSave) || settings.postgres.exists(_.enableRestore) ) {
     if (settings.postgres.exists(_.enableSave))
       system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")
-    if (settings.postgres.exists(_.enableRestore))
+    if (settings.postgres.exists(_.enableRestore)) {
       system.actorOf(Props(classOf[PostgresRestore], dbService, nodeViewHolder), "postgresRestore")
+      if (!settings.levelDb.exists(_.enableRestore)) system.actorSelection("/user/postgresRestore") ! StartRecovery
+    }
   }
-  if (settings.levelDb.exists(_.enableSave) || settings.levelDb.exists(_.enableRestore) ) {
-      system.actorOf(Props[ModifiersHolder], "modifiersHolder")
-    if (!settings.levelDb.exists(_.enableRestore)) system.actorSelection("/user/postgresRestore") ! StartRecovery
-  }
+  if (settings.levelDb.exists(_.enableSave) || settings.levelDb.exists(_.enableRestore))
+    system.actorOf(Props[ModifiersHolder], "modifiersHolder")
   if (settings.node.mining) miner ! StartMining
-  if (settings.node.enableCLI) {
+  if (settings.node.useCli) {
     system.actorOf(Props[ConsoleListener], "cliListener")
     system.actorSelection("/user/cliListener") ! StartListening
   }
