@@ -124,4 +124,8 @@ object EncryApp extends App with Logging {
     case _ => Restart
   }
 
+  def test(): String = {
+    "hello"
+  }
+
 }
