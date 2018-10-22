@@ -79,7 +79,7 @@ class Miner extends Actor with Logging {
       context.become(miningDisabled)
     case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
       logInfo(s"Going to propagate new block $block from worker $workerIdx" +
-        s" with nonce ${block.header.nonce}")
+        s" with nonce: ${block.header.nonce}")
       killAllWorkers()
         nodeViewHolder ! LocallyGeneratedModifier(block.header)
         nodeViewHolder ! LocallyGeneratedModifier(block.payload)
