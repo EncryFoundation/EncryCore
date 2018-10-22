@@ -101,9 +101,8 @@ object EncryApp extends App with Logging {
       InfoApiRoute(readersHolder, miner, peerManager, settings, nodeId, timeProvider),
       HistoryApiRoute(readersHolder, miner, settings, nodeId, settings.node.stateMode),
       TransactionsApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
-      StateInfoApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
+      StateInfoApiRoute(readersHolder, nodeViewHolder, settings, settings.node.stateMode),
       WalletInfoApiRoute(nodeViewHolder, settings.restApi),
-      StateApiRoute(settings)
     )
     Http().bindAndHandle(
       CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute,

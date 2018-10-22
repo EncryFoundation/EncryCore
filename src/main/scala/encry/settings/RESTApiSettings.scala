@@ -8,4 +8,5 @@ case class RESTApiSettings(enabled: Option[Boolean],
                            bindAddress: InetSocketAddress,
                            apiKeyHash: Option[String],
                            corsAllowedOrigin: Option[String],
-                           timeout: FiniteDuration)
+                           timeout: FiniteDuration,
+                           enableStateDownload: Boolean)
