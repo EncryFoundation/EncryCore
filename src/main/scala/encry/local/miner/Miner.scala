@@ -26,6 +26,7 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 import scala.collection._
@@ -50,7 +51,7 @@ class Miner extends Actor with Logging {
   def killAllWorkers(): Unit = context.children.foreach(context.stop)
 
   def needNewCandidate(b: Block): Boolean =
-    candidateOpt.flatMap(_.parentOpt).exists(parent => parent.height + 200 < b.header.height) || candidateOpt.isEmpty
+    !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(id => Algos.encode(id) == Algos.encode(b.header.id))
 
   override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
 
@@ -75,8 +76,8 @@ class Miner extends Actor with Logging {
       candidateOpt = None
       context.become(miningDisabled)
     case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
-      logInfo(s"Going to propagate new block $block from worker $workerIdx " +
-        s"with nonce ${block.header.nonce}")
+      logInfo(s"Going to propagate new block $block from worker $workerIdx" +
+        s" with nonce: ${block.header.nonce}")
       killAllWorkers()
         nodeViewHolder ! LocallyGeneratedModifier(block.header)
         nodeViewHolder ! LocallyGeneratedModifier(block.payload)
@@ -88,7 +89,6 @@ class Miner extends Actor with Logging {
         block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
-      self ! StartMining
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
     case _ =>
   }
@@ -173,13 +173,11 @@ class Miner extends Actor with Logging {
     val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
       .getOrElse(throw new Exception("ADProof generation failed"))
 
-    val difficulty: Difficulty = Difficulty @@ (bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
-      .getOrElse(Constants.Chain.InitialDifficulty) + BigInt(15))
+    val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
+      .getOrElse(Constants.Chain.InitialDifficulty)
 
     val candidate: CandidateBlock =
       CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
-
-    logInfo(s"Generate block for height: $height diff = $difficulty")
 
     logInfo( s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
       s"and 1 coinbase for height $height")
@@ -198,19 +196,20 @@ class Miner extends Actor with Logging {
           case None => logInfo(s"No best header opt")
         }
         val candidate: CandidateEnvelope =
-          if (bestHeaderOpt.isDefined || settings.node.offlineGeneration) {
-            logInfo(s"Starting candidate generation at " +
-              s"${dateFormat.format(new Date(System.currentTimeMillis()))}")
-            if (settings.influxDB.isDefined)
-              context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
-            logInfo("Going to calculate last block:")
-            val envelope: CandidateEnvelope =
-              CandidateEnvelope
-                .fromCandidate(createCandidate(nodeView, bestHeaderOpt))
-            if (settings.influxDB.isDefined)
-              context.actorSelection("user/statsSender") !
-                CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
-            envelope
+          if ((bestHeaderOpt.isDefined &&
+            (syncingDone || nodeView.history.isFullChainSynced)) || settings.node.offlineGeneration) {
+              logInfo(s"Starting candidate generation at " +
+                s"${dateFormat.format(new Date(System.currentTimeMillis()))}")
+              if (settings.influxDB.isDefined)
+                context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
+              logInfo("Going to calculate last block:")
+              val envelope: CandidateEnvelope =
+                CandidateEnvelope
+                  .fromCandidate(createCandidate(nodeView, bestHeaderOpt))
+              if (settings.influxDB.isDefined)
+                context.actorSelection("user/statsSender") !
+                  CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
+              envelope
           } else CandidateEnvelope.empty
         candidate
     }
