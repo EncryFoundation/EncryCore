@@ -2,7 +2,7 @@ package encry
 
 import java.net.InetAddress
 import akka.actor.SupervisorStrategy.Restart
-import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props, Terminated}
+import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.ExceptionHandler
@@ -11,7 +11,7 @@ import encry.api.http.routes._
 import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
 import encry.cli.ConsoleListener
 import encry.cli.ConsoleListener.StartListening
-import encry.local.explorer.BlockListener
+import encry.local.explorer.{BestChainWriter, BlockListener}
 import encry.local.explorer.database.DBService
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
@@ -20,7 +20,7 @@ import encry.network.{PeerManager, _}
 import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, LoggingActor, StatsSender, Zombie}
 import encry.utils.{Logging, NetworkTimeProvider}
-import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
+import encry.view.{EncryNodeViewHolder, ReadersHolder}
 import org.encryfoundation.common.Algos
 import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
@@ -53,7 +53,7 @@ object EncryApp extends App with Logging {
 
   lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props()
     .withDispatcher("nvh-dispatcher").withMailbox("nvh-mailbox"), "nodeViewHolder")
-  val readersHolder: ActorRef = system.actorOf(Props[EncryViewReadersHolder], "readersHolder")
+  val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
     .withDispatcher("network-dispatcher"), "networkController")
   lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
@@ -78,7 +78,7 @@ object EncryApp extends App with Logging {
   if (settings.levelDb.exists(_.enableSave) || settings.levelDb.exists(_.enableRestore))
     system.actorOf(Props[ModifiersHolder], "modifiersHolder")
   if (settings.node.mining) miner ! StartMining
-  if (settings.node.enableCLI) {
+  if (settings.node.useCli) {
     system.actorOf(Props[ConsoleListener], "cliListener")
     system.actorSelection("/user/cliListener") ! StartListening
   }
