@@ -32,4 +32,4 @@ case class KafkaSettings(sendToKafka: Boolean, topicName: String, groupId: Strin
 
 case class InfluxDBSettings(url: String, login: String, password: String, udpPort: Int)
 
-case class ForksDBSettings(nodeName: String, gap: Int)
+case class ForksDBSettings(nodeName: String, gap: Int, batchSize: Int)

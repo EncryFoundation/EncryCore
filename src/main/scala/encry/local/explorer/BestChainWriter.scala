@@ -16,58 +16,54 @@ class BestChainWriter(dbService: DBService) extends Actor with Logging {
 
   val nodeViewHolderRef: ActorSelection = context.actorSelection("/user/nodeViewHolder")
   val nodeName: String = settings.forksDBSettings.map(_.nodeName).getOrElse("")
-  println(nodeName)
   val currentForkHeight: Future[Int] = dbService.selectHeightFromFork(nodeName).map(_.getOrElse(0))
   val gap: Int = settings.forksDBSettings.map(_.gap).getOrElse(20)
+  val batch: Int = settings.forksDBSettings.map(_.batchSize).getOrElse(100)
 
   currentForkHeight.onComplete {
-    case Success(height) => println(s"Starting write forks to postgres with height: $height")
+    case Success(height) => logInfo(s"Starting write forks to postgres with height: $height")
       self ! SetNewHeight(height)
       nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
     case Failure(ex) =>
-      println(s"Failed to connect to DB. Actor will be stopped with exception: ${ex.getStackTrace}")
+      logError(s"Failed to connect to DB. Actor will be stopped with exception: ${ex.getStackTrace}")
       context.stop(self)
   }
 
   override def receive: Receive = receiveHandler()
 
-  def receiveHandler(lastWrittenHeight: Int = 0,
-                     recoveryCompeted: Boolean = false,
-                     currentState: List[Header] = List()): Receive = {
+  def receiveHandler(lastWrittenHeight: Int = 0): Receive = {
 
-    case SetNewHeight(height) => println(height)
-      context.become(receiveHandler(height))
+    case SetNewHeight(height) => context.become(receiveHandler(height))
 
-    case ChangedHistory(history) => currentForkHeight.map {
-      case _ =>
-        println(s"Height from DB is: $lastWrittenHeight")
-        val diffNew = history.bestHeaderHeight - lastWrittenHeight
-        println(s"New difference between bestHeight and HeightFromDB is: $diffNew")
-        val lastHeadersForWrite: List[Header] =
-          history
-            .lastHeaders(diffNew)
-            .headers
-            .dropRight(gap)
-            .sortBy(_.height)
-            .toList
-        lastHeadersForWrite.foreach(x => println(s"Headers for write ${x.height} and ${x.encodedId}"))
+    case ChangedHistory(history) => currentForkHeight.map { _ =>
 
-        lastHeadersForWrite.foldLeft(Future.successful(1)) { case (prevList, headerNew) =>
-          prevList.flatMap { _ =>
-            val headerForDb: HeaderForDBForks = HeaderForDBForks(headerNew.encodedId, headerNew.height)
-            val dbInsert: Future[Int] =
-              dbService.insertHeadersFromNode(headerForDb, nodeName)
-            dbInsert.onComplete {
-              case Success(_) => self ! SetNewHeight(headerNew.height)
-                println(s"New height from FUTURE DB is: ${headerNew.height}")
-              case Failure(ex) =>
-                println(s"Error while writing to postgres: ${ex.getStackTrace}")
-            }
-            dbInsert
+      val diffNew = history.bestHeaderHeight - lastWrittenHeight
+      val lastHeadersForWrite: List[Header] =
+        history
+          .lastHeaders(diffNew)
+          .headers
+          .dropRight(gap)
+          .sortBy(_.height)
+          .toList
+
+      val headersList: List[Header] =
+        if (lastHeadersForWrite.length > batch) lastHeadersForWrite.take(batch)
+        else lastHeadersForWrite
+
+      headersList.foldLeft(Future.successful(1)) { case (prevList, headerNew) =>
+        prevList.flatMap { _ =>
+          val headerForDb: HeaderForDBForks = HeaderForDBForks(headerNew.encodedId, headerNew.height)
+          val dbInsert: Future[Int] =
+            dbService.insertHeadersFromNode(headerForDb, nodeName)
+          dbInsert.onComplete {
+            case Success(_) => self ! SetNewHeight(headerNew.height)
+              logInfo(s"New height from FUTURE DB is: ${headerNew.height}")
+            case Failure(ex) =>
+              logError(s"Error while writing to postgres: ${ex.getStackTrace}")
           }
+          dbInsert
         }
-
-        context.become(receiveHandler(lastHeadersForWrite.lastOption.map(_.height).getOrElse(lastWrittenHeight)))
+      }
     }
 
     case SyntacticallySuccessfulModifier(mod) => mod match {
@@ -75,6 +71,8 @@ class BestChainWriter(dbService: DBService) extends Actor with Logging {
         nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
       case _ =>
     }
+
+    case _ =>
   }
 }
 
@@ -83,7 +81,5 @@ object BestChainWriter {
   case class HeaderForDBForks(id: String, height: Int)
 
   case class SetNewHeight(height: Int)
-
-  case object StartRecoveryForForks
 
 }
