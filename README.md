@@ -13,7 +13,8 @@ Encry is a distributed digital asset platform supporting smart contracts in non 
 #### 1) Running Latest release
 
 At first, you should download latest release from [this page](https://github.com/EncryFoundation/EncryCore/releases), your target in `EncryCore.jar`. Make sure that you have a compatible Java Runtime Environment 1.8 or later (64-bit version, you can find official [guide here](https://docs.oracle.com/javase/8/docs/technotes/guides/install/install_overview.html)). Once download is complete, you should navigate to the folder where `EncryCore.jar` is located and execute the following command:
-`java -jar EncryCore.jar`
+
+`$ java -jar EncryCore.jar`
 
 #### 2) From Docker Container
 Make sure you have docker installed for documentation and guide check [this page](https://docs.docker.com/install/). Once docker is installed, run in terminal following commands:
@@ -43,10 +44,12 @@ Linux/MacOS/Windows:
 
 ## Interacting with CLI
 You can interact with your node using command line interface. Note that generic command structure is:
+
 `[GROUP_NAME] [COMMAND] -[ARGUMENT_1]=[VAL_1] -[ARGUMENT_2]=[VAL_2]`
 
 If you just have installed node, to check that everything is fine you can run :
-`wallet balance`
+
+`wallet createKey`
 
 Here is list of the other valid commands:
 
