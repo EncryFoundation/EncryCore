@@ -7,7 +7,7 @@ import encry.api.http.routes.GetAllBoxes
 import encry.modifiers.state.box.EncryBaseBox
 import encry.stats.StatsSender.CurrentUtxosQtyInIOdb
 import encry.view.history.EncryHistory
-import encry.view.mempool.EncryMempool
+import encry.view.mempool.Mempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -20,7 +20,7 @@ class WalletStorageHolder extends Actor {
   system.scheduler.schedule(settings.walletStorageHolder.map(_.startTime.second).getOrElse(10 second),
     settings.walletStorageHolder.map(_.askTime.second).getOrElse(15 second)) {
     system.actorSelection("user/nodeViewHolder") !
-      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Seq[EncryBaseBox]] {
+      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Mempool, Seq[EncryBaseBox]] {
         _.vault.walletStorage.allBoxes
       }
   }
