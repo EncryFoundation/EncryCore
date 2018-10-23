@@ -40,22 +40,15 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   override def preStart(): Unit = logInfo(s"ModifiersHolder actor is started.")
 
-  override def receiveRecover: Receive = if (settings.levelDb.exists(_.enableRestore)) receiveRecoverEnabled else receiveRecoverDisabled
+  override def receiveRecover: Receive =
+    if (settings.levelDb.exists(_.enableRestore)) receiveRecoverEnabled else receiveRecoverDisabled
 
   def receiveRecoverEnabled: Receive = {
-    case header: Header =>
-      updateHeaders(header)
-      logDebug(s"Header ${header.height} is recovered from leveldb.")
-    case payload: Payload =>
-      updatePayloads(payload)
-      logDebug(s"Payload ${Algos.encode(payload.headerId)} is recovered from leveldb.")
-    case block: Block =>
-      updateCompletedBlocks(block)
-      logDebug(s"Block ${block.header.height} is recovered from leveldb.")
-    case RecoveryCompleted if completedBlocks.isEmpty =>
-      notifyRecoveryCompleted()
-    case RecoveryCompleted =>
-      context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
+    case header: Header => updateHeaders(header)
+    case payload: Payload => updatePayloads(payload)
+    case block: Block => updateCompletedBlocks(block)
+    case RecoveryCompleted if completedBlocks.isEmpty => notifyRecoveryCompleted()
+    case RecoveryCompleted => context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
   }
 
   def receiveRecoverDisabled: Receive = {
@@ -74,7 +67,8 @@ class ModifiersHolder extends PersistentActor with Logging {
       completedBlocks = completedBlocks.drop(settings.levelDb
         .map(_.batchSize)
         .getOrElse(throw new RuntimeException("batchsize not specified")))
-      nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend, completedBlocks.isEmpty && !settings.postgres.exists(_.enableRestore))
+      nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend, completedBlocks.isEmpty &&
+        !settings.postgres.exists(_.enableRestore))
 
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
@@ -93,24 +87,21 @@ class ModifiersHolder extends PersistentActor with Logging {
     case header: Header =>
       if (!headers.contains(Algos.encode(header.id)))
         persist(header) { header =>
-          logDebug(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} is persisted successfully.")
+          logDebug(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} " +
+            s"is persisted successfully.")
         }
       updateHeaders(header)
-      logDebug(s"Got header ${Algos.encode(header.id)} on height ${header.height}")
     case payload: Payload =>
       if (!payloads.contains(Algos.encode(payload.id)))
         persist(payload) { payload =>
           logDebug(s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully.")
         }
       updatePayloads(payload)
-      logDebug(s"Got payload with id: ${Algos.encode(payload.id)} " +
-        s"${
-          nonCompletedBlocks.get(Algos.encode(payload.id)).map(headerId =>
-            headers.get(headerId).map(header => s"for header $headerId height: ${header._1.height}"))}")
     case block: Block =>
       if (!completedBlocks.values.toSeq.contains(block))
         persist(block) { block =>
-          logDebug(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} is persisted successfully.")
+          logDebug(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} " +
+            s"is persisted successfully.")
         }
       updateCompletedBlocks(block)
     case x: Any => logError(s"Strange input $x.")

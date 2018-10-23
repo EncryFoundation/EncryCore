@@ -8,7 +8,7 @@ import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.RESTApiSettings
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.EncryHistory
-import encry.view.mempool.EncryMempool
+import encry.view.mempool.Mempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
@@ -24,8 +24,8 @@ case class WalletInfoApiRoute(nodeViewHolderRef: ActorRef,
 
   override val settings: RESTApiSettings = restApiSettings
 
-  private def getWallet: Future[EncryWallet] = (nodeViewHolderRef ?
-    GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, EncryWallet](_.vault))
+  private def getWallet: Future[EncryWallet] = (nodeViewActorRef ?
+    GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Mempool, EncryWallet](_.vault))
     .mapTo[EncryWallet]
 
   private def getBoxes: Future[Seq[EncryBaseBox]] = (walletStorageHolder ? GetAllBoxes()).mapTo[Seq[EncryBaseBox]]

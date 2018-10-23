@@ -7,8 +7,8 @@ trait ModifierWithDigest extends PersistentNodeViewModifier {
 
   override lazy val id: ModifierId = ModifierWithDigest.computeId(modifierTypeId, headerId, digest)
 
-  // Likely Merkle Root hash
   def digest: Array[Byte]
+
   def headerId: Array[Byte]
 }
 

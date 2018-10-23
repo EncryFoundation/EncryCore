@@ -22,7 +22,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
 
-trait BlockHeaderProcessor extends Logging {
+trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider
@@ -139,14 +139,15 @@ trait BlockHeaderProcessor extends Logging {
       scoreOf(h.parentId).map { parentScore =>
         val score = Difficulty @@ (parentScore + difficulty)
         val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-          if (score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
+          if (h.height > bestHeaderHeight || score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
         val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) =
           headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
         val heightRow: (ByteArrayWrapper, ByteArrayWrapper) =
           headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
-        val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = if (score > bestHeadersChainScore) {
+        val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
+          if ((h.height > bestHeaderHeight || score > bestHeadersChainScore) && (h.height < bestBlockHeight)) {
           bestBlockHeaderIdsRow(h, score)
-        } else {
+          } else {
           if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(h)
           orphanedBlockHeaderIdsRow(h, score)
         }

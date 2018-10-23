@@ -7,7 +7,7 @@ import encry.utils.CoreTaggedTypes.ModifierId
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
 import encry.modifiers.history.{Block, Header}
 import encry.settings.{EncryAppSettings, RESTApiSettings}
-import encry.view.EncryViewReadersHolder.GetDataFromHistory
+import encry.view.ReadersHolder.GetDataFromHistory
 import encry.view.history.EncryHistoryReader
 import encry.view.state.StateMode
 import io.circe.Json

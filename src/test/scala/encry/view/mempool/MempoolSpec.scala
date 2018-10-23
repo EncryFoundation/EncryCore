@@ -6,7 +6,7 @@ import encry.settings.EncryAppSettings
 import encry.utils.{EncryGenerator, NetworkTimeProvider}
 import org.scalatest.{Matchers, PropSpec}
 
-class EncryMempoolSpec extends PropSpec with Matchers with EncryGenerator {
+class MempoolSpec extends PropSpec with Matchers with EncryGenerator {
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read
 
@@ -16,7 +16,7 @@ class EncryMempoolSpec extends PropSpec with Matchers with EncryGenerator {
 
   property("Mempool.put(txs) should not allow overflow.") {
 
-    val mempool: EncryMempool = EncryMempool.empty(settings, timeProvider, as)
+    val mempool: Mempool = Mempool.empty(settings, timeProvider, as)
 
     val maxCapacity: Int = settings.node.mempoolMaxCapacity
 
@@ -29,7 +29,7 @@ class EncryMempoolSpec extends PropSpec with Matchers with EncryGenerator {
 
   property("Mempool should not accept invalid transactions.") {
 
-    val mempool: EncryMempool = EncryMempool.empty(settings, timeProvider, as)
+    val mempool: Mempool = Mempool.empty(settings, timeProvider, as)
 
     val validTxs: Seq[Transaction] = genValidPaymentTxs(60)
 

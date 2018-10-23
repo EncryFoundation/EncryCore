@@ -1,7 +1,6 @@
 package encry.view.history
 
 import java.io.File
-
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
@@ -13,7 +12,6 @@ import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStatePro
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.encryfoundation.common.Algos
-
 import scala.util.Try
 
 /** History implementation. It is processing persistent modifiers generated locally or received from the network.
