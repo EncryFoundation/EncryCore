@@ -18,7 +18,8 @@ case class NodeSettings(stateMode: StateMode,
                         mempoolCleanupInterval: FiniteDuration,
                         mempoolMaxCapacity: Int,
                         useCli: Boolean,
-                        loggingMode: String)
+                        loggingMode: String,
+                        downloadStateFrom: Option[String])
 
 trait NodeSettingsReader {
 
@@ -37,7 +38,8 @@ trait NodeSettingsReader {
       cfg.as[FiniteDuration](s"$path.mempoolCleanupInterval"),
       cfg.as[Int](s"$path.mempoolMaxCapacity"),
       cfg.as[Boolean](s"$path.useCli"),
-      cfg.as[String](s"$path.loggingMode")
+      cfg.as[String](s"$path.loggingMode"),
+      cfg.as[Option[String]](s"$path.downloadStateFrom")
     )
   }
 

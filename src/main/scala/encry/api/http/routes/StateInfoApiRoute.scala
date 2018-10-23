@@ -56,8 +56,8 @@ case class StateInfoApiRoute(readersHolder: ActorRef,
       .filter(f => Seq("state", "history").exists(f.name.contains(_)))
       .map(_.copyToDirectory(dir))
     logInfo(s"Copying ${files.size} files to tmp directory")
-    val zip: File = file"${appSettings.directory}/encry.zip"
-    dir.zipTo(file"${appSettings.directory}/encry.zip")
+    val zip: File = file"${appSettings.directory}/encry.zip".deleteOnExit()
+    dir.zipTo(file"${appSettings.directory}/encry.zip").deleteOnExit()
     zip.path
   }
 

@@ -63,6 +63,8 @@ object EncryApp extends App with Logging {
   if (settings.influxDB.isDefined) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.kafka.exists(_.sendToKafka))
     system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
+
+  if (settings.node.downloadStateFrom.isDefined) system.actorOf(Props(classOf[StateDownloader], settings))
   if (settings.postgres.exists(_.enableSave) || settings.postgres.exists(_.enableRestore) ) {
     if (settings.postgres.exists(_.enableSave))
       system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")
