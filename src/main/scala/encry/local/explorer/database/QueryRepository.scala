@@ -5,7 +5,10 @@ import doobie.free.connection.ConnectionIO
 import doobie.util.update.Update
 import doobie.postgres.implicits._
 import doobie.implicits._
+import doobie.util.fragment.Fragment
 import doobie.util.log.{ExecFailure, LogHandler, ProcessingFailure, Success}
+import doobie.util.query.Query
+import encry.local.explorer.BestChainWriter.HeaderForDBForks
 import encry.modifiers.history.{Block, Header, HeaderDBVersion, Payload}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.utils.Logging
@@ -17,13 +20,18 @@ protected[database] object QueryRepository extends Logging {
 
   def processBlockQuery(block: Block): ConnectionIO[Int] =
     for {
-      _       <- markAsRemovedFromMainChainQuery(block.header.height)
+      _ <- markAsRemovedFromMainChainQuery(block.header.height)
       headerR <- insertHeaderQuery(block)
-      txsR    <- insertTransactionsQuery(block)
-      dirR    <- insertDirectivesQuery(block.payload.transactions)
-      outsR   <- insertOutputsQuery(block.payload)
-      insR    <- insertInputsQuery(block.payload)
+      txsR <- insertTransactionsQuery(block)
+      dirR <- insertDirectivesQuery(block.payload.transactions)
+      outsR <- insertOutputsQuery(block.payload)
+      insR <- insertInputsQuery(block.payload)
     } yield txsR + headerR + outsR + insR + dirR
+
+  def processHeadersForForksQuery(header: HeaderForDBForks, nodeName: String): ConnectionIO[Int] =
+    for {
+      headerDB <- insertHeadersFOrForks(header, nodeName)
+    } yield headerDB
 
   def markAsRemovedFromMainChainQuery(ids: List[ModifierId]): ConnectionIO[Int] = {
     val query: String = s"UPDATE public.headers SET best_chain = FALSE WHERE id = ?"
@@ -59,6 +67,9 @@ protected[database] object QueryRepository extends Logging {
     Update[HeaderDBVersion](query).run(headerDB)
   }
 
+  def getCurrentHeightInForksChain(nodeName: String): ConnectionIO[Option[Int]] =
+    Fragment.const(s"SELECT MAX(height) FROM chain$nodeName;").query[Option[Int]].unique
+
   def heightOptQuery: ConnectionIO[Option[Int]] =
     sql"SELECT MAX(height) FROM headers WHERE id IN (SELECT DISTINCT block_id FROM transactions);".query[Option[Int]].unique
 
@@ -81,6 +92,15 @@ protected[database] object QueryRepository extends Logging {
     sql"""WITH tmp(k) AS (VALUES (${ids.toList}))
          |SELECT * FROM public.directives WHERE tx_id = ANY(SELECT unnest(k) FROM tmp)
        """.stripMargin.query[DirectiveDBVersion].to[List]
+
+  private def insertHeadersFOrForks(header: HeaderForDBForks, nodeName: String): ConnectionIO[Int] = {
+    val query: String =
+      s"""
+        |INSERT INTO public.chain$nodeName (id, height)
+        |VALUES (?, ?) ON CONFLICT DO NOTHING;
+      """.stripMargin
+    Update[HeaderForDBForks](query).run(header)
+  }
 
   private def insertTransactionsQuery(block: Block): ConnectionIO[Int] = {
     val txs: Seq[TransactionDBVersion] = TransactionDBVersion(block)
@@ -128,30 +148,33 @@ protected[database] object QueryRepository extends Logging {
 
   private implicit val logHandler: LogHandler = LogHandler {
     case Success(s, a, e1, e2) =>
-      logInfo(s"""Successful Statement Execution:
-                  |
+      logInfo(
+        s"""Successful Statement Execution:
+           |
             |  ${s.lines.dropWhile(_.trim.isEmpty).mkString("\n  ")}
-                  |
+           |
             | arguments = [${a.mkString(", ")}]
-                  |   elapsed = ${e1.toMillis} ms exec + ${e2.toMillis} ms processing (${(e1 + e2).toMillis} ms total)
+           |   elapsed = ${e1.toMillis} ms exec + ${e2.toMillis} ms processing (${(e1 + e2).toMillis} ms total)
           """.stripMargin)
     case ProcessingFailure(s, a, e1, e2, t) =>
-      logWarn(s"""Failed Resultset Processing:
-                  |
+      logWarn(
+        s"""Failed Resultset Processing:
+           |
             |  ${s.lines.dropWhile(_.trim.isEmpty).mkString("\n  ")}
-                  |
+           |
             | arguments = [${a.mkString(", ")}]
-                  |   elapsed = ${e1.toMillis} ms exec + ${e2.toMillis} ms processing (failed) (${(e1 + e2).toMillis} ms total)
-                  |   failure = ${t.getMessage}
+           |   elapsed = ${e1.toMillis} ms exec + ${e2.toMillis} ms processing (failed) (${(e1 + e2).toMillis} ms total)
+           |   failure = ${t.getMessage}
           """.stripMargin)
     case ExecFailure(s, a, e1, t) =>
-      logWarn(s"""Failed Statement Execution:
-                  |
+      logWarn(
+        s"""Failed Statement Execution:
+           |
             |  ${s.lines.dropWhile(_.trim.isEmpty).mkString("\n  ")}
-                  |
+           |
             | arguments = [${a.mkString(", ")}]
-                  |   elapsed = ${e1.toMillis} ms exec (failed)
-                  |   failure = ${t.getMessage}
+           |   elapsed = ${e1.toMillis} ms exec (failed)
+           |   failure = ${t.getMessage}
           """.stripMargin)
   }
 }

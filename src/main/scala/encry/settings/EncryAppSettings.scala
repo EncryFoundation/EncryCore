@@ -14,7 +14,8 @@ case class EncryAppSettings(directory: String,
                             ntp: NetworkTimeProviderSettings,
                             postgres: Option[PostgresSettings],
                             influxDB: Option[InfluxDBSettings],
-                            levelDb: Option[LevelDbSettings])
+                            levelDb: Option[LevelDbSettings],
+                            forksDBSettings: Option[ForksDBSettings])
 
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader {
 
@@ -31,3 +32,4 @@ case class KafkaSettings(sendToKafka: Boolean, topicName: String, groupId: Strin
 
 case class InfluxDBSettings(url: String, login: String, password: String, udpPort: Int)
 
+case class ForksDBSettings(nodeName: String, gap: Int, batchSize: Int)

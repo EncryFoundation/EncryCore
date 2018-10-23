@@ -8,6 +8,7 @@ import QueryRepository._
 import com.zaxxer.hikari.HikariDataSource
 import doobie.hikari.implicits._
 import encry.EncryApp.settings
+import encry.local.explorer.BestChainWriter.HeaderForDBForks
 import encry.modifiers.history.{Block, Header}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.history.HeaderDBVersion
@@ -26,6 +27,13 @@ class DBService extends Logging {
       count
     }
 
+  def insertHeadersFromNode(header: HeaderForDBForks, nodeName: String): Future[Int] =
+    runAsync(processHeadersForForksQuery(header, nodeName), "processHeadersForForksQuery")
+      .map { count =>
+        logInfo(s"Successfully wrote headers. Last height is ${header.height} as best chain")
+        count
+      }
+
   def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] =
     runAsync(markAsRemovedFromMainChainQuery(ids), "markAsRemovedFromMainChain")
 
@@ -33,6 +41,9 @@ class DBService extends Logging {
     runAsync(insertOrphanedHeaderQuery(header), "processOrphanedHeader")
 
   def selectHeightOpt: Future[Option[Int]] = runAsync(heightOptQuery, "selectHeightOpt")
+
+  def selectHeightFromFork(nodeName: String): Future[Option[Int]] =
+    runAsync(getCurrentHeightInForksChain(nodeName), "heightFromFork")
 
   def headersByRange(from: Int, to: Int): Future[List[HeaderDBVersion]] =
     runAsync(headersByRangeQuery(from, to), "headersByRange")
