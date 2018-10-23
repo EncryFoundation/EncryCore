@@ -49,6 +49,7 @@ If you just have installed node, to check that everything is fine you can run :
 `wallet balance`
 
 Here is list of the other valid commands:
+
 Group name | Command | Argument | Description
 --- | ---| --- | --- |
 node|          shutdown|       None|          Shutdown the node
@@ -60,6 +61,7 @@ wallet|        createKey|           None|           Add key to storage
 wallet|        balance|          None|           Show balance of current wallet
 wallet|        transfer|         addr, amount|   Transfer `amount` to `addr`ess
 app|           help|             None|           Show all supported commands
+
 ## Running tests
 
 `$ sbt test`
