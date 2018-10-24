@@ -5,15 +5,13 @@ import akka.actor.Actor
 import akka.pattern.pipe
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse, StatusCodes}
-import akka.persistence.RecoveryCompleted
 import akka.stream.scaladsl.FileIO
 import encry.settings.EncryAppSettings
 import encry.utils.Logging
+import encry.EncryApp
 import encry.EncryApp._
 import better.files._
 import better.files.File
-import encry.view.EncryNodeViewHolder.ReceivableMessages.ReloadState
-import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 class StateDownloader(settings: EncryAppSettings) extends Actor with Logging {
@@ -22,24 +20,23 @@ class StateDownloader(settings: EncryAppSettings) extends Actor with Logging {
 
   override def receive: Receive = {
     case address: String =>
+      file"${settings.directory}".createDirectories()
       pipe(Http(context.system).singleRequest(HttpRequest(uri = s"http://$address/state/download"))).to(self)
     case HttpResponse(StatusCodes.OK, _, entity, _) =>
       entity.dataBytes.runWith(FileIO.toPath(Paths.get(s"${settings.directory}/encry.zip"))).onComplete {
         case Success(_) =>
           logInfo(s"Successfully downloaded file from other node")
           unzip()
-          context.system.scheduler.scheduleOnce(10 seconds) {
-            nodeViewHolder ! ReloadState
-            peerManager ! RecoveryCompleted
-          }
+          EncryApp.createSecondaryActors()
         case Failure(th) =>
+          EncryApp.createSecondaryActors()
           logWarn(s"Failed to download state from other node with exception: ${th.getCause}")
           context.stop(self)
       }
     case resp @ HttpResponse(code, _, _, _) =>
       logWarn("Request failed, response code: " + code)
       resp.discardEntityBytes()
-      peerManager ! RecoveryCompleted
+      EncryApp.createSecondaryActors()
   }
 
   def unzip(): Unit = {

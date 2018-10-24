@@ -334,7 +334,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   def restoreState(): Option[NodeView] = if (EncryHistory.getHistoryObjectsDir(settings).listFiles.nonEmpty)
     try {
-      println("try")
       val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
       val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
