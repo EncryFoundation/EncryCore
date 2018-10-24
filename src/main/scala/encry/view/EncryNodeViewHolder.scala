@@ -70,6 +70,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   override def receive: Receive = {
+    case ReloadState => nodeView = restoreState().getOrElse(genesisState)
     case BlocksFromLocalPersistence(blocks, allSent)
       if settings.levelDb.exists(_.enableRestore) || settings.postgres.exists(_.enableRestore) =>
       blocks.foreach { block =>
@@ -331,8 +332,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     NodeView(history, state, wallet, memPool)
   }
 
-  def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryObjectsDir(settings).listFiles.isEmpty)
+  def restoreState(): Option[NodeView] = if (EncryHistory.getHistoryObjectsDir(settings).listFiles.nonEmpty)
     try {
+      println("try")
       val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
       val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
@@ -419,6 +421,8 @@ object EncryNodeViewHolder {
 
     case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentNodeViewModifier]
     (pmod: EncryPersistentModifier)
+
+    case object ReloadState
 
   }
 
