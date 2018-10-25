@@ -99,14 +99,7 @@ object ModifiersCache extends Logging {
             logInfo(s"In cache: ${cache.map(mods => s"Modifier: ${Algos.encode(mods._2.id)} with type: ${mods._2.modifierTypeId}")}")
             cache.find { case (k, v) =>
               v match {
-//                case _: Header if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) =>
-//                  true
-//                case header: Header =>
-//                  logInfo(s"Shit header: ${header.toString}")
-//                  logInfo(s"Try to apply: ${tryToApply(k)}")
-//                  tryToApply(k)
-                case _ =>
-                  tryToApply(k)
+                case _ => tryToApply(k)
               }
             }.map { case (k, _) => k }
         }
