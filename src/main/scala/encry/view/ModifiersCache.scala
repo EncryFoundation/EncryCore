@@ -31,6 +31,7 @@ object ModifiersCache extends Logging {
   def contains(key: Key): Boolean = cache.contains(key) || ConcurrentHashMap.newKeySet[Key]().contains(key)
 
   def put(key: Key, value: EncryPersistentModifier, history: EncryHistory): Unit = if (!contains(key)) {
+    logInfo(s"Put: ${Algos.encode(value.id)} of type: ${value.modifierTypeId}")
     cache.put(key, value)
     value match {
       case header: Header =>
@@ -95,10 +96,15 @@ object ModifiersCache extends Logging {
         headersQueue.get(history.bestHeaderHeight + 1).flatMap(_.headOption).orElse {
           if (possibleHeaders.nonEmpty) Some(possibleHeaders.head)
           else
+            logInfo(s"In cache: ${cache.map(mods => s"Modifier: ${Algos.encode(mods._2.id)} with type: ${mods._2.modifierTypeId}")}")
             cache.find { case (k, v) =>
               v match {
-                case _: Header if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) =>
-                  true
+//                case _: Header if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) =>
+//                  true
+//                case header: Header =>
+//                  logInfo(s"Shit header: ${header.toString}")
+//                  logInfo(s"Try to apply: ${tryToApply(k)}")
+//                  tryToApply(k)
                 case _ =>
                   tryToApply(k)
               }
