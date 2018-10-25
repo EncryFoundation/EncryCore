@@ -144,7 +144,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
         val heightRow: (ByteArrayWrapper, ByteArrayWrapper) =
           headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
         val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-          if ((h.height > bestHeaderHeight || score > bestHeadersChainScore) && (h.height < bestBlockHeight)) {
+          if (h.height > bestHeaderHeight || score > bestHeadersChainScore) {
           bestBlockHeaderIdsRow(h, score)
           } else {
           if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(h)
@@ -315,7 +315,8 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
         }
         .validate(header.difficulty >= requiredDifficultyAfter(parent)){
           fatal(s"Incorrect required difficulty in header: " +
-            s"${Algos.encode(header.id)} on height ${header.height}")
+            s"${Algos.encode(header.id)} on height ${header.height}. Required: ${requiredDifficultyAfter(parent)} " +
+            s"diff is: ${header.difficulty}. Real: ${realDifficulty(header)}")
         }
         .validate(heightOf(header.parentId).exists(h => bestHeaderHeight - h < Constants.Chain.MaxRollbackDepth)) {
         fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
