@@ -104,7 +104,8 @@ object ModifiersCache extends Logging {
       s"${payloadIds.map(wrappedId => Algos.encode(wrappedId.toArray)).mkString(",")}")
 
     val payloadsAndADProofsInCache: Seq[(mutable.WrappedArray[Byte], EncryPersistentModifier)] =
-      payloadIds.flatMap(payloadId => cache.get(payloadId).map(v => payloadId -> v)) // пейлоады и адпруфы, которые есть в кэше
+      payloadIds.flatMap(payloadId => cache.get(payloadId).map(payload => payloadId -> payload))
+    // пейлоады и адпруфы, которые есть в кэше
 
     logError("payloadsAndADProofsInCache (Only ids): " +
       s"${payloadsAndADProofsInCache.map(tup => Algos.encode(tup._1.toArray)).mkString(",")}")
