@@ -19,9 +19,7 @@ object Help extends Command {
         |node          startMining      None           Node starts mining
         |wallet        pubKeys          None           Print available public keys
         |wallet        addrs            None           Print available addresses
-        |wallet        init             seed           Init storage with seed
-        |wallet        init             None           Generate new storage
-        |wallet        addKey           None           Add key to storage
+        |wallet        createKey           None           Add key to storage
         |wallet        balance          None           Show balance of current wallet
         |wallet        transfer         addr, amount   Transfer `amount` to `addr`ess
         |app           help             None           Show all supported commands
