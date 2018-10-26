@@ -85,26 +85,26 @@ object ModifiersCache extends Logging {
     )
 
     val headersIdAfterLastFullBlock: Seq[ModifierId] =
-      history.headerIdsAtHeight(history.bestBlockHeight + 1) //все айди хедеры на высоте полного блока + 1
+      history.headerIdsAtHeight(history.bestBlockHeight + 1) //все айди хедеры на высоте полного блока + 1 //запрос к БД
 
     logError(s"headersIdAfterLastFullBlock: " +
       s"${headersIdAfterLastFullBlock.map(Algos.encode).mkString(",")}")
 
     val headersAfterLastFullBlock: Seq[Header] =
       headersIdAfterLastFullBlock
-        .flatMap(id => history.typedModifierById[Header](id)) //получили хедеры соответствующие айди
+        .flatMap(id => history.typedModifierById[Header](id)) //получили хедеры соответствующие айди //запрос к БД
 
     logError(s"headersAfterLastFullBlock (Only Ids): " +
       s"${headersAfterLastFullBlock.map(header => Algos.encode(header.id)).mkString(",")}")
 
-    val payloadsAndADProofsId: Seq[mutable.WrappedArray[Byte]] = headersAfterLastFullBlock
-      .flatMap(_.ADProofAndPayloadIds.map(id => mutable.WrappedArray.make[Byte](id))) //айди пейлоада и айди адпруф
+    val payloadIds: Seq[mutable.WrappedArray[Byte]] = headersAfterLastFullBlock
+      .flatMap(_.payloadId.map(id => mutable.WrappedArray.make[Byte](id))) //айди пейлоадов для хедеров
 
     logError(s"payloadsAndADProofsId: " +
-      s"${payloadsAndADProofsId.map(wrappedId => Algos.encode(wrappedId.toArray)).mkString(",")}")
+      s"${payloadIds.map(wrappedId => Algos.encode(wrappedId.toArray)).mkString(",")}")
 
     val payloadsAndADProofsInCache: Seq[(mutable.WrappedArray[Byte], EncryPersistentModifier)] =
-      payloadsAndADProofsId.flatMap(id => cache.get(id).map(v => id -> v)) // пейлоады и адпруфы, которые есть в кэше
+      payloadIds.flatMap(payloadId => cache.get(payloadId).map(v => payloadId -> v)) // пейлоады и адпруфы, которые есть в кэше
 
     logError("payloadsAndADProofsInCache (Only ids): " +
       s"${payloadsAndADProofsInCache.map(tup => Algos.encode(tup._1.toArray)).mkString(",")}")
