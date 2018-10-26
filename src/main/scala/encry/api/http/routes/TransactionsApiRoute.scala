@@ -47,8 +47,6 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
       dataSeq =>
         println(dataSeq)
         complete {
-          println(settings.token.contains(dataSeq.token))
-          println(settings.token)
           if (settings.token.contains(dataSeq.token)) {
             val possibleIds =
               (nodeViewActorRef ? GenerateDataTxs(dataSeq.data)).mapTo[Seq[String]]
