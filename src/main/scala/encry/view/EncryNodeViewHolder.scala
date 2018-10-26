@@ -100,7 +100,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       }
       if (applicationsSuccessful && settings.levelDb.exists(_.enableRestore) && !receivedAll) sender ! SendBlocks
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
-      if (ModifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
+      if (ModifiersCache.isEmpty && nodeView.history.isHeadersChainSynced)
+        context.actorSelection("/user/nodeViewSynchronizer") ! StopSync
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
@@ -115,7 +116,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         }
         logInfo(s"Cache before(${ModifiersCache.size})")
         computeApplications()
-        if (ModifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
+        if (ModifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced)
+          context.actorSelection("/user/nodeViewSynchronizer") ! ContinueSync
         logInfo(s"Cache after(${ModifiersCache.size})")
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
@@ -187,7 +189,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
   }
 
   def requestDownloads(pi: ProgressInfo[EncryPersistentModifier]): Unit =
-    pi.toDownload.foreach { case (tid, id) => nodeViewSynchronizer ! DownloadRequest(tid, id) }
+    pi.toDownload.foreach { case (tid, id) =>
+      context.actorSelection("/user/nodeViewSynchronizer") ! DownloadRequest(tid, id)
+    }
 
   def trimChainSuffix(suffix: IndexedSeq[EncryPersistentModifier], rollbackPoint: ModifierId):
   IndexedSeq[EncryPersistentModifier] = {
@@ -231,7 +235,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             case Failure(e) =>
               val (newHis: EncryHistory, newProgressInfo: ProgressInfo[EncryPersistentModifier]) =
                 history.reportModifierIsInvalid(modToApply, progressInfo)
-              nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
+              context.actorSelection("/user/nodeViewSynchronizer") ! SemanticallyFailedModification(modToApply, e)
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           } else u
         }
@@ -264,7 +268,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         if (settings.influxDB.isDefined)
           context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
         logInfo(s"Going to apply modifications to the state: $progressInfo")
-        nodeViewSynchronizer ! SyntacticallySuccessfulModifier(pmod)
+        context.actorSelection("/user/nodeViewSynchronizer") ! SyntacticallySuccessfulModifier(pmod)
         if (progressInfo.toApply.nonEmpty) {
           val startPoint: Long = System.currentTimeMillis()
           val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
@@ -287,15 +291,17 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                 newHistory.bestHeaderOpt.foreach(header =>
                   context.actorSelection("/user/statsSender") !
                     BestHeaderInChain(header, System.currentTimeMillis()))
-              if (newHistory.isFullChainSynced && receivedAll)
-                Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
-              else miner ! DisableMining
+              if (newHistory.isFullChainSynced && receivedAll) {
+                context.actorSelection("/user/nodeViewSynchronizer") ! FullBlockChainSynced
+                context.actorSelection("/user/miner") ! FullBlockChainSynced
+              }
+              else context.actorSelection("/user/miner")! DisableMining
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
               logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
                 s"to minimal state because of: $e")
               updateNodeView(updatedHistory = Some(newHistory))
-              nodeViewSynchronizer ! SemanticallyFailedModification(pmod, e)
+              context.actorSelection("/user/nodeViewSynchronizer") ! SemanticallyFailedModification(pmod, e)
           }
         } else {
           requestDownloads(progressInfo)
@@ -304,7 +310,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       case Failure(e) =>
         logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
           s" to history caused $e")
-        nodeViewSynchronizer ! SyntacticallyFailedModification(pmod, e)
+        context.actorSelection("/user/nodeViewSynchronizer") ! SyntacticallyFailedModification(pmod, e)
     }
   } else logWarn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
 
@@ -312,7 +318,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case Success(newPool) =>
       val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
-      nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, Transaction](tx)
+      context.actorSelection("/user/nodeViewSynchronizer") ! SuccessfulTransaction[EncryProposition, Transaction](tx)
     case Failure(e) => logWarn(s"Failed to put tx ${tx.id} to mempool" +
       s" with exception ${e.getLocalizedMessage}")
   }
