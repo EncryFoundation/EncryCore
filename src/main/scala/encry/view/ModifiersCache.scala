@@ -1,13 +1,16 @@
 package encry.view
 
 import java.util.concurrent.ConcurrentHashMap
+
 import encry.EncryApp.settings
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.Header
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.Logging
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.EncryHistory
 import org.encryfoundation.common.Algos
+
 import scala.collection.concurrent.TrieMap
 import scala.collection.immutable.SortedMap
 import scala.collection.mutable
@@ -81,20 +84,20 @@ object ModifiersCache extends Logging {
     }
     )
 
-    val headersIdAfterLastFullBlock =
+    val headersIdAfterLastFullBlock: Seq[ModifierId] =
       history.headerIdsAtHeight(history.bestBlockHeight + 1) //все айди хедеры на высоте полного блока + 1
 
-    val headersAfterLastFullBlock =
+    val headersAfterLastFullBlock: Seq[Header] =
       headersIdAfterLastFullBlock
         .flatMap(id => history.typedModifierById[Header](id)) //получили хедеры соответствующие айди
 
-    val payloadsAndADProofsId = headersAfterLastFullBlock
+    val payloadsAndADProofsId: Seq[mutable.WrappedArray[Byte]] = headersAfterLastFullBlock
       .flatMap(_.partsIds.map(id => mutable.WrappedArray.make[Byte](id))) //айди пейлоада и айди адпруф
 
-    val payloadsAndADProofsInCache =
+    val payloadsAndADProofsInCache: Seq[(mutable.WrappedArray[Byte], EncryPersistentModifier)] =
       payloadsAndADProofsId.flatMap(id => cache.get(id).map(v => id -> v)) // пейлоады и адпруфы, которые есть в кэше
 
-    val applicableModifiers =
+    val applicableModifiers: Option[mutable.WrappedArray[Byte]] =
       payloadsAndADProofsInCache
         .find(p => tryToApply(p._1)).map(_._1) // пейлоады и адпруфы, которые можно применить к истории
 
