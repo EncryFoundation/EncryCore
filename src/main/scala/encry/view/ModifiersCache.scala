@@ -98,7 +98,7 @@ object ModifiersCache extends Logging {
       s"${headersAfterLastFullBlock.map(header => Algos.encode(header.id)).mkString(",")}")
 
     val payloadsAndADProofsId: Seq[mutable.WrappedArray[Byte]] = headersAfterLastFullBlock
-      .flatMap(_.partsIds.map(id => mutable.WrappedArray.make[Byte](id))) //айди пейлоада и айди адпруф
+      .flatMap(_.ADProofAndPayloadIds.map(id => mutable.WrappedArray.make[Byte](id))) //айди пейлоада и айди адпруф
 
     logError(s"payloadsAndADProofsId: " +
       s"${payloadsAndADProofsId.map(wrappedId => Algos.encode(wrappedId.toArray)).mkString(",")}")
