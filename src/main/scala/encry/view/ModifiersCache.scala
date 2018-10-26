@@ -81,23 +81,36 @@ object ModifiersCache extends Logging {
     }
     )
 
-    history.headerIdsAtHeight(history.bestBlockHeight + 1) //все айди хедеры на высоте полного блока + 1
-      .flatMap(id => history.typedModifierById[Header](id)) //получили хедеры соответствующие айди
+    val headersIdAfterLastFullBlock =
+      history.headerIdsAtHeight(history.bestBlockHeight + 1) //все айди хедеры на высоте полного блока + 1
+
+    val headersAfterLastFullBlock =
+      headersIdAfterLastFullBlock
+        .flatMap(id => history.typedModifierById[Header](id)) //получили хедеры соответствующие айди
+
+    val payloadsAndADProofsId = headersAfterLastFullBlock
       .flatMap(_.partsIds.map(id => mutable.WrappedArray.make[Byte](id))) //айди пейлоада и айди адпруф
-      .flatMap(id => cache.get(id).map(v => id -> v)) //
-      .find(p => tryToApply(p._1)).map(_._1)
-      .orElse {
+
+    val payloadsAndADProofsInCache =
+      payloadsAndADProofsId.flatMap(id => cache.get(id).map(v => id -> v)) // пейлоады и адпруфы, которые есть в кэше
+
+    val applicableModifiers =
+      payloadsAndADProofsInCache
+        .find(p => tryToApply(p._1)).map(_._1) // пейлоады и адпруфы, которые можно применить к истории
+
+      applicableModifiers.orElse {
         // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
         val possibleHeaders: Seq[Key] =
           headersQueue.get(history.bestHeaderOpt.map(_.height).getOrElse(0) + 1).map(headersKey =>
             headersKey.filter(tryToApply)
-          ).getOrElse(Seq.empty)
+          ).getOrElse(Seq.empty) // Cписок возможно подходящих хедеров
         headersQueue.get(history.bestHeaderHeight + 1).flatMap(_.headOption).orElse {
-          if (possibleHeaders.nonEmpty) Some(possibleHeaders.head)
+          if (possibleHeaders.nonEmpty) Some(possibleHeaders.head) //Если список не пуст, то возвращаем первый из списка
           else
             cache.find { case (k, v) =>
               v match {
-                case _: Header if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) =>
+                case _: Header
+                  if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) =>
                   true
                 case _ =>
                   tryToApply(k)
