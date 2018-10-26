@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, Props}
 import akka.pattern._
 import akka.persistence.RecoveryCompleted
@@ -17,6 +18,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.utils.Logging
@@ -31,13 +33,14 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging {
+class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings) extends Actor with Logging {
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: Mempool)
 
@@ -428,8 +431,8 @@ object EncryNodeViewHolder {
 
   }
 
-  def props(): Props = settings.node.stateMode match {
-    case StateMode.Digest => Props[EncryNodeViewHolder[DigestState]]
-    case StateMode.Utxo => Props[EncryNodeViewHolder[UtxoState]]
+  def props(setting: EncryAppSettings): Props = settings.node.stateMode match {
+    case StateMode.Digest => Props(classOf[EncryNodeViewHolder[DigestState]], settings)
+    case StateMode.Utxo => Props(classOf[EncryNodeViewHolder[UtxoState]], settings)
   }
 }
