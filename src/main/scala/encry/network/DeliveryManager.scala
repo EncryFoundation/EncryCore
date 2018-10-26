@@ -21,7 +21,6 @@ import encry.utils.Logging
 import org.encryfoundation.common.Algos
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{Failure, Try}
 
 class DeliveryManager extends Actor with Logging {
 
@@ -71,7 +70,7 @@ class DeliveryManager extends Actor with Logging {
     case HandshakedPeer(remote) => statusTracker.updateStatus(remote, Unknown)
     case DisconnectedPeer(remote) => statusTracker.clearStatus(remote)
     case CheckDelivery(peer, modifierTypeId, modifierId) =>
-      if (peerWhoDelivered(modifierId).contains(peer)) delete(modifierId)
+      if (peerWhoDelivered(modifierId).contains(peer)) delivered -= key(modifierId)
       else reexpect(peer, modifierTypeId, modifierId)
     case CheckModifiersToDownload =>
       historyReaderOpt.foreach { h =>
@@ -124,7 +123,7 @@ class DeliveryManager extends Actor with Logging {
     peer.handlerRef ! Message(EncrySyncInfoMessageSpec, Right(syncInfo), None)
   )
 
-  def expect(peer: ConnectedPeer, mTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = tryWithLogging {
+  def expect(peer: ConnectedPeer, mTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit =
     if ((mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining) || mTypeId != Transaction.ModifierTypeId) {
       val notYetRequestedIds: Seq[ModifierId] = modifierIds.foldLeft(Vector[ModifierId]()) {
         case (notYetRequested, modId) =>
@@ -145,9 +144,8 @@ class DeliveryManager extends Actor with Logging {
         cancellables = cancellables.updated(key(id), (peer, (cancellable, 0)))
       }
     }
-  }
 
-  def reexpect(cp: ConnectedPeer, mTypeId: ModifierTypeId, modifierId: ModifierId): Unit = tryWithLogging {
+  def reexpect(cp: ConnectedPeer, mTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
     val modifierKey: ModifierIdAsKey = key(modifierId)
     val peerAndHistoryOpt: Option[(ConnectedPeer, HistoryComparisonResult)] =
       statusTracker.statuses.find(peer => peer._1.socketAddress == cp.socketAddress)
@@ -176,9 +174,7 @@ class DeliveryManager extends Actor with Logging {
 
   def isExpecting(mtid: ModifierTypeId, mid: ModifierId): Boolean = cancellables.contains(key(mid))
 
-  def delete(mid: ModifierId): Unit = tryWithLogging(delivered -= key(mid))
-
-  def deleteSpam(mids: Seq[ModifierId]): Unit = for (id <- mids) tryWithLogging(deliveredSpam -= key(id))
+  def deleteSpam(mids: Seq[ModifierId]): Unit = for (id <- mids) deliveredSpam -= key(id)
 
   def isSpam(mid: ModifierId): Boolean = deliveredSpam contains key(mid)
 
@@ -192,26 +188,20 @@ class DeliveryManager extends Actor with Logging {
     }
   }
 
-  def tryWithLogging(fn: => Unit): Unit = Try(fn).recoverWith {
-    case e => logInfo(s"Unexpected error: $e")
-      Failure(e)
-  }
-
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     if (settings.influxDB.isDefined)
       context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
     statusTracker.statuses.keys.foreach(expect(_, modifierTypeId, modifierIds))
   }
 
-  def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = tryWithLogging {
-    if (isExpecting(mtid, mid)) {
-      delivered = delivered.updated(key(mid), cp)
-      cancellables.get(key(mid)).foreach(_._2._1.cancel())
-      cancellables -= key(mid)
-      peers -= key(mid)
-    }
-    else deliveredSpam = deliveredSpam - key(mid) + (key(mid) -> cp)
+  def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = if (isExpecting(mtid, mid)) {
+    delivered = delivered.updated(key(mid), cp)
+    cancellables.get(key(mid)).foreach(_._2._1.cancel())
+    cancellables -= key(mid)
+    peers -= key(mid)
   }
+  else deliveredSpam = deliveredSpam - key(mid) + (key(mid) -> cp)
+
 }
 
 object DeliveryManager {
