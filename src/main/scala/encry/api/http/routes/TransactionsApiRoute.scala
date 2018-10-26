@@ -45,7 +45,6 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
   def dataTxs: Route = path("data") {
     post(entity(as[DataForTx]) {
       dataSeq =>
-        println(dataSeq)
         complete {
           if (settings.token.contains(dataSeq.token)) {
             val possibleIds =
@@ -53,7 +52,7 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
             for {
               ids <- possibleIds
             } yield {
-              ids.asJson
+              ids.reverse.asJson
             }
           } else
             StatusCodes.BadRequest
