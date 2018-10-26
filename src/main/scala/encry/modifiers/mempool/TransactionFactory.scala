@@ -1,8 +1,8 @@
 package encry.modifiers.mempool
 
-import encry.modifiers.mempool.directive.{Directive, TransferDirective}
+import encry.modifiers.mempool.directive.{DataDirective, Directive, TransferDirective}
 import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.MonetaryBox
+import encry.modifiers.state.box.{EncryProposition, MonetaryBox}
 import encry.view.history.History.Height
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import org.encryfoundation.common.transaction.EncryAddress.Address
@@ -29,6 +29,28 @@ object TransactionFactory {
       )
       else IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt))
 
+    val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, directives)
+    val signature: Signature25519 = privKey.sign(uTransaction.messageToSign)
+
+    uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
+  }
+
+  def defaultDataTransactionScratch(privKey: PrivateKey25519,
+                                    fee: Amount,
+                                    timestamp: Long,
+                                    data: Array[Byte],
+                                    useBoxes: IndexedSeq[MonetaryBox]): Transaction = {
+    val pubKey: PublicKey25519 = privKey.publicImage
+    val uInputs: IndexedSeq[Input] = useBoxes
+      .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes)))).toIndexedSeq
+    val change: Amount = useBoxes.map(_.amount).sum - fee
+    val dataDirective: DataDirective =
+      DataDirective(EncryProposition.pubKeyLocked(privKey.publicImage.pubKeyBytes).contractHash, data)
+    val directives: IndexedSeq[Directive] =
+      if (change > 0) IndexedSeq(
+        TransferDirective(pubKey.address.address, change, None), dataDirective
+      )
+      else IndexedSeq(dataDirective)
     val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, directives)
     val signature: Signature25519 = privKey.sign(uTransaction.messageToSign)
 

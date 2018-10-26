@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, Props}
 import akka.pattern._
 import akka.persistence.RecoveryCompleted
@@ -12,14 +13,14 @@ import encry.local.miner.Miner.DisableMining
 import encry.modifiers._
 import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
-import encry.modifiers.state.box.EncryProposition
+import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
-import encry.utils.Logging
+import encry.utils.{Logging, TxGenerator}
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
@@ -31,6 +32,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -118,6 +120,17 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         if (ModifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
         logInfo(s"Cache after(${ModifiersCache.size})")
       }
+    case dataToTxs: GenerateDataTxs =>
+      val txs: Seq[Transaction] = TxGenerator.generateDataTxs(
+        dataToTxs.dataSeq,
+        nodeView.wallet.walletStorage.allBoxes.flatMap {
+          case assetBox: AssetBox => Some(assetBox)
+          case _ => None
+        },
+        nodeView.wallet.accountManager.mandatoryAccount
+      )
+      sender() ! txs.map(tx => Algos.encode(tx.id))
+      txs.foreach(tx => self ! LocallyGeneratedTransaction(tx))
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       logInfo(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
@@ -419,6 +432,8 @@ object EncryNodeViewHolder {
 
     case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentNodeViewModifier]
     (pmod: EncryPersistentModifier)
+
+    case class GenerateDataTxs(dataSeq: Seq[Array[Byte]])
 
   }
 
