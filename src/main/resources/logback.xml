@@ -11,7 +11,7 @@
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>DEBUG</level>
+            <level>ERROR</level>
         </filter>
         <encoder>
             <pattern>[%thread] >> [%-5level] >> %d{yyyy-MM-dd HH:mm:ss} %msg%n</pattern>
