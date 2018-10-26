@@ -99,7 +99,7 @@ object ModifiersCache extends Logging {
 
     val applicableModifiers: Option[mutable.WrappedArray[Byte]] =
       payloadsAndADProofsInCache
-        .find(p => tryToApply(p._1)).map(_._1) // пейлоады и адпруфы, которые можно применить к истории
+        .find(p => tryToApply(p._1)).map(_._1) // пейлоад или адпруф, который можно применить к истории
 
       applicableModifiers.orElse {
         // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
