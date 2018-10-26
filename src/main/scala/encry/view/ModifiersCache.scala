@@ -81,10 +81,10 @@ object ModifiersCache extends Logging {
     }
     )
 
-    history.headerIdsAtHeight(history.bestBlockHeight + 1)
-      .flatMap(id => history.typedModifierById[Header](id))
-      .flatMap(_.partsIds.map(id => mutable.WrappedArray.make[Byte](id)))
-      .flatMap(id => cache.get(id).map(v => id -> v))
+    history.headerIdsAtHeight(history.bestBlockHeight + 1) //все айди хедеры на высоте полного блока + 1
+      .flatMap(id => history.typedModifierById[Header](id)) //получили хедеры соответствующие айди
+      .flatMap(_.partsIds.map(id => mutable.WrappedArray.make[Byte](id))) //айди пейлоада и айди адпруф
+      .flatMap(id => cache.get(id).map(v => id -> v)) //
       .find(p => tryToApply(p._1)).map(_._1)
       .orElse {
         // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
