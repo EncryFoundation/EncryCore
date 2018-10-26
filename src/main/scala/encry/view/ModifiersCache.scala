@@ -87,19 +87,33 @@ object ModifiersCache extends Logging {
     val headersIdAfterLastFullBlock: Seq[ModifierId] =
       history.headerIdsAtHeight(history.bestBlockHeight + 1) //все айди хедеры на высоте полного блока + 1
 
+    logError(s"headersIdAfterLastFullBlock: " +
+      s"${headersIdAfterLastFullBlock.map(Algos.encode).mkString(",")}")
+
     val headersAfterLastFullBlock: Seq[Header] =
       headersIdAfterLastFullBlock
         .flatMap(id => history.typedModifierById[Header](id)) //получили хедеры соответствующие айди
 
+    logError(s"headersAfterLastFullBlock (Only Ids): " +
+      s"${headersAfterLastFullBlock.map(header => Algos.encode(header.id)).mkString(",")}")
+
     val payloadsAndADProofsId: Seq[mutable.WrappedArray[Byte]] = headersAfterLastFullBlock
       .flatMap(_.partsIds.map(id => mutable.WrappedArray.make[Byte](id))) //айди пейлоада и айди адпруф
+
+    logError(s"payloadsAndADProofsId: " +
+      s"${payloadsAndADProofsId.map(wrappedId => Algos.encode(wrappedId.toArray)).mkString(",")}")
 
     val payloadsAndADProofsInCache: Seq[(mutable.WrappedArray[Byte], EncryPersistentModifier)] =
       payloadsAndADProofsId.flatMap(id => cache.get(id).map(v => id -> v)) // пейлоады и адпруфы, которые есть в кэше
 
+    logError("payloadsAndADProofsInCache (Only ids): " +
+      s"${payloadsAndADProofsInCache.map(tup => Algos.encode(tup._1.toArray)).mkString(",")}")
+
     val applicableModifier: Option[mutable.WrappedArray[Byte]] =
       payloadsAndADProofsInCache
         .find(p => tryToApply(p._1)).map(_._1) // пейлоад или адпруф, который можно применить к истории
+
+    logError(s"applicableModifier: ${applicableModifier.map(wrappedId => Algos.encode(wrappedId.toArray))}")
 
     applicableModifier.orElse {
         // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
@@ -107,6 +121,7 @@ object ModifiersCache extends Logging {
           headersQueue.get(history.bestHeaderOpt.map(_.height).getOrElse(0) + 1).map(headersKey =>
             headersKey.filter(tryToApply)
           ).getOrElse(Seq.empty) // Cписок возможно подходящих хедеров
+        logError(s"possibleHeaders: ${possibleHeaders.map(key => Algos.encode(key.toArray)).mkString(",")}")
         headersQueue.get(history.bestHeaderHeight + 1).flatMap(_.headOption).orElse {
           if (possibleHeaders.nonEmpty) Some(possibleHeaders.head) //Если список не пуст, то возвращаем первый из списка
           else
@@ -116,6 +131,7 @@ object ModifiersCache extends Logging {
                   if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) =>
                   true
                 case _ => //Ищем любой подходящий модификатор
+                  logError(s"Try to apply: ${Algos.encode(k.toArray)} and result is: ${tryToApply(k)}")
                   tryToApply(k)
               }
             }.map { case (k, _) => k }
