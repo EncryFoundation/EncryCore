@@ -109,10 +109,10 @@ object ModifiersCache extends Logging {
           else
             cache.find { case (k, v) =>
               v match {
-                case _: Header
+                case _: Header //Ищем хедер, у которого в качестве родителя указан последний лучший хэдер
                   if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) =>
                   true
-                case _ =>
+                case _ => //Ищем любой подходящий модификатор
                   tryToApply(k)
               }
             }.map { case (k, _) => k }
