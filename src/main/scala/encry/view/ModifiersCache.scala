@@ -97,11 +97,11 @@ object ModifiersCache extends Logging {
     val payloadsAndADProofsInCache: Seq[(mutable.WrappedArray[Byte], EncryPersistentModifier)] =
       payloadsAndADProofsId.flatMap(id => cache.get(id).map(v => id -> v)) // пейлоады и адпруфы, которые есть в кэше
 
-    val applicableModifiers: Option[mutable.WrappedArray[Byte]] =
+    val applicableModifier: Option[mutable.WrappedArray[Byte]] =
       payloadsAndADProofsInCache
         .find(p => tryToApply(p._1)).map(_._1) // пейлоад или адпруф, который можно применить к истории
 
-      applicableModifiers.orElse {
+    applicableModifier.orElse {
         // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
         val possibleHeaders: Seq[Key] =
           headersQueue.get(history.bestHeaderOpt.map(_.height).getOrElse(0) + 1).map(headersKey =>
