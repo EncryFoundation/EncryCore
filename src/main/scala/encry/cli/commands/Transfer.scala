@@ -9,7 +9,7 @@ import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.settings.EncryAppSettings
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.history.EncryHistory
-import encry.view.mempool.EncryMempool
+import encry.view.mempool.Mempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
@@ -26,7 +26,7 @@ object Transfer extends Command {
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (nodeViewHolder ?
-      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryMempool, Option[Transaction]] { view =>
+      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Mempool, Option[Transaction]] { view =>
         Try {
           val secret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
           val recipient: Address = args.requireArg[Ast.Str]("addr").s

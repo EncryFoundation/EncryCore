@@ -20,7 +20,7 @@ import encry.stats.StatsSender.NodeSynced
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.history.{EncryHistory, EncryHistoryReader, EncrySyncInfo, EncrySyncInfoMessageSpec}
-import encry.view.mempool.{EncryMempool, MempoolReader}
+import encry.view.mempool.{Mempool, MempoolReader}
 import encry.view.state.StateReader
 import encry.utils.Logging
 import encry.utils.Utils._
@@ -30,7 +30,7 @@ import org.encryfoundation.common.transaction.Proposition
 class NodeViewSynchronizer extends Actor with Logging {
 
   var historyReaderOpt: Option[EncryHistory] = None
-  var mempoolReaderOpt: Option[EncryMempool] = None
+  var mempoolReaderOpt: Option[Mempool] = None
   val invSpec: InvSpec = new InvSpec(settings.network.maxInvObjects)
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
   val deliveryManager: ActorRef =
@@ -60,7 +60,7 @@ class NodeViewSynchronizer extends Actor with Logging {
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       historyReaderOpt = Some(reader)
       deliveryManager ! ChangedHistory(reader)
-    case ChangedMempool(reader: EncryMempool) if reader.isInstanceOf[EncryMempool] =>
+    case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] =>
       mempoolReaderOpt = Some(reader)
     case SendLocalSyncInfo => deliveryManager ! SendLocalSyncInfo
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
@@ -96,7 +96,7 @@ class NodeViewSynchronizer extends Actor with Logging {
           self ! ResponseFromLocal(remote, invData._1, objs)
         }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
-      logDebug(s"Got inv message from ${remote.socketAddress}.")
+      logDebug(s"Got inv message from ${remote.socketAddress}")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       deliveryManager ! DataFromPeer(spec, data: ModifiersData@unchecked, remote)
@@ -118,6 +118,7 @@ class NodeViewSynchronizer extends Actor with Logging {
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
     networkController ! SendToNetwork(Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None), Broadcast)
+
 }
 
 object NodeViewSynchronizer {
@@ -153,7 +154,7 @@ object NodeViewSynchronizer {
 
     case class ChangedHistory[HR <: EncryHistoryReader](reader: HR) extends NodeViewChange
 
-    case class ChangedMempool[MR <: MempoolReader[Transaction]](mempool: MR) extends NodeViewChange
+    case class ChangedMempool[MR <: MempoolReader](mempool: MR) extends NodeViewChange
 
     case class ChangedState[SR <: StateReader](reader: SR) extends NodeViewChange
 

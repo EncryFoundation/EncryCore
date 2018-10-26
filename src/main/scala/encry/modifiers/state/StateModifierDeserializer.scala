@@ -1,7 +1,6 @@
 package encry.modifiers.state
 
 import encry.modifiers.state.box._
-
 import scala.util.{Failure, Try}
 
 object StateModifierDeserializer {

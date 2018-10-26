@@ -91,7 +91,7 @@ class StatsSender extends Actor {
     case BestHeaderInChain(fb: Header, applyTime: Long) =>
       influxDB.write(InfluxPort, util.Arrays.asList(
         s"difficulty,nodeName=${nodeName} diff=${fb.difficulty.toString},height=${fb.height}",
-        s"""height,nodeName=${nodeName},header=${Algos.encode(fb.id)} height=${fb.height},value="[${sdf.format(applyTime)}]"""",
+        s"""height,nodeName=${nodeName} header="${Algos.encode(fb.id)}",height=${fb.height}""",
         s"stateWeight,nodeName=${nodeName},height=${fb.height} " +
           s"value=${new File("encry/data/state/").listFiles.foldLeft(0L)(_ + _.length())}",
         s"historyWeight,nodeName=${nodeName},height=${fb.height} " +

@@ -1,5 +1,5 @@
 name := "EncryCore"
-version := "0.9.2"
+version := "0.9.3"
 organization := "org.encryfoundation"
 scalaVersion := "2.12.6"
 

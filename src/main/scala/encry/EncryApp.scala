@@ -20,9 +20,9 @@ import encry.network.{PeerManager, _}
 import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, LoggingActor, StatsSender, Zombie}
 import encry.utils.{Logging, NetworkTimeProvider}
-import encry.view.{EncryNodeViewHolder, EncryViewReadersHolder}
+import encry.view.{EncryNodeViewHolder, ReadersHolder}
 import org.encryfoundation.common.Algos
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
 import scala.io.Source
 import scala.language.postfixOps
@@ -53,7 +53,7 @@ object EncryApp extends App with Logging {
 
   lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props()
     .withDispatcher("nvh-dispatcher").withMailbox("nvh-mailbox"), "nodeViewHolder")
-  val readersHolder: ActorRef = system.actorOf(Props[EncryViewReadersHolder], "readersHolder")
+  val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
     .withDispatcher("network-dispatcher"), "networkController")
   lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
@@ -63,18 +63,18 @@ object EncryApp extends App with Logging {
   if (settings.influxDB.isDefined) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.kafka.exists(_.sendToKafka))
     system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
-  if (settings.postgres.isDefined) {
+  if (settings.postgres.exists(_.enableSave) || settings.postgres.exists(_.enableRestore) ) {
     if (settings.postgres.exists(_.enableSave))
       system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")
-    if (settings.postgres.exists(_.enableRestore))
+    if (settings.postgres.exists(_.enableRestore)) {
       system.actorOf(Props(classOf[PostgresRestore], dbService, nodeViewHolder), "postgresRestore")
+      if (!settings.levelDb.exists(_.enableRestore)) system.actorSelection("/user/postgresRestore") ! StartRecovery
+    }
   }
-  if (settings.levelDb.isDefined) {
-      system.actorOf(Props[ModifiersHolder], "modifiersHolder")
-    if (!settings.levelDb.exists(_.enableRestore)) system.actorSelection("/user/postgresRestore") ! StartRecovery
-  }
+  if (settings.levelDb.exists(_.enableSave) || settings.levelDb.exists(_.enableRestore))
+    system.actorOf(Props[ModifiersHolder], "modifiersHolder")
   if (settings.node.mining) miner ! StartMining
-  if (settings.node.enableCLI) {
+  if (settings.node.useCli) {
     system.actorOf(Props[ConsoleListener], "cliListener")
     system.actorSelection("/user/cliListener") ! StartListening
   }
@@ -110,7 +110,13 @@ object EncryApp extends App with Logging {
       settings.restApi.bindAddress.getPort)
   }
 
-  def forceStopApplication(code: Int = 0): Nothing = sys.exit(code)
+  def forceStopApplication(code: Int = 0): Nothing = {
+    system.registerOnTermination {
+      println("Actor system terminated")
+    }
+    Await.ready(system.terminate(), 2 minutes)
+    sys.exit(code)
+  }
 
   def commonSupervisorStrategy: OneForOneStrategy = OneForOneStrategy(
     maxNrOfRetries = 5,
@@ -118,5 +124,4 @@ object EncryApp extends App with Logging {
     case _ => Restart
   }
 
-  sys.addShutdownHook(system.terminate)
 }

@@ -11,7 +11,7 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeerManager.ReceivableMessages.{GetConnectedPeers, GetRecoveryStatus}
 import encry.settings._
 import encry.utils.{NetworkTime, NetworkTimeProvider}
-import encry.view.EncryViewReadersHolder.{GetReaders, Readers}
+import encry.view.ReadersHolder.{GetReaders, Readers}
 import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.Algos

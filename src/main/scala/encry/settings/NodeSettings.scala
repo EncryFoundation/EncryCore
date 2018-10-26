@@ -9,6 +9,7 @@ import scala.concurrent.duration.FiniteDuration
 case class NodeSettings(stateMode: StateMode,
                         verifyTransactions: Boolean,
                         blocksToKeep: Int,
+                        modifiersCacheSize: Int,
                         mining: Boolean,
                         numberOfMiningWorkers: Int,
                         miningDelay: FiniteDuration,
@@ -16,7 +17,7 @@ case class NodeSettings(stateMode: StateMode,
                         utxMaxAge: FiniteDuration,
                         mempoolCleanupInterval: FiniteDuration,
                         mempoolMaxCapacity: Int,
-                        enableCLI: Boolean,
+                        useCli: Boolean,
                         loggingMode: String)
 
 trait NodeSettingsReader {
@@ -27,6 +28,7 @@ trait NodeSettingsReader {
     NodeSettings(stateMode,
       cfg.as[Boolean](s"$path.verifyTransactions"),
       cfg.as[Int](s"$path.blocksToKeep"),
+      cfg.as[Int](s"$path.modifiersCacheSize"),
       cfg.as[Boolean](s"$path.mining"),
       cfg.as[Int](s"$path.numberOfMiningWorkers"),
       cfg.as[FiniteDuration](s"$path.miningDelay"),
