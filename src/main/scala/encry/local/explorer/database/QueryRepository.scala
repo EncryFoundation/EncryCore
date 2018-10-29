@@ -49,7 +49,8 @@ protected[database] object QueryRepository extends Logging {
         |      block_size, equihash_solution, ad_proofs, tx_qty, miner_address, miner_reward, fees_total, txs_size, best_chain, block_ad_proofs)
         |VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET
         |best_chain = TRUE, ad_proofs = EXCLUDED.ad_proofs, tx_qty = EXCLUDED.tx_qty, miner_address = EXCLUDED.miner_address,
-        |miner_reward = EXCLUDED.miner_reward, fees_total = EXCLUDED.fees_total, txs_size = EXCLUDED.txs_size, block_ad_proofs = EXCLUDED.block_ad_proofs
+        |miner_reward = EXCLUDED.miner_reward, fees_total = EXCLUDED.fees_total, txs_size = EXCLUDED.txs_size,
+        |block_ad_proofs = EXCLUDED.block_ad_proofs, block_size = EXCLUDED.block_size
       """.stripMargin
     Update[HeaderDBVersion](query).run(headerDB)
   }
