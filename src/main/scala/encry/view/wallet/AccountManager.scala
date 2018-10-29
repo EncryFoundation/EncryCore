@@ -32,7 +32,7 @@ case class AccountManager(store: Store) extends Logging {
     else acc
   }
 
-  def createAccount(seedOpt: Option[String]): PrivateKey25519 = {
+  def createAccount(seedOpt: Option[String], mandatory: Boolean = false): PrivateKey25519 = {
     val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
       Blake2b256.hash(
         seedOpt
@@ -47,6 +47,8 @@ case class AccountManager(store: Store) extends Logging {
       )
     )
     saveAccount(privateKey, publicKey)
+    if (settings.postgres.exists(_.enableSave) && !mandatory)
+      EncryApp.system.actorSelection("/user/blockListener") ! PublicKey25519(publicKey)
     PrivateKey25519(privateKey, publicKey)
   }
 

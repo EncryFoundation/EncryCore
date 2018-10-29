@@ -8,14 +8,17 @@ import encry.local.explorer.database.DBService
 import encry.modifiers.history.Block.Height
 import encry.modifiers.history.{Block, Header}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.ChangedHistory
-import encry.utils.Logging
+import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetNodeViewChanges
+import encry.view.EncryNodeViewHolder.WalletPublicKeys
 import encry.view.history.EncryHistoryReader
+import org.encryfoundation.common.crypto.PublicKey25519
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolder: ActorRef) extends Actor with Logging {
+class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolder: ActorRef, ntp: NetworkTimeProvider)
+  extends Actor with Logging {
 
   override def preStart(): Unit = logInfo(s"Start listening to new blocks.")
 
@@ -28,7 +31,7 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
     case Success(height) =>
       if (height == 0) logInfo("Going to begin writing to empty database")
       else logInfo(s"Going to begin writing to table with $height blocks")
-      nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
+      nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = true, mempool = false)
     case Failure(th) =>
       logWarn(s"Failed to connect to database with exception $th")
       context.stop(self)
@@ -37,6 +40,10 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
   def orphanedAndChainSwitching: Receive = {
     case NewOrphaned(header: Header) => dbService.processOrphanedHeader(header)
     case ChainSwitching(ids) => dbService.markAsRemovedFromMainChain(ids.toList)
+    case WalletPublicKeys(keys) if keys.nonEmpty =>
+      dbService.writeNodeInfo(NodeInfo(settings.network.nodeName, keys.map(_.toString).toList, ntp.estimatedTime))
+    case key: PublicKey25519 =>
+      dbService.writeNodeInfo(NodeInfo(settings.network.nodeName, List(key.toString), ntp.estimatedTime))
   }
 
   override def receive: Receive = orphanedAndChainSwitching.orElse {
@@ -119,4 +126,5 @@ object BlockListener {
   case class NewOrphaned(header: Header)
   case class UploadToDbOnHeight(height: Int)
   case class LastUploaded(height: Int)
+  case class NodeInfo(nodeName: Option[String], pubKeys: List[String], ts: Long)
 }

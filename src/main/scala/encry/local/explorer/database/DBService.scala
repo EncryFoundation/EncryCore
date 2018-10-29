@@ -8,6 +8,7 @@ import QueryRepository._
 import com.zaxxer.hikari.HikariDataSource
 import doobie.hikari.implicits._
 import encry.EncryApp.settings
+import encry.local.explorer.BlockListener.NodeInfo
 import encry.modifiers.history.{Block, Header}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.history.HeaderDBVersion
@@ -28,6 +29,8 @@ class DBService extends Logging {
 
   def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] =
     runAsync(markAsRemovedFromMainChainQuery(ids), "markAsRemovedFromMainChain")
+
+  def writeNodeInfo(nodeInfo: NodeInfo): Future[Int] = runAsync(writeNodeInfoQuery(nodeInfo), "writeNodeInfo")
 
   def processOrphanedHeader(header: Header): Future[Int] =
     runAsync(insertOrphanedHeaderQuery(header), "processOrphanedHeader")

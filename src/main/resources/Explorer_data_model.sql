@@ -71,8 +71,6 @@ CREATE INDEX tx_id_directives_index ON directives (tx_id);
 
 CREATE TABLE node_info(
   node_name TEXT,
-  publicKeys TEXT[],
-  node_time BIGINT,
-  node_ip TEXT,
-  mode TEXT --"restored" or "created"
+  public_keys TEXT[],
+  node_time BIGINT
 );

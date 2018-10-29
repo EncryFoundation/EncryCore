@@ -7,11 +7,12 @@ import encry.local.explorer.BlockListener.{ChainSwitching, NewBestBlock, NewOrph
 import encry.local.explorer.database.DBService
 import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.mempool.Transaction
-import encry.utils.EncryGenerator
+import encry.utils.{EncryGenerator, NetworkTimeProvider}
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import org.mockito.Mockito._
 import org.mockito.ArgumentMatchers.{eq => eq_}
+
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -45,8 +46,9 @@ class BlockListenerSpec extends TestKit(ActorSystem("BlockListenerSpec")) with I
     val dbServiceMock: DBService = mock[DBService]
     val readersHolderMock: ActorRef = system.actorOf(Props.empty)
     val nvhMock: ActorRef = system.actorOf(Props.empty)
+    val ntpMock: NetworkTimeProvider = mock[NetworkTimeProvider]
     when(dbServiceMock.selectHeightOpt).thenReturn(Future.successful(None))
-    val actor: ActorRef = system.actorOf(Props(new BlockListener(dbServiceMock, readersHolderMock, nvhMock)))
+    val actor: ActorRef = system.actorOf(Props(new BlockListener(dbServiceMock, readersHolderMock, nvhMock, ntpMock)))
     val sampleHeader: Header = genHeader
     val sampleTxs: Seq[Transaction] = genValidPaymentTxs(100)
     val samplePayload: Payload = Payload(sampleHeader.id, sampleTxs)

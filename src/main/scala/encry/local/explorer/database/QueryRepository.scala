@@ -6,6 +6,7 @@ import doobie.util.update.Update
 import doobie.postgres.implicits._
 import doobie.implicits._
 import doobie.util.log.{ExecFailure, LogHandler, ProcessingFailure, Success}
+import encry.local.explorer.BlockListener.NodeInfo
 import encry.modifiers.history.{Block, Header, HeaderDBVersion, Payload}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.utils.Logging
@@ -33,6 +34,11 @@ protected[database] object QueryRepository extends Logging {
   def markAsRemovedFromMainChainQuery(height: Int): ConnectionIO[Int] = {
     val query: String = s"UPDATE public.headers SET best_chain = FALSE WHERE height = ?"
     Update[Int](query).run(height)
+  }
+
+  def writeNodeInfoQuery(nodeInfo: NodeInfo): ConnectionIO[Int] = {
+    val query: String = s"INSERT INTO public.node_info(node_name, public_keys, node_time) VALUES(?, ?, ?);"
+    Update[NodeInfo](query).run(nodeInfo)
   }
 
   def insertHeaderQuery(block: Block): ConnectionIO[Int] = {

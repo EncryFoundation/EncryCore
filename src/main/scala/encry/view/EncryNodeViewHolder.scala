@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, Props}
 import akka.pattern._
 import akka.persistence.RecoveryCompleted
@@ -28,9 +29,11 @@ import encry.view.state._
 import encry.view.wallet.EncryWallet
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.Algos
+import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -133,6 +136,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       if (history) sender() ! ChangedHistory(nodeView.history)
       if (state) sender() ! ChangedState(nodeView.state)
       if (mempool) sender() ! ChangedMempool(nodeView.mempool)
+      if (vault) sender() ! WalletPublicKeys(nodeView.wallet.publicKeys)
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] = modifierTypeId match {
         case Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
@@ -402,6 +406,8 @@ object EncryNodeViewHolder {
   case class DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) extends NodeViewHolderEvent
 
   case class CurrentView[HIS, MS, VL, MP](history: HIS, state: MS, vault: VL, pool: MP)
+
+  case class WalletPublicKeys(keys: Set[PublicKey25519])
 
   object ReceivableMessages {
 
