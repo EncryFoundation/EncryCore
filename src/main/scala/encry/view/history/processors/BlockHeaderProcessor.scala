@@ -1,10 +1,10 @@
 package encry.view.history.processors
 
 import com.google.common.primitives.Ints
-import encry.EncryApp.{settings, system, forceStopApplication}
+import encry.EncryApp.{forceStopApplication, settings, system}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.consensus.History.ProgressInfo
-import encry.consensus.{ModifierSemanticValidity, _}
+import encry.consensus.{ConsensusTaggedTypes, ModifierSemanticValidity, _}
 import encry.local.explorer.BlockListener.NewOrphaned
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history._
@@ -17,6 +17,7 @@ import encry.view.history.History.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
+import supertagged.@@
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
@@ -124,37 +125,34 @@ trait BlockHeaderProcessor extends Logging {
     case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
 
-  private def getHeaderInfoUpdate(h: Header): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)],
-    EncryPersistentModifier)] = {
-    val difficulty: Difficulty = h.difficulty
-    if (h.isGenesis) {
-      logInfo(s"Initialize header chain with genesis header ${h.encodedId}")
-      Option(Seq(
-        BestHeaderKey -> ByteArrayWrapper(h.id),
-        heightIdsKey(Constants.Chain.GenesisHeight) -> ByteArrayWrapper(h.id),
-        headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(Constants.Chain.GenesisHeight)),
-        headerScoreKey(h.id) -> ByteArrayWrapper(difficulty.toByteArray)), h)
-    } else {
-      scoreOf(h.parentId).map { parentScore =>
-        val score = Difficulty @@ (parentScore + difficulty)
-        val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-          if (h.height > bestHeaderHeight || score > bestHeadersChainScore)
-            Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
-        val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) =
-          headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
-        val heightRow: (ByteArrayWrapper, ByteArrayWrapper) =
-          headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
-        val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-          if ((h.height > bestHeaderHeight || score > bestHeadersChainScore) && (h.height < bestBlockHeight)) {
-            bestBlockHeaderIdsRow(h, score)
-          } else {
-            if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(h)
-            orphanedBlockHeaderIdsRow(h, score)
-          }
-        (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, h)
-      }
+  private def getHeaderInfoUpdate(header: Header): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)],
+    EncryPersistentModifier)] = if (header.isGenesis) {
+    logInfo(s"Initialize header chain with genesis header ${header.encodedId}")
+    Option(Seq(
+      BestHeaderKey -> ByteArrayWrapper(header.id),
+      heightIdsKey(Constants.Chain.GenesisHeight) -> ByteArrayWrapper(header.id),
+      headerHeightKey(header.id) -> ByteArrayWrapper(Ints.toByteArray(Constants.Chain.GenesisHeight)),
+      headerScoreKey(header.id) -> ByteArrayWrapper(header.difficulty.toByteArray)), header)
+  } else {
+    scoreOf(header.parentId).map { parentScore =>
+      val score: BigInt @@ ConsensusTaggedTypes.Difficulty.Tag = Difficulty @@ (parentScore + header.difficulty)
+      val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
+        if (header.height > bestHeaderHeight || score > bestHeadersChainScore)
+          Seq(BestHeaderKey -> ByteArrayWrapper(header.id)) else Seq.empty
+      val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) =
+        headerScoreKey(header.id) -> ByteArrayWrapper(score.toByteArray)
+      val heightRow: (ByteArrayWrapper, ByteArrayWrapper) =
+        headerHeightKey(header.id) -> ByteArrayWrapper(Ints.toByteArray(header.height))
+      val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
+        if (header.height > bestHeaderHeight || score > bestHeadersChainScore) bestBlockHeaderIdsRow(header, score)
+        else {
+          if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(header)
+          orphanedBlockHeaderIdsRow(header, score)
+        }
+      (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
     }
   }
+
 
   /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
     * header ids at this height */
