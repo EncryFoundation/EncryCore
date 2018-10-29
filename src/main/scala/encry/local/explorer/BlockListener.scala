@@ -31,7 +31,7 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
     case Success(height) =>
       if (height == 0) logInfo("Going to begin writing to empty database")
       else logInfo(s"Going to begin writing to table with $height blocks")
-      nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = true, mempool = false)
+      nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
     case Failure(th) =>
       logWarn(s"Failed to connect to database with exception $th")
       context.stop(self)
