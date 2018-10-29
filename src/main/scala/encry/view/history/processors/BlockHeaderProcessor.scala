@@ -138,16 +138,18 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
       scoreOf(h.parentId).map { parentScore =>
         val score = Difficulty @@ (parentScore + difficulty)
         val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-          if (h.height > bestHeaderHeight || score > bestHeadersChainScore) Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
+          if ((h.height > bestHeaderHeight || score > bestHeadersChainScore) && (h.height < bestBlockHeight))
+            Seq(BestHeaderKey -> ByteArrayWrapper(h.id)) else Seq.empty
         val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) =
           headerScoreKey(h.id) -> ByteArrayWrapper(score.toByteArray)
         val heightRow: (ByteArrayWrapper, ByteArrayWrapper) =
           headerHeightKey(h.id) -> ByteArrayWrapper(Ints.toByteArray(h.height))
         val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-          if ((h.height > bestHeaderHeight || score > bestHeadersChainScore) && (h.height < bestBlockHeight)) {
+          if ((h.height > bestHeaderHeight || score > bestHeadersChainScore) && (h.height < bestBlockHeight)){
           bestBlockHeaderIdsRow(h, score)
           } else {
-          if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(h)
+          if (settings.postgres.exists(_.enableSave))
+            system.actorSelection("/user/blockListener") ! NewOrphaned(h)
           orphanedBlockHeaderIdsRow(h, score)
         }
         (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, h)
