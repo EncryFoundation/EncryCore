@@ -73,5 +73,6 @@ CREATE TABLE node_info(
   node_name TEXT,
   publicKeys TEXT[],
   node_time BIGINT,
-  node_ip TEXT
+  node_ip TEXT,
+  mode TEXT --"restored" or "created"
 );
