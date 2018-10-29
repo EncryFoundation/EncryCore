@@ -1,7 +1,6 @@
 package encry.view
 
 import java.util.concurrent.ConcurrentHashMap
-
 import encry.EncryApp.settings
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.Header
@@ -10,7 +9,6 @@ import encry.utils.Logging
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.EncryHistory
 import org.encryfoundation.common.Algos
-
 import scala.collection.concurrent.TrieMap
 import scala.collection.immutable.SortedMap
 import scala.collection.mutable
