@@ -86,35 +86,21 @@ object ModifiersCache extends Logging {
     val headersIdAfterLastFullBlock: Seq[ModifierId] =
       history.headerIdsAtHeight(history.bestBlockHeight + 1)
 
-    logError(s"headersIdAfterLastFullBlock: " +
-      s"${headersIdAfterLastFullBlock.map(Algos.encode).mkString(",")}")
-
     //хедеры соответствующие айди //запрос к БД
     val headersAfterLastFullBlock: Seq[Header] =
       headersIdAfterLastFullBlock.flatMap(id => history.typedModifierById[Header](id))
-
-    logError(s"headersAfterLastFullBlock (Only Ids): " +
-      s"${headersAfterLastFullBlock.map(header => Algos.encode(header.id)).mkString(",")}")
 
     //айди пейлоадов для хедеров
     val payloadIds: Seq[mutable.WrappedArray[Byte]] = headersAfterLastFullBlock
       .map(header => new mutable.WrappedArray.ofByte(header.parentId))
 
-    logError(s"payloadsAndADProofsId: " +
-      s"${payloadIds.map(wrappedId => Algos.encode(wrappedId.toArray)).mkString(",")}")
-
     // пейлоады, которые есть в кэше
     val payloadIdsAndPayloadsInCache: Map[mutable.WrappedArray[Byte], EncryPersistentModifier] =
       payloadIds.flatMap(payloadId => cache.get(payloadId).map(payload => payloadId -> payload)).toMap
 
-    logError("payloadIdsAndPayloadsInCache (Only ids): " +
-      s"${payloadIdsAndPayloadsInCache.map(tup => Algos.encode(tup._1.toArray)).mkString(",")}")
-
     // пейлоад, который можно применить к истории
     val applicablePayload: Option[mutable.WrappedArray[Byte]] =
       payloadIdsAndPayloadsInCache.find(payloadIdAndPayloadInCache => isApplicable(payloadIdAndPayloadInCache._1)).map(_._1)
-
-    logError(s"applicableModifier: ${applicablePayload.map(wrappedId => Algos.encode(wrappedId.toArray))}")
 
     applicablePayload.orElse {
       // do exhaustive search between modifiers, that are possibly may be applied (exclude headers far from best header)
