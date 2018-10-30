@@ -149,8 +149,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   def computeApplications(): Unit =
     ModifiersCache.popCandidate(nodeView.history) match {
-      case Some(mod) =>
-        pmodModify(mod)
+      case Some(payload) =>
+        pmodModify(payload)
         computeApplications()
       case None => Unit
     }

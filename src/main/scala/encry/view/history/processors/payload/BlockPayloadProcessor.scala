@@ -6,7 +6,6 @@ import encry.modifiers.history.{ADProofs, Block, Header, Payload}
 import encry.view.history.processors.BlockProcessor
 import encry.view.history.storage.HistoryStorage
 import encry.EncryApp.settings.network
-
 import scala.util.Try
 
 trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcessor {

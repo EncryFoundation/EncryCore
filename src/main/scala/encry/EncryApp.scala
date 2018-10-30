@@ -112,9 +112,9 @@ object EncryApp extends App with Logging {
 
   def forceStopApplication(code: Int = 0): Nothing = {
     system.registerOnTermination {
-      println("Actor system terminated")
+      println("Actor system is terminated.")
     }
-    Await.ready(system.terminate(), 2 minutes)
+    Await.ready(system.terminate(), 1 minute)
     sys.exit(code)
   }
 
