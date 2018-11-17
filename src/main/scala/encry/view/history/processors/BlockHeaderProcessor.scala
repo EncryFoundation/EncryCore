@@ -249,8 +249,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
     val requiredHeights: Seq[Height] =
       difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
         .ensuring(_.last == parentHeight, "Incorrect heights sequence!")
-    val chain: HeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1,
-      parent, (_: Header) => false)
+    val chain: HeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1, parent, (_: Header) => false)
     val requiredHeaders: immutable.IndexedSeq[(Int, Header)] = (requiredHeights.min to requiredHeights.max)
       .zip(chain.headers).filter(p => requiredHeights.contains(p._1))
     assert(requiredHeights.length == requiredHeaders.length,

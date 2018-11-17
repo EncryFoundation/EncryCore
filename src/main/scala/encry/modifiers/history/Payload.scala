@@ -30,7 +30,8 @@ case class Payload(override val headerId: ModifierId, txs: Seq[Transaction])
 
   override def serializer: Serializer[Payload] = PayloadSerializer
 
-  override def toString: String = s"Payload(headerId=${Algos.encode(headerId)}, txsQty=${transactions.size})"
+  override def toString: String = s"Payload(headerId=${Algos.encode(headerId)}," +
+    s" txsQty=${transactions.size}, id = ${Algos.encode(id)})"
 }
 
 object Payload {

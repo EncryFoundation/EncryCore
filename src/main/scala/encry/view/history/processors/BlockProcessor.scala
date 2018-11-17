@@ -102,7 +102,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def nonBestBlock: BlockProcessing = {
     case params =>
       //Orphaned block or full chain is not initialized yet
-      logInfo(s"Appending ${params.fullBlock.encodedId} as a non best block")
+      logInfo(s"Appending ${params.fullBlock.encodedId} as a non best block.")
       logStatus(Seq(), Seq(), params.fullBlock, None)
       historyStorage.bulkInsert(storageVersion(params.newModRow), Seq.empty, Seq(params.newModRow))
       ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
@@ -127,7 +127,8 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
                             updateHeaderInfo: Boolean = false): Unit = {
     val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeaderId)
     val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-      if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)
+      if (updateHeaderInfo)
+        Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)
       else Seq(BestBlockKey -> bestFullHeaderIdWrapped)
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
   }

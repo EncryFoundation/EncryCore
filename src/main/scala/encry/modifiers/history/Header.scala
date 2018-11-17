@@ -60,7 +60,7 @@ case class Header(version: Version,
 
   override def serializer: Serializer[M] = HeaderSerializer
 
-  override def toString: String = s"Header(id=$encodedId, height=$height)"
+  override def toString: String = s"Header(id=$encodedId, height=$height, parent=${Algos.encode(parentId)})"
 }
 
 case class HeaderDBVersion(id: String,

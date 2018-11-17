@@ -131,8 +131,9 @@ trait EncryHistory extends EncryHistoryReader {
       case block: Block =>
         val nonMarkedIds: Seq[ModifierId] = (Seq(block.header.id, block.payload.id) ++ block.adProofsOpt.map(_.id))
           .filter(id => historyStorage.get(validityKey(id)).isEmpty)
-        if (nonMarkedIds.nonEmpty) historyStorage.
-          insert(validityKey(nonMarkedIds.head), nonMarkedIds.map(id => validityKey(id) -> ByteArrayWrapper(Array(1.toByte))))
+        if (nonMarkedIds.nonEmpty) {
+          historyStorage.
+          insert(validityKey(nonMarkedIds.head), nonMarkedIds.map(id => validityKey(id) -> ByteArrayWrapper(Array(1.toByte))))}
         if (bestBlockOpt.contains(block))
           ProgressInfo[EncryPersistentModifier](None, Seq.empty, Seq.empty, Seq.empty) // Applies best header to the history
         else {
@@ -148,7 +149,7 @@ trait EncryHistory extends EncryHistoryReader {
               s"Block to appy should link to current block. Failed for ${chainBack.headOption} and ${block.header}")
           ProgressInfo[EncryPersistentModifier](None, Seq.empty, toApply.toSeq, Seq.empty)
         }
-      case _ =>
+      case mod =>
         historyStorage.insert(validityKey(modifier.id), Seq(validityKey(modifier.id) -> ByteArrayWrapper(Array(1.toByte))))
         ProgressInfo[EncryPersistentModifier](None, Seq.empty, Seq.empty, Seq.empty)
     }

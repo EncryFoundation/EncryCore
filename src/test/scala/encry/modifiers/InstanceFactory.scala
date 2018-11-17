@@ -1,11 +1,13 @@
 package encry.modifiers
 
+import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
 import encry.view.history.EncryHistory
 import encry.view.history.History.Height
@@ -19,7 +21,6 @@ import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.Ast.Expr
 import org.encryfoundation.prismlang.core.{Ast, Types}
 import scorex.utils.Random
-
 import scala.util.{Random => Scarand}
 
 trait InstanceFactory extends Keys with EncryGenerator {
@@ -113,16 +114,18 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
   lazy val UnsignedInput: Input = Input(ADKey @@ Random.randomBytes(), Left(Contract), List.empty)
 
-  def generateNextBlock(history: EncryHistory): Block = {
-    val previousHeaderId = history.bestBlockIdOpt.getOrElse(Header.GenesisParentId)
-    val difficulty = history.bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
+  def generateNextBlock(history: EncryHistory, difficultyDiff: BigInt = 0): Block = {
+    val previousHeaderId: ModifierId = history.bestHeaderOpt.map(_.id).getOrElse(Header.GenesisParentId)
+    val requiredDifficulty: Difficulty = history.bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
       .getOrElse(Constants.Chain.InitialDifficulty)
+    val txs = genValidPaymentTxs(Scarand.nextInt(100)) ++ Seq(coinbaseTransaction)
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.bestHeaderHeight + 1,
-      difficulty = difficulty
+      difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff),
+      transactionsRoot = Payload.rootHash(txs.map(_.id))
     )
-    Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
+    Block(header, Payload(header.id, txs), None)
   }
 
   def generateDummyHistory: EncryHistory = {
