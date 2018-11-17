@@ -22,7 +22,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
 
-trait BlockHeaderProcessor extends Logging {
+trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider
@@ -294,10 +294,10 @@ trait BlockHeaderProcessor extends Logging {
         .validateNot(historyStorage.containsObject(header.id)) {
           fatal("Header is already in history")
         }
-        .validate(realDifficulty(header) >= header.requiredDifficulty) {
-          fatal(s"Block difficulty ${realDifficulty(header)} is less than required " +
-            s"${header.requiredDifficulty}")
-        }
+//        .validate(realDifficulty(header) >= header.requiredDifficulty) {
+//          fatal(s"Block difficulty ${realDifficulty(header)} is less than required " +
+//            s"${header.requiredDifficulty}")
+//        }
         .validate(header.difficulty >= requiredDifficultyAfter(parent)) {
           fatal(s"Incorrect required difficulty in header: " +
             s"${Algos.encode(header.id)} on height ${header.height}")
