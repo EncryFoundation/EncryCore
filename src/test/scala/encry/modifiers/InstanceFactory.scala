@@ -114,8 +114,11 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
   lazy val UnsignedInput: Input = Input(ADKey @@ Random.randomBytes(), Left(Contract), List.empty)
 
-  def generateNextBlock(history: EncryHistory, difficultyDiff: BigInt = 0): Block = {
-    val previousHeaderId: ModifierId = history.bestHeaderOpt.map(_.id).getOrElse(Header.GenesisParentId)
+  def generateNextBlock(history: EncryHistory,
+                        difficultyDiff: BigInt = 0,
+                        prevId: Option[ModifierId] = None): Block = {
+    val previousHeaderId: ModifierId =
+      prevId.getOrElse(history.bestHeaderOpt.map(_.id).getOrElse(Header.GenesisParentId))
     val requiredDifficulty: Difficulty = history.bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
       .getOrElse(Constants.Chain.InitialDifficulty)
     val txs = genValidPaymentTxs(Scarand.nextInt(100)) ++ Seq(coinbaseTransaction)
