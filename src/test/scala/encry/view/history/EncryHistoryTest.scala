@@ -38,14 +38,14 @@ class EncryHistoryTest extends PropSpec with Matchers with InstanceFactory with 
     val (historyWith40Blocks: EncryHistory, fork: Seq[Block]) = (0 until 5).foldLeft(historyWith35Blocks, Seq[Block]()) {
       case ((prevHistory, forkBlocks), _) =>
         val mainBlock: Block = generateNextBlock(prevHistory)
-        val forkBlock: Block = generateNextBlock(prevHistory, 100, prevId = forkBlocks.lastOption.map(_.id))
+        val forkBlock: Block = generateNextBlock(prevHistory, prevId = forkBlocks.lastOption.map(_.id))
         prevHistory.append(mainBlock.header).get._1.append(mainBlock.payload).get._1.reportModifierIsValid(mainBlock) ->
           (forkBlocks :+ forkBlock)
     }
 
     val historyWithFork: EncryHistory = fork.foldLeft(historyWith40Blocks) {
       case (prevHistory, blockToApply) =>
-        prevHistory.append(blockToApply.header).get._1.append(blockToApply.payload).get._1.reportModifierIsValid(blockToApply)
+        prevHistory.append(blockToApply.header).get._1.append(blockToApply.payload).get._1
     }
 
     val historyAfterSimpleFork: EncryHistory = (0 until 5).foldLeft(historyWithFork) {
@@ -81,30 +81,20 @@ class EncryHistoryTest extends PropSpec with Matchers with InstanceFactory with 
     val (historyWith40Blocks: EncryHistory, fork: Seq[Block]) = (0 until 5).foldLeft(historyWith35Blocks, Seq[Block]()) {
       case ((prevHistory, forkBlocks), _) =>
         val mainBlock: Block = generateNextBlock(prevHistory)
-        val forkBlock: Block = generateNextBlock(prevHistory, 100, prevId = forkBlocks.lastOption.map(_.id))
+        val forkBlock: Block = generateNextBlock(prevHistory, 1000000, prevId = forkBlocks.lastOption.map(_.id))
         prevHistory.append(mainBlock.header).get._1.append(mainBlock.payload).get._1.reportModifierIsValid(mainBlock) ->
           (forkBlocks :+ forkBlock)
     }
 
     val maxHistoryHeightWithoutForks: Int = historyWith40Blocks.bestBlockHeight
 
-    val historyWithFork: EncryHistory = fork.take(3).foldLeft(historyWith40Blocks) {
+    val historyWithFork: EncryHistory = fork.take(1).foldLeft(historyWith40Blocks) {
       case (prevHistory, blockToApply) =>
-        prevHistory.append(blockToApply.header).get._1.append(blockToApply.payload).get._1.reportModifierIsValid(blockToApply)
+        prevHistory.append(blockToApply.header).get._1.append(blockToApply.payload).get._1
     }
+
+    historyWithFork.headerIdsAtHeight(35).length shouldEqual 2 //two headers at height
 
     maxHistoryHeightWithoutForks shouldEqual historyWithFork.bestBlockHeight
-
-    val historyAfterSimpleFork: EncryHistory = (0 until 5).foldLeft(historyWithFork) {
-      case (prevHistory, _) =>
-        val block: Block = generateNextBlock(prevHistory)
-        prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
-    }
-
-//    historyAfterSimpleFork.headerIdsAtHeight(34).length shouldEqual 1
-//    historyAfterSimpleFork.headerIdsAtHeight(35).length shouldEqual 2 //two headers at height
-//    historyAfterSimpleFork.headerIdsAtHeight(36).length shouldEqual 2
-//    historyAfterSimpleFork.headerIdsAtHeight(37).length shouldEqual 2
-//    historyAfterSimpleFork.headerIdsAtHeight(38).length shouldEqual 1
   }
 }

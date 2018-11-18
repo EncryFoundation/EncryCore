@@ -64,14 +64,15 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
         //application of this block leads to full chain with higher score
-        logInfo(s"Appending ${fullBlock.encodedId} as a better chain")
+        logInfo(s"Appending ${fullBlock.encodedId}|${fullBlock.header.height} as a better chain")
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
         val updateBestHeader: Boolean =
-          (fullBlock.header.height > bestHeaderHeight) ||
+          (fullBlock.header.height > bestHeaderHeight) || (
+            (fullBlock.header.height == bestHeaderHeight) &&
             scoreOf(fullBlock.id)
               .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
-              .getOrElse(false)
+              .getOrElse(false))
         updateStorage(newModRow, newBestHeader.id, updateBestHeader)
 
         if (settings.postgres.exists(_.enableSave))
@@ -93,16 +94,17 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
   private def isBetterChain(id: ModifierId): Boolean = {
     val isBetter: Option[Boolean] = for {
       bestFullBlockId <- bestBlockIdOpt
+      heightOfThisHeader <- typedModifierById[Header](id).map(_.height)
       prevBestScore <- scoreOf(bestFullBlockId)
       score <- scoreOf(id)
-    } yield score > prevBestScore
+   } yield (bestBlockHeight < heightOfThisHeader) || (bestBlockHeight == heightOfThisHeader && score > prevBestScore)
     isBetter getOrElse false
   }
 
   private def nonBestBlock: BlockProcessing = {
     case params =>
       //Orphaned block or full chain is not initialized yet
-      logInfo(s"Appending ${params.fullBlock.encodedId} as a non best block.")
+      logInfo(s"Appending ${params.fullBlock.encodedId}. Height: ${params.fullBlock.header.height} as a non best block.")
       logStatus(Seq(), Seq(), params.fullBlock, None)
       historyStorage.bulkInsert(storageVersion(params.newModRow), Seq.empty, Seq(params.newModRow))
       ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
