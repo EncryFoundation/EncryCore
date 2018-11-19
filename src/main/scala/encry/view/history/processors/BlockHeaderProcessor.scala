@@ -137,7 +137,8 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
     scoreOf(header.parentId).map { parentScore =>
       val score: BigInt @@ ConsensusTaggedTypes.Difficulty.Tag = Difficulty @@ (parentScore + header.difficulty)
       val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-        if (header.height > bestHeaderHeight || score > bestHeadersChainScore)
+        if ((header.height > bestHeaderHeight) ||
+          (header.height == bestHeaderHeight && score > bestHeadersChainScore))
           Seq(BestHeaderKey -> ByteArrayWrapper(header.id)) else Seq.empty
       val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) =
         headerScoreKey(header.id) -> ByteArrayWrapper(score.toByteArray)

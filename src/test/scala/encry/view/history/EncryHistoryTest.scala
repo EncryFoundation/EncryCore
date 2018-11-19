@@ -3,6 +3,7 @@ package encry.view.history
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.{Block, Header}
 import encry.settings.Constants
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.EncryGenerator
 import org.scalatest.{Matchers, PropSpec}
 
@@ -86,7 +87,10 @@ class EncryHistoryTest extends PropSpec with Matchers with InstanceFactory with 
           (forkBlocks :+ forkBlock)
     }
 
-    val maxHistoryHeightWithoutForks: Int = historyWith40Blocks.bestBlockHeight
+    val blocksHeightWithoutForks: Int = historyWith40Blocks.bestBlockHeight
+    val headersHeightWithoutForks: Int = historyWith40Blocks.bestHeaderHeight
+    val bestHeaderIdWithoutForks: ModifierId = historyWith40Blocks.bestHeaderOpt.get.id
+    val bestBlockIdWithoutForks: ModifierId = historyWith40Blocks.bestBlockIdOpt.get
 
     val historyWithFork: EncryHistory = fork.take(1).foldLeft(historyWith40Blocks) {
       case (prevHistory, blockToApply) =>
@@ -94,7 +98,10 @@ class EncryHistoryTest extends PropSpec with Matchers with InstanceFactory with 
     }
 
     historyWithFork.headerIdsAtHeight(35).length shouldEqual 2 //two headers at height
-
-    maxHistoryHeightWithoutForks shouldEqual historyWithFork.bestBlockHeight
+    blocksHeightWithoutForks shouldEqual historyWithFork.bestBlockHeight
+    headersHeightWithoutForks shouldEqual historyWithFork.bestHeaderHeight
+    historyWithFork.bestBlockHeight shouldEqual historyWithFork.bestHeaderHeight
+    bestHeaderIdWithoutForks shouldEqual historyWithFork.bestHeaderOpt.get.id
+    bestBlockIdWithoutForks shouldEqual historyWithFork.bestBlockIdOpt.get
   }
 }
