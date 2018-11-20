@@ -135,7 +135,8 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
       headerScoreKey(header.id) -> ByteArrayWrapper(header.difficulty.toByteArray)), header)
   } else {
     scoreOf(header.parentId).map { parentScore =>
-      val score: BigInt @@ ConsensusTaggedTypes.Difficulty.Tag = Difficulty @@ (parentScore + header.difficulty)
+      val score: BigInt @@ ConsensusTaggedTypes.Difficulty.Tag =
+        Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
       val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
         if ((header.height > bestHeaderHeight) ||
           (header.height == bestHeaderHeight && score > bestHeadersChainScore))
@@ -295,10 +296,10 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
         .validateNot(historyStorage.containsObject(header.id)) {
           fatal("Header is already in history")
         }
-//        .validate(realDifficulty(header) >= header.requiredDifficulty) {
-//          fatal(s"Block difficulty ${realDifficulty(header)} is less than required " +
-//            s"${header.requiredDifficulty}")
-//        }
+        .validate(realDifficulty(header) >= header.requiredDifficulty) {
+          fatal(s"Block difficulty ${realDifficulty(header)} is less than required " +
+            s"${header.requiredDifficulty}")
+        }
         .validate(header.difficulty >= requiredDifficultyAfter(parent)) {
           fatal(s"Incorrect required difficulty in header: " +
             s"${Algos.encode(header.id)} on height ${header.height}")
