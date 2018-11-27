@@ -39,7 +39,7 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
 
   def getUtxosR: Route = (path("utxos") & get) {
     getWallet
-      .map { wallet => scala.util.Random.shuffle(wallet.walletStorage.allBoxes).take(300).asJson }
+      .map { wallet => wallet.walletStorage.allBoxes.take(300).asJson }
       .okJson()
   }
 }
