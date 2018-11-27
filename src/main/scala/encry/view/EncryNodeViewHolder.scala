@@ -129,6 +129,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         case resultFuture: Future[_] => resultFuture.pipeTo(sender())
         case _ => sender() ! result
       }
+    case GetBoxesFromWallet => sender() ! nodeView.wallet.walletStorage.allBoxes
     case GetNodeViewChanges(history, state, vault, mempool) =>
       if (history) sender() ! ChangedHistory(nodeView.history)
       if (state) sender() ! ChangedState(nodeView.state)
@@ -419,6 +420,8 @@ object EncryNodeViewHolder {
 
     case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentNodeViewModifier]
     (pmod: EncryPersistentModifier)
+
+    case object GetBoxesFromWallet
 
   }
 

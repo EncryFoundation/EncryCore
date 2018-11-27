@@ -4,8 +4,9 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
+import encry.modifiers.state.box.EncryBaseBox
 import encry.settings.RESTApiSettings
-import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetBoxesFromWallet, GetDataFromCurrentView}
 import encry.view.history.EncryHistory
 import encry.view.mempool.Mempool
 import encry.view.state.UtxoState
@@ -26,6 +27,8 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
     GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Mempool, EncryWallet](_.vault))
     .mapTo[EncryWallet]
 
+  private def getBoxes: Future[Seq[EncryBaseBox]] = (nodeViewActorRef ? GetBoxesFromWallet).mapTo[Seq[EncryBaseBox]]
+
   def infoR: Route = (path("info") & get) {
     getWallet
       .map { w =>
@@ -38,8 +41,8 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
   }
 
   def getUtxosR: Route = (path("utxos") & get) {
-    getWallet
-      .map { wallet => wallet.walletStorage.allBoxes.take(300).asJson }
+    getBoxes
+      .map { _.take(300).asJson}
       .okJson()
   }
 }
