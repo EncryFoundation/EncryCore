@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.modifiers.state.box.EncryBaseBox
+import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.RESTApiSettings
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetBoxesFromWallet, GetDataFromCurrentView}
 import encry.view.history.EncryHistory
@@ -13,6 +13,7 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
+
 import scala.concurrent.Future
 
 case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
@@ -27,7 +28,7 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
     GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Mempool, EncryWallet](_.vault))
     .mapTo[EncryWallet]
 
-  private def getBoxes: Future[Seq[EncryBaseBox]] = (nodeViewActorRef ? GetBoxesFromWallet).mapTo[Seq[EncryBaseBox]]
+  private def getBoxes: Future[Seq[EncryBaseBox]] = (nodeViewActorRef ? GetBoxesFromWallet).mapTo[Seq[AssetBox]]
 
   def infoR: Route = (path("info") & get) {
     getWallet
