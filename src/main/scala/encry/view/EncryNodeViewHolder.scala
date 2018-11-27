@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, Props}
 import akka.pattern._
 import akka.persistence.RecoveryCompleted
@@ -31,11 +32,12 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Random, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging {
 
@@ -131,7 +133,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       }
     case GetBoxesFromWallet =>
       logInfo("Sent boxes to api")
-      sender() ! nodeView.wallet.walletStorage.allBoxes.take(300)
+      sender() ! Random.shuffle(nodeView.wallet.walletStorage.allBoxes).take(100)
     case GetNodeViewChanges(history, state, vault, mempool) =>
       if (history) sender() ! ChangedHistory(nodeView.history)
       if (state) sender() ! ChangedState(nodeView.state)

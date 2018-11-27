@@ -6,6 +6,7 @@ import akka.pattern._
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import encry.settings.RESTApiSettings
+import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetBoxesFromWallet, GetDataFromCurrentView}
 import encry.view.history.EncryHistory
 import encry.view.mempool.Mempool
@@ -18,7 +19,7 @@ import scala.concurrent.Future
 
 case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
                               restApiSettings: RESTApiSettings)(implicit val context: ActorRefFactory)
-  extends EncryBaseApiRoute with FailFastCirceSupport {
+  extends EncryBaseApiRoute with FailFastCirceSupport with Logging {
 
   override val route: Route = pathPrefix("wallet") { infoR ~ getUtxosR }
 
@@ -43,7 +44,9 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
 
   def getUtxosR: Route = (path("utxos") & get) {
     getBoxes
-      .map { _.take(300).asJson}
+      .map { boxes =>
+        logInfo(s"Get ${boxes.length} boxes")
+        boxes.asJson}
       .okJson()
   }
 }
