@@ -103,6 +103,6 @@ object EncryWallet {
     keysDir.mkdirs()
     val walletStore: LSMStore = new LSMStore(walletDir, keepVersions = 0)
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 33)
-    EncryWallet(walletStore, AccountManager(accountManagerStore))
+    EncryWallet(walletStore, AccountManager(accountManagerStore, settings))
   }
 }

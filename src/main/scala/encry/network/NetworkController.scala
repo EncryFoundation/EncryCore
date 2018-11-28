@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
+
 import akka.actor._
 import akka.io.Tcp.SO.KeepAlive
 import akka.io.Tcp._
@@ -13,17 +14,17 @@ import encry.network.message.Message.MessageCode
 import PeerManager._
 import encry.network.message.{Message, MessageHandler}
 import PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
-import encry.settings.NetworkSettings
+import encry.settings.{EncryAppSettings, NetworkSettings}
 import encry.view.history.EncrySyncInfoMessageSpec
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
 import scala.util.{Failure, Success, Try}
 
-class NetworkController extends Actor {
+class NetworkController(settings: EncryAppSettings, peerManager: ActorRef, statSenderOpt: Option[ActorRef] = None) extends Actor {
 
   val networkSettings: NetworkSettings = settings.network
-  context.actorOf(Props[PeerSynchronizer].withDispatcher("network-dispatcher"), "peerSynchronizer")
+  context.actorOf(Props(classOf[PeerSynchronizer], settings, context.self, peerManager).withDispatcher("network-dispatcher"), "peerSynchronizer")
   val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
   var messageHandlers: Map[Seq[MessageCode], ActorRef] = Map.empty
   var outgoing: Set[InetSocketAddress] = Set.empty
@@ -73,7 +74,7 @@ class NetworkController extends Actor {
 
   def peerLogic: Receive = {
     case ConnectTo(remote)
-      if checkPossibilityToAddPeer(remote) =>
+      if checkPossibilityToAddPeer(remote, settings) =>
       logInfo(s"Connecting to: $remote")
       outgoing += remote
       IO(Tcp) ! Connect(remote,
@@ -82,14 +83,14 @@ class NetworkController extends Actor {
         timeout = Some(networkSettings.connectionTimeout),
         pullMode = true)
     case Connected(remote, local)
-      if checkPossibilityToAddPeer(remote) =>
+      if checkPossibilityToAddPeer(remote, settings) =>
       val direction: ConnectionType = if (outgoing.contains(remote)) Outgoing else Incoming
       val logMsg: String = direction match {
         case Incoming => s"New incoming connection from $remote established (bound to local $local)"
         case Outgoing => s"New outgoing connection to $remote established (bound to local $local)"
       }
       logInfo(logMsg)
-      context.actorOf(PeerConnectionHandler.props(messagesHandler, sender(), direction, externalSocketAddress, remote)
+      context.actorOf(PeerConnectionHandler.props(messagesHandler, sender(), direction, externalSocketAddress, remote, settings, context.self, peerManager)
         .withDispatcher("network-dispatcher"))
       outgoing -= remote
     case CommandFailed(c: Connect) =>
@@ -102,7 +103,7 @@ class NetworkController extends Actor {
     case RegisterMessagesHandler(specs, handler) =>
       logInfo( s"Registering handlers for ${specs.map(s => s.messageCode -> s.messageName)}")
       messageHandlers += specs.map(_.messageCode) -> handler
-    case CommandFailed(cmd: Tcp.Command) => context.actorSelection("/user/statsSender") ! "Failed to execute command : " + cmd
+    case CommandFailed(cmd: Tcp.Command) => statSenderOpt.foreach(_ ! "Failed to execute command : " + cmd)
     case nonsense: Any => logWarn(s"NetworkController: got something strange $nonsense")
   }
 }

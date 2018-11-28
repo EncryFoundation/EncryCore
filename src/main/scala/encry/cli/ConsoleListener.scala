@@ -1,12 +1,12 @@
 package encry.cli
 
 import akka.actor.Actor
-import encry.EncryApp.settings
 import encry.cli.commands._
+import encry.settings.EncryAppSettings
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class ConsoleListener extends Actor {
+class ConsoleListener(settings: EncryAppSettings) extends Actor {
 
   import ConsoleListener._
 

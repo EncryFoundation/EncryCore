@@ -1,6 +1,8 @@
 package encry.view.history
 
 import java.io.File
+
+import akka.actor.ActorRef
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
@@ -12,6 +14,7 @@ import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStatePro
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.encryfoundation.common.Algos
+
 import scala.util.Try
 
 /** History implementation. It is processing persistent modifiers generated locally or received from the network.
@@ -170,32 +173,35 @@ object EncryHistory {
     dir
   }
 
-  def readOrGenerate(settings: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistory = {
+  def readOrGenerate(appSettings: EncryAppSettings, ntp: NetworkTimeProvider, blockListener: Option[ActorRef]): EncryHistory = {
 
-    val historyIndexDir: File = getHistoryIndexDir(settings)
-    val historyObjectsDir: File = getHistoryObjectsDir(settings)
+    val historyIndexDir: File = getHistoryIndexDir(appSettings)
+    val historyObjectsDir: File = getHistoryObjectsDir(appSettings)
     val indexStore: LSMStore = new LSMStore(historyIndexDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(historyObjectsDir, keepVersions = 0)
     val storage: HistoryStorage = new HistoryStorage(indexStore, objectsStore)
 
-    val history: EncryHistory = (settings.node.stateMode.isDigest, settings.node.verifyTransactions) match {
+    val history: EncryHistory = (appSettings.node.stateMode.isDigest, appSettings.node.verifyTransactions) match {
       case (true, true) =>
         new EncryHistory with ADStateProofProcessor with BlockPayloadProcessor {
-          override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
+          override val blockListenerOpt: Option[ActorRef] = blockListener
+          override val settings: EncryAppSettings = appSettings
         }
       case (false, true) =>
         new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
-          override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
+          override val blockListenerOpt: Option[ActorRef] = blockListener
+          override val settings: EncryAppSettings = appSettings
         }
       case (true, false) =>
         new EncryHistory with ADStateProofProcessor with EmptyBlockPayloadProcessor {
-          override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
+          override val blockListenerOpt: Option[ActorRef] = blockListener
+          override val settings: EncryAppSettings = appSettings
         }
       case m => throw new Error(s"Unsupported settings ADState=:${m._1}, verifyTransactions=:${m._2}, ")
     }

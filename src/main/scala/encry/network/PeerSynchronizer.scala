@@ -1,7 +1,7 @@
 package encry.network
 
 import java.net.InetSocketAddress
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef}
 import akka.pattern.ask
 import akka.util.Timeout
 import encry.EncryApp._
@@ -9,11 +9,12 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, Registe
 import encry.network.message.{GetPeersSpec, Message, PeersSpec}
 import PeerManager._
 import PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
+import encry.settings.EncryAppSettings
 import encry.utils.Logging
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class PeerSynchronizer extends Actor with Logging {
+class PeerSynchronizer(settings: EncryAppSettings, networkController: ActorRef, peerManager: ActorRef) extends Actor with Logging {
 
   implicit val timeout: Timeout = Timeout(settings.network.syncTimeout.getOrElse(5 seconds))
 
@@ -28,7 +29,7 @@ class PeerSynchronizer extends Actor with Logging {
   override def receive: Receive = {
     case DataFromPeer(spec, peers: Seq[InetSocketAddress]@unchecked, remote)
       if spec.messageCode == PeersSpec.messageCode =>
-      peers.filter(checkPossibilityToAddPeer).foreach(isa =>
+      peers.filter(peer => checkPossibilityToAddPeer(peer, settings)).foreach(isa =>
         peerManager ! AddOrUpdatePeer(isa, None, Some(remote.direction)))
       logDebug(s"Got new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
     case DataFromPeer(spec, _, remote) if spec.messageCode == GetPeersSpec.messageCode =>

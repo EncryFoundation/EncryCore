@@ -7,18 +7,18 @@ import doobie.hikari.HikariTransactor
 import QueryRepository._
 import com.zaxxer.hikari.HikariDataSource
 import doobie.hikari.implicits._
-import encry.EncryApp.settings
 import encry.modifiers.history.{Block, Header}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.history.HeaderDBVersion
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, TransactionDBVersion}
+import encry.settings.EncryAppSettings
 import encry.utils.Logging
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.control.NonFatal
 
-class DBService extends Logging {
+class DBService(settings: EncryAppSettings) extends Logging {
 
   def processBlock(block: Block): Future[Int] = runAsync(processBlockQuery(block), "processBlock")
     .map { count =>
@@ -71,8 +71,4 @@ class DBService extends Logging {
           logWarn(s"Failed to perform $queryName query with exception ${th.getLocalizedMessage}")
           Future.failed(th)
       }
-}
-
-object DBService {
-  def apply(): DBService = new DBService
 }

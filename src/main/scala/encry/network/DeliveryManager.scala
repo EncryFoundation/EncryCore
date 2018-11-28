@@ -1,8 +1,7 @@
 package encry.network
 
-import akka.actor.{Actor, Cancellable}
+import akka.actor.{Actor, ActorRef, Cancellable}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.EncryApp.{networkController, nodeViewHolder, settings}
 import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.mempool.Transaction
@@ -12,6 +11,7 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToN
 import encry.network.PeerConnectionHandler._
 import encry.network.message.BasicMsgDataTypes.ModifiersData
 import encry.network.message.{InvSpec, Message, ModifiersSpec, RequestModifierSpec}
+import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
@@ -22,7 +22,7 @@ import org.encryfoundation.common.Algos
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class DeliveryManager extends Actor with Logging {
+class DeliveryManager(settings: EncryAppSettings, nodeViewHolder: ActorRef, networkController: ActorRef, statSenderOpt: Option[ActorRef] = None) extends Actor with Logging {
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
@@ -89,8 +89,7 @@ class DeliveryManager extends Actor with Logging {
       val modifiers: Map[ModifierId, Array[Byte]] = data._2
       val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
         modifiers partition { case (id, _) => isSpam(id) }
-      if (settings.influxDB.isDefined)
-        context.actorSelection("/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
+      statSenderOpt.foreach(_ ! GetModifiers(typeId, modifiers.keys.toSeq))
       for ((id, _) <- modifiers) receive(typeId, id, remote)
       if (spam.nonEmpty) {
         logInfo(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
@@ -189,8 +188,7 @@ class DeliveryManager extends Actor with Logging {
   }
 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
-    if (settings.influxDB.isDefined)
-      context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
+    statSenderOpt.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
     statusTracker.statuses.keys.foreach(expect(_, modifierTypeId, modifierIds))
   }
 

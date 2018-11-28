@@ -1,8 +1,8 @@
 package encry.view.wallet
 
 import encry.EncryApp
-import encry.EncryApp.settings
 import encry.crypto.encryption.AES
+import encry.settings.EncryAppSettings
 import encry.utils.{Logging, Mnemonic}
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.Algos
@@ -11,7 +11,7 @@ import scorex.crypto.hash.Blake2b256
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scala.util.Try
 
-case class AccountManager(store: Store) extends Logging {
+case class AccountManager(store: Store, settings: EncryAppSettings) extends Logging {
 
   import encry.storage.EncryStorage._
 

@@ -46,7 +46,7 @@ class BlockListenerSpec extends TestKit(ActorSystem("BlockListenerSpec")) with I
     val readersHolderMock: ActorRef = system.actorOf(Props.empty)
     val nvhMock: ActorRef = system.actorOf(Props.empty)
     when(dbServiceMock.selectHeightOpt).thenReturn(Future.successful(None))
-    val actor: ActorRef = system.actorOf(Props(new BlockListener(dbServiceMock, readersHolderMock, nvhMock)))
+    val actor: ActorRef = system.actorOf(Props(new BlockListener(dbServiceMock, ???,  readersHolderMock, nvhMock)))
     val sampleHeader: Header = genHeader
     val sampleTxs: Seq[Transaction] = genValidPaymentTxs(100)
     val samplePayload: Payload = Payload(sampleHeader.id, sampleTxs)

@@ -33,9 +33,9 @@ object EncryApp extends App with Logging {
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
 
-  lazy val settings: EncryAppSettings = EncryAppSettings.read
+  val settings: EncryAppSettings = EncryAppSettings.read
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
-  lazy val dbService: DBService = DBService()
+  lazy val dbService: DBService = new DBService(settings)
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
   val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName
     .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)).take(5)
@@ -51,35 +51,50 @@ object EncryApp extends App with Logging {
     )
   }
 
-  lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props()
-    .withDispatcher("nvh-dispatcher").withMailbox("nvh-mailbox"), "nodeViewHolder")
-  val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
-  lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
-    .withDispatcher("network-dispatcher"), "networkController")
-  lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
-  lazy val nodeViewSynchronizer: ActorRef =
-    system.actorOf(Props(classOf[NodeViewSynchronizer]), "nodeViewSynchronizer")
-  lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
-  if (settings.influxDB.isDefined) system.actorOf(Props[StatsSender], "statsSender")
-  if (settings.kafka.exists(_.sendToKafka))
-    system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
-  if (settings.postgres.exists(_.enableSave) || settings.postgres.exists(_.enableRestore) ) {
+  val statsSenderOpt: Option[ActorRef] =
+    if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender], "statsSender"))
+    else None
+  val postgresRestoreOpt: Option[ActorRef] =
+    if (settings.postgres.exists(_.enableRestore))
+      Some(system.actorOf(Props(classOf[PostgresRestore], dbService, nodeViewHolder, settings, peerManager), "postgresRestore"))
+    else None
+  postgresRestoreOpt.foreach(_ ! StartRecovery)
+  val modifiersHolderOpt: Option[ActorRef] =
+    if (settings.levelDb.exists(_.enableSave) || settings.levelDb.exists(_.enableRestore))
+      Some(system.actorOf(Props(classOf[ModifiersHolder], settings, nodeViewHolder, postgresRestoreOpt), "modifiersHolder"))
+    else None
+  val readersHolder: ActorRef = system.actorOf(Props(classOf[ReadersHolder], nodeViewHolder), "readersHolder")
+  val blockListenerOpt: Option[ActorRef] =
     if (settings.postgres.exists(_.enableSave))
-      system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")
-    if (settings.postgres.exists(_.enableRestore)) {
-      system.actorOf(Props(classOf[PostgresRestore], dbService, nodeViewHolder), "postgresRestore")
-      if (!settings.levelDb.exists(_.enableRestore)) system.actorSelection("/user/postgresRestore") ! StartRecovery
-    }
-  }
-  if (settings.levelDb.exists(_.enableSave) || settings.levelDb.exists(_.enableRestore))
-    system.actorOf(Props[ModifiersHolder], "modifiersHolder")
+      Some(system.actorOf(Props(classOf[BlockListener], dbService, settings, readersHolder, nodeViewHolder), "blockListener"))
+    else None
+  val nodeViewSynchronizer: ActorRef =
+    system.actorOf(Props(classOf[NodeViewSynchronizer], settings, networkController, statsSenderOpt), "nodeViewSynchronizer")
+  lazy val peerManager: ActorRef = system.actorOf(Props(classOf[PeerManager], settings, nodeViewSynchronizer), "peerManager")
+  lazy val nodeViewHolder: ActorRef =
+    system.actorOf(EncryNodeViewHolder.props(
+      settings,
+      peerManager,
+      nodeViewSynchronizer,
+      modifiersHolderOpt = modifiersHolderOpt,
+      statSenderOpt = statsSenderOpt,
+      blockListenerOpt = blockListenerOpt)
+    .withDispatcher("nvh-dispatcher").withMailbox("nvh-mailbox"), "nodeViewHolder")
+  lazy val networkController: ActorRef = system.actorOf(Props(classOf[NetworkController], settings, peerManager, statsSenderOpt)
+    .withDispatcher("network-dispatcher"), "networkController")
+  lazy val miner: ActorRef = system.actorOf(Props(classOf[Miner], settings, nodeViewHolder, statsSenderOpt), "miner")
+  val kafkaSenderOpt: Option[ActorRef] =
+    if (settings.kafka.exists(_.sendToKafka))
+      Some(system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor"))
+    else None
+
   if (settings.node.mining) miner ! StartMining
   if (settings.node.useCli) {
-    system.actorOf(Props[ConsoleListener], "cliListener")
+    system.actorOf(Props(classOf[ConsoleListener], settings), "cliListener")
     system.actorSelection("/user/cliListener") ! StartListening
   }
   if (settings.node.loggingMode != "off") {
-    system.actorOf(Props[LoggingActor], "loggingActor")
+    system.actorOf(Props(classOf[LoggingActor], statsSenderOpt, kafkaSenderOpt), "loggingActor")
     system.actorOf(Props[Zombie], "zombie")
   }
 

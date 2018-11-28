@@ -1,11 +1,12 @@
 package encry.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.{Actor, ActorRef, Props}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
-import encry.EncryApp._
 import encry.consensus.History._
 import encry.consensus.SyncInfo
+import encry.EncryApp.nodeViewHolder
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.history.{ADProofs, Header, Payload}
 import encry.modifiers.mempool.Transaction
@@ -16,6 +17,7 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, Registe
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.message._
+import encry.settings.EncryAppSettings
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.history.{EncryHistory, EncryHistoryReader, EncrySyncInfo, EncrySyncInfoMessageSpec}
@@ -26,14 +28,17 @@ import encry.utils.Utils._
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.Proposition
 
-class NodeViewSynchronizer extends Actor with Logging {
+class NodeViewSynchronizer(settings: EncryAppSettings,
+                           networkController: ActorRef,
+                           statSenderOpt: Option[ActorRef])
+  extends Actor with Logging {
 
   var historyReaderOpt: Option[EncryHistory] = None
   var mempoolReaderOpt: Option[Mempool] = None
   val invSpec: InvSpec = new InvSpec(settings.network.maxInvObjects)
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
   val deliveryManager: ActorRef =
-    context.actorOf(Props(classOf[DeliveryManager]), "deliveryManager")
+    context.actorOf(Props(classOf[DeliveryManager], settings, nodeViewHolder, networkController, statSenderOpt), "deliveryManager")
 
   override def preStart(): Unit = {
     val messageSpecs: Seq[MessageSpec[_]] = Seq(invSpec, requestModifierSpec, ModifiersSpec, EncrySyncInfoMessageSpec)

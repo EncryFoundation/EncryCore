@@ -1,7 +1,8 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
-import akka.actor.Actor
+
+import akka.actor.{Actor, ActorRef}
 import akka.persistence.RecoveryCompleted
 import encry.EncryApp._
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
@@ -10,12 +11,13 @@ import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, 
 import encry.network.PeerConnectionHandler._
 import encry.network.PeerManager.ReceivableMessages._
 import encry.network.PeerManager._
+import encry.settings.EncryAppSettings
 import encry.utils.Logging
 import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.util.Random
 
-class PeerManager extends Actor with Logging {
+class PeerManager(settings: EncryAppSettings, nodeViewSynchronizer: ActorRef) extends Actor with Logging {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
   var connectingPeers: Set[InetSocketAddress] = Set.empty
@@ -30,7 +32,7 @@ class PeerManager extends Actor with Logging {
     case GetRecoveryStatus => sender() ! recoveryCompleted
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
       if (!isSelf(address, None) &&
-        checkPossibilityToAddPeer(address) &&
+        checkPossibilityToAddPeer(address, settings) &&
         checkDuplicateIP(address)) timeProvider
         .time()
         .map { time => addOrUpdateKnownPeer(address, PeerInfo(time, peerNameOpt, connTypeOpt))
@@ -95,7 +97,7 @@ class PeerManager extends Actor with Logging {
     !connectedPeers.map(_._1.getAddress).toSet.contains(address.getAddress)
 
   def checkPossibilityToAddPeerWRecovery(address: InetSocketAddress): Boolean =
-    checkPossibilityToAddPeer(address) && recoveryCompleted
+    checkPossibilityToAddPeer(address, settings) && recoveryCompleted
 
   def addOrUpdateKnownPeer(address: InetSocketAddress, peerInfo: PeerInfo): Unit = {
     val updatedPeerInfo: PeerInfo = nodes.get(address).fold(peerInfo) { dbPeerInfo =>
@@ -135,7 +137,7 @@ object PeerManager {
 
   }
 
-  def checkPossibilityToAddPeer(address: InetSocketAddress): Boolean =
+  def checkPossibilityToAddPeer(address: InetSocketAddress, settings: EncryAppSettings): Boolean =
     (settings.network.connectOnlyWithKnownPeers.getOrElse(false) && settings.network.knownPeers.contains(address)) ||
       !settings.network.connectOnlyWithKnownPeers.getOrElse(false)
 }

@@ -1,5 +1,6 @@
 package encry.view.history.processors
 
+import akka.actor.ActorRef
 import encry.EncryApp.{settings, system}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History.ProgressInfo
@@ -11,6 +12,7 @@ import encry.utils.Logging
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
+
 import scala.util.{Failure, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with Logging {
@@ -75,7 +77,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
         updateStorage(newModRow, newBestHeader.id, updateBestHeader)
 
         if (settings.postgres.exists(_.enableSave))
-          system.actorSelection("/user/blockListener") ! NewBestBlock(fullBlock.header.height)
+          blockListenerOpt.foreach(_ ! NewBestBlock(fullBlock.header.height))
 
         if (blocksToKeep >= 0) {
           val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)

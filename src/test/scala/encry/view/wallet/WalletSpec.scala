@@ -21,7 +21,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val accountManagerStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0, keySize = 33)
 
-    val accountManager: AccountManager = AccountManager(accountManagerStore)
+    val accountManager: AccountManager = AccountManager(accountManagerStore, settings)
 
     val wallet: EncryWallet = EncryWallet(walletStore, accountManager)
 
@@ -68,7 +68,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val accountManagerStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0, keySize = 33)
 
-    val keyManager: AccountManager = AccountManager(accountManagerStore)
+    val keyManager: AccountManager = AccountManager(accountManagerStore, settings)
 
     val wallet: EncryWallet = EncryWallet(walletStore, keyManager)
 

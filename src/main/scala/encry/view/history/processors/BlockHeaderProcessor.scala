@@ -1,5 +1,6 @@
 package encry.view.history.processors
 
+import akka.actor.ActorRef
 import com.google.common.primitives.Ints
 import encry.EncryApp.{forceStopApplication, settings, system}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
@@ -9,7 +10,7 @@ import encry.local.explorer.BlockListener.NewOrphaned
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history._
 import encry.settings.Constants._
-import encry.settings.{Constants, NodeSettings}
+import encry.settings.{Constants, EncryAppSettings, NodeSettings}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.validation.{ModifierValidator, ValidationResult}
@@ -18,13 +19,16 @@ import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import supertagged.@@
+
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
 
 trait BlockHeaderProcessor extends Logging {
 
-  protected val nodeSettings: NodeSettings
+  val settings: EncryAppSettings
+  val blockListenerOpt: Option[ActorRef]
+  protected  lazy val nodeSettings: NodeSettings = settings.node
   protected val timeProvider: NetworkTimeProvider
   private val difficultyController: PowLinearController.type = PowLinearController
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
@@ -146,7 +150,7 @@ trait BlockHeaderProcessor extends Logging {
       val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
         if (header.height > bestHeaderHeight || score > bestHeadersChainScore) bestBlockHeaderIdsRow(header, score)
         else {
-          if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(header)
+          if (settings.postgres.exists(_.enableSave)) blockListenerOpt.foreach(_ ! NewOrphaned(header))
           orphanedBlockHeaderIdsRow(header, score)
         }
       (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)

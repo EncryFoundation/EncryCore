@@ -7,11 +7,11 @@ import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
-import encry.EncryApp.settings
 import encry.EncryApp._
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle, _}
 import encry.network.message.MessageHandler
 import PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
+import encry.settings.EncryAppSettings
 import encry.utils.Logging
 import scala.annotation.tailrec
 import scala.concurrent.duration._
@@ -21,7 +21,10 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
                             connection: ActorRef,
                             direction: ConnectionType,
                             ownSocketAddress: Option[InetSocketAddress],
-                            remote: InetSocketAddress) extends Actor with Logging {
+                            remote: InetSocketAddress,
+                            settings: EncryAppSettings,
+                            networkController: ActorRef,
+                            peerManager: ActorRef) extends Actor with Logging {
 
   import PeerConnectionHandler.ReceivableMessages._
 
@@ -234,7 +237,13 @@ object PeerConnectionHandler {
 
   }
 
-  def props(messagesHandler: MessageHandler, connection: ActorRef, direction: ConnectionType,
-            ownSocketAddress: Option[InetSocketAddress], remote: InetSocketAddress): Props =
-    Props(new PeerConnectionHandler(messagesHandler, connection, direction, ownSocketAddress, remote))
+  def props(messagesHandler: MessageHandler,
+            connection: ActorRef,
+            direction: ConnectionType,
+            ownSocketAddress: Option[InetSocketAddress],
+            remote: InetSocketAddress,
+            settings: EncryAppSettings,
+            networkController: ActorRef,
+            peerManager: ActorRef): Props =
+    Props(new PeerConnectionHandler(messagesHandler, connection, direction, ownSocketAddress, remote, settings, networkController, peerManager))
 }

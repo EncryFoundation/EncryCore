@@ -1,11 +1,13 @@
 package encry.network
 
+import akka.actor.ActorRef
 import akka.persistence._
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp._
 import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.network.ModifiersHolder._
+import encry.settings.EncryAppSettings
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, LocallyGeneratedModifier}
 import org.encryfoundation.common.Algos
 import encry.utils.Logging
@@ -13,7 +15,7 @@ import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class ModifiersHolder extends PersistentActor with Logging {
+class ModifiersHolder(settings: EncryAppSettings, nodeViewHolder: ActorRef, postgresRestoreOpt: Option[ActorRef]) extends PersistentActor with Logging {
 
   var stat: Statistics = Statistics(0, 0, 0, 0, 0, Seq.empty, Seq.empty)
   var headers: Map[String, (Header, Int)] = Map.empty
@@ -31,7 +33,7 @@ class ModifiersHolder extends PersistentActor with Logging {
 
   def notifyRecoveryCompleted(): Unit = if (settings.postgres.exists(_.enableRestore)) {
     logInfo("Recovery from levelDb completed, going to download rest of the blocks from postgres")
-    context.system.actorSelection("/user/postgresRestore") ! StartRecovery
+    postgresRestoreOpt.foreach(_ ! StartRecovery)
   } else {
     logInfo("Recovery completed")
     peerManager ! RecoveryCompleted

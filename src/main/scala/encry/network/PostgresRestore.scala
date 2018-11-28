@@ -2,7 +2,6 @@ package encry.network
 
 import akka.actor.{Actor, ActorRef}
 import akka.persistence.RecoveryCompleted
-import encry.EncryApp.{peerManager, settings}
 import encry.utils.Logging
 import encry.local.explorer.database.DBService
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
@@ -10,6 +9,7 @@ import encry.modifiers.history.{Block, HeaderDBVersion, Payload}
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, Transaction, TransactionDBVersion}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.ChangedHistory
+import encry.settings.EncryAppSettings
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, GetNodeViewChanges}
 import org.encryfoundation.common.transaction.ProofSerializer
 import scorex.crypto.encode.Base16
@@ -18,7 +18,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
-class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef) extends Actor with Logging {
+class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef, settings: EncryAppSettings, peerManager: ActorRef)
+  extends Actor with Logging {
 
   val heightFuture: Future[Int] = dbService.selectHeightOpt.map(_.getOrElse(0))
 

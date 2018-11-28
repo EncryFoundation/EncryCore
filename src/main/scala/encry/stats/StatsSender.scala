@@ -6,9 +6,10 @@ import java.util
 import java.text.SimpleDateFormat
 import akka.actor.Actor
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.EncryApp.{settings, timeProvider}
+import encry.EncryApp.timeProvider
 import encry.consensus.EncrySupplyController
 import encry.modifiers.history.Header
+import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.stats.LoggingActor.LogMessage
 import encry.view.history.History.Height
@@ -17,7 +18,7 @@ import org.influxdb.{InfluxDB, InfluxDBFactory}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class StatsSender extends Actor {
+class StatsSender(settings: EncryAppSettings) extends Actor {
 
   var modifiersToDownload: Map[String, (ModifierTypeId, Long)] = Map()
 

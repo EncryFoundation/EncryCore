@@ -1,7 +1,6 @@
 package encry.view
 
-import akka.actor.Actor
-import encry.EncryApp._
+import akka.actor.{Actor, ActorRef}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, NodeViewChange}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetNodeViewChanges
 import encry.view.ReadersHolder.{GetDataFromHistory, GetReaders, Readers}
@@ -9,7 +8,7 @@ import encry.view.history.EncryHistoryReader
 import encry.view.mempool.MempoolReader
 import encry.view.state.UtxoStateReader
 
-class ReadersHolder extends Actor {
+class ReadersHolder(nodeViewHolder: ActorRef) extends Actor {
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])

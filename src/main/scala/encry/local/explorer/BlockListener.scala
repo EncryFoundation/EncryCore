@@ -1,13 +1,13 @@
 package encry.local.explorer
 
 import akka.actor.{Actor, ActorRef}
-import encry.EncryApp.settings
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.local.explorer.BlockListener._
 import encry.local.explorer.database.DBService
 import encry.modifiers.history.Block.Height
 import encry.modifiers.history.{Block, Header}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.ChangedHistory
+import encry.settings.EncryAppSettings
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetNodeViewChanges
 import encry.view.history.EncryHistoryReader
@@ -15,7 +15,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolder: ActorRef) extends Actor with Logging {
+class BlockListener(dbService: DBService, settings: EncryAppSettings, readersHolder: ActorRef, nodeViewHolder: ActorRef) extends Actor with Logging {
 
   override def preStart(): Unit = logInfo(s"Start listening to new blocks.")
 

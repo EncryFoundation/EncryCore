@@ -1,7 +1,8 @@
 package encry.view
 
 import java.io.File
-import akka.actor.{Actor, Props}
+
+import akka.actor.{Actor, ActorRef, Props}
 import akka.pattern._
 import akka.persistence.RecoveryCompleted
 import encry.EncryApp
@@ -16,7 +17,9 @@ import encry.modifiers.state.box.EncryProposition
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
+import encry.network.NodeViewSynchronizer
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.utils.Logging
@@ -31,13 +34,20 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging {
+class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings,
+                                                              peerManager: ActorRef,
+                                                              nodeViewSynchronizer: ActorRef,
+                                                              modifiersHolderOpt: Option[ActorRef] = None,
+                                                              statSenderOpt: Option[ActorRef] = None,
+                                                              blockListenerOpt: Option[ActorRef] = None)
+  extends Actor with Logging {
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: Mempool)
 
@@ -52,10 +62,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     Transaction.ModifierTypeId -> TransactionSerializer
   )
 
-  system.scheduler.schedule(5.second, 5.second) {
-    if (settings.influxDB.isDefined)
-      system.actorSelection("user/statsSender") !
-        HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
+  context.system.scheduler.schedule(5.second, 5.second) {
+    statSenderOpt.foreach(_ ! HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight))
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -84,13 +92,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
             peerManager ! RecoveryCompleted
         }
       }
-      if (settings.levelDb.exists(_.enableSave)) {
-        context.actorSelection("/user/modifiersHolder") !
-          RequestedModifiers(Header.modifierTypeId, blocks.map(_.header))
-        context.actorSelection("/user/modifiersHolder") !
-          RequestedModifiers(Payload.modifierTypeId, blocks.map(_.payload))
-        context.actorSelection("/user/modifiersHolder") !
-          RequestedModifiers(ADProofs.modifierTypeId, blocks.flatMap(_.adProofsOpt))
+      if (settings.levelDb.exists(_.enableSave)) modifiersHolderOpt.foreach { modifiersHolder =>
+        modifiersHolder ! RequestedModifiers(Header.modifierTypeId, blocks.map(_.header))
+        modifiersHolder ! RequestedModifiers(Payload.modifierTypeId, blocks.map(_.payload))
+        modifiersHolder ! RequestedModifiers(ADProofs.modifierTypeId, blocks.flatMap(_.adProofsOpt))
       }
       receivedAll = allSent
       if (receivedAll) {
@@ -109,8 +114,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
               ModifiersCache.put(key(pmod.id), pmod, nodeView.history)
-              if (settings.levelDb.exists(_.enableSave))
-                context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
+              if (settings.levelDb.exists(_.enableSave)) modifiersHolderOpt.foreach(_ ! RequestedModifiers(modifierTypeId, Seq(pmod)))
             }
         }
         logInfo(s"Cache before(${ModifiersCache.size})")
@@ -122,7 +126,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       logInfo(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
-      if (settings.levelDb.exists(_.enableSave)) context.actorSelection("/user/modifiersHolder") ! lm
+      if (settings.levelDb.exists(_.enableSave)) modifiersHolderOpt.foreach(_ ! lm)
     case GetDataFromCurrentView(f) =>
       val result = f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool))
       result match {
@@ -256,21 +260,17 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
     logInfo(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
-    if (settings.influxDB.isDefined) context.system
-      .actorSelection("user/statsSender") !
-      StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
+    statSenderOpt.foreach(_ !StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis()))
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
-        if (settings.influxDB.isDefined)
-          context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
+        statSenderOpt.foreach(_ ! EndOfApplyingModif(pmod.id))
         logInfo(s"Going to apply modifications to the state: $progressInfo")
         nodeViewSynchronizer ! SyntacticallySuccessfulModifier(pmod)
         if (progressInfo.toApply.nonEmpty) {
           val startPoint: Long = System.currentTimeMillis()
           val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
-          if (settings.influxDB.isDefined)
-            context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
+          statSenderOpt.foreach(_ ! StateUpdating(System.currentTimeMillis() - startPoint))
           newStateTry match {
             case Success(newMinState) =>
               val newMemPool: Mempool =
@@ -281,12 +281,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               blocksApplied.foreach(newVault.scanPersistent)
               logInfo(s"Persistent modifier ${pmod.encodedId} applied successfully")
               if (progressInfo.chainSwitchingNeeded)
-                context.actorSelection("/user/blockListener") !
-                  ChainSwitching(progressInfo.toRemove.map(_.id))
-              if (settings.influxDB.isDefined)
-                newHistory.bestHeaderOpt.foreach(header =>
-                  context.actorSelection("/user/statsSender") !
-                    BestHeaderInChain(header, System.currentTimeMillis()))
+                blockListenerOpt.foreach(_ !ChainSwitching(progressInfo.toRemove.map(_.id)))
+              statSenderOpt.foreach { statSender =>
+                  newHistory.bestHeaderOpt.foreach(statSender ! BestHeaderInChain(_, System.currentTimeMillis()))
+              }
               if (newHistory.isFullChainSynced && receivedAll)
                 Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
               else miner ! DisableMining
@@ -325,7 +323,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       if (settings.node.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings.node)
       else EncryState.generateGenesisUtxoState(stateDir, Some(self))
     }.asInstanceOf[StateType]
-    val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
+    val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider, blockListenerOpt)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
     val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
     NodeView(history, state, wallet, memPool)
@@ -333,7 +331,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryObjectsDir(settings).listFiles.isEmpty)
     try {
-      val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
+      val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider, blockListenerOpt)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
       val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
       val state: StateType =
@@ -422,8 +420,16 @@ object EncryNodeViewHolder {
 
   }
 
-  def props(): Props = settings.node.stateMode match {
-    case StateMode.Digest => Props[EncryNodeViewHolder[DigestState]]
-    case StateMode.Utxo => Props[EncryNodeViewHolder[UtxoState]]
+  def props(settings: EncryAppSettings,
+            peerManager: ActorRef,
+            nodeViewSynchronizer: ActorRef,
+            modifiersHolderOpt: Option[ActorRef] = None,
+            statSenderOpt: Option[ActorRef] = None,
+            blockListenerOpt: Option[ActorRef] = None): Props =
+    settings.node.stateMode match {
+    case StateMode.Digest =>
+      Props(classOf[EncryNodeViewHolder[DigestState]], settings, peerManager, nodeViewSynchronizer, modifiersHolderOpt, statSenderOpt, blockListenerOpt)
+    case StateMode.Utxo =>
+      Props(classOf[EncryNodeViewHolder[UtxoState]], settings, peerManager, nodeViewSynchronizer, modifiersHolderOpt, statSenderOpt, blockListenerOpt)
   }
 }

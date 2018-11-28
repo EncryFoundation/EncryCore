@@ -1,17 +1,17 @@
 package encry.stats
 
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef}
 import com.typesafe.scalalogging.StrictLogging
 import encry.stats.LoggingActor.LogMessage
 import encry.EncryApp.settings
 import encry.stats.KafkaActor.KafkaMessage
 
-class LoggingActor extends Actor with StrictLogging {
+class LoggingActor(statSenderOpt: Option[ActorRef] = None, kafkaSenderOpt: Option[ActorRef] = None) extends Actor with StrictLogging {
 
   override def receive: Receive = {
     case LogMessage(logLevel, logMessage, logsTime) => settings.node.loggingMode match {
-      case "Influx" => context.system.actorSelection(path = "user/statsSender") ! LogMessage(logLevel, logMessage, logsTime)
-      case "kafka" => context.system.actorSelection(path = "/user/kafkaActor") ! KafkaMessage(logLevel, logMessage)
+      case "Influx" => statSenderOpt.foreach(_ ! LogMessage(logLevel, logMessage, logsTime))
+      case "kafka" => kafkaSenderOpt.foreach(_ ! KafkaMessage(logLevel, logMessage))
       case "file" => logLevel match {
         case "Info" => logger.info(logMessage)
         case "Warn" => logger.warn(logMessage)

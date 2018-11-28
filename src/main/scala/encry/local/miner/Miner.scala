@@ -2,7 +2,7 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import encry.EncryApp._
 import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
@@ -12,7 +12,7 @@ import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.network.DeliveryManager.FullBlockChainSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import encry.settings.Constants
+import encry.settings.{Constants, EncryAppSettings}
 import encry.stats.StatsSender.{CandidateProducingTime, MiningEnd, MiningTime, SleepTime}
 import encry.utils.Logging
 import encry.utils.NetworkTime.Time
@@ -31,7 +31,7 @@ import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 import scala.collection._
 
-class Miner extends Actor with Logging {
+class Miner(settings: EncryAppSettings, nodeViewHolder: ActorRef, statSenderOpt: Option[ActorRef] = None) extends Actor with Logging {
 
   import Miner._
 
@@ -81,9 +81,9 @@ class Miner extends Actor with Logging {
       killAllWorkers()
         nodeViewHolder ! LocallyGeneratedModifier(block.header)
         nodeViewHolder ! LocallyGeneratedModifier(block.payload)
-      if (settings.influxDB.isDefined) {
-        context.actorSelection("/user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
-        context.actorSelection("/user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
+      statSenderOpt.foreach { statSender =>
+        statSender ! MiningEnd(block.header, workerIdx, context.children.size)
+        statSender ! MiningTime(System.currentTimeMillis() - startTime)
       }
       if (settings.node.stateMode == StateMode.Digest)
         block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
@@ -200,16 +200,13 @@ class Miner extends Actor with Logging {
             (syncingDone || nodeView.history.isFullChainSynced)) || settings.node.offlineGeneration) {
               logInfo(s"Starting candidate generation at " +
                 s"${dateFormat.format(new Date(System.currentTimeMillis()))}")
-              if (settings.influxDB.isDefined)
-                context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
+            statSenderOpt.foreach(_ ! SleepTime(System.currentTimeMillis() - sleepTime))
               logInfo("Going to calculate last block:")
               val envelope: CandidateEnvelope =
                 CandidateEnvelope
                   .fromCandidate(createCandidate(nodeView, bestHeaderOpt))
-              if (settings.influxDB.isDefined)
-                context.actorSelection("user/statsSender") !
-                  CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
-              envelope
+            statSenderOpt.foreach(_ ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime))
+            envelope
           } else CandidateEnvelope.empty
         candidate
     }
