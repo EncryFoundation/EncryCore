@@ -5,23 +5,27 @@ import akka.actor.ActorRef
 import encry.avltree
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
-import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
 import encry.settings.Constants
-import encry.utils.{EncryGenerator, FileHelper, TestHelper}
+import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
 import encry.view.history.History.Height
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.Algos.HF
 import org.encryfoundation.common.{Algos, crypto}
 import org.encryfoundation.common.transaction.Pay2PubKeyAddress
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, SerializedAdProof}
+import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{Matchers, PropSpec}
+import org.mockito.Mockito._
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
 
-class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
+class UtxoStateSpec extends PropSpec with Matchers with MockitoSugar with EncryGenerator {
+
+  val timeProviderMock: NetworkTimeProvider = mock[NetworkTimeProvider]
+  when(timeProviderMock.estimatedTime).thenReturn(System.currentTimeMillis())
 
   def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
     val p = new avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
@@ -35,7 +39,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
       PersistentBatchAVLProver.create(p, storage).get
     }
 
-    new UtxoState(persistentProver, EncryState.genesisStateVersion, Constants.Chain.GenesisHeight, stateStore, 0L, None)
+    new UtxoState(persistentProver, EncryState.genesisStateVersion, Constants.Chain.GenesisHeight, stateStore, 0L, None, timeProviderMock)
   }
 
   property("Proofs for transaction") {

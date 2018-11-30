@@ -2,6 +2,7 @@ package encry.network
 
 import akka.actor.ActorRef
 import akka.persistence._
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp._
 import encry.modifiers.history.{Block, Header, Payload}
@@ -10,21 +11,22 @@ import encry.network.ModifiersHolder._
 import encry.settings.EncryAppSettings
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, LocallyGeneratedModifier}
 import org.encryfoundation.common.Algos
-import encry.utils.Logging
+
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class ModifiersHolder(settings: EncryAppSettings, nodeViewHolder: ActorRef, postgresRestoreOpt: Option[ActorRef]) extends PersistentActor with Logging {
+class ModifiersHolder(settings: EncryAppSettings, postgresRestoreOpt: Option[ActorRef]) extends PersistentActor with StrictLogging {
 
   var stat: Statistics = Statistics(0, 0, 0, 0, 0, Seq.empty, Seq.empty)
   var headers: Map[String, (Header, Int)] = Map.empty
   var payloads: Map[String, (Payload, Int)] = Map.empty
   var nonCompletedBlocks: Map[String, String] = Map.empty
   var completedBlocks: SortedMap[Int, Block] = SortedMap.empty
+  var nvhOpt: Option[ActorRef] = None
 
   context.system.scheduler.schedule(10.second, 30.second) {
-    logDebug(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
+    logger.debug(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
   }
 
   context.system.scheduler.scheduleOnce(5 seconds) {
@@ -32,14 +34,14 @@ class ModifiersHolder(settings: EncryAppSettings, nodeViewHolder: ActorRef, post
   }
 
   def notifyRecoveryCompleted(): Unit = if (settings.postgres.exists(_.enableRestore)) {
-    logInfo("Recovery from levelDb completed, going to download rest of the blocks from postgres")
+    logger.info("Recovery from levelDb completed, going to download rest of the blocks from postgres")
     postgresRestoreOpt.foreach(_ ! StartRecovery)
   } else {
-    logInfo("Recovery completed")
+    logger.info("Recovery completed")
     peerManager ! RecoveryCompleted
   }
 
-  override def preStart(): Unit = logInfo(s"ModifiersHolder actor is started.")
+  override def preStart(): Unit = logger.info(s"ModifiersHolder actor is started.")
 
   override def receiveRecover: Receive =
     if (settings.levelDb.exists(_.enableRestore)) receiveRecoverEnabled else receiveRecoverDisabled
@@ -57,6 +59,7 @@ class ModifiersHolder(settings: EncryAppSettings, nodeViewHolder: ActorRef, post
   }
 
   override def receiveCommand: Receive = {
+    case nvh: ActorRef => nvhOpt = Some(nvh)
     case CheckAllBlocksSent =>
       if (completedBlocks.isEmpty) notifyRecoveryCompleted()
       else context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
@@ -68,12 +71,12 @@ class ModifiersHolder(settings: EncryAppSettings, nodeViewHolder: ActorRef, post
       completedBlocks = completedBlocks.drop(settings.levelDb
         .map(_.batchSize)
         .getOrElse(throw new RuntimeException("batchsize not specified")))
-      nodeViewHolder ! BlocksFromLocalPersistence(blocksToSend, completedBlocks.isEmpty &&
-        !settings.postgres.exists(_.enableRestore))
+      nvhOpt.foreach(_ ! BlocksFromLocalPersistence(blocksToSend, completedBlocks.isEmpty &&
+        !settings.postgres.exists(_.enableRestore)))
 
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))
-    case x: Any => logError(s"Strange input: $x.")
+    case x: Any => logger.error(s"Strange input: $x.")
   }
 
   def createBlockIfPossible(payloadId: ModifierId): Unit =
@@ -88,24 +91,24 @@ class ModifiersHolder(settings: EncryAppSettings, nodeViewHolder: ActorRef, post
     case header: Header =>
       if (!headers.contains(Algos.encode(header.id)))
         persist(header) { header =>
-          logDebug(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} " +
+          logger.debug(s"Header at height: ${header.height} with id: ${Algos.encode(header.id)} " +
             s"is persisted successfully.")
         }
       updateHeaders(header)
     case payload: Payload =>
       if (!payloads.contains(Algos.encode(payload.id)))
         persist(payload) { payload =>
-          logDebug(s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully.")
+          logger.debug(s"Payload with id: ${Algos.encode(payload.id)} is persisted successfully.")
         }
       updatePayloads(payload)
     case block: Block =>
       if (!completedBlocks.values.toSeq.contains(block))
         persist(block) { block =>
-          logDebug(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} " +
+          logger.debug(s"Header at height: ${block.header.height} with id: ${Algos.encode(block.id)} " +
             s"is persisted successfully.")
         }
       updateCompletedBlocks(block)
-    case x: Any => logError(s"Strange input $x.")
+    case x: Any => logger.error(s"Strange input $x.")
   }
 
   def updateHeaders(header: Header): Unit = {

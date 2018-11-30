@@ -2,18 +2,18 @@ package encry.modifiers.mempool
 
 import encry.modifiers.InstanceFactory
 import encry.modifiers.state.box.AssetBox
-import encry.utils.TestHelper
+import encry.utils.{NetworkTimeProvider, TestHelper}
 import org.scalatest.{Matchers, PropSpec}
 
 class TransactionSpec extends PropSpec with Matchers with InstanceFactory {
 
   private val txValid = paymentTransactionValid
-
   private val txInvalid = paymentTransactionInvalid
+  private val time: Long = System.currentTimeMillis()
 
   property("semanticValidity of valid tx") {
 
-    txValid.semanticValidity.isSuccess shouldBe true
+    txValid.semanticValidity(time).isSuccess shouldBe true
   }
 
   property("semanticValidity of invalid tx (Inputs duplication)") {
@@ -25,7 +25,7 @@ class TransactionSpec extends PropSpec with Matchers with InstanceFactory {
         randomAddress, TestHelper.Props.txAmount)
     }
 
-    tx.semanticValidity.isSuccess shouldBe false
+    tx.semanticValidity(time).isSuccess shouldBe false
   }
 
   property("semanticValidity of invalid tx (Negative fee)") {
@@ -37,7 +37,7 @@ class TransactionSpec extends PropSpec with Matchers with InstanceFactory {
         randomAddress, TestHelper.Props.txAmount)
     }
 
-    tx.semanticValidity.isSuccess shouldBe false
+    tx.semanticValidity(time).isSuccess shouldBe false
   }
 
   property("semanticValidity of invalid tx (Empty inputs)") {
@@ -49,7 +49,7 @@ class TransactionSpec extends PropSpec with Matchers with InstanceFactory {
         randomAddress, TestHelper.Props.txAmount)
     }
 
-    tx.semanticValidity.isSuccess shouldBe false
+    tx.semanticValidity(time).isSuccess shouldBe false
   }
 
   property("semanticValidity of invalid tx (Too many inputs)") {
@@ -62,6 +62,6 @@ class TransactionSpec extends PropSpec with Matchers with InstanceFactory {
         randomAddress, TestHelper.Props.txAmount)
     }
 
-    tx.semanticValidity.isSuccess shouldBe false
+    tx.semanticValidity(time).isSuccess shouldBe false
   }
 }

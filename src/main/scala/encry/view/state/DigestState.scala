@@ -1,12 +1,13 @@
 package encry.view.state
 
 import java.io.File
+import com.typesafe.scalalogging.StrictLogging
+import encry.EncryApp.timeProvider
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{ADProofs, Block, Header}
 import encry.modifiers.mempool.Transaction
 import encry.settings.{Constants, NodeSettings}
-import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
@@ -16,7 +17,7 @@ class DigestState protected(override val version: VersionTag,
                             override val rootHash: ADDigest,
                             val stateStore: Store,
                             settings: NodeSettings)
-  extends EncryState[DigestState] with ModifierValidation[EncryPersistentModifier] with Logging {
+  extends EncryState[DigestState] with ModifierValidation[EncryPersistentModifier] with StrictLogging {
 
   stateStore.lastVersionID
     .foreach(id => assert(version sameElements id.data, "`version` should always be equal to store.lastVersionID"))
@@ -33,15 +34,15 @@ class DigestState protected(override val version: VersionTag,
         val declaredHash: ADDigest = block.header.stateRoot
 
         txs.foldLeft(Success(): Try[Unit]) { case (status, tx) =>
-          status.flatMap(_ => tx.semanticValidity)
+          status.flatMap(_ => tx.semanticValidity(timeProvider.estimatedTime))
         }.flatMap(_ => block.adProofsOpt.map(_.verify(extractStateChanges(txs), rootHash, declaredHash))
           .getOrElse(Failure(new Exception("Proofs are empty"))))
       }.flatten match {
         case s: Success[_] =>
-          logInfo(s"Valid modifier applied to DigestState: ${block.encodedId}")
+          logger.info(s"Valid modifier applied to DigestState: ${block.encodedId}")
           s
         case Failure(e) =>
-          logWarn(s"Modifier $mod is not valid: $e")
+          logger.warn(s"Modifier $mod is not valid: $e")
           Failure(e)
       }
     case mod: Any =>
@@ -56,26 +57,26 @@ class DigestState protected(override val version: VersionTag,
 
   override def applyModifier(mod: EncryPersistentModifier): Try[DigestState] = mod match {
     case block: Block if settings.verifyTransactions =>
-      logInfo(s"Got new full block with id ${block.encodedId} " +
+      logger.info(s"Got new full block with id ${block.encodedId} " +
         s"with root ${Algos.encoder.encode(block.header.stateRoot)}")
       this.validate(block).flatMap(_ => update(VersionTag !@@ block.header.id, block.header.stateRoot))
 
     case header: Header if !settings.verifyTransactions =>
-      logInfo(s"Got new Header ${header.encodedId} with root ${Algos.encoder.encode(header.stateRoot)}")
+      logger.info(s"Got new Header ${header.encodedId} with root ${Algos.encoder.encode(header.stateRoot)}")
       update(VersionTag !@@ header.id, header.stateRoot)
 
     case a: Any =>
-      logInfo(s"Unhandled modifier: $a")
+      logger.info(s"Unhandled modifier: $a")
       Failure(new Exception(s"Unhandled modifier: $mod"))
   }
 
   override def rollbackTo(version: VersionTag): Try[DigestState] = {
-    logInfo(s"Rollback Digest State to version ${Algos.encoder.encode(version)}")
+    logger.info(s"Rollback Digest State to version ${Algos.encoder.encode(version)}")
     val wrappedVersion: ByteArrayWrapper = ByteArrayWrapper(version)
     Try(stateStore.rollback(wrappedVersion)).map { _ =>
       stateStore.clean(Constants.DefaultKeepVersions)
       val rootHash: ADDigest = ADDigest @@ stateStore.get(wrappedVersion).get.data
-      logInfo(s"Rollback to version ${Algos.encoder.encode(version)} with roothash " +
+      logger.info(s"Rollback to version ${Algos.encoder.encode(version)} with roothash " +
         s"${Algos.encoder.encode(rootHash)}")
       new DigestState(version, rootHash, stateStore, settings)
     }

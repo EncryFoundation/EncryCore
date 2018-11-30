@@ -2,7 +2,7 @@ package encry.network
 
 import akka.actor.{Actor, ActorRef}
 import akka.persistence.RecoveryCompleted
-import encry.utils.Logging
+import com.typesafe.scalalogging.StrictLogging
 import encry.local.explorer.database.DBService
 import encry.modifiers.history.{ADProofSerializer, ADProofs}
 import encry.modifiers.history.{Block, HeaderDBVersion, Payload}
@@ -13,57 +13,65 @@ import encry.settings.EncryAppSettings
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, GetNodeViewChanges}
 import org.encryfoundation.common.transaction.ProofSerializer
 import scorex.crypto.encode.Base16
+
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
-class PostgresRestore(dbService: DBService, nodeViewHolder: ActorRef, settings: EncryAppSettings, peerManager: ActorRef)
-  extends Actor with Logging {
+class PostgresRestore(dbService: DBService, settings: EncryAppSettings, peerManager: ActorRef)
+  extends Actor with StrictLogging {
 
   val heightFuture: Future[Int] = dbService.selectHeightOpt.map(_.getOrElse(0))
+  var nvhOpt: Option[ActorRef] = None
 
   override def postStop(): Unit = if (settings.postgres.exists(_.enableSave)) Unit else dbService.shutdown()
 
   heightFuture.onComplete {
     case Success(0) =>
-      logInfo("Seems like postgres is empty")
+      logger.info("Seems like postgres is empty")
       context.stop(self)
     case Success(height) =>
-      logInfo(s"Going to download $height blocks from postgres")
+      logger.info(s"Going to download $height blocks from postgres")
     case Failure(_) =>
-      logWarn("Failed to connect to postgres")
+      logger.warn("Failed to connect to postgres")
       peerManager ! RecoveryCompleted
-      nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true)
       context.stop(self)
   }
 
   override def receive: Receive = {
-    case StartRecovery => nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
+    case nvh: ActorRef =>
+      nvhOpt = Some(nvh)
+      heightFuture.recoverWith {
+        case NonFatal(th) =>
+          nvh ! BlocksFromLocalPersistence(Seq.empty, true)
+          Future.failed(th)
+      }
+      nvh ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
     case ChangedHistory(history) =>
       val currentNodeHeight = history.bestBlockOpt.map(_.header.height).getOrElse(0)
       startRecovery(if (currentNodeHeight == 0) 0 else currentNodeHeight + 1).map { _ =>
-        logInfo(s"All blocks restored from postgres")
+        logger.info(s"All blocks restored from postgres")
         context.stop(self)
       }
   }
 
   def startRecovery(startFrom: Int): Future[Unit] = heightFuture.flatMap { height =>
     if (height <= startFrom) {
-      nodeViewHolder ! BlocksFromLocalPersistence(Seq.empty, true)
+      nvhOpt.foreach(_ ! BlocksFromLocalPersistence(Seq.empty, true))
       Future.unit
     } else settings.postgres.flatMap(_.restoreBatchSize) match {
       case Some(step) =>
-        logInfo(s"Going to download blocks from postgres starting from $startFrom")
+        logger.info(s"Going to download blocks from postgres starting from $startFrom")
         (startFrom to height).sliding(step, step).foldLeft(Future.successful(List[Block]())) { case (prevBlocks, slide) =>
           val from: Int = slide.head
           val to: Int = slide.last
           prevBlocks.flatMap { retrievedBlocks =>
-            nodeViewHolder ! BlocksFromLocalPersistence(retrievedBlocks, to == height)
+            nvhOpt.foreach(_ ! BlocksFromLocalPersistence(retrievedBlocks, to == height))
             selectBlocksByRange(from, to)
               .recoverWith {
                 case NonFatal(th) =>
-                  logWarn(s"Failure during restore: ${th.getLocalizedMessage}")
+                  logger.warn(s"Failure during restore: ${th.getLocalizedMessage}")
                   Future.failed(th)
               }
           }

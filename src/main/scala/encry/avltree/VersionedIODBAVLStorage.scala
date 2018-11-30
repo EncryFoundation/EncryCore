@@ -1,8 +1,8 @@
 package encry.avltree
 
 import com.google.common.primitives.Ints
+import com.typesafe.scalalogging.StrictLogging
 import encry.avltree.VersionedIODBAVLStorage.{InternalNodePrefix, LeafPrefix}
-import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, Balance}
@@ -14,7 +14,7 @@ case class NodeParameters(keySize: Int, valueSize: Option[Int], labelSize: Int)
 
 class VersionedIODBAVLStorage[D <: Digest](store: Store,
                                            nodeParameters: NodeParameters)(implicit val hf: CryptographicHash[D])
-  extends Logging {
+  extends StrictLogging {
 
   val TopNodeKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(nodeParameters.labelSize)(123: Byte))
   val TopNodeHeight: ByteArrayWrapper = ByteArrayWrapper(Array.fill(nodeParameters.labelSize)(124: Byte))
@@ -26,7 +26,7 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store,
     val topHeight: Int = Ints.fromByteArray(store.get(TopNodeHeight).get.data)
     top -> topHeight
   }.recoverWith { case e =>
-    logInfo(s"Failed to recover tree for digest ${Algos.encode(version)}: $e")
+    logger.info(s"Failed to recover tree for digest ${Algos.encode(version)}: $e")
     Failure(e)
   }
 
@@ -47,11 +47,11 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store,
       additionalData.map { case (k, v) => ByteArrayWrapper(k) -> ByteArrayWrapper(v) }
     val toUpdateWithWrapped: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = toUpdate ++ toUpdateWrapped
     val toRemoveMerged: List[ByteArrayWrapper] = toRemove.filterNot(toUpdate.map(_._1).intersect(toRemove).contains)
-    logInfo(s"Update storage to version ${digestWrapper.data}: ${toUpdateWithWrapped.size} elements to insert," +
+    logger.info(s"Update storage to version ${digestWrapper.data}: ${toUpdateWithWrapped.size} elements to insert," +
       s" ${toRemove.size} elements to remove")
     store.update(digestWrapper, toRemoveMerged, toUpdateWithWrapped)
   }.recoverWith { case e =>
-    logInfo(s"Failed to update tree: $e")
+    logger.info(s"Failed to update tree: $e")
     Failure(e)
   }
 

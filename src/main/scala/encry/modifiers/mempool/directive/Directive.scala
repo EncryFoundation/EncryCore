@@ -2,7 +2,6 @@ package encry.modifiers.mempool.directive
 
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.EncryBaseBox
-import encry.utils.Logging
 import io.circe._
 import cats.implicits._
 import encry.utils.CoreTaggedTypes.ModifierId
@@ -57,7 +56,7 @@ case class DirectiveDBVersion(txId: String,
                               amount: Long,
                               address: String,
                               tokenIdOpt: Option[String],
-                              data: String) extends Logging {
+                              data: String) {
   def toDirective: Option[Directive] =
     dTypeId match {
       case AssetIssuingDirective.TypeId => Base16.decode(contractHash).map(AssetIssuingDirective(_, amount)).toOption
@@ -75,8 +74,6 @@ case class DirectiveDBVersion(txId: String,
       case DataDirective.TypeId => (Base16.decode(contractHash), Base16.decode(data)).mapN {
         case (contractHashDec, dataDec) => DataDirective(contractHashDec, dataDec)
       }.toOption
-      case _ =>
-        logWarn(s"Malformed directive from DB: $this")
-        None
+      case _ => None
     }
 }

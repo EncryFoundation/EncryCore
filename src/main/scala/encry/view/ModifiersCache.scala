@@ -1,11 +1,11 @@
 package encry.view
 
 import java.util.concurrent.ConcurrentHashMap
+import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.settings
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.Header
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.utils.Logging
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.EncryHistory
 import org.encryfoundation.common.Algos
@@ -14,7 +14,7 @@ import scala.collection.immutable.SortedMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
 
-object ModifiersCache extends Logging {
+object ModifiersCache extends StrictLogging {
 
   private type Key = mutable.WrappedArray[Byte]
 
@@ -102,7 +102,7 @@ object ModifiersCache extends Logging {
         headersQueue.get(history.bestHeaderOpt.map(_.height).getOrElse(0) + 1).map(headersKey =>
           headersKey.filter(isApplicable)
         ).getOrElse(Seq.empty)
-      logError(s"possibleHeaders: ${possibleHeaders.map(key => Algos.encode(key.toArray)).mkString(",")}")
+      logger.error(s"possibleHeaders: ${possibleHeaders.map(key => Algos.encode(key.toArray)).mkString(",")}")
       headersQueue.get(history.bestHeaderHeight + 1).flatMap(_.headOption).orElse {
         if (possibleHeaders.nonEmpty) Some(possibleHeaders.head)
         else
@@ -112,7 +112,7 @@ object ModifiersCache extends Logging {
                 if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) =>
                 true
               case _ =>
-                logError(s"Try to apply: ${Algos.encode(k.toArray)} and result is: ${isApplicable(k)}")
+                logger.error(s"Try to apply: ${Algos.encode(k.toArray)} and result is: ${isApplicable(k)}")
                 isApplicable(k)
             }
           }.map { case (k, _) => k }

@@ -2,8 +2,9 @@ package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, ActorSelection}
 import akka.persistence.RecoveryCompleted
+import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
@@ -12,17 +13,18 @@ import encry.network.PeerConnectionHandler._
 import encry.network.PeerManager.ReceivableMessages._
 import encry.network.PeerManager._
 import encry.settings.EncryAppSettings
-import encry.utils.Logging
+import encry.utils.NetworkTimeProvider
 import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.util.Random
 
-class PeerManager(settings: EncryAppSettings, nodeViewSynchronizer: ActorRef) extends Actor with Logging {
+class PeerManager(settings: EncryAppSettings, timeProvider: NetworkTimeProvider) extends Actor with StrictLogging {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
   var connectingPeers: Set[InetSocketAddress] = Set.empty
   var recoveryCompleted: Boolean = !(settings.levelDb.exists(_.enableRestore) || settings.postgres.exists(_.enableRestore))
   var nodes: Map[InetSocketAddress, PeerInfo] = Map.empty
+  lazy val nodeViewSynchronizer: ActorSelection = context.system.actorSelection("/user/nodeViewSynchronizer")
 
   addKnownPeersToPeersDatabase()
 
@@ -41,11 +43,11 @@ class PeerManager(settings: EncryAppSettings, nodeViewSynchronizer: ActorRef) ex
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
     case DoConnecting(remote, direction) =>
       if (connectingPeers.contains(remote) && direction != Incoming) {
-        logInfo(s"Trying to connect twice to $remote, going to drop the duplicate connection")
+        logger.info(s"Trying to connect twice to $remote, going to drop the duplicate connection")
         sender() ! CloseConnection
       }
       else if (direction != Incoming) {
-        logInfo(s"Connecting to $remote")
+        logger.info(s"Connecting to $remote")
         connectingPeers += remote
       }
       sender() ! StartInteraction
@@ -75,7 +77,7 @@ class PeerManager(settings: EncryAppSettings, nodeViewSynchronizer: ActorRef) ex
           checkDuplicateIP(address)
         ).foreach { address => sender() ! ConnectTo(address) }
     case RecoveryCompleted =>
-      logInfo("Received RecoveryCompleted")
+      logger.info("Received RecoveryCompleted")
       recoveryCompleted = true
       addKnownPeersToPeersDatabase()
   }

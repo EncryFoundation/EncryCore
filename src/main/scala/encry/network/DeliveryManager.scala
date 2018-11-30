@@ -1,6 +1,7 @@
 package encry.network
 
 import akka.actor.{Actor, ActorRef, Cancellable}
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
@@ -17,12 +18,12 @@ import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.Mempool
-import encry.utils.Logging
 import org.encryfoundation.common.Algos
+
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class DeliveryManager(settings: EncryAppSettings, nodeViewHolder: ActorRef, networkController: ActorRef, statSenderOpt: Option[ActorRef] = None) extends Actor with Logging {
+class DeliveryManager(settings: EncryAppSettings, nodeViewHolder: ActorRef, networkController: ActorRef, statSenderOpt: Option[ActorRef] = None) extends Actor with StrictLogging {
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
@@ -54,7 +55,7 @@ class DeliveryManager(settings: EncryAppSettings, nodeViewHolder: ActorRef, netw
   def syncSending: Receive = {
     case SendLocalSyncInfo =>
       if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2)
-        logInfo("Trying to send sync info too often")
+        logger.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case StopSync => context.become(netMessages)
   }
@@ -63,7 +64,7 @@ class DeliveryManager(settings: EncryAppSettings, nodeViewHolder: ActorRef, netw
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       statusTracker.updateStatus(remote, status)
       status match {
-        case Unknown => logInfo("Peer status is still unknown")
+        case Unknown => logger.info("Peer status is still unknown")
         case Younger => sendExtension(remote, status, extOpt)
         case _ =>
       }
@@ -92,7 +93,7 @@ class DeliveryManager(settings: EncryAppSettings, nodeViewHolder: ActorRef, netw
       statSenderOpt.foreach(_ ! GetModifiers(typeId, modifiers.keys.toSeq))
       for ((id, _) <- modifiers) receive(typeId, id, remote)
       if (spam.nonEmpty) {
-        logInfo(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
+        logger.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
           s": ${spam.keys.map(Algos.encode)}")
         deleteSpam(spam.keys.toSeq)
       }
@@ -108,7 +109,7 @@ class DeliveryManager(settings: EncryAppSettings, nodeViewHolder: ActorRef, netw
     case DisableMining => isMining = false
     case SendLocalSyncInfo =>
       if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2)
-        logInfo("Trying to send sync info too often")
+        logger.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       historyReaderOpt = Some(reader)
@@ -151,7 +152,7 @@ class DeliveryManager(settings: EncryAppSettings, nodeViewHolder: ActorRef, netw
     cancellables.get(modifierKey) match {
       case Some(peerInfo) if peerInfo._2._2 < settings.network.maxDeliveryChecks && peerAndHistoryOpt.isDefined =>
         peerAndHistoryOpt.foreach { case (peer, _) =>
-          logDebug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: " +
+          logger.debug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: " +
             s"$mTypeId with id: ${Algos.encode(modifierId)}")
           peer.handlerRef ! Message(requestModifierSpec, Right(mTypeId -> Seq(modifierId)), None)
           val cancellable: Cancellable = context.system.scheduler
@@ -181,7 +182,7 @@ class DeliveryManager(settings: EncryAppSettings, nodeViewHolder: ActorRef, netw
 
   def sendExtension(remote: ConnectedPeer, status: HistoryComparisonResult,
                     extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit = extOpt match {
-    case None => logInfo(s"extOpt is empty for: $remote. Its status is: $status.")
+    case None => logger.info(s"extOpt is empty for: $remote. Its status is: $status.")
     case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
       case (mid, mods) => networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
     }

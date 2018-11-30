@@ -5,6 +5,7 @@ import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 import doobie.hikari.HikariTransactor
 import QueryRepository._
+import com.typesafe.scalalogging.StrictLogging
 import com.zaxxer.hikari.HikariDataSource
 import doobie.hikari.implicits._
 import encry.modifiers.history.{Block, Header}
@@ -13,16 +14,16 @@ import encry.modifiers.history.HeaderDBVersion
 import encry.modifiers.mempool.directive.DirectiveDBVersion
 import encry.modifiers.mempool.{InputDBVersion, TransactionDBVersion}
 import encry.settings.EncryAppSettings
-import encry.utils.Logging
+
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.control.NonFatal
 
-class DBService(settings: EncryAppSettings) extends Logging {
+class DBService(settings: EncryAppSettings) extends StrictLogging {
 
   def processBlock(block: Block): Future[Int] = runAsync(processBlockQuery(block), "processBlock")
     .map { count =>
-      logInfo(s"Successfully wrote block on height ${block.header.height} as best chain")
+      logger.info(s"Successfully wrote block on height ${block.header.height} as best chain")
       count
     }
 
@@ -57,7 +58,7 @@ class DBService(settings: EncryAppSettings) extends Logging {
   private lazy val pgTransactor: HikariTransactor[IO] = HikariTransactor[IO](dataSource)
 
   def shutdown(): Future[Unit] = {
-    logInfo("Shutting down dbService")
+    logger.info("Shutting down dbService")
     pgTransactor.shutdown.unsafeToFuture
   }
 
@@ -68,7 +69,7 @@ class DBService(settings: EncryAppSettings) extends Logging {
       .unsafeToFuture()
       .recoverWith {
         case NonFatal(th) =>
-          logWarn(s"Failed to perform $queryName query with exception ${th.getLocalizedMessage}")
+          logger.warn(s"Failed to perform $queryName query with exception ${th.getLocalizedMessage}")
           Future.failed(th)
       }
 }

@@ -7,6 +7,7 @@ import encry.local.explorer.BlockListener.{ChainSwitching, NewBestBlock, NewOrph
 import encry.local.explorer.database.DBService
 import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.mempool.Transaction
+import encry.settings.{EncryAppSettings, PostgresSettings}
 import encry.utils.EncryGenerator
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
@@ -43,10 +44,14 @@ class BlockListenerSpec extends TestKit(ActorSystem("BlockListenerSpec")) with I
   private trait BlockListenerSpecWiring {
     val noHeight: Future[Option[Int]] = Future.successful(None)
     val dbServiceMock: DBService = mock[DBService]
+    when(dbServiceMock.selectHeightOpt).thenReturn(Future.successful(None))
     val readersHolderMock: ActorRef = system.actorOf(Props.empty)
     val nvhMock: ActorRef = system.actorOf(Props.empty)
-    when(dbServiceMock.selectHeightOpt).thenReturn(Future.successful(None))
-    val actor: ActorRef = system.actorOf(Props(new BlockListener(dbServiceMock, ???,  readersHolderMock, nvhMock)))
+    val settingsMock: EncryAppSettings = mock[EncryAppSettings]
+    val pgSettingMock: PostgresSettings = mock[PostgresSettings]
+    when(pgSettingMock.writingGap).thenReturn(Some(20))
+    when(settingsMock.postgres).thenReturn(Some(pgSettingMock))
+    val actor: ActorRef = system.actorOf(Props(new BlockListener(dbServiceMock, settingsMock, readersHolderMock)))
     val sampleHeader: Header = genHeader
     val sampleTxs: Seq[Transaction] = genValidPaymentTxs(100)
     val samplePayload: Payload = Payload(sampleHeader.id, sampleTxs)

@@ -2,9 +2,10 @@ package encry.view
 
 import java.io.File
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, ActorSelection, Props}
 import akka.pattern._
 import akka.persistence.RecoveryCompleted
+import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
@@ -17,12 +18,11 @@ import encry.modifiers.state.box.EncryProposition
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
-import encry.network.NodeViewSynchronizer
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
-import encry.utils.Logging
+import encry.utils.NetworkTimeProvider
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
@@ -34,7 +34,6 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
-
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -43,11 +42,11 @@ import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings,
                                                               peerManager: ActorRef,
-                                                              nodeViewSynchronizer: ActorRef,
+                                                              timeProvider: NetworkTimeProvider,
                                                               modifiersHolderOpt: Option[ActorRef] = None,
                                                               statSenderOpt: Option[ActorRef] = None,
                                                               blockListenerOpt: Option[ActorRef] = None)
-  extends Actor with Logging {
+  extends Actor with StrictLogging {
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: Mempool)
 
@@ -61,6 +60,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
     ADProofs.modifierTypeId -> ADProofSerializer,
     Transaction.ModifierTypeId -> TransactionSerializer
   )
+  lazy val nodeViewSynchronizer: ActorSelection = context.system.actorSelection("/user/nodeViewSynchronizer")
+
 
   context.system.scheduler.schedule(5.second, 5.second) {
     statSenderOpt.foreach(_ ! HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight))
@@ -72,7 +73,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
   }
 
   override def postStop(): Unit = {
-    logWarn(s"Stopping EncryNodeViewHolder")
+    logger.warn(s"Stopping EncryNodeViewHolder")
     nodeView.history.closeStorage()
     nodeView.state.closeStorage()
   }
@@ -83,10 +84,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
       blocks.foreach { block =>
         pmodModifyRecovery(block) match {
           case Success(_) =>
-            logInfo(s"Block ${block.encodedId} on height" +
+            logger.info(s"Block ${block.encodedId} on height" +
               s" ${block.header.height} from recovery applied successfully")
           case Failure(th) =>
-            logWarn(s"Failed to apply block ${block.encodedId} on height ${block.header.height} " +
+            logger.warn(s"Failed to apply block ${block.encodedId} on height ${block.header.height} " +
               s"from recovery caused $th")
             applicationsSuccessful = false
             peerManager ! RecoveryCompleted
@@ -99,7 +100,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
       }
       receivedAll = allSent
       if (receivedAll) {
-        logInfo(s"Received all blocks from recovery")
+        logger.info(s"Received all blocks from recovery")
         peerManager ! RecoveryCompleted
         ModifiersCache.setCleaningToTrue()
       }
@@ -111,20 +112,20 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
           case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
             if (nodeView.history.contains(pmod.id) || ModifiersCache.contains(key(pmod.id)))
-              logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
+              logger.warn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
               ModifiersCache.put(key(pmod.id), pmod, nodeView.history)
               if (settings.levelDb.exists(_.enableSave)) modifiersHolderOpt.foreach(_ ! RequestedModifiers(modifierTypeId, Seq(pmod)))
             }
         }
-        logInfo(s"Cache before(${ModifiersCache.size})")
+        logger.info(s"Cache before(${ModifiersCache.size})")
         computeApplications()
         if (ModifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
-        logInfo(s"Cache after(${ModifiersCache.size})")
+        logger.info(s"Cache after(${ModifiersCache.size})")
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
-      logInfo(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
+      logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
       if (settings.levelDb.exists(_.enableSave)) modifiersHolderOpt.foreach(_ ! lm)
     case GetDataFromCurrentView(f) =>
@@ -144,7 +145,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
       }
       sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case a: Any =>
-      logError(s"Strange input: $a")
+      logger.error(s"Strange input: $a")
   }
 
   def computeApplications(): Unit =
@@ -244,14 +245,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
           case None => (uf.history, Success(uf.state), uf.suffix)
         }
       case Failure(e) =>
-        logError(s"Rollback failed: $e")
+        logger.error(s"Rollback failed: $e")
         context.system.eventStream.publish(RollbackFailed(branchingPointOpt))
         EncryApp.forceStopApplication(500)
     }
   }
 
   def pmodModifyRecovery(block: Block): Try[Unit] = if (!nodeView.history.contains(block.id)) Try {
-    logInfo(s"Trying to apply block ${block.encodedId} from recovery")
+    logger.info(s"Trying to apply block ${block.encodedId} from recovery")
     pmodModify(block.header)
     nodeView.history.blockDownloadProcessor.updateBestBlock(block.header)
     pmodModify(block.payload)
@@ -259,12 +260,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
   } else Success(Unit)
 
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
-    logInfo(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
+    logger.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
     statSenderOpt.foreach(_ !StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis()))
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
         statSenderOpt.foreach(_ ! EndOfApplyingModif(pmod.id))
-        logInfo(s"Going to apply modifications to the state: $progressInfo")
+        logger.info(s"Going to apply modifications to the state: $progressInfo")
         nodeViewSynchronizer ! SyntacticallySuccessfulModifier(pmod)
         if (progressInfo.toApply.nonEmpty) {
           val startPoint: Long = System.currentTimeMillis()
@@ -279,18 +280,20 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
                 nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
               else nodeView.wallet
               blocksApplied.foreach(newVault.scanPersistent)
-              logInfo(s"Persistent modifier ${pmod.encodedId} applied successfully")
+              logger.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
               if (progressInfo.chainSwitchingNeeded)
                 blockListenerOpt.foreach(_ !ChainSwitching(progressInfo.toRemove.map(_.id)))
               statSenderOpt.foreach { statSender =>
                   newHistory.bestHeaderOpt.foreach(statSender ! BestHeaderInChain(_, System.currentTimeMillis()))
               }
-              if (newHistory.isFullChainSynced && receivedAll)
-                Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
+              if (newHistory.isFullChainSynced && receivedAll) {
+                nodeViewSynchronizer ! FullBlockChainSynced
+                miner ! FullBlockChainSynced
+              }
               else miner ! DisableMining
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
             case Failure(e) =>
-              logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
+              logger.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
                 s"to minimal state because of: $e")
               updateNodeView(updatedHistory = Some(newHistory))
               nodeViewSynchronizer ! SemanticallyFailedModification(pmod, e)
@@ -300,18 +303,18 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Failure(e) =>
-        logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
+        logger.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
           s" to history caused $e")
         nodeViewSynchronizer ! SyntacticallyFailedModification(pmod, e)
     }
-  } else logWarn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
+  } else logger.warn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
 
   def txModify(tx: Transaction): Unit = nodeView.mempool.put(tx) match {
     case Success(newPool) =>
       val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
       updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, Transaction](tx)
-    case Failure(e) => logWarn(s"Failed to put tx ${tx.id} to mempool" +
+    case Failure(e) => logger.warn(s"Failed to put tx ${tx.id} to mempool" +
       s" with exception ${e.getLocalizedMessage}")
   }
 
@@ -321,7 +324,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
     val state: StateType = {
       if (settings.node.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings.node)
-      else EncryState.generateGenesisUtxoState(stateDir, Some(self))
+      else EncryState.generateGenesisUtxoState(stateDir, Some(self), timeProvider)
     }.asInstanceOf[StateType]
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider, blockListenerOpt)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
@@ -335,11 +338,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
       val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
       val state: StateType =
-        restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
+        restoreConsistentState(EncryState.readOrGenerate(settings, Some(self), timeProvider).asInstanceOf[StateType], history)
       Some(NodeView(history, state, wallet, memPool))
     } catch {
       case ex: Throwable =>
-        logInfo(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
+        logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
         new File(settings.directory).listFiles.foreach(dir => {
           FileUtils.cleanDirectory(dir)
         })
@@ -355,7 +358,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
       (version, digest) match {
         case (Some(_), Some(_)) if settings.node.stateMode.isDigest =>
           DigestState.create(version, digest, dir, settings.node)
-        case _ => EncryState.readOrGenerate(settings, Some(self))
+        case _ => EncryState.readOrGenerate(settings, Some(self), timeProvider)
       }
     }.asInstanceOf[StateType]
       .ensuring(_.rootHash sameElements digest.getOrElse(EncryState.afterGenesisStateDigest), "State root is incorrect")
@@ -364,23 +367,23 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
   def restoreConsistentState(stateIn: StateType, history: EncryHistory): StateType =
     (stateIn.version, history.bestBlockOpt, stateIn) match {
       case (stateId, None, _) if stateId sameElements EncryState.genesisStateVersion =>
-        logInfo(s"State and history are both empty on startup")
+        logger.info(s"State and history are both empty on startup")
         stateIn
       case (stateId, Some(block), _) if stateId sameElements block.id =>
-        logInfo(s"State and history have the same version ${Algos.encode(stateId)}, no recovery needed.")
+        logger.info(s"State and history have the same version ${Algos.encode(stateId)}, no recovery needed.")
         stateIn
       case (_, None, _) =>
-        logInfo(s"State and history are inconsistent." +
+        logger.info(s"State and history are inconsistent." +
           s" History is empty on startup, rollback state to genesis.")
         getRecreatedState()
       case (_, Some(bestBlock), _: DigestState) =>
-        logInfo(s"State and history are inconsistent." +
+        logger.info(s"State and history are inconsistent." +
           s" Going to switch state to version ${bestBlock.encodedId}")
         getRecreatedState(Some(VersionTag !@@ bestBlock.id), Some(bestBlock.header.stateRoot))
       case (stateId, Some(historyBestBlock), state: StateType@unchecked) =>
         val stateBestHeaderOpt = history.typedModifierById[Header](ModifierId !@@ stateId)
         val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
-        logInfo(s"State and history are inconsistent." +
+        logger.info(s"State and history are inconsistent." +
           s" Going to rollback to ${rollbackId.map(Algos.encode)} and " +
           s"apply ${newChain.length} modifiers")
         val startState = rollbackId.map(id => state.rollbackTo(VersionTag !@@ id).get)
@@ -422,14 +425,14 @@ object EncryNodeViewHolder {
 
   def props(settings: EncryAppSettings,
             peerManager: ActorRef,
-            nodeViewSynchronizer: ActorRef,
-            modifiersHolderOpt: Option[ActorRef] = None,
-            statSenderOpt: Option[ActorRef] = None,
-            blockListenerOpt: Option[ActorRef] = None): Props =
+            timeProvider: NetworkTimeProvider,
+            modifiersHolderOpt: Option[ActorRef],
+            statSenderOpt: Option[ActorRef],
+            blockListenerOpt: Option[ActorRef]): Props =
     settings.node.stateMode match {
-    case StateMode.Digest =>
-      Props(classOf[EncryNodeViewHolder[DigestState]], settings, peerManager, nodeViewSynchronizer, modifiersHolderOpt, statSenderOpt, blockListenerOpt)
-    case StateMode.Utxo =>
-      Props(classOf[EncryNodeViewHolder[UtxoState]], settings, peerManager, nodeViewSynchronizer, modifiersHolderOpt, statSenderOpt, blockListenerOpt)
-  }
+      case StateMode.Digest =>
+        Props(new EncryNodeViewHolder[DigestState](settings, peerManager, timeProvider, modifiersHolderOpt, statSenderOpt, blockListenerOpt))
+      case StateMode.Utxo =>
+        Props(new EncryNodeViewHolder[UtxoState](settings, peerManager, timeProvider, modifiersHolderOpt, statSenderOpt, blockListenerOpt))
+    }
 }

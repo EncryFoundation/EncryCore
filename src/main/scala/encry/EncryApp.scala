@@ -7,6 +7,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.ExceptionHandler
 import akka.stream.ActorMaterializer
+import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.routes._
 import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
 import encry.cli.ConsoleListener
@@ -18,8 +19,8 @@ import encry.local.miner.Miner.StartMining
 import encry.network.message._
 import encry.network.{PeerManager, _}
 import encry.settings.EncryAppSettings
-import encry.stats.{KafkaActor, LoggingActor, StatsSender, Zombie}
-import encry.utils.{Logging, NetworkTimeProvider}
+import encry.stats.{KafkaActor, StatsSender, Zombie}
+import encry.utils.NetworkTimeProvider
 import encry.view.{EncryNodeViewHolder, ReadersHolder}
 import org.encryfoundation.common.Algos
 import scala.concurrent.{Await, ExecutionContextExecutor}
@@ -27,7 +28,7 @@ import scala.concurrent.duration._
 import scala.io.Source
 import scala.language.postfixOps
 
-object EncryApp extends App with Logging {
+object EncryApp extends App with StrictLogging {
 
   implicit val system: ActorSystem = ActorSystem()
   implicit val materializer: ActorMaterializer = ActorMaterializer()
@@ -56,47 +57,42 @@ object EncryApp extends App with Logging {
     else None
   val postgresRestoreOpt: Option[ActorRef] =
     if (settings.postgres.exists(_.enableRestore))
-      Some(system.actorOf(Props(classOf[PostgresRestore], dbService, nodeViewHolder, settings, peerManager), "postgresRestore"))
+      Some(system.actorOf(Props(classOf[PostgresRestore], dbService, settings, peerManager), "postgresRestore"))
     else None
-  postgresRestoreOpt.foreach(_ ! StartRecovery)
   val modifiersHolderOpt: Option[ActorRef] =
     if (settings.levelDb.exists(_.enableSave) || settings.levelDb.exists(_.enableRestore))
-      Some(system.actorOf(Props(classOf[ModifiersHolder], settings, nodeViewHolder, postgresRestoreOpt), "modifiersHolder"))
+      Some(system.actorOf(Props(classOf[ModifiersHolder], settings, postgresRestoreOpt), "modifiersHolder"))
     else None
-  val readersHolder: ActorRef = system.actorOf(Props(classOf[ReadersHolder], nodeViewHolder), "readersHolder")
+  val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
   val blockListenerOpt: Option[ActorRef] =
     if (settings.postgres.exists(_.enableSave))
-      Some(system.actorOf(Props(classOf[BlockListener], dbService, settings, readersHolder, nodeViewHolder), "blockListener"))
+      Some(system.actorOf(Props(classOf[BlockListener], dbService, settings, readersHolder), "blockListener"))
     else None
+  val networkController: ActorRef = system.actorOf(Props(classOf[NetworkController], settings, peerManager, statsSenderOpt)
+    .withDispatcher("network-dispatcher"), "networkController")
   val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[NodeViewSynchronizer], settings, networkController, statsSenderOpt), "nodeViewSynchronizer")
-  lazy val peerManager: ActorRef = system.actorOf(Props(classOf[PeerManager], settings, nodeViewSynchronizer), "peerManager")
-  lazy val nodeViewHolder: ActorRef =
-    system.actorOf(EncryNodeViewHolder.props(
-      settings,
-      peerManager,
-      nodeViewSynchronizer,
-      modifiersHolderOpt = modifiersHolderOpt,
-      statSenderOpt = statsSenderOpt,
-      blockListenerOpt = blockListenerOpt)
-    .withDispatcher("nvh-dispatcher").withMailbox("nvh-mailbox"), "nodeViewHolder")
-  lazy val networkController: ActorRef = system.actorOf(Props(classOf[NetworkController], settings, peerManager, statsSenderOpt)
-    .withDispatcher("network-dispatcher"), "networkController")
-  lazy val miner: ActorRef = system.actorOf(Props(classOf[Miner], settings, nodeViewHolder, statsSenderOpt), "miner")
+  lazy val peerManager: ActorRef = system.actorOf(Props(classOf[PeerManager], settings, timeProvider), "peerManager")
+  val nvhProps = EncryNodeViewHolder.props(settings, peerManager, timeProvider, modifiersHolderOpt, statsSenderOpt, blockListenerOpt)
+  val nodeViewHolder: ActorRef =
+    system.actorOf(nvhProps.withDispatcher("nvh-dispatcher").withMailbox("nvh-mailbox"), "nodeViewHolder")
+  modifiersHolderOpt.foreach(_ ! nodeViewHolder)
+  readersHolder ! nodeViewHolder
+  blockListenerOpt.foreach(_ ! nodeViewHolder)
+  postgresRestoreOpt.foreach(_ ! nodeViewHolder)
+  nodeViewSynchronizer ! nodeViewHolder
+  lazy val miner: ActorRef = system.actorOf(Props(classOf[Miner], settings, nodeViewHolder, timeProvider, statsSenderOpt), "miner")
   val kafkaSenderOpt: Option[ActorRef] =
     if (settings.kafka.exists(_.sendToKafka))
       Some(system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor"))
     else None
-
   if (settings.node.mining) miner ! StartMining
   if (settings.node.useCli) {
     system.actorOf(Props(classOf[ConsoleListener], settings), "cliListener")
     system.actorSelection("/user/cliListener") ! StartListening
   }
-  if (settings.node.loggingMode != "off") {
-    system.actorOf(Props(classOf[LoggingActor], statsSenderOpt, kafkaSenderOpt), "loggingActor")
-    system.actorOf(Props[Zombie], "zombie")
-  }
+  system.actorOf(Props[Zombie], "zombie")
+
 
   if (settings.restApi.enabled.getOrElse(false)) {
     import akka.http.scaladsl.model.StatusCodes._
@@ -105,7 +101,7 @@ object EncryApp extends App with Logging {
       ExceptionHandler {
         case e: Exception =>
           extractUri { uri =>
-            logError(s"Request to $uri could not be handled normally due to: $e")
+            logger.error(s"Request to $uri could not be handled normally due to: $e")
             complete(HttpResponse(InternalServerError, entity = "Internal server error"))
           }
       }

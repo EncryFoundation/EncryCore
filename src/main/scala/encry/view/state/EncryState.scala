@@ -1,16 +1,19 @@
 package encry.view.state
 
 import java.io.File
+
 import akka.actor.ActorRef
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
 import encry.modifiers.state.box._
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
-import encry.utils.Logging
+import encry.utils.NetworkTimeProvider
 import io.iohk.iodb.Store
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scorex.crypto.encode.Base16
+
 import scala.util.Try
 
 trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
@@ -46,7 +49,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   override type NVCT = this.type
 }
 
-object EncryState extends Logging {
+object EncryState extends StrictLogging {
 
   def initialStateBoxes: IndexedSeq[AssetBox] = IndexedSeq(AssetBox(EncryProposition.open, -9, 0))
 
@@ -58,12 +61,12 @@ object EncryState extends Logging {
 
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
-  def generateGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
+  def generateGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef], timeProvider: NetworkTimeProvider): UtxoState = {
     val supplyBoxes: List[EncryBaseBox] = EncryState.initialStateBoxes.toList
-    UtxoState.genesis(supplyBoxes, stateDir, nodeViewHolderRef).ensuring(us => {
-      logInfo(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
-      logInfo(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
-      logInfo(s"Generated UTXO state with ${supplyBoxes.size} boxes inside.")
+    UtxoState.genesis(supplyBoxes, stateDir, nodeViewHolderRef, timeProvider).ensuring(us => {
+      logger.info(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
+      logger.info(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
+      logger.info(s"Generated UTXO state with ${supplyBoxes.size} boxes inside.")
       us.rootHash.sameElements(afterGenesisStateDigest) && us.version.sameElements(genesisStateVersion)
     })
   }
@@ -71,13 +74,13 @@ object EncryState extends Logging {
   def generateGenesisDigestState(stateDir: File, settings: NodeSettings): DigestState =
     DigestState.create(Some(genesisStateVersion), Some(afterGenesisStateDigest), stateDir, settings)
 
-  def readOrGenerate(settings: EncryAppSettings, nodeViewHolderRef: Option[ActorRef]): EncryState[_] = {
+  def readOrGenerate(settings: EncryAppSettings, nodeViewHolderRef: Option[ActorRef], timeProvider: NetworkTimeProvider): EncryState[_] = {
     val stateDir: File = getStateDir(settings)
     stateDir.mkdirs()
     settings.node.stateMode match {
       case StateMode.Digest => DigestState.create(None, None, stateDir, settings.node)
-      case StateMode.Utxo if stateDir.listFiles().nonEmpty => UtxoState.create(stateDir, nodeViewHolderRef)
-      case _ => EncryState.generateGenesisUtxoState(stateDir, nodeViewHolderRef)
+      case StateMode.Utxo if stateDir.listFiles().nonEmpty => UtxoState.create(stateDir, nodeViewHolderRef, timeProvider)
+      case _ => EncryState.generateGenesisUtxoState(stateDir, nodeViewHolderRef, timeProvider)
     }
   }
 }

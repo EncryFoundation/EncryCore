@@ -6,13 +6,12 @@ import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, DataBox}
 import encry.modifiers.state.box.EncryBaseBox
-import encry.EncryApp.timeProvider
 import io.circe.{Decoder, HCursor}
 import io.circe.syntax._
 import org.encryfoundation.common.transaction._
 import org.encryfoundation.prismlang.core.Types
 import encry.settings.Constants
-import encry.utils.CoreTaggedTypes
+import encry.utils.{CoreTaggedTypes, NetworkTimeProvider}
 import io.circe.Encoder
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.{Input, Proof}
@@ -53,9 +52,9 @@ case class Transaction(fee: Amount,
   override def toString: String =
     s"<Transaction id=${Algos.encode(id)}\nfee=$fee\ninputs=$inputs\ndirectives=$directives\nts=$timestamp\nproofs=$defaultProofOpt>"
 
-  lazy val semanticValidity: Try[Unit] = accumulateErrors
+  def semanticValidity(estimatedTime: Long): Try[Unit] = accumulateErrors
     .demand(fee >= 0, "Negative fee amount")
-    .demand(timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift, "Invalid timestamp")
+    .demand(timestamp - estimatedTime <= Constants.Chain.MaxTimeDrift, "Invalid timestamp")
     .demand(inputs.lengthCompare(inputs.toSet.size) == 0, "Inputs duplication")
     .demand(inputs.lengthCompare(Short.MaxValue) <= 0, "Wrong number of inputs")
     .demand(directives.lengthCompare(Short.MaxValue) <= 0 && directives.nonEmpty, "Wrong number of directives")

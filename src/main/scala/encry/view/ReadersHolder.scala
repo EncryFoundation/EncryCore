@@ -8,18 +8,16 @@ import encry.view.history.EncryHistoryReader
 import encry.view.mempool.MempoolReader
 import encry.view.state.UtxoStateReader
 
-class ReadersHolder(nodeViewHolder: ActorRef) extends Actor {
+class ReadersHolder extends Actor {
 
-  override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[NodeViewChange])
-    nodeViewHolder ! GetNodeViewChanges(history = true, state = true, vault = true, mempool = true)
-  }
+  override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[NodeViewChange])
 
   var historyReaderOpt: Option[EncryHistoryReader] = None
   var stateReaderOpt: Option[UtxoStateReader] = None
   var mempoolReaderOpt: Option[MempoolReader] = None
 
   override def receive: Receive = {
+    case nvh: ActorRef => nvh ! GetNodeViewChanges(history = true, state = true, vault = true, mempool = true)
     case ChangedHistory(reader: EncryHistoryReader@unchecked) if reader.isInstanceOf[EncryHistoryReader] =>
       historyReaderOpt = Some(reader)
     case ChangedState(reader: UtxoStateReader@unchecked) if reader.isInstanceOf[UtxoStateReader] =>

@@ -11,7 +11,6 @@ import encry.consensus.EncrySupplyController
 import encry.modifiers.history.Header
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
-import encry.stats.LoggingActor.LogMessage
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
 import org.influxdb.{InfluxDB, InfluxDBFactory}
@@ -47,16 +46,6 @@ class StatsSender(settings: EncryAppSettings) extends Actor {
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
   override def receive: Receive = {
-    case LogMessage(logLevel, logMessage, logTime) => influxDB.write(InfluxPort,
-      s"""logsFromNode,nodeName=${nodeName},logLevel=${
-        logLevel match {
-          case "Info" => 1
-          case "Debug" => 2
-          case "Warn" => 3
-          case "Error" => 4
-          case _ => 4
-        }
-      } value="[${sdf.format(logTime)}] $logMessage"""")
     case HeightStatistics(bestHeaderHeight, bestBlockHeight) =>
       influxDB.write(InfluxPort,
         s"chainStat,nodeName=${nodeName} value=$bestHeaderHeight,bestBlockHeight=$bestBlockHeight")
