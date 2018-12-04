@@ -22,9 +22,16 @@ import scala.util.{Failure, Success, Try}
 class PostgresRestore(dbService: DBService, settings: EncryAppSettings, peerManager: ActorRef)
   extends Actor with StrictLogging {
 
-  val heightFuture: Future[Int] = dbService.selectHeightOpt.map(_.getOrElse(0))
-  var nvhOpt: Option[ActorRef] = None
+  val heightFuture: Future[Int] =
+    dbService
+      .selectHeightOpt.map(_.getOrElse(0))
+      .recoverWith {
+        case NonFatal(th) =>
+          context.parent ! BlocksFromLocalPersistence(Seq.empty, true)
+          Future.failed(th)
+      }
 
+  override def preStart(): Unit = context.parent ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
   override def postStop(): Unit = if (settings.postgres.exists(_.enableSave)) Unit else dbService.shutdown()
 
   heightFuture.onComplete {
@@ -40,14 +47,6 @@ class PostgresRestore(dbService: DBService, settings: EncryAppSettings, peerMana
   }
 
   override def receive: Receive = {
-    case nvh: ActorRef =>
-      nvhOpt = Some(nvh)
-      heightFuture.recoverWith {
-        case NonFatal(th) =>
-          nvh ! BlocksFromLocalPersistence(Seq.empty, true)
-          Future.failed(th)
-      }
-      nvh ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
     case ChangedHistory(history) =>
       val currentNodeHeight = history.bestBlockOpt.map(_.header.height).getOrElse(0)
       startRecovery(if (currentNodeHeight == 0) 0 else currentNodeHeight + 1).map { _ =>
@@ -58,7 +57,7 @@ class PostgresRestore(dbService: DBService, settings: EncryAppSettings, peerMana
 
   def startRecovery(startFrom: Int): Future[Unit] = heightFuture.flatMap { height =>
     if (height <= startFrom) {
-      nvhOpt.foreach(_ ! BlocksFromLocalPersistence(Seq.empty, true))
+      context.parent ! BlocksFromLocalPersistence(Seq.empty, true)
       Future.unit
     } else settings.postgres.flatMap(_.restoreBatchSize) match {
       case Some(step) =>
@@ -67,7 +66,7 @@ class PostgresRestore(dbService: DBService, settings: EncryAppSettings, peerMana
           val from: Int = slide.head
           val to: Int = slide.last
           prevBlocks.flatMap { retrievedBlocks =>
-            nvhOpt.foreach(_ ! BlocksFromLocalPersistence(retrievedBlocks, to == height))
+            context.parent ! BlocksFromLocalPersistence(retrievedBlocks, to == height)
             selectBlocksByRange(from, to)
               .recoverWith {
                 case NonFatal(th) =>

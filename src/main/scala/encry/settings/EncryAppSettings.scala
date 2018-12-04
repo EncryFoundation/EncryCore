@@ -8,7 +8,6 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 case class EncryAppSettings(directory: String,
                             node: NodeSettings,
                             wallet: Option[WalletSettings],
-                            kafka: Option[KafkaSettings],
                             network: NetworkSettings,
                             restApi: RESTApiSettings,
                             ntp: NetworkTimeProviderSettings,
@@ -26,8 +25,6 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader {
 case class WalletSettings(password: String, seed: Option[String])
 
 case class LevelDbSettings(enableSave: Boolean, enableRestore: Boolean, batchSize: Int)
-
-case class KafkaSettings(sendToKafka: Boolean, topicName: String, groupId: String, kafkaBrokers: String)
 
 case class InfluxDBSettings(url: String, login: String, password: String, udpPort: Int)
 

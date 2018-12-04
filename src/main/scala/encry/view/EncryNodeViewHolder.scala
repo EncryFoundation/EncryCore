@@ -1,15 +1,16 @@
 package encry.view
 
 import java.io.File
-
-import akka.actor.{Actor, ActorRef, ActorSelection, Props}
 import akka.pattern._
+import akka.actor.{Actor, ActorRef, ActorSelection, Props}
 import akka.persistence.RecoveryCompleted
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
-import encry.EncryApp._
+import encry.EncryApp.miner
 import encry.consensus.History.ProgressInfo
+import encry.local.explorer.BlockListener
 import encry.local.explorer.BlockListener.ChainSwitching
+import encry.local.explorer.database.DBService
 import encry.local.miner.Miner.DisableMining
 import encry.modifiers._
 import encry.modifiers.history._
@@ -17,6 +18,7 @@ import encry.modifiers.mempool.{Transaction, TransactionSerializer}
 import encry.modifiers.state.box.EncryProposition
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
+import encry.network.{ModifiersHolder, PostgresRestore}
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
@@ -36,20 +38,21 @@ import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryAppSettings,
                                                               peerManager: ActorRef,
                                                               timeProvider: NetworkTimeProvider,
-                                                              modifiersHolderOpt: Option[ActorRef] = None,
-                                                              statSenderOpt: Option[ActorRef] = None,
-                                                              blockListenerOpt: Option[ActorRef] = None)
+                                                              statSenderOpt: Option[ActorRef],
+                                                              readersHolder: ActorRef,
+                                                              dbService: DBService)
   extends Actor with StrictLogging {
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: Mempool)
 
+  implicit val ec: ExecutionContext = context.dispatcher
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
   var receivedAll: Boolean = !(settings.postgres.exists(_.enableRestore) || settings.levelDb.exists(_.enableRestore))
@@ -61,7 +64,18 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
     Transaction.ModifierTypeId -> TransactionSerializer
   )
   lazy val nodeViewSynchronizer: ActorSelection = context.system.actorSelection("/user/nodeViewSynchronizer")
-
+  val postgresRestoreOpt: Option[ActorRef] =
+    if (settings.postgres.exists(_.enableRestore))
+      Some(context.actorOf(Props(classOf[PostgresRestore], dbService, settings, peerManager), "postgresRestore"))
+    else None
+  val modifiersHolderOpt: Option[ActorRef] =
+    if (settings.levelDb.exists(_.enableSave) || settings.levelDb.exists(_.enableRestore))
+      Some(context.actorOf(Props(classOf[ModifiersHolder], settings, postgresRestoreOpt), "modifiersHolder"))
+    else None
+  val blockListenerOpt: Option[ActorRef] =
+    if (settings.postgres.exists(_.enableSave))
+      Some(context.actorOf(Props(classOf[BlockListener], dbService, settings, readersHolder), "blockListener"))
+    else None
 
   context.system.scheduler.schedule(5.second, 5.second) {
     statSenderOpt.foreach(_ ! HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight))
@@ -328,7 +342,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
     }.asInstanceOf[StateType]
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider, blockListenerOpt)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
-    val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
+    val memPool: Mempool = Mempool.empty(settings, timeProvider, context.system)
     NodeView(history, state, wallet, memPool)
   }
 
@@ -336,7 +350,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
     try {
       val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider, blockListenerOpt)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
-      val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
+      val memPool: Mempool = Mempool.empty(settings, timeProvider, context.system)
       val state: StateType =
         restoreConsistentState(EncryState.readOrGenerate(settings, Some(self), timeProvider).asInstanceOf[StateType], history)
       Some(NodeView(history, state, wallet, memPool))
@@ -426,13 +440,13 @@ object EncryNodeViewHolder {
   def props(settings: EncryAppSettings,
             peerManager: ActorRef,
             timeProvider: NetworkTimeProvider,
-            modifiersHolderOpt: Option[ActorRef],
             statSenderOpt: Option[ActorRef],
-            blockListenerOpt: Option[ActorRef]): Props =
+            readersHolder: ActorRef,
+            dbService: DBService): Props =
     settings.node.stateMode match {
       case StateMode.Digest =>
-        Props(new EncryNodeViewHolder[DigestState](settings, peerManager, timeProvider, modifiersHolderOpt, statSenderOpt, blockListenerOpt))
+        Props(new EncryNodeViewHolder[DigestState](settings, peerManager, timeProvider, statSenderOpt, readersHolder, dbService))
       case StateMode.Utxo =>
-        Props(new EncryNodeViewHolder[UtxoState](settings, peerManager, timeProvider, modifiersHolderOpt, statSenderOpt, blockListenerOpt))
+        Props(new EncryNodeViewHolder[UtxoState](settings, peerManager, timeProvider, statSenderOpt, readersHolder, dbService))
     }
 }

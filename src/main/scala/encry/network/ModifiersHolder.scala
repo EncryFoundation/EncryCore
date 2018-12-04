@@ -11,7 +11,6 @@ import encry.network.ModifiersHolder._
 import encry.settings.EncryAppSettings
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{BlocksFromLocalPersistence, LocallyGeneratedModifier}
 import org.encryfoundation.common.Algos
-
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -23,7 +22,6 @@ class ModifiersHolder(settings: EncryAppSettings, postgresRestoreOpt: Option[Act
   var payloads: Map[String, (Payload, Int)] = Map.empty
   var nonCompletedBlocks: Map[String, String] = Map.empty
   var completedBlocks: SortedMap[Int, Block] = SortedMap.empty
-  var nvhOpt: Option[ActorRef] = None
 
   context.system.scheduler.schedule(10.second, 30.second) {
     logger.debug(Statistics(headers, payloads, nonCompletedBlocks, completedBlocks).toString)
@@ -59,7 +57,6 @@ class ModifiersHolder(settings: EncryAppSettings, postgresRestoreOpt: Option[Act
   }
 
   override def receiveCommand: Receive = {
-    case nvh: ActorRef => nvhOpt = Some(nvh)
     case CheckAllBlocksSent =>
       if (completedBlocks.isEmpty) notifyRecoveryCompleted()
       else context.system.scheduler.scheduleOnce(5 seconds)(self ! CheckAllBlocksSent)
@@ -71,8 +68,8 @@ class ModifiersHolder(settings: EncryAppSettings, postgresRestoreOpt: Option[Act
       completedBlocks = completedBlocks.drop(settings.levelDb
         .map(_.batchSize)
         .getOrElse(throw new RuntimeException("batchsize not specified")))
-      nvhOpt.foreach(_ ! BlocksFromLocalPersistence(blocksToSend, completedBlocks.isEmpty &&
-        !settings.postgres.exists(_.enableRestore)))
+      context.parent ! BlocksFromLocalPersistence(blocksToSend, completedBlocks.isEmpty &&
+        !settings.postgres.exists(_.enableRestore))
 
     case RequestedModifiers(modifierTypeId, modifiers) => updateModifiers(modifierTypeId, modifiers)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] => updateModifiers(lm.pmod.modifierTypeId, Seq(lm.pmod))

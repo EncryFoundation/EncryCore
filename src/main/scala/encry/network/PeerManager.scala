@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
-
 import akka.actor.{Actor, ActorSelection}
 import akka.persistence.RecoveryCompleted
 import com.typesafe.scalalogging.StrictLogging

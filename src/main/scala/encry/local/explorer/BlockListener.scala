@@ -17,7 +17,10 @@ import scala.util.{Failure, Success}
 
 class BlockListener(dbService: DBService, settings: EncryAppSettings, readersHolder: ActorRef) extends Actor with StrictLogging {
 
-  override def preStart(): Unit = logger.info(s"Start listening to new blocks.")
+  override def preStart(): Unit = {
+    context.parent ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
+    logger.info(s"Start listening to new blocks.")
+  }
 
   override def postStop(): Unit = dbService.shutdown()
 
@@ -40,9 +43,6 @@ class BlockListener(dbService: DBService, settings: EncryAppSettings, readersHol
   }
 
   override def receive: Receive = orphanedAndChainSwitching.orElse {
-    case nvh: ActorRef =>
-      nvh ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
-      nvhOpt = Some(nvh)
     case ChangedHistory(history) => currentDbHeightFuture.map { dbHeight =>
       val currentHistoryHeight: Height = history.bestBlockOpt.map(_.header.height).getOrElse(0)
       if (dbHeight <= currentHistoryHeight && currentHistoryHeight >= writingGap) {
@@ -56,7 +56,7 @@ class BlockListener(dbService: DBService, settings: EncryAppSettings, readersHol
   def operating(history: EncryHistoryReader, pending: Vector[Int] = Vector(), lastUploaded: Int): Receive =
     orphanedAndChainSwitching.orElse {
       case NewBestBlock(newHeight) =>
-        nvhOpt.foreach(_ ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false))
+        context.parent ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
 
         val newPending: Seq[Height] =
           if (newHeight != 0 && newHeight - writingGap - lastUploaded > 1) (lastUploaded + 1 until (newHeight - writingGap)).toVector
@@ -91,7 +91,7 @@ class BlockListener(dbService: DBService, settings: EncryAppSettings, readersHol
               self ! UploadToDbOnHeight(height)
           }
         }
-      case UploadToDbOnHeight(_) => nvhOpt.foreach(_ ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false))
+      case UploadToDbOnHeight(_) => context.parent ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
       case ChangedHistory(newHistory) => context.become(operating(newHistory, pending, newHistory.bestBlockOpt.map(_.header.height).getOrElse(0)))
       case NewBestBlock(height) => context.become(uploadGap(history, currentHeight, pending :+ height))
     }
