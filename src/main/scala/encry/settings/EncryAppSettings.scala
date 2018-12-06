@@ -1,8 +1,9 @@
 package encry.settings
 
 import java.io.File
-import com.typesafe.config.{Config, ConfigFactory}
+
 import com.typesafe.scalalogging.StrictLogging
+import com.typesafe.config.{Config, ConfigFactory}
 import encry.EncryApp
 import encry.utils.NetworkTimeProviderSettings
 import net.ceedubs.ficus.Ficus._
@@ -57,6 +58,8 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     fromConfig(readConfigFromPath(userConfigPath))
   }
 
+  val allConfig: Config = ConfigFactory.load("local.conf")
+    .withFallback(ConfigFactory.load())
   def fromConfig(config: Config): EncryAppSettings = {
 
     val directory = config.as[String](s"$configPath.directory")
@@ -90,9 +93,6 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     logger.error(s"Stop application due to malformed configuration file: $msg")
     EncryApp.forceStopApplication()
   }
-
-  val allConfig: Config = ConfigFactory.load("local.conf")
-    .withFallback(ConfigFactory.load())
 }
 
 case class WalletSettings(password: String, seed: Option[String])
