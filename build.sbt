@@ -65,6 +65,7 @@ libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-io" % "1.3.2",
   "org.apache.kafka" % "kafka-clients" % "2.0.0",
   "commons-net" % "commons-net" % "3.6",
+  "org.aspectj" % "aspectjweaver" % "1.9.2"
 ) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
