@@ -7,6 +7,7 @@ val akkaVersion = "2.5.13"
 val akkaHttpVersion = "10.0.9"
 val doobieVersion = "0.5.2"
 val logbackVersion = "1.2.3"
+val kamonVersion = "0.6.6"
 
 val databaseDependencies = Seq(
   "org.tpolecat" %% "doobie-core" % doobieVersion,
@@ -36,6 +37,13 @@ val testingDependencies = Seq(
   "org.mockito" % "mockito-core" % "2.19.1" % Test
 )
 
+lazy val monitoringDependencies = Seq(
+  "io.kamon" %% "kamon-core" % kamonVersion,
+  "io.kamon" %% "kamon-akka-2.5" % kamonVersion,
+  "io.kamon" %% "kamon-system-metrics" % kamonVersion,
+  "io.kamon" %% "kamon-influxdb" % "1.0.1"
+)
+
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
@@ -55,8 +63,8 @@ libraryDependencies ++= Seq(
   "org.influxdb" % "influxdb-java" % "2.10",
   "org.apache.commons" % "commons-io" % "1.3.2",
   "org.apache.kafka" % "kafka-clients" % "2.0.0",
-  "commons-net" % "commons-net" % "3.6"
-) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies
+  "commons-net" % "commons-net" % "3.6",
+) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
   "SonaType" at "https://oss.sonatype.org/content/groups/public",
