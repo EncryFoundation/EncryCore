@@ -21,6 +21,9 @@ import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, LoggingActor, StatsSender, Zombie}
 import encry.utils.{Logging, NetworkTimeProvider}
 import encry.view.{EncryNodeViewHolder, ReadersHolder}
+import kamon.Kamon
+import kamon.influxdb.InfluxDBReporter
+import kamon.system.SystemMetrics
 import org.encryfoundation.common.Algos
 import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
@@ -36,6 +39,7 @@ object EncryApp extends App with Logging {
   lazy val settings: EncryAppSettings = EncryAppSettings.read
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
   lazy val dbService: DBService = DBService()
+
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
   val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName
     .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)).take(5)
@@ -60,6 +64,11 @@ object EncryApp extends App with Logging {
   lazy val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[NodeViewSynchronizer]), "nodeViewSynchronizer")
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
+  if (settings.monitoringSettings.exists(_.kamonEnabled)) {
+    Kamon.reconfigure(EncryAppSettings.allConfig)
+    Kamon.addReporter(new InfluxDBReporter())
+    SystemMetrics.startCollecting()
+  }
   if (settings.influxDB.isDefined) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.kafka.exists(_.sendToKafka))
     system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
