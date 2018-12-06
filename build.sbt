@@ -39,8 +39,8 @@ val testingDependencies = Seq(
 
 lazy val monitoringDependencies = Seq(
   "io.kamon" %% "kamon-core" % kamonVersion,
-  "io.kamon" %% "kamon-akka-2.5" % kamonVersion,
-  "io.kamon" %% "kamon-system-metrics" % kamonVersion,
+  "io.kamon" %% "kamon-akka-2.5" % "1.1.0",
+  "io.kamon" %% "kamon-system-metrics" % "1.0.0",
   "io.kamon" %% "kamon-influxdb" % "1.0.1"
 )
 
@@ -53,6 +53,7 @@ libraryDependencies ++= Seq(
   "javax.xml.bind" % "jaxb-api" % "2.3.0",
   "com.iheart" %% "ficus" % "1.4.2",
   "org.slf4j" % "slf4j-api" % "1.7.25",
+  "com.typesafe.akka" %% "akka-slf4j" % "2.5.18",
   "org.bouncycastle" % "bcprov-jdk15on" % "1.58",
   "org.whispersystems" % "curve25519-java" % "0.5.0",
   "org.rudogma" %% "supertagged" % "1.4",
