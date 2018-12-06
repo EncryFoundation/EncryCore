@@ -1,7 +1,6 @@
 package encry.settings
 
 import java.io.File
-
 import com.typesafe.scalalogging.StrictLogging
 import com.typesafe.config.{Config, ConfigFactory}
 import encry.EncryApp
