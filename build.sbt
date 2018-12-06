@@ -7,7 +7,7 @@ val akkaVersion = "2.5.13"
 val akkaHttpVersion = "10.0.9"
 val doobieVersion = "0.5.2"
 val logbackVersion = "1.2.3"
-val kamonVersion = "0.6.6"
+val kamonVersion = "1.1.0"
 
 val databaseDependencies = Seq(
   "org.tpolecat" %% "doobie-core" % doobieVersion,
