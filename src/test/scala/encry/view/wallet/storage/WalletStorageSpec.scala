@@ -3,9 +3,11 @@ package encry.view.wallet.storage
 import encry.utils.FileHelper
 import encry.view.wallet.WalletStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.scalatest.{Matchers, PropSpec}
 
+import scala.collection.immutable
 import scala.util.{Random, Try}
 
 class WalletStorageSpec extends PropSpec with Matchers {
@@ -17,11 +19,22 @@ class WalletStorageSpec extends PropSpec with Matchers {
 
     val values: Seq[Array[Byte]] = Seq(Array.fill(32)(1: Byte), Array.fill(32)(2: Byte), Array.fill(32)(3: Byte))
 
-    val packedValues: ByteArrayWrapper = new ByteArrayWrapper(values.foldLeft(Array[Byte]())(_ ++ _))
+    val values2: Seq[Array[Byte]] = (0 to 3000).map { x =>
+      Algos.hash(x.toString)
+    }
+
+    val packedValues: ByteArrayWrapper = new ByteArrayWrapper(values2.foldLeft(Array[Byte]())(_ ++ _))
 
     val key: ByteArrayWrapper = ByteArrayWrapper(scorex.utils.Random.randomBytes())
 
     walletStorage.store.update(Random.nextLong(), Seq(), Seq(key -> packedValues))
+
+
+    (0 to 100).foreach { _ =>
+      val a = System.currentTimeMillis()
+      walletStorage.store.getAll()
+      println(s"Diff is: ${(System.currentTimeMillis() - a)}")
+    }
 
     def parseComplexValue(bytes: Array[Byte], unitLen: Int): Try[Seq[Array[Byte]]] = Try {
       bytes.sliding(unitLen, unitLen).foldLeft(Seq[Array[Byte]]())(_ :+ _)

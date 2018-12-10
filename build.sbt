@@ -1,3 +1,5 @@
+import sbt._
+
 name := "EncryCore"
 version := "0.9.3"
 organization := "org.encryfoundation"
@@ -64,6 +66,11 @@ libraryDependencies ++= Seq(
   "org.influxdb" % "influxdb-java" % "2.10",
   "org.apache.commons" % "commons-io" % "1.3.2",
   "org.apache.kafka" % "kafka-clients" % "2.0.0",
+  "commons-net" % "commons-net" % "3.6",
+  "com.spotify" % "docker-client" % "8.11.0" % "test" classifier "shaded",
+  "org.asynchttpclient" % "async-http-client" % "2.4.7",
+  "com.spotify" % "docker-client" % "8.11.3",
+  "io.monix" %% "monix" % "3.0.0-RC1",
   "commons-net" % "commons-net" % "3.6",
   "org.aspectj" % "aspectjweaver" % "1.9.2"
 ) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies
