@@ -62,7 +62,7 @@ trait NodeApi {
     post(s"http://$restAddress", nodeRestPort, path,
       (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(body))
 
-  def JsonAnswerAs[A](body: String)(implicit d: Decoder[A]): A = parse(body)
+  def jsonAnswerAs[A](body: String)(implicit d: Decoder[A]): A = parse(body)
     .flatMap(_.as[A])
     .fold(e => throw e, r => r)
 
@@ -70,15 +70,15 @@ trait NodeApi {
     post("/debug/blacklist", s"$networkIpAddress:$hostNetworkPort").map(_ => ())
 
   def connectedPeers: Future[Seq[Peer]] = get("/peers/connected").map { r =>
-    JsonAnswerAs[Seq[Peer]](r.getResponseBody)
+    jsonAnswerAs[Seq[Peer]](r.getResponseBody)
   }
 
   def allPeers: Future[Seq[Peer]] = get("/peers/all").map { r =>
-    JsonAnswerAs[Seq[Peer]](r.getResponseBody)
+    jsonAnswerAs[Seq[Peer]](r.getResponseBody)
   }
 
   def blacklistedPeers: Future[Seq[BlacklistedPeer]] = get("/peers/blacklisted").map { r =>
-    JsonAnswerAs[Seq[BlacklistedPeer]](r.getResponseBody)
+    jsonAnswerAs[Seq[BlacklistedPeer]](r.getResponseBody)
   }
 
   def connect(addressAndPort: String): Future[Unit] = post("/peers/connect", addressAndPort).map(_ => ())
@@ -94,7 +94,7 @@ trait NodeApi {
   def waitForStartup: Future[this.type] = get("/info").map(_ => this)
 
   def height: Future[Int] = get("/info") flatMap { r =>
-    val response = JsonAnswerAs[Json](r.getResponseBody)
+    val response = jsonAnswerAs[Json](r.getResponseBody)
     val eitherHeight = response.hcursor.downField("fullHeight").as[Option[Int]]
     eitherHeight.fold[Future[Int]](
       e => Future.failed(new Exception(s"Error getting `fullHeight` from /info response: $e\n$response", e)),
@@ -102,18 +102,18 @@ trait NodeApi {
     )
   }
 
-  def status: Future[Status] = get("/info").map(j => Status(JsonAnswerAs[Json](j.getResponseBody).noSpaces))
+  def status: Future[Status] = get("/info").map(j => Status(jsonAnswerAs[Json](j.getResponseBody).noSpaces))
 
-  def info: Future[NodeInfo] = get("/info").map(r => JsonAnswerAs[NodeInfo](r.getResponseBody))
+  def info: Future[NodeInfo] = get("/info").map(r => jsonAnswerAs[NodeInfo](r.getResponseBody))
 
   def headerIdsByHeight(h: Int): Future[Seq[String]] = get(s"/blocks/at/$h")
-    .map(j => JsonAnswerAs[Seq[String]](j.getResponseBody))
+    .map(j => jsonAnswerAs[Seq[String]](j.getResponseBody))
 
   def headerById(id: String): Future[Header] = get(s"/blocks/$id/header")
-    .map(r => JsonAnswerAs[Header](r.getResponseBody))
+    .map(r => jsonAnswerAs[Header](r.getResponseBody))
 
   def headers(offset: Int, limit: Int): Future[Seq[String]] = get(s"/blocks?offset=$offset&limit=$limit")
-    .map(r => JsonAnswerAs[Seq[String]](r.getResponseBody))
+    .map(r => jsonAnswerAs[Seq[String]](r.getResponseBody))
 
   def waitFor[A](f: this.type => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] = {
     timer.retryUntil(f(this), cond, retryInterval)
