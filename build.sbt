@@ -148,3 +148,5 @@ sourceGenerators in Compile += Def.task {
        |""".stripMargin)
   Seq(versionFile)
 }
+
+lazy val it = project

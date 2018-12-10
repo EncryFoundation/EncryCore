@@ -1,7 +1,9 @@
 package encry.it.docker
 
 import java.net.{InetAddress, InetSocketAddress, URL}
+
 import com.typesafe.config.Config
+import com.typesafe.scalalogging.{Logger, StrictLogging}
 import encry.EncryApp.settings
 import encry.it.util.GlobalTimer
 import encry.settings.{Constants, EncryAppSettings}
@@ -13,13 +15,14 @@ import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
 import scala.concurrent.duration.FiniteDuration
 
-abstract class Node(config: Config) extends AutoCloseable {
+abstract class Node(config: Config) extends AutoCloseable with StrictLogging {
 
+  val log: Logger = logger
   val settings: EncryAppSettings = EncryAppSettings.fromConfig(config)
   val client: AsyncHttpClient = asyncHttpClient(
     clientConfig()
       .setKeepAlive(false)
-      .setNettyTimer(GlobalTimer.instance))
+      .setNettyTimer(GlobalTimer.timer))
 
   val keyPair: (PrivateKey, PublicKey) =
     Curve25519.createKeyPair(Algos.decode(settings.wallet.flatMap(_.seed).getOrElse("")).get)

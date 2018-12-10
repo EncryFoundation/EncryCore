@@ -18,7 +18,7 @@ import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.ConfigFactory._
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import monix.eval.Coeval
-import encry.it.util.GlobalTimer.{instance => timer}
+import encry.it.util.GlobalTimer.{timer => timer}
 import encry.settings.EncryAppSettings
 import encry.utils.Logging
 import net.ceedubs.ficus.Ficus._
