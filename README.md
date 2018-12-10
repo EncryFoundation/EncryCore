@@ -16,7 +16,7 @@ At first, you should download latest release from [this page](https://github.com
 
 `$ java -jar EncryCore.jar`
 
-#### 2) From Docker Container
+#### 2) From container.Docker Container
 Make sure you have docker installed for documentation and guide check [this page](https://docs.docker.com/install/). Once docker is installed, run in terminal following commands:
 
 `$ docker pull encryfoundation/encry-core`

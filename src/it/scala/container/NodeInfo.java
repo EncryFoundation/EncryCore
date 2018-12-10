@@ -1,3 +1,5 @@
+package container;
+
 case class NodeInfo(hostRestApiPort: Int,
                     hostNetworkPort: Int,
                     containerNetworkPort: Int,
