@@ -1,3 +1,5 @@
+package container;
+
 class Docker(suiteConfig: Config = ConfigFactory.empty,
              tag: String = "",
              localDataVolumeOpt: Option[String] = None)
