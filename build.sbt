@@ -37,8 +37,6 @@ val loggingDependencies = Seq(
 val testingDependencies = Seq(
   "com.typesafe.akka" %% "akka-testkit" % "2.4.+" % Test,
   "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % Test,
-  "org.scalatest" %% "scalatest" % "3.0.5" % Test,
-  "org.scalactic" %% "scalactic" % "3.0.5" % Test,
   "org.scalacheck" %% "scalacheck" % "1.13.+" % Test,
   "org.mockito" % "mockito-core" % "2.19.1" % Test
 )
@@ -65,6 +63,8 @@ libraryDependencies ++= Seq(
   "org.scorexfoundation" %% "iodb" % "0.3.2",
   "io.spray" %% "spray-json" % "1.3.3",
   "org.encry" %% "encry-common" % "0.8.3",
+  "org.scalatest" %% "scalatest" % "3.0.5",
+  "org.scalactic" %% "scalactic" % "3.0.5",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
   "org.influxdb" % "influxdb-java" % "2.10",
   "org.apache.commons" % "commons-io" % "1.3.2",

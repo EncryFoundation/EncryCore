@@ -2,12 +2,14 @@ package encry.it.api
 
 import java.io.IOException
 import java.util.concurrent.TimeoutException
+
 import encry.it.docker.Node
 import encry.utils.Logging
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import encry.it.util.GlobalTimer._
-import encry.it.api.AsyncHttpApi._
+import org.scalatest.{Assertions, Matchers}
+
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.duration._
 import scala.concurrent.Future
@@ -55,9 +57,6 @@ object AsyncHttpApi extends Logging { // scalastyle:ignore
       executeRequest
     }
   }
-}
-
-object AsyncHttpApi {
 
   case class UnexpectedStatusCodeException(request: Request, response: Response)
     extends Exception(s"Request: ${request.getUrl}\n Unexpected status code (${response.getStatusCode}): " +
