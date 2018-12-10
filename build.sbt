@@ -35,7 +35,8 @@ val loggingDependencies = Seq(
 val testingDependencies = Seq(
   "com.typesafe.akka" %% "akka-testkit" % "2.4.+" % Test,
   "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % Test,
-  "org.scalatest" %% "scalatest" % "3.0.3" % Test,
+  "org.scalatest" %% "scalatest" % "3.0.5" % Test,
+  "org.scalactic" %% "scalactic" % "3.0.5" % Test,
   "org.scalacheck" %% "scalacheck" % "1.13.+" % Test,
   "org.mockito" % "mockito-core" % "2.19.1" % Test
 )
@@ -68,7 +69,11 @@ libraryDependencies ++= Seq(
   "org.apache.kafka" % "kafka-clients" % "2.0.0",
   "commons-net" % "commons-net" % "3.6",
   "com.spotify" % "docker-client" % "8.11.0" % "test" classifier "shaded",
+  "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.9.6",
+  "com.fasterxml.jackson.core"   % "jackson-databind"      % "2.9.6",
+  "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.6",
   "org.asynchttpclient" % "async-http-client" % "2.4.7",
+  "com.typesafe.play" %% "play-json" % "2.6.10",
   "com.spotify" % "docker-client" % "8.11.3",
   "io.monix" %% "monix" % "3.0.0-RC1",
   "commons-net" % "commons-net" % "3.6",
