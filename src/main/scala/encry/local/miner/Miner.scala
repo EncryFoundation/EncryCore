@@ -14,6 +14,7 @@ import encry.network.DeliveryManager.FullBlockChainSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
 import encry.stats.StatsSender.{CandidateProducingTime, MiningEnd, MiningTime, SleepTime}
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.Logging
 import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.CurrentView
@@ -40,6 +41,7 @@ class Miner extends Actor with Logging {
   var sleepTime: Long = System.currentTimeMillis()
   var candidateOpt: Option[CandidateBlock] = None
   var syncingDone: Boolean = false
+  var previousSelfMinedBlockId: ModifierId = ModifierId @@ Array.emptyByteArray
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
 
@@ -51,7 +53,8 @@ class Miner extends Actor with Logging {
   def killAllWorkers(): Unit = context.children.foreach(context.stop)
 
   def needNewCandidate(b: Block): Boolean =
-    !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(id => Algos.encode(id) == Algos.encode(b.header.id))
+    previousSelfMinedBlockId == Array.emptyByteArray ||
+    Algos.encode(b.header.parentId) == Algos.encode(previousSelfMinedBlockId)
 
   override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
 
@@ -78,6 +81,8 @@ class Miner extends Actor with Logging {
     case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
       logInfo(s"Going to propagate new block $block from worker $workerIdx" +
         s" with nonce: ${block.header.nonce}")
+      logInfo(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
+      previousSelfMinedBlockId = block.id
       killAllWorkers()
         nodeViewHolder ! LocallyGeneratedModifier(block.header)
         nodeViewHolder ! LocallyGeneratedModifier(block.payload)

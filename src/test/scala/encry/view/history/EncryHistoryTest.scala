@@ -74,7 +74,7 @@ class EncryHistoryTest extends PropSpec with Matchers with InstanceFactory with 
 //
 //  property("Fork on non-best-height, but with bigger commulative sum"){
 //
-//    val historyWith35Blocks: EncryHistory = (0 until 100000).foldLeft(generateDummyHistory) {
+//    val historyWith35Blocks: EncryHistory = (0 until 35).foldLeft(generateDummyHistory) {
 //      case (prevHistory, _) =>
 //        val block: Block = generateNextBlock(prevHistory)
 //        val startTime = System.currentTimeMillis()
@@ -83,7 +83,7 @@ class EncryHistoryTest extends PropSpec with Matchers with InstanceFactory with 
 //        history
 //    }
 //
-//    val (historyWith40Blocks: EncryHistory, fork: Seq[Block]) = (0 until 100).foldLeft(historyWith35Blocks, Seq[Block]()) {
+//    val (historyWith40Blocks: EncryHistory, fork: Seq[Block]) = (0 until 5).foldLeft(historyWith35Blocks, Seq[Block]()) {
 //      case ((prevHistory, forkBlocks), _) =>
 //        val mainBlock: Block = generateNextBlock(prevHistory)
 //        val forkBlock: Block = generateNextBlock(prevHistory, 100000000, prevId = forkBlocks.lastOption.map(_.id))
