@@ -77,6 +77,7 @@ libraryDependencies ++= Seq(
   "com.fasterxml.jackson.core"% "jackson-databind" % "2.9.6",
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.6",
   "org.asynchttpclient" % "async-http-client" % "2.4.7",
+  "com.typesafe.play" %% "play-json" % "2.6.10",
   "com.spotify" % "docker-client" % "8.11.3",
   "io.monix" %% "monix" % "3.0.0-RC1",
   "com.sun.jersey" % "jersey-client" % "1.19",
