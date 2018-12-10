@@ -3,7 +3,6 @@ package encry.view.wallet.storage
 import encry.utils.FileHelper
 import encry.view.wallet.WalletStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.scalatest.{Matchers, PropSpec}
 import scala.util.{Random, Try}
