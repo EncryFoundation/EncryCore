@@ -152,5 +152,4 @@ sourceGenerators in Compile += Def.task {
 }
 
 lazy val encry = (project in file(".")).settings(settings: _*)
-
-lazy val it = (project in file("it")).settings(settings: _*, name := "it").dependsOn(encry)
+lazy val it = project.dependsOn(encry)
