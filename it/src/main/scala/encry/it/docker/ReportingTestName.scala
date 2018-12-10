@@ -16,14 +16,14 @@ trait ReportingTestName extends SuiteMixin with StrictLogging {
     r
   }
 
-  private def print(text: String): Unit = {
-    import scala.concurrent.ExecutionContext.Implicits.global
-    val formatted = s"---------- $text ----------"
-    logger.debug(formatted)
-    try {
-      Await.result(Future.traverse(nodes)(_.printDebugMessage(DebugMessage(formatted))), 10.seconds)
-    } catch {
-      case _: Throwable => ()
-    }
-  }
+//  private def print(text: String): Unit = {
+//    import scala.concurrent.ExecutionContext.Implicits.global
+//    val formatted = s"---------- $text ----------"
+//    logger.debug(formatted)
+//    try {
+//      Await.result(Future.traverse(nodes)(_.printDebugMessage(DebugMessage(formatted))), 10.seconds)
+//    } catch {
+//      case _: Throwable => ()
+//    }
+//  }
 }
