@@ -1,47 +1,31 @@
 package it
 
-import java.net.{InetSocketAddress, URL}
-
-import com.typesafe.config.Config
-
-import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.asynchttpclient._
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
-abstract class Node(config: Config) extends AutoCloseable {
-  lazy val log: LoggerFacade =
-    LoggerFacade(LoggerFactory.getLogger(s"${getClass.getCanonicalName}.${this.name}"))
 
-  val settings:Settings = Settings.fromConfig(config)
-  val client: AsyncHttpClient = asyncHttpClient(
-    clientConfig()
-      .setKeepAlive(false)
-      .setNettyTimer(GlobalTimer.instance))
+class Node(val settings: EncrySettings, val nodeInfo: NodeInfo, override val client: AsyncHttpClient)
+          (implicit override val ec: ExecutionContext) extends NodeApi with NetworkNodeApi {
+  // todo after addresses will added
+  //  val privateKey: String = config.getString("private-key")
+  //  val publicKey: String = config.getString("public-key")
+  //  val address: String = config.getString("address")
+  //  val accountSeed: String = config.getString("account-seed")
 
-  val privateKey: PrivateKeyAccount = PrivateKeyAccount.fromSeed(config.getString("account-seed")).explicitGet()
-  val publicKey: PublicKeyAccount   = PublicKeyAccount.fromBase58String(config.getString("public-key")).explicitGet()
-  val address: String               = config.getString("address")
+  override protected val log: Logger =
+    LoggerFactory.getLogger(s"${getClass.getName}.${settings.network.nodeName}")
 
-  def nodeApiEndpoint: URL
-  def matcherApiEndpoint: URL
-  def apiKey: String
+  def nodeName: String = settings.network.nodeName
+  def containerId: String = nodeInfo.containerId
+  override val chainId: Char = 'I'
+  override val networkNodeName: String = s"it-test-client-to-${nodeInfo.networkIpAddress}"
+  override val restAddress: String = "localhost"
+  override val networkAddress: String = "localhost"
+  override val nodeRestPort: Int = nodeInfo.hostRestApiPort
+  override val networkPort: Int = nodeInfo.hostNetworkPort
+  override val blockDelay: FiniteDuration = settings.chainSettings.blockInterval
 
-  /** An address which can be reached from the host running IT (may not match the declared address) */
-  def networkAddress: InetSocketAddress
-
-  override def close(): Unit = client.close()
-}
-
-object Node {
-  implicit class NodeExt(val n: Node) extends AnyVal {
-    def name: String = n.settings.networkSettings.nodeName
-
-    def publicKeyStr = Base58.encode(n.publicKey.publicKey)
-
-    def fee(txTypeId: Byte): Long = CommonValidation.FeeConstants(txTypeId) * CommonValidation.FeeUnit
-
-    def blockDelay: FiniteDuration = n.settings.blockchainSettings.genesisSettings.averageBlockDelay
-  }
 }
