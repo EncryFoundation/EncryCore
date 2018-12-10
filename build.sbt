@@ -1,9 +1,11 @@
 import sbt._
 
-name := "EncryCore"
-version := "0.9.3"
-organization := "org.encryfoundation"
-scalaVersion := "2.12.6"
+lazy val settings = Seq(
+  name := "EncryCore",
+  version := "0.9.3",
+  organization := "org.encryfoundation",
+  scalaVersion := "2.12.6"
+)
 
 val akkaVersion = "2.5.13"
 val akkaHttpVersion = "10.0.9"
@@ -149,4 +151,6 @@ sourceGenerators in Compile += Def.task {
   Seq(versionFile)
 }
 
-lazy val it = project
+lazy val encry = (project in file(".")).settings(settings: _*)
+
+lazy val it = (project in file("it")).settings(settings: _*, name := "it").dependsOn(encry)
