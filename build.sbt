@@ -73,6 +73,9 @@ libraryDependencies ++= Seq(
   "io.monix" %% "monix" % "3.0.0-RC1",
   "commons-net" % "commons-net" % "3.6",
   "org.aspectj" % "aspectjweaver" % "1.9.2"
+  "org.typelevel" % "cats-core_2.12" % "1.0.1",
+  "org.typelevel" % "cats-kernel_2.12" % "1.0.1",
+  "org.typelevel" % "cats-macros_2.12" % "1.0.1"
 ) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",

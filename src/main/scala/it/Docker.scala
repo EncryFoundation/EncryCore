@@ -7,6 +7,7 @@ import java.util.Collections.singletonList
 import java.util.{Collections, Properties, UUID}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import cats.implicits._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
