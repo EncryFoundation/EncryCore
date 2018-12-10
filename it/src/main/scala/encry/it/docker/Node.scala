@@ -5,7 +5,6 @@ import java.net.{InetAddress, InetSocketAddress, URL}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.{Logger, StrictLogging}
 import encry.EncryApp.settings
-import encry.it.api.HttpApi
 import encry.it.util.GlobalTimer
 import encry.settings.{Constants, EncryAppSettings}
 import org.asynchttpclient.Dsl.{config => clientConfig, _}
@@ -16,30 +15,27 @@ import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
 import scala.concurrent.duration.FiniteDuration
 
-case class Node(config: Config,
-                restApiPort: Int,
-                containerId: String,
-                nodeIp: String,
-                nodePort: Int,
-                client: AsyncHttpClient) extends AutoCloseable with StrictLogging with HttpApi {
+abstract class Node(config: Config) extends AutoCloseable with StrictLogging {
 
+  val log: Logger = logger
   val settings: EncryAppSettings = EncryAppSettings.fromConfig(config)
+  val client: AsyncHttpClient = asyncHttpClient(
+    clientConfig()
+      .setKeepAlive(false)
+      .setNettyTimer(GlobalTimer.timer))
+
   val keyPair: (PrivateKey, PublicKey) =
     Curve25519.createKeyPair(Algos.decode(settings.wallet.flatMap(_.seed).getOrElse("")).get)
   val publicKey = PublicKey25519(keyPair._2)
   val address: String = publicKey.address.address
 
-  def nodeApiEndpoint: URL = new URL("http://0.0.0.0:9051")
-  def apiKey: String = "key"
+  def nodeApiEndpoint: URL
+  def apiKey: String
 
   /** An address which can be reached from the host running IT (may not match the declared address) */
-  def networkAddress: InetSocketAddress = new InetSocketAddress("0.0.0.0", 1234)
+  def networkAddress: InetSocketAddress
 
   override def close(): Unit = client.close()
-
-  override def restAddress: String = "localhost"
-
-  override def nodeRestPort: Int = restApiPort
 }
 
 object Node {
