@@ -57,14 +57,11 @@ object EncryApp extends App with StrictLogging {
   val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
   val networkController: ActorRef = system.actorOf(Props(classOf[NetworkController], settings, peerManager, statsSenderOpt)
     .withDispatcher("network-dispatcher"), "networkController")
-  val nodeViewSynchronizer: ActorRef =
-    system.actorOf(Props(classOf[NodeViewSynchronizer], settings, networkController, statsSenderOpt), "nodeViewSynchronizer")
   lazy val peerManager: ActorRef = system.actorOf(Props(classOf[PeerManager], settings, timeProvider), "peerManager")
-  val nvhProps = EncryNodeViewHolder.props(settings, peerManager, timeProvider, statsSenderOpt, readersHolder, dbService)
+  val nvhProps = EncryNodeViewHolder.props(settings, peerManager, timeProvider, statsSenderOpt, readersHolder, dbService, networkController)
   val nodeViewHolder: ActorRef =
     system.actorOf(nvhProps.withDispatcher("nvh-dispatcher").withMailbox("nvh-mailbox"), "nodeViewHolder")
   readersHolder ! nodeViewHolder
-  nodeViewSynchronizer ! nodeViewHolder
   lazy val miner: ActorRef = system.actorOf(Props(classOf[Miner], settings, nodeViewHolder, timeProvider, statsSenderOpt), "miner")
   if (settings.node.mining) miner ! StartMining
   if (settings.node.useCli) {

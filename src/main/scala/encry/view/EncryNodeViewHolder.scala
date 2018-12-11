@@ -2,7 +2,7 @@ package encry.view
 
 import java.io.File
 import akka.pattern._
-import akka.actor.{Actor, ActorRef, ActorSelection, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import akka.persistence.RecoveryCompleted
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
@@ -11,14 +11,14 @@ import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener
 import encry.local.explorer.BlockListener.ChainSwitching
 import encry.local.explorer.database.DBService
-import encry.local.miner.Miner.DisableMining
+import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers._
 import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
 import encry.modifiers.state.box.EncryProposition
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
-import encry.network.{ModifiersHolder, PostgresRestore}
+import encry.network.{ModifiersHolder, NodeViewSynchronizer, PostgresRestore}
 import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
@@ -47,7 +47,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
                                                               timeProvider: NetworkTimeProvider,
                                                               statSenderOpt: Option[ActorRef],
                                                               readersHolder: ActorRef,
-                                                              dbService: DBService)
+                                                              dbService: DBService,
+                                                              networkController: ActorRef)
   extends Actor with StrictLogging {
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: Mempool)
@@ -63,7 +64,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
     ADProofs.modifierTypeId -> ADProofSerializer,
     Transaction.ModifierTypeId -> TransactionSerializer
   )
-  lazy val nodeViewSynchronizer: ActorSelection = context.system.actorSelection("/user/nodeViewSynchronizer")
+  val nodeViewSynchronizer: ActorRef =
+    context.actorOf(Props(classOf[NodeViewSynchronizer], settings, networkController, statSenderOpt), "nodeViewSynchronizer")
   val postgresRestoreOpt: Option[ActorRef] =
     if (settings.postgres.exists(_.enableRestore))
       Some(context.actorOf(Props(classOf[PostgresRestore], dbService, settings, peerManager), "postgresRestore"))
@@ -93,6 +95,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](settings: EncryApp
   }
 
   override def receive: Receive = {
+    case DisableMining => nodeViewSynchronizer ! DisableMining
+    case StartMining => nodeViewSynchronizer ! StartMining
     case BlocksFromLocalPersistence(blocks, allSent)
       if settings.levelDb.exists(_.enableRestore) || settings.postgres.exists(_.enableRestore) =>
       blocks.foreach { block =>
@@ -442,11 +446,12 @@ object EncryNodeViewHolder {
             timeProvider: NetworkTimeProvider,
             statSenderOpt: Option[ActorRef],
             readersHolder: ActorRef,
-            dbService: DBService): Props =
+            dbService: DBService,
+            networkController: ActorRef): Props =
     settings.node.stateMode match {
       case StateMode.Digest =>
-        Props(new EncryNodeViewHolder[DigestState](settings, peerManager, timeProvider, statSenderOpt, readersHolder, dbService))
+        Props(new EncryNodeViewHolder[DigestState](settings, peerManager, timeProvider, statSenderOpt, readersHolder, dbService, networkController))
       case StateMode.Utxo =>
-        Props(new EncryNodeViewHolder[UtxoState](settings, peerManager, timeProvider, statSenderOpt, readersHolder, dbService))
+        Props(new EncryNodeViewHolder[UtxoState](settings, peerManager, timeProvider, statSenderOpt, readersHolder, dbService, networkController))
     }
 }

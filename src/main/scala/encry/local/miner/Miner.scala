@@ -61,6 +61,7 @@ class Miner(settings: EncryAppSettings, nodeViewHolder: ActorRef, ntp: NetworkTi
       killAllWorkers()
       self ! StartMining
     case StartMining =>
+      nodeViewHolder ! StartMining
       for (i <- 0 until numberOfWorkers) yield context.actorOf(
         Props(classOf[Worker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
       candidateOpt match {
@@ -72,6 +73,7 @@ class Miner(settings: EncryAppSettings, nodeViewHolder: ActorRef, ntp: NetworkTi
           produceCandidate()
       }
     case DisableMining if context.children.nonEmpty =>
+      nodeViewHolder ! DisableMining
       logger.info("Received DisableMining msg")
       killAllWorkers()
       candidateOpt = None

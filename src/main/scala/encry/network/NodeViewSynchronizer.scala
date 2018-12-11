@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
@@ -34,7 +33,6 @@ class NodeViewSynchronizer(settings: EncryAppSettings,
 
   var historyReaderOpt: Option[EncryHistory] = None
   var mempoolReaderOpt: Option[Mempool] = None
-  var nvhOpt: Option[ActorRef] = None
   val invSpec: InvSpec = new InvSpec(settings.network.maxInvObjects)
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
 
@@ -43,13 +41,11 @@ class NodeViewSynchronizer(settings: EncryAppSettings,
     networkController ! RegisterMessagesHandler(messageSpecs, self)
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
+    context.actorOf(Props(classOf[DeliveryManager], settings, context.parent, networkController, statSenderOpt), "deliveryManager")
+    context.parent ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = true)
   }
 
   override def receive: Receive = {
-    case nvh: ActorRef =>
-      nvhOpt = Some(nvh)
-      context.actorOf(Props(classOf[DeliveryManager], settings, nvh, networkController, statSenderOpt), "deliveryManager")
-      nvh ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = true)
     case SyntacticallySuccessfulModifier(mod)
       if (mod.isInstanceOf[Header] || mod.isInstanceOf[Payload] || mod.isInstanceOf[ADProofs]) &&
         historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
@@ -97,7 +93,7 @@ class NodeViewSynchronizer(settings: EncryAppSettings,
         }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
       logger.debug(s"Got inv message from ${remote.socketAddress}")
-      nvhOpt.foreach(_ ! CompareViews(remote, invData._1, invData._2))
+      context.parent ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       context.children.foreach(_ ! DataFromPeer(spec, data: ModifiersData@unchecked, remote))
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
