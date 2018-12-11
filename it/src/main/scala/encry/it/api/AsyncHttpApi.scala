@@ -1,14 +1,19 @@
 package encry.it.api
 
 import java.io.IOException
+import java.net.InetSocketAddress
 import java.util.concurrent.TimeoutException
+
 import encry.it.docker.Node
 import encry.utils.Logging
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import encry.it.util.GlobalTimer._
+
 import scala.compat.java8.FutureConverters._
 import org.scalatest.{Assertions, Matchers}
+import org.asynchttpclient.Dsl.{get => _get, post => _post}
+
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.duration._
 import scala.concurrent.Future
@@ -56,5 +61,28 @@ object AsyncHttpApi extends Logging { // scalastyle:ignore
 
       executeRequest
     }
+
+    def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
+      retrying(f(_get(s"${n.nodeApiEndpoint}$path")).build())
+
+    def post(url: String, port: Int, path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
+      retrying(f(
+        _post(s"$url:$port$path").setHeader("api_key", "integration-test-rest-api")
+      ).build())
+
+    def post(path: String, body: String): Future[Response] =
+      post(s"${n.nodeApiEndpoint}", n.nodeApiEndpoint.getPort, path,
+        (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(body))
+
+    def waitForStartup(): Future[this.type] = get("/info").map(_ => this)
+
+    def connect(addressAndPort: String): Future[Unit] = post("/peers/connect", addressAndPort).map(_ => ())
+
+    def postJson[A: Writes](path: String, body: A): Future[Response] =
+      post(path, stringify(toJson(body)))
+
+    def connect(address: InetSocketAddress): Future[Unit] =
+      postJson("/peers/connect", ConnectReq(address.getHostName, address.getPort)).map(_ => ())
+
   }
 }
