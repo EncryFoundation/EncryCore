@@ -166,7 +166,7 @@ case class Docker(suiteConfig: Config = empty,
 
       val containerConfig = ContainerConfig
         .builder()
-        .image("bromel777/encry-core:testContainer")
+        .image("bromel777/encry-core:latest")
         .exposedPorts(s"$ProfilerPort", restApiPort, networkPort)
         .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
           network.name() -> endpointConfigFor(nodeName)
