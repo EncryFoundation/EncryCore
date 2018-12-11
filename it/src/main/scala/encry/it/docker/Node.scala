@@ -5,6 +5,7 @@ import java.net.{InetAddress, InetSocketAddress, URL}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.{Logger, StrictLogging}
 import encry.EncryApp.settings
+import encry.it.api.HttpApi
 import encry.it.util.GlobalTimer
 import encry.settings.{Constants, EncryAppSettings}
 import org.asynchttpclient.Dsl.{config => clientConfig, _}
@@ -15,11 +16,10 @@ import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
 import scala.concurrent.duration.FiniteDuration
 
-abstract class Node(config: Config) extends AutoCloseable with StrictLogging {
+abstract class Node(config: Config) extends AutoCloseable with StrictLogging with HttpApi {
 
-  val log: Logger = logger
   val settings: EncryAppSettings = EncryAppSettings.fromConfig(config)
-  val client: AsyncHttpClient = asyncHttpClient(
+  override val client: AsyncHttpClient = asyncHttpClient(
     clientConfig()
       .setKeepAlive(false)
       .setNettyTimer(GlobalTimer.timer))

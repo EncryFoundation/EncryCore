@@ -11,14 +11,16 @@ import java.util.{Properties, List => JList, Map => JMap}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
+import com.google.common.primitives.Ints
 import com.google.common.primitives.Ints._
+import com.spotify.docker.client.exceptions.ImageNotFoundException
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.ConfigFactory._
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import monix.eval.Coeval
-import encry.it.util.GlobalTimer.{timer => timer}
+import encry.it.util.GlobalTimer.timer
 import encry.settings.EncryAppSettings
 import encry.utils.Logging
 import net.ceedubs.ficus.Ficus._
@@ -33,8 +35,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, blocking}
 import scala.util.control.NonFatal
-import scala.util.{Random, Try}
-import encry.it.api.AsyncHttpApi._
+import scala.util.{Failure, Random, Try}
 
 class Docker(suiteConfig: Config = empty,
              tag: String = "",
@@ -79,7 +80,10 @@ class Docker(suiteConfig: Config = empty,
     r
   }
 
-  private def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
+  private def ipForNode(nodeId: Int, networkSeed: Int): String = {
+    val addressBytes = Ints.toByteArray(nodeId & 0xF | networkSeed)
+    InetAddress.getByAddress(addressBytes).getHostAddress
+  }
 
   private lazy val network: Network = {
     val networkName = s"encry-${hashCode().toLong.toHexString}"
@@ -189,86 +193,46 @@ class Docker(suiteConfig: Config = empty,
         .map(_ => ())
   }
 
-  private def startNodeInternal(nodeConfig: Config): DockerNode =
+  private def startNodeInternal(configForNode: Config): DockerNode =
     try {
-      val overrides = nodeConfig
-        .withFallback(suiteConfig)
-        .withFallback(genesisOverride)
+      val initialSettings = EncryAppSettings.fromConfig(configForNode)
+      val configuredNodeName = initialSettings.network.nodeName
+      val nodeNumber = configuredNodeName.map(_.replace("node", "").toInt).getOrElse(0)
+      val ip = ipForNode(nodeNumber, networkSeed)
+      val restApiPort = initialSettings.restApi.bindAddress.getPort
+      val networkPort = initialSettings.network.bindAddress.getPort
 
-      val actualConfig = overrides
-        .withFallback(configTemplate)
-        .withFallback(defaultApplication())
-        .withFallback(defaultReference())
-        .resolve()
+      val nodeConfig: Config = enrichNodeConfig(nodeSpecificConfig, extraConfig, ip, networkPort)
+      val settings: ErgoSettings = buildErgoSettings(nodeConfig)
+      val containerConfig: ContainerConfig = buildPeerContainerConfig(nodeConfig, settings, ip, specialVolumeOpt)
+      val containerName = networkName + "-" + configuredNodeName + "-" + uuidShort
 
-      val restApiPort    = actualConfig.getString("encry.rest-api.port")
-      val networkPort    = actualConfig.getString("encry.network.port")
-      val matcherApiPort = actualConfig.getString("encry.matcher.port")
+      Try {
+        val containerId = client.createContainer(containerConfig, containerName).id
+        val attachedNetwork = connectToNetwork(containerId, ip)
+        client.startContainer(containerId)
 
-      val portBindings = new ImmutableMap.Builder[String, java.util.List[PortBinding]]()
-        .put(s"$ProfilerPort", singletonList(PortBinding.randomPort("0.0.0.0")))
-        .put(restApiPort, singletonList(PortBinding.randomPort("0.0.0.0")))
-        .put(networkPort, singletonList(PortBinding.randomPort("0.0.0.0")))
-        .put(matcherApiPort, singletonList(PortBinding.randomPort("0.0.0.0")))
-        .build()
+        val containerInfo = client.inspectContainer(containerId)
+        val ports = containerInfo.networkSettings().ports()
 
-      val hostConfig = HostConfig
-        .builder()
-        .portBindings(portBindings)
-        .build()
+        val nodeInfo = NodeInfo(
+          hostRestApiPort = extractHostPort(ports, restApiPort),
+          hostNetworkPort = extractHostPort(ports, networkPort),
+          containerNetworkPort = networkPort,
+          containerApiPort = restApiPort,
+          apiIpAddress = containerInfo.networkSettings().ipAddress(),
+          networkIpAddress = attachedNetwork.ipAddress(),
+          containerId = containerId)
 
-      val nodeName   = actualConfig.getString("encry.network.node-name")
-      val nodeNumber = nodeName.replace("node", "").toInt
-      val ip         = ipForNode(nodeNumber)
+        log.info(s"Started node: $nodeInfo")
 
-      val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
-      val configOverrides: String = {
-        val ntpServer = Option(System.getenv("NTP_SERVER")).fold("")(x => s"-Dencry.ntp-server=$x ")
-
-        var config = s"$javaOptions ${renderProperties(asProperties(overrides))} " +
-          s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dencry.network.declared-address=$ip:$networkPort $ntpServer"
-
-        val withAspectJ = Option(System.getenv("WITH_ASPECTJ")).fold(false)(_.toBoolean)
-        if (withAspectJ) config += s"-javaagent:$ContainerRoot/aspectjweaver.jar "
-        config
+        val node = new Node(settings, nodeInfo, http)
+        nodeRepository = nodeRepository :+ node
+        node
+      } recoverWith {
+        case e: ImageNotFoundException =>
+          Failure(new Exception(s"Error: docker image is missing. Run 'sbt it:test' to generate it.", e))
       }
-
-      val containerConfig = ContainerConfig
-        .builder()
-        .image("bromel777/encry-core:testContainer")
-        .exposedPorts(s"$ProfilerPort", restApiPort, networkPort, matcherApiPort)
-        .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
-          network.name() -> endpointConfigFor(nodeName)
-        ).asJava))
-        .hostConfig(hostConfig)
-        .build()
-
-      val containerId = {
-        val containerName = s"${network.name()}-$nodeName"
-        dumpContainers(
-          client.listContainers(DockerClient.ListContainersParam.filter("name", containerName)),
-          "Containers with same name"
-        )
-
-        logDebug(s"Creating container $containerName at $ip with options: $javaOptions")
-        val r = client.createContainer(containerConfig, containerName)
-        Option(r.warnings().asScala).toSeq.flatten.foreach(logWarn)
-        r.id()
-      }
-
-      client.startContainer(containerId)
-
-      val node = new DockerNode(actualConfig,
-        containerId,
-        getNodeInfo(containerId, EncryAppSettings.fromConfig(actualConfig)))
-      nodes.add(node)
-      logDebug(s"Started $containerId -> ${node.name}: ${node.nodeInfo}")
-      node
-    } catch {
-      case NonFatal(e) =>
-        logError(s"Can't start a container. Error: $e")
-        dumpContainers(client.listContainers())
-        throw e
     }
 
   private def getNodeInfo(containerId: String, settings: EncryAppSettings): NodeInfo = {

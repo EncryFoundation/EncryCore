@@ -13,7 +13,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Awaitable, Future}
 import scala.util._
 import scala.util.control.NonFatal
-import encry.it.api.{AsyncHttpApi => async}
+import encry.it.api.{HttpApi => async}
 
 object SyncHttpApi extends Assertions {
 //  case class ErrorMessage(error: Int, message: String)
