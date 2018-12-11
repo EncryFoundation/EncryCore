@@ -52,13 +52,13 @@ object EncryApp extends App with StrictLogging {
   }
 
   val statsSenderOpt: Option[ActorRef] =
-    if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender], "statsSender"))
+    if (settings.influxDB.isDefined) Some(system.actorOf(Props(classOf[StatsSender], settings), "statsSender"))
     else None
   val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
   val networkController: ActorRef = system.actorOf(Props(classOf[NetworkController], settings, peerManager, statsSenderOpt)
     .withDispatcher("network-dispatcher"), "networkController")
   lazy val peerManager: ActorRef = system.actorOf(Props(classOf[PeerManager], settings, timeProvider), "peerManager")
-  val nvhProps = EncryNodeViewHolder.props(settings, peerManager, timeProvider, statsSenderOpt, readersHolder, dbService, networkController)
+  val nvhProps: Props = EncryNodeViewHolder.props(settings, peerManager, timeProvider, statsSenderOpt, readersHolder, dbService, networkController)
   val nodeViewHolder: ActorRef =
     system.actorOf(nvhProps.withDispatcher("nvh-dispatcher").withMailbox("nvh-mailbox"), "nodeViewHolder")
   readersHolder ! nodeViewHolder
