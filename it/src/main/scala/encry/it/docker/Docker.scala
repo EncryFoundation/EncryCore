@@ -34,6 +34,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, blocking}
 import scala.util.control.NonFatal
 import scala.util.{Random, Try}
+import encry.it.api.AsyncHttpApi._
 
 class Docker(suiteConfig: Config = empty,
              tag: String = "",
@@ -251,7 +252,7 @@ class Docker(suiteConfig: Config = empty,
 
         logDebug(s"Creating container $containerName at $ip with options: $javaOptions")
         val r = client.createContainer(containerConfig, containerName)
-        Option(r.warnings().asScala).toSeq.flatten.foreach(logWarn(_))
+        Option(r.warnings().asScala).toSeq.flatten.foreach(logWarn)
         r.id()
       }
 
