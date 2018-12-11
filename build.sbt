@@ -72,7 +72,7 @@ libraryDependencies ++= Seq(
   "commons-net" % "commons-net" % "3.6",
   "com.spotify" % "docker-client" % "8.11.0" % "test" classifier "shaded",
   "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.9.6",
-  "com.fasterxml.jackson.core"   % "jackson-databind"      % "2.9.6",
+  "com.fasterxml.jackson.core"% "jackson-databind" % "2.9.6",
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.6",
   "org.asynchttpclient" % "async-http-client" % "2.4.7",
   "com.spotify" % "docker-client" % "8.11.3",
@@ -135,6 +135,30 @@ assemblyMergeStrategy in assembly := {
   case PathList("reference.conf") => MergeStrategy.concat
   case _ => MergeStrategy.first
 }
+
+enablePlugins(DockerPlugin)
+
+inTask(docker)(
+  Seq(
+    dockerfile := {
+      val configTemplate = (Compile / resourceDirectory).value / "application.conf"
+      val startWaves     = sourceDirectory.value / "container" / "startDocker.sh"
+
+      new Dockerfile {
+        from("anapsix/alpine-java:8_server-jre")
+        runRaw("mkdir -p /opt/encry")
+
+        // Install YourKit
+        add((assembly in LocalProject("encry")).value, "/opt/encry/encry.jar")
+        add(Seq(configTemplate, startWaves), "/opt/encry/")
+        runShell("chmod", "+x", "/opt/encry/startDocker.sh")
+        entryPoint("/opt/encry/startDocker.sh")
+        expose(10001)
+      }
+    },
+    buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
+  ))
+
 
 sourceGenerators in Compile += Def.task {
   val versionFile = (sourceManaged in Compile).value / "encry" / "Version.scala"
