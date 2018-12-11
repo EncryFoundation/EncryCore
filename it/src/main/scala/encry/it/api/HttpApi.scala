@@ -15,8 +15,21 @@ import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{FiniteDuration, _}
+import encry.utils.Logging
+import org.asynchttpclient._
+import org.asynchttpclient.util.HttpConstants
+import encry.it.util.GlobalTimer._
+import io.circe.Encoder
+import io.circe.syntax._
+import scala.compat.java8.FutureConverters._
+import org.asynchttpclient.Dsl.{get => _get, post => _post}
+import org.slf4j.{Logger, LoggerFactory}
+import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
-trait HttpApi { // scalastyle:ignore
+trait HttpApi extends Logging { // scalastyle:ignore
 
   def restAddress: String
 
