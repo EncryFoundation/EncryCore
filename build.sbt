@@ -139,6 +139,30 @@ assemblyMergeStrategy in assembly := {
   case _ => MergeStrategy.first
 }
 
+enablePlugins(DockerPlugin)
+
+inTask(docker)(
+  Seq(
+    dockerfile := {
+      val configTemplate = (Compile / resourceDirectory).value / "application.conf"
+      val startWaves     = sourceDirectory.value / "container" / "startDocker.sh"
+
+      new Dockerfile {
+        from("anapsix/alpine-java:8_server-jre")
+        runRaw("mkdir -p /opt/encry")
+
+        // Install YourKit
+        add((assembly in LocalProject("encry")).value, "/opt/encry/encry.jar")
+        add(Seq(configTemplate, startWaves), "/opt/encry/")
+        runShell("chmod", "+x", "/opt/encry/startDocker.sh")
+        entryPoint("/opt/encry/startDocker.sh")
+        expose(10001)
+      }
+    },
+    buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
+  ))
+
+
 sourceGenerators in Compile += Def.task {
   val versionFile = (sourceManaged in Compile).value / "encry" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
