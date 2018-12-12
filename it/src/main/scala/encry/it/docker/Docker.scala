@@ -1,43 +1,29 @@
 package encry.it.docker
 
-import java.io.{File, FileOutputStream, IOException}
 import java.net.{InetAddress, InetSocketAddress, URL}
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.Paths
 import java.util.Collections._
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{Properties, UUID, List => JList, Map => JMap}
-
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
 import com.google.common.primitives.Ints
-import com.google.common.primitives.Ints._
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
-import com.spotify.docker.client.exceptions.ImageNotFoundException
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.ConfigFactory._
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.scalalogging.StrictLogging
-import monix.eval.Coeval
-import encry.it.util.GlobalTimer.timer
-import encry.settings.EncryAppSettings
-import encry.utils.Logging
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-import org.apache.commons.compress.archivers.ArchiveStreamFactory
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry
-import org.apache.commons.io.{FileUtils, IOUtils}
 import org.asynchttpclient.Dsl._
-
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future, blocking}
+import scala.concurrent.{Await, Future}
+import scala.util.Random
 import scala.util.control.NonFatal
-import scala.util.{Failure, Random, Try}
 
 case class Docker(suiteConfig: Config = empty,
              tag: String = "",
