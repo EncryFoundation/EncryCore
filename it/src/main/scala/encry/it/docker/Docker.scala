@@ -46,7 +46,14 @@ case class Docker(suiteConfig: Config = empty,
   import Docker._
 
   private val client = DefaultDockerClient.fromEnv().build()
-  private val nodes = ConcurrentHashMap.newKeySet[Node]()
+  val nodes = ConcurrentHashMap.newKeySet[Node]()
+
+  private val http = asyncHttpClient(config()
+    .setMaxConnections(50)
+    .setMaxConnectionsPerHost(10)
+    .setMaxRequestRetry(1)
+    .setReadTimeout(10000)
+    .setRequestTimeout(10000))
 
   private def uuidShort: String = UUID.randomUUID().hashCode().toHexString
   private val networkName = Docker.networkNamePrefix + uuidShort
@@ -54,6 +61,15 @@ case class Docker(suiteConfig: Config = empty,
   private val networkPrefix = s"${InetAddress.getByAddress(Ints.toByteArray(networkSeed)).getHostAddress}/28"
   private val isStopped = new AtomicBoolean(false)
   val network = createNetwork(3)
+
+  def waitForStartupBlocking(nodes: List[Node]): List[Node] = {
+    logger.debug("Waiting for nodes to start")
+    Await.result(waitForStartup(nodes), nodes.size * 90.seconds)
+  }
+
+  def waitForStartup(nodes: List[Node]): Future[List[Node]] = {
+    Future.sequence(nodes map { _.waitForStartup })
+  }
 
   def ipForNode(nodeNumber: Int): String = {
     val addressBytes = Ints.toByteArray(nodeNumber & 0xF | networkSeed)
@@ -189,8 +205,10 @@ case class Docker(suiteConfig: Config = empty,
       }
 
       client.startContainer(containerId)
-
-      val node = new Node(actualConfig, containerId)
+      val containerInfo = client.inspectContainer(containerId)
+      val ports = containerInfo.networkSettings().ports()
+      val hostRestApiPort = extractHostPort(ports, 9051) //get port from settings
+      val node = new Node(actualConfig, hostRestApiPort, containerId, http)
       nodes.add(node)
       logger.debug(s"Started $containerId -> ${node.name}")
       node
@@ -200,6 +218,9 @@ case class Docker(suiteConfig: Config = empty,
         dumpContainers(client.listContainers())
         throw e
     }
+
+  def extractHostPort(portBindingMap: JMap[String, JList[PortBinding]], containerPort: Int): Int =
+    portBindingMap.get(s"$containerPort/tcp").get(0).hostPort().toInt
 
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {

@@ -1,4 +1,7 @@
 package encry.it.api
 
-case class UnexpectedStatusCodeException(requestUrl: String, statusCode: Int, responseBody: String)
-  extends Exception(s"Request: $requestUrl; Unexpected status code ($statusCode): $responseBody")
+import org.asynchttpclient.{Request, Response}
+
+case class UnexpectedStatusCodeException(request: Request, response: Response)
+  extends Exception(s"Request: ${request.getUrl}\n Unexpected status code (${response.getStatusCode}): " +
+    s"${response.getResponseBody}")

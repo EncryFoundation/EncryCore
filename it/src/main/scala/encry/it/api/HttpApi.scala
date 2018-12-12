@@ -22,39 +22,30 @@ trait HttpApi extends Logging { // scalastyle:ignore
 
   def nodeRestPort: Int
 
-  protected val client: AsyncHttpClient = new DefaultAsyncHttpClient
+  val client: AsyncHttpClient
 
   protected val log: Logger = LoggerFactory.getLogger(s"${getClass.getName} $restAddress")
 
-  def retrying(r: Request,
+  def retrying(request: Request,
                interval: FiniteDuration = 1.second,
-               statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200,
-               waitForStatus: Boolean = false): Future[Response] = {
+               statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[Response] = {
     def executeRequest: Future[Response] = {
-      log.trace(s"Executing request '$r'")
-      if (r.getStringData != null) log.debug(s"Request's body '${r.getStringData}'")
-      client.executeRequest(
-          r,
-          new AsyncCompletionHandler[Response] {
-            override def onCompleted(response: Response): Response = {
-              if (response.getStatusCode == statusCode) {
-                log.debug(s"Request: ${r.getUrl}\nResponse: ${response.getResponseBody}")
-                response
-              } else {
-                log.debug(s"Request: ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
-                throw UnexpectedStatusCodeException(r.getUrl, response.getStatusCode, response.getResponseBody)
-              }
-            }
+      log.info(s"Executing request '$request'")
+      client.executeRequest(request, new AsyncCompletionHandler[Response] {
+        override def onCompleted(response: Response): Response = {
+          if (response.getStatusCode == statusCode) {
+            log.info(s"Request: ${request.getUrl} \n Response: ${response.getResponseBody}")
+            response
+          } else {
+            log.info(s"Request:  ${request.getUrl} \n Unexpected status code(${response.getStatusCode}): " +
+              s"${response.getResponseBody}")
+            throw UnexpectedStatusCodeException(request, response)
           }
-        )
-        .toCompletableFuture
-        .toScala
+        }
+      }).toCompletableFuture.toScala
         .recoverWith {
-          case e: UnexpectedStatusCodeException if waitForStatus =>
-            log.debug(s"Failed to execute request '$r' with error: ${e.getMessage}")
-            timer.schedule(executeRequest, interval)
           case e@(_: IOException | _: TimeoutException) =>
-            log.debug(s"Failed to execute request '$r' with error: $e")
+            log.info(s"Failed to execute request '$request' with error: ${e.getMessage}")
             timer.schedule(executeRequest, interval)
         }
     }
@@ -74,7 +65,7 @@ trait HttpApi extends Logging { // scalastyle:ignore
     post(s"http://$restAddress", nodeRestPort, path,
       (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(body))
 
-  def waitForStartup(): Future[this.type] = get("/info").map(_ => this)
+  def waitForStartup: Future[this.type] = get("/info").map(_ => this)
 
   def connect(addressAndPort: String): Future[Unit] = post("/peers/connect", addressAndPort).map(_ => ())
 

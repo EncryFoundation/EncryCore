@@ -16,14 +16,12 @@ import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
 import scala.concurrent.duration.FiniteDuration
 
-case class Node(config: Config, containerId: String) extends AutoCloseable with StrictLogging with HttpApi {
+case class Node(config: Config,
+                port: Int,
+                containerId: String,
+                client: AsyncHttpClient) extends AutoCloseable with StrictLogging with HttpApi {
 
   val settings: EncryAppSettings = EncryAppSettings.fromConfig(config)
-  override val client: AsyncHttpClient = asyncHttpClient(
-    clientConfig()
-      .setKeepAlive(false)
-      .setNettyTimer(GlobalTimer.timer))
-
   val keyPair: (PrivateKey, PublicKey) =
     Curve25519.createKeyPair(Algos.decode(settings.wallet.flatMap(_.seed).getOrElse("")).get)
   val publicKey = PublicKey25519(keyPair._2)
@@ -37,9 +35,9 @@ case class Node(config: Config, containerId: String) extends AutoCloseable with 
 
   override def close(): Unit = client.close()
 
-  override def restAddress: String = "0.0.0.0"
+  override def restAddress: String = "localhost"
 
-  override def nodeRestPort: Int = 9051
+  override def nodeRestPort: Int = port
 }
 
 object Node {
