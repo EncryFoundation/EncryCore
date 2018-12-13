@@ -1,18 +1,26 @@
 package encry.it
 
-import com.spotify.docker.client.DockerClient
-import com.spotify.docker.client.DockerClient.ExecCreateParam
 import com.typesafe.config.ConfigFactory
+import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.Docker
+import encry.settings.Constants._
+import encry.view.history.History.Height
+import org.encryfoundation.common.Algos
 import org.scalatest.{AsyncFunSuite, Matchers}
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class SimpleNodeStart extends AsyncFunSuite with Matchers {
 
-  test("Mining 5 blocks") {
+  test("Miner balance should increase") {
+
+    val heightToCheck = 5
+    val supplyAtHeight = (0 to heightToCheck).foldLeft(0: Long) {
+      case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i)
+    }
+
     val docker = Docker()
     val config = ConfigFactory.load
       .withFallback(Configs.mining(true))
@@ -20,13 +28,15 @@ class SimpleNodeStart extends AsyncFunSuite with Matchers {
       .withFallback(Configs.offlineGeneration(true))
       .withFallback(Configs.nodeName("node1"))
     val node = docker.startNodeInternal(config)
-    val height = node.waitForHeadersHeight(5)
+    val height = node.waitForHeadersHeight(heightToCheck)
     Await.result(height, 4.minutes)
-    height map { headersHeight =>
-      val balance = Await.result(node.balances, 4.minutes)
-      println(balance)
+    height map { _ =>
+      val res = Await.result(node.balances, 4.minutes)
+        .find(_._1 == Algos.encode(IntrinsicTokenId))
+        .map(_._2 == supplyAtHeight)
+        .get
       docker.close()
-      (headersHeight >= 5) shouldBe true
+      res shouldEqual true
     }
   }
 }
