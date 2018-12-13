@@ -12,7 +12,7 @@ import org.scalatest.{AsyncFunSuite, Matchers}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class SimpleNodeStart extends AsyncFunSuite with Matchers {
+class MinerWalletBalanceTest extends AsyncFunSuite with Matchers {
 
   test("Miner balance should increase") {
 
