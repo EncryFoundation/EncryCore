@@ -20,9 +20,7 @@ inTask(docker)(
     buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
   ))
 
-Defaults.itSettings
-configs(IntegrationTest extend (Test))
-inConfig(IntegrationTest)(Seq(
+inConfig(Test)(Seq(
   parallelExecution := false,
   test := (test dependsOn docker).value,
 ))
