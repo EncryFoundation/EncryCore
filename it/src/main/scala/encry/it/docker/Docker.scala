@@ -6,6 +6,7 @@ import java.util.Collections._
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{Properties, UUID, List => JList, Map => JMap}
+
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
@@ -18,6 +19,7 @@ import com.typesafe.config.ConfigFactory._
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.scalalogging.StrictLogging
 import org.asynchttpclient.Dsl._
+
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -132,17 +134,8 @@ case class Docker(suiteConfig: Config = empty,
 
   def startNodeInternal(nodeConfig: Config): Node =
     try {
-      val overrides = nodeConfig
-        .withFallback(suiteConfig)
-
-      val actualConfig = overrides
-        .withFallback(configTemplate)
-        .withFallback(defaultApplication())
-        .withFallback(defaultReference())
-        .resolve()
-
-      val restApiPort = actualConfig.getString("encry.restApi.bindAddress").split(":").last
-      val networkPort = actualConfig.getString("encry.network.bindAddress").split(":").last
+      val restApiPort = nodeConfig.getString("encry.restApi.bindAddress").split(":").last
+      val networkPort = nodeConfig.getString("encry.network.bindAddress").split(":").last
 
       val portBindings = new ImmutableMap.Builder[String, java.util.List[PortBinding]]()
         .put(s"$ProfilerPort", singletonList(PortBinding.randomPort("0.0.0.0")))
@@ -155,16 +148,13 @@ case class Docker(suiteConfig: Config = empty,
         .portBindings(portBindings)
         .build()
 
-      val nodeName   = actualConfig.getString("encry.network.nodeName")
+      val nodeName   = nodeConfig.getString("encry.network.nodeName")
       val nodeNumber = nodeName.replace("node", "").toInt
       val ip         = ipForNode(nodeNumber)
 
       val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
-      val configOverrides: String = {
-        val ntpServer = Option(System.getenv("NTP_SERVER")).fold("")(x => s"-Dencry.ntp-server=$x ")
-          s"$javaOptions ${renderProperties(asProperties(overrides))} " +
-          s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dencry.network.declared-address=$ip:$networkPort $ntpServer"
-      }
+
+      val configCommandLine = renderProperties(asProperties(nodeConfig))
 
       val containerConfig = ContainerConfig
         .builder()
@@ -174,7 +164,7 @@ case class Docker(suiteConfig: Config = empty,
           network.name() -> endpointConfigFor(nodeName)
         ).asJava))
         .hostConfig(hostConfig)
-        .env(s"Encry_OPTS=$configOverrides")
+        .env(s"OPTS=$configCommandLine")
         .build()
 
       val containerId = {
@@ -194,7 +184,7 @@ case class Docker(suiteConfig: Config = empty,
       val containerInfo = client.inspectContainer(containerId)
       val ports = containerInfo.networkSettings().ports()
       val hostRestApiPort = extractHostPort(ports, 9051) //get port from settings
-      val node = new Node(actualConfig, hostRestApiPort, containerId, http)
+      val node = new Node(nodeConfig, hostRestApiPort, containerId, http)
       nodes.add(node)
       logger.debug(s"Started $containerId -> ${node.name}")
       node
@@ -207,6 +197,11 @@ case class Docker(suiteConfig: Config = empty,
 
   def extractHostPort(portBindingMap: JMap[String, JList[PortBinding]], containerPort: Int): Int =
     portBindingMap.get(s"$containerPort/tcp").get(0).hostPort().toInt
+
+  def asProperties(config: Config): Properties = {
+    val jsonConfig = config.root().render(ConfigRenderOptions.concise())
+    propsMapper.writeValueAsProperties(jsonMapper.readTree(jsonConfig))
+  }
 
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {

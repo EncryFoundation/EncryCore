@@ -34,9 +34,6 @@ object Configs {
          |"${n._1}:${n._2}"
        """.stripMargin)
     val peerInfoStr: String = peerInfoSeq.mkString("[", ",", "]")
-    println(s"PeerInfo = ${s"""
-                              |encry.network.knownPeers=$peerInfoStr
-     """.stripMargin}")
     s"""
        |encry.network.knownPeers=$peerInfoStr
      """.stripMargin
