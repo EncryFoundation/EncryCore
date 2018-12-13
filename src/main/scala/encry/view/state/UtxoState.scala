@@ -1,8 +1,10 @@
 package encry.view.state
 
 import java.io.File
+
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.EncryApp.{settings, system}
 import encry.avltree.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
@@ -24,6 +26,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.Algos.HF
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
+
 import scala.util.{Failure, Success, Try}
 
 class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
@@ -32,7 +35,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
                 override val stateStore: Store,
                 val lastBlockTimestamp: Long,
                 nodeViewHolderRef: Option[ActorRef])
-  extends EncryState[UtxoState] with UtxoStateReader with Logging {
+  extends EncryState[UtxoState] with UtxoStateReader with StrictLogging {
 
   import UtxoState.metadata
 
@@ -41,7 +44,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
   def maxRollbackDepth: Int = Constants.Chain.MaxRollbackDepth
 
   private def onAdProofGenerated(proof: ADProofs): Unit = {
-    if (nodeViewHolderRef.isEmpty) logWarn(s"Got proof while nodeViewHolderRef is empty")
+    if (nodeViewHolderRef.isEmpty) logger.warn(s"Got proof while nodeViewHolderRef is empty")
     nodeViewHolderRef.foreach(_ ! LocallyGeneratedModifier(proof))
   }
 
@@ -77,7 +80,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
 
     case block: Block =>
-      logInfo(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
+      logger.info(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
 
       applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
@@ -87,7 +90,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
 
         if (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest) onAdProofGenerated(ADProofs(block.header.id, proofBytes))
-        logInfo(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with" +
+        logger.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with" +
           s" root hash ${Algos.encode(rootHash)}")
 
         if (!stateStore.get(ByteArrayWrapper(block.id)).exists(_.data sameElements block.header.stateRoot))
@@ -101,7 +104,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
 
         new UtxoState(persistentProver, VersionTag !@@ block.id, Height @@ block.header.height, stateStore, lastBlockTimestamp, nodeViewHolderRef)
       }.recoverWith[UtxoState] { case e =>
-        logWarn(s"Failed to apply block with header ${block.header.encodedId} to UTXOState with root" +
+        logger.warn(s"Failed to apply block with header ${block.header.encodedId} to UTXOState with root" +
           s" ${Algos.encode(rootHash)}: $e")
         Failure(e)
       }
@@ -113,19 +116,19 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
   }
 
   def generateProofs(txs: Seq[Transaction]): Try[(SerializedAdProof, ADDigest)] = Try {
-    logInfo(s"Generating proof for ${txs.length} transactions ...")
+    logger.info(s"Generating proof for ${txs.length} transactions ...")
     val rootHash: ADDigest = persistentProver.digest
     if (txs.isEmpty) throw new Exception("Got empty transaction sequence")
     else if (!storage.version.exists(_.sameElements(rootHash)))
       throw new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}")
     persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
   }.flatten.recoverWith[(SerializedAdProof, ADDigest)] { case e =>
-    logWarn(s"Failed to generate ADProof cause $e")
+    logger.warn(s"Failed to generate ADProof cause $e")
     Failure(e)
   }
 
   override def rollbackTo(version: VersionTag): Try[UtxoState] = {
-    logInfo(s"Rollback UtxoState to version ${Algos.encoder.encode(version)}")
+    logger.info(s"Rollback UtxoState to version ${Algos.encoder.encode(version)}")
     stateStore.get(ByteArrayWrapper(version)) match {
       case Some(v) =>
         val rollbackResult: Try[UtxoState] = persistentProver.rollback(ADDigest @@ v.data).map { _ =>
@@ -188,7 +191,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
   def filterValid(txs: Seq[Transaction]): Seq[Transaction] = txs.filter(tx => isValid(tx))
 }
 
-object UtxoState extends Logging {
+object UtxoState extends StrictLogging {
 
   private val bestVersionKey: Digest32 = Algos.hash("best_state_version")
 
@@ -234,7 +237,7 @@ object UtxoState extends Logging {
     val stateStore: LSMStore = new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions)
     val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
     val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(stateStore, np)(Algos.hash)
-    logInfo(s"Generating UTXO State with ${boxes.size} boxes")
+    logger.info(s"Generating UTXO State with ${boxes.size} boxes")
 
     val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF] = PersistentBatchAVLProver.create(
       p, storage, metadata(EncryState.genesisStateVersion, p.digest, Constants.Chain.PreGenesisHeight, 0L), paranoidChecks = true

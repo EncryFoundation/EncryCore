@@ -1,23 +1,26 @@
 package encry.local.explorer
 
 import akka.actor.{Actor, ActorRef}
-import encry.EncryApp.settings
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.local.explorer.BlockListener._
 import encry.local.explorer.database.DBService
 import encry.modifiers.history.Block.Height
 import encry.modifiers.history.{Block, Header}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.ChangedHistory
-import encry.utils.Logging
+import encry.settings.EncryAppSettings
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetNodeViewChanges
 import encry.view.history.EncryHistoryReader
+
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolder: ActorRef) extends Actor with Logging {
+class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolder: ActorRef) extends Actor with StrictLogging {
 
-  override def preStart(): Unit = logInfo(s"Start listening to new blocks.")
+  val settings: EncryAppSettings = EncryAppSettings.read
+
+  override def preStart(): Unit = logger.info(s"Start listening to new blocks.")
 
   override def postStop(): Unit = dbService.shutdown()
 
@@ -26,11 +29,11 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
 
   currentDbHeightFuture.onComplete {
     case Success(height) =>
-      if (height == 0) logInfo("Going to begin writing to empty database")
-      else logInfo(s"Going to begin writing to table with $height blocks")
+      if (height == 0) logger.info("Going to begin writing to empty database")
+      else logger.info(s"Going to begin writing to table with $height blocks")
       nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
     case Failure(th) =>
-      logWarn(s"Failed to connect to database with exception $th")
+      logger.warn(s"Failed to connect to database with exception $th")
       context.stop(self)
   }
 
@@ -67,7 +70,7 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
             dbService.processBlock(block).foreach(_ => self ! LastUploaded(newHeight - writingGap))
             context.become(operating(history, pending ++ newPending, lastUploaded))
           case None if newHeight - writingGap >= 0 =>
-            logInfo(s"Block on height ${newHeight - writingGap} not found, adding to pending list")
+            logger.info(s"Block on height ${newHeight - writingGap} not found, adding to pending list")
             context.become(operating(history, (pending :+ (newHeight - writingGap)) ++ newPending, lastUploaded))
           case None =>
         }
@@ -104,7 +107,7 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
       case (notFound, (blockOpt, height)) =>
         blockOpt match {
           case Some(block) =>
-            logInfo(s"Pending block on height $height found, writing to postgres")
+            logger.info(s"Pending block on height $height found, writing to postgres")
             dbService.processBlock(block)
             notFound
           case None => notFound :+ height

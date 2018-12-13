@@ -53,9 +53,9 @@ case class Transaction(fee: Amount,
   override def toString: String =
     s"<Transaction id=${Algos.encode(id)}\nfee=$fee\ninputs=$inputs\ndirectives=$directives\nts=$timestamp\nproofs=$defaultProofOpt>"
 
+  //TODO: add validation of timestamp
   lazy val semanticValidity: Try[Unit] = accumulateErrors
     .demand(fee >= 0, "Negative fee amount")
-    .demand(timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift, "Invalid timestamp")
     .demand(inputs.lengthCompare(inputs.toSet.size) == 0, "Inputs duplication")
     .demand(inputs.lengthCompare(Short.MaxValue) <= 0, "Wrong number of inputs")
     .demand(directives.lengthCompare(Short.MaxValue) <= 0 && directives.nonEmpty, "Wrong number of directives")
