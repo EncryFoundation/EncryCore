@@ -99,12 +99,12 @@ trait HttpApi extends Logging { // scalastyle:ignore
     )
   }
 
-  def balances: Future[Map[String, Long]] = get("/wallet/info") flatMap { r =>
+  def balances: Future[List[(String, Long)]] = get("/wallet/info") flatMap { r =>
     val response = jsonAnswerAs[Json](r.getResponseBody)
-    val eitherBalance = response.hcursor.downField("balances").as[Map[String, String]]
-    eitherBalance.fold[Future[Map[String, Long]]](
+    val eitherBalance = response.hcursor.downField("balances").as[List[(String, Long)]]
+    eitherBalance.fold[Future[List[(String, Long)]]](
       e => Future.failed(new Exception(s"Error getting `balances` from /info response: $e\n$response", e)),
-      maybeBalance => Future.successful(maybeBalance.map{case (token, balance) => token -> balance.toLong})
+      maybeBalance => Future.successful(maybeBalance)
     )
   }
 
