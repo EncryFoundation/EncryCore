@@ -1,7 +1,6 @@
 package encry.it.util
 
 import io.netty.util.{HashedWheelTimer, Timer}
-
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
