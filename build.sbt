@@ -77,6 +77,7 @@ libraryDependencies ++= Seq(
   "org.asynchttpclient" % "async-http-client" % "2.4.7",
   "com.spotify" % "docker-client" % "8.11.3",
   "io.monix" %% "monix" % "3.0.0-RC1",
+  "com.sun.jersey" % "jersey-client" % "1.19",
   "commons-net" % "commons-net" % "3.6",
   "org.aspectj" % "aspectjweaver" % "1.9.2"
   "org.typelevel" % "cats-core_2.12" % "1.0.1",

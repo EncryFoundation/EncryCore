@@ -16,6 +16,12 @@ object Configs {
     """.stripMargin
   )
 
+  def nodeName(name: String): Config = ConfigFactory.parseString(
+    s"""
+       |encry.network.nodeName="$name"
+    """.stripMargin
+  )
+
   def miningDelay(miningDelay: Int): Config = ConfigFactory.parseString(
     s"""
        |encry.node.miningDelay=${miningDelay}s

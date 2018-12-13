@@ -33,7 +33,7 @@ case class Docker(suiteConfig: Config = empty,
 
   import Docker._
 
-  private val client = DefaultDockerClient.fromEnv().build()
+  val client = DefaultDockerClient.fromEnv().build()
   val nodes = ConcurrentHashMap.newKeySet[Node]()
 
   private val http = asyncHttpClient(config()
@@ -156,8 +156,11 @@ case class Docker(suiteConfig: Config = empty,
 
       val configCommandLine = renderProperties(asProperties(nodeConfig))
 
+      println(s"""$configCommandLine""")
+
       val containerConfig = ContainerConfig
         .builder()
+        .attachStdin(true)
         .image("bromel777/encry-core:latest")
         .exposedPorts(s"$ProfilerPort", restApiPort, networkPort)
         .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
