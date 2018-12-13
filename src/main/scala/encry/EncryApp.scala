@@ -36,7 +36,7 @@ object EncryApp extends App with Logging {
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
 
-  lazy val settings: EncryAppSettings = EncryAppSettings.read
+  lazy val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
   lazy val dbService: DBService = DBService()
 

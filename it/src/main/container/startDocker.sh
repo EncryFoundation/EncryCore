@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 
-java $* -jar EncryCore.jar
+echo Options: $OPTS
+java $OPTS -jar /opt/encry/encry.jar /opt/encry/template.conf
