@@ -109,9 +109,6 @@ case class Docker(suiteConfig: Config = empty,
   private def endpointConfigFor(nodeName: String): EndpointConfig = {
     val nodeNumber = nodeName.replace("node", "").toInt
     val ip         = ipForNode(nodeNumber)
-
-    println(ip)
-
     EndpointConfig
       .builder()
       .ipAddress(ip)
@@ -155,8 +152,6 @@ case class Docker(suiteConfig: Config = empty,
       val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
 
       val configCommandLine = renderProperties(asProperties(nodeConfig))
-
-      println(s"""$configCommandLine""")
 
       val containerConfig = ContainerConfig
         .builder()
