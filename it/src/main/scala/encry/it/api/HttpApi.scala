@@ -89,8 +89,12 @@ trait HttpApi extends Logging { // scalastyle:ignore
 
   def waitForStartup: Future[this.type] = get("/info").map(_ => this)
 
-  def waitForHeight(expectedHeight: Int, retryingInterval: FiniteDuration = 1.second): Future[Int] = {
+  def waitForFullHeight(expectedHeight: Int, retryingInterval: FiniteDuration = 1.second): Future[Int] = {
     waitFor[Int](_.fullHeight, h => h >= expectedHeight, retryingInterval)
+  }
+
+  def waitForHeadersHeight(expectedHeight: Int, retryingInterval: FiniteDuration = 1.second): Future[Int] = {
+    waitFor[Int](_.headersHeight, h => h >= expectedHeight, retryingInterval)
   }
 
   def waitFor[A](f: this.type => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] = {
