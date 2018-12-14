@@ -149,46 +149,42 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
 
   def validate(tx: Transaction, allowedOutputDelta: Amount = 0L): Try[Unit] =
     tx.semanticValidity.map { _: Unit =>
+      if (tx.inputs.forall(input => persistentProver.unauthenticatedLookup(input.boxId).isDefined)) {
+        val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, rootHash)
+        val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => persistentProver.unauthenticatedLookup(input.boxId)
+          .map(bytes => StateModifierDeserializer.parseBytes(bytes, input.boxId.head))
+          .map(_.toOption -> input))
+          .foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
+            (bxOpt, tx.defaultProofOpt) match {
+              // If no `proofs` provided, then `defaultProof` is used.
+              case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
+                if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
+                  defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc :+ bx else acc
+              case (Some(bx), Some(defaultProof)) =>
+                if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, Seq(defaultProof))) acc :+ bx else acc
+              case (Some(bx), defaultProofOpt) =>
+                if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
+                  defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
+              case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
+            }
+          }
 
-      val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, rootHash)
-
-      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.map(input => persistentProver.unauthenticatedLookup(input.boxId)
-        .map(bytes => StateModifierDeserializer.parseBytes(bytes, input.boxId.head))
-        .map(_.toOption -> input)
-        .getOrElse(throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")))
-        .foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
-          (bxOpt, tx.defaultProofOpt) match {
-            // If no `proofs` provided, then `defaultProof` is used.
-            case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
-              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
-                defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc :+ bx else acc
-            case (Some(bx), Some(defaultProof)) =>
-              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, Seq(defaultProof))) acc :+ bx else acc
-            case (Some(bx), defaultProofOpt) =>
-              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
-                defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
-            case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
+        val validBalance: Boolean = {
+          val debitB: Map[TokenId, Amount] = BalanceCalculator.balanceSheet(bxs)
+          val creditB: Map[TokenId, Amount] = {
+            val balanceSheet: Map[TokenId, Amount] = BalanceCalculator.balanceSheet(tx.newBoxes, excludeTokenIssuance = true)
+            val intrinsicBalance: Amount = balanceSheet.getOrElse(Constants.IntrinsicTokenId, 0L)
+            balanceSheet.updated(Constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
+          }
+          creditB.forall { case (tokenId, amount) =>
+            if (ByteArrayWrapper(tokenId) == ByteArrayWrapper(Constants.IntrinsicTokenId))
+              debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
+            else debitB.getOrElse(tokenId, 0L) >= amount
           }
         }
 
-      val validBalance: Boolean = {
-        val debitB: Map[TokenId, Amount] = BalanceCalculator.balanceSheet(bxs)
-        val creditB: Map[TokenId, Amount] = {
-          val balanceSheet: Map[TokenId, Amount] = BalanceCalculator.balanceSheet(tx.newBoxes, excludeTokenIssuance = true)
-          val intrinsicBalance: Amount = balanceSheet.getOrElse(Constants.IntrinsicTokenId, 0L)
-          balanceSheet.updated(Constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
-        }
-        creditB.forall { case (tokenId, amount) =>
-          if (ByteArrayWrapper(tokenId) == ByteArrayWrapper(Constants.IntrinsicTokenId))
-            debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
-          else debitB.getOrElse(tokenId, 0L) >= amount
-        }
-      }
-
-      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
-    }.recoverWith { case e =>
-      e.printStackTrace()
-      Failure(e)
+        if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
+      } else Failure(TransactionValidationException(s"Box() not found"))
     }
 
   def isValid(tx: Transaction, allowedOutputDelta: Amount = 0L): Boolean = validate(tx, allowedOutputDelta).isSuccess
