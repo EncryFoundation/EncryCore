@@ -2,8 +2,8 @@ package encry.it.api
 
 import java.io.IOException
 import java.util.concurrent.TimeoutException
+import com.typesafe.scalalogging.StrictLogging
 import encry.it.util.GlobalTimer._
-import encry.utils.Logging
 import io.circe.parser.parse
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, Json}
@@ -16,7 +16,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{FiniteDuration, _}
 
-trait HttpApi extends Logging { // scalastyle:ignore
+trait HttpApi extends StrictLogging { // scalastyle:ignore
 
   def restAddress: String
 
