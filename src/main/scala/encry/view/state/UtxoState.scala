@@ -162,7 +162,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
               case (Some(bx), defaultProofOpt) =>
                 if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
                   defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
-              case _ =>
+              case _ => acc
             }
           }
 
