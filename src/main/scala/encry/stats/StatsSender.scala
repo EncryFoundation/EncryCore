@@ -46,8 +46,26 @@ class StatsSender extends Actor {
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
   override def receive: Receive = {
+    case WorkedTime(time, size) =>
+      influxDB.write(InfluxPort, s"workedTime,nodeName=$nodeName value=$time,size=$size")
+
+    case TxsInBlock(txsNum) =>
+      influxDB.write(InfluxPort, s"txsInEachBlock,nodeName=$nodeName value=$txsNum")
+
+    case CurrentUtxosQtyInIOdb(utxosQty) =>
+      influxDB.write(InfluxPort, s"utxosQty,nodeName=$nodeName value=$utxosQty")
+
+    case DiffBtwMempoolAndLastBlockTxs(num) =>
+      influxDB.write(InfluxPort, s"txsDiff,nodeName=$nodeName value=$num")
+
+    case MempoolStat(size) =>
+      influxDB.write(InfluxPort, s"txsInMempool,nodeName=$nodeName value=$size")
+
+    case TransactionsStatMessage(num, height) =>
+      influxDB.write(InfluxPort, s"numOfTxsInBlock,nodeName=$nodeName value=$num,height=$height")
+
     case LogMessage(logLevel, logMessage, logTime) => influxDB.write(InfluxPort,
-      s"""logsFromNode,nodeName=${nodeName},logLevel=${
+      s"""logsFromNode,nodeName=$nodeName,logLevel=${
         logLevel match {
           case "Info" => 1
           case "Debug" => 2
@@ -58,16 +76,16 @@ class StatsSender extends Actor {
       } value="[${sdf.format(logTime)}] $logMessage"""")
     case HeightStatistics(bestHeaderHeight, bestBlockHeight) =>
       influxDB.write(InfluxPort,
-        s"chainStat,nodeName=${nodeName} value=$bestHeaderHeight,bestBlockHeight=$bestBlockHeight")
+        s"chainStat,nodeName=$nodeName value=$bestHeaderHeight,bestBlockHeight=$bestBlockHeight")
     case BestHeaderInChain(fb: Header, applyTime: Long) =>
       influxDB.write(InfluxPort, util.Arrays.asList(
-        s"difficulty,nodeName=${nodeName} diff=${fb.difficulty.toString},height=${fb.height}",
-        s"""height,nodeName=${nodeName} header="${Algos.encode(fb.id)}",height=${fb.height}""",
-        s"stateWeight,nodeName=${nodeName},height=${fb.height} " +
+        s"difficulty,nodeName=$nodeName diff=${fb.difficulty.toString},height=${fb.height}",
+        s"""height,nodeName=$nodeName header="${Algos.encode(fb.id)}",height=${fb.height}""",
+        s"stateWeight,nodeName=$nodeName,height=${fb.height} " +
           s"value=${new File("encry/data/state/").listFiles.foldLeft(0L)(_ + _.length())}",
-        s"historyWeight,nodeName=${nodeName},height=${fb.height} " +
+        s"historyWeight,nodeName=$nodeName,height=${fb.height} " +
           s"value=${new File("encry/data/history/").listFiles.foldLeft(0L)(_ + _.length())}",
-        s"supply,nodeName=${nodeName},height=${fb.height} " +
+        s"supply,nodeName=$nodeName,height=${fb.height} " +
           s"value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[Height])}"
       )
       )
@@ -79,9 +97,9 @@ class StatsSender extends Actor {
           influxDB.write(
             InfluxPort,
             util.Arrays.asList(
-              s"miningEnd,nodeName=${nodeName},block=${Algos.encode(blockHeader.id)}," +
+              s"miningEnd,nodeName=$nodeName,block=${Algos.encode(blockHeader.id)}," +
                 s"height=${blockHeader.height},worker=$workerIdx value=${time - blockHeader.timestamp}",
-              s"minerIterCount,nodeName=${nodeName},block=${Algos.encode(blockHeader.id)}," +
+              s"minerIterCount,nodeName=$nodeName,block=${Algos.encode(blockHeader.id)}," +
                 s"height=${blockHeader.height} value=${blockHeader.nonce - Long.MaxValue / workersQty * workerIdx + 1}"
             )
           )
@@ -92,25 +110,25 @@ class StatsSender extends Actor {
 
     case EndOfApplyingModif(modifierId) =>
       modifiersToApply.get(Algos.encode(modifierId)).foreach { modInfo =>
-        influxDB.write(InfluxPort, s"modifApplying,nodeName=${nodeName}," +
+        influxDB.write(InfluxPort, s"modifApplying,nodeName=$nodeName," +
           s"modType=${modInfo._1} value=${System.currentTimeMillis() - modInfo._2}")
         modifiersToApply -= Algos.encode(modifierId)
       }
 
     case TransactionGeneratorStat(txsQty: Int, generationTime: Long) =>
-      influxDB.write(InfluxPort, s"transactionGenerator,nodeName=${nodeName} txsQty=$txsQty,generationTime=$generationTime")
+      influxDB.write(InfluxPort, s"transactionGenerator,nodeName=$nodeName txsQty=$txsQty,generationTime=$generationTime")
 
     case SleepTime(time: Long) =>
-      influxDB.write(InfluxPort, s"sleepTime,nodeName=${nodeName} value=$time")
+      influxDB.write(InfluxPort, s"sleepTime,nodeName=$nodeName value=$time")
 
     case MiningTime(time: Long) =>
-      influxDB.write(InfluxPort, s"miningTime,nodeName=${nodeName} value=$time")
+      influxDB.write(InfluxPort, s"miningTime,nodeName=$nodeName value=$time")
 
     case CandidateProducingTime(time: Long) =>
-      influxDB.write(InfluxPort, s"candidateProducing,nodeName=${nodeName} value=$time")
+      influxDB.write(InfluxPort, s"candidateProducing,nodeName=$nodeName value=$time")
 
     case StateUpdating(time: Long) =>
-      influxDB.write(InfluxPort, s"stateUpdatingTime,nodeName=${nodeName} value=$time")
+      influxDB.write(InfluxPort, s"stateUpdatingTime,nodeName=$nodeName value=$time")
 
     case SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
       modifiersToDownload = modifiersToDownload ++ modifiers.map(mod => (Algos.encode(mod), (modifierTypeId, System.currentTimeMillis())))
@@ -120,7 +138,7 @@ class StatsSender extends Actor {
         modifiersToDownload.get(Algos.encode(downloadedModifierId)).foreach { dowloadInfo =>
           influxDB.write(
             InfluxPort,
-            s"modDownloadStat,nodeName=${nodeName},modId=${Algos.encode(downloadedModifierId)}," +
+            s"modDownloadStat,nodeName=$nodeName,modId=${Algos.encode(downloadedModifierId)}," +
               s"modType=${dowloadInfo._1} value=${System.currentTimeMillis() - dowloadInfo._2}"
           )
           modifiersToDownload = modifiersToDownload - Algos.encode(downloadedModifierId)
@@ -154,5 +172,17 @@ object StatsSender {
   case class StateUpdating(time: Long)
 
   case class TransactionGeneratorStat(txsQty: Int, generationTime: Long)
+
+  case class TransactionsStatMessage(transactionsNum: Int, blockHeight: Int)
+
+  case class MempoolStat(size: Int)
+
+  case class DiffBtwMempoolAndLastBlockTxs(diff: Int)
+
+  case class TxsInBlock(txsNum: Int)
+
+  case class WorkedTime(time: Long, size: Int)
+
+  case class CurrentUtxosQtyInIOdb(utxosQty: Int)
 
 }
