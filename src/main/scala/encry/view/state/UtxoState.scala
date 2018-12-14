@@ -183,6 +183,9 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
       }
 
       if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
+    }.recoverWith { case e =>
+      e.printStackTrace()
+      Failure(e)
     }
 
   def isValid(tx: Transaction, allowedOutputDelta: Amount = 0L): Boolean = validate(tx, allowedOutputDelta).isSuccess
