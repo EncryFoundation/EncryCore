@@ -26,6 +26,7 @@ import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.history.Block
 import encry.modifiers.history.Block.Timestamp
 import encry.validation.ModifierValidator
+import encry.view.state.UtxoState
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}

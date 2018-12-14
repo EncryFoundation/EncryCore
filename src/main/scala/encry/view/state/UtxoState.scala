@@ -152,9 +152,11 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
 
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, rootHash)
 
-      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => persistentProver.unauthenticatedLookup(input.boxId)
+      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.map(input => persistentProver.unauthenticatedLookup(input.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, input.boxId.head))
-        .map(_.toOption -> input)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
+        .map(_.toOption -> input)
+        .getOrElse(throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")))
+        .foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
           (bxOpt, tx.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
             case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
