@@ -157,14 +157,7 @@ class Miner extends Actor with Logging {
         case ((validTxs, invalidTxs, bxsAcc), tx) =>
           val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.inputs.map(u => ByteArrayWrapper(u.boxId))
           if ((validTxs.map(_.size).sum + tx.size) <= Constants.PayloadMaxSize) {
-            val validResult = try {
-              view.state.validate(tx)
-              Success("123")
-            } catch {
-              case e: Exception =>
-                Failure(e)
-            }
-            if (validResult.isSuccess && bxsRaw.forall(k =>
+            if (view.state.validate(tx).isSuccess && bxsRaw.forall(k =>
               !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size)
               (validTxs :+ tx, invalidTxs, bxsAcc ++ bxsRaw)
             else (validTxs, invalidTxs :+ tx, bxsAcc)
