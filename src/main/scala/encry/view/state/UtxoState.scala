@@ -4,7 +4,7 @@ import java.io.File
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.settings
+import encry.EncryApp.{settings, system}
 import encry.avltree.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import encry.consensus.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
@@ -19,6 +19,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.BalanceCalculator
 import encry.validation.ValidationResult.{Invalid, Valid}
 import encry.validation.{MalformedModifierError, ValidationResult}
+import encry.stats.StatsSender.TxsInBlock
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.History.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
@@ -81,7 +82,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     case block: Block =>
       logger.info(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
-
+      system.actorSelection("user/statsSender") ! TxsInBlock(block.payload.transactions.size)
       applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] =
           metadata(VersionTag !@@ block.id, block.header.stateRoot, Height @@ block.header.height, block.header.timestamp)

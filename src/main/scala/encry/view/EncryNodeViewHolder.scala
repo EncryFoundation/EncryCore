@@ -54,10 +54,27 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     Transaction.ModifierTypeId -> TransactionSerializer
   )
 
-  system.scheduler.schedule(5.second, 5.second) {
-    if (settings.influxDB.isDefined)
-      system.actorSelection("user/statsSender") !
+  var txsInBlocks: Int = 0
+  if (settings.influxDB.isDefined) {
+    context.system.scheduler.schedule(5.second, 5.second) {
+      context.system.actorSelection("user/statsSender") !
         HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
+    }
+  }
+
+  if (settings.influxDB.isDefined) {
+    context.system.scheduler.schedule(10.second, 1.second) {
+      val txsInLastBlock: Int = nodeView.history.bestBlockOpt.map(x => x.payload.transactions.size).getOrElse(0)
+      val txsInMempool: Int = nodeView.mempool.unconfirmed.values.size
+      val diffBtw: Int = txsInMempool - txsInLastBlock
+
+      context.system.actorSelection("user/statsSender") !
+        TransactionsStatMessage(txsInLastBlock, nodeView.history.bestBlockHeight)
+
+      context.system.actorSelection("user/statsSender") ! MempoolStat(txsInMempool)
+
+      context.system.actorSelection("user/statsSender") ! DiffBtwMempoolAndLastBlockTxs(diffBtw)
+    }
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
