@@ -122,9 +122,6 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     case mod: Any => Failure(new Exception(s"Modifier $mod is of incorrect type."))
   }
 
-  /** Checks whether the modifier is applicable to the history. */
-  def applicable(modifier: EncryPersistentModifier): Boolean = testApplicable(modifier).isSuccess
-
   def lastHeaders(count: Int): HeaderChain = bestHeaderOpt
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(HeaderChain.empty)
 
