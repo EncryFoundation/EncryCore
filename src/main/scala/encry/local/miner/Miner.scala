@@ -31,6 +31,7 @@ import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 
 import scala.collection._
+import scala.util.{Failure, Try}
 
 class Miner extends Actor with Logging {
 
@@ -155,7 +156,10 @@ class Miner extends Actor with Logging {
         case ((validTxs, invalidTxs, bxsAcc), tx) =>
           val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.inputs.map(u => ByteArrayWrapper(u.boxId))
           if ((validTxs.map(_.size).sum + tx.size) <= Constants.PayloadMaxSize) {
-            if (view.state.validate(tx).isSuccess && bxsRaw.forall(k =>
+            val validResult = view.state.validate(tx).recoverWith{
+              case e: Exception => Try(Failure(e))
+            }
+            if (validResult.isSuccess && bxsRaw.forall(k =>
               !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size)
               (validTxs :+ tx, invalidTxs, bxsAcc ++ bxsRaw)
             else (validTxs, invalidTxs :+ tx, bxsAcc)
