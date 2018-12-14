@@ -28,7 +28,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{FiniteDuration, _}
 
-trait HttpApi extends Logging { // scalastyle:ignore
+trait HttpApi extends StrictLogging { // scalastyle:ignore
 
   def restAddress: String
 
