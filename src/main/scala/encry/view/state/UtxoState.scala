@@ -165,7 +165,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
               case (Some(bx), defaultProofOpt) =>
                 if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
                   defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
-              case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
+              case _ =>
             }
           }
 
@@ -183,7 +183,8 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           }
         }
 
-        if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
+        if (!validBalance) Failure(TransactionValidationException(s"Non-positive balance in $tx"))
+        else if (bxs.length != tx.inputs.length) Failure(TransactionValidationException(s"Box not found"))
       } else Failure(TransactionValidationException(s"Box() not found"))
     }
 
