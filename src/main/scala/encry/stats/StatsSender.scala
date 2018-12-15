@@ -180,4 +180,6 @@ object StatsSender {
 
   case class TimestampDifference(diff: Long)
 
+  case class NewBlockAppended(isHeader: Boolean, success: Boolean)
+
 }
