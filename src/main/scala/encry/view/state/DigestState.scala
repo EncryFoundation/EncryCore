@@ -35,8 +35,9 @@ class DigestState protected(override val version: VersionTag,
         val txs: Seq[Transaction] = block.payload.transactions
         val declaredHash: ADDigest = block.header.stateRoot
 
+        //TODO: refactor
         txs.foldLeft(Success(): Try[Unit]) { case (status, tx) =>
-          status.flatMap(_ => tx.semanticValidity)
+          status.flatMap(_ => if (tx.semanticValidity.isSuccess) Success(tx) else util.Failure(new Exception("")))
         }.flatMap(_ => block.adProofsOpt.map(_.verify(extractStateChanges(txs), rootHash, declaredHash))
           .getOrElse(Failure(new Exception("Proofs are empty"))))
       }.flatten match {

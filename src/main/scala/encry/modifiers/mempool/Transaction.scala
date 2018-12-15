@@ -19,13 +19,12 @@ import org.encryfoundation.common.transaction.{Input, Proof}
 import org.encryfoundation.prismlang.core.PConvertible
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
-
 import scala.util.{Success, Try}
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.history.Block
 import encry.modifiers.history.Block.Timestamp
-import encry.validation.ModifierValidator
+import encry.validation.{ModifierValidator, ValidationResult}
 import encry.view.state.UtxoState
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
@@ -55,16 +54,15 @@ case class Transaction(fee: Amount,
   override def toString: String =
     s"<Transaction id=${Algos.encode(id)}\nfee=$fee\ninputs=$inputs\ndirectives=$directives\nts=$timestamp\nproofs=$defaultProofOpt>"
 
-  //TODO: add validation of timestamp
-  lazy val semanticValidity: Try[Unit] = accumulateErrors
+  lazy val semanticValidity: ValidationResult = accumulateErrors
     .demand(fee >= 0, "Negative fee amount")
+    .demand(timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift, "Invalid timestamp")
     .demand(inputs.lengthCompare(inputs.toSet.size) == 0, "Inputs duplication")
     .demand(inputs.lengthCompare(Short.MaxValue) <= 0, "Wrong number of inputs")
     .demand(directives.lengthCompare(Short.MaxValue) <= 0 && directives.nonEmpty, "Wrong number of directives")
     .demand(directives.forall(_.isValid), "Invalid outputs")
     .demand(size <= Constants.PayloadMaxSize, "Invalid size")
     .result
-    .toTry
 
   val tpe: Types.Product = Types.EncryTransaction
 
