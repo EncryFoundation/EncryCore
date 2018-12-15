@@ -140,7 +140,7 @@ class StatsSender extends Actor {
       val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
       influxDB.write(InfluxPort,s"""newBlockAppended,success=$success,isHeader=$isHeader value=$nodeNumber""")
     case NewBlockAppended(_, _) =>
-    case TimestampDifference(diff) => influxDB.write(InfluxPort,s"""tsDiff,nodeName=$nodeName value=$diff""")
+    case TimestampDifference(diff) => influxDB.write(InfluxPort,s"""newBlockAppended,nodeName=$nodeName value=$diff""")
   }
 }
 
@@ -185,4 +185,5 @@ object StatsSender {
   case class CurrentUtxosQtyInIOdb(utxosQty: Int)
 
   case class TimestampDifference(diff: Long)
+
 }
