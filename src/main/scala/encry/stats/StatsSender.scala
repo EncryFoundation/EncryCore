@@ -79,9 +79,9 @@ class StatsSender extends Actor {
           influxDB.write(
             InfluxPort,
             util.Arrays.asList(
-              s"miningEnd,nodeName=${nodeName},block=${Algos.encode(blockHeader.id)}," +
+              s"miningEnd,nodeName=$nodeName,block=${Algos.encode(blockHeader.id)}," +
                 s"height=${blockHeader.height},worker=$workerIdx value=${time - blockHeader.timestamp}",
-              s"minerIterCount,nodeName=${nodeName},block=${Algos.encode(blockHeader.id)}," +
+              s"minerIterCount,nodeName=$nodeName,block=${Algos.encode(blockHeader.id)}," +
                 s"height=${blockHeader.height} value=${blockHeader.nonce - Long.MaxValue / workersQty * workerIdx + 1}"
             )
           )
@@ -92,25 +92,25 @@ class StatsSender extends Actor {
 
     case EndOfApplyingModif(modifierId) =>
       modifiersToApply.get(Algos.encode(modifierId)).foreach { modInfo =>
-        influxDB.write(InfluxPort, s"modifApplying,nodeName=${nodeName}," +
+        influxDB.write(InfluxPort, s"modifApplying,nodeName=$nodeName," +
           s"modType=${modInfo._1} value=${System.currentTimeMillis() - modInfo._2}")
         modifiersToApply -= Algos.encode(modifierId)
       }
 
     case TransactionGeneratorStat(txsQty: Int, generationTime: Long) =>
-      influxDB.write(InfluxPort, s"transactionGenerator,nodeName=${nodeName} txsQty=$txsQty,generationTime=$generationTime")
+      influxDB.write(InfluxPort, s"transactionGenerator,nodeName=$nodeName txsQty=$txsQty,generationTime=$generationTime")
 
     case SleepTime(time: Long) =>
-      influxDB.write(InfluxPort, s"sleepTime,nodeName=${nodeName} value=$time")
+      influxDB.write(InfluxPort, s"sleepTime,nodeName=$nodeName value=$time")
 
     case MiningTime(time: Long) =>
-      influxDB.write(InfluxPort, s"miningTime,nodeName=${nodeName} value=$time")
+      influxDB.write(InfluxPort, s"miningTime,nodeName=$nodeName value=$time")
 
     case CandidateProducingTime(time: Long) =>
-      influxDB.write(InfluxPort, s"candidateProducing,nodeName=${nodeName} value=$time")
+      influxDB.write(InfluxPort, s"candidateProducing,nodeName=$nodeName value=$time")
 
     case StateUpdating(time: Long) =>
-      influxDB.write(InfluxPort, s"stateUpdatingTime,nodeName=${nodeName} value=$time")
+      influxDB.write(InfluxPort, s"stateUpdatingTime,nodeName=$nodeName value=$time")
 
     case SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
       modifiersToDownload = modifiersToDownload ++ modifiers.map(mod => (Algos.encode(mod), (modifierTypeId, System.currentTimeMillis())))
@@ -120,12 +120,16 @@ class StatsSender extends Actor {
         modifiersToDownload.get(Algos.encode(downloadedModifierId)).foreach { dowloadInfo =>
           influxDB.write(
             InfluxPort,
-            s"modDownloadStat,nodeName=${nodeName},modId=${Algos.encode(downloadedModifierId)}," +
+            s"modDownloadStat,nodeName=$nodeName,modId=${Algos.encode(downloadedModifierId)}," +
               s"modType=${dowloadInfo._1} value=${System.currentTimeMillis() - dowloadInfo._2}"
           )
           modifiersToDownload = modifiersToDownload - Algos.encode(downloadedModifierId)
         }
       )
+    case NewBlockAppended(isHeader, success) if nodeName.exists(_.isDigit) =>
+      val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
+      influxDB.write(InfluxPort,s"""newBlockAppended,success=$success,isHeader=$isHeader value=$nodeNumber""")
+    case NewBlockAppended(_, _) =>
   }
 }
 
@@ -154,5 +158,7 @@ object StatsSender {
   case class StateUpdating(time: Long)
 
   case class TransactionGeneratorStat(txsQty: Int, generationTime: Long)
+
+  case class NewBlockAppended(isHeader: Boolean, success: Boolean)
 
 }
