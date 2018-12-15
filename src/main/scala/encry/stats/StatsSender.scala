@@ -134,7 +134,7 @@ class StatsSender extends Actor {
     case SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
       modifiersToDownload = modifiersToDownload ++ modifiers.map(mod => (Algos.encode(mod), (modifierTypeId, System.currentTimeMillis())))
 
-    case GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
+    case GetModifiers(_: ModifierTypeId, modifiers: Seq[ModifierId]) =>
       modifiers.foreach(downloadedModifierId =>
         modifiersToDownload.get(Algos.encode(downloadedModifierId)).foreach { dowloadInfo =>
           influxDB.write(
@@ -149,6 +149,7 @@ class StatsSender extends Actor {
       val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
       influxDB.write(InfluxPort,s"""newBlockAppended,success=$success,isHeader=$isHeader value=$nodeNumber""")
     case NewBlockAppended(_, _) =>
+    case TimestampDifference(diff) => influxDB.write(InfluxPort,s"""newBlockAppended,nodeName=$nodeName value=$diff""")
   }
 }
 
@@ -191,5 +192,7 @@ object StatsSender {
   case class CurrentUtxosQtyInIOdb(utxosQty: Int)
 
   case class NewBlockAppended(isHeader: Boolean, success: Boolean)
+
+  case class TimestampDifference(diff: Long)
 
 }

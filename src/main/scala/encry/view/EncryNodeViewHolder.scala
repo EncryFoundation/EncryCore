@@ -124,6 +124,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
+            if (settings.influxDB.isDefined) {
+              val pmodTs: Long = pmod match {
+                case h: Header => h.timestamp
+                case b: Block => b.header.timestamp
+                case _ => 0L
+              }
+              context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - pmodTs)
+            }
             if (nodeView.history.contains(pmod.id) || ModifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
             else {
