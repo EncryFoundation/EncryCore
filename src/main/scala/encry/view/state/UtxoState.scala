@@ -20,6 +20,8 @@ import encry.utils.BalanceCalculator
 import encry.validation.ValidationResult.{Invalid, Valid}
 import encry.validation.{MalformedModifierError, ValidationResult}
 import encry.stats.StatsSender.TxsInBlock
+import encry.validation.{MalformedModifierError, ValidationResult}
+import encry.validation.ValidationResult.{Invalid, Valid}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.History.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
