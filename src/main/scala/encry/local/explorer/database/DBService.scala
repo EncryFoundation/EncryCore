@@ -26,6 +26,7 @@ class DBService extends Logging {
       count
     }
 
+
   def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] =
     runAsync(markAsRemovedFromMainChainQuery(ids), "markAsRemovedFromMainChain")
 
