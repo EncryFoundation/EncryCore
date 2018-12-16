@@ -46,8 +46,26 @@ class StatsSender extends Actor {
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
   override def receive: Receive = {
+    case WorkedTime(time, size) =>
+      influxDB.write(InfluxPort, s"workedTime,nodeName=$nodeName value=$time,size=$size")
+
+    case TxsInBlock(txsNum) =>
+      influxDB.write(InfluxPort, s"txsInEachBlock,nodeName=$nodeName value=$txsNum")
+
+    case CurrentUtxosQtyInIOdb(utxosQty) =>
+      influxDB.write(InfluxPort, s"utxosQty,nodeName=$nodeName value=$utxosQty")
+
+    case DiffBtwMempoolAndLastBlockTxs(num) =>
+      influxDB.write(InfluxPort, s"txsDiff,nodeName=$nodeName value=$num")
+
+    case MempoolStat(size) =>
+      influxDB.write(InfluxPort, s"txsInMempool,nodeName=$nodeName value=$size")
+
+    case TransactionsStatMessage(num, height) =>
+      influxDB.write(InfluxPort, s"numOfTxsInBlock,nodeName=$nodeName value=$num,height=$height")
+
     case LogMessage(logLevel, logMessage, logTime) => influxDB.write(InfluxPort,
-      s"""logsFromNode,nodeName=${nodeName},logLevel=${
+      s"""logsFromNode,nodeName=$nodeName,logLevel=${
         logLevel match {
           case "Info" => 1
           case "Debug" => 2
@@ -58,16 +76,16 @@ class StatsSender extends Actor {
       } value="[${sdf.format(logTime)}] $logMessage"""")
     case HeightStatistics(bestHeaderHeight, bestBlockHeight) =>
       influxDB.write(InfluxPort,
-        s"chainStat,nodeName=${nodeName} value=$bestHeaderHeight,bestBlockHeight=$bestBlockHeight")
+        s"chainStat,nodeName=$nodeName value=$bestHeaderHeight,bestBlockHeight=$bestBlockHeight")
     case BestHeaderInChain(fb: Header, applyTime: Long) =>
       influxDB.write(InfluxPort, util.Arrays.asList(
-        s"difficulty,nodeName=${nodeName} diff=${fb.difficulty.toString},height=${fb.height}",
-        s"""height,nodeName=${nodeName} header="${Algos.encode(fb.id)}",height=${fb.height}""",
-        s"stateWeight,nodeName=${nodeName},height=${fb.height} " +
+        s"difficulty,nodeName=$nodeName diff=${fb.difficulty.toString},height=${fb.height}",
+        s"""height,nodeName=$nodeName header="${Algos.encode(fb.id)}",height=${fb.height}""",
+        s"stateWeight,nodeName=$nodeName,height=${fb.height} " +
           s"value=${new File("encry/data/state/").listFiles.foldLeft(0L)(_ + _.length())}",
-        s"historyWeight,nodeName=${nodeName},height=${fb.height} " +
+        s"historyWeight,nodeName=$nodeName,height=${fb.height} " +
           s"value=${new File("encry/data/history/").listFiles.foldLeft(0L)(_ + _.length())}",
-        s"supply,nodeName=${nodeName},height=${fb.height} " +
+        s"supply,nodeName=$nodeName,height=${fb.height} " +
           s"value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[Height])}"
       )
       )
@@ -159,6 +177,18 @@ object StatsSender {
   case class StateUpdating(time: Long)
 
   case class TransactionGeneratorStat(txsQty: Int, generationTime: Long)
+
+  case class TransactionsStatMessage(transactionsNum: Int, blockHeight: Int)
+
+  case class MempoolStat(size: Int)
+
+  case class DiffBtwMempoolAndLastBlockTxs(diff: Int)
+
+  case class TxsInBlock(txsNum: Int)
+
+  case class WorkedTime(time: Long, size: Int)
+
+  case class CurrentUtxosQtyInIOdb(utxosQty: Int)
 
   case class NewBlockAppended(isHeader: Boolean, success: Boolean)
 
