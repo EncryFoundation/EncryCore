@@ -147,7 +147,7 @@ class StatsSender extends Actor {
       )
     case NewBlockAppended(isHeader, success) if nodeName.exists(_.isDigit) =>
       val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
-      influxDB.write(InfluxPort,s"""newBlockAppended,success=$success,isHeader=$isHeader value=$nodeNumber""")
+      influxDB.write(InfluxPort,s"""newBlockAppended,success=$success,isHeader=$isHeader,nodeName=$nodeName value=$nodeNumber""")
     case NewBlockAppended(_, _) =>
     case TimestampDifference(diff) => influxDB.write(InfluxPort,s"""tsDiff,nodeName=$nodeName value=$diff""")
   }
