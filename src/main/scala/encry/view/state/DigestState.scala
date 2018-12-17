@@ -1,6 +1,7 @@
 package encry.view.state
 
 import java.io.File
+
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{ADProofs, Block, Header}
