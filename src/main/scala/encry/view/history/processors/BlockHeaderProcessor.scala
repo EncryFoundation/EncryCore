@@ -135,16 +135,19 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
       headerScoreKey(header.id) -> ByteArrayWrapper(header.difficulty.toByteArray)), header)
   } else {
     scoreOf(header.parentId).map { parentScore =>
-      val score: BigInt @@ ConsensusTaggedTypes.Difficulty.Tag = Difficulty @@ (parentScore + header.difficulty)
+      val score: BigInt @@ ConsensusTaggedTypes.Difficulty.Tag =
+        Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
       val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-        if (header.height > bestHeaderHeight || score > bestHeadersChainScore)
+        if ((header.height > bestHeaderHeight) ||
+          (header.height == bestHeaderHeight && score > bestHeadersChainScore))
           Seq(BestHeaderKey -> ByteArrayWrapper(header.id)) else Seq.empty
       val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) =
         headerScoreKey(header.id) -> ByteArrayWrapper(score.toByteArray)
       val heightRow: (ByteArrayWrapper, ByteArrayWrapper) =
         headerHeightKey(header.id) -> ByteArrayWrapper(Ints.toByteArray(header.height))
       val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-        if (header.height > bestHeaderHeight || score > bestHeadersChainScore) bestBlockHeaderIdsRow(header, score)
+        if ((header.height > bestHeaderHeight) ||
+          (header.height == bestHeaderHeight && score > bestHeadersChainScore)) bestBlockHeaderIdsRow(header, score)
         else {
           if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(header)
           orphanedBlockHeaderIdsRow(header, score)
@@ -249,8 +252,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
     val requiredHeights: Seq[Height] =
       difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
         .ensuring(_.last == parentHeight, "Incorrect heights sequence!")
-    val chain: HeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1,
-      parent, (_: Header) => false)
+    val chain: HeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1, parent, (_: Header) => false)
     val requiredHeaders: immutable.IndexedSeq[(Int, Header)] = (requiredHeights.min to requiredHeights.max)
       .zip(chain.headers).filter(p => requiredHeights.contains(p._1))
     assert(requiredHeights.length == requiredHeaders.length,

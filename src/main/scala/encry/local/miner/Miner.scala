@@ -29,6 +29,7 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
+
 import scala.collection._
 
 class Miner extends Actor with Logging {
@@ -78,6 +79,7 @@ class Miner extends Actor with Logging {
     case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
       logInfo(s"Going to propagate new block $block from worker $workerIdx" +
         s" with nonce: ${block.header.nonce}")
+      logInfo(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
       killAllWorkers()
         nodeViewHolder ! LocallyGeneratedModifier(block.header)
         nodeViewHolder ! LocallyGeneratedModifier(block.payload)
