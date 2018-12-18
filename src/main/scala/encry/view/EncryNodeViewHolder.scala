@@ -254,13 +254,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               if (settings.influxDB.isDefined) context.system
-                .actorSelection("user/statsSender") ! NewBlockAppended(modToApply.modifierTypeId == Header.modifierTypeId, true)
+                .actorSelection("user/statsSender") ! NewBlockAppended(false, true)
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Failure(e) =>
               val (newHis: EncryHistory, newProgressInfo: ProgressInfo[EncryPersistentModifier]) =
                 history.reportModifierIsInvalid(modToApply, progressInfo)
               if (settings.influxDB.isDefined) context.system
-                .actorSelection("user/statsSender") ! NewBlockAppended(modToApply.modifierTypeId == Header.modifierTypeId, false)
+                .actorSelection("user/statsSender") ! NewBlockAppended(false, false)
               nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           } else u
@@ -328,10 +328,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               nodeViewSynchronizer ! SemanticallyFailedModification(pmod, e)
           }
         } else {
+          if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.modifierTypeId) context.system
+            .actorSelection("user/statsSender") ! NewBlockAppended(true, true)
           requestDownloads(progressInfo)
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Failure(e) =>
+        if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.modifierTypeId) context.system
+          .actorSelection("user/statsSender") ! NewBlockAppended(true, false)
         logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
           s" to history caused $e")
         nodeViewSynchronizer ! SyntacticallyFailedModification(pmod, e)
