@@ -258,13 +258,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               if (settings.influxDB.isDefined) context.system
-                .actorSelection("user/statsSender") ! NewBlockAppended(modToApply.modifierTypeId == Header.modifierTypeId, true)
+                .actorSelection("user/statsSender") ! NewBlockAppended(false, true)
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Failure(e) =>
               val (newHis: EncryHistory, newProgressInfo: ProgressInfo[EncryPersistentModifier]) =
                 history.reportModifierIsInvalid(modToApply, progressInfo)
               if (settings.influxDB.isDefined) context.system
-                .actorSelection("user/statsSender") ! NewBlockAppended(modToApply.modifierTypeId == Header.modifierTypeId, false)
+                .actorSelection("user/statsSender") ! NewBlockAppended(false, false)
               nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           } else u
