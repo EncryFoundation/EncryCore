@@ -13,17 +13,11 @@ class NodeSyncAfterRestartTest extends AsyncFunSuite with Matchers {
 
     val docker = Docker()
 
-    val defaultConf = ConfigFactory.load
-
-    val firstNodeConfig = defaultConf
-      .withFallback(Configs.mining(true))
-      .withFallback(Configs.knownPeers(Seq.empty))
+    val firstNodeConfig = Configs.mining(true)
       .withFallback(Configs.offlineGeneration(true))
       .withFallback(Configs.nodeName("node123"))
 
-    val secondNodeConfig = defaultConf
-      .withFallback(Configs.mining(true))
-      .withFallback(Configs.knownPeers(Seq("172.168.10.1")))
+    val secondNodeConfig = Configs.mining(true)
       .withFallback(Configs.offlineGeneration(false))
       .withFallback(Configs.nodeName("node2"))
 

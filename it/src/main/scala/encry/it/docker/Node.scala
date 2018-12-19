@@ -17,9 +17,10 @@ import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scala.concurrent.duration.FiniteDuration
 
 case class Node(config: Config,
-                port: Int,
+                restApiPort: Int,
                 containerId: String,
                 nodeIp: String,
+                nodePort: Int,
                 client: AsyncHttpClient) extends AutoCloseable with StrictLogging with HttpApi {
 
   val settings: EncryAppSettings = EncryAppSettings.fromConfig(config)
@@ -38,7 +39,7 @@ case class Node(config: Config,
 
   override def restAddress: String = "localhost"
 
-  override def nodeRestPort: Int = port
+  override def nodeRestPort: Int = restApiPort
 }
 
 object Node {

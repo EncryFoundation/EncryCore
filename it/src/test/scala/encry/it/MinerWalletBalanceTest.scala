@@ -25,8 +25,6 @@ class MinerWalletBalanceTest extends AsyncFunSuite with Matchers {
       .withFallback(Configs.knownPeers(Seq.empty))
       .withFallback(Configs.offlineGeneration(true))
       .withFallback(Configs.nodeName("node1234"))
-      .withFallback(ConfigFactory.load())
-      .resolve()
 
     val node = docker.startNodeInternal(config)
     val height = node.waitForHeadersHeight(heightToCheck)
