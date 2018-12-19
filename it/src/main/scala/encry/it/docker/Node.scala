@@ -19,6 +19,7 @@ import scala.concurrent.duration.FiniteDuration
 case class Node(config: Config,
                 port: Int,
                 containerId: String,
+                nodeIp: String,
                 client: AsyncHttpClient) extends AutoCloseable with StrictLogging with HttpApi {
 
   val settings: EncryAppSettings = EncryAppSettings.fromConfig(config)
