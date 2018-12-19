@@ -28,9 +28,18 @@ object Configs {
     """.stripMargin
   )
 
-  def knownPeers(peers: List[String]): Config = ConfigFactory.parseString(
+  def knownPeers(peers: Seq[String]): Config = ConfigFactory.parseString({
+    val port = 9001
+    val peerInfoSeq: Seq[String] = peers.map(n =>
+      s"""
+         |"$n:$port"
+       """.stripMargin)
+    val peerInfoStr: String = peerInfoSeq.mkString("[", ",", "]")
+    println(s"PeerInfo = ${s"""
+                              |encry.network.knownPeers=$peerInfoStr
+     """.stripMargin}")
     s"""
-       |encry.network.knownPeers=[${peers.map(peer => s""""$peer"""").mkString(",")}]
-    """.stripMargin
-  )
+       |encry.network.knownPeers=$peerInfoStr
+     """.stripMargin
+  })
 }

@@ -57,6 +57,7 @@ libraryDependencies ++= Seq(
   "javax.xml.bind" % "jaxb-api" % "2.3.0",
   "com.iheart" %% "ficus" % "1.4.2",
   "org.slf4j" % "slf4j-api" % "1.7.25",
+  "com.typesafe" % "config" % "1.3.3",
   "org.bouncycastle" % "bcprov-jdk15on" % "1.58",
   "org.whispersystems" % "curve25519-java" % "0.5.0",
   "org.rudogma" %% "supertagged" % "1.4",
@@ -152,5 +153,5 @@ sourceGenerators in Compile += Def.task {
   Seq(versionFile)
 }
 
-lazy val encry = (project in file(".")).settings(settings: _*)
+val encry = (project in file(".")).settings(settings: _*)
 lazy val it = project.dependsOn(encry)

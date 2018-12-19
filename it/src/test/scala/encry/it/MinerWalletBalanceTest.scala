@@ -8,7 +8,6 @@ import encry.settings.Constants._
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
 import org.scalatest.{AsyncFunSuite, Matchers}
-
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
@@ -22,11 +21,13 @@ class MinerWalletBalanceTest extends AsyncFunSuite with Matchers {
     }
 
     val docker = Docker()
-    val config = ConfigFactory.load
-      .withFallback(Configs.mining(true))
-      .withFallback(Configs.knownPeers(List.empty))
+    val config = Configs.mining(true)
+      .withFallback(Configs.knownPeers(Seq.empty))
       .withFallback(Configs.offlineGeneration(true))
-      .withFallback(Configs.nodeName("node1"))
+      .withFallback(Configs.nodeName("node1234"))
+      .withFallback(ConfigFactory.load())
+      .resolve()
+
     val node = docker.startNodeInternal(config)
     val height = node.waitForHeadersHeight(heightToCheck)
     Await.result(height, 4.minutes)

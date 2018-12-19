@@ -23,7 +23,7 @@ import org.asynchttpclient.Dsl._
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, Future, blocking}
 import scala.util.Random
 import scala.util.control.NonFatal
 
@@ -62,6 +62,13 @@ case class Docker(suiteConfig: Config = empty,
   def ipForNode(nodeNumber: Int): String = {
     val addressBytes = Ints.toByteArray(nodeNumber & 0xF | networkSeed)
     InetAddress.getByAddress(addressBytes).getHostAddress
+  }
+
+  def startNodes(nodeConfig: Seq[Config]): List[Node] = {
+    logger.info(s"Starting ${nodeConfig.size} containers")
+    val nodes: List[Node] = nodeConfig.map(cfg => startNodeInternal(cfg)).toList
+    blocking(Thread.sleep(nodeConfig.size * 5000))
+    nodes
   }
 
   def createNetwork(maxRetry: Int = 5): Network = try {
@@ -146,17 +153,18 @@ case class Docker(suiteConfig: Config = empty,
         .build()
 
       val nodeName   = nodeConfig.getString("encry.network.nodeName")
+      println(s"nodeName in docker: ${nodeName}")
       val nodeNumber = nodeName.replace("node", "").toInt
+      println(s"nodenumber in docker: ${nodeNumber}")
       val ip         = ipForNode(nodeNumber)
 
-      val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
+     // println("prop" + asProperties(nodeConfig).toString)
 
       val configCommandLine = renderProperties(asProperties(nodeConfig))
 
       val containerConfig = ContainerConfig
         .builder()
-        .attachStdin(true)
-        .image("bromel777/encry-core:latest")
+        .image("it/it")
         .exposedPorts(s"$ProfilerPort", restApiPort, networkPort)
         .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
           network.name() -> endpointConfigFor(nodeName)
@@ -172,7 +180,6 @@ case class Docker(suiteConfig: Config = empty,
           "Containers with same name"
         )
 
-        logger.debug(s"Creating container $containerName at $ip with options: $javaOptions")
         val r = client.createContainer(containerConfig, containerName)
         Option(r.warnings().asScala).toSeq.flatten.foreach(logger.warn(_))
         r.id()
@@ -182,7 +189,7 @@ case class Docker(suiteConfig: Config = empty,
       val containerInfo = client.inspectContainer(containerId)
       val ports = containerInfo.networkSettings().ports()
       val hostRestApiPort = extractHostPort(ports, 9051) //get port from settings
-      val node = new Node(nodeConfig, hostRestApiPort, containerId, http)
+      val node = new Node(nodeConfig, hostRestApiPort, containerId, ip, http)
       nodes.add(node)
       logger.debug(s"Started $containerId -> ${node.name}")
       node
@@ -195,11 +202,6 @@ case class Docker(suiteConfig: Config = empty,
 
   def extractHostPort(portBindingMap: JMap[String, JList[PortBinding]], containerPort: Int): Int =
     portBindingMap.get(s"$containerPort/tcp").get(0).hostPort().toInt
-
-  def asProperties(config: Config): Properties = {
-    val jsonConfig = config.root().render(ConfigRenderOptions.concise())
-    propsMapper.writeValueAsProperties(jsonMapper.readTree(jsonConfig))
-  }
 
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {
@@ -237,24 +239,21 @@ object Docker {
 
   val configTemplate = parseResources("application.conf")
 
-  def apply(owner: Class[_]): Docker = new Docker(tag = owner.getSimpleName)
-
-  private def asProperties(config: Config): Properties = {
-    val jsonConfig = config.root().render(ConfigRenderOptions.concise())
+  def asProperties(config: Config): Properties = {
+    val jsonConfig = config.getObject("encry").render(ConfigRenderOptions.concise())
     propsMapper.writeValueAsProperties(jsonMapper.readTree(jsonConfig))
   }
 
   private def renderProperties(p: Properties) =
     p.asScala
       .map {
-        case (k, v) if v.contains(" ") => k -> s""""$v""""
+        case (k, v) if v.contains(" ") => k -> s"""\"$v\""""
         case x                         => x
       }
-      .map { case (k, v) => s"-D$k=$v" }
+      .map { case (k, v) => s"-Dencry.$k=$v" }
       .mkString(" ")
 
-  private def extractHostPort(m: JMap[String, JList[PortBinding]], containerPort: Int) =
-    m.get(s"$containerPort/tcp").get(0).hostPort().toInt
+  def apply(owner: Class[_]): Docker = new Docker(tag = owner.getSimpleName)
 
   case class NodeInfo(nodeApiEndpoint: URL,
                       hostNetworkAddress: InetSocketAddress,
