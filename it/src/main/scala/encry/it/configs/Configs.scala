@@ -28,11 +28,10 @@ object Configs {
     """.stripMargin
   )
 
-  def knownPeers(peers: Seq[String]): Config = ConfigFactory.parseString({
-    val port = 9001
+  def knownPeers(peers: Seq[(String, Int)]): Config = ConfigFactory.parseString({
     val peerInfoSeq: Seq[String] = peers.map(n =>
       s"""
-         |"$n:$port"
+         |"${n._1}:${n._2}"
        """.stripMargin)
     val peerInfoStr: String = peerInfoSeq.mkString("[", ",", "]")
     println(s"PeerInfo = ${s"""
