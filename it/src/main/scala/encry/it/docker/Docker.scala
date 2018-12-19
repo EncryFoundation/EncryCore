@@ -1,7 +1,8 @@
 package encry.it.docker
 
+import java.io.FileOutputStream
 import java.net.{InetAddress, InetSocketAddress, URL}
-import java.nio.file.Paths
+import java.nio.file.{Files, Paths}
 import java.util.Collections._
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -76,6 +77,7 @@ case class Docker(suiteConfig: Config = empty,
         .endpointConfig(endpointConfigFor(ip))
         .build()
     )
+    logger.info(s"Connecting to network. ContainerId: $containerId and ip: $ip")
     waitForNetwork(containerId)
   }
 
@@ -84,10 +86,11 @@ case class Docker(suiteConfig: Config = empty,
     val containerInfo = client.inspectContainer(containerId)
     val networks = containerInfo.networkSettings().networks().asScala
     if (networks.contains(network.name())) {
+      logger.info("Succesfully connected")
       networks(network.name())
     } else if (maxTry > 0) {
       blocking(Thread.sleep(1000))
-      logger.debug(s"$errMsg, retrying. Max tries = $maxTry")
+      logger.info(s"$errMsg, retrying. Max tries = $maxTry")
       waitForNetwork(containerId, maxTry - 1)
     } else {
       throw new IllegalStateException(errMsg)
@@ -102,10 +105,12 @@ case class Docker(suiteConfig: Config = empty,
   }
 
   def generateConfigWithCorrectKnownPeers(nodeConfig: Config): Config = {
-    nodeConfig
-      .withFallback(Configs.knownPeers(nodes.asScala.map(node => node.nodeIp -> node.nodePort).toSeq))
+    val config = nodeConfig
+      .withFallback(Configs.knownPeers(nodes.asScala.map(node => node.nodeIp -> 9001).toSeq))
       .withFallback(defaultConf)
       .resolve()
+    println(s"Config123:$config")
+    config
   }
 
   def createNetwork(maxRetry: Int = 5): Network = try {
@@ -245,6 +250,27 @@ case class Docker(suiteConfig: Config = empty,
   def extractHostPort(portBindingMap: JMap[String, JList[PortBinding]], containerPort: Int): Int =
     portBindingMap.get(s"$containerPort/tcp").get(0).hostPort().toInt
 
+  private def saveNodeLogs(): Unit = {
+    val logDir = Paths.get(System.getProperty("user.dir"), "target", "logs")
+    Files.createDirectories(logDir)
+    nodes.asScala.foreach { node =>
+
+      val fileName = if (tag.isEmpty) node.containerId else s"$tag-${node.containerId}"
+      val logFile = logDir.resolve(s"$fileName.log").toFile
+      logger.info(s"Writing logs of ${node.containerId} to ${logFile.getAbsolutePath}")
+
+      val fileStream = new FileOutputStream(logFile, false)
+      client.logs(
+        node.containerId,
+        DockerClient.LogsParam.timestamps(),
+        DockerClient.LogsParam.follow(),
+        DockerClient.LogsParam.stdout(),
+        DockerClient.LogsParam.stderr()
+      )
+        .attach(fileStream, fileStream)
+    }
+  }
+
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {
       logger.info("Stopping containers")
@@ -252,7 +278,7 @@ case class Docker(suiteConfig: Config = empty,
         node.close()
         client.stopContainer(node.containerId, 0)
       }
-
+      saveNodeLogs()
       nodes.asScala.foreach(_.client.close())
 
       //saveNodeLogs()
@@ -273,8 +299,6 @@ case class Docker(suiteConfig: Config = empty,
 
 object Docker {
   private val ContainerRoot      = Paths.get("/opt/encry")
-  private val ProfilerController = ContainerRoot.resolve("yjp-controller-api-redist.jar")
-  private val ProfilerPort       = 10001
   private val jsonMapper         = new ObjectMapper
   private val propsMapper        = new JavaPropsMapper
   val networkNamePrefix: String = "itest-"
