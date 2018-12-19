@@ -1,6 +1,6 @@
 package encry.settings
 
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import encry.utils.NetworkTimeProviderSettings
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
@@ -14,13 +14,16 @@ case class EncryAppSettings(directory: String,
                             ntp: NetworkTimeProviderSettings,
                             postgres: Option[PostgresSettings],
                             influxDB: Option[InfluxDBSettings],
-                            levelDb: Option[LevelDbSettings])
+                            levelDb: Option[LevelDbSettings],
+                            monitoringSettings: Option[MonitoringSettings])
 
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader {
 
   val read: EncryAppSettings = ConfigFactory.load("local.conf")
     .withFallback(ConfigFactory.load()).as[EncryAppSettings]("encry")
 
+  val allConfig: Config = ConfigFactory.load("local.conf")
+    .withFallback(ConfigFactory.load())
 }
 
 case class WalletSettings(password: String, seed: Option[String])
