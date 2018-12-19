@@ -21,6 +21,7 @@ class StatsSender extends Actor {
 
   var modifiersToDownload: Map[String, (ModifierTypeId, Long)] = Map()
 
+
   val nodeName: String = settings.network.nodeName match {
     case Some(value) => value
     case None => InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort
