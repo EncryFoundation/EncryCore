@@ -46,15 +46,6 @@ class StatsSender extends Actor {
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
   override def receive: Receive = {
-    case WorkedTime(time, size) =>
-      influxDB.write(InfluxPort, s"workedTime,nodeName=$nodeName value=$time,size=$size")
-
-    case TxsInBlock(txsNum) =>
-      influxDB.write(InfluxPort, s"txsInEachBlock,nodeName=$nodeName value=$txsNum")
-
-    case CurrentUtxosQtyInIOdb(utxosQty) =>
-      influxDB.write(InfluxPort, s"utxosQty,nodeName=$nodeName value=$utxosQty")
-
     case DiffBtwMempoolAndLastBlockTxs(num) =>
       influxDB.write(InfluxPort, s"txsDiff,nodeName=$nodeName value=$num")
 
@@ -183,12 +174,6 @@ object StatsSender {
   case class MempoolStat(size: Int)
 
   case class DiffBtwMempoolAndLastBlockTxs(diff: Int)
-
-  case class TxsInBlock(txsNum: Int)
-
-  case class WorkedTime(time: Long, size: Int)
-
-  case class CurrentUtxosQtyInIOdb(utxosQty: Int)
 
   case class NewBlockAppended(isHeader: Boolean, success: Boolean)
 
