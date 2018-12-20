@@ -1,6 +1,7 @@
 package encry.it.docker
 
 import java.io.FileOutputStream
+import java.lang
 import java.net.{InetAddress, InetSocketAddress, URL}
 import java.nio.file.{Files, Paths}
 import java.util.Collections._
@@ -37,8 +38,8 @@ case class Docker(suiteConfig: Config = empty,
 
   import Docker._
 
-  val client = DefaultDockerClient.fromEnv().build()
-  val nodes = ConcurrentHashMap.newKeySet[Node]()
+  val client: DefaultDockerClient = DefaultDockerClient.fromEnv().build()
+  val nodes: ConcurrentHashMap.KeySetView[Node, lang.Boolean] = ConcurrentHashMap.newKeySet[Node]()
 
   private val http = asyncHttpClient(config()
     .setMaxConnections(50)
@@ -48,10 +49,10 @@ case class Docker(suiteConfig: Config = empty,
     .setRequestTimeout(10000))
 
   private def uuidShort: String = UUID.randomUUID().hashCode().toHexString
-  private val networkName = Docker.networkNamePrefix + uuidShort
-  private val networkSeed = Random.nextInt(0x100000) << 4 | 0x0A000000
-  private val networkPrefix = s"${InetAddress.getByAddress(Ints.toByteArray(networkSeed)).getHostAddress}/28"
-  private val isStopped = new AtomicBoolean(false)
+  private val networkName: String = Docker.networkNamePrefix + uuidShort
+  private val networkSeed: Int = Random.nextInt(0x100000) << 4 | 0x0A000000
+  private val networkPrefix: String = s"${InetAddress.getByAddress(Ints.toByteArray(networkSeed)).getHostAddress}/28"
+  private val isStopped: AtomicBoolean = new AtomicBoolean(false)
   val network = createNetwork(3)
 
   def waitForStartupBlocking(nodes: List[Node]): List[Node] = {
@@ -288,22 +289,16 @@ case class Docker(suiteConfig: Config = empty,
       }
       client.removeNetwork(network.id())
       client.close()
-
-//      localDataVolumeOpt.foreach { path =>
-//        val dataVolume = new File(path)
-//        FileUtils.deleteDirectory(dataVolume)
-//      }
     }
   }
 }
 
 object Docker {
-  private val ContainerRoot      = Paths.get("/opt/encry")
-  private val jsonMapper         = new ObjectMapper
-  private val propsMapper        = new JavaPropsMapper
+  private val jsonMapper: ObjectMapper = new ObjectMapper
+  private val propsMapper: JavaPropsMapper = new JavaPropsMapper
   val networkNamePrefix: String = "itest-"
 
-  val defaultConf = ConfigFactory.load
+  val defaultConf: Config = ConfigFactory.load
 
   def asProperties(config: Config): Properties = {
     val jsonConfig = config.getObject("encry").render(ConfigRenderOptions.concise())
