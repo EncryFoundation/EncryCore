@@ -26,11 +26,11 @@ class MinerWalletBalanceTest extends AsyncFunSuite with Matchers {
       .withFallback(Configs.offlineGeneration(true))
       .withFallback(Configs.nodeName("node1234"))
 
-    val node = docker.startNodeInternal(config)
-    val height = node.waitForHeadersHeight(heightToCheck)
+    val nodes = docker.startNodes(Seq(config))
+    val height = nodes.head.waitForHeadersHeight(heightToCheck)
     Await.result(height, 4.minutes)
     height map { _ =>
-      val res = Await.result(node.balances, 4.minutes)
+      val res = Await.result(nodes.head.balances, 4.minutes)
         .find(_._1 == Algos.encode(IntrinsicTokenId))
         .map(_._2 == supplyAtHeight)
         .get
