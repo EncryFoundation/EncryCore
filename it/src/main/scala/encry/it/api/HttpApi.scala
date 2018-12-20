@@ -2,8 +2,11 @@ package encry.it.api
 
 import java.io.IOException
 import java.util.concurrent.TimeoutException
+
 import com.typesafe.scalalogging.StrictLogging
 import encry.it.util.GlobalTimer._
+import encry.modifiers.mempool.Transaction
+import encry.modifiers.state.box.EncryBaseBox
 import io.circe.parser.parse
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, Json}
@@ -11,6 +14,7 @@ import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import org.slf4j.{Logger, LoggerFactory}
+
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -107,6 +111,18 @@ trait HttpApi { // scalastyle:ignore
       maybeBalance => Future.successful(maybeBalance.map{case (token, balance) => token -> balance.toLong})
     )
   }
+
+  def outputs: Future[Seq[EncryBaseBox]] = get("/wallet/utxos").flatMap { r =>
+    val response: Json = jsonAnswerAs[Json](r.getResponseBody)
+    val boxes = response.hcursor.value.as[Seq[EncryBaseBox]]
+    boxes.fold[Future[Seq[EncryBaseBox]]](
+      e => Future.failed(new Exception(s"Error getting `balances` from /info response: $e\n$response", e)),
+      maybeBoxes => Future.successful(maybeBoxes)
+    )
+  }
+
+  def sendTransaction(transaction: Transaction): Future[Unit] =
+    post("/transactions/send", s"$transaction").map(_ => ())
 
   def waitForStartup: Future[this.type] = get("/info").map(_ => this)
 

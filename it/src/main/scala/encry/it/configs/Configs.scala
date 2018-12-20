@@ -38,4 +38,10 @@ object Configs {
        |encry.network.knownPeers=$peerInfoStr
      """.stripMargin
   })
+
+  def mnemonicKey(key: String): Config = ConfigFactory.parseString(
+    s"""
+       |wallet.seed=$key
+     """.stripMargin
+  )
 }
