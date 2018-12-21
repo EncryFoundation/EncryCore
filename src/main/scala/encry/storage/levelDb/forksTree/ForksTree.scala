@@ -1,11 +1,12 @@
 package encry.storage.levelDb.forksTree
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.modifiers.EncryPersistentModifier
+import encry.modifiers.NodeViewModifier
 import encry.storage.levelDb.forksTree.ForksTree.BrunchNum
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
+
 import scala.util.Try
 
 trait ForksTree extends StrictLogging {
@@ -16,14 +17,14 @@ trait ForksTree extends StrictLogging {
 
   var modifiersTree: ForksTreeNode = ForksTreeNode.empty
 
-  def add(modifier: EncryPersistentModifier)
+  def add(modifier: NodeViewModifier): Unit
 
-  def getDiffs(targetNodeId: ModifierId,
-               currentNode: ForksTreeNode = modifiersTree,
-               diffs: Seq[Diff] = Seq.empty): Seq[Diff] = {
+  def getDiffsPath(targetNodeId: ModifierId,
+                   currentNode: ForksTreeNode = modifiersTree,
+                   diffs: Seq[Diff] = Seq.empty): Seq[Diff] = {
     if (targetNodeId == currentNode.modifierId) diffs
     else currentNode.parent
-      .map(parentNode => getDiffs(targetNodeId, parentNode, diffs ++ currentNode.diffs.map(_.revert)))
+      .map(parentNode => getDiffsPath(targetNodeId, parentNode, diffs ++ currentNode.diffs.map(_.revert)))
       .getOrElse(diffs)
   }
 
