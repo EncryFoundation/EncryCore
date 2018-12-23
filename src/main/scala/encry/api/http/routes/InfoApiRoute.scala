@@ -1,9 +1,11 @@
 package encry.api.http.routes
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import encry.api.http.routes.InfoApiRoute.InfoDTO
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
 import encry.modifiers.history.Block
 import encry.modifiers.history.Header
@@ -14,10 +16,15 @@ import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.ReadersHolder.{GetReaders, Readers}
 import io.circe.Json
 import io.circe.syntax._
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.media.{Content, Schema}
+import io.swagger.v3.oas.annotations.responses.ApiResponse
+import javax.ws.rs.{GET, Path}
 import org.encryfoundation.common.Algos
-import scala.concurrent.Future
-import scala.util.control.NonFatal
 
+import scala.concurrent.Future
+
+@Path("/info")
 case class InfoApiRoute(readersHolder: ActorRef,
                         miner: ActorRef,
                         peerManager: ActorRef,
@@ -30,6 +37,14 @@ case class InfoApiRoute(readersHolder: ActorRef,
 
   private val launchTimeFuture: Future[NetworkTime.Time] = timeProvider.time()
 
+  @GET
+  @Path("/")
+  @Operation(summary = "Return current information about node",
+    responses = Array(
+      new ApiResponse(responseCode = "200", description = "Information response",
+        content = Array(new Content(schema = new Schema(implementation = classOf[InfoDTO])))),
+      new ApiResponse(responseCode = "500", description = "Internal server error"))
+  )
   override val route: Route = (path("info") & get) {
     val minerInfoF: Future[MinerStatus] = getMinerInfo
     val connectedPeersF: Future[Int] = getConnectedPeers
@@ -127,4 +142,22 @@ object InfoApiRoute {
       "isConnectedWithKnownPeers" -> connectWithOnlyKnownPeer.asJson,
     ).asJson
   }
+
+  case class InfoDTO(name: String,
+                     headersHeight: Int,
+                     fullHeight: Int,
+                     bestHeaderId: String,
+                     bestFullHeaderId: String,
+                     previousFullHeaderId: String,
+                     difficulty: BigInt,
+                     unconfirmedCount: Int,
+                     stateType: String,
+                     stateVersion: String,
+                     isMining: Boolean,
+                     peersCount: Int,
+                     knownPeers: Array[String],
+                     storage: String,
+                     uptime: Long,
+                     isConnectedWithKnownPeers: Boolean
+                    )
 }
