@@ -5,6 +5,7 @@ import java.util.concurrent.TimeoutException
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.it.util.GlobalTimer._
+import encry.modifiers.history.{Block, Header}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.EncryBaseBox
 import io.circe.parser.parse
@@ -116,8 +117,26 @@ trait HttpApi { // scalastyle:ignore
     val response: Json = jsonAnswerAs[Json](r.getResponseBody)
     val boxes = response.hcursor.value.as[Seq[EncryBaseBox]]
     boxes.fold[Future[Seq[EncryBaseBox]]](
-      e => Future.failed(new Exception(s"Error getting `balances` from /info response: $e\n$response", e)),
+      e => Future.failed(new Exception(s"Error getting `outputs` from /info response: $e\n$response", e)),
       maybeBoxes => Future.successful(maybeBoxes)
+    )
+  }
+
+  def lastHeaders(qty: Int): Future[Seq[Header]] = get(s"lastHeaders/$qty").flatMap { r =>
+    val response = jsonAnswerAs[Json](r.getResponseBody)
+    val eitherBalance = response.hcursor.as[Seq[Header]]
+    eitherBalance.fold[Future[Seq[Header]]](
+      e => Future.failed(new Exception(s"Error getting `lastHeaders` from /lastHeaders/qty response: $e\n$response", e)),
+      maybeHeaders => Future.successful(maybeHeaders)
+    )
+  }
+
+  def getBlock(modId: String): Future[Block] = get(s"history/$modId").flatMap { r =>
+    val response = jsonAnswerAs[Json](r.getResponseBody)
+    val eitherBalance = response.hcursor.as[Block]
+    eitherBalance.fold[Future[Block]](
+      e => Future.failed(new Exception(s"Error getting `block` from /history/modId response: $e\n$response", e)),
+      maybeBlock => Future.successful(maybeBlock)
     )
   }
 
