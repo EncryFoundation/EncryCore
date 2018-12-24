@@ -44,7 +44,8 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
   @Operation(summary = "Return wallet info",
     responses = Array(
       new ApiResponse(responseCode = "200", description = "Wallet info response",
-        content = Array(new Content(schema = new Schema(implementation = classOf[WalletInfoResponse])))),
+        content = Array(new Content(mediaType = "application/json",
+          schema = new Schema(implementation = classOf[WalletInfoResponse])))),
       new ApiResponse(responseCode = "500", description = "Internal server error"))
   )
   def infoR: Route = (path("info") & get) {
@@ -63,7 +64,8 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
   @Operation(summary = "Return wallet utxos",
     responses = Array(
       new ApiResponse(responseCode = "200", description = "Wallet utxos response",
-        content = Array(new Content(array = new ArraySchema(schema =
+        content = Array(new Content(mediaType = "application/json",
+          array = new ArraySchema(schema =
           new Schema(allOf = Array(classOf[AssetBoxResponse], classOf[DataBoxResponse], classOf[TokenIssuingBoxResponse])))))),
       new ApiResponse(responseCode = "500", description = "Internal server error"))
   )

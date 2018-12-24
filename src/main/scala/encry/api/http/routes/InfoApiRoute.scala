@@ -5,7 +5,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.api.http.routes.InfoApiRoute.InfoDTO
+import encry.api.http.routes.InfoApiRoute.InfoResponse
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
 import encry.modifiers.history.Block
 import encry.modifiers.history.Header
@@ -16,12 +16,14 @@ import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.ReadersHolder.{GetReaders, Readers}
 import io.circe.Json
 import io.circe.syntax._
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.{Content, Schema}
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import javax.ws.rs.{GET, Path}
 import org.encryfoundation.common.Algos
 
+import scala.annotation.meta.field
 import scala.concurrent.Future
 
 @Path("/info")
@@ -42,7 +44,8 @@ case class InfoApiRoute(readersHolder: ActorRef,
   @Operation(summary = "Return current information about node",
     responses = Array(
       new ApiResponse(responseCode = "200", description = "Information response",
-        content = Array(new Content(schema = new Schema(implementation = classOf[InfoDTO])))),
+        content = Array(new Content(mediaType = "application/json",
+          schema = new Schema(implementation = classOf[InfoResponse])))),
       new ApiResponse(responseCode = "500", description = "Internal server error"))
   )
   override val route: Route = (path("info") & get) {
@@ -143,21 +146,22 @@ object InfoApiRoute {
     ).asJson
   }
 
-  case class InfoDTO(name: String,
-                     headersHeight: Int,
-                     fullHeight: Int,
-                     bestHeaderId: String,
-                     bestFullHeaderId: String,
-                     previousFullHeaderId: String,
-                     difficulty: BigInt,
-                     unconfirmedCount: Int,
-                     stateType: String,
-                     stateVersion: String,
-                     isMining: Boolean,
-                     peersCount: Int,
-                     knownPeers: Array[String],
-                     storage: String,
-                     uptime: Long,
-                     isConnectedWithKnownPeers: Boolean
+  @ApiModel(value = "Node info")
+  case class InfoResponse(@(ApiModelProperty @field)(value = "node name") name: String,
+                          @(ApiModelProperty @field)(value = "headers height") headersHeight: Int,
+                          @(ApiModelProperty @field)(value = "full height") fullHeight: Int,
+                          @(ApiModelProperty @field)(value = "best header id") bestHeaderId: String,
+                          @(ApiModelProperty @field)(value = "best full block id") bestFullHeaderId: String,
+                          @(ApiModelProperty @field)(value = "previous full block id") previousFullHeaderId: String,
+                          @(ApiModelProperty @field)(value = "difficulty") difficulty: BigInt,
+                          @(ApiModelProperty @field)(value = "number of unconfirmed transactions") unconfirmedCount: Int,
+                          @(ApiModelProperty @field)(value = "state type", example = "digest") stateType: String,
+                          @(ApiModelProperty @field)(value = "state version") stateVersion: String,
+                          @(ApiModelProperty @field)(value = "indicator if node is mining") isMining: Boolean,
+                          @(ApiModelProperty @field)(value = "number of connected peers") peersCount: Int,
+                          @(ApiModelProperty @field)(value = "number of known peers") knownPeers: Array[String],
+                          @(ApiModelProperty @field)(value = "interaction with storage") storage: String,
+                          @(ApiModelProperty @field)(value = "node uptime") uptime: Long,
+                          @(ApiModelProperty @field)(value = "indicator if node will connect to unknown peers") isConnectedWithKnownPeers: Boolean
                     )
 }

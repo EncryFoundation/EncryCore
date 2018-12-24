@@ -72,7 +72,8 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
   @Operation(summary = "Return unconfirmed transactions",
     responses = Array(
       new ApiResponse(responseCode = "200", description = "Unconfirmed transactions response",
-        content = Array(new Content(array = new ArraySchema(schema = new Schema(implementation = classOf[TransactionResponse]))))),
+        content = Array(new Content(mediaType = "application/json",
+          array = new ArraySchema(schema = new Schema(implementation = classOf[TransactionResponse]))))),
       new ApiResponse(responseCode = "500", description = "Internal server error")),
     parameters = Array(
       new Parameter(name = "offset", required = false, schema = new Schema(implementation = classOf[Int], defaultValue = "0"), in = ParameterIn.QUERY),
