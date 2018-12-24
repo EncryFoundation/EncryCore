@@ -26,7 +26,8 @@ val loggingDependencies = Seq(
   "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
   "ch.qos.logback" % "logback-classic" % logbackVersion,
   "ch.qos.logback" % "logback-core" % logbackVersion,
-  "net.logstash.logback" % "logstash-logback-encoder" % "1.0"
+  "net.logstash.logback" % "logstash-logback-encoder" % "1.0",
+  "com.typesafe.akka" %% "akka-slf4j" % "2.5.18"
 )
 
 val testingDependencies = Seq(
@@ -53,7 +54,6 @@ libraryDependencies ++= Seq(
   "javax.xml.bind" % "jaxb-api" % "2.3.0",
   "com.iheart" %% "ficus" % "1.4.2",
   "org.slf4j" % "slf4j-api" % "1.7.25",
-  "com.typesafe.akka" %% "akka-slf4j" % "2.5.18",
   "org.bouncycastle" % "bcprov-jdk15on" % "1.58",
   "org.whispersystems" % "curve25519-java" % "0.5.0",
   "org.rudogma" %% "supertagged" % "1.4",
