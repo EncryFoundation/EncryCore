@@ -79,7 +79,7 @@ trait HttpApi { // scalastyle:ignore
 
   def post(url: String, port: Int, path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(
-      _post(s"$url:$port$path").setHeader("api_key", "integration-test-rest-api")
+      _post(s"$url:$port$path")
     ).build())
 
   def post(path: String, body: String): Future[Response] =
