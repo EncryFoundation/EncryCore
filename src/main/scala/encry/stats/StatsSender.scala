@@ -179,7 +179,4 @@ object StatsSender {
   case class NewBlockAppended(isHeader: Boolean, success: Boolean)
 
   case class TimestampDifference(diff: Long)
-
-  case class NewBlockAppended(isHeader: Boolean, success: Boolean)
-
 }
