@@ -1,7 +1,7 @@
 package encry.view.wallet
 
 import com.google.common.primitives.Longs
-import encry.modifiers.state.StateModifierDeserializer
+import encry.modifiers.state.StateModifierSerializer
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box._
@@ -16,7 +16,7 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
   import WalletStorage._
 
   def getBoxById(id: ADKey): Option[EncryBaseBox] = store.get(keyByBoxId(id))
-    .flatMap(d => StateModifierDeserializer.parseBytes(d.data, id.head).toOption)
+    .flatMap(d => StateModifierSerializer.parseBytes(d.data, id.head).toOption)
 
   def allBoxes: Seq[EncryBaseBox] = store.getAll
     .filter(_._2 != balancesKey)

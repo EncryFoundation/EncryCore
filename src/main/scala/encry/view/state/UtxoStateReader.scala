@@ -1,7 +1,7 @@
 package encry.view.state
 
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
-import encry.modifiers.state.StateModifierDeserializer
+import encry.modifiers.state.StateModifierSerializer
 import encry.modifiers.state.box._
 import encry.view.history.History.Height
 import io.iohk.iodb.Store
@@ -24,7 +24,7 @@ trait UtxoStateReader extends StateReader {
   protected val persistentProver: PersistentBatchAVLProver[Digest32, Algos.HF]
 
   def boxById(boxId: ADKey): Option[EncryBaseBox] = persistentProver.unauthenticatedLookup(boxId)
-    .map(bytes => StateModifierDeserializer.parseBytes(bytes, boxId.head)).flatMap(_.toOption)
+    .map(bytes => StateModifierSerializer.parseBytes(bytes, boxId.head)).flatMap(_.toOption)
 
   def boxesByIds(ids: Seq[ADKey]): Seq[EncryBaseBox] = ids.foldLeft(Seq[EncryBaseBox]())((acc, id) =>
     boxById(id).map(bx => acc :+ bx).getOrElse(acc))

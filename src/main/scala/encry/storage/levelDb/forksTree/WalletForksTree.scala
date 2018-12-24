@@ -2,11 +2,24 @@ package encry.storage.levelDb.forksTree
 import encry.modifiers.NodeViewModifier
 import encry.modifiers.history.Block
 import encry.modifiers.mempool.Transaction
+import encry.modifiers.state.box.EncryBaseBox
 import encry.utils.BalanceCalculator
+import org.encryfoundation.common.Algos
+import org.iq80.leveldb.DB
 
-class WalletForksTree extends ForksTree {
+case class WalletForksTree(override val db: DB) extends ForksTree {
 
-  override def add(modifier: NodeViewModifier): Unit = ???
+  def addBoxesToCache(boxes: Seq[EncryBaseBox]): Unit = {
+    val batch = db.createWriteBatch()
+    boxes
+      .map(box => (Algos.decode("diffCache").get ++ box.id) -> box.bytes)
+      .foreach{case (boxId, boxBytes) => batch.put(boxId, boxBytes)}
+    db.write(batch)
+  }
+
+  override def add(modifier: NodeViewModifier): Unit = {
+
+  }
 }
 
 object WalletForksTree {
