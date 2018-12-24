@@ -12,13 +12,12 @@ case class WalletForksTree(override val db: DB) extends ForksTree {
   def addBoxesToCache(boxes: Seq[EncryBaseBox]): Unit = {
     val batch = db.createWriteBatch()
     boxes
-      .map(box => (Algos.decode("diffCache").get ++ box.id) -> box.bytes)
-      .foreach{case (boxId, boxBytes) => batch.put(boxId, boxBytes)}
-    db.write(batch)
+      .map(box => ("cache".getBytes ++ box.id) -> box.bytes)
+      .foreach{case (boxId, boxBytes) => db.put(boxId, boxBytes)}
   }
 
   override def add(modifier: NodeViewModifier): Unit = {
-
+    val modifiers = WalletForksTree.getDiffs(modifier)
   }
 }
 
