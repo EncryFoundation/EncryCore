@@ -49,7 +49,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
     val header = genHeader.copy(parentId = Header.GenesisParentId, height = Constants.Chain.GenesisHeight)
 
-    Block(header, Payload(header.id, Seq.empty), None)
+    Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
   }
 
   def paymentTransactionDynamic: Transaction = {

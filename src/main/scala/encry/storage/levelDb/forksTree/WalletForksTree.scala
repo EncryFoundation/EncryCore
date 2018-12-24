@@ -34,19 +34,26 @@ case class WalletForksTree(override val db: DB) extends ForksTree {
           boxes :+ box
       }
       diff.boxesToAdd.foreach(box => db.put(box.id, box.bytes))
-      diff.balanceChanges.foreach{ case (balanceKey, balance) =>
-        val previousBalance = Longs.fromByteArray(db.get(balanceKey))
-        db.delete(balanceKey)
-        db.put(balanceKey, Longs.toByteArray(previousBalance + balance))
+      val previousBalances = getBalances
+      val newBalances = diff.balanceChanges.foldLeft(Map.empty[Array[Byte], Long]) {
+        case (balances, balanceToken) => balances.updated(balanceToken._1,
+          previousBalances.getOrElse(balanceToken._1, 0L) + balanceToken._2)
       }
+      db.put(BalancesKey, newBalances.foldLeft(Array.empty[Byte]) { case (acc, (id, balance)) =>
+        acc ++ id ++ Longs.toByteArray(balance)
+      })
       boxesToCache
     })
   }
 
-  def getBalances: Map[TokenId, Amount] = db.get(BalancesKey)
-    .sliding(40, 40)
-    .map(ch => ch.take(32) -> Longs.fromByteArray(ch.takeRight(8)))
-    .toMap
+  def getBalances: Map[TokenId, Amount] = {
+    val balances = db.get(BalancesKey)
+    if (balances == null) Map.empty
+    else balances
+      .sliding(40, 40)
+      .map(ch => ch.take(32) -> Longs.fromByteArray(ch.takeRight(8)))
+      .toMap
+  }
 
   def calculateNewBalance(bxsToInsert: Seq[EncryBaseBox], bxsToRemove: Seq[EncryBaseBox]): Array[Byte] = {
     val balancesToInsert: Map[Array[Byte], Long] = BalanceCalculator.balanceSheet(bxsToInsert)
@@ -70,6 +77,12 @@ case class WalletForksTree(override val db: DB) extends ForksTree {
 object WalletForksTree {
 
   val BalancesKey: Array[Byte] = Algos.hash("balances")
+
+  def apply(db: DB): WalletForksTree = {
+    val tree = new WalletForksTree(db)
+    db.put(BalancesKey, Array.emptyByteArray)
+    tree
+  }
 
   def getDiffs(modifier: NodeViewModifier): Seq[WalletDiff] = modifier match {
     case block: Block => block.payload.transactions.flatMap(getDiffs)
