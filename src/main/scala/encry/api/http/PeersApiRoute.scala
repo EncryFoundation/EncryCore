@@ -38,7 +38,8 @@ case class PeersApiRoute(peerManager: ActorRef,
   @Operation(summary = "Return all known peers",
     responses = Array(
     new ApiResponse(responseCode = "200", description = "Array of peers",
-      content = Array(new Content(array = new ArraySchema(schema = new Schema(implementation = classOf[PeerInfoResponse]))))),
+      content = Array(new Content(mediaType = "application/json",
+        array = new ArraySchema(schema = new Schema(implementation = classOf[PeerInfoResponse]))))),
     new ApiResponse(responseCode = "500", description = "Internal server error")),
   )
   def allPeers: Route = (path("all") & get) {
@@ -56,7 +57,8 @@ case class PeersApiRoute(peerManager: ActorRef,
   @Operation(summary = "Return all connected peers",
     responses = Array(
       new ApiResponse(responseCode = "200", description = "Array of connected peers",
-        content = Array(new Content(array = new ArraySchema(schema = new Schema(implementation = classOf[PeerInfoResponse]))))),
+        content = Array(new Content(mediaType = "application/json",
+          array = new ArraySchema(schema = new Schema(implementation = classOf[PeerInfoResponse]))))),
       new ApiResponse(responseCode = "500", description = "Internal server error"))
   )
   def connectedPeers: Route = (path("connected") & get) {

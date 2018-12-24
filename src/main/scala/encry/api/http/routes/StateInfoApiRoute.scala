@@ -4,12 +4,13 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.modifiers.state.box.EncryBaseBox
+import encry.api.http.routes.WalletInfoApiRoute.EncryBaseBoxResponse
 import encry.settings.RESTApiSettings
 import encry.view.ReadersHolder.{GetReaders, Readers}
 import encry.view.state.{StateMode, UtxoStateReader}
 import io.circe.Json
 import io.circe.syntax._
+import io.circe.generic.auto._
 import io.swagger.v3.oas.annotations.enums.ParameterIn
 import io.swagger.v3.oas.annotations.{Operation, Parameter}
 import io.swagger.v3.oas.annotations.media.{Content, Schema}
@@ -32,14 +33,15 @@ case class StateInfoApiRoute(readersHolder: ActorRef,
 
   private def getState: Future[UtxoStateReader] = (readersHolder ? GetReaders).mapTo[Readers].map(_.s.get)
 
-  private def getBoxById(id: ADKey): Future[Option[Json]] = getState.map(_.boxById(id).map(_.asJson))
+  private def getBoxById(id: ADKey): Future[Option[Json]] = getState.map(_.boxById(id).map(EncryBaseBoxResponse(_)).map(_.asJson))
 
   @GET
   @Path("/{boxId}")
   @Operation(summary = "Return box with given id",
     responses = Array(
       new ApiResponse(responseCode = "200", description = "Box response",
-        content = Array(new Content(schema = new Schema(implementation = classOf[EncryBaseBox])))),
+        content = Array(new Content(mediaType = "application/json",
+          schema = new Schema(implementation = classOf[EncryBaseBoxResponse])))),
       new ApiResponse(responseCode = "500", description = "Internal server error")),
     parameters = Array(
       new Parameter(name = "boxId", required = true, schema = new Schema(implementation = classOf[String]), in = ParameterIn.PATH),
