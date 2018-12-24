@@ -25,25 +25,30 @@ case class WalletForksTree(override val db: DB) extends ForksTree {
 
   override def add(modifier: NodeViewModifier): Unit = {
     val modifiers = WalletForksTree.getDiffs(modifier)
-    addBoxesToCache(modifiers.flatMap{diff =>
-      val boxesToCache = diff.boxesToRemove.foldLeft(Seq.empty[EncryBaseBox]) {
-        case (boxes, id) =>
-          //TODO: Remove get
-          val box = StateModifierSerializer.parseBytes(db.get(id), id.head).get
-          db.delete(id)
-          boxes :+ box
+    modifiers.foreach(applyWalletDiff)
+  }
+
+  def applyWalletDiff(diff: WalletDiff): Unit = {
+    addBoxesToCache({
+        val boxesToCache = diff.boxesToRemove.foldLeft(Seq.empty[EncryBaseBox]) {
+          case (boxes, id) =>
+            //TODO: Remove get
+            val box = StateModifierSerializer.parseBytes(db.get(id), id.head).get
+            db.delete(id)
+            boxes :+ box
+        }
+        diff.boxesToAdd.foreach(box => db.put(box.id, box.bytes))
+        val previousBalances = getBalances
+        val newBalances = diff.balanceChanges.foldLeft(Map.empty[Array[Byte], Long]) {
+          case (balances, balanceToken) => balances.updated(balanceToken._1,
+            previousBalances.getOrElse(balanceToken._1, 0L) + balanceToken._2)
+        }
+        db.put(BalancesKey, newBalances.foldLeft(Array.empty[Byte]) { case (acc, (id, balance)) =>
+          acc ++ id ++ Longs.toByteArray(balance)
+        })
+        boxesToCache
       }
-      diff.boxesToAdd.foreach(box => db.put(box.id, box.bytes))
-      val previousBalances = getBalances
-      val newBalances = diff.balanceChanges.foldLeft(Map.empty[Array[Byte], Long]) {
-        case (balances, balanceToken) => balances.updated(balanceToken._1,
-          previousBalances.getOrElse(balanceToken._1, 0L) + balanceToken._2)
-      }
-      db.put(BalancesKey, newBalances.foldLeft(Array.empty[Byte]) { case (acc, (id, balance)) =>
-        acc ++ id ++ Longs.toByteArray(balance)
-      })
-      boxesToCache
-    })
+    )
   }
 
   def getBalances: Map[TokenId, Amount] = {
