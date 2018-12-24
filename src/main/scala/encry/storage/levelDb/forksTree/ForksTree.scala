@@ -6,10 +6,13 @@ import encry.storage.levelDb.forksTree.ForksTree.BrunchNum
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
+import org.iq80.leveldb.DB
 
 import scala.util.Try
 
 trait ForksTree extends StrictLogging {
+
+  val db: DB
 
   var diffsMap: Map[ModifierId, Seq[Diff]] = Map.empty
 
