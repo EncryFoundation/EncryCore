@@ -5,7 +5,7 @@ import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.settings.Constants
-import io.circe.Encoder
+import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
@@ -43,13 +43,27 @@ object AssetBox {
   val TypeId: BxTypeId = 1.toByte
 
   implicit val jsonEncoder: Encoder[AssetBox] = (bx: AssetBox) => Map(
-    "type" -> TypeId.asJson,
-    "id" -> Algos.encode(bx.id).asJson,
+    "type"        -> TypeId.asJson,
+    "id"          -> Algos.encode(bx.id).asJson,
     "proposition" -> bx.proposition.asJson,
-    "nonce" -> bx.nonce.asJson,
-    "value" -> bx.amount.asJson,
-    "tokenId" -> bx.tokenIdOpt.map(id => Algos.encode(id)).asJson
+    "nonce"       -> bx.nonce.asJson,
+    "value"       -> bx.amount.asJson,
+    "tokenId"     -> bx.tokenIdOpt.map(id => Algos.encode(id)).asJson
   ).asJson
+
+  implicit val jsonDecoder: Decoder[AssetBox] = (c: HCursor) => {
+    for {
+      proposition <- c.downField("proposition").as[EncryProposition]
+      nonce       <- c.downField("nonce").as[Long]
+      amount      <- c.downField("value").as[Long]
+      tokenIdOpt  <- c.downField("tokenId").as[Option[TokenId]]
+    } yield AssetBox(
+      proposition,
+      nonce,
+      amount,
+      tokenIdOpt
+    )
+  }
 }
 
 object AssetBoxSerializer extends Serializer[AssetBox] {

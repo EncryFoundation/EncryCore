@@ -10,7 +10,7 @@ import encry.modifiers.mempool.directive.TransferDirective
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
 import encry.settings.Constants
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import io.circe.Encoder
+import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import org.encryfoundation.common.Algos
@@ -169,19 +169,45 @@ object Header {
   lazy val GenesisParentId: ModifierId = ModifierId @@ Array.fill(Constants.DigestLength)(0: Byte)
 
   implicit val jsonEncoder: Encoder[Header] = (h: Header) => Map(
-    "id" -> Algos.encode(h.id).asJson,
-    "version" -> h.version.asJson,
-    "parentId" -> Algos.encode(h.parentId).asJson,
-    "adProofsRoot" -> Algos.encode(h.adProofsRoot).asJson,
-    "payloadId" -> Algos.encode(h.payloadId).asJson,
-    "stateRoot" -> Algos.encode(h.stateRoot).asJson,
-    "txRoot" -> Algos.encode(h.transactionsRoot).asJson,
-    "nonce" -> h.nonce.asJson,
-    "timestamp" -> h.timestamp.asJson,
-    "height" -> h.height.asJson,
-    "difficulty" -> h.difficulty.toString.asJson,
+    "id"               -> Algos.encode(h.id).asJson,
+    "version"          -> h.version.asJson,
+    "parentId"         -> Algos.encode(h.parentId).asJson,
+    "adProofsRoot"     -> Algos.encode(h.adProofsRoot).asJson,
+    "payloadId"        -> Algos.encode(h.payloadId).asJson,
+    "stateRoot"        -> Algos.encode(h.stateRoot).asJson,
+    "txRoot"           -> Algos.encode(h.transactionsRoot).asJson,
+    "nonce"            -> h.nonce.asJson,
+    "timestamp"        -> h.timestamp.asJson,
+    "height"           -> h.height.asJson,
+    "difficulty"       -> h.difficulty.toString.asJson,
     "equihashSolution" -> h.equihashSolution.asJson
   ).asJson
+
+  implicit val jsonDecoder: Decoder[Header] = (c: HCursor) => {
+    for {
+      version          <- c.downField("version").as[Byte]
+      parentId         <- c.downField("parentId").as[Array[Byte]]
+      adProofsRoot     <- c.downField("adProofsRoot").as[Array[Byte]]
+      stateRoot        <- c.downField("stateRoot").as[Array[Byte]]
+      txRoot           <- c.downField("txRoot").as[Array[Byte]]
+      timestamp        <- c.downField("timestamp").as[Long]
+      height           <- c.downField("height").as[Int]
+      nonce            <- c.downField("nonce").as[Long]
+      difficulty       <- c.downField("difficulty").as[BigInt]
+      equihashSolution <- c.downField("equihashSolution").as[EquihashSolution]
+    } yield Header(
+      version,
+      ModifierId @@ parentId,
+      Digest32 @@ adProofsRoot,
+      ADDigest @@ stateRoot,
+      Digest32 @@ txRoot,
+      timestamp,
+      height,
+      nonce,
+      Difficulty @@ difficulty,
+      equihashSolution
+    )
+  }
 
   def getPowHash(header: Header): Digest32 = {
     val digest: Blake2bDigest = new Blake2bDigest(256)

@@ -5,11 +5,11 @@ import encry.modifiers.mempool._
 import encry.modifiers.state.box.EncryProposition
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest, TransactionsCarryingPersistentNodeViewModifier}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import io.circe.Encoder
+import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
-import org.encryfoundation.common.utils.TaggedTypes.LeafData
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, LeafData}
 import scorex.crypto.hash.Digest32
 import scala.util.Try
 
@@ -37,9 +37,19 @@ case class Payload(override val headerId: ModifierId, txs: Seq[Transaction])
 object Payload {
 
   implicit val jsonEncoder: Encoder[Payload] = (bp: Payload) => Map(
-    "headerId" -> Algos.encode(bp.headerId).asJson,
+    "headerId"     -> Algos.encode(bp.headerId).asJson,
     "transactions" -> bp.txs.map(_.asJson).asJson
   ).asJson
+
+  implicit val jsonDecoder: Decoder[Payload] = (c: HCursor) => {
+    for {
+      headerId     <- c.downField("headerId").as[Array[Byte]]
+      transactions <- c.downField("transactions").as[Seq[Transaction]]
+    } yield Payload(
+      ModifierId @@ headerId,
+      transactions
+    )
+  }
 
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (102: Byte)
 

@@ -117,7 +117,7 @@ trait HttpApi { // scalastyle:ignore
     val response: Json = jsonAnswerAs[Json](r.getResponseBody)
     val boxes = response.hcursor.value.as[Seq[EncryBaseBox]]
     boxes.fold[Future[Seq[EncryBaseBox]]](
-      e => Future.failed(new Exception(s"Error getting `outputs` from /info response: $e\n$response", e)),
+      e => Future.failed(new Exception(s"Error getting `outputs` from /wallet/utxos response: $e\n$response", e)),
       maybeBoxes => Future.successful(maybeBoxes)
     )
   }

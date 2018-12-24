@@ -2,7 +2,7 @@ package encry.crypto.equihash
 
 import com.google.common.primitives.Ints
 import encry.settings.Constants
-import io.circe.Encoder
+import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.common.serialization.{BytesSerializable, Serializer}
 import scala.util.Try
 
@@ -23,6 +23,9 @@ object EquihashSolution {
   /** This is for json representation of [[EquihashSolution]] instances */
   implicit val jsonEncoder: Encoder[EquihashSolution] =
     Encoder.encodeSeq[Int].contramap[EquihashSolution](_.ints)
+
+  implicit val jsonDecoder: Decoder[EquihashSolution] = (c: HCursor) =>
+    for { equihashSolution <- c.downField("equihashSolution").as[Seq[Int]] } yield EquihashSolution(equihashSolution)
 }
 
 object EquihashSolutionsSerializer extends Serializer[EquihashSolution] {

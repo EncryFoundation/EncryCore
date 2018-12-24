@@ -2,7 +2,7 @@ package encry.modifiers.state.box
 
 import encry.settings.Constants
 import encry.view.history.History.Height
-import io.circe.Encoder
+import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
@@ -46,6 +46,10 @@ object EncryProposition {
   implicit val jsonEncoder: Encoder[EncryProposition] = (p: EncryProposition) => Map(
     "contractHash" -> Algos.encode(p.contractHash).asJson
   ).asJson
+
+  implicit val jsonDecoder: Decoder[EncryProposition] = (c: HCursor) =>
+    for { contractHash <- c.downField("contractHash").as[String] }
+      yield EncryProposition(Algos.decode(contractHash).getOrElse(Array.emptyByteArray))
 
   def open: EncryProposition = EncryProposition(OpenContract.contract.hash)
   def heightLocked(height: Height): EncryProposition = EncryProposition(HeightLockedContract(height).contract.hash)

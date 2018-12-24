@@ -7,7 +7,7 @@ import encry.modifiers.state.box.EncryProposition
 import encry.modifiers.{EncryPersistentModifier, TransactionsCarryingPersistentNodeViewModifier}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.validation.{ModifierValidator, ValidationResult}
-import io.circe.Encoder
+import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
 import org.encryfoundation.common.serialization.Serializer
 import scorex.crypto.encode.Base16
@@ -76,10 +76,22 @@ object Block {
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (100: Byte)
 
   implicit val jsonEncoder: Encoder[Block] = (b: Block) => Map(
-    "header" -> b.header.asJson,
-    "payload" -> b.payload.asJson,
+    "header"   -> b.header.asJson,
+    "payload"  -> b.payload.asJson,
     "adProofs" -> b.adProofsOpt.map(_.asJson).getOrElse(Map.empty[String, String].asJson)
   ).asJson
+
+  implicit val jsonDecoder: Decoder[Block] = (c: HCursor) => {
+    for {
+      header  <- c.downField("header").as[Header]
+      payload <- c.downField("payload").as[Payload]
+      adProof <- c.downField("adProofs").as[ADProofs]
+    } yield Block(
+      header,
+      payload,
+      Some(adProof)
+    )
+  }
 }
 
 object BlockSerializer extends Serializer[Block] {
