@@ -32,6 +32,7 @@ case class WalletForksTree(override val db: DB) extends ForksTree[WalletDiff] {
   }
 
   def applyDiff(diff: WalletDiff): Unit = {
+    logger.info(s"Applying: ${diff.balanceChanges}")
     diff.boxesToRemove.foreach(key => db.delete(key))
     diff.boxesToAdd.foreach(box => db.put(box.id, box.bytes))
     val previousBalances: Map[String, Amount] = getBalances

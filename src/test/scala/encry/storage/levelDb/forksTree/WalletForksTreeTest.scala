@@ -14,6 +14,8 @@ import org.iq80.leveldb.{DB, Options}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.hash.{Blake2b256, Digest32}
 
+import scala.util.Success
+
 class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator with InstanceFactory with StrictLogging{
 
   property("Applying 35 blocks. Wallet balance should increase") {
@@ -59,9 +61,12 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
 
     val blocksToWallet: Seq[Block] = (0 until 35).foldLeft(generateDummyHistory, Seq.empty[Block]) {
       case ((prevHistory, blocks), _) =>
-        val block: Block = generateNextBlock(prevHistory)
+        val block: Block = generateNextBlock(prevHistory, txsQty = 0)
         prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block) -> (blocks :+ block)
     }._2
+
+    def amountInBlocks(blocks: Seq[Block]): Long =
+      blocks.map(_.payload.transactions.map(_.newBoxes.collect{case ab: AssetBox => ab.amount}.sum).sum).sum
 
     def applyModifications(mods: Seq[Modification]): Unit =
       mods.foreach(m => {
@@ -83,21 +88,31 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
       LevelDbFactory.factory.open(dir, new Options)
     }
 
+    //init tree
     val walletTree = WalletForksTree(db)
 
+    //add all blocks
     blocksToWallet.foreach(walletTree.add)
 
-    println(walletTree
-      .getBalances)
+    //Check params before rollback
 
-    walletTree.rollbackTo(blocksToWallet.dropRight(2).last.id, persistentProver)
+      //check correct balance
+      blocksToWallet.last.id shouldEqual walletTree.id
 
-    println(Algos.encode(blocksToWallet.last.id))
+      //check correct head of tree
+      amountInBlocks(blocksToWallet) shouldEqual walletTree.getBalances.head._2
 
-    println(Algos.encode(blocksToWallet.dropRight(2).last.id))
+    // do rollback
 
-    println(Algos.encode(walletTree.id))
+    val result = walletTree.rollbackTo(blocksToWallet.init.last.id, persistentProver)
 
+    // Check params after rollback
+
+      //check correct balance
+      amountInBlocks(blocksToWallet.init) shouldEqual walletTree.getBalances.head._2
+
+      //check correct head of tree
+      blocksToWallet.tail.last.id shouldEqual walletTree.id
   }
 
 }
