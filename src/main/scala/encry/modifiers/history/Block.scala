@@ -85,11 +85,10 @@ object Block {
     for {
       header  <- c.downField("header").as[Header]
       payload <- c.downField("payload").as[Payload]
-      adProof <- c.downField("adProofs").as[ADProofs]
     } yield Block(
       header,
       payload,
-      Some(adProof)
+      None
     )
   }
 }

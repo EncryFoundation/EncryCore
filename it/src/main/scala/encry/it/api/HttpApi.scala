@@ -3,7 +3,9 @@ package encry.it.api
 import java.io.IOException
 import java.util.concurrent.TimeoutException
 
-import com.typesafe.scalalogging.StrictLogging
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.headers.Host
+import akka.http.scaladsl.model._
 import encry.it.util.GlobalTimer._
 import encry.modifiers.history.{Block, Header}
 import encry.modifiers.mempool.Transaction
@@ -84,7 +86,7 @@ trait HttpApi { // scalastyle:ignore
 
   def post(path: String, body: String): Future[Response] =
     post(s"http://$restAddress", nodeRestPort, path,
-      (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(body))
+      (rb: RequestBuilder) => rb.setHeader("Content-Type", "application/json").setBody(body))
 
   def fullHeight: Future[Int] = get("/info") flatMap { r =>
     val response = jsonAnswerAs[Json](r.getResponseBody)
@@ -122,7 +124,7 @@ trait HttpApi { // scalastyle:ignore
     )
   }
 
-  def lastHeaders(qty: Int): Future[Seq[Header]] = get(s"lastHeaders/$qty").flatMap { r =>
+  def lastHeaders(qty: Int): Future[Seq[Header]] = get(s"/history/lastHeaders/$qty").flatMap { r =>
     val response = jsonAnswerAs[Json](r.getResponseBody)
     val eitherBalance = response.hcursor.as[Seq[Header]]
     eitherBalance.fold[Future[Seq[Header]]](
@@ -131,7 +133,7 @@ trait HttpApi { // scalastyle:ignore
     )
   }
 
-  def getBlock(modId: String): Future[Block] = get(s"history/$modId").flatMap { r =>
+  def getBlock(modId: String): Future[Block] = get(s"/history/$modId").flatMap { r =>
     val response = jsonAnswerAs[Json](r.getResponseBody)
     val eitherBalance = response.hcursor.as[Block]
     eitherBalance.fold[Future[Block]](
@@ -140,8 +142,17 @@ trait HttpApi { // scalastyle:ignore
     )
   }
 
+  def getHeadersIdAtHeight(height: Int): Future[List[String]] = get(s"/history/at/$height").flatMap { r =>
+    val response = jsonAnswerAs[Json](r.getResponseBody)
+    val eitherBalance = response.hcursor.as[List[String]]
+    eitherBalance.fold[Future[List[String]]](
+      e => Future.failed(new Exception(s"Error getting `block` from /history/modId response: $e\n$response", e)),
+      maybeBlock => Future.successful(maybeBlock)
+    )
+  }
+
   def sendTransaction(transaction: Transaction): Future[Unit] =
-    post("/transactions/send", s"$transaction").map(_ => ())
+    post("/transactions/send", s"${transaction.asJson}").map(ex => println(ex.getUri, ex.getResponseBody, ex.isRedirected))
 
   def waitForStartup: Future[this.type] = get("/info").map(_ => this)
 

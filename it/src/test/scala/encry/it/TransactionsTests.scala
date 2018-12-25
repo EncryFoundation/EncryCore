@@ -15,6 +15,9 @@ import org.encryfoundation.common.transaction.EncryAddress.Address
 import scorex.crypto.encode.Base16
 import scorex.crypto.signatures.Curve25519
 import scorex.utils.Random
+import io.circe.syntax._
+import io.circe.{Decoder, Encoder, Json}
+import org.encryfoundation.common.Algos
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -25,74 +28,77 @@ class TransactionsTests extends AsyncFunSuite with Matchers with ScalaFutures wi
   test("Get box, form and send transaction. Check block for availability of this transaction. Check miner balance.") {
 
     val heightToCheck: Int = 5
-    val heightToCheckNew: Int = 2
+    val heightToCheckNew: Int = 8
     val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
     val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
+    logger.info(Algos.encode(privKey.privKeyBytes) + " dksfmksdfmkfksdkfkdskkd")
     val recipientAddress: Address = PublicKey25519(Curve25519.createKeyPair(Random.randomBytes())._2).address.address
 
     val docker: Docker = Docker()
     val config: Config = Configs.mining(true)
       .withFallback(Configs.offlineGeneration(true))
-      .withFallback(Configs.mnemonicKey(mnemonicKey))
       .withFallback(Configs.nodeName("node1"))
 
     val nodes: List[Node] = docker.startNodes(Seq(config))
     val height: Future[Int] = nodes.head.waitForHeadersHeight(heightToCheck)
 
-    val res1: Int = Await.result(height, 4.minutes)
+    val res1: Int = Await.result(height, 2.minutes)
 
     val boxes: Future[Seq[EncryBaseBox]] = nodes.head.outputs
 
-    val res2: Seq[EncryBaseBox] = Await.result(boxes, 4.minutes)
+    val res2: Seq[EncryBaseBox] = Await.result(boxes, 2.minutes)
 
-    val box: MonetaryBox = res2.head.asInstanceOf[MonetaryBox]
+    val box: AssetBox = res2.collect {
+      case ab: AssetBox => ab
+    }.head
 
     logger.info(box.toString)
 
-    val transaction: Transaction = TransactionFactory.defaultPaymentTransactionScratch(
+    val transaction = CreateTransaction.defaultPaymentTransaction(
       privKey,
-      1,
+      101,
       System.currentTimeMillis(),
-      IndexedSeq(box),
+      IndexedSeq(box).map(_ -> None),
       recipientAddress,
-      1000
+      102
     )
 
-    logger.info(transaction.toString)
+    logger.info(transaction.asJson.toString())
 
     val sendTransaction: Future[Unit] = nodes.head.sendTransaction(transaction)
 
     logger.info(123.toString)
 
-    val resTmp: Unit = Await.result(sendTransaction, 4.minutes)
+    val resTmp: Unit = Await.result(sendTransaction, 2.minutes)
 
     logger.info(456.toString)
 
     val heightNew: Future[Int] = nodes.head.waitForHeadersHeight(heightToCheckNew)
 
-    val res3: Int = Await.result(heightNew, 4.minutes)
+    val res3: Int = Await.result(heightNew, 2.minutes)
 
     logger.info(res3.toString)
 
-    val lastHeaders: Future[Seq[Header]] = nodes.head.lastHeaders(heightToCheckNew)
+    val lastHeaders: List[String] =
+      (heightToCheck + 1 to heightToCheckNew).foldLeft(List[String]()) { case (a, b) =>
+        val headers: Future[List[String]] = nodes.head.getHeadersIdAtHeight(b)
+        val result: List[String] = Await.result(headers, 1.minutes)
+        a ::: result
+      }
 
-    val res4: Seq[Header] = Await.result(lastHeaders, 4.minutes)
+    val test = nodes.head.getBlock(lastHeaders.head)
 
-    logger.info(res4.toString())
+    val qwer = Await.result(test, 1.minutes)
 
-    val lastBlocks: Future[Seq[Block]] = Future.sequence(res4.map { h =>
-      nodes.head.getBlock(Base16.encode(h.id))
-    })
+    logger.info(qwer.toString)
 
-    val res5: Seq[Block] = Await.result(lastBlocks, 4.minutes)
+    val lastBlocks: Future[Seq[Block]] = Future.sequence(lastHeaders.map { h => nodes.head.getBlock(h) })
 
-    Future {
-      val numTxs: Int = res5.map { b =>
-        b.payload.txs.size
-      }.sum
+    lastBlocks.map { blocks =>
+      val txsNum: Int = blocks.map(_.payload.transactions.size).sum
       docker.close()
-      true shouldEqual (numTxs > 2)
-      numTxs shouldEqual 3
+      true shouldEqual (txsNum > 3)
+      txsNum shouldEqual 4
     }
   }
 }

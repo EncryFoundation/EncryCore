@@ -21,11 +21,10 @@ object EquihashSolution {
   def empty: EquihashSolution = EquihashSolution(Seq.fill(length)(0))
 
   /** This is for json representation of [[EquihashSolution]] instances */
-  implicit val jsonEncoder: Encoder[EquihashSolution] =
-    Encoder.encodeSeq[Int].contramap[EquihashSolution](_.ints)
+  implicit val jsonEncoder: Encoder[EquihashSolution] = Encoder.encodeSeq[Int].contramap[EquihashSolution](_.ints)
 
   implicit val jsonDecoder: Decoder[EquihashSolution] = (c: HCursor) =>
-    for { equihashSolution <- c.downField("equihashSolution").as[Seq[Int]] } yield EquihashSolution(equihashSolution)
+    for { equihashSolution <- c.as[List[Int]] } yield EquihashSolution(equihashSolution)
 }
 
 object EquihashSolutionsSerializer extends Serializer[EquihashSolution] {
@@ -35,9 +34,7 @@ object EquihashSolutionsSerializer extends Serializer[EquihashSolution] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[EquihashSolution] = Try {
-    val seq = for {i <- bytes.indices by Ints.BYTES} yield {
-      Ints.fromByteArray(bytes.slice(i, i + Ints.BYTES))
-    }
+    val seq = for { i <- bytes.indices by Ints.BYTES } yield { Ints.fromByteArray(bytes.slice(i, i + Ints.BYTES)) }
     EquihashSolution(seq)
   }
 }

@@ -79,11 +79,11 @@ object ADProofs {
 
   implicit val jsonDecoder: Decoder[ADProofs] = (c: HCursor) => {
     for {
-      headerId   <- c.downField("headerId").as[Array[Byte]]
-      proofBytes <- c.downField("proofBytes").as[Array[Byte]]
+      headerIdAd <- c.downField("headerId").as[String]
+      proofBytes <- c.downField("proofBytes").as[String]
     } yield ADProofs(
-      ModifierId @@ headerId,
-      SerializedAdProof @@ proofBytes,
+      ModifierId @@ Algos.decode(headerIdAd).getOrElse(Array.emptyByteArray),
+      SerializedAdProof @@ Algos.decode(proofBytes).getOrElse(Array.emptyByteArray),
     )
   }
 

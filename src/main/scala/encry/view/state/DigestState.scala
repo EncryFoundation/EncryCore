@@ -11,7 +11,6 @@ import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
-
 import scala.util
 import scala.util.{Failure, Success, Try}
 

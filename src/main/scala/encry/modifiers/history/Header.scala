@@ -186,10 +186,10 @@ object Header {
   implicit val jsonDecoder: Decoder[Header] = (c: HCursor) => {
     for {
       version          <- c.downField("version").as[Byte]
-      parentId         <- c.downField("parentId").as[Array[Byte]]
-      adProofsRoot     <- c.downField("adProofsRoot").as[Array[Byte]]
-      stateRoot        <- c.downField("stateRoot").as[Array[Byte]]
-      txRoot           <- c.downField("txRoot").as[Array[Byte]]
+      parentId         <- c.downField("parentId").as[String]
+      adProofsRoot     <- c.downField("adProofsRoot").as[String]
+      stateRoot        <- c.downField("stateRoot").as[String]
+      txRoot           <- c.downField("txRoot").as[String]
       timestamp        <- c.downField("timestamp").as[Long]
       height           <- c.downField("height").as[Int]
       nonce            <- c.downField("nonce").as[Long]
@@ -197,10 +197,10 @@ object Header {
       equihashSolution <- c.downField("equihashSolution").as[EquihashSolution]
     } yield Header(
       version,
-      ModifierId @@ parentId,
-      Digest32 @@ adProofsRoot,
-      ADDigest @@ stateRoot,
-      Digest32 @@ txRoot,
+      ModifierId @@ Algos.decode(parentId).getOrElse(Array.emptyByteArray),
+      Digest32 @@ Algos.decode(adProofsRoot).getOrElse(Array.emptyByteArray),
+      ADDigest @@ Algos.decode(stateRoot).getOrElse(Array.emptyByteArray),
+      Digest32 @@ Algos.decode(txRoot).getOrElse(Array.emptyByteArray),
       timestamp,
       height,
       nonce,

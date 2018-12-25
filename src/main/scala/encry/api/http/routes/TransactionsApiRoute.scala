@@ -60,7 +60,10 @@ case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: Actor
   )
   def defaultTransferTransactionR: Route = path("send") {
     post(entity(as[Transaction]) {
-      tx => complete {
+      tx =>
+        println(tx)
+        complete {
+        println(2222)
         nodeViewActorRef ! LocallyGeneratedTransaction[EncryProposition, Transaction](tx)
         StatusCodes.OK
       }

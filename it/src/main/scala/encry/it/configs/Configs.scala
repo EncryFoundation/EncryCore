@@ -41,7 +41,7 @@ object Configs {
 
   def mnemonicKey(key: String): Config = ConfigFactory.parseString(
     s"""
-       |wallet.seed=$key
+       |encry.wallet.seed="$key"
      """.stripMargin
   )
 }
