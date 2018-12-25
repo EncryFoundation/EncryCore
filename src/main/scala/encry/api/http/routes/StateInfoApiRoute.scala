@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.api.http.routes.WalletInfoApiRoute.EncryBaseBoxResponse
+import encry.api.http.routes.WalletInfoApiRoute.{AssetBoxResponse, DataBoxResponse, EncryBaseBoxResponse, TokenIssuingBoxResponse}
 import encry.settings.RESTApiSettings
 import encry.view.ReadersHolder.{GetReaders, Readers}
 import encry.view.state.{StateMode, UtxoStateReader}
@@ -41,7 +41,8 @@ case class StateInfoApiRoute(readersHolder: ActorRef,
     responses = Array(
       new ApiResponse(responseCode = "200", description = "Box response",
         content = Array(new Content(mediaType = "application/json",
-          schema = new Schema(implementation = classOf[EncryBaseBoxResponse])))),
+          schema = new Schema(anyOf =
+            Array(classOf[AssetBoxResponse], classOf[TokenIssuingBoxResponse], classOf[DataBoxResponse]))))),
       new ApiResponse(responseCode = "500", description = "Internal server error")),
     parameters = Array(
       new Parameter(name = "boxId", required = true, schema = new Schema(implementation = classOf[String]), in = ParameterIn.PATH),

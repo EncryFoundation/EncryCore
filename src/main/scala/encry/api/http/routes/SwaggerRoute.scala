@@ -16,7 +16,7 @@ object SwaggerRoute extends SwaggerHttpService {
     )
 
   override def info: model.Info = Info(
-    version = "0.3.1",
+    version = "0.9.2",
     title = "Encry Node API",
     description = "API docs for Encry Node.",
     license = Some(License(name = "GPL 3.0", url = "https://www.gnu.org/licenses/gpl-3.0.en.html"))
