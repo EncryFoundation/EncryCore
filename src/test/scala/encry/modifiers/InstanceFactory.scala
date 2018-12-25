@@ -116,12 +116,13 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
   def generateNextBlock(history: EncryHistory,
                         difficultyDiff: BigInt = 0,
-                        prevId: Option[ModifierId] = None): Block = {
+                        prevId: Option[ModifierId] = None,
+                        txsQty: Int = 100): Block = {
     val previousHeaderId: ModifierId =
       prevId.getOrElse(history.bestHeaderOpt.map(_.id).getOrElse(Header.GenesisParentId))
     val requiredDifficulty: Difficulty = history.bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
       .getOrElse(Constants.Chain.InitialDifficulty)
-    val txs = genValidPaymentTxs(Scarand.nextInt(100)) ++ Seq(coinbaseTransaction)
+    val txs = (if (txsQty != 0) genValidPaymentTxs(Scarand.nextInt(txsQty)) else Seq.empty) ++ Seq(coinbaseTransaction)
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.bestHeaderHeight + 1,

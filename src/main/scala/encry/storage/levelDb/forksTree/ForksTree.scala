@@ -29,9 +29,10 @@ trait ForksTree[D <: RevertabaleDiff[D]] extends StrictLogging {
                    currentNode: ForksTreeNode[D] = modifiersTree,
                    diffs: Seq[D] = Seq.empty,
                    persistantProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Seq[D] = {
+//    logger.info(s"getDiffsPath for: ${Algos.encode(currentNode.modifierId)}")
     if (targetNodeId == currentNode.modifierId) {
-      logger.info("targetNodeId == currentNode.modifierId")
-      logger.info(s"Diffs: ${diffs}")
+//      logger.info("targetNodeId == currentNode.modifierId")
+//      logger.info(s"Diffs: ${diffs}")
       diffs
     }
     else currentNode.children.flatMap(child => getDiffsPath(
@@ -43,18 +44,22 @@ trait ForksTree[D <: RevertabaleDiff[D]] extends StrictLogging {
   }
 
   def rollbackTo(rollbackPoint: ModifierId,
-                 prover: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Try[Unit] = Try {
+                 prover: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
+                 diffsPath: Seq[D] = Seq.empty[D]): Try[Unit] = Try {
     if (checkRollbackPoint(rollbackPoint)) {
       logger.info("Rollback point exists")
-      val diffs = getDiffsPath(rollbackPoint, persistantProver = prover)
-      logger.info(s"diifs: ${diffs}")
+      logger.info(s"difs: ${diffsPath}")
       if (modifiersTree.modifierId == rollbackPoint) {
-        applyDiff(diffs.tail.foldLeft(diffs.head)(_ ++ _))
-        logger.info(s"Successful rollback to: ${Algos.encode(rollbackPoint)}")
+        logger.info("modifiersTree.modifierId == rollbackPoint")
+        applyDiff(diffsPath.tail.foldLeft(diffsPath.head)(_ ++ _))
+        //logger.info(s"Successful rollback to: ${Algos.encode(rollbackPoint)}")
       }
-      else modifiersTree.parent.map { parent =>
-        modifiersTree = parent.copy(parent = None)
-        rollbackTo(rollbackPoint, prover)
+      else modifiersTree.children.map { child =>
+        modifiersTree = child.copy(parent = None)
+        logger.info(s"diffsPath.isEmpty: ${diffsPath.isEmpty}")
+        rollbackTo(rollbackPoint, prover,
+          //TODO: Remove if
+          if (diffsPath.isEmpty) getDiffsPath(rollbackPoint, persistantProver = prover) else diffsPath)
       }
     }
     else throw new Exception(s"Impossible to rollback to: ${Algos.encode(rollbackPoint)}")
