@@ -112,7 +112,7 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
       amountInBlocks(blocksToWallet.init) shouldEqual walletTree.getBalances.head._2
 
       //check correct head of tree
-      blocksToWallet.tail.last.id shouldEqual walletTree.id
+      blocksToWallet.init.last.id shouldEqual walletTree.id
   }
 
 }
