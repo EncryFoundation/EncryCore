@@ -19,28 +19,30 @@ trait ForksTree[D <: RevertabaleDiff[D]] extends StrictLogging {
 
   var keysMap: Map[ModifierId, (Height, BrunchNum)] = Map.empty
 
-  var modifiersTree: ForksTreeNode[D] = ForksTreeNode.empty[D]
+  var modifiersTree: List[ForksTreeNode[D]] = List.empty[ForksTreeNode[D]]
 
   def add(modifier: NodeViewModifier): Unit
 
   def applyDiff(diff: D): Unit
 
   def getDiffsPath(targetNodeId: ModifierId,
-                   currentNode: ForksTreeNode[D] = modifiersTree,
+                   currentNodesList: List[ForksTreeNode[D]] = modifiersTree,
                    diffs: Seq[D] = Seq.empty,
                    persistantProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Seq[D] = {
 //    logger.info(s"getDiffsPath for: ${Algos.encode(currentNode.modifierId)}")
-    if (targetNodeId == currentNode.modifierId) {
+    if (targetNodeId == currentNodesList.last.modifierId) {
 //      logger.info("targetNodeId == currentNode.modifierId")
 //      logger.info(s"Diffs: ${diffs}")
       diffs
     }
-    else currentNode.children.flatMap(child => getDiffsPath(
+    else if (currentNodesList.nonEmpty)
+      getDiffsPath(
         targetNodeId,
-        child,
-        diffs ++ currentNode.diffs.map(_.revert(persistantProver)),
-        persistantProver)
+        currentNodesList.init,
+        diffs ++ currentNodesList.last.diffs.map(_.revert(persistantProver)),
+        persistantProver
       )
+    else diffs
   }
 
   def rollbackTo(rollbackPoint: ModifierId,
@@ -49,14 +51,14 @@ trait ForksTree[D <: RevertabaleDiff[D]] extends StrictLogging {
     if (checkRollbackPoint(rollbackPoint)) {
       logger.info("Rollback point exists")
       logger.info(s"difs: ${diffsPath}")
-      if (modifiersTree.modifierId == rollbackPoint) {
+      if (modifiersTree.last.modifierId == rollbackPoint) {
         logger.info("modifiersTree.modifierId == rollbackPoint")
         applyDiff(diffsPath.tail.foldLeft(diffsPath.head)(_ ++ _))
         //logger.info(s"Successful rollback to: ${Algos.encode(rollbackPoint)}")
       }
-      else modifiersTree.children.map { child =>
+      else {
         val diffs = getDiffsPath(rollbackPoint, persistantProver = prover)
-        modifiersTree = child.copy(parent = None)
+        modifiersTree = modifiersTree.init
         logger.info(s"diffsPath.isEmpty: ${diffsPath.isEmpty}: ${diffs}")
         rollbackTo(rollbackPoint, prover,
           //TODO: Remove if
@@ -66,10 +68,10 @@ trait ForksTree[D <: RevertabaleDiff[D]] extends StrictLogging {
     else throw new Exception(s"Impossible to rollback to: ${Algos.encode(rollbackPoint)}")
   }
 
-  private def checkRollbackPoint(rollbackPoint: ModifierId, node: ForksTreeNode[D] = modifiersTree): Boolean = {
-    if (node.modifierId sameElements rollbackPoint) true
-    else if (node.children.isEmpty) false
-    else node.children.forall(child => checkRollbackPoint(rollbackPoint, child))
+  private def checkRollbackPoint(rollbackPoint: ModifierId, nodesList: List[ForksTreeNode[D]] = modifiersTree): Boolean = {
+    if (nodesList.last.modifierId sameElements rollbackPoint) true
+    else if (nodesList.isEmpty) false
+    else checkRollbackPoint(rollbackPoint, nodesList.init)
   }
 }
 

@@ -15,7 +15,7 @@ case class WalletForksTree(override val db: DB) extends ForksTree[WalletDiff] {
 
   import WalletForksTree._
 
-  def id: ModifierId = modifiersTree.modifierId
+  def id: ModifierId = modifiersTree.last.modifierId
 
   override def add(modifier: NodeViewModifier): Unit = {
     logger.info(s"Applying mod: ${Algos.encode(modifier.id)} with height ${modifier.asInstanceOf[Block].header.height}")
@@ -23,9 +23,8 @@ case class WalletForksTree(override val db: DB) extends ForksTree[WalletDiff] {
 //    logger.info(s"Diff qty is: ${diffs.length}")
 //    logger.info(s"Balance change are: ${diffs.tail.foldLeft(diffs.head)(_ ++ _).balanceChanges}")
     applyDiff(diffs.tail.foldLeft(diffs.head)(_ ++ _))
-    val newModifiersTree = ForksTreeNode(Seq(modifiersTree), modifier.id, diffs)
-    modifiersTree.setParent(newModifiersTree)
-    modifiersTree = newModifiersTree
+    val newModifiersTree = ForksTreeNode[WalletDiff](modifier.id, diffs)
+    modifiersTree = modifiersTree :+ newModifiersTree
     //logger.info(s"Tree: ${modifiersTree.printTree}")
     //logger.info(s"Current tree nod id is: ${Algos.encode(id)}")
     //logger.info(s"Balance tree: $getBalances")
