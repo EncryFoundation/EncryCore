@@ -3,7 +3,6 @@ import com.google.common.primitives.Longs
 import encry.modifiers.NodeViewModifier
 import encry.modifiers.history.Block
 import encry.modifiers.mempool.Transaction
-import encry.modifiers.state.StateModifierSerializer
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.EncryBaseBox
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
@@ -11,44 +10,29 @@ import encry.utils.BalanceCalculator
 import org.encryfoundation.common.Algos
 import org.iq80.leveldb.DB
 
-case class WalletForksTree(override val db: DB) extends ForksTree {
+case class WalletForksTree(override val db: DB) extends ForksTree[WalletDiff] {
 
   import WalletForksTree._
 
-  def addBoxesToCache(boxes: Seq[EncryBaseBox]): Unit = {
-    val batch = db.createWriteBatch()
-    boxes
-      .map(box => ("cache".getBytes ++ box.id) -> box.bytes)
-      .foreach{case (boxId, boxBytes) => db.put(boxId, boxBytes)}
-  }
-
-
   override def add(modifier: NodeViewModifier): Unit = {
-    val modifiers = WalletForksTree.getDiffs(modifier)
-    modifiers.foreach(applyWalletDiff)
+    val diffs = WalletForksTree.getDiffs(modifier)
+    applyDiff(diffs.tail.foldLeft(diffs.head)(_ ++ _))
+    val newModifiersTree = ForksTreeNode(Seq(modifiersTree), modifier.id, diffs)
+    modifiersTree.setParent(newModifiersTree)
+    modifiersTree = newModifiersTree
   }
 
-  def applyWalletDiff(diff: WalletDiff): Unit = {
-    addBoxesToCache({
-        val boxesToCache = diff.boxesToRemove.foldLeft(Seq.empty[EncryBaseBox]) {
-          case (boxes, id) =>
-            //TODO: Remove get
-            val box = StateModifierSerializer.parseBytes(db.get(id), id.head).get
-            db.delete(id)
-            boxes :+ box
-        }
-        diff.boxesToAdd.foreach(box => db.put(box.id, box.bytes))
-        val previousBalances = getBalances
-        val newBalances = diff.balanceChanges.foldLeft(Map.empty[Array[Byte], Long]) {
-          case (balances, balanceToken) => balances.updated(balanceToken._1,
-            previousBalances.getOrElse(balanceToken._1, 0L) + balanceToken._2)
-        }
-        db.put(BalancesKey, newBalances.foldLeft(Array.empty[Byte]) { case (acc, (id, balance)) =>
-          acc ++ id ++ Longs.toByteArray(balance)
-        })
-        boxesToCache
-      }
-    )
+  def applyDiff(diff: WalletDiff): Unit = {
+    diff.boxesToRemove.foreach(key => db.delete(key))
+    diff.boxesToAdd.foreach(box => db.put(box.id, box.bytes))
+    val previousBalances: Map[TokenId, Amount] = getBalances
+    val newBalances: Map[Array[Byte], Amount] = diff.balanceChanges.foldLeft(Map.empty[Array[Byte], Long]) {
+      case (balances, balanceToken) => balances.updated(balanceToken._1,
+        previousBalances.getOrElse(balanceToken._1, 0L) + balanceToken._2)
+    }
+    db.put(BalancesKey, newBalances.foldLeft(Array.empty[Byte]) { case (acc, (id, balance)) =>
+      acc ++ id ++ Longs.toByteArray(balance)
+    })
   }
 
   def getBalances: Map[TokenId, Amount] = {

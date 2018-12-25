@@ -6,28 +6,38 @@ import encry.storage.levelDb.forksTree.ForksTree.BrunchNum
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
+import org.encryfoundation.common.Algos.HF
 import org.iq80.leveldb.DB
+import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-trait ForksTree extends StrictLogging {
+trait ForksTree[D <: RevertabaleDiff[D]] extends StrictLogging {
 
   val db: DB
 
-  var diffsMap: Map[ModifierId, Seq[Diff]] = Map.empty
+  var diffsMap: Map[ModifierId, Seq[D]] = Map.empty
 
   var keysMap: Map[ModifierId, (Height, BrunchNum)] = Map.empty
 
-  var modifiersTree: ForksTreeNode = ForksTreeNode.empty
+  var modifiersTree: ForksTreeNode[D] = ForksTreeNode.empty[D]
 
   def add(modifier: NodeViewModifier): Unit
 
+  def applyDiff(diff: D): Unit
+
   def getDiffsPath(targetNodeId: ModifierId,
-                   currentNode: ForksTreeNode = modifiersTree,
-                   diffs: Seq[Diff] = Seq.empty): Seq[Diff] = {
+                   currentNode: ForksTreeNode[D] = modifiersTree,
+                   diffs: Seq[D] = Seq.empty,
+                   persistantProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Seq[D] = {
     if (targetNodeId == currentNode.modifierId) diffs
     else currentNode.parent
-      .map(parentNode => getDiffsPath(targetNodeId, parentNode, diffs ++ currentNode.diffs.map(_.revert)))
+      .map(parentNode => getDiffsPath(
+        targetNodeId,
+        parentNode,
+        diffs ++ currentNode.diffs.map(_.revert(persistantProver)),
+        persistantProver)
+      )
       .getOrElse(diffs)
   }
 
