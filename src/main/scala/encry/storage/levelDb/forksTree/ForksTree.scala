@@ -55,11 +55,12 @@ trait ForksTree[D <: RevertabaleDiff[D]] extends StrictLogging {
         //logger.info(s"Successful rollback to: ${Algos.encode(rollbackPoint)}")
       }
       else modifiersTree.children.map { child =>
+        val diffs = getDiffsPath(rollbackPoint, persistantProver = prover)
         modifiersTree = child.copy(parent = None)
-        logger.info(s"diffsPath.isEmpty: ${diffsPath.isEmpty}")
+        logger.info(s"diffsPath.isEmpty: ${diffsPath.isEmpty}: ${diffs}")
         rollbackTo(rollbackPoint, prover,
           //TODO: Remove if
-          if (diffsPath.isEmpty) getDiffsPath(rollbackPoint, persistantProver = prover) else diffsPath)
+          if (diffsPath.isEmpty) diffs else diffsPath)
       }
     }
     else throw new Exception(s"Impossible to rollback to: ${Algos.encode(rollbackPoint)}")
