@@ -45,7 +45,7 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
   }
 
 
-  property("Aplly 35 blocks, balance should increase") {
+  property("Rollback of 1 block. No spending txs") {
 
     type HF = Blake2b256.type
     implicit val hf: HF = Blake2b256
@@ -89,6 +89,14 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
 
     println(walletTree
       .getBalances)
+
+    walletTree.rollbackTo(blocksToWallet.dropRight(2).last.id, persistentProver)
+
+    println(Algos.encode(blocksToWallet.last.id))
+
+    println(Algos.encode(blocksToWallet.dropRight(2).last.id))
+
+    println(Algos.encode(walletTree.id))
 
   }
 
