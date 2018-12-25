@@ -47,7 +47,7 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
   }
 
 
-  property("Rollback of 1 block. No spending txs") {
+  property("Rollback of 10 block. Only coinbase txs") {
 
     type HF = Blake2b256.type
     implicit val hf: HF = Blake2b256
@@ -104,15 +104,15 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
 
     // do rollback
 
-    val result = walletTree.rollbackTo(blocksToWallet.init.last.id, persistentProver)
+    val result = walletTree.rollbackTo(blocksToWallet.dropRight(10).last.id, persistentProver)
 
     // Check params after rollback
 
       //check correct balance
-      amountInBlocks(blocksToWallet.init) shouldEqual walletTree.getBalances.head._2
+      amountInBlocks(blocksToWallet.dropRight(10)) shouldEqual walletTree.getBalances.head._2
 
       //check correct head of tree
-      blocksToWallet.init.last.id shouldEqual walletTree.id
+      blocksToWallet.dropRight(10).last.id shouldEqual walletTree.id
   }
 
 }
