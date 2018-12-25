@@ -54,7 +54,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     Transaction.ModifierTypeId -> TransactionSerializer
   )
 
-  var txsInBlocks: Int = 0
   if (settings.influxDB.isDefined) {
     context.system.scheduler.schedule(5.second, 5.second) {
       context.system.actorSelection("user/statsSender") !
