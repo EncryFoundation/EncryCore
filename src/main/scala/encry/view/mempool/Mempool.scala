@@ -25,7 +25,7 @@ class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
 
   def put(txs: Iterable[Transaction]): Try[Mempool] = {
     val validTxs: Iterable[Transaction] = txs
-      .filter{tx => println(tx.semanticValidity); tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id))}
+      .filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
     if (validTxs.nonEmpty) {
       if ((size + validTxs.size) <= settings.node.mempoolMaxCapacity) {
         Success(putWithoutCheck(validTxs))

@@ -156,8 +156,6 @@ class Miner extends Actor with Logging {
       .foldLeft((Seq[Transaction](), Seq[Transaction](), Set[ByteArrayWrapper]())) {
         case ((validTxs, invalidTxs, bxsAcc), tx) =>
           val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.inputs.map(u => ByteArrayWrapper(u.boxId))
-          println(view.state.validate(tx).isSuccess, bxsRaw.forall(k =>
-            !bxsAcc.contains(k)), bxsRaw.size == bxsRaw.toSet.size)
           if ((validTxs.map(_.size).sum + tx.size) <= Constants.PayloadMaxSize) {
             if (view.state.validate(tx).isSuccess && bxsRaw.forall(k =>
               !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size)
@@ -169,7 +167,6 @@ class Miner extends Actor with Logging {
     view.pool.removeAsync(txsToDrop)
 
     val minerSecret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
-    println(s"${Algos.encode(minerSecret.privKeyBytes)} oooooqqqqwd-12--312-3-1-23-")
     val feesTotal: Amount = txsToPut.map(_.fee).sum
     val supplyTotal: Amount = EncrySupplyController.supplyAt(view.state.height)
     val coinbase: Transaction = TransactionFactory

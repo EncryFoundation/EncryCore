@@ -54,7 +54,6 @@ case class AccountManager(store: Store) extends Logging {
   }
 
   def createMandatory(seedOpt: Option[String]): PrivateKey25519 = {
-    println(seedOpt.get + "111111111111111")
     val acc: PrivateKey25519 = createAccount(seedOpt)
     store.update(
       scala.util.Random.nextLong(),

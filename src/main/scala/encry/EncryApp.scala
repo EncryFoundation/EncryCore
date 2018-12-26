@@ -99,9 +99,7 @@ object EncryApp extends App with Logging {
     implicit def apiExceptionHandler: ExceptionHandler =
       ExceptionHandler {
         case e: Exception =>
-          println(s"Request to could not be handled normally due to: $e")
           extractUri { uri =>
-            println(s"Request to $uri could not be handled normally due to: $e")
             logInfo(s"Request to $uri could not be handled normally due to: $e")
             complete(HttpResponse(InternalServerError, entity = "Internal server error"))
           }
