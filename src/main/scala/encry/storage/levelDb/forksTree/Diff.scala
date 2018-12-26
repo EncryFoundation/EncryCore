@@ -32,11 +32,10 @@ case class WalletDiff(boxesToRemove: Seq[ADKey],
       balanceChanges = this.balanceChanges.map(assetBalance => assetBalance.copy(_2 = assetBalance._2 * -1))
     )
 
-  override def ++(diff: WalletDiff): WalletDiff = {
+  override def ++(diff: WalletDiff): WalletDiff =
     WalletDiff(
       this.boxesToRemove ++ diff.boxesToRemove,
       this.boxesToAdd ++ diff.boxesToAdd,
       this.balanceChanges |+| diff.balanceChanges
     )
-  }
 }
