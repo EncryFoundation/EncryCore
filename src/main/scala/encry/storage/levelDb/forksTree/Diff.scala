@@ -10,6 +10,8 @@ import cats.instances.all._
 import com.typesafe.scalalogging.StrictLogging
 import org.encryfoundation.common.Algos
 
+import scala.util.Success
+
 trait Diff
 
 trait RevertabaleDiff[D <: Diff] extends Diff {
@@ -22,16 +24,13 @@ trait RevertabaleDiff[D <: Diff] extends Diff {
 case class WalletDiff(boxesToRemove: Seq[ADKey],
                       boxesToAdd: Seq[EncryBaseBox],
                       balanceChanges: Map[String, Long]) extends RevertabaleDiff[WalletDiff] with StrictLogging{
-  override def revert(persistantProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): WalletDiff = {
+  override def revert(persistantProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): WalletDiff =
     this.copy(
-      boxesToAdd =
-        this.boxesToRemove
-          .map(boxId => persistantProver.unauthenticatedLookup(boxId)
-            .map(bytes => StateModifierSerializer.parseBytes(bytes, boxId.head)).get.get),
+      boxesToAdd = this.boxesToRemove.flatMap(boxId => persistantProver.unauthenticatedLookup(boxId)
+          .map(bytes => StateModifierSerializer.parseBytes(bytes, boxId.head))).collect{case Success(x) => x},
       boxesToRemove = this.boxesToAdd.map(_.id),
       balanceChanges = this.balanceChanges.map(assetBalance => assetBalance.copy(_2 = assetBalance._2 * -1))
     )
-  }
 
   override def ++(diff: WalletDiff): WalletDiff = {
     WalletDiff(
