@@ -23,6 +23,8 @@ class TransactionsTests extends AsyncFunSuite with Matchers with ScalaFutures wi
 
   test("Get box, form and send transaction. Check block for availability of this transaction. Check miner balance.") {
 
+    println(Docker.configTemplate + " wkjefjnksnfklnsdlfnlwekjnflk")
+
     val heightToCheckFirst: Int   = 5
     val heightToCheckSecond: Int  = 8
     val mnemonicKey: String       = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
