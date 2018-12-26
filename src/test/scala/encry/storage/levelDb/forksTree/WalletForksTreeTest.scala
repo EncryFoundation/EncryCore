@@ -5,7 +5,9 @@ import encry.avltree._
 import encry.avltree.benchmark.IODBBenchmark.getRandomTempDir
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.Block
+import encry.modifiers.state.StateModifierSerializer
 import encry.modifiers.state.box.AssetBox
+import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.{EncryGenerator, FileHelper}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.Algos
@@ -13,10 +15,27 @@ import org.encryfoundation.common.utils.TaggedTypes.ADValue
 import org.iq80.leveldb.{DB, Options}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.hash.{Blake2b256, Digest32}
+import io.circe.syntax._
 
-import scala.util.Success
+class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator with InstanceFactory with StrictLogging {
 
-class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator with InstanceFactory with StrictLogging{
+  type HF = Blake2b256.type
+  implicit val hf: HF = Blake2b256
+
+  def amountInBlocks(blocks: Seq[Block], prover: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Long = {
+    val toAdd = blocks.map(_.payload.transactions.map(_.newBoxes.collect { case ab: AssetBox => ab.amount }.sum).sum).sum
+    val toRemove = blocks.map(
+        _.payload.transactions.map(
+          _.inputs.map(input =>
+            prover.unauthenticatedLookup(input.boxId)
+              .map(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head)
+                .collect { case ab: AssetBox => ab.amount }).map(_.get).sum
+          ).sum
+        ).sum
+      ).sum
+    toAdd - toRemove
+  }
+
 
   property("Applying 35 blocks. Wallet balance should increase") {
 
@@ -39,18 +58,21 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
         newBalance
     }
 
+    //init wallet tree
+
     val walletTree = WalletForksTree(db)
 
+    //add blocks to wallet
+
     blocksToWallet.foreach(walletTree.add)
+
+    //check correct balance
 
     walletTree.getBalances.head._2 shouldEqual correctBalance
   }
 
 
   property("Rollback of 10 block. Only coinbase txs") {
-
-    type HF = Blake2b256.type
-    implicit val hf: HF = Blake2b256
 
     val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
     val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(new LSMStore(getRandomTempDir), np)
@@ -67,20 +89,6 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
 
     def amountInBlocks(blocks: Seq[Block]): Long =
       blocks.map(_.payload.transactions.map(_.newBoxes.collect{case ab: AssetBox => ab.amount}.sum).sum).sum
-
-    def applyModifications(mods: Seq[Modification]): Unit =
-      mods.foreach(m => {
-        persistentProver.performOneOperation(m).ensuring(_.isSuccess, "Mod application failed.")
-      })
-
-    val modificationsFromBlocks =
-      blocksToWallet
-        .flatMap(_.payload.transactions
-          .flatMap(_.newBoxes.map(box => Insert(box.id, ADValue @@ box.bytes)))).distinct
-
-    applyModifications(modificationsFromBlocks)
-
-    persistentProver.generateProofAndUpdateStorage()
 
     val db: DB = {
       val dir = FileHelper.getRandomTempDir
@@ -115,4 +123,76 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
       blocksToWallet.dropRight(10).last.id shouldEqual walletTree.id
   }
 
+  property("Rollback of 10 blocks. With spending txs") {
+
+    val rolbackLength = 10
+
+    val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
+    val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(new LSMStore(getRandomTempDir), np)
+    val persistentProver: PersistentBatchAVLProver[Digest32, HF] =
+      PersistentBatchAVLProver.create(
+        new BatchAVLProver[Digest32, HF](
+          keyLength = 32, valueLengthOpt = None), storage).get
+
+    val blocksToWallet: Seq[Block] = generateFakeChain(25)
+
+    def applyModifications(mods: Seq[Modification]): Unit =
+      mods.foreach(m => {
+        persistentProver.performOneOperation(m).ensuring(_.isSuccess, "Mod application failed.")
+      })
+
+    def modificationsFromBlocks(blocks: Seq[Block]): Seq[Modification] =
+      blocks
+        .flatMap(_.payload.transactions
+          .flatMap(tx =>
+            tx.inputs.map(input => Remove(input.boxId)) ++ tx.newBoxes.map(box => Insert(box.id, ADValue @@ box.bytes))
+          )
+        ).distinct
+
+    applyModifications(modificationsFromBlocks(blocksToWallet.dropRight(rolbackLength)))
+
+    persistentProver.generateProofAndUpdateStorage()
+
+    val amountAfterRollback = amountInBlocks(blocksToWallet.dropRight(rolbackLength), persistentProver)
+
+    val ppRoot = persistentProver.digest
+
+    applyModifications(modificationsFromBlocks(blocksToWallet.takeRight(rolbackLength)))
+
+    persistentProver.generateProofAndUpdateStorage()
+
+    val db: DB = {
+      val dir = FileHelper.getRandomTempDir
+      if (!dir.exists()) dir.mkdirs()
+      LevelDbFactory.factory.open(dir, new Options)
+    }
+
+    //init tree
+    val walletTree = WalletForksTree(db)
+
+    //add all blocks
+    blocksToWallet.foreach(walletTree.add)
+
+    //Check params before rollback
+
+      //check correct balance
+      blocksToWallet.last.id shouldEqual walletTree.id
+
+      //check correct head of tree
+      amountInBlocks(blocksToWallet, persistentProver) shouldEqual walletTree.getBalances.head._2
+
+    // do rollback
+
+    persistentProver.rollback(ppRoot)
+
+    walletTree.rollbackTo(blocksToWallet.dropRight(rolbackLength).last.id, persistentProver)
+
+    // Check params after rollback
+
+      //check correct balance
+      amountAfterRollback shouldEqual walletTree.getBalances.head._2
+
+      //check correct head of tree
+      blocksToWallet.dropRight(rolbackLength).last.id shouldEqual walletTree.id
+  }
 }

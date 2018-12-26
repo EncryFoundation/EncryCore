@@ -29,12 +29,7 @@ trait ForksTree[D <: RevertabaleDiff[D]] extends StrictLogging {
                    currentNodesList: List[ForksTreeNode[D]] = modifiersTree,
                    diffs: Seq[D] = Seq.empty,
                    persistantProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Seq[D] = {
-//    logger.info(s"getDiffsPath for: ${Algos.encode(currentNode.modifierId)}")
-    if (targetNodeId == currentNodesList.last.modifierId) {
-//      logger.info("targetNodeId == currentNode.modifierId")
-//      logger.info(s"Diffs: ${diffs}")
-      diffs
-    }
+    if (targetNodeId == currentNodesList.last.modifierId) diffs
     else if (currentNodesList.nonEmpty)
       getDiffsPath(
         targetNodeId,
@@ -49,17 +44,12 @@ trait ForksTree[D <: RevertabaleDiff[D]] extends StrictLogging {
                  prover: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
                  diffsPath: Seq[D] = Seq.empty[D]): Try[Unit] = Try {
     if (checkRollbackPoint(rollbackPoint)) {
-      logger.info("Rollback point exists")
-      logger.info(s"difs: ${diffsPath}")
       if (modifiersTree.last.modifierId == rollbackPoint) {
-        logger.info("modifiersTree.modifierId == rollbackPoint")
         applyDiff(diffsPath.tail.foldLeft(diffsPath.head)(_ ++ _))
-        //logger.info(s"Successful rollback to: ${Algos.encode(rollbackPoint)}")
       }
       else {
         val diffs = getDiffsPath(rollbackPoint, persistantProver = prover)
         modifiersTree = modifiersTree.init
-        logger.info(s"diffsPath.isEmpty: ${diffsPath.isEmpty}: ${diffs}")
         rollbackTo(rollbackPoint, prover,
           //TODO: Remove if
           if (diffsPath.isEmpty) diffs else diffsPath)
