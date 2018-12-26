@@ -63,7 +63,7 @@ case class AccountManager(store: Store) extends Logging {
   private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, settings.wallet.map(_.password)
     .getOrElse(throw new RuntimeException("password not specified"))))
     .fold(e => {
-      logError(s"AccountManager: decryption failed cause ${e.getCause}")
+      logError(s"AccountManager: decryption failed cause - ${e.getCause}")
       EncryApp.forceStopApplication(500)
     }, r => r)
 
