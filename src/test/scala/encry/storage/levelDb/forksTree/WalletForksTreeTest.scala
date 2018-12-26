@@ -125,7 +125,7 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
 
   property("Rollback of 10 blocks. With spending txs") {
 
-    val rolbackLength = 10
+    val rollbackLength = 10
 
     val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
     val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(new LSMStore(getRandomTempDir), np)
@@ -149,15 +149,15 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
           )
         ).distinct
 
-    applyModifications(modificationsFromBlocks(blocksToWallet.dropRight(rolbackLength)))
+    applyModifications(modificationsFromBlocks(blocksToWallet.dropRight(rollbackLength)))
 
     persistentProver.generateProofAndUpdateStorage()
 
-    val amountAfterRollback = amountInBlocks(blocksToWallet.dropRight(rolbackLength), persistentProver)
+    val amountAfterRollback = amountInBlocks(blocksToWallet.dropRight(rollbackLength), persistentProver)
 
     val ppRoot = persistentProver.digest
 
-    applyModifications(modificationsFromBlocks(blocksToWallet.takeRight(rolbackLength)))
+    applyModifications(modificationsFromBlocks(blocksToWallet.takeRight(rollbackLength)))
 
     persistentProver.generateProofAndUpdateStorage()
 
@@ -185,7 +185,7 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
 
     persistentProver.rollback(ppRoot)
 
-    walletTree.rollbackTo(blocksToWallet.dropRight(rolbackLength).last.id, persistentProver)
+    walletTree.rollbackTo(blocksToWallet.dropRight(rollbackLength).last.id, persistentProver)
 
     // Check params after rollback
 
@@ -193,12 +193,12 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
       amountAfterRollback shouldEqual walletTree.getBalances.head._2
 
       //check correct head of tree
-      blocksToWallet.dropRight(rolbackLength).last.id shouldEqual walletTree.id
+      blocksToWallet.dropRight(rollbackLength).last.id shouldEqual walletTree.id
   }
 
   property("Rollback of 10 blocks then add 5 blocks. With spending txs") {
 
-    val rolbackLength = 10
+    val rollbackLength = 10
 
     val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
     val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(new LSMStore(getRandomTempDir), np)
@@ -222,15 +222,15 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
           )
         ).distinct
 
-    applyModifications(modificationsFromBlocks(blocksToWallet.dropRight(rolbackLength)))
+    applyModifications(modificationsFromBlocks(blocksToWallet.dropRight(rollbackLength)))
 
     persistentProver.generateProofAndUpdateStorage()
 
-    val amountAfterRollback = amountInBlocks(blocksToWallet.dropRight(rolbackLength), persistentProver)
+    val amountAfterRollback = amountInBlocks(blocksToWallet.dropRight(rollbackLength), persistentProver)
 
     val ppRoot = persistentProver.digest
 
-    applyModifications(modificationsFromBlocks(blocksToWallet.takeRight(rolbackLength)))
+    applyModifications(modificationsFromBlocks(blocksToWallet.takeRight(rollbackLength)))
 
     persistentProver.generateProofAndUpdateStorage()
 
@@ -258,7 +258,7 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
 
     persistentProver.rollback(ppRoot)
 
-    walletTree.rollbackTo(blocksToWallet.dropRight(rolbackLength).last.id, persistentProver)
+    walletTree.rollbackTo(blocksToWallet.dropRight(rollbackLength).last.id, persistentProver)
 
     // Check params after rollback
 
@@ -266,23 +266,23 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
       amountAfterRollback shouldEqual walletTree.getBalances.head._2
 
     //check correct head of tree
-      blocksToWallet.dropRight(rolbackLength).last.id shouldEqual walletTree.id
+      blocksToWallet.dropRight(rollbackLength).last.id shouldEqual walletTree.id
 
     // add 5 blocks
 
     val modificationOf5Blocks = modificationsFromBlocks(
-      blocksToWallet.slice(blocksToWallet.length - rolbackLength, blocksToWallet.length - rolbackLength + 5)
+      blocksToWallet.slice(blocksToWallet.length - rollbackLength, blocksToWallet.length - rollbackLength + 5)
     )
 
     applyModifications(modificationOf5Blocks)
 
     persistentProver.generateProofAndUpdateStorage()
 
-    blocksToWallet.slice(blocksToWallet.length - rolbackLength, blocksToWallet.length - rolbackLength + 5).foreach(walletTree.add)
+    blocksToWallet.slice(blocksToWallet.length - rollbackLength, blocksToWallet.length - rollbackLength + 5).foreach(walletTree.add)
 
     //check balance
 
-      amountInBlocks(blocksToWallet.take(blocksToWallet.length - rolbackLength + 5),
+      amountInBlocks(blocksToWallet.take(blocksToWallet.length - rollbackLength + 5),
         persistentProver) shouldEqual walletTree.getBalances.head._2
 
   }
