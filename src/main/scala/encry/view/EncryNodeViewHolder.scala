@@ -123,7 +123,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
-            if (settings.influxDB.isDefined) {
+            if (settings.influxDB.isDefined && nodeView.history.isFullChainSynced) {
               pmod match {
                 case h: Header => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - h.timestamp)
                 case b: Block => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - b.header.timestamp)
