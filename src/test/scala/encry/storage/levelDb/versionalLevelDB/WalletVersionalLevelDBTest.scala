@@ -58,15 +58,15 @@ class WalletVersionalLevelDBTest extends PropSpec with Matchers with EncryGenera
 
     //init wallet tree
 
-    val walletTree = WalletVersionalLevelDB(db)
+    val walletVersionalDB = WalletVersionalLevelDB(db)
 
     //add blocks to wallet
 
-    blocksToWallet.foreach(walletTree.add)
+    blocksToWallet.foreach(walletVersionalDB.add)
 
     //check correct balance
 
-    walletTree.getBalances.head._2 shouldEqual correctBalance
+    walletVersionalDB.getBalances.head._2 shouldEqual correctBalance
   }
 
 
@@ -94,31 +94,31 @@ class WalletVersionalLevelDBTest extends PropSpec with Matchers with EncryGenera
       LevelDbFactory.factory.open(dir, new Options)
     }
 
-    //init tree
-    val walletTree = WalletVersionalLevelDB(db)
+    //init ver db
+    val walletVersionalDB = WalletVersionalLevelDB(db)
 
     //add all blocks
-    blocksToWallet.foreach(walletTree.add)
+    blocksToWallet.foreach(walletVersionalDB.add)
 
     //Check params before rollback
 
       //check correct balance
-      blocksToWallet.last.id shouldEqual walletTree.id
+      blocksToWallet.last.id shouldEqual walletVersionalDB.id
 
       //check correct head of tree
-      amountInBlocks(blocksToWallet) shouldEqual walletTree.getBalances.head._2
+      amountInBlocks(blocksToWallet) shouldEqual walletVersionalDB.getBalances.head._2
 
     // do rollback
 
-    val result = walletTree.rollbackTo(blocksToWallet.dropRight(10).last.id, persistentProver)
+    val result = walletVersionalDB.rollbackTo(blocksToWallet.dropRight(10).last.id, persistentProver)
 
     // Check params after rollback
 
       //check correct balance
-      amountInBlocks(blocksToWallet.dropRight(10)) shouldEqual walletTree.getBalances.head._2
+      amountInBlocks(blocksToWallet.dropRight(10)) shouldEqual walletVersionalDB.getBalances.head._2
 
       //check correct head of tree
-      blocksToWallet.dropRight(10).last.id shouldEqual walletTree.id
+      blocksToWallet.dropRight(10).last.id shouldEqual walletVersionalDB.id
   }
 
   property("Rollback of 10 blocks. With spending txs") {
@@ -165,33 +165,33 @@ class WalletVersionalLevelDBTest extends PropSpec with Matchers with EncryGenera
       LevelDbFactory.factory.open(dir, new Options)
     }
 
-    //init tree
-    val walletTree = WalletVersionalLevelDB(db)
+    //init ver db
+    val walletVersionalDB = WalletVersionalLevelDB(db)
 
     //add all blocks
-    blocksToWallet.foreach(walletTree.add)
+    blocksToWallet.foreach(walletVersionalDB.add)
 
     //Check params before rollback
 
-      //check correct balance
-      blocksToWallet.last.id shouldEqual walletTree.id
-
       //check correct head of tree
-      amountInBlocks(blocksToWallet, persistentProver) shouldEqual walletTree.getBalances.head._2
+      blocksToWallet.last.id shouldEqual walletVersionalDB.id
+
+      //check correct balance
+      amountInBlocks(blocksToWallet, persistentProver) shouldEqual walletVersionalDB.getBalances.head._2
 
     // do rollback
 
     persistentProver.rollback(ppRoot)
 
-    walletTree.rollbackTo(blocksToWallet.dropRight(rollbackLength).last.id, persistentProver)
+    walletVersionalDB.rollbackTo(blocksToWallet.dropRight(rollbackLength).last.id, persistentProver)
 
     // Check params after rollback
 
       //check correct balance
-      amountAfterRollback shouldEqual walletTree.getBalances.head._2
+      amountAfterRollback shouldEqual walletVersionalDB.getBalances.head._2
 
       //check correct head of tree
-      blocksToWallet.dropRight(rollbackLength).last.id shouldEqual walletTree.id
+      blocksToWallet.dropRight(rollbackLength).last.id shouldEqual walletVersionalDB.id
   }
 
   property("Rollback of 10 blocks then add 5 blocks. With spending txs") {
@@ -238,33 +238,33 @@ class WalletVersionalLevelDBTest extends PropSpec with Matchers with EncryGenera
       LevelDbFactory.factory.open(dir, new Options)
     }
 
-    //init tree
-    val walletTree = WalletVersionalLevelDB(db)
+    //init ver db
+    val walletVersionalDB = WalletVersionalLevelDB(db)
 
     //add all blocks
-    blocksToWallet.foreach(walletTree.add)
+    blocksToWallet.foreach(walletVersionalDB.add)
 
     //Check params before rollback
 
       //check correct balance
-      blocksToWallet.last.id shouldEqual walletTree.id
+      blocksToWallet.last.id shouldEqual walletVersionalDB.id
 
       //check correct head of tree
-      amountInBlocks(blocksToWallet, persistentProver) shouldEqual walletTree.getBalances.head._2
+      amountInBlocks(blocksToWallet, persistentProver) shouldEqual walletVersionalDB.getBalances.head._2
 
     // do rollback
 
     persistentProver.rollback(ppRoot)
 
-    walletTree.rollbackTo(blocksToWallet.dropRight(rollbackLength).last.id, persistentProver)
+    walletVersionalDB.rollbackTo(blocksToWallet.dropRight(rollbackLength).last.id, persistentProver)
 
     // Check params after rollback
 
       //check correct balance
-      amountAfterRollback shouldEqual walletTree.getBalances.head._2
+      amountAfterRollback shouldEqual walletVersionalDB.getBalances.head._2
 
     //check correct head of tree
-      blocksToWallet.dropRight(rollbackLength).last.id shouldEqual walletTree.id
+      blocksToWallet.dropRight(rollbackLength).last.id shouldEqual walletVersionalDB.id
 
     // add 5 blocks
 
@@ -276,12 +276,12 @@ class WalletVersionalLevelDBTest extends PropSpec with Matchers with EncryGenera
 
     persistentProver.generateProofAndUpdateStorage()
 
-    blocksToWallet.slice(blocksToWallet.length - rollbackLength, blocksToWallet.length - rollbackLength + 5).foreach(walletTree.add)
+    blocksToWallet.slice(blocksToWallet.length - rollbackLength, blocksToWallet.length - rollbackLength + 5).foreach(walletVersionalDB.add)
 
     //check balance
 
       amountInBlocks(blocksToWallet.take(blocksToWallet.length - rollbackLength + 5),
-        persistentProver) shouldEqual walletTree.getBalances.head._2
+        persistentProver) shouldEqual walletVersionalDB.getBalances.head._2
 
   }
 }
