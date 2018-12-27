@@ -59,12 +59,7 @@ class DataTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures 
 
     Await.result(nodes.head.sendTransaction(transaction), waitTime)
 
-    Await.result( nodes.head.waitForHeadersHeight(heightToCheckSecond), waitTime)
-
-    val checkBalance: Boolean = Await.result(nodes.head.balances, waitTime)
-      .find(_._1 == Algos.encode(IntrinsicTokenId))
-      .map(_._2 == supplyAtHeight - amount)
-      .get
+    Await.result(nodes.head.waitForHeadersHeight(heightToCheckSecond), waitTime)
 
     val headersAtHeight: List[String] = (heightToCheckFirst + 1 to heightToCheckSecond)
       .foldLeft(List[String]()) { case (list, blockHeight) =>
@@ -82,7 +77,6 @@ class DataTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures 
       docker.close()
       true shouldEqual (txsNum > heightToCheckSecond - heightToCheckFirst)
       txsNum shouldEqual (heightToCheckSecond - heightToCheckFirst + 1)
-      checkBalance shouldBe true
     }
   }
 }
