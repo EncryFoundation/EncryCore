@@ -1,4 +1,4 @@
-package encry.storage.levelDb.forksTree
+package encry.storage.levelDb.versionalLevelDB
 
 import encry.modifiers.state.StateModifierSerializer
 import encry.modifiers.state.box.EncryBaseBox

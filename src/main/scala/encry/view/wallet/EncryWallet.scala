@@ -6,7 +6,7 @@ import encry.modifiers.history.Block
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.{EncryBaseBox, EncryProposition}
 import encry.settings.EncryAppSettings
-import encry.storage.levelDb.forksTree.{LevelDbFactory, WalletForksTree}
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB}
 import encry.utils.CoreTaggedTypes.{ModifierId, VersionTag}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.Algos.HF
@@ -17,7 +17,7 @@ import scala.util.Try
 
 case class EncryWallet(walletStore: DB, accountManager: AccountManager) {
 
-  val walletStorage: WalletForksTree = WalletForksTree(walletStore)
+  val walletStorage: WalletVersionalLevelDB = WalletVersionalLevelDB(walletStore)
 
   def publicKeys: Set[PublicKey25519] = accountManager.publicAccounts.toSet
 

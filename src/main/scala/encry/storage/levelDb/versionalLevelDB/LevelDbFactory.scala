@@ -1,4 +1,4 @@
-package encry.storage.levelDb.forksTree
+package encry.storage.levelDb.versionalLevelDB
 
 import com.typesafe.scalalogging.StrictLogging
 import org.iq80.leveldb.DBFactory

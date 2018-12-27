@@ -1,8 +1,8 @@
-package encry.storage.levelDb.forksTree
+package encry.storage.levelDb.versionalLevelDB
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.NodeViewModifier
-import encry.storage.levelDb.forksTree.ForksTree.BrunchNum
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDB.BrunchNum
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
@@ -11,22 +11,18 @@ import org.iq80.leveldb.DB
 import scorex.crypto.hash.Digest32
 import scala.util.Try
 
-trait ForksTree[D <: RevertabaleDiff[D]] extends StrictLogging {
+trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
 
   val db: DB
 
-  var diffsMap: Map[ModifierId, Seq[D]] = Map.empty
-
-  var keysMap: Map[ModifierId, (Height, BrunchNum)] = Map.empty
-
-  var modifiersTree: List[ForksTreeNode[D]] = List.empty[ForksTreeNode[D]]
+  var versionsList: List[Version[D]] = List.empty[Version[D]]
 
   def add(modifier: NodeViewModifier): Unit
 
   def applyDiff(diff: D): Unit
 
   def getDiffsPath(targetNodeId: ModifierId,
-                   currentNodesList: List[ForksTreeNode[D]] = modifiersTree,
+                   currentNodesList: List[Version[D]] = versionsList,
                    diffs: Seq[D] = Seq.empty,
                    persistantProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Seq[D] = {
     if (targetNodeId == currentNodesList.last.modifierId) diffs
@@ -44,12 +40,12 @@ trait ForksTree[D <: RevertabaleDiff[D]] extends StrictLogging {
                  prover: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
                  diffsPath: Seq[D] = Seq.empty[D]): Try[Unit] = Try {
     if (checkRollbackPoint(rollbackPoint)) {
-      if (modifiersTree.last.modifierId == rollbackPoint) {
+      if (versionsList.last.modifierId == rollbackPoint) {
         applyDiff(diffsPath.tail.foldLeft(diffsPath.head)(_ ++ _))
       }
       else {
         val diffs = getDiffsPath(rollbackPoint, persistantProver = prover)
-        modifiersTree = modifiersTree.init
+        versionsList = versionsList.init
         rollbackTo(rollbackPoint, prover,
           //TODO: Remove if
           if (diffsPath.isEmpty) diffs else diffsPath)
@@ -58,14 +54,14 @@ trait ForksTree[D <: RevertabaleDiff[D]] extends StrictLogging {
     else throw new Exception(s"Impossible to rollback to: ${Algos.encode(rollbackPoint)}")
   }
 
-  private def checkRollbackPoint(rollbackPoint: ModifierId, nodesList: List[ForksTreeNode[D]] = modifiersTree): Boolean = {
+  private def checkRollbackPoint(rollbackPoint: ModifierId, nodesList: List[Version[D]] = versionsList): Boolean = {
     if (nodesList.last.modifierId sameElements rollbackPoint) true
     else if (nodesList.isEmpty) false
     else checkRollbackPoint(rollbackPoint, nodesList.init)
   }
 }
 
-object ForksTree {
+object VersionalLevelDB {
 
   type BrunchNum = Long
 }

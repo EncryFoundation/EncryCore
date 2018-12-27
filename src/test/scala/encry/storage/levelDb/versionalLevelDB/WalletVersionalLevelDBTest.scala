@@ -1,4 +1,4 @@
-package encry.storage.levelDb.forksTree
+package encry.storage.levelDb.versionalLevelDB
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.avltree._
@@ -15,7 +15,7 @@ import org.iq80.leveldb.{DB, Options}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.hash.{Blake2b256, Digest32}
 
-class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator with InstanceFactory with StrictLogging {
+class WalletVersionalLevelDBTest extends PropSpec with Matchers with EncryGenerator with InstanceFactory with StrictLogging {
 
   type HF = Blake2b256.type
   implicit val hf: HF = Blake2b256
@@ -58,7 +58,7 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
 
     //init wallet tree
 
-    val walletTree = WalletForksTree(db)
+    val walletTree = WalletVersionalLevelDB(db)
 
     //add blocks to wallet
 
@@ -95,7 +95,7 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
     }
 
     //init tree
-    val walletTree = WalletForksTree(db)
+    val walletTree = WalletVersionalLevelDB(db)
 
     //add all blocks
     blocksToWallet.foreach(walletTree.add)
@@ -166,7 +166,7 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
     }
 
     //init tree
-    val walletTree = WalletForksTree(db)
+    val walletTree = WalletVersionalLevelDB(db)
 
     //add all blocks
     blocksToWallet.foreach(walletTree.add)
@@ -239,7 +239,7 @@ class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator wit
     }
 
     //init tree
-    val walletTree = WalletForksTree(db)
+    val walletTree = WalletVersionalLevelDB(db)
 
     //add all blocks
     blocksToWallet.foreach(walletTree.add)
