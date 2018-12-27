@@ -59,6 +59,7 @@ case class WalletVersionalLevelDB(override val db: DB) extends VersionalLevelDB[
       acc ++ Algos.decode(id).get ++ Longs.toByteArray(balance)
     })
     db.write(batch)
+    batch.close()
   }
 
   def getBalances: Map[String, Amount] = {
