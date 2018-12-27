@@ -44,6 +44,7 @@ object TokenIssuingBox {
   implicit val jsonEncoder: Encoder[TokenIssuingBox] = (bx: TokenIssuingBox) => Map(
     "type"        -> TypeId.asJson,
     "id"          -> Algos.encode(bx.id).asJson,
+    "tokenId"     -> Algos.encode(bx.tokenId).asJson,
     "proposition" -> bx.proposition.asJson,
     "nonce"       -> bx.nonce.asJson,
     "amount"      -> bx.amount.asJson
@@ -54,7 +55,7 @@ object TokenIssuingBox {
       proposition <- c.downField("proposition").as[EncryProposition]
       nonce       <- c.downField("nonce").as[Long]
       amount      <- c.downField("amount").as[Long]
-      tokenId     <- c.downField("id").as[TokenId]
+      tokenId     <- c.downField("tokenId").as[TokenId]
     } yield TokenIssuingBox(
       proposition,
       nonce,

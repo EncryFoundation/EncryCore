@@ -16,7 +16,7 @@ import org.scalatest.{AsyncFunSuite, Matchers}
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
-class AssetTockenTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures with StrictLogging {
+class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures with StrictLogging {
 
   test("Get box, form and send assetIssue transaction. Check block for availability of this transaction.") {
 
