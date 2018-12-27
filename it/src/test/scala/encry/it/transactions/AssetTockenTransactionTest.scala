@@ -1,26 +1,24 @@
-package encry.it
+package encry.it.transactions
 
 import TransactionGenerator.CreateTransaction
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.it.configs.Configs
 import encry.it.docker.{Docker, Node}
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{AsyncFunSuite, Matchers}
 import encry.it.util.KeyHelper._
 import encry.modifiers.history.Block
 import encry.modifiers.mempool.Transaction
+import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.transaction.PubKeyLockedContract
-import scorex.utils.Random
-import scala.concurrent.Await
+import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.{AsyncFunSuite, Matchers}
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-import scala.concurrent.Future
 
-class DataTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures with StrictLogging {
+class AssetTockenTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures with StrictLogging {
 
-  test("Get box, form and send data transaction. Check block for availability of this transaction.") {
+  test("Get box, form and send assetIssue transaction. Check block for availability of this transaction.") {
 
     println(Docker.configTemplate + " wkjefjnksnlfnlwekjnfl123k")
 
@@ -43,14 +41,13 @@ class DataTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures 
     val resultOne: Seq[EncryBaseBox]     = Await.result(boxes, 2.minutes)
 
     val oneBox: AssetBox         = resultOne.collect { case ab: AssetBox => ab }.head
-    val transaction: Transaction = CreateTransaction.dataTransactionScratch(
+    val transaction: Transaction = CreateTransaction.assetIssuingTransactionScratch(
       privKey,
       fee        = 101,
       timestamp  = System.currentTimeMillis(),
       useOutputs = IndexedSeq(oneBox).map(_ -> None),
       contract   = PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract,
       amount     = 1000,
-      data       = Random.randomBytes(32)
     )
 
     val sendTransaction: Future[Unit] = nodes.head.sendTransaction(transaction)
@@ -74,9 +71,8 @@ class DataTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures 
     lastBlocks.map { blocks =>
       val txsNum: Int = blocks.map(_.payload.transactions.size).sum
       docker.close()
-      true shouldEqual (txsNum > heightToCheckSecond - heightToCheckFirst)
-      txsNum shouldEqual (heightToCheckSecond - heightToCheckFirst + 1)
+      true shouldEqual (txsNum > 3)
+      txsNum shouldEqual 4
     }
   }
-
 }

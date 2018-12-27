@@ -1,23 +1,22 @@
-package encry.it
+package encry.it.transactions
 
 import TransactionGenerator.CreateTransaction
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.it.configs.Configs
 import encry.it.docker.{Docker, Node}
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{AsyncFunSuite, Matchers}
 import encry.it.util.KeyHelper._
 import encry.modifiers.history.Block
 import encry.modifiers.mempool.Transaction
+import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.transaction.EncryAddress.Address
+import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.crypto.signatures.Curve25519
 import scorex.utils.Random
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-import scala.concurrent.Future
 
 class MonetaryTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures with StrictLogging {
 
