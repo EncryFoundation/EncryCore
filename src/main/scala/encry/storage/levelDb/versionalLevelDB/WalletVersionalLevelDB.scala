@@ -15,39 +15,17 @@ import encry.modifiers.state.box.EncryBaseBox
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 
-import scala.util.Success
-
 case class WalletVersionalLevelDB(override val db: DB) extends VersionalLevelDB[WalletDiff] {
 
   import WalletVersionalLevelDB._
 
-  def id: ModifierId = versionsList.lastOption.map(_.modifierId).getOrElse(ModifierId @@ Array.fill(32)(0: Byte))
+  def id: ModifierId = versionsList.last.modifierId
 
   override def add(modifier: NodeViewModifier): Unit = {
     val diffs = WalletVersionalLevelDB.getDiffs(modifier)
     applyDiff(diffs.tail.foldLeft(diffs.head)(_ ++ _))
     val newModifiersTree = Version[WalletDiff](modifier.id, diffs)
     versionsList = versionsList :+ newModifiersTree
-  }
-
-  def getAllBoxes: Seq[EncryBaseBox] =
-    getAll
-      .map{case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head)}
-      .collect{
-        case Success(box) => box
-      }
-
-  override def getAll: Seq[(Array[Byte], Array[Byte])] = {
-    var elementsBuffer: Seq[(Array[Byte], Array[Byte])] = Seq.empty
-    val iterator = db.iterator()
-    iterator.seekToFirst()
-    while (iterator.hasNext) {
-      val nextElem = iterator.next()
-      if (nextElem.getKey sameElements WalletVersionalLevelDB.BalancesKey) elementsBuffer
-      else elementsBuffer = elementsBuffer :+ (nextElem.getKey -> nextElem.getValue)
-    }
-    iterator.seekToLast()
-    elementsBuffer
   }
 
   def getBoxById(id: ADKey): Option[EncryBaseBox] = StateModifierSerializer.parseBytes(db.get(id), id.head).toOption
@@ -81,7 +59,6 @@ case class WalletVersionalLevelDB(override val db: DB) extends VersionalLevelDB[
       acc ++ Algos.decode(id).get ++ Longs.toByteArray(balance)
     })
     db.write(batch)
-    batch.close()
   }
 
   def getBalances: Map[String, Amount] = {

@@ -21,23 +21,11 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
 
   def applyDiff(diff: D): Unit
 
-  def getAll: Seq[(Array[Byte], Array[Byte])] = {
-    var elementsBuffer: Seq[(Array[Byte], Array[Byte])] = Seq.empty
-    val iterator = db.iterator()
-    iterator.seekToFirst()
-    while (iterator.hasNext) {
-      val nextElem = iterator.next()
-      elementsBuffer = elementsBuffer :+ (nextElem.getKey -> nextElem.getValue)
-    }
-    iterator.seekToLast()
-    elementsBuffer
-  }
-
   def getDiffsPath(targetNodeId: ModifierId,
                    currentNodesList: List[Version[D]] = versionsList,
                    diffs: Seq[D] = Seq.empty,
                    persistantProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Seq[D] = {
-    if (currentNodesList.nonEmpty && targetNodeId == currentNodesList.last.modifierId) diffs
+    if (targetNodeId == currentNodesList.last.modifierId) diffs
     else if (currentNodesList.nonEmpty)
       getDiffsPath(
         targetNodeId,
@@ -57,13 +45,10 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
       }
       else {
         val diffs = getDiffsPath(rollbackPoint, persistantProver = prover)
-        if (versionsList.nonEmpty) {
-          versionsList = versionsList.init
-          rollbackTo(rollbackPoint, prover,
-            //TODO: Remove if
-            if (diffsPath.isEmpty) diffs else diffsPath)
-        }
-        else diffsPath
+        versionsList = versionsList.init
+        rollbackTo(rollbackPoint, prover,
+          //TODO: Remove if
+          if (diffsPath.isEmpty) diffs else diffsPath)
       }
     }
     else throw new Exception(s"Impossible to rollback to: ${Algos.encode(rollbackPoint)}")
