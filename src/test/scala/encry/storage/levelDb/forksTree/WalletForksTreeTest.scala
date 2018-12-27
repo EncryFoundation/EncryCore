@@ -7,7 +7,6 @@ import encry.modifiers.InstanceFactory
 import encry.modifiers.history.Block
 import encry.modifiers.state.StateModifierSerializer
 import encry.modifiers.state.box.AssetBox
-import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.{EncryGenerator, FileHelper}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.Algos
@@ -15,7 +14,6 @@ import org.encryfoundation.common.utils.TaggedTypes.ADValue
 import org.iq80.leveldb.{DB, Options}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.hash.{Blake2b256, Digest32}
-import io.circe.syntax._
 
 class WalletForksTreeTest extends PropSpec with Matchers with EncryGenerator with InstanceFactory with StrictLogging {
 

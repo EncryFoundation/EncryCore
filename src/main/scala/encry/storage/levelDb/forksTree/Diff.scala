@@ -8,7 +8,6 @@ import scorex.crypto.hash.Digest32
 import cats.syntax.semigroup._
 import cats.instances.all._
 import com.typesafe.scalalogging.StrictLogging
-import org.encryfoundation.common.Algos
 
 import scala.util.Success
 

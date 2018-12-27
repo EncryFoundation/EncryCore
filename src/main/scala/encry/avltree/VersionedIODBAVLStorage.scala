@@ -122,7 +122,9 @@ object VersionedIODBAVLStorage {
                                                  (implicit val phf: CryptographicHash[D],
                                                   store: Store,
                                                   nodeParameters: NodeParameters)
+
     extends InternalProverEncryNode(k = pk, l = null, r = null, b = pb)(phf) {
+
     override def left: EncryProverNodes[D] = {
       if (l == null) l = VersionedIODBAVLStorage.fetch[D](lkey)
       l
