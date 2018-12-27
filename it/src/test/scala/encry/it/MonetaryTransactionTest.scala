@@ -19,9 +19,9 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.concurrent.Future
 
-class TransactionsTests extends AsyncFunSuite with Matchers with ScalaFutures with StrictLogging {
+class MonetaryTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures with StrictLogging {
 
-  test("Get box, form and send transaction. Check block for availability of this transaction. Check miner balance.") {
+  test("Get box, form and send monetary transaction. Check block for availability of this transaction.") {
 
     println(Docker.configTemplate + " wkjefjnksnlfnlwekjnfl123k")
 
@@ -47,11 +47,11 @@ class TransactionsTests extends AsyncFunSuite with Matchers with ScalaFutures wi
     val oneBox: AssetBox         = resultOne.collect { case ab: AssetBox => ab }.head
     val transaction: Transaction = CreateTransaction.defaultPaymentTransaction(
       privKey,
-      101,
-      System.currentTimeMillis(),
-      IndexedSeq(oneBox).map(_ -> None),
-      recipientAddress,
-      102
+      fee        = 101,
+      timestamp  = System.currentTimeMillis(),
+      useOutputs = IndexedSeq(oneBox).map(_ -> None),
+      recipient  = recipientAddress,
+      amount     = 102
     )
 
     val sendTransaction: Future[Unit] = nodes.head.sendTransaction(transaction)
