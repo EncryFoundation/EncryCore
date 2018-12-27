@@ -26,6 +26,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
     val heightToCheckSecond: Int  = 8
     val mnemonicKey: String       = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
     val privKey: PrivateKey25519  = createPrivKey(Some(mnemonicKey))
+    val waitTime: FiniteDuration  = 2.minutes
 
     val docker: Docker = Docker()
     val config: Config = Configs.mining(true)
@@ -33,15 +34,11 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
       .withFallback(Configs.nodeName("node2"))
 
     val nodes: List[Node]   = docker.startNodes(Seq(config))
-    val height: Future[Int] = nodes.head.waitForHeadersHeight(heightToCheckFirst)
+    Await.result(nodes.head.waitForHeadersHeight(heightToCheckFirst), waitTime)
 
-    Await.result(height, 2.minutes)
-
-    val boxes: Future[Seq[EncryBaseBox]] = nodes.head.outputs
-    val resultOne: Seq[EncryBaseBox]     = Await.result(boxes, 2.minutes)
-
-    val oneBox: AssetBox         = resultOne.collect { case ab: AssetBox => ab }.head
-    val transaction: Transaction = CreateTransaction.assetIssuingTransactionScratch(
+    val getBoxes: Seq[EncryBaseBox] = Await.result(nodes.head.outputs, waitTime)
+    val oneBox: AssetBox            = getBoxes.collect { case ab: AssetBox => ab }.head
+    val transaction: Transaction    = CreateTransaction.assetIssuingTransactionScratch(
       privKey,
       fee        = 101,
       timestamp  = System.currentTimeMillis(),
@@ -50,25 +47,22 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
       amount     = 1001,
     )
 
-    val sendTransaction: Future[Unit] = nodes.head.sendTransaction(transaction)
-    Await.result(sendTransaction, 2.minutes)
+    Await.result(nodes.head.sendTransaction(transaction), waitTime)
 
-    val heightNew: Future[Int] = nodes.head.waitForHeadersHeight(heightToCheckSecond)
-    Await.result(heightNew, 2.minutes)
+    Await.result(nodes.head.waitForHeadersHeight(heightToCheckSecond), waitTime)
 
-    val lastHeaders: List[String] =
-      (heightToCheckFirst + 1 to heightToCheckSecond).foldLeft(List[String]()) { case (list, blockHeight) =>
+    val headersAtHeight: List[String] = (heightToCheckFirst + 1 to heightToCheckSecond)
+      .foldLeft(List[String]()) { case (list, blockHeight) =>
         val headers: Future[List[String]] = nodes.head.getHeadersIdAtHeight(blockHeight)
-        val result: List[String]          = Await.result(headers, 1.minutes)
+        val result: List[String]          = Await.result(headers, waitTime)
         list ::: result
       }
 
-    val test = nodes.head.getBlock(lastHeaders.head)
-    Await.result(test, 1.minutes)
+    Await.result(nodes.head.getBlock(headersAtHeight.head), waitTime)
 
-    val lastBlocks: Future[Seq[Block]] = Future.sequence(lastHeaders.map { h => nodes.head.getBlock(h) })
+    val blockByHeaders: Future[Seq[Block]] = Future.sequence(headersAtHeight.map { h => nodes.head.getBlock(h) })
 
-    lastBlocks.map { blocks =>
+    blockByHeaders.map { blocks =>
       val txsNum: Int = blocks.map(_.payload.transactions.size).sum
       docker.close()
       true shouldEqual (txsNum > 3)

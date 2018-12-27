@@ -2,14 +2,11 @@ package encry.it.api
 
 import java.io.IOException
 import java.util.concurrent.TimeoutException
-
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.headers.Host
-import akka.http.scaladsl.model._
 import encry.it.util.GlobalTimer._
 import encry.modifiers.history.{Block, Header}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.EncryBaseBox
+import io.circe.Decoder.Result
 import io.circe.parser.parse
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, Json}
@@ -17,7 +14,6 @@ import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import org.slf4j.{Logger, LoggerFactory}
-
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -117,7 +113,7 @@ trait HttpApi { // scalastyle:ignore
 
   def outputs: Future[Seq[EncryBaseBox]] = get("/wallet/utxos").flatMap { r =>
     val response: Json = jsonAnswerAs[Json](r.getResponseBody)
-    val boxes = response.hcursor.value.as[Seq[EncryBaseBox]]
+    val boxes: Result[Seq[EncryBaseBox]] = response.hcursor.value.as[Seq[EncryBaseBox]]
     boxes.fold[Future[Seq[EncryBaseBox]]](
       e => Future.failed(new Exception(s"Error getting `outputs` from /wallet/utxos response: $e\n$response", e)),
       maybeBoxes => Future.successful(maybeBoxes)
@@ -125,34 +121,34 @@ trait HttpApi { // scalastyle:ignore
   }
 
   def lastHeaders(qty: Int): Future[Seq[Header]] = get(s"/history/lastHeaders/$qty").flatMap { r =>
-    val response = jsonAnswerAs[Json](r.getResponseBody)
-    val eitherBalance = response.hcursor.as[Seq[Header]]
-    eitherBalance.fold[Future[Seq[Header]]](
-      e => Future.failed(new Exception(s"Error getting `lastHeaders` from /lastHeaders/qty response: $e\n$response", e)),
+    val response: Json = jsonAnswerAs[Json](r.getResponseBody)
+    val eitherHeaders: Result[Seq[Header]] = response.hcursor.as[Seq[Header]]
+    eitherHeaders.fold[Future[Seq[Header]]](
+      e => Future.failed(new Exception(s"Error getting `lastHeaders` from /lastHeaders/$qty response: $e\n$response", e)),
       maybeHeaders => Future.successful(maybeHeaders)
     )
   }
 
   def getBlock(modId: String): Future[Block] = get(s"/history/$modId").flatMap { r =>
-    val response = jsonAnswerAs[Json](r.getResponseBody)
-    val eitherBalance = response.hcursor.as[Block]
-    eitherBalance.fold[Future[Block]](
-      e => Future.failed(new Exception(s"Error getting `block` from /history/modId response: $e\n$response", e)),
+    val response: Json = jsonAnswerAs[Json](r.getResponseBody)
+    val eitherBlock: Result[Block] = response.hcursor.as[Block]
+    eitherBlock.fold[Future[Block]](
+      e => Future.failed(new Exception(s"Error getting `block` from /history/$modId response: $e\n$response", e)),
       maybeBlock => Future.successful(maybeBlock)
     )
   }
 
   def getHeadersIdAtHeight(height: Int): Future[List[String]] = get(s"/history/at/$height").flatMap { r =>
-    val response = jsonAnswerAs[Json](r.getResponseBody)
-    val eitherBalance = response.hcursor.as[List[String]]
-    eitherBalance.fold[Future[List[String]]](
-      e => Future.failed(new Exception(s"Error getting `block` from /history/modId response: $e\n$response", e)),
-      maybeBlock => Future.successful(maybeBlock)
+    val response: Json = jsonAnswerAs[Json](r.getResponseBody)
+    val eitherHeaders: Result[List[String]] = response.hcursor.as[List[String]]
+    eitherHeaders.fold[Future[List[String]]](
+      e => Future.failed(new Exception(s"Error getting `headerId` from /history/at/$height response: $e\n$response", e)),
+      maybeHeaderId => Future.successful(maybeHeaderId)
     )
   }
 
   def sendTransaction(transaction: Transaction): Future[Unit] =
-    post("/transactions/send", s"${transaction.asJson}").map(ex => println(ex.getUri, ex.getResponseBody, ex.isRedirected))
+    post("/transactions/send", s"${transaction.asJson}").map(_ => ())
 
   def waitForStartup: Future[this.type] = get("/info").map(_ => this)
 
