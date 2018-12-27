@@ -27,8 +27,6 @@ class MonetaryTransactionTest extends AsyncFunSuite with Matchers with ScalaFutu
   test("Get box, form and send monetary transaction. Check block for availability of this transaction. " +
     "Check balance after sending transaction") {
 
-    println(Docker.configTemplate + " wkjefjnksnlfnlwekjnfl123k")
-
     val amount: Int               = 1001
     val heightToCheckFirst: Int   = 5
     val heightToCheckSecond: Int  = 8

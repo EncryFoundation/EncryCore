@@ -26,8 +26,6 @@ class DataTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures 
   test("Get box, form and send data transaction. Check block for availability of this transaction. " +
     "Check balance after sending transaction.") {
 
-    println(Docker.configTemplate + " wkjefjnksnlfnlwekjnfl123k")
-
     val amount: Int               = 1001
     val heightToCheckFirst: Int   = 5
     val heightToCheckSecond: Int  = 8

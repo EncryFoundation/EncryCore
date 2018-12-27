@@ -41,15 +41,15 @@ object AssetIssuingDirective {
   val TypeId: DTypeId = 2.toByte
 
   implicit val jsonEncoder: Encoder[AssetIssuingDirective] = (d: AssetIssuingDirective) => Map(
-    "typeId" -> d.typeId.asJson,
+    "typeId"       -> d.typeId.asJson,
     "contractHash" -> Algos.encode(d.contractHash).asJson,
-    "amount" -> d.amount.asJson
+    "amount"       -> d.amount.asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[AssetIssuingDirective] = (c: HCursor) => {
     for {
       contractHash <- c.downField("contractHash").as[String]
-      amount <- c.downField("amount").as[Long]
+      amount       <- c.downField("amount").as[Long]
     } yield Algos.decode(contractHash)
       .map(ch => AssetIssuingDirective(ch, amount))
       .getOrElse(throw new Exception("Decoding failed"))

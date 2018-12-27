@@ -110,7 +110,6 @@ case class Docker(suiteConfig: Config = empty,
       .withFallback(Configs.knownPeers(nodes.asScala.map(node => node.nodeIp -> 9001).toSeq))
       .withFallback(defaultConf)
       .resolve()
-    println(s"Config123:$config")
     config
   }
 

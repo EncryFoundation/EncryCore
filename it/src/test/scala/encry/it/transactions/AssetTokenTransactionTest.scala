@@ -8,7 +8,9 @@ import encry.it.docker.{Docker, Node}
 import encry.it.util.KeyHelper._
 import encry.modifiers.history.Block
 import encry.modifiers.mempool.Transaction
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
+import encry.modifiers.state.box.TokenIssuingBox.TokenId
+import encry.modifiers.state.box.{AssetBox, EncryBaseBox, TokenIssuingBox}
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.transaction.PubKeyLockedContract
 import org.scalatest.concurrent.ScalaFutures
@@ -18,15 +20,15 @@ import scala.concurrent.duration._
 
 class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures with StrictLogging {
 
-  test("Get box, form and send assetIssue transaction. Check block for availability of this transaction.") {
-
-    println(Docker.configTemplate + " wkjefjnksnlfnlwekjnfl123k")
+  test("Get box, form and send assetIssue transaction. Check block for availability of this transaction. " +
+    "Check balance after sending transaction.") {
 
     val heightToCheckFirst: Int   = 5
     val heightToCheckSecond: Int  = 8
     val mnemonicKey: String       = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
     val privKey: PrivateKey25519  = createPrivKey(Some(mnemonicKey))
     val waitTime: FiniteDuration  = 2.minutes
+    val amount: Int               = 1001
 
     val docker: Docker = Docker()
     val config: Config = Configs.mining(true)
@@ -44,7 +46,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
       timestamp  = System.currentTimeMillis(),
       useOutputs = IndexedSeq(oneBox).map(_ -> None),
       contract   = PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract,
-      amount     = 1001,
+      amount,
     )
 
     Await.result(nodes.head.sendTransaction(transaction), waitTime)
@@ -63,10 +65,25 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
     val blockByHeaders: Future[Seq[Block]] = Future.sequence(headersAtHeight.map { h => nodes.head.getBlock(h) })
 
     blockByHeaders.map { blocks =>
+
+      val tokenId: TokenId = blocks.collect {
+        case block: Block if block.transactions.size > 1 =>
+          block.transactions.collect {
+            case transaction: Transaction if transaction.fee > 0 =>
+              transaction.newBoxes.toList.collect { case box: TokenIssuingBox => box.tokenId }
+          }.flatten
+      }.flatten.toList.head
+
+      val balance: Boolean = Await.result(nodes.head.balances, waitTime)
+        .find(_._1 == Algos.encode(tokenId))
+        .map(_._2 == amount)
+        .get
+
       val txsNum: Int = blocks.map(_.payload.transactions.size).sum
       docker.close()
       true shouldEqual (txsNum > 3)
       txsNum shouldEqual 4
+      balance shouldBe true
     }
   }
 }
