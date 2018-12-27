@@ -63,7 +63,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
     wallet.walletStorage.getTokenBalanceById(Constants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance - useBox.amount
   }
 
-  property("Balance count (intrinsic coins + tokens)") {
+  property("Balance count (intrinsic coins + tokens) ") {
 
     val txsQty: Int = 4
 
