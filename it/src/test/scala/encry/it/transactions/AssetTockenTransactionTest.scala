@@ -47,7 +47,7 @@ class AssetTockenTransactionTest extends AsyncFunSuite with Matchers with ScalaF
       timestamp  = System.currentTimeMillis(),
       useOutputs = IndexedSeq(oneBox).map(_ -> None),
       contract   = PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract,
-      amount     = 1000,
+      amount     = 1001,
     )
 
     val sendTransaction: Future[Unit] = nodes.head.sendTransaction(transaction)

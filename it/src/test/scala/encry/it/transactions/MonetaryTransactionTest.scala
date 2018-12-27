@@ -3,12 +3,16 @@ package encry.it.transactions
 import TransactionGenerator.CreateTransaction
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
+import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.{Docker, Node}
 import encry.it.util.KeyHelper._
 import encry.modifiers.history.Block
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
+import encry.settings.Constants.IntrinsicTokenId
+import encry.view.history.History.Height
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.transaction.EncryAddress.Address
 import org.scalatest.concurrent.ScalaFutures
@@ -20,15 +24,21 @@ import scala.concurrent.duration._
 
 class MonetaryTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures with StrictLogging {
 
-  test("Get box, form and send monetary transaction. Check block for availability of this transaction.") {
+  test("Get box, form and send monetary transaction. Check block for availability of this transaction. " +
+    "Check balance after sending transaction") {
 
     println(Docker.configTemplate + " wkjefjnksnlfnlwekjnfl123k")
 
+    val amount: Int               = 1001
     val heightToCheckFirst: Int   = 5
     val heightToCheckSecond: Int  = 8
     val mnemonicKey: String       = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
     val privKey: PrivateKey25519  = createPrivKey(Some(mnemonicKey))
     val recipientAddress: Address = PublicKey25519(Curve25519.createKeyPair(Random.randomBytes())._2).address.address
+
+    val supplyAtHeight: Long = (0 to heightToCheckSecond).foldLeft(0: Long) {
+      case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i)
+    }
 
     val docker: Docker = Docker()
     val config: Config = Configs.mining(true)
@@ -50,7 +60,7 @@ class MonetaryTransactionTest extends AsyncFunSuite with Matchers with ScalaFutu
       timestamp  = System.currentTimeMillis(),
       useOutputs = IndexedSeq(oneBox).map(_ -> None),
       recipient  = recipientAddress,
-      amount     = 102
+      amount
     )
 
     val sendTransaction: Future[Unit] = nodes.head.sendTransaction(transaction)
@@ -58,6 +68,11 @@ class MonetaryTransactionTest extends AsyncFunSuite with Matchers with ScalaFutu
 
     val heightNew: Future[Int] = nodes.head.waitForHeadersHeight(heightToCheckSecond)
     Await.result(heightNew, 2.minutes)
+
+    val checkBalance: Boolean = Await.result(nodes.head.balances, 4.minutes)
+      .find(_._1 == Algos.encode(IntrinsicTokenId))
+      .map(_._2 == supplyAtHeight - amount)
+      .get
 
     val lastHeaders: List[String] =
       (heightToCheckFirst + 1 to heightToCheckSecond).foldLeft(List[String]()) { case (list, blockHeight) =>
@@ -74,8 +89,9 @@ class MonetaryTransactionTest extends AsyncFunSuite with Matchers with ScalaFutu
     lastBlocks.map { blocks =>
       val txsNum: Int = blocks.map(_.payload.transactions.size).sum
       docker.close()
-      true shouldEqual (txsNum > 3)
-      txsNum shouldEqual 4
+      true shouldEqual (txsNum > heightToCheckSecond - heightToCheckFirst)
+      txsNum shouldEqual (heightToCheckSecond - heightToCheckFirst + 1)
+      checkBalance shouldBe true
     }
   }
 }

@@ -3,12 +3,16 @@ package encry.it.transactions
 import TransactionGenerator.CreateTransaction
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
+import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.{Docker, Node}
 import encry.it.util.KeyHelper._
 import encry.modifiers.history.Block
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
+import encry.settings.Constants.IntrinsicTokenId
+import encry.view.history.History.Height
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.transaction.PubKeyLockedContract
 import org.scalatest.concurrent.ScalaFutures
@@ -19,14 +23,20 @@ import scala.concurrent.duration._
 
 class DataTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures with StrictLogging {
 
-  test("Get box, form and send data transaction. Check block for availability of this transaction.") {
+  test("Get box, form and send data transaction. Check block for availability of this transaction. " +
+    "Check balance after sending transaction.") {
 
     println(Docker.configTemplate + " wkjefjnksnlfnlwekjnfl123k")
 
+    val amount: Int               = 1001
     val heightToCheckFirst: Int   = 5
     val heightToCheckSecond: Int  = 8
     val mnemonicKey: String       = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
     val privKey: PrivateKey25519  = createPrivKey(Some(mnemonicKey))
+
+    val supplyAtHeight: Long = (0 to heightToCheckSecond).foldLeft(0: Long) {
+      case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i)
+    }
 
     val docker: Docker = Docker()
     val config: Config = Configs.mining(true)
@@ -48,7 +58,7 @@ class DataTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures 
       timestamp  = System.currentTimeMillis(),
       useOutputs = IndexedSeq(oneBox).map(_ -> None),
       contract   = PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract,
-      amount     = 1000,
+      amount,
       data       = Random.randomBytes(32)
     )
 
@@ -57,6 +67,11 @@ class DataTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures 
 
     val heightNew: Future[Int] = nodes.head.waitForHeadersHeight(heightToCheckSecond)
     Await.result(heightNew, 2.minutes)
+
+    val checkBalance: Boolean = Await.result(nodes.head.balances, 4.minutes)
+      .find(_._1 == Algos.encode(IntrinsicTokenId))
+      .map(_._2 == supplyAtHeight - amount)
+      .get
 
     val lastHeaders: List[String] =
       (heightToCheckFirst + 1 to heightToCheckSecond).foldLeft(List[String]()) { case (list, blockHeight) =>
@@ -75,7 +90,7 @@ class DataTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures 
       docker.close()
       true shouldEqual (txsNum > heightToCheckSecond - heightToCheckFirst)
       txsNum shouldEqual (heightToCheckSecond - heightToCheckFirst + 1)
+      checkBalance shouldBe true
     }
   }
-
 }
