@@ -51,6 +51,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
 
     Await.result(nodes.head.sendTransaction(transaction), waitTime)
 
+
     Await.result(nodes.head.waitForHeadersHeight(heightToCheckSecond), waitTime)
 
     val headersAtHeight: List[String] = (heightToCheckFirst + 1 to heightToCheckSecond)
