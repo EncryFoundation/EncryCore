@@ -25,7 +25,6 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
     var ellementsBuffer: Seq[(Array[Byte], Array[Byte])] = Seq.empty
     val iterator = db.iterator()
     iterator.seekToFirst()
-    println(iterator.hasNext)
     while (iterator.hasNext) {
       val nextElem = iterator.next()
       ellementsBuffer = ellementsBuffer :+ (nextElem.getKey -> nextElem.getValue)
