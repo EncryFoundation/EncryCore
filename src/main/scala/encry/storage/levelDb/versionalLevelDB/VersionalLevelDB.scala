@@ -58,10 +58,13 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
       }
       else {
         val diffs = getDiffsPath(rollbackPoint, persistantProver = prover)
-        versionsList = versionsList.init
-        rollbackTo(rollbackPoint, prover,
-          //TODO: Remove if
-          if (diffsPath.isEmpty) diffs else diffsPath)
+        if (versionsList.nonEmpty) {
+          versionsList = versionsList.init
+          rollbackTo(rollbackPoint, prover,
+            //TODO: Remove if
+            if (diffsPath.isEmpty) diffs else diffsPath)
+        }
+        else diffsPath
       }
     }
     else throw new Exception(s"Impossible to rollback to: ${Algos.encode(rollbackPoint)}")
