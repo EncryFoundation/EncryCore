@@ -14,6 +14,8 @@ sealed trait ValidationResult {
 
   def errors: Seq[ModifierError]
 
+  def isSuccess: Boolean
+
   def ++(next: ValidationResult): ValidationResult
 
   def toTry: Try[Unit]
@@ -38,6 +40,8 @@ object ValidationResult {
 
   final case object Valid extends ValidationResult {
 
+    override def isSuccess: Boolean = true
+
     def message: String = "OK"
 
     def errors: Seq[ModifierError] = Seq.empty
@@ -48,6 +52,8 @@ object ValidationResult {
   }
 
   final case class Invalid(errors: Seq[ModifierError]) extends ValidationResult {
+
+    override def isSuccess: Boolean = false
 
     def isFatal: Boolean = errors.exists(_.isFatal)
 

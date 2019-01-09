@@ -1,24 +1,24 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
-import encry.utils.CoreTaggedTypes.VersionTag
-import encry.EncryApp.{settings, system}
+import encry.EncryApp.settings
 import encry.avltree.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import encry.consensus.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{ADProofs, Block, Header}
 import encry.modifiers.mempool.Transaction
-import encry.modifiers.mempool.Transaction.TransactionValidationException
 import encry.modifiers.state.StateModifierDeserializer
-import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.Box.Amount
+import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box._
-import encry.utils.{BalanceCalculator, Logging}
 import encry.settings.Constants
+import encry.utils.CoreTaggedTypes.VersionTag
+import encry.utils.BalanceCalculator
+import encry.validation.ValidationResult.{Invalid, Valid}
+import encry.validation.{MalformedModifierError, ValidationResult}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.History.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
@@ -26,7 +26,6 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.Algos.HF
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
-
 import scala.util.{Failure, Success, Try}
 
 class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
@@ -53,12 +52,12 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     def applyTry(txs: Seq[Transaction], allowedOutputDelta: Amount = 0L): Try[Unit] =
       txs.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, tx) =>
         t.flatMap { _ =>
-          validate(tx, allowedOutputDelta).flatMap { _ =>
+          if (validate(tx, allowedOutputDelta).isSuccess) {
             extractStateChanges(tx).operations.map(ADProofs.toModification)
               .foldLeft[Try[Option[ADValue]]](Success(None)) { case (tIn, m) =>
-                tIn.flatMap(_ => persistentProver.performOneOperation(m))
+              tIn.flatMap(_ => persistentProver.performOneOperation(m))
             }
-          }
+          } else util.Failure(validate(tx, allowedOutputDelta).errors.head.toThrowable)
         }
       }.map(_ => Unit)
 
@@ -147,14 +146,13 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     persistentProver.storage.rollbackVersions.map(v =>
       VersionTag @@ stateStore.get(ByteArrayWrapper(Algos.hash(v))).get.data)
 
-  def validate(tx: Transaction, allowedOutputDelta: Amount = 0L): Try[Unit] =
-    tx.semanticValidity.map { _: Unit =>
-
+  def validate(tx: Transaction, allowedOutputDelta: Amount = 0L): ValidationResult =
+    if (tx.semanticValidity.isSuccess) {
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, rootHash)
-
       val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => persistentProver.unauthenticatedLookup(input.boxId)
         .map(bytes => StateModifierDeserializer.parseBytes(bytes, input.boxId.head))
-        .map(_.toOption -> input)).foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
+        .map(_.toOption -> input))
+        .foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
           (bxOpt, tx.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
             case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
@@ -165,7 +163,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
             case (Some(bx), defaultProofOpt) =>
               if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
                 defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
-            case _ => throw TransactionValidationException(s"Box(${Algos.encode(input.boxId)}) not found")
+            case _ => acc
           }
         }
 
@@ -183,8 +181,10 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         }
       }
 
-      if (!validBalance) throw TransactionValidationException(s"Non-positive balance in $tx")
-    }
+      if (!validBalance) Invalid(Seq(MalformedModifierError(s"Non-positive balance in $tx")))
+      else if (bxs.length != tx.inputs.length) Invalid(Seq(MalformedModifierError(s"Box not found")))
+      else Valid
+    } else tx.semanticValidity
 
   def isValid(tx: Transaction, allowedOutputDelta: Amount = 0L): Boolean = validate(tx, allowedOutputDelta).isSuccess
 

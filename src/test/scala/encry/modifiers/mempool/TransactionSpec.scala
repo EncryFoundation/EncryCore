@@ -28,7 +28,7 @@ class TransactionSpec extends PropSpec with Matchers with InstanceFactory {
     tx.semanticValidity.isSuccess shouldBe false
   }
 
-  property("semanticValidity of invalid tx (Negative fee)") {
+  property("semanticValidity of invalid tx (negative fee)") {
 
     val tx: Transaction = {
       val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(TestHelper.genAssetBox(publicKey.address.address))

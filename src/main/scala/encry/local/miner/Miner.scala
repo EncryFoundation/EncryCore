@@ -32,6 +32,7 @@ import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 
 import scala.collection._
+import scala.util.{Failure, Success, Try}
 
 class Miner extends Actor with Logging {
 
