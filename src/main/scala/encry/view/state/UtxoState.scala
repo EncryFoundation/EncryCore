@@ -16,7 +16,7 @@ import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box._
 import encry.settings.Constants
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.utils.{BalanceCalculator, Logging}
+import encry.utils.BalanceCalculator
 import encry.validation.ValidationResult.{Invalid, Valid}
 import encry.validation.{MalformedModifierError, ValidationResult}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
