@@ -104,7 +104,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
       tokenAmount,
       1,
       Some(ADKey @@ tokenId),
-      sendAssetTokens = true
+      tokenAmount = 11
     )
 
     Await.result(nodes.head.sendTransaction(transactionWithAssetToken), waitTime)
