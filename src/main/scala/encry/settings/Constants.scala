@@ -57,9 +57,9 @@ object Constants {
     val NewHeaderTimeMultiplier: Int = 5
 
     // Number of last epochs for difficulty recalculation
-    val RetargetingEpochsQty: Int = 3
+    val RetargetingEpochsQty: Int = 4
 
-    val EpochLength: Int = 10
+    val EpochLength: Int = 100
 
     val GenesisHeight: Height = Height @@ 0
 
