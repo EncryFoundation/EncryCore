@@ -3,16 +3,12 @@ package encry.it.transactions
 import TransactionGenerator.CreateTransaction
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.{Docker, Node}
 import encry.it.util.KeyHelper._
 import encry.modifiers.history.Block
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
-import encry.settings.Constants.IntrinsicTokenId
-import encry.view.history.History.Height
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.transaction.PubKeyLockedContract
 import org.scalatest.concurrent.ScalaFutures
@@ -32,10 +28,6 @@ class DataTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures 
     val mnemonicKey: String       = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
     val privKey: PrivateKey25519  = createPrivKey(Some(mnemonicKey))
     val waitTime: FiniteDuration  = 2.minutes
-
-    val supplyAtHeight: Long = (0 to heightToCheckSecond).foldLeft(0: Long) {
-      case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i)
-    }
 
     val docker: Docker   = Docker()
     val config: Config   = Configs.mining(true)

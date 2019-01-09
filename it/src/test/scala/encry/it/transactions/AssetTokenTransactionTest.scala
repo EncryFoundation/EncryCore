@@ -13,14 +13,12 @@ import encry.modifiers.state.box._
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.transaction.EncryAddress.Address
-import org.encryfoundation.common.transaction.{Proof, PubKeyLockedContract}
+import org.encryfoundation.common.transaction.PubKeyLockedContract
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
-import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.crypto.signatures.Curve25519
 import scorex.utils.Random
-
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
@@ -36,6 +34,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
     val privKey: PrivateKey25519  = createPrivKey(Some(mnemonicKey))
     val waitTime: FiniteDuration  = 2.minutes
     val amount: Int               = 1001
+    val fee: Int                  = 101
     val tokenAmount: Int          = 101
     val recipientAddress: Address = PublicKey25519(Curve25519.createKeyPair(Random.randomBytes())._2).address.address
 
@@ -51,7 +50,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
     val oneBox: AssetBox            = getBoxes.collect { case ab: AssetBox => ab }.head
     val transaction: Transaction    = CreateTransaction.assetIssuingTransactionScratch(
       privKey,
-      fee        = 101,
+      fee,
       timestamp  = System.currentTimeMillis(),
       useOutputs = IndexedSeq(oneBox).map(_ -> None),
       contract   = PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract,
@@ -94,17 +93,18 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
     txsNum  shouldEqual (heightToCheckSecond - heightToCheckFirst + 1)
 
     val getBoxesAgain: Seq[EncryBaseBox]       = Await.result(nodes.head.outputs, waitTime)
-    val assetBoxForFee: AssetBox               = getBoxesAgain.collect { case ab: AssetBox => ab }.head
-    val tokenIssuingBox: TokenIssuingBox       = getBoxesAgain.collect { case ab: TokenIssuingBox => ab }.head
+    val assetBoxForFee: AssetBox               = getBoxesAgain.collect { case ab: AssetBox if ab.amount > amount => ab }.head
+    val tokenIssuingBox: TokenIssuingBox       = getBoxesAgain.collect { case tb: TokenIssuingBox if tb.amount > fee => tb }.head
     val transactionWithAssetToken: Transaction = CreateTransaction.defaultPaymentTransaction(
       privKey,
-      101,
+      fee,
       System.currentTimeMillis(),
       IndexedSeq(assetBoxForFee, tokenIssuingBox).map(_ -> None),
       recipientAddress,
       tokenAmount,
       1,
-      Some(ADKey @@ tokenId)
+      Some(ADKey @@ tokenId),
+      sendAssetTokens = true
     )
 
     Await.result(nodes.head.sendTransaction(transactionWithAssetToken), waitTime)

@@ -1,6 +1,5 @@
 package encry.it
 
-import com.typesafe.config.ConfigFactory
 import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.Docker

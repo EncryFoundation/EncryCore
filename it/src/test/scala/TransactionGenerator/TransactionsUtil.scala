@@ -21,7 +21,8 @@ object CreateTransaction extends StrictLogging {
                                 recipient: String,
                                 amount: Long,
                                 numberOfCreatedDirectives: Int = 1,
-                                tokenIdOpt: Option[ADKey] = None): Transaction = {
+                                tokenIdOpt: Option[ADKey] = None,
+                                sendAssetTokens: Boolean = false): Transaction = {
     val directives: IndexedSeq[TransferDirective] = if (useOutputs.size < 10)
       (1 to numberOfCreatedDirectives).foldLeft(IndexedSeq.empty[TransferDirective]) { case (directivesAll, _) =>
         directivesAll :+ TransferDirective(recipient, amount / numberOfCreatedDirectives, tokenIdOpt)
