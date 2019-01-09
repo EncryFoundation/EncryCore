@@ -79,7 +79,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
       val startId: ModifierId = headerIdsAtHeight(heightFrom).head
       val startHeader: Header = typedModifierById[Header](startId).get
       val headers: HeaderChain = headerChainBack(size, startHeader, _ => false)
-        .ensuring(_.headers.exists(_.height == Constants.Chain.GenesisHeight), "Should always contain genesis header")
+        .ensuring(_.headers.exists(_.height == Constants.Chain.GenesisHeight), "Should always contain genesis header.")
       headers.headers.flatMap(h => Seq((Header.modifierTypeId, h.id)))
     } else {
       val ids: Seq[ModifierId] = info.lastHeaderIds
