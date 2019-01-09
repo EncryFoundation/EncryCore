@@ -1,26 +1,24 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
-import encry.utils.CoreTaggedTypes.VersionTag
-import encry.EncryApp.{settings, system}
+import encry.EncryApp.settings
 import encry.avltree.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import encry.consensus.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{ADProofs, Block, Header}
 import encry.modifiers.mempool.Transaction
-import encry.modifiers.mempool.Transaction.TransactionValidationException
 import encry.modifiers.state.StateModifierDeserializer
-import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.Box.Amount
+import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box._
-import encry.utils.{BalanceCalculator, Logging}
 import encry.settings.Constants
-import encry.validation.{MalformedModifierError, ValidationResult}
+import encry.utils.CoreTaggedTypes.VersionTag
+import encry.utils.{BalanceCalculator, Logging}
 import encry.validation.ValidationResult.{Invalid, Valid}
+import encry.validation.{MalformedModifierError, ValidationResult}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.History.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
@@ -28,7 +26,6 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.Algos.HF
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
-
 import scala.util.{Failure, Success, Try}
 
 class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
@@ -60,7 +57,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
               .foldLeft[Try[Option[ADValue]]](Success(None)) { case (tIn, m) =>
               tIn.flatMap(_ => persistentProver.performOneOperation(m))
             }
-          } else Try(None)
+          } else util.Failure(validate(tx, allowedOutputDelta).errors.head.toThrowable)
         }
       }.map(_ => Unit)
 
