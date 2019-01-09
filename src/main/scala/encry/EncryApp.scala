@@ -25,6 +25,7 @@ import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
 import org.encryfoundation.common.Algos
+
 import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
 import scala.io.Source
@@ -36,7 +37,7 @@ object EncryApp extends App with Logging {
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
 
-  lazy val settings: EncryAppSettings = EncryAppSettings.read
+  lazy val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
   lazy val dbService: DBService = DBService()
 

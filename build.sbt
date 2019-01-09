@@ -1,7 +1,11 @@
-name := "EncryCore"
-version := "0.9.3"
-organization := "org.encryfoundation"
-scalaVersion := "2.12.6"
+import sbt._
+
+lazy val settings = Seq(
+  name := "EncryCore",
+  version := "0.9.3",
+  organization := "org.encryfoundation",
+  scalaVersion := "2.12.6"
+)
 
 val akkaVersion = "2.5.13"
 val akkaHttpVersion = "10.0.9"
@@ -33,7 +37,6 @@ val loggingDependencies = Seq(
 val testingDependencies = Seq(
   "com.typesafe.akka" %% "akka-testkit" % "2.4.+" % Test,
   "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % Test,
-  "org.scalatest" %% "scalatest" % "3.0.3" % Test,
   "org.scalacheck" %% "scalacheck" % "1.13.+" % Test,
   "org.mockito" % "mockito-core" % "2.19.1" % Test
 )
@@ -54,18 +57,33 @@ libraryDependencies ++= Seq(
   "javax.xml.bind" % "jaxb-api" % "2.3.0",
   "com.iheart" %% "ficus" % "1.4.2",
   "org.slf4j" % "slf4j-api" % "1.7.25",
+  "com.typesafe" % "config" % "1.3.3",
   "org.bouncycastle" % "bcprov-jdk15on" % "1.58",
   "org.whispersystems" % "curve25519-java" % "0.5.0",
   "org.rudogma" %% "supertagged" % "1.4",
   "org.scorexfoundation" %% "iodb" % "0.3.2",
   "io.spray" %% "spray-json" % "1.3.3",
   "org.encry" %% "encry-common" % "0.8.3",
+  "org.scalatest" %% "scalatest" % "3.0.5",
+  "org.scalactic" %% "scalactic" % "3.0.5",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
   "org.influxdb" % "influxdb-java" % "2.10",
   "org.apache.commons" % "commons-io" % "1.3.2",
   "org.apache.kafka" % "kafka-clients" % "2.0.0",
   "commons-net" % "commons-net" % "3.6",
-  "org.aspectj" % "aspectjweaver" % "1.9.2"
+  "com.spotify" % "docker-client" % "8.11.0" % "test" classifier "shaded",
+  "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.9.6",
+  "com.fasterxml.jackson.core"% "jackson-databind" % "2.9.6",
+  "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.6",
+  "org.asynchttpclient" % "async-http-client" % "2.4.7",
+  "com.spotify" % "docker-client" % "8.11.3",
+  "io.monix" %% "monix" % "3.0.0-RC1",
+  "com.sun.jersey" % "jersey-client" % "1.19",
+  "commons-net" % "commons-net" % "3.6",
+  "org.aspectj" % "aspectjweaver" % "1.9.2",
+  "org.typelevel" % "cats-core_2.12" % "1.0.1",
+  "org.typelevel" % "cats-kernel_2.12" % "1.0.1",
+  "org.typelevel" % "cats-macros_2.12" % "1.0.1"
 ) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
@@ -134,3 +152,6 @@ sourceGenerators in Compile += Def.task {
        |""".stripMargin)
   Seq(versionFile)
 }
+
+val encry = (project in file(".")).settings(settings: _*)
+lazy val it = project.dependsOn(encry)
