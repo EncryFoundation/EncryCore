@@ -4,7 +4,8 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.mempool.directive._
-import encry.modifiers.state.box.{AssetBox, MonetaryBox}
+import encry.modifiers.state.box.TokenIssuingBox.TokenId
+import encry.modifiers.state.box.{AssetBox, MonetaryBox, TokenIssuingBox}
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import org.encryfoundation.common.transaction.{Input, Proof, PubKeyLockedContract}
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
@@ -99,36 +100,29 @@ object CreateTransaction extends StrictLogging {
       )
     }
 
-    val change = useOutputs.map(_._1).collect {
-      case ab: AssetBox => ab
+    val tb: Map[TokenId, Seq[TokenIssuingBox]] =
+      useOutputs.map(_._1).collect { case tb: TokenIssuingBox => tb }.groupBy(_.tokenId)
+    val ab: Seq[AssetBox] = useOutputs.map(_._1).collect { case ab: AssetBox => ab }
+
+    val change: Seq[Long] = {
+      val tokensChange: Seq[Long] = tb.foldLeft(Seq[Long]()) { case (seq, tokens) =>
+        seq :+ (tokens._2.map(_.amount).sum - tokenAmount)
+      }
+      val feeChange: Long = ab.map(_.amount).sum - (amount + fee)
+      feeChange +: tokensChange
     }
 
-    val change = if (sendAssetTokens) {
-      val changeFee: Long    = useOutputs.head._1.amount - (amount + fee)
-      val changeAmount: Long = useOutputs.tail.map(_._1.amount).sum - tokenAmount
-      (changeFee, changeAmount)
-    } else (0, useOutputs.map(_._1.amount).sum - (amount + fee))
-
-    if (change._1 < 0 || change._2 < 0) {
+    change.foreach(x => if (x < 0) {
       logger.warn(s"Transaction impossible: required amount is bigger than available. Change is: $change.")
       throw new RuntimeException("Transaction impossible: required amount is bigger than available")
-    }
+    })
 
-    val directives: IndexedSeq[Directive] = if (sendAssetTokens) {
-      val feeDirective: IndexedSeq[Directive] =
-        if (change._1 > 0) directivesSeq :+ TransferDirective(pubKey.address.address, change._1, None)
-        else directivesSeq
-      val amountDirective: IndexedSeq[Directive] =
-        if (change._2 > 0) feeDirective :+ TransferDirective(pubKey.address.address, change._2, tokenIdOpt)
-        else feeDirective
-      amountDirective
+    val directivesFee: IndexedSeq[Directive] =
+      directivesSeq :+ TransferDirective(pubKey.address.address, change.head, None)
+    val directivesAmount: IndexedSeq[Directive] = change.foldLeft(directivesFee) { case (seq, changeL) =>
+      seq :+ TransferDirective(pubKey.address.address, changeL, tokenIdOpt)
     }
-    else {
-      if (change._2 > 0) directivesSeq :+ TransferDirective(pubKey.address.address, change._2, tokenIdOpt)
-      else directivesSeq
-    }
-
-    val uTransaction: UnsignedEncryTransaction = UnsignedEncryTransaction(fee, timestamp, uInputs, directives)
+    val uTransaction: UnsignedEncryTransaction = UnsignedEncryTransaction(fee, timestamp, uInputs, directivesAmount)
     val signature: Signature25519              = privKey.sign(uTransaction.messageToSign)
     val proofs: IndexedSeq[Seq[Proof]]         = useOutputs.flatMap(_._2.map(_._2)).toIndexedSeq
 
