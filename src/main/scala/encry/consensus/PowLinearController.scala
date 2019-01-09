@@ -13,7 +13,7 @@ object PowLinearController {
   val PrecisionConstant: Int = 1000000000
 
   def getDifficulty(previousHeaders: Seq[(Int, Header)]): Difficulty =
-    if (previousHeaders.lengthCompare(1) == 0 || previousHeaders.head._2.timestamp >= previousHeaders.last._2.timestamp)
+    if (previousHeaders.length == 1 || previousHeaders.head._2.timestamp >= previousHeaders.last._2.timestamp)
       previousHeaders.head._2.difficulty
     else {
       val data: Seq[(Int, Difficulty)] = previousHeaders.sliding(2).toList.map { d =>
