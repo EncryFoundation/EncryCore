@@ -282,8 +282,6 @@ case class Docker(suiteConfig: Config = empty,
       saveNodeLogs()
       nodes.asScala.foreach(_.client.close())
 
-      //saveNodeLogs()
-
       nodes.asScala foreach { node =>
         client.removeContainer(node.containerId, RemoveContainerParam.forceKill())
       }
