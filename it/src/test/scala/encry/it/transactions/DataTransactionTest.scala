@@ -19,8 +19,7 @@ import scala.concurrent.duration._
 
 class DataTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures with StrictLogging {
 
-  test("Get box, form and send data transaction. Check block for availability of this transaction. " +
-    "Check balance after sending transaction.") {
+  test("Create and send data transaction. Check chain for it.") {
 
     val amount: Int               = 1001
     val heightToCheckFirst: Int   = 5

@@ -21,7 +21,7 @@ case class TokenIssuingBox(override val proposition: EncryProposition,
 
   override type M = TokenIssuingBox
 
-  override val typeId: BxTypeId = AssetBox.TypeId
+  override val typeId: BxTypeId = TokenIssuingBox.TypeId
 
   override def serializer: Serializer[M] = AssetIssuingBoxSerializer
 
@@ -55,12 +55,12 @@ object TokenIssuingBox {
       proposition <- c.downField("proposition").as[EncryProposition]
       nonce       <- c.downField("nonce").as[Long]
       amount      <- c.downField("amount").as[Long]
-      tokenId     <- c.downField("tokenId").as[TokenId]
+      tokenId     <- c.downField("tokenId").as[String]
     } yield TokenIssuingBox(
       proposition,
       nonce,
       amount,
-      tokenId
+      Algos.decode(tokenId).getOrElse(Array.emptyByteArray)
     )
   }
 }

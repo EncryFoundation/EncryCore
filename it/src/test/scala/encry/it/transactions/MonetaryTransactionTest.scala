@@ -24,8 +24,7 @@ import scala.concurrent.duration._
 
 class MonetaryTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures with StrictLogging {
 
-  test("Get box, form and send monetary transaction. Check block for availability of this transaction. " +
-    "Check balance after sending transaction") {
+  test("Create and send monetary transaction. Check balance.") {
 
     val amount: Int               = 1001
     val heightToCheckFirst: Int   = 5
@@ -60,7 +59,7 @@ class MonetaryTransactionTest extends AsyncFunSuite with Matchers with ScalaFutu
 
     Await.result(nodes.head.sendTransaction(transaction), waitTime)
 
-    Await.result( nodes.head.waitForHeadersHeight(heightToCheckSecond), waitTime)
+    Await.result(nodes.head.waitForHeadersHeight(heightToCheckSecond), waitTime)
 
     val checkBalance: Boolean = Await.result(nodes.head.balances, waitTime)
       .find(_._1 == Algos.encode(IntrinsicTokenId))

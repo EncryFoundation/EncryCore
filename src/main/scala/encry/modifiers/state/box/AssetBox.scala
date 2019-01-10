@@ -56,12 +56,12 @@ object AssetBox {
       proposition <- c.downField("proposition").as[EncryProposition]
       nonce       <- c.downField("nonce").as[Long]
       amount      <- c.downField("value").as[Long]
-      tokenIdOpt  <- c.downField("tokenId").as[Option[TokenId]]
+      tokenIdOpt  <- c.downField("tokenId").as[Option[String]]
     } yield AssetBox(
       proposition,
       nonce,
       amount,
-      tokenIdOpt
+      tokenIdOpt.map(str => Algos.decode(str).getOrElse(Array.emptyByteArray))
     )
   }
 }
