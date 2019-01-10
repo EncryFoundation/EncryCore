@@ -32,8 +32,8 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
     getWallet
       .map { w =>
         Map(
-          "balances" -> w.getBalances.map(i => Algos.encode(i._1) -> i._2.toString).toMap.asJson,
-          "utxosQty" -> w.walletStorage.allBoxes.length.asJson
+          "balances" -> w.getBalances.map(i => i._1 -> i._2.toString).toMap.asJson,
+          "utxosQty" -> w.walletStorage.getAllBoxes.length.asJson
         ).asJson
       }
       .okJson()
@@ -41,7 +41,7 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
 
   def getUtxosR: Route = (path("utxos") & get) {
     getWallet
-      .map { _.walletStorage.allBoxes.asJson }
+      .map { _.walletStorage.getAllBoxes.asJson }
       .okJson()
   }
 }

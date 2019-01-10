@@ -9,7 +9,7 @@ import encry.consensus.EncrySupplyController
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{ADProofs, Block, Header}
 import encry.modifiers.mempool.Transaction
-import encry.modifiers.state.StateModifierDeserializer
+import encry.modifiers.state.StateModifierSerializer
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box._
@@ -184,7 +184,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     if (tx.semanticValidity.isSuccess) {
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, rootHash)
       val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => persistentProver.unauthenticatedLookup(input.boxId)
-        .map(bytes => StateModifierDeserializer.parseBytes(bytes, input.boxId.head))
+        .map(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head))
         .map(_.toOption -> input))
         .foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
           (bxOpt, tx.defaultProofOpt) match {
