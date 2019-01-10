@@ -171,14 +171,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
     )
   )
   def getFullBlockByHeaderIdR: Route = (modifierId & get) { id =>
-    getFullBlockByHeaderId(id)
-      .map(_.map { b =>
-        BlockResponse(
-          HeaderResponse(b.header),
-          PayloadResponse(Algos.encode(b.header.id), b.payload.transactions.map(TransactionResponse(_))),
-          b.adProofsOpt.map(proofs => ADProofsResponse(Algos.encode(b.header.id), Algos.encode(proofs.proofBytes), Algos.encode(proofs.digest)))
-        ).asJson
-      }).okJson()
+    getFullBlockByHeaderId(id).map(_.map(_.asJson)).okJson()
   }
 }
 
@@ -256,6 +249,4 @@ object HistoryApiRoute {
       cb.difficulty
     )
   }
-
-
 }

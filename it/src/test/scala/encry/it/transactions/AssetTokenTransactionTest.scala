@@ -99,7 +99,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
         IndexedSeq(assetBoxForFee, tokenIssuingBox).map(_ -> None),
         recipientAddress,
         amount,
-        tokenAmount
+        Map(tokenId -> tokenAmount)
       )
 
       Await.result(nodes.head.sendTransaction(transactionWithAssetToken), waitTime)

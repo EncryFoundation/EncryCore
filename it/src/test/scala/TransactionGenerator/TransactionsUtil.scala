@@ -20,17 +20,18 @@ object CreateTransaction extends StrictLogging {
                                 timestamp: Long,
                                 useOutputs: Seq[(MonetaryBox, Option[(CompiledContract, Seq[Proof])])],
                                 recipient: String,
-                                amount: Long,
-                                tokenAmount: Long = 0): Transaction = {
-    val tb: Map[TokenId, TokenIssuingBox] = useOutputs.map(_._1).collect {
-      case tb: TokenIssuingBox => tb
-    }.map(box => box.tokenId -> box).toMap
+                                encryCoinAmount: Long,
+                                tokensAmount: Map[TokenId, Long] = Map()): Transaction = {
+    val tb: Map[TokenId, (TokenIssuingBox, Long)] = useOutputs.map(_._1).collect {
+      case tb: TokenIssuingBox =>
+        tb.tokenId -> (tb, tokensAmount.filter(elem => tb.tokenId.sameElements(elem._1)).head._2)
+    }.toMap
     val tokensDirectives: IndexedSeq[TransferDirective] =
-      tb.foldLeft(IndexedSeq[TransferDirective]()) { case (directivesAll, tokenBox) =>
-        directivesAll :+ TransferDirective(recipient, tokenAmount, Some(ADKey @@ tokenBox._1))
+      tb.foldLeft(IndexedSeq[TransferDirective]()) { case (directivesAll, tbCollection) =>
+        directivesAll :+ TransferDirective(recipient, tbCollection._2._2, Some(ADKey @@ tbCollection._1))
       }
-    val allDirectives: IndexedSeq[TransferDirective] = tokensDirectives :+ TransferDirective(recipient, amount, None)
-    prepareTransaction(privKey, fee, timestamp, useOutputs, allDirectives, amount, tokenAmount)
+    val allDirectives: IndexedSeq[TransferDirective] = tokensDirectives :+ TransferDirective(recipient, encryCoinAmount, None)
+    prepareTransaction(privKey, fee, timestamp, useOutputs, allDirectives, encryCoinAmount, tokensAmount, tb)
   }
 
   def scriptedAssetTransactionScratch(privKey: PrivateKey25519,
@@ -82,8 +83,9 @@ object CreateTransaction extends StrictLogging {
                                  timestamp: Long,
                                  useOutputs: Seq[(MonetaryBox, Option[(CompiledContract, Seq[Proof])])],
                                  directivesSeq: IndexedSeq[Directive],
-                                 amount: Long,
-                                 tokenAmount: Long = 0): Transaction = {
+                                 encryCoinAmount: Long,
+                                 tokensAmount: Map[TokenId, Long] = Map(),
+                                 tokenBoxes: Map[TokenId, (TokenIssuingBox, Long)] = Map()): Transaction = {
 
     val pubKey: PublicKey25519     = privKey.publicImage
     val uInputs: IndexedSeq[Input] = useOutputs.toIndexedSeq.map { case (box, contractOpt) =>
@@ -95,16 +97,13 @@ object CreateTransaction extends StrictLogging {
         }
       )}
 
-    val tb: Map[TokenId, TokenIssuingBox] = useOutputs.map(_._1).collect {
-      case tb: TokenIssuingBox => tb
-    }.map(box => box.tokenId -> box).toMap
     val ab: Seq[AssetBox] = useOutputs.map(_._1).collect { case ab: AssetBox => ab }
 
-    val tokensChange = tb.foldLeft(Seq[(TokenId, Long)]()) { case (seq, tokens) =>
-      (tokens._1 -> (tokens._2.amount - tokenAmount)) +: seq
+    val tokensChange: Seq[(TokenId, Long)] = tokenBoxes.foldLeft(Seq[(TokenId, Long)]()) { case (seq, tokens) =>
+      (tokens._1 -> (tokens._2._1.amount - tokens._2._2)) +: seq
     }
 
-    val coinChange = ab.map(_.amount).sum - (amount + fee)
+    val coinChange: Long = ab.map(_.amount).sum - (encryCoinAmount + fee)
 
     tokensChange.foreach(x => if (x._2 < 0) {
       logger.warn(s"Transaction impossible: required amount is bigger than available. Change is: ${x._2}.")
