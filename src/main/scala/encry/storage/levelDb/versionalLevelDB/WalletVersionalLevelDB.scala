@@ -21,7 +21,7 @@ case class WalletVersionalLevelDB(override val db: DB) extends VersionalLevelDB[
 
   import WalletVersionalLevelDB._
 
-  def id: ModifierId = versionsList.last.modifierId
+  def id: ModifierId = versionsList.lastOption.map(_.modifierId).getOrElse(ModifierId @@ Array.fill(32)(0: Byte))
 
   override def add(modifier: NodeViewModifier): Unit = {
     val diffs = WalletVersionalLevelDB.getDiffs(modifier)
@@ -38,16 +38,16 @@ case class WalletVersionalLevelDB(override val db: DB) extends VersionalLevelDB[
       }
 
   override def getAll: Seq[(Array[Byte], Array[Byte])] = {
-    var ellementsBuffer: Seq[(Array[Byte], Array[Byte])] = Seq.empty
+    var elementsBuffer: Seq[(Array[Byte], Array[Byte])] = Seq.empty
     val iterator = db.iterator()
     iterator.seekToFirst()
     while (iterator.hasNext) {
       val nextElem = iterator.next()
-      if (nextElem.getKey sameElements WalletVersionalLevelDB.BalancesKey) ellementsBuffer
-      else ellementsBuffer = ellementsBuffer :+ (nextElem.getKey -> nextElem.getValue)
+      if (nextElem.getKey sameElements WalletVersionalLevelDB.BalancesKey) elementsBuffer
+      else elementsBuffer = elementsBuffer :+ (nextElem.getKey -> nextElem.getValue)
     }
     iterator.seekToLast()
-    ellementsBuffer
+    elementsBuffer
   }
 
   def getBoxById(id: ADKey): Option[EncryBaseBox] = StateModifierSerializer.parseBytes(db.get(id), id.head).toOption
