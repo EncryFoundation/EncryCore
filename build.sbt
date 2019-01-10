@@ -21,8 +21,9 @@ val databaseDependencies = Seq(
 )
 
 val apiDependencies = Seq(
-  "io.swagger" %% "swagger-scala-module" % "1.0.3",
-  "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.10.0",
+  "javax.ws.rs" % "javax.ws.rs-api" % "2.0.1",
+  "com.github.swagger-akka-http" %% "swagger-akka-http" % "2.0.0",
+  "io.swagger" %% "swagger-scala-module" % "1.0.4",
   "com.typesafe.akka" %% "akka-http" % akkaHttpVersion
 )
 
@@ -31,7 +32,7 @@ val loggingDependencies = Seq(
   "ch.qos.logback" % "logback-classic" % logbackVersion,
   "ch.qos.logback" % "logback-core" % logbackVersion,
   "net.logstash.logback" % "logstash-logback-encoder" % "1.0",
-  "com.typesafe.akka" %% "akka-slf4j" % "2.5.18"
+  "com.typesafe.akka" %% "akka-slf4j" % akkaVersion
 )
 
 val testingDependencies = Seq(
@@ -43,7 +44,7 @@ val testingDependencies = Seq(
 
 lazy val monitoringDependencies = Seq(
   "io.kamon" %% "kamon-core" % kamonVersion,
-  "io.kamon" %% "kamon-akka-2.5" % "1.1.0",
+  "io.kamon" %% "kamon-akka-2.5" % kamonVersion,
   "io.kamon" %% "kamon-system-metrics" % "1.0.0",
   "io.kamon" %% "kamon-influxdb" % "1.0.1"
 )
