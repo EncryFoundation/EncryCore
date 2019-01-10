@@ -22,15 +22,15 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
   def applyDiff(diff: D): Unit
 
   def getAll: Seq[(Array[Byte], Array[Byte])] = {
-    var ellementsBuffer: Seq[(Array[Byte], Array[Byte])] = Seq.empty
+    var elementsBuffer: Seq[(Array[Byte], Array[Byte])] = Seq.empty
     val iterator = db.iterator()
     iterator.seekToFirst()
     while (iterator.hasNext) {
       val nextElem = iterator.next()
-      ellementsBuffer = ellementsBuffer :+ (nextElem.getKey -> nextElem.getValue)
+      elementsBuffer = elementsBuffer :+ (nextElem.getKey -> nextElem.getValue)
     }
     iterator.seekToLast()
-    ellementsBuffer
+    elementsBuffer
   }
 
   def getDiffsPath(targetNodeId: ModifierId,
