@@ -141,7 +141,6 @@ case class UnsignedEncryTransaction(fee: Long,
                                     directives: IndexedSeq[Directive]) {
 
   val messageToSign: Array[Byte] = UnsignedEncryTransaction.bytesToSign(fee, timestamp, inputs, directives)
-
   def toSigned(proofs: IndexedSeq[Seq[Proof]], defaultProofOpt: Option[Proof]): Transaction = {
     val signedInputs: IndexedSeq[Input] = inputs.zipWithIndex.map { case (input, idx) =>
       if (proofs.nonEmpty && proofs.lengthCompare(idx + 1) <= 0) input.copy(proofs = proofs(idx).toList) else input
