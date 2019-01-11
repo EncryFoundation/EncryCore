@@ -24,7 +24,7 @@ class ConsoleListener extends Actor {
                   }
               case None => println("Unknown command. Type 'app help' to see command list.")
             }
-          case Failure(_) =>
+          case Failure(ex) => println(s"ex: ${ex.getMessage}")
         }
       }
   }
