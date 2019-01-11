@@ -137,7 +137,6 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
         val txsNumNew: Int = blockByHeadersNew.map(_.payload.transactions.size).sum
 
         docker.close()
-
         val transactionFromChainNew: Transaction = blockByHeadersNew.flatMap(_.payload.transactions.init).head
 
         transactionFromChainNew.id shouldEqual transactionWithAssetToken.id
