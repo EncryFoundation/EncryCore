@@ -3,6 +3,7 @@ package encry.it.transactions
 import TransactionGenerator.CreateTransaction
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
+import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.{Docker, Node}
 import encry.it.util.KeyHelper._
@@ -10,6 +11,8 @@ import encry.modifiers.history.Block
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box._
+import encry.settings.Constants.IntrinsicTokenId
+import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.transaction.EncryAddress.Address
@@ -26,24 +29,25 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
   test("Create and send asset token transaction. Check new token's balance." +
     " Send tokens. Check new balance.") {
 
-    val heightToCheckFirst: Int   = 5
-    val heightToCheckSecond: Int  = 8
-    val heightToCheckThird: Int   = 11
+    val firstHeightToWait: Int    = 5
+    val secondHeightToWait: Int   = 8
+    val thirdHeightToWait: Int    = 11
     val mnemonicKey: String       = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
     val privKey: PrivateKey25519  = createPrivKey(Some(mnemonicKey))
     val waitTime: FiniteDuration  = 1.minutes
-    val amount: Int               = 1001
-    val fee: Int                  = 101
-    val tokenAmount: Int          = 101
+    val amount: Int               = scala.util.Random.nextInt(2000)
+    val fee: Int                  = scala.util.Random.nextInt(500)
+    val createdTokensAmount: Int  = scala.util.Random.nextInt(2000)
+    val tokenAmount: Int          = scala.util.Random.nextInt(500)
     val recipientAddress: Address = PublicKey25519(Curve25519.createKeyPair(Random.randomBytes())._2).address.address
 
     val docker: Docker = Docker()
     val config: Config = Configs.mining(true)
       .withFallback(Configs.offlineGeneration(true))
-      .withFallback(Configs.nodeName("node2"))
+      .withFallback(Configs.nodeName("node1"))
     val nodes: List[Node] = docker.startNodes(Seq(config))
 
-    Await.result(nodes.head.waitForHeadersHeight(heightToCheckFirst), waitTime)
+    Await.result(nodes.head.waitForHeadersHeight(firstHeightToWait), waitTime)
 
     val getBoxes: Seq[EncryBaseBox] = Await.result(nodes.head.outputs, waitTime)
     val oneBox: AssetBox            = getBoxes.collect { case ab: AssetBox => ab }.head
@@ -53,13 +57,13 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
       timestamp = System.currentTimeMillis(),
       useOutputs = IndexedSeq(oneBox).map(_ -> None),
       contract = PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract,
-      amount
+      createdTokensAmount
     )
 
     Await.result(nodes.head.sendTransaction(transaction), waitTime)
-    Await.result(nodes.head.waitForHeadersHeight(heightToCheckSecond), waitTime)
+    Await.result(nodes.head.waitForHeadersHeight(secondHeightToWait), waitTime)
 
-    val headersAtHeight: List[String] = (heightToCheckFirst + 1 to heightToCheckSecond).foldLeft(List[String]()) {
+    val headersAtHeight: List[String] = (firstHeightToWait + 1 to secondHeightToWait).foldLeft(List[String]()) {
       case (list, blockHeight) =>
         val headers: Future[List[String]] = nodes.head.getHeadersIdAtHeight(blockHeight)
         val result: List[String]          = Await.result(headers, waitTime)
@@ -76,20 +80,22 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
           }.flatten
       }.flatten.head
 
-      val balance: Boolean = Await.result(nodes.head.balances, waitTime)
+      val checkBalance: Boolean = Await.result(nodes.head.balances, waitTime)
         .find(_._1 == Algos.encode(tokenId))
-        .map(_._2 == amount)
+        .map(_._2 == createdTokensAmount)
         .get
 
       val txsNum: Int = blockByHeaders.map(_.payload.transactions.size).sum
+      val transactionFromChain: Transaction = blockByHeaders.flatMap(_.payload.transactions.init).head
 
-      balance shouldEqual true
-      true shouldEqual (txsNum > heightToCheckSecond - heightToCheckFirst)
-      txsNum shouldEqual (heightToCheckSecond - heightToCheckFirst + 1)
+      transactionFromChain.id shouldEqual transaction.id
+      checkBalance shouldEqual true
+      true shouldEqual (txsNum > secondHeightToWait - firstHeightToWait)
+      txsNum shouldEqual (secondHeightToWait - firstHeightToWait + 1)
 
       val getBoxesAgain: Seq[EncryBaseBox] = Await.result(nodes.head.outputs, waitTime)
 
-      val assetBoxForFee: AssetBox         = getBoxesAgain.collect { case ab: AssetBox if ab.amount > amount => ab }.head
+      val assetBoxForFee: AssetBox         = getBoxesAgain.collect { case ab: AssetBox if ab.amount > amount + fee => ab }.head
       val tokenIssuingBox: TokenIssuingBox = getBoxesAgain.collect { case tb: TokenIssuingBox if tb.amount > fee => tb }.head
 
       val transactionWithAssetToken: Transaction = CreateTransaction.defaultPaymentTransaction(
@@ -103,9 +109,9 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
       )
 
       Await.result(nodes.head.sendTransaction(transactionWithAssetToken), waitTime)
-      Await.result(nodes.head.waitForHeadersHeight(heightToCheckThird), waitTime)
+      Await.result(nodes.head.waitForHeadersHeight(thirdHeightToWait), waitTime)
 
-      val headersAtHeightNew: List[String] = (heightToCheckSecond + 1 to heightToCheckThird)
+      val headersAtHeightNew: List[String] = (secondHeightToWait + 1 to thirdHeightToWait)
         .foldLeft(List[String]()) { case (list, blockHeight) =>
           val headers: Future[List[String]] = nodes.head.getHeadersIdAtHeight(blockHeight)
           val result: List[String] = Await.result(headers, waitTime)
@@ -114,18 +120,31 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
 
       Future.sequence(headersAtHeightNew.map { h => nodes.head.getBlock(h) }).map { blockByHeadersNew =>
 
-        val balanceNew: Boolean = Await.result(nodes.head.balances, waitTime)
+        val checkTokenBalance: Boolean = Await.result(nodes.head.balances, waitTime)
           .find(_._1 == Algos.encode(tokenId))
-          .map(_._2 == amount - tokenAmount)
+          .map(_._2 == createdTokensAmount - tokenAmount)
+          .get
+
+        val supplyAtHeight: Long = (0 to thirdHeightToWait).foldLeft(0: Long) {
+          case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i)
+        }
+
+        val ckeckEncryBalanceNew: Boolean = Await.result(nodes.head.balances, waitTime)
+          .find(_._1 == Algos.encode(IntrinsicTokenId))
+          .map(_._2 == supplyAtHeight - amount)
           .get
 
         val txsNumNew: Int = blockByHeadersNew.map(_.payload.transactions.size).sum
 
         docker.close()
 
-        balanceNew shouldEqual true
-        true shouldEqual (txsNumNew > heightToCheckThird - heightToCheckSecond)
-        txsNumNew shouldEqual (heightToCheckThird - heightToCheckSecond + 1)
+        val transactionFromChainNew: Transaction = blockByHeadersNew.flatMap(_.payload.transactions.init).head
+
+        transactionFromChainNew.id shouldEqual transactionWithAssetToken.id
+        ckeckEncryBalanceNew shouldEqual true
+        checkTokenBalance shouldEqual true
+        true shouldEqual (txsNumNew > thirdHeightToWait - secondHeightToWait)
+        txsNumNew shouldEqual (thirdHeightToWait - secondHeightToWait + 1)
       }
     }
   }
