@@ -64,7 +64,7 @@ class Miner extends Actor with Logging {
       self ! StartMining
     case StartMining =>
       for (i <- 0 until numberOfWorkers) yield context.actorOf(
-        Props(classOf[Worker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
+        Props(classOf[Worker], i, numberOfWorkers))
       candidateOpt match {
         case Some(candidateBlock) =>
           logInfo(s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
