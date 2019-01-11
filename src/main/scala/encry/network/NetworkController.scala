@@ -23,7 +23,7 @@ import scala.util.{Failure, Success, Try}
 class NetworkController extends Actor {
 
   val networkSettings: NetworkSettings = settings.network
-  context.actorOf(Props[PeerSynchronizer].withDispatcher("network-dispatcher"), "peerSynchronizer")
+  context.actorOf(Props[PeerSynchronizer], "peerSynchronizer")
   val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
   var messageHandlers: Map[Seq[MessageCode], ActorRef] = Map.empty
   var outgoing: Set[InetSocketAddress] = Set.empty
@@ -89,8 +89,7 @@ class NetworkController extends Actor {
         case Outgoing => s"New outgoing connection to $remote established (bound to local $local)"
       }
       logInfo(logMsg)
-      context.actorOf(PeerConnectionHandler.props(messagesHandler, sender(), direction, externalSocketAddress, remote)
-        .withDispatcher("network-dispatcher"))
+      context.actorOf(PeerConnectionHandler.props(messagesHandler, sender(), direction, externalSocketAddress, remote))
       outgoing -= remote
     case CommandFailed(c: Connect) =>
       outgoing -= c.remoteAddress
