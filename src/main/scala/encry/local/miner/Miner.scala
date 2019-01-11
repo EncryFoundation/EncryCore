@@ -70,7 +70,7 @@ class Miner extends Actor with Logging {
           logInfo(s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
           context.children.foreach(_ ! NextChallenge(candidateBlock))
         case None =>
-          logInfo("Candidate is empty! Producing new candidate!")
+          logInfo("Candidate is empty! Producing new candidate !")
           produceCandidate()
       }
     case DisableMining if context.children.nonEmpty =>
