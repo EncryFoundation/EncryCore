@@ -53,7 +53,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
       timestamp = System.currentTimeMillis(),
       useOutputs = IndexedSeq(oneBox).map(_ -> None),
       contract = PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract,
-      amount,
+      amount
     )
 
     Await.result(nodes.head.sendTransaction(transaction), waitTime)
