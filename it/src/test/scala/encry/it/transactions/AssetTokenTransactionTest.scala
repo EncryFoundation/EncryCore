@@ -90,13 +90,16 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
 
       transactionFromChain.id shouldEqual transaction.id
       checkBalance shouldEqual true
-      true shouldEqual (txsNum > secondHeightToWait - firstHeightToWait)
       txsNum shouldEqual (secondHeightToWait - firstHeightToWait + 1)
 
       val getBoxesAgain: Seq[EncryBaseBox] = Await.result(nodes.head.outputs, waitTime)
 
-      val assetBoxForFee: AssetBox         = getBoxesAgain.collect { case ab: AssetBox if ab.amount > amount + fee => ab }.head
-      val tokenIssuingBox: TokenIssuingBox = getBoxesAgain.collect { case tb: TokenIssuingBox if tb.amount > fee => tb }.head
+      val assetBoxForFee: AssetBox = getBoxesAgain.collect {
+        case ab: AssetBox if ab.amount >= amount + fee => ab
+      }.head
+      val tokenIssuingBox: TokenIssuingBox = getBoxesAgain.collect {
+        case tb: TokenIssuingBox if tb.amount >= tokenAmount => tb
+      }.head
 
       val transactionWithAssetToken: Transaction = CreateTransaction.defaultPaymentTransaction(
         privKey,
@@ -142,7 +145,6 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
         transactionFromChainNew.id shouldEqual transactionWithAssetToken.id
         ckeckEncryBalanceNew shouldEqual true
         checkTokenBalance shouldEqual true
-        true shouldEqual (txsNumNew > thirdHeightToWait - secondHeightToWait)
         txsNumNew shouldEqual (thirdHeightToWait - secondHeightToWait + 1)
       }
     }
