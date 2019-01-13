@@ -48,21 +48,18 @@ object CreateTransaction extends StrictLogging {
 
     val directivesForTransferAndChangeForAllCoins: IndexedSeq[TransferDirective] =
       filteredBoxes.foldLeft(IndexedSeq[TransferDirective]()) {
-        case (collectionForTransfer, element) =>
-          element._1 match {
-            case Some(tokenId) =>
-              val directiveForChange: TransferDirective =
-                createDirectiveForChange(privKey, 0, element._2._2, element._2._1.map(_.amount).sum, Some(tokenId))
-              val collectionWithTransferD =
-                collectionForTransfer :+ TransferDirective(recipient, element._2._2, Option(ADKey @@ tokenId))
-              collectionWithTransferD :+ directiveForChange
-            case None =>
-              val directiveForChange: TransferDirective =
-                createDirectiveForChange(privKey, fee, element._2._2, element._2._1.map(_.amount).sum, None)
-              val collectionWithTransferD =
-                collectionForTransfer :+ TransferDirective(recipient, element._2._2, None)
-              collectionWithTransferD :+ directiveForChange
-          }
+        case (collectionForTransfer, (tId, element)) =>
+          val directiveForChange: IndexedSeq[TransferDirective] =
+            createDirectiveForChange(
+              privKey,
+              tId.map(_ => 0L).getOrElse(fee),
+              element._2,
+              element._1.map(_.amount).sum,
+              tId
+            )
+          val collectionWithDirectiveForTransfer: IndexedSeq[TransferDirective] =
+            collectionForTransfer :+ TransferDirective(recipient, element._2, tId.map(id => ADKey @@ id))
+          collectionWithDirectiveForTransfer ++ directiveForChange
       }
 
     prepareTransaction(
@@ -81,10 +78,10 @@ object CreateTransaction extends StrictLogging {
                                       contract: CompiledContract,
                                       numberOfTokensForIssue: Long,
                                       tokenIdOpt: Option[ADKey] = None): Transaction = {
-    val directiveForChange: TransferDirective =
+    val directiveForChange: IndexedSeq[TransferDirective] =
       createDirectiveForChange(privKey, fee, amount = 0, useOutputs.map(_._1.amount).sum)
     val directiveForScriptedAssetIssue: IndexedSeq[Directive] =
-      IndexedSeq(ScriptedAssetDirective(contract.hash, numberOfTokensForIssue, tokenIdOpt)) :+ directiveForChange
+      directiveForChange :+ ScriptedAssetDirective(contract.hash, numberOfTokensForIssue, tokenIdOpt)
     prepareTransaction(privKey, fee, timestamp, useOutputs, directiveForScriptedAssetIssue)
   }
 
@@ -94,10 +91,10 @@ object CreateTransaction extends StrictLogging {
                                      useOutputs: Seq[(MonetaryBox, Option[(CompiledContract, Seq[Proof])])],
                                      contract: CompiledContract,
                                      numberOfTokensForIssue: Long): Transaction = {
-    val directiveForChange: TransferDirective =
+    val directiveForChange: IndexedSeq[TransferDirective] =
       createDirectiveForChange(privKey, fee, amount = 0, useOutputs.map(_._1.amount).sum)
     val directiveForTokenIssue: IndexedSeq[Directive] =
-      IndexedSeq(AssetIssuingDirective(contract.hash, numberOfTokensForIssue)) :+ directiveForChange
+      directiveForChange :+ AssetIssuingDirective(contract.hash, numberOfTokensForIssue)
     prepareTransaction(privKey, fee, timestamp, useOutputs, directiveForTokenIssue)
   }
 
@@ -107,10 +104,10 @@ object CreateTransaction extends StrictLogging {
                              useOutputs: Seq[(MonetaryBox, Option[(CompiledContract, Seq[Proof])])],
                              contract: CompiledContract,
                              data: Array[Byte]): Transaction = {
-    val directiveForChange: TransferDirective =
+    val directiveForChange: IndexedSeq[TransferDirective] =
       createDirectiveForChange(privKey, fee, amount = 0, useOutputs.map(_._1.amount).sum)
     val directiveForDataTransaction: IndexedSeq[Directive] =
-      IndexedSeq(DataDirective(contract.hash, data)) :+ directiveForChange
+      directiveForChange :+ DataDirective(contract.hash, data)
     prepareTransaction(privKey, fee, timestamp, useOutputs, directiveForDataTransaction)
   }
 
@@ -118,13 +115,15 @@ object CreateTransaction extends StrictLogging {
                                        fee: Long,
                                        amount: Long,
                                        totalAmount: Long,
-                                       tokenId: Option[TokenId] = None): TransferDirective = {
+                                       tokenId: Option[TokenId] = None): IndexedSeq[TransferDirective] = {
     val change: Long = totalAmount - (amount + fee)
     if (change < 0) {
       logger.warn(s"Transaction impossible: required amount is bigger than available. Change is: $change.")
       throw new RuntimeException(s"Transaction impossible: required amount is bigger than available $change")
     }
-    TransferDirective(privKey.publicImage.address.address, change, tokenId.map(element => ADKey @@ element))
+    if (change > 0)
+      IndexedSeq(TransferDirective(privKey.publicImage.address.address, change, tokenId.map(element => ADKey @@ element)))
+    else IndexedSeq()
   }
 
   private def prepareTransaction(privKey: PrivateKey25519,

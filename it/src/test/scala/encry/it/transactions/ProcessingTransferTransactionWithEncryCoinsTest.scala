@@ -22,7 +22,10 @@ import scorex.utils.Random
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
-class MonetaryTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures with StrictLogging {
+class ProcessingTransferTransactionWithEncryCoinsTest extends AsyncFunSuite
+  with Matchers
+  with ScalaFutures
+  with StrictLogging {
 
   test("Create and send monetary transaction. Check balance.") {
 
