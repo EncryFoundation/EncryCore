@@ -4,6 +4,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 
 import akka.actor.{Actor, Props}
+import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
 import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
@@ -31,10 +32,11 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 
+import scala.concurrent.duration._
 import scala.collection._
 import scala.util.{Failure, Success, Try}
 
-class Miner extends Actor with Logging {
+class Miner extends Actor with StrictLogging {
 
   import Miner._
 
@@ -45,9 +47,14 @@ class Miner extends Actor with Logging {
   var syncingDone: Boolean = false
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
+  var miningStartTime: Long = 0L
 
-  override def preStart(): Unit =
+  override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
+    context.system.scheduler.schedule(5.second, 5.second){
+      logger.info(s"Miner - Workers qty: ${context.children.size}, last mining start time: ${dateFormat.format(new Date(miningStartTime))}")
+    }
+  }
 
   override def postStop(): Unit = killAllWorkers()
 
@@ -67,21 +74,23 @@ class Miner extends Actor with Logging {
         Props(classOf[Worker], i, numberOfWorkers))
       candidateOpt match {
         case Some(candidateBlock) =>
-          logInfo(s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+          miningStartTime = System.currentTimeMillis()
+          logger.info(s"Starting mining at ${dateFormat.format(new Date(miningStartTime))}")
           context.children.foreach(_ ! NextChallenge(candidateBlock))
         case None =>
-          logInfo("Candidate is empty! Producing new candidate !")
+          logger.info("Candidate is empty! Producing new candidate !")
           produceCandidate()
       }
     case DisableMining if context.children.nonEmpty =>
-      logInfo("Received DisableMining msg")
+      logger.info("Received DisableMining msg")
       killAllWorkers()
       candidateOpt = None
       context.become(miningDisabled)
     case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
-      logInfo(s"Going to propagate new block $block from worker $workerIdx" +
+      logger.info(s"End mining in ${(System.currentTimeMillis() - miningStartTime)/1000} seconds")
+      logger.info(s"Going to propagate new block $block from worker $workerIdx" +
         s" with nonce: ${block.header.nonce}")
-      logInfo(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
+      logger.info(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
       killAllWorkers()
         nodeViewHolder ! LocallyGeneratedModifier(block.header)
         nodeViewHolder ! LocallyGeneratedModifier(block.payload)
@@ -117,7 +126,7 @@ class Miner extends Actor with Logging {
 
   def receiveSemanticallySuccessfulModifier: Receive = {
     case SemanticallySuccessfulModifier(mod: Block) if needNewCandidate(mod) =>
-      logInfo(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
+      logger.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
         s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       produceCandidate()
     case SemanticallySuccessfulModifier(_) =>
@@ -127,12 +136,12 @@ class Miner extends Actor with Logging {
     case c: CandidateBlock => procCandidateBlock(c)
     case cEnv: CandidateEnvelope if cEnv.c.nonEmpty => procCandidateBlock(cEnv.c.get)
     case _: CandidateEnvelope =>
-      logDebug( "Received empty CandidateEnvelope, going to suspend mining for a while")
+      logger.debug( "Received empty CandidateEnvelope, going to suspend mining for a while")
       self ! DisableMining
   }
 
   def unknownMessage: Receive = {
-    case m => logWarn(s"Unexpected message $m")
+    case m => logger.warn(s"Unexpected message $m")
   }
 
   def chainEvents: Receive = {
@@ -140,7 +149,7 @@ class Miner extends Actor with Logging {
   }
 
   def procCandidateBlock(c: CandidateBlock): Unit = {
-    logInfo(s"Got candidate block $c in ${dateFormat.format(new Date(System.currentTimeMillis()))}")
+    logger.info(s"Got candidate block $c in ${dateFormat.format(new Date(System.currentTimeMillis()))}")
     candidateOpt = Some(c)
     self ! StartMining
   }
@@ -183,7 +192,7 @@ class Miner extends Actor with Logging {
     val candidate: CandidateBlock =
       CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
 
-    logInfo( s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
+    logger.info( s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
       s"and 1 coinbase for height $height")
 
     candidate
@@ -196,17 +205,17 @@ class Miner extends Actor with Logging {
         startTime = producingStartTime
         val bestHeaderOpt: Option[Header] = nodeView.history.bestBlockOpt.map(_.header)
         bestHeaderOpt match {
-          case Some(h) => logInfo(s"Best header at height ${h.height}")
-          case None => logInfo(s"No best header opt")
+          case Some(h) => logger.info(s"Best header at height ${h.height}")
+          case None => logger.info(s"No best header opt")
         }
         val candidate: CandidateEnvelope =
           if ((bestHeaderOpt.isDefined &&
             (syncingDone || nodeView.history.isFullChainSynced)) || settings.node.offlineGeneration) {
-              logInfo(s"Starting candidate generation at " +
+              logger.info(s"Starting candidate generation at " +
                 s"${dateFormat.format(new Date(System.currentTimeMillis()))}")
               if (settings.influxDB.isDefined)
                 context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
-              logInfo("Going to calculate last block:")
+              logger.info("Going to calculate last block:")
               val envelope: CandidateEnvelope =
                 CandidateEnvelope
                   .fromCandidate(createCandidate(nodeView, bestHeaderOpt))
