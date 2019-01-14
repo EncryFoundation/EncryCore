@@ -48,7 +48,6 @@ class DataTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures 
     )
 
     Await.result(nodes.head.sendTransaction(transaction), waitTime)
-
     Await.result(nodes.head.waitForHeadersHeight(secondHeightToWait), waitTime)
 
     val headersAtHeight: List[String] = (firstHeightToWait + 1 to secondHeightToWait)
