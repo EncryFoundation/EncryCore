@@ -94,14 +94,6 @@ resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repos
 
 fork := true
 
-Test / fork := true
-
-Test / javaOptions ++= Seq(
-  "-XX:+IgnoreUnrecognizedVMOptions",
-  "--add-modules=java.xml.bind",
-  "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED"
-)
-
 fork in run := true
 
 outputStrategy := Some(StdoutOutput)
@@ -131,11 +123,6 @@ val opts = Seq(
   "-XX:MaxMetaspaceSize=512m")
 
 javaOptions in run ++= opts
-
-javaOptions in run ++= Seq(
-  "-XX:+IgnoreUnrecognizedVMOptions",
-  "--add-modules=java.xml.bind"
-)
 
 scalacOptions ++= Seq("-J-Xss8m")
 
