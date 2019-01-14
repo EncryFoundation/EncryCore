@@ -65,7 +65,6 @@ class PeerManager extends Actor with Logging {
         if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
         else None
       }
-
       if (connectedPeers.size + connectingPeers.size <= settings.network.maxConnections)
         randomPeer.filter(address => !connectedPeers.exists(_._1 == address) &&
           !connectingPeers.exists(_.getHostName == address.getHostName) &&
