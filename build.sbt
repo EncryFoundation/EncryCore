@@ -94,6 +94,14 @@ resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repos
 
 fork := true
 
+Test / fork := true
+
+Test / javaOptions ++= Seq(
+  "-XX:+IgnoreUnrecognizedVMOptions",
+  "--add-modules=java.xml.bind",
+  "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED"
+)
+
 fork in run := true
 
 outputStrategy := Some(StdoutOutput)
@@ -106,10 +114,11 @@ evictionWarningOptions in update := EvictionWarningOptions.default
   .withWarnScalaVersionEviction(false)
 
 logLevel := Level.Error
+
 val opts = Seq(
-  "-server",
-  "-Xms4G",
-  "-Xmx4G",
+  "-J-server",
+  "-J-Xms128M",
+  "-J-Xmx2G",
   "-XX:+ExitOnOutOfMemoryError",
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
@@ -118,10 +127,16 @@ val opts = Seq(
   "-XX:+AlwaysPreTouch",
   "-XX:+PerfDisableSharedMem",
   "-XX:+ParallelRefProcEnabled",
-  "-XX:+UseStringDeduplication",
-  "-XX:MaxMetaspaceSize=512m")
+  "-XX:+UseStringDeduplication")
 
 javaOptions in run ++= opts
+
+javaOptions in run ++= Seq(
+  "-XX:+IgnoreUnrecognizedVMOptions",
+  "--add-modules=java.xml.bind"
+)
+
+scalacOptions ++= Seq("-J-Xss8m")
 
 assemblyJarName in assembly := "EncryCore.jar"
 
