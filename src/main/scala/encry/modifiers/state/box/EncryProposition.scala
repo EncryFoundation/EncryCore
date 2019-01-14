@@ -22,7 +22,7 @@ case class EncryProposition(contractHash: ContractHash) extends Proposition {
 
   override def serializer: Serializer[EncryProposition] = EncryPropositionSerializer
 
-  def canUnlock(ctx: Context, contract: CompiledContract, proofs: Seq[Proof]): Boolean =
+  def canUnlock(ctx: ContextFix, contract: CompiledContract, proofs: Seq[Proof]): Boolean =
     if (sameHash(contractHash, contract.hash)) {
       val env: List[(Option[String], PValue)] =
         if (contract.args.isEmpty) List.empty

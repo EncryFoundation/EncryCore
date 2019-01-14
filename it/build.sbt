@@ -4,7 +4,7 @@ inTask(docker)(
   Seq(
     dockerfile := {
       val configTemplate = (Compile / resourceDirectory).value / "template.conf"
-      val startEncry     = sourceDirectory.value / "container" / "startNode.sh"
+      val startEncry = sourceDirectory.value / "container" / "startNode.sh"
 
       new Dockerfile {
         from("anapsix/alpine-java:8_server-jre")
@@ -20,31 +20,12 @@ inTask(docker)(
     buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
   )
 )
-inConfig(Test)(Seq(
-  parallelExecution := false,
-  test := (test dependsOn docker).value,
-))
-
-val opts = Seq(
-  "-J-server",
-  "-J-Xms128M",
-  "-J-Xmx4G",
-  "-XX:+ExitOnOutOfMemoryError",
-  "-XX:+IgnoreUnrecognizedVMOptions",
-  "--add-modules=java.xml.bind",
-  "-XX:+UseG1GC",
-  "-XX:+UseNUMA",
-  "-XX:+AlwaysPreTouch",
-  "-XX:+PerfDisableSharedMem",
-  "-XX:+ParallelRefProcEnabled",
-  "-XX:+UseStringDeduplication",
-  "-XX:MaxMetaspaceSize=512m")
-
-javaOptions in run ++= opts
-
-javaOptions in run ++= Seq(
-  "-XX:+IgnoreUnrecognizedVMOptions",
-  "--add-modules=java.xml.bind"
-)
-
-scalacOptions ++= Seq("-J-Xss8m")
+inConfig(Test) {
+  val commonFlags = "-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap"
+  Seq(
+    parallelExecution := false,
+    envVars in test += "CONTAINER_JAVA_OPTS" -> s"-Xmx1500m $commonFlags",
+    envVars in testOnly += "CONTAINER_JAVA_OPTS" -> s"-Xmx512m $commonFlags",
+    test :=(test dependsOn docker).value,
+  )
+}

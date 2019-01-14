@@ -157,12 +157,12 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           (bxOpt, tx.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
             case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
-              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
+              if (bx.proposition.canUnlock(ContextFix(tx, bx, stateView), input.realContract,
                 defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc :+ bx else acc
             case (Some(bx), Some(defaultProof)) =>
-              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, Seq(defaultProof))) acc :+ bx else acc
+              if (bx.proposition.canUnlock(ContextFix(tx, bx, stateView), input.realContract, Seq(defaultProof))) acc :+ bx else acc
             case (Some(bx), defaultProofOpt) =>
-              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
+              if (bx.proposition.canUnlock(ContextFix(tx, bx, stateView), input.realContract,
                 defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
             case _ => acc
           }
