@@ -23,7 +23,7 @@ import scala.util.{Failure, Success, Try}
 class NetworkController extends Actor {
 
   val networkSettings: NetworkSettings = settings.network
-  context.actorOf(Props[PeerSynchronizer], "peerSynchronizer")
+  context.actorOf(Props[PeerSynchronizer].withDispatcher("network-dispatcher"), "peerSynchronizer")
   val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
   var messageHandlers: Map[Seq[MessageCode], ActorRef] = Map.empty
   var outgoing: Set[InetSocketAddress] = Set.empty

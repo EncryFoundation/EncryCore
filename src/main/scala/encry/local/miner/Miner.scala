@@ -71,7 +71,7 @@ class Miner extends Actor with StrictLogging {
       self ! StartMining
     case StartMining =>
       for (i <- 0 until numberOfWorkers) yield context.actorOf(
-        Props(classOf[Worker], i, numberOfWorkers))
+        Props(classOf[Worker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
       candidateOpt match {
         case Some(candidateBlock) =>
           miningStartTime = System.currentTimeMillis()

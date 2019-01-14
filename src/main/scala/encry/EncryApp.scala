@@ -59,7 +59,8 @@ object EncryApp extends App with Logging {
   lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props()
     .withDispatcher("nvh-dispatcher").withMailbox("nvh-mailbox"), "nodeViewHolder")
   val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
-  lazy val networkController: ActorRef = system.actorOf(Props[NetworkController], "networkController")
+  val networkController: ActorRef = system.actorOf(Props[NetworkController]
+    .withDispatcher("network-dispatcher"), "networkController")
   lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
   lazy val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[NodeViewSynchronizer]), "nodeViewSynchronizer")
