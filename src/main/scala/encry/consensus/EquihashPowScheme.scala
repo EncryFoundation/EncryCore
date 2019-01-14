@@ -1,6 +1,7 @@
 package encry.consensus
 
 import com.google.common.primitives.Chars
+import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.crypto.equihash.{Equihash, EquihashSolution}
@@ -12,11 +13,10 @@ import org.bouncycastle.crypto.digests.Blake2bDigest
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.SerializedAdProof
 import scorex.crypto.hash.Digest32
-
 import scala.annotation.tailrec
 import scala.math.BigInt
 
-case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
+case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme with StrictLogging {
 
   private val seed: Array[Byte] =
     "equi_seed_12".getBytes(Algos.charset) ++ Chars.toByteArray(n) ++ Chars.toByteArray(k)
@@ -50,18 +50,30 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
 
     @tailrec
     def generateHeader(nonce: Long): Option[Header] = {
+      val diStart = System.currentTimeMillis()
       val currentDigest = new Blake2bDigest(digest)
+      logger.info(s"currentDigest: ${(System.currentTimeMillis() - diStart)/1000} seconds")
+      val hashStart = System.currentTimeMillis()
       Equihash.hashNonce(currentDigest, nonce)
+      logger.info(s"hashNonce: ${(System.currentTimeMillis() - hashStart)/1000} seconds")
+      val gpgStart = System.currentTimeMillis()
       val solutions = Equihash.gbpBasic(currentDigest, n, k)
+      logger.info(s"solutions: ${(System.currentTimeMillis() - gpgStart)/1000} seconds")
+      val headerWithSuitableSolutionStart = System.currentTimeMillis()
       val headerWithSuitableSolution = solutions
         .map { solution => h.copy(nonce = nonce, equihashSolution = solution) }
         .find { newHeader => correctWorkDone(realDifficulty(newHeader), difficulty) }
+      logger.info(s"headerWithSuitableSolution: ${(System.currentTimeMillis() - headerWithSuitableSolutionStart)/1000} seconds")
       headerWithSuitableSolution match {
         case headerWithFoundSolution @ Some(_) => headerWithFoundSolution
-        case None if nonce + 1 < finishingNonce => generateHeader(nonce + 1)
+        case None if nonce + 1 < finishingNonce =>
+          logger.info(s"Trying nonce: ${nonce + 1}")
+          generateHeader(nonce + 1)
         case _ => None
       }
     }
+
+    val startTime = System.currentTimeMillis()
 
     val possibleHeader = generateHeader(startingNonce)
 
