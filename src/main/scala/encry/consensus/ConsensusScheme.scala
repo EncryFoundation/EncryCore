@@ -11,6 +11,9 @@ import scala.math.BigInt
 
 trait ConsensusScheme {
 
+  def verifyCandidate(candidateBlock: CandidateBlock, nonce: Long): Option[Block] =
+    verifyCandidate(candidateBlock, nonce, nonce)
+
   def verifyCandidate(candidateBlock: CandidateBlock, finishingNonce: Long, startingNonce: Long): Option[Block]
 
   def realDifficulty(header: Header): BigInt
