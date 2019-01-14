@@ -38,13 +38,13 @@ class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with StrictLogging 
       val verificationCandidateTime = System.currentTimeMillis()
       val verRes = ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, Long.MaxValue, initialNonce)
       logger.info(s"Verification time: ${(System.currentTimeMillis() - verificationCandidateTime)/1000} seconds . Worker ${myIdx}")
-      verRes.fold{
+      if (verRes.isEmpty) {
         selfMsgTime = System.currentTimeMillis()
         self ! MineBlock(candidate, nonce + 1)
-      } { block =>
-          logger.info(s"New block is found: $block on worker $self at " +
+      } else {
+          logger.info(s"New block is found: ${verRes.get} on worker $self at " +
             s"${sdf.format(new Date(System.currentTimeMillis()))}. Iter qty: ${nonce - initialNonce + 1}")
-          miner ! MinedBlock(block, myIdx)
+          miner ! MinedBlock(verRes.get, myIdx)
         }
     case NextChallenge(candidate: CandidateBlock) =>
       challengeStartTime = new Date(System.currentTimeMillis())
