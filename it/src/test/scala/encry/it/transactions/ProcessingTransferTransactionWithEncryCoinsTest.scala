@@ -62,7 +62,6 @@ class ProcessingTransferTransactionWithEncryCoinsTest extends AsyncFunSuite
     )
 
     Await.result(nodes.head.sendTransaction(transaction), waitTime)
-
     Await.result(nodes.head.waitForHeadersHeight(secondHeightToWait), waitTime)
 
     val checkBalance: Boolean = Await.result(nodes.head.balances, waitTime)
