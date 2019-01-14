@@ -112,7 +112,7 @@ object ModifiersCache extends Logging {
                 if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) =>
                 true
               case _ =>
-                logError(s"Try to apply: ${Algos.encode(k.toArray)} and result is: ${isApplicable(k)}")
+                //logError(s"Try to apply: ${Algos.encode(k.toArray)} and result is: ${isApplicable(k)}")
                 isApplicable(k)
             }
           }.map { case (k, _) => k }
