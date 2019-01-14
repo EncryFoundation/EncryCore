@@ -126,6 +126,14 @@ javaOptions in run ++= opts
 
 scalacOptions ++= Seq("-J-Xss8m")
 
+Test / fork := true
+
+Test / javaOptions ++= Seq(
+  "-XX:+IgnoreUnrecognizedVMOptions",
+  "--add-modules=java.xml.bind",
+  "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED"
+)
+
 assemblyJarName in assembly := "EncryCore.jar"
 
 mainClass in assembly := Some("encry.EncryApp")
