@@ -35,17 +35,15 @@ class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with StrictLogging 
       if (selfMsgTime != 0L) logger.info(s"Time in mailbox: ${(System.currentTimeMillis() - selfMsgTime)/1000} seconds")
       logger.info(s"Trying nonce: $nonce. Start nonce is: $initialNonce. " +
         s"Iter qty: ${nonce - initialNonce + 1} on worker: $myIdx with diff: ${candidate.difficulty}")
-      val verificationCandidateTime = System.currentTimeMillis()
-      val verRes = ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, Long.MaxValue, initialNonce)
-      logger.info(s"Verification time: ${(System.currentTimeMillis() - verificationCandidateTime)/1000} seconds . Worker ${myIdx}")
-      if (verRes.isEmpty) {
-        selfMsgTime = System.currentTimeMillis()
-        self ! MineBlock(candidate, nonce + 1)
-      } else {
-          logger.info(s"New block is found: ${verRes.get} on worker $self at " +
-            s"${sdf.format(new Date(System.currentTimeMillis()))}. Iter qty: ${nonce - initialNonce + 1}")
-          miner ! MinedBlock(verRes.get, myIdx)
-        }
+      var verRes = ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, initialNonce)
+      var nonceToTest = nonce
+      do {
+        nonceToTest += 1
+        verRes = ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, nonceToTest)
+      } while (verRes.isEmpty)
+      logger.info(s"New block is found: ${verRes.get} on worker $self at " +
+        s"${sdf.format(new Date(System.currentTimeMillis()))}. Iter qty: ${nonce - initialNonce + 1}")
+      miner ! MinedBlock(verRes.get, myIdx)
     case NextChallenge(candidate: CandidateBlock) =>
       challengeStartTime = new Date(System.currentTimeMillis())
       logger.info(s"Start next challenge on worker: $myIdx at height " +
