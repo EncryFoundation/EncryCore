@@ -132,6 +132,7 @@ val opts = Seq(
 
 javaOptions in run ++= opts
 
+
 javaOptions in run ++= Seq(
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind"
