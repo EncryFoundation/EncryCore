@@ -108,8 +108,8 @@ evictionWarningOptions in update := EvictionWarningOptions.default
 logLevel := Level.Error
 val opts = Seq(
   "-server",
-  "-Xms8G",
-  "-Xmx8G",
+  "-Xms4G",
+  "-Xmx4G",
   "-XX:+ExitOnOutOfMemoryError",
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
@@ -118,7 +118,8 @@ val opts = Seq(
   "-XX:+AlwaysPreTouch",
   "-XX:+PerfDisableSharedMem",
   "-XX:+ParallelRefProcEnabled",
-  "-XX:+UseStringDeduplication")
+  "-XX:+UseStringDeduplication",
+  "-XX:MaxMetaspaceSize=512m")
 
 javaOptions in run ++= opts
 
