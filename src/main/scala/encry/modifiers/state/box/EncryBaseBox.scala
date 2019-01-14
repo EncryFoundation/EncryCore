@@ -2,7 +2,7 @@ package encry.modifiers.state.box
 
 import com.google.common.primitives.Longs
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import io.circe.Encoder
+import io.circe.{Decoder, DecodingFailure, Encoder}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
@@ -34,8 +34,22 @@ trait EncryBaseBox extends Box[EncryProposition] with PConvertible {
 object EncryBaseBox {
 
   implicit val jsonEncoder: Encoder[EncryBaseBox] = {
-    case ab: AssetBox => AssetBox.jsonEncoder(ab)
-    case db: DataBox => DataBox.jsonEncoder(db)
+    case ab: AssetBox         => AssetBox.jsonEncoder(ab)
+    case db: DataBox          => DataBox.jsonEncoder(db)
     case aib: TokenIssuingBox => TokenIssuingBox.jsonEncoder(aib)
+  }
+
+  implicit val jsonDecoder: Decoder[EncryBaseBox] = {
+    Decoder.instance { c =>
+      c.downField("type").as[BxTypeId] match {
+        case Right(s) => s match {
+          case AssetBox.TypeId        => AssetBox.jsonDecoder(c)
+          case DataBox.TypeId         => DataBox.jsonDecoder(c)
+          case TokenIssuingBox.TypeId => TokenIssuingBox.jsonDecoder(c)
+          case _ => Left(DecodingFailure("Incorrect directive typeID", c.history))
+        }
+        case Left(_) => Left(DecodingFailure("None typeId", c.history))
+      }
+    }
   }
 }

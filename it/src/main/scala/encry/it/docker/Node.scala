@@ -7,12 +7,15 @@ import com.typesafe.scalalogging.{Logger, StrictLogging}
 import encry.EncryApp.settings
 import encry.it.api.HttpApi
 import encry.it.util.GlobalTimer
+import encry.it.util.KeyHelper.createPrivKey
 import encry.settings.{Constants, EncryAppSettings}
 import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.asynchttpclient._
 import org.encryfoundation.common.Algos
-import org.encryfoundation.common.crypto.PublicKey25519
+import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
+import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -24,9 +27,8 @@ case class Node(config: Config,
                 client: AsyncHttpClient) extends AutoCloseable with StrictLogging with HttpApi {
 
   val settings: EncryAppSettings = EncryAppSettings.fromConfig(config)
-  val keyPair: (PrivateKey, PublicKey) =
-    Curve25519.createKeyPair(Algos.decode(settings.wallet.flatMap(_.seed).getOrElse("")).get)
-  val publicKey = PublicKey25519(keyPair._2)
+  val privKey: PrivateKey25519 = createPrivKey(Some(settings.wallet.flatMap(_.seed).getOrElse("")))
+  val publicKey: PublicKey25519 = privKey.publicImage
   val address: String = publicKey.address.address
 
   def nodeApiEndpoint: URL = new URL("http://0.0.0.0:9051")

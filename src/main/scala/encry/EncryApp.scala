@@ -100,7 +100,7 @@ object EncryApp extends App with Logging {
       ExceptionHandler {
         case e: Exception =>
           extractUri { uri =>
-            logError(s"Request to $uri could not be handled normally due to: $e")
+            logInfo(s"Request to $uri could not be handled normally due to: $e")
             complete(HttpResponse(InternalServerError, entity = "Internal server error"))
           }
       }

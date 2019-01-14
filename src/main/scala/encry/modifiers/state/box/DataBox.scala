@@ -2,7 +2,7 @@ package encry.modifiers.state.box
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import encry.modifiers.state.box.EncryBox.BxTypeId
-import io.circe.Encoder
+import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
@@ -37,12 +37,24 @@ object DataBox {
   val TypeId: BxTypeId = 4.toByte
 
   implicit val jsonEncoder: Encoder[DataBox] = (bx: DataBox) => Map(
-    "type" -> TypeId.asJson,
-    "id" -> Algos.encode(bx.id).asJson,
+    "type"        -> TypeId.asJson,
+    "id"          -> Algos.encode(bx.id).asJson,
     "proposition" -> bx.proposition.asJson,
-    "nonce" -> bx.nonce.asJson,
-    "data" -> Algos.encode(bx.data).asJson,
+    "nonce"       -> bx.nonce.asJson,
+    "data"        -> Algos.encode(bx.data).asJson,
   ).asJson
+
+  implicit val jsonDecoder: Decoder[DataBox] = (c: HCursor) => {
+    for {
+      proposition <- c.downField("proposition").as[EncryProposition]
+      nonce       <- c.downField("nonce").as[Long]
+      data        <- c.downField("data").as[Array[Byte]]
+    } yield DataBox(
+      proposition,
+      nonce,
+      data
+    )
+  }
 }
 
 object DataBoxSerializer extends Serializer[DataBox] {

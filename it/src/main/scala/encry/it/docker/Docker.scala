@@ -53,7 +53,7 @@ case class Docker(suiteConfig: Config = empty,
   private val networkSeed: Int = Random.nextInt(0x100000) << 4 | 0x0A000000
   private val networkPrefix: String = s"${InetAddress.getByAddress(Ints.toByteArray(networkSeed)).getHostAddress}/28"
   private val isStopped: AtomicBoolean = new AtomicBoolean(false)
-  val network = createNetwork(3)
+  val network: Network = createNetwork(3)
 
   def waitForStartupBlocking(nodes: List[Node]): List[Node] = {
     logger.debug("Waiting for nodes to start")
@@ -110,7 +110,6 @@ case class Docker(suiteConfig: Config = empty,
       .withFallback(Configs.knownPeers(nodes.asScala.map(node => node.nodeIp -> 9001).toSeq))
       .withFallback(defaultConf)
       .resolve()
-    println(s"Config123:$config")
     config
   }
 
@@ -213,7 +212,7 @@ case class Docker(suiteConfig: Config = empty,
 
   def startNodeInternal(nodeConfig: Config): Node =
     try {
-      val settings = EncryAppSettings.fromConfig(nodeConfig)
+      val settings = EncryAppSettings.fromConfig(nodeConfig.withFallback(configTemplate))
       val nodeNumber = settings.network.nodeName.map(_.replace("node", "").toInt).getOrElse(0)
       val ip = ipForNode(nodeNumber)
 
@@ -295,6 +294,7 @@ object Docker {
   private val jsonMapper: ObjectMapper = new ObjectMapper
   private val propsMapper: JavaPropsMapper = new JavaPropsMapper
   val networkNamePrefix: String = "itest-"
+  val configTemplate: Config = parseResources("template.conf")
 
   val defaultConf: Config = ConfigFactory.load
 
@@ -303,7 +303,7 @@ object Docker {
     propsMapper.writeValueAsProperties(jsonMapper.readTree(jsonConfig))
   }
 
-  def renderProperties(p: Properties) =
+  def renderProperties(p: Properties): String =
     p.asScala
       .map {
         case (k, v) if v.contains(" ") => k -> s"""\"$v\""""

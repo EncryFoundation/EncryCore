@@ -71,7 +71,7 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
   )
   def getUtxosR: Route = (path("utxos") & get) {
     getWallet
-      .map { _.walletStorage.allBoxes.map(EncryBaseBoxResponse(_)).asJson }
+      .map { _.walletStorage.allBoxes.map(_.asJson).asJson }
       .okJson()
   }
 

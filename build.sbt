@@ -106,7 +106,6 @@ evictionWarningOptions in update := EvictionWarningOptions.default
   .withWarnScalaVersionEviction(false)
 
 logLevel := Level.Error
-
 val opts = Seq(
   "-server",
   "-Xms4G",
@@ -119,7 +118,8 @@ val opts = Seq(
   "-XX:+AlwaysPreTouch",
   "-XX:+PerfDisableSharedMem",
   "-XX:+ParallelRefProcEnabled",
-  "-XX:+UseStringDeduplication")
+  "-XX:+UseStringDeduplication",
+  "-XX:MaxMetaspaceSize=512m")
 
 javaOptions in run ++= opts
 

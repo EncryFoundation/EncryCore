@@ -6,7 +6,7 @@ import encry.avltree.{BatchAVLVerifier, Insert, Modification, Remove}
 import encry.modifiers.state.box._
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest}
 import encry.settings.Constants
-import io.circe.Encoder
+import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
@@ -72,10 +72,20 @@ object ADProofs {
   val KeyLength = 32
 
   implicit val jsonEncoder: Encoder[ADProofs] = (p: ADProofs) => Map(
-    "headerId" -> Algos.encode(p.headerId).asJson,
+    "headerId"   -> Algos.encode(p.headerId).asJson,
     "proofBytes" -> Algos.encode(p.proofBytes).asJson,
-    "digest" -> Algos.encode(p.digest).asJson
+    "digest"     -> Algos.encode(p.digest).asJson
   ).asJson
+
+  implicit val jsonDecoder: Decoder[ADProofs] = (c: HCursor) => {
+    for {
+      headerIdAd <- c.downField("headerId").as[String]
+      proofBytes <- c.downField("proofBytes").as[String]
+    } yield ADProofs(
+      ModifierId @@ Algos.decode(headerIdAd).getOrElse(Array.emptyByteArray),
+      SerializedAdProof @@ Algos.decode(proofBytes).getOrElse(Array.emptyByteArray),
+    )
+  }
 
   def proofDigest(proofBytes: SerializedAdProof): Digest32 = Algos.hash(proofBytes)
 
