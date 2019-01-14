@@ -118,7 +118,7 @@ logLevel := Level.Error
 val opts = Seq(
   "-J-server",
   "-J-Xms128M",
-  "-J-Xmx2G",
+  "-J-Xmx4G",
   "-XX:+ExitOnOutOfMemoryError",
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
