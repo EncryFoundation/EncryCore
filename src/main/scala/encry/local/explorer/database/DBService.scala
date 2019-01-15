@@ -48,7 +48,7 @@ class DBService extends Logging {
     runAsync(inputsByTransactionIdsQuery(ids), "inputsByTxIds")
 
   private lazy val dataSource = new HikariDataSource
-  if (settings.postgres.exists(_.enableSave) || settings.postgres.exists(_.enableRestore)) {
+  if (settings.postgres.isDefined) {
     dataSource.setJdbcUrl(settings.postgres.map(_.host + "?loggerLevel=OFF").getOrElse(throw new RuntimeException("host not specified")))
     dataSource.setUsername(settings.postgres.map(_.user).getOrElse(throw new RuntimeException("user not specified")))
     dataSource.setPassword(settings.postgres.map(_.password).getOrElse(throw new RuntimeException("password not specified")))

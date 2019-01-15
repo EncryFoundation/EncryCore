@@ -18,8 +18,8 @@ import encry.stats.StatsSender.{CandidateProducingTime, MiningEnd, MiningTime, S
 import encry.utils.Logging
 import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.CurrentView
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
-import encry.view.history.EncryHistory
+import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, GetFromCurrentHistory, LocallyGeneratedModifier}
+import encry.view.FromCurrentHistory
 import encry.view.history.History.Height
 import encry.view.mempool.Mempool
 import encry.view.state.{StateMode, UtxoState}
@@ -32,7 +32,6 @@ import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 
 import scala.collection._
-import scala.util.{Failure, Success, Try}
 
 class Miner extends Actor with Logging {
 
@@ -71,7 +70,11 @@ class Miner extends Actor with Logging {
           context.children.foreach(_ ! NextChallenge(candidateBlock))
         case None =>
           logInfo("Candidate is empty! Producing new candidate!")
-          produceCandidate()
+          requestHistoryData()
+      }
+    case FromCurrentHistory(value: (Option[Header], Boolean, Option[Difficulty])) =>
+      value match {
+        case (headerOpt, isSynced, difficultyOpt) => produceCandidate(headerOpt, isSynced, difficultyOpt)
       }
     case DisableMining if context.children.nonEmpty =>
       logInfo("Received DisableMining msg")
@@ -119,7 +122,11 @@ class Miner extends Actor with Logging {
     case SemanticallySuccessfulModifier(mod: Block) if needNewCandidate(mod) =>
       logInfo(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
         s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
-      produceCandidate()
+      requestHistoryData()
+    case FromCurrentHistory(value: (Option[Header], Boolean, Option[Difficulty])) =>
+      value match {
+        case (headerOpt, isSynced, difficultyOpt) => produceCandidate(headerOpt, isSynced, difficultyOpt)
+      }
     case SemanticallySuccessfulModifier(_) =>
   }
 
@@ -145,8 +152,9 @@ class Miner extends Actor with Logging {
     self ! StartMining
   }
 
-  def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet, Mempool],
-                      bestHeaderOpt: Option[Header]): CandidateBlock = {
+  def createCandidate(view: CurrentView[UtxoState, EncryWallet, Mempool],
+                      bestHeaderOpt: Option[Header],
+                      difficultyOpt: Option[Difficulty]): CandidateBlock = {
     val timestamp: Time = timeProvider.estimatedTime
     val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
 
@@ -177,8 +185,7 @@ class Miner extends Actor with Logging {
     val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
       .getOrElse(throw new Exception("ADProof generation failed"))
 
-    val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
-      .getOrElse(Constants.Chain.InitialDifficulty)
+    val difficulty: Difficulty = difficultyOpt.getOrElse(Constants.Chain.InitialDifficulty)
 
     val candidate: CandidateBlock =
       CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
@@ -189,19 +196,25 @@ class Miner extends Actor with Logging {
     candidate
   }
 
-  def produceCandidate(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Mempool, CandidateEnvelope] {
+  def requestHistoryData(): Unit = nodeViewHolder ! GetFromCurrentHistory[(Option[Header], Boolean, Option[Difficulty])] {
+    history => (history.bestBlockOpt.map(_.header),
+      history.isFullChainSynced,
+      history.bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
+    )
+  }
+
+  def produceCandidate(bestHeaderOpt: Option[Header], isFullChainSynced: Boolean, difficultyOpt: Option[Difficulty]): Unit =
+    nodeViewHolder ! GetDataFromCurrentView[UtxoState, EncryWallet, Mempool, CandidateEnvelope] {
       nodeView =>
         val producingStartTime: Time = System.currentTimeMillis()
         startTime = producingStartTime
-        val bestHeaderOpt: Option[Header] = nodeView.history.bestBlockOpt.map(_.header)
         bestHeaderOpt match {
           case Some(h) => logInfo(s"Best header at height ${h.height}")
           case None => logInfo(s"No best header opt")
         }
         val candidate: CandidateEnvelope =
           if ((bestHeaderOpt.isDefined &&
-            (syncingDone || nodeView.history.isFullChainSynced)) || settings.node.offlineGeneration) {
+            (syncingDone || isFullChainSynced)) || settings.node.offlineGeneration) {
               logInfo(s"Starting candidate generation at " +
                 s"${dateFormat.format(new Date(System.currentTimeMillis()))}")
               if (settings.influxDB.isDefined)
@@ -209,7 +222,7 @@ class Miner extends Actor with Logging {
               logInfo("Going to calculate last block:")
               val envelope: CandidateEnvelope =
                 CandidateEnvelope
-                  .fromCandidate(createCandidate(nodeView, bestHeaderOpt))
+                  .fromCandidate(createCandidate(nodeView, bestHeaderOpt, difficultyOpt))
               if (settings.influxDB.isDefined)
                 context.actorSelection("user/statsSender") !
                   CandidateProducingTime(System.currentTimeMillis() - producingStartTime)

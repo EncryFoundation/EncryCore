@@ -20,10 +20,6 @@ object ModifiersCache extends Logging {
 
   private val cache: TrieMap[Key, EncryPersistentModifier] = TrieMap[Key, EncryPersistentModifier]()
   private var headersQueue: SortedMap[Int, Seq[Key]] = SortedMap.empty[Int, Seq[Key]]
-  private var cleaning: Boolean = settings.postgres.forall(postgres => !postgres.enableRestore) &&
-    settings.levelDb.forall(levelDb => !levelDb.enableRestore)
-
-  def setCleaningToTrue(): Unit = cleaning = true
 
   def size: Int = cache.size
 
@@ -41,7 +37,7 @@ object ModifiersCache extends Logging {
         )
       case _ =>
     }
-    if (size > settings.node.modifiersCacheSize && cleaning) cache.find {
+    if (size > settings.node.modifiersCacheSize) cache.find {
       case (_, value) => history.testApplicable(value) match {
         case Success(_) => false
         case Failure(_: RecoverableModifierError) => false

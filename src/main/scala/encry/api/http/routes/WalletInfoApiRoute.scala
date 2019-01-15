@@ -7,7 +7,6 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.settings.RESTApiSettings
 import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
-import encry.view.history.EncryHistory
 import encry.view.mempool.Mempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
@@ -24,7 +23,7 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
   override val settings: RESTApiSettings = restApiSettings
 
   private def getWallet: Future[EncryWallet] = (nodeViewActorRef ?
-    GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Mempool, EncryWallet](_.vault))
+    GetDataFromCurrentView[UtxoState, EncryWallet, Mempool, EncryWallet](_.vault))
     .mapTo[EncryWallet]
 
   def infoR: Route = (path("info") & get) {

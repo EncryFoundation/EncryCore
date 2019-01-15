@@ -149,7 +149,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
         if ((header.height > bestHeaderHeight) ||
           (header.height == bestHeaderHeight && score > bestHeadersChainScore)) bestBlockHeaderIdsRow(header, score)
         else {
-          if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(header)
+          if (settings.postgres.isDefined) system.actorSelection("/user/blockListener") ! NewOrphaned(header)
           orphanedBlockHeaderIdsRow(header, score)
         }
       (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)

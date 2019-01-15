@@ -75,7 +75,7 @@ trait BlockProcessor extends BlockHeaderProcessor with Logging {
               .getOrElse(false))
         updateStorage(newModRow, newBestHeader.id, updateBestHeader)
 
-        if (settings.postgres.exists(_.enableSave))
+        if (settings.postgres.isDefined)
           system.actorSelection("/user/blockListener") ! NewBestBlock(fullBlock.header.height)
 
         if (blocksToKeep >= 0) {

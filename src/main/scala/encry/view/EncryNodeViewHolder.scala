@@ -2,11 +2,11 @@ package encry.view
 
 import java.io.File
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import akka.pattern._
-import akka.persistence.RecoveryCompleted
 import encry.EncryApp
 import encry.EncryApp._
+import encry.consensus.History
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
 import encry.local.miner.Miner.DisableMining
@@ -15,8 +15,7 @@ import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
 import encry.modifiers.state.box.EncryProposition
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
-import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
-import encry.network.ModifiersHolder.{RequestedModifiers, SendBlocks}
+import encry.network.DeliveryManager.FullBlockChainSynced
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
@@ -35,18 +34,17 @@ import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration._
-import scala.util.{Failure, Random, Success, Try}
+import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging {
 
-  case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: Mempool)
+  //implicit val ec: ExecutionContextExecutor = context.dispatcher
 
-  var applicationsSuccessful: Boolean = true
-  var nodeView: NodeView = restoreState().getOrElse(genesisState)
-  var receivedAll: Boolean = !(settings.postgres.exists(_.enableRestore) || settings.levelDb.exists(_.enableRestore))
-  var triedToDownload: Boolean = !settings.postgres.exists(_.enableRestore)
+  case class NodeView(state: StateType, wallet: EncryWallet, mempool: Mempool)
+
+  var (nodeView: NodeView, history: EncryHistory) = restoreState().getOrElse(genesisState)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     Header.modifierTypeId -> HeaderSerializer,
     Payload.modifierTypeId -> PayloadSerializer,
@@ -54,25 +52,19 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     Transaction.ModifierTypeId -> TransactionSerializer
   )
 
-  if (settings.influxDB.isDefined) {
-    context.system.scheduler.schedule(5.second, 5.second) {
-      context.system.actorSelection("user/statsSender") !
-        HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
-    }
-  }
+  val nodeHistoryHolder: ActorRef = context.actorOf(Props(new NodeHistoryHolder(history, settings)))//.withDispatcher("nhh-dispatcher"))
 
   if (settings.influxDB.isDefined) {
     context.system.scheduler.schedule(10.second, 1.second) {
-      val txsInLastBlock: Int = nodeView.history.bestBlockOpt.map(x => x.payload.transactions.size).getOrElse(0)
-      val txsInMempool: Int = nodeView.mempool.unconfirmed.values.size
-      val diffBtw: Int = txsInMempool - txsInLastBlock
+      nodeHistoryHolder ! GetFromCurrentHistory { history =>
+        val txsInLastBlock: Int = history.bestBlockOpt.map(x => x.payload.transactions.size).getOrElse(0)
+        val txsInMempool: Int = nodeView.mempool.unconfirmed.values.size
+        val diffBtw: Int = txsInMempool - txsInLastBlock
 
-      context.system.actorSelection("user/statsSender") !
-        TransactionsStatMessage(txsInLastBlock, nodeView.history.bestBlockHeight)
-
-      context.system.actorSelection("user/statsSender") ! MempoolStat(txsInMempool)
-
-      context.system.actorSelection("user/statsSender") ! DiffBtwMempoolAndLastBlockTxs(diffBtw)
+        context.system.actorSelection("user/statsSender") ! TransactionsStatMessage(txsInLastBlock, history.bestBlockHeight)
+        context.system.actorSelection("user/statsSender") ! MempoolStat(txsInMempool)
+        context.system.actorSelection("user/statsSender") ! DiffBtwMempoolAndLastBlockTxs(diffBtw)
+      }
     }
   }
 
@@ -83,98 +75,35 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   override def postStop(): Unit = {
     logWarn(s"Stopping EncryNodeViewHolder")
-    nodeView.history.closeStorage()
     nodeView.state.closeStorage()
   }
 
   override def receive: Receive = {
-    case BlocksFromLocalPersistence(blocks, allSent)
-      if settings.levelDb.exists(_.enableRestore) || settings.postgres.exists(_.enableRestore) =>
-      blocks.foreach { block =>
-        pmodModifyRecovery(block) match {
-          case Success(_) =>
-            logInfo(s"Block ${block.encodedId} on height" +
-              s" ${block.header.height} from recovery applied successfully")
-          case Failure(th) =>
-            logWarn(s"Failed to apply block ${block.encodedId} on height ${block.header.height} " +
-              s"from recovery caused $th")
-            applicationsSuccessful = false
-            peerManager ! RecoveryCompleted
-        }
-      }
-      if (settings.levelDb.exists(_.enableSave)) {
-        context.actorSelection("/user/modifiersHolder") !
-          RequestedModifiers(Header.modifierTypeId, blocks.map(_.header))
-        context.actorSelection("/user/modifiersHolder") !
-          RequestedModifiers(Payload.modifierTypeId, blocks.map(_.payload))
-        context.actorSelection("/user/modifiersHolder") !
-          RequestedModifiers(ADProofs.modifierTypeId, blocks.flatMap(_.adProofsOpt))
-      }
-      receivedAll = allSent
-      if (receivedAll) {
-        logInfo(s"Received all blocks from recovery")
-        peerManager ! RecoveryCompleted
-        ModifiersCache.setCleaningToTrue()
-      }
-      if (applicationsSuccessful && settings.levelDb.exists(_.enableRestore) && !receivedAll) sender ! SendBlocks
-    case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
-      if (ModifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
-      modifierSerializers.get(modifierTypeId).foreach { companion =>
-        remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
-          case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
-          case pmod: EncryPersistentModifier@unchecked =>
-            if (settings.influxDB.isDefined && nodeView.history.isFullChainSynced) {
-              pmod match {
-                case h: Header => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - h.timestamp)
-                case b: Block => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - b.header.timestamp)
-                case _ =>
-              }
-            }
-            if (nodeView.history.contains(pmod.id) || ModifiersCache.contains(key(pmod.id)))
-              logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
-            else {
-              ModifiersCache.put(key(pmod.id), pmod, nodeView.history)
-              if (settings.levelDb.exists(_.enableSave))
-                context.actorSelection("/user/modifiersHolder") ! RequestedModifiers(modifierTypeId, Seq(pmod))
-            }
-        }
-        logInfo(s"Cache before(${ModifiersCache.size})")
-        computeApplications()
-        if (ModifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
-        logInfo(s"Cache after(${ModifiersCache.size})")
-      }
+    case HistoryUpdate(historyUpdate, pmod) => processUpdatedHistory(historyUpdate, pmod)
+    case msg: ModifiersFromRemote => nodeHistoryHolder ! msg
+    case TxForTxModify(tx) => txModify(tx)
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
       logInfo(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
-      pmodModify(lm.pmod)
-      if (settings.levelDb.exists(_.enableSave)) context.actorSelection("/user/modifiersHolder") ! lm
+      nodeHistoryHolder ! lm.pmod
+    case msg: GetFromCurrentHistory[Any] => nodeHistoryHolder.forward(msg)
     case GetDataFromCurrentView(f) =>
-      val result = f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool))
+      val result = f(CurrentView(nodeView.state, nodeView.wallet, nodeView.mempool))
       result match {
         case resultFuture: Future[_] => resultFuture.pipeTo(sender())
         case _ => sender() ! result
       }
-    case GetNodeViewChanges(history, state, vault, mempool) =>
-      if (history) sender() ! ChangedHistory(nodeView.history)
+    case msg@GetNodeViewChanges(history, state, vault, mempool) =>
+      if (history) nodeHistoryHolder.forward(msg)
       if (state) sender() ! ChangedState(nodeView.state)
       if (mempool) sender() ! ChangedMempool(nodeView.mempool)
-    case CompareViews(peer, modifierTypeId, modifierIds) =>
-      val ids: Seq[ModifierId] = modifierTypeId match {
-        case Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
-        case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
-      }
-      sender() ! RequestFromLocal(peer, modifierTypeId, ids)
+    case CompareViews(peer, modifierTypeId, modifierIds) if modifierTypeId == Transaction.ModifierTypeId =>
+      sender() ! RequestFromLocal(peer, modifierTypeId, nodeView.mempool.notIn(modifierIds))
+    case msg: CompareViews => nodeHistoryHolder.forward(msg)
+    case _: FromCurrentHistory[_] =>
     case a: Any =>
       logError(s"Strange input: $a")
   }
-
-  def computeApplications(): Unit =
-    ModifiersCache.popCandidate(nodeView.history) match {
-      case Some(payload) =>
-        pmodModify(payload)
-        computeApplications()
-      case None => Unit
-    }
 
   def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
@@ -182,11 +111,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                      updatedState: Option[StateType] = None,
                      updatedVault: Option[EncryWallet] = None,
                      updatedMempool: Option[Mempool] = None): Unit = {
-    val newNodeView: NodeView = NodeView(updatedHistory.getOrElse(nodeView.history),
-      updatedState.getOrElse(nodeView.state),
+    updatedHistory.foreach(nodeHistoryHolder ! HistoryUpdateFromNVH(_, true))
+    val newNodeView: NodeView = NodeView(updatedState.getOrElse(nodeView.state),
       updatedVault.getOrElse(nodeView.wallet),
       updatedMempool.getOrElse(nodeView.mempool))
-    if (updatedHistory.nonEmpty) context.system.eventStream.publish(ChangedHistory(newNodeView.history))
     if (updatedState.nonEmpty) context.system.eventStream.publish(ChangedState(newNodeView.state))
     if (updatedMempool.nonEmpty) context.system.eventStream.publish(ChangedMempool(newNodeView.mempool))
     nodeView = newNodeView
@@ -242,7 +170,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
           else Success(state) -> IndexedSeq()
         }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty")))
       } else Success(state) -> suffixApplied
-
     stateToApplyTry match {
       case Success(stateToApply) =>
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
@@ -280,71 +207,59 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     }
   }
 
-  def pmodModifyRecovery(block: Block): Try[Unit] = if (!nodeView.history.contains(block.id)) Try {
-    logInfo(s"Trying to apply block ${block.encodedId} from recovery")
-    pmodModify(block.header)
-    nodeView.history.blockDownloadProcessor.updateBestBlock(block.header)
-    pmodModify(block.payload)
-    block.adProofsOpt.foreach(pmodModify(_))
-  } else Success(Unit)
-
-  def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
-    logInfo(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
-    if (settings.influxDB.isDefined) context.system
-      .actorSelection("user/statsSender") !
-      StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
-    nodeView.history.append(pmod) match {
-      case Success((historyBeforeStUpdate, progressInfo)) =>
+  def processUpdatedHistory(historyUpdate: Try[(EncryHistory, History.ProgressInfo[EncryPersistentModifier])],
+                            pmod: EncryPersistentModifier): Unit = historyUpdate match {
+    case Success((historyBeforeStUpdate, progressInfo)) =>
+      if (settings.influxDB.isDefined)
+        context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
+      logInfo(s"Going to apply modifications to the state: $progressInfo")
+      nodeViewSynchronizer ! SyntacticallySuccessfulModifier(pmod)
+      if (progressInfo.toApply.nonEmpty) {
+        val startPoint: Long = System.currentTimeMillis()
+        val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
+          updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
+        nodeHistoryHolder ! HistoryUpdateFromNVH(newHistory, false)
         if (settings.influxDB.isDefined)
-          context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
-        logInfo(s"Going to apply modifications to the state: $progressInfo")
-        nodeViewSynchronizer ! SyntacticallySuccessfulModifier(pmod)
-        if (progressInfo.toApply.nonEmpty) {
-          val startPoint: Long = System.currentTimeMillis()
-          val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
-            updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
-          if (settings.influxDB.isDefined)
-            context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
-          newStateTry match {
-            case Success(newMinState) =>
-              val newMemPool: Mempool =
-                updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)
-              val newVault: EncryWallet = if (progressInfo.chainSwitchingNeeded)
-                nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
-              else nodeView.wallet
-              blocksApplied.foreach(newVault.scanPersistent)
-              logInfo(s"Persistent modifier ${pmod.encodedId} applied successfully")
-              if (progressInfo.chainSwitchingNeeded)
-                context.actorSelection("/user/blockListener") !
-                  ChainSwitching(progressInfo.toRemove.map(_.id))
-              if (settings.influxDB.isDefined)
-                newHistory.bestHeaderOpt.foreach(header =>
-                  context.actorSelection("/user/statsSender") !
-                    BestHeaderInChain(header, System.currentTimeMillis()))
-              if (newHistory.isFullChainSynced && receivedAll)
-                Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
-              else miner ! DisableMining
-              updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
-            case Failure(e) =>
-              logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
-                s"to minimal state because of: $e")
-              updateNodeView(updatedHistory = Some(newHistory))
-              nodeViewSynchronizer ! SemanticallyFailedModification(pmod, e)
-          }
-        } else {
-          if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.modifierTypeId) context.system
-            .actorSelection("user/statsSender") ! NewBlockAppended(true, true)
-          requestDownloads(progressInfo)
-          updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
+          context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
+        newStateTry match {
+          case Success(newMinState) =>
+            val newMemPool: Mempool =
+              updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)
+            val newVault: EncryWallet = if (progressInfo.chainSwitchingNeeded)
+              nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
+            else nodeView.wallet
+            blocksApplied.foreach(newVault.scanPersistent)
+            logInfo(s"Persistent modifier ${pmod.encodedId} applied successfully")
+            if (progressInfo.chainSwitchingNeeded)
+              context.actorSelection("/user/blockListener") !
+                ChainSwitching(progressInfo.toRemove.map(_.id))
+            if (settings.influxDB.isDefined)
+              newHistory.bestHeaderOpt.foreach(header =>
+                context.actorSelection("/user/statsSender") !
+                  BestHeaderInChain(header, System.currentTimeMillis()))
+            if (newHistory.isFullChainSynced)
+              Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
+            else miner ! DisableMining
+            updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
+          case Failure(e) =>
+            logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
+              s"to minimal state because of: $e")
+            updateNodeView(updatedHistory = Some(newHistory))
+            nodeViewSynchronizer ! SemanticallyFailedModification(pmod, e)
         }
-      case Failure(e) =>
+      } else {
         if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.modifierTypeId) context.system
-          .actorSelection("user/statsSender") ! NewBlockAppended(true, false)
-        logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
-          s" to history caused $e")
-        nodeViewSynchronizer ! SyntacticallyFailedModification(pmod, e)
-    }
-  } else logWarn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
+          .actorSelection("user/statsSender") ! NewBlockAppended(true, true)
+        requestDownloads(progressInfo)
+        updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
+      }
+    case Failure(e) =>
+      if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.modifierTypeId) context.system
+        .actorSelection("user/statsSender") ! NewBlockAppended(true, false)
+      logWarn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
+        s" to history caused $e")
+      nodeViewSynchronizer ! SyntacticallyFailedModification(pmod, e)
+  }
 
   def txModify(tx: Transaction): Unit = nodeView.mempool.put(tx) match {
     case Success(newPool) =>
@@ -355,7 +270,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
       s" with exception ${e.getLocalizedMessage}")
   }
 
-  def genesisState: NodeView = {
+  def genesisState: (NodeView, EncryHistory) = {
     val stateDir: File = EncryState.getStateDir(settings)
     stateDir.mkdir()
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
@@ -366,17 +281,17 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
     val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
-    NodeView(history, state, wallet, memPool)
+    (NodeView(state, wallet, memPool), history)
   }
 
-  def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryObjectsDir(settings).listFiles.isEmpty)
+  def restoreState(): Option[(NodeView, EncryHistory)] = if (!EncryHistory.getHistoryObjectsDir(settings).listFiles.isEmpty)
     try {
       val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
       val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
       val state: StateType =
         restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
-      Some(NodeView(history, state, wallet, memPool))
+      Some((NodeView(state, wallet, memPool), history))
     } catch {
       case ex: Throwable =>
         logInfo(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
@@ -439,17 +354,17 @@ object EncryNodeViewHolder {
 
   case class DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) extends NodeViewHolderEvent
 
-  case class CurrentView[HIS, MS, VL, MP](history: HIS, state: MS, vault: VL, pool: MP)
+  case class CurrentView[MS, VL, MP](state: MS, vault: VL, pool: MP)
 
   object ReceivableMessages {
 
     case class GetNodeViewChanges(history: Boolean, state: Boolean, vault: Boolean, mempool: Boolean)
 
-    case class GetDataFromCurrentView[HIS, MS, VL, MP, A](f: CurrentView[HIS, MS, VL, MP] => A)
+    case class GetDataFromCurrentView[MS, VL, MP, A](f: CurrentView[MS, VL, MP] => A)
+
+    case class GetFromCurrentHistory[A](f: EncryHistory => A)
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
-
-    case class BlocksFromLocalPersistence(blocks: Seq[Block], allBlocksSent: Boolean = true)
 
     case class ModifiersFromRemote(modTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
 
@@ -457,6 +372,8 @@ object EncryNodeViewHolder {
 
     case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentNodeViewModifier]
     (pmod: EncryPersistentModifier)
+
+    case class RequestChangedHistory(requestSender: ActorRef)
 
   }
 
