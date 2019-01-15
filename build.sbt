@@ -117,8 +117,7 @@ val opts = Seq(
   "-XX:+AlwaysPreTouch",
   "-XX:+PerfDisableSharedMem",
   "-XX:+ParallelRefProcEnabled",
-  "-XX:+UseStringDeduplication",
-  "-XX:MaxMetaspaceSize=512m")
+  "-XX:+UseStringDeduplication")
 
 javaOptions in run ++= opts
 
