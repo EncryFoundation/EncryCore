@@ -88,6 +88,9 @@ class StatsSender extends Actor {
           )
         }
 
+    case TxsInBlock(txsNum) =>
+      influxDB.write(InfluxPort, s"txsInEachBlock,nodeName=$nodeName value=$txsNum")
+
     case StartApplyingModif(modifierId: ModifierId, modifierTypeId: ModifierTypeId, startTime: Long) =>
       modifiersToApply += Algos.encode(modifierId) -> (modifierTypeId, startTime)
 
