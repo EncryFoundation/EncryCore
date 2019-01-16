@@ -39,6 +39,8 @@ class NodeHistoryHolder(var history: EncryHistory, settings: EncryAppSettings) e
     }
   }
 
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit = reason.printStackTrace()
+
   override def receive: Receive = {
     case GetFromCurrentHistory(f) =>
       val result = f(history)

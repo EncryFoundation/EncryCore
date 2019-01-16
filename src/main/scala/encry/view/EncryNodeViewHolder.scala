@@ -40,7 +40,7 @@ import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with Logging {
 
-  //implicit val ec: ExecutionContextExecutor = context.dispatcher
+  implicit val ec: ExecutionContextExecutor = context.dispatcher
 
   case class NodeView(state: StateType, wallet: EncryWallet, mempool: Mempool)
 
@@ -52,7 +52,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     Transaction.ModifierTypeId -> TransactionSerializer
   )
 
-  val nodeHistoryHolder: ActorRef = context.actorOf(Props(new NodeHistoryHolder(history, settings)))//.withDispatcher("nhh-dispatcher"))
+  val nodeHistoryHolder: ActorRef = context.actorOf(Props(new NodeHistoryHolder(history, settings)).withDispatcher("nhh-dispatcher"))
 
   if (settings.influxDB.isDefined) {
     context.system.scheduler.schedule(10.second, 1.second) {
