@@ -42,7 +42,7 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
       getDiffsPath(
         targetNodeId,
         currentNodesList.init,
-        diffs ++ currentNodesList.last.diffs.map(_.revert(persistantProver)),
+        diffs ++ currentNodesList.lastOption.map(_.diffs.map(_.revert(persistantProver))).getOrElse(Seq.empty),
         persistantProver
       )
     else diffs
