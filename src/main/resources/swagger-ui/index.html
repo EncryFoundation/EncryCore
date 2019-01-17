@@ -1,225 +1,225 @@
 <!doctype html>
 <html>
-  <head>
+<head>
     <title>Encry Node API</title>
     <style type="text/css">
-      body {
-      	font-family: Trebuchet MS, sans-serif;
-      	font-size: 15px;
-      	color: #444;
-      	margin-right: 24px;
-      }
-      
-      h1	{
-      	font-size: 25px;
-      }
-      h2	{
-      	font-size: 20px;
-      }
-      h3	{
-      	font-size: 16px;
-      	font-weight: bold;
-      }
-      hr	{
-      	height: 1px;
-      	border: 0;
-      	color: #ddd;
-      	background-color: #ddd;
-      }
-      
-      .app-desc {
-        clear: both;
-        margin-left: 20px;
-      }
-      .param-name {
-        width: 100%;
-      }
-      .license-info {
-        margin-left: 20px;
-      }
-      
-      .license-url {
-        margin-left: 20px;
-      }
-      
-      .model {
-        margin: 0 0 0px 20px;
-      }
-      
-      .method {
-        margin-left: 20px;
-      }
-      
-      .method-notes	{
-      	margin: 10px 0 20px 0;
-      	font-size: 90%;
-      	color: #555;
-      }
-      
-      pre {
-        padding: 10px;
-        margin-bottom: 2px;
-      }
-      
-      .http-method {
-       text-transform: uppercase;
-      }
-      
-      pre.get {
-        background-color: #0f6ab4;
-      }
-      
-      pre.post {
-        background-color: #10a54a;
-      }
-      
-      pre.put {
-        background-color: #c5862b;
-      }
-      
-      pre.delete {
-        background-color: #a41e22;
-      }
-      
-      .huge	{
-      	color: #fff;
-      }
-      
-      pre.example {
-        background-color: #f3f3f3;
-        padding: 10px;
-        border: 1px solid #ddd;
-      }
-      
-      code {
-        white-space: pre;
-      }
-      
-      .nickname {
-        font-weight: bold;
-      }
-      
-      .method-path {
-        font-size: 1.5em;
-        background-color: #0f6ab4;
-      }
-      
-      .up {
-        float:right;
-      }
-      
-      .parameter {
-        width: 500px;
-      }
-      
-      .param {
-        width: 500px;
-        padding: 10px 0 0 20px;
-        font-weight: bold;
-      }
-      
-      .param-desc {
-        width: 700px;
-        padding: 0 0 0 20px;
-        color: #777;
-      }
-      
-      .param-type {
-        font-style: italic;
-      }
-      
-      .param-enum-header {
-      width: 700px;
-      padding: 0 0 0 60px;
-      color: #777;
-      font-weight: bold;
-      }
-      
-      .param-enum {
-      width: 700px;
-      padding: 0 0 0 80px;
-      color: #777;
-      font-style: italic;
-      }
-      
-      .field-label {
-        padding: 0;
-        margin: 0;
-        clear: both;
-      }
-      
-      .field-items	{
-      	padding: 0 0 15px 0;
-      	margin-bottom: 15px;
-      }
-      
-      .return-type {
-        clear: both;
-        padding-bottom: 10px;
-      }
-      
-      .param-header {
-        font-weight: bold;
-      }
-      
-      .method-tags {
-        text-align: right;
-      }
-      
-      .method-tag {
-        background: none repeat scroll 0% 0% #24A600;
-        border-radius: 3px;
-        padding: 2px 10px;
-        margin: 2px;
-        color: #FFF;
-        display: inline-block;
-        text-decoration: none;
-      }
+        body {
+            font-family: Trebuchet MS, sans-serif;
+            font-size: 15px;
+            color: #444;
+            margin-right: 24px;
+        }
+
+        h1	{
+            font-size: 25px;
+        }
+        h2	{
+            font-size: 20px;
+        }
+        h3	{
+            font-size: 16px;
+            font-weight: bold;
+        }
+        hr	{
+            height: 1px;
+            border: 0;
+            color: #ddd;
+            background-color: #ddd;
+        }
+
+        .app-desc {
+            clear: both;
+            margin-left: 20px;
+        }
+        .param-name {
+            width: 100%;
+        }
+        .license-info {
+            margin-left: 20px;
+        }
+
+        .license-url {
+            margin-left: 20px;
+        }
+
+        .model {
+            margin: 0 0 0px 20px;
+        }
+
+        .method {
+            margin-left: 20px;
+        }
+
+        .method-notes	{
+            margin: 10px 0 20px 0;
+            font-size: 90%;
+            color: #555;
+        }
+
+        pre {
+            padding: 10px;
+            margin-bottom: 2px;
+        }
+
+        .http-method {
+            text-transform: uppercase;
+        }
+
+        pre.get {
+            background-color: #0f6ab4;
+        }
+
+        pre.post {
+            background-color: #10a54a;
+        }
+
+        pre.put {
+            background-color: #c5862b;
+        }
+
+        pre.delete {
+            background-color: #a41e22;
+        }
+
+        .huge	{
+            color: #fff;
+        }
+
+        pre.example {
+            background-color: #f3f3f3;
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+
+        code {
+            white-space: pre;
+        }
+
+        .nickname {
+            font-weight: bold;
+        }
+
+        .method-path {
+            font-size: 1.5em;
+            background-color: #0f6ab4;
+        }
+
+        .up {
+            float:right;
+        }
+
+        .parameter {
+            width: 500px;
+        }
+
+        .param {
+            width: 500px;
+            padding: 10px 0 0 20px;
+            font-weight: bold;
+        }
+
+        .param-desc {
+            width: 700px;
+            padding: 0 0 0 20px;
+            color: #777;
+        }
+
+        .param-type {
+            font-style: italic;
+        }
+
+        .param-enum-header {
+            width: 700px;
+            padding: 0 0 0 60px;
+            color: #777;
+            font-weight: bold;
+        }
+
+        .param-enum {
+            width: 700px;
+            padding: 0 0 0 80px;
+            color: #777;
+            font-style: italic;
+        }
+
+        .field-label {
+            padding: 0;
+            margin: 0;
+            clear: both;
+        }
+
+        .field-items	{
+            padding: 0 0 15px 0;
+            margin-bottom: 15px;
+        }
+
+        .return-type {
+            clear: both;
+            padding-bottom: 10px;
+        }
+
+        .param-header {
+            font-weight: bold;
+        }
+
+        .method-tags {
+            text-align: right;
+        }
+
+        .method-tag {
+            background: none repeat scroll 0% 0% #24A600;
+            border-radius: 3px;
+            padding: 2px 10px;
+            margin: 2px;
+            color: #FFF;
+            display: inline-block;
+            text-decoration: none;
+        }
     </style>
-  </head>
-  <body>
-  <h1>Encry Node API</h1>
-    <div class="app-desc">API docs for Encry Node.</div>
-    <div class="app-desc">More information: <a href="https://helloreverb.com">https://helloreverb.com</a></div>
-    <div class="app-desc">Contact Info: <a href="hello@helloreverb.com">hello@helloreverb.com</a></div>
-    <div class="app-desc">Version: 0.9.2</div>
-    <div class="app-desc">BasePath:/</div>
-    <div class="license-info">GPL 3.0</div>
-    <div class="license-url">https://www.gnu.org/licenses/gpl-3.0.en.html</div>
-  <h2>Access</h2>
+</head>
+<body>
+<h1>Encry Node API</h1>
+<div class="app-desc">API docs for Encry Node.</div>
+<div class="app-desc">More information: <a href="https://helloreverb.com">https://helloreverb.com</a></div>
+<div class="app-desc">Contact Info: <a href="hello@helloreverb.com">hello@helloreverb.com</a></div>
+<div class="app-desc">Version: 0.9.2</div>
+<div class="app-desc">BasePath:/</div>
+<div class="license-info">GPL 3.0</div>
+<div class="license-url">https://www.gnu.org/licenses/gpl-3.0.en.html</div>
+<h2>Access</h2>
 
-  <h2><a name="__Methods">Methods</a></h2>
-  [ Jump to <a href="#__Models">Models</a> ]
+<h2><a name="__Methods">Methods</a></h2>
+[ Jump to <a href="#__Models">Models</a> ]
 
-  <h3>Table of Contents </h3>
-  <div class="method-summary"></div>
-  <h4><a href="#Default">Default</a></h4>
-  <ul>
-  <li><a href="#allPeers"><code><span class="http-method">get</span> /peers/all</code></a></li>
-  <li><a href="#candidateBlockR"><code><span class="http-method">get</span> /history/candidateBlock</code></a></li>
-  <li><a href="#connect"><code><span class="http-method">post</span> /peers/connect</code></a></li>
-  <li><a href="#connectedPeers"><code><span class="http-method">get</span> /peers/connected</code></a></li>
-  <li><a href="#defaultTransferTransactionR"><code><span class="http-method">post</span> /transactions/send</code></a></li>
-  <li><a href="#getBlockHeaderByHeaderIdR"><code><span class="http-method">get</span> /history/{modifierId}/header</code></a></li>
-  <li><a href="#getBlockIdsAtHeightR"><code><span class="http-method">get</span> /history/at/{height}</code></a></li>
-  <li><a href="#getBlockTransactionsByHeaderIdR"><code><span class="http-method">get</span> /history/{modifierId}/transactions</code></a></li>
-  <li><a href="#getBlocksR"><code><span class="http-method">get</span> /history</code></a></li>
-  <li><a href="#getBoxByIdR"><code><span class="http-method">get</span> /state/{boxId}</code></a></li>
-  <li><a href="#getFullBlockByHeaderIdR"><code><span class="http-method">get</span> /history/{modifierId}</code></a></li>
-  <li><a href="#getLastHeadersR"><code><span class="http-method">get</span> /history/lastHeaders/{quantity}</code></a></li>
-  <li><a href="#getUnconfirmedTransactionsR"><code><span class="http-method">get</span> /transactions/unconfirmed</code></a></li>
-  <li><a href="#getUtxosR"><code><span class="http-method">get</span> /wallet/utxos</code></a></li>
-  <li><a href="#hashBlake2b"><code><span class="http-method">post</span> /utils/hash/blake2b</code></a></li>
-  <li><a href="#infoR"><code><span class="http-method">get</span> /wallet/info</code></a></li>
-  <li><a href="#length"><code><span class="http-method">get</span> /utils/seed/{length}</code></a></li>
-  <li><a href="#seedRoute"><code><span class="http-method">get</span> /utils/seed</code></a></li>
-  </ul>
+<h3>Table of Contents </h3>
+<div class="method-summary"></div>
+<h4><a href="#Default">Default</a></h4>
+<ul>
+    <li><a href="#allPeers"><code><span class="http-method">get</span> /peers/all</code></a></li>
+    <li><a href="#candidateBlockR"><code><span class="http-method">get</span> /history/candidateBlock</code></a></li>
+    <li><a href="#connect"><code><span class="http-method">post</span> /peers/connect</code></a></li>
+    <li><a href="#connectedPeers"><code><span class="http-method">get</span> /peers/connected</code></a></li>
+    <li><a href="#defaultTransferTransactionR"><code><span class="http-method">post</span> /transactions/send</code></a></li>
+    <li><a href="#getBlockHeaderByHeaderIdR"><code><span class="http-method">get</span> /history/{modifierId}/header</code></a></li>
+    <li><a href="#getBlockIdsAtHeightR"><code><span class="http-method">get</span> /history/at/{height}</code></a></li>
+    <li><a href="#getBlockTransactionsByHeaderIdR"><code><span class="http-method">get</span> /history/{modifierId}/transactions</code></a></li>
+    <li><a href="#getBlocksR"><code><span class="http-method">get</span> /history</code></a></li>
+    <li><a href="#getBoxByIdR"><code><span class="http-method">get</span> /state/{boxId}</code></a></li>
+    <li><a href="#getFullBlockByHeaderIdR"><code><span class="http-method">get</span> /history/{modifierId}</code></a></li>
+    <li><a href="#getLastHeadersR"><code><span class="http-method">get</span> /history/lastHeaders/{quantity}</code></a></li>
+    <li><a href="#getUnconfirmedTransactionsR"><code><span class="http-method">get</span> /transactions/unconfirmed</code></a></li>
+    <li><a href="#getUtxosR"><code><span class="http-method">get</span> /wallet/utxos</code></a></li>
+    <li><a href="#hashBlake2b"><code><span class="http-method">post</span> /utils/hash/blake2b</code></a></li>
+    <li><a href="#infoR"><code><span class="http-method">get</span> /wallet/info</code></a></li>
+    <li><a href="#length"><code><span class="http-method">get</span> /utils/seed/{length}</code></a></li>
+    <li><a href="#seedRoute"><code><span class="http-method">get</span> /utils/seed</code></a></li>
+</ul>
 
-  <h1><a name="Default">Default</a></h1>
-  <div class="method"><a name="allPeers"></a>
+<h1><a name="Default">Default</a></h1>
+<div class="method"><a name="allPeers"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="get"><code class="huge"><span class="http-method">get</span> /peers/all</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="get"><code class="huge"><span class="http-method">get</span> /peers/all</code></pre></div>
     <div class="method-summary">Return all known peers (<span class="nickname">allPeers</span>)</div>
     <div class="method-notes"></div>
 
@@ -231,8 +231,8 @@
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      array[<a href="#PeerInfoResponse">PeerInfoResponse</a>]
-      
+        array[<a href="#PeerInfoResponse">PeerInfoResponse</a>]
+
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -242,22 +242,22 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>application/json</code></li>
+        <li><code>application/json</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Array of peers
-        
+
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="candidateBlockR"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="candidateBlockR"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="get"><code class="huge"><span class="http-method">get</span> /history/candidateBlock</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="get"><code class="huge"><span class="http-method">get</span> /history/candidateBlock</code></pre></div>
     <div class="method-summary">Return current candidate block (<span class="nickname">candidateBlockR</span>)</div>
     <div class="method-notes"></div>
 
@@ -269,8 +269,8 @@
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      <a href="#MinerStatusResponse">MinerStatusResponse</a>
-      
+        <a href="#MinerStatusResponse">MinerStatusResponse</a>
+
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -280,22 +280,22 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>application/json</code></li>
+        <li><code>application/json</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Candidate block response
-        <a href="#MinerStatusResponse">MinerStatusResponse</a>
+    <a href="#MinerStatusResponse">MinerStatusResponse</a>
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="connect"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="connect"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="post"><code class="huge"><span class="http-method">post</span> /peers/connect</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="post"><code class="huge"><span class="http-method">post</span> /peers/connect</code></pre></div>
     <div class="method-summary">Add address to peers list (<span class="nickname">connect</span>)</div>
     <div class="method-notes"></div>
 
@@ -303,14 +303,14 @@
     <h3 class="field-label">Consumes</h3>
     This API call consumes the following media types via the <span class="header">Content-Type</span> request header:
     <ul>
-      <li><code>*/*</code></li>
+        <li><code>*/*</code></li>
     </ul>
 
     <h3 class="field-label">Request body</h3>
     <div class="field-items">
-      <div class="param">body <a href="#string">string</a> (required)</div>
-      
-            <div class="param-desc"><span class="param-type">Body Parameter</span> &mdash;  </div>
+        <div class="param">body <a href="#string">string</a> (required)</div>
+
+        <div class="param-desc"><span class="param-type">Body Parameter</span> &mdash;  </div>
     </div>  <!-- field-items -->
 
 
@@ -324,19 +324,19 @@
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Attempt to connect to the peer
-        <a href="#"></a>
+    <a href="#"></a>
     <h4 class="field-label">400</h4>
     Bad request
-        <a href="#"></a>
+    <a href="#"></a>
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="connectedPeers"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="connectedPeers"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="get"><code class="huge"><span class="http-method">get</span> /peers/connected</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="get"><code class="huge"><span class="http-method">get</span> /peers/connected</code></pre></div>
     <div class="method-summary">Return all connected peers (<span class="nickname">connectedPeers</span>)</div>
     <div class="method-notes"></div>
 
@@ -348,8 +348,8 @@
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      array[<a href="#PeerInfoResponse">PeerInfoResponse</a>]
-      
+        array[<a href="#PeerInfoResponse">PeerInfoResponse</a>]
+
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -359,22 +359,22 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>application/json</code></li>
+        <li><code>application/json</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Array of connected peers
-        
+
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="defaultTransferTransactionR"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="defaultTransferTransactionR"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="post"><code class="huge"><span class="http-method">post</span> /transactions/send</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="post"><code class="huge"><span class="http-method">post</span> /transactions/send</code></pre></div>
     <div class="method-summary">Send unconfirmed transactions (<span class="nickname">defaultTransferTransactionR</span>)</div>
     <div class="method-notes"></div>
 
@@ -382,14 +382,14 @@
     <h3 class="field-label">Consumes</h3>
     This API call consumes the following media types via the <span class="header">Content-Type</span> request header:
     <ul>
-      <li><code>*/*</code></li>
+        <li><code>*/*</code></li>
     </ul>
 
     <h3 class="field-label">Request body</h3>
     <div class="field-items">
-      <div class="param">body <a href="#TransactionResponse">TransactionResponse</a> (optional)</div>
-      
-            <div class="param-desc"><span class="param-type">Body Parameter</span> &mdash;  </div>
+        <div class="param">body <a href="#TransactionResponse">TransactionResponse</a> (optional)</div>
+
+        <div class="param-desc"><span class="param-type">Body Parameter</span> &mdash;  </div>
     </div>  <!-- field-items -->
 
 
@@ -403,21 +403,21 @@
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Transaction sent to NodeViewHolder
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="getBlockHeaderByHeaderIdR"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="getBlockHeaderByHeaderIdR"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="get"><code class="huge"><span class="http-method">get</span> /history/{modifierId}/header</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="get"><code class="huge"><span class="http-method">get</span> /history/{modifierId}/header</code></pre></div>
     <div class="method-summary">Return header with given {modifierId} (<span class="nickname">getBlockHeaderByHeaderIdR</span>)</div>
     <div class="method-notes"></div>
 
     <h3 class="field-label">Path parameters</h3>
     <div class="field-items">
-      <div class="param">modifierId (required)</div>
-      
-            <div class="param-desc"><span class="param-type">Path Parameter</span> &mdash; Base58-encoded 32 byte modifier id </div>    </div>  <!-- field-items -->
+        <div class="param">modifierId (required)</div>
+
+        <div class="param-desc"><span class="param-type">Path Parameter</span> &mdash; Base58-encoded 32 byte modifier id </div>    </div>  <!-- field-items -->
 
 
 
@@ -426,8 +426,8 @@
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      <a href="#HeaderResponse">HeaderResponse</a>
-      
+        <a href="#HeaderResponse">HeaderResponse</a>
+
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -437,30 +437,30 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>application/json</code></li>
+        <li><code>application/json</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Header response
-        <a href="#HeaderResponse">HeaderResponse</a>
+    <a href="#HeaderResponse">HeaderResponse</a>
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="getBlockIdsAtHeightR"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="getBlockIdsAtHeightR"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="get"><code class="huge"><span class="http-method">get</span> /history/at/{height}</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="get"><code class="huge"><span class="http-method">get</span> /history/at/{height}</code></pre></div>
     <div class="method-summary">Return ids of all headers at {height} (<span class="nickname">getBlockIdsAtHeightR</span>)</div>
     <div class="method-notes"></div>
 
     <h3 class="field-label">Path parameters</h3>
     <div class="field-items">
-      <div class="param">height (required)</div>
-      
-            <div class="param-desc"><span class="param-type">Path Parameter</span> &mdash;  format: int32</div>    </div>  <!-- field-items -->
+        <div class="param">height (required)</div>
+
+        <div class="param-desc"><span class="param-type">Path Parameter</span> &mdash;  format: int32</div>    </div>  <!-- field-items -->
 
 
 
@@ -469,8 +469,8 @@
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      
-      array[String]
+
+        array[String]
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -480,30 +480,30 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>text</code></li>
+        <li><code>text</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Headers ids response
-        
+
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="getBlockTransactionsByHeaderIdR"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="getBlockTransactionsByHeaderIdR"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="get"><code class="huge"><span class="http-method">get</span> /history/{modifierId}/transactions</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="get"><code class="huge"><span class="http-method">get</span> /history/{modifierId}/transactions</code></pre></div>
     <div class="method-summary">Return list of transactions of block with given {modifierId} (<span class="nickname">getBlockTransactionsByHeaderIdR</span>)</div>
     <div class="method-notes"></div>
 
     <h3 class="field-label">Path parameters</h3>
     <div class="field-items">
-      <div class="param">modifierId (required)</div>
-      
-            <div class="param-desc"><span class="param-type">Path Parameter</span> &mdash;  </div>    </div>  <!-- field-items -->
+        <div class="param">modifierId (required)</div>
+
+        <div class="param-desc"><span class="param-type">Path Parameter</span> &mdash;  </div>    </div>  <!-- field-items -->
 
 
 
@@ -512,8 +512,8 @@
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      array[<a href="#TransactionResponse">TransactionResponse</a>]
-      
+        array[<a href="#TransactionResponse">TransactionResponse</a>]
+
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -523,22 +523,22 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>application/json</code></li>
+        <li><code>application/json</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Transaction response
-        
+
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="getBlocksR"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="getBlocksR"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="get"><code class="huge"><span class="http-method">get</span> /history</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="get"><code class="huge"><span class="http-method">get</span> /history</code></pre></div>
     <div class="method-summary">Return ids of {limit} headers starting from {offset} (<span class="nickname">getBlocksR</span>)</div>
     <div class="method-notes"></div>
 
@@ -548,17 +548,17 @@
 
     <h3 class="field-label">Query parameters</h3>
     <div class="field-items">
-      <div class="param">offset (optional)</div>
-      
-            <div class="param-desc"><span class="param-type">Query Parameter</span> &mdash;  format: int32</div>      <div class="param">limit (optional)</div>
-      
-            <div class="param-desc"><span class="param-type">Query Parameter</span> &mdash;  format: int32</div>    </div>  <!-- field-items -->
+        <div class="param">offset (optional)</div>
+
+        <div class="param-desc"><span class="param-type">Query Parameter</span> &mdash;  format: int32</div>      <div class="param">limit (optional)</div>
+
+        <div class="param-desc"><span class="param-type">Query Parameter</span> &mdash;  format: int32</div>    </div>  <!-- field-items -->
 
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      
-      array[String]
+
+        array[String]
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -568,30 +568,30 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>text</code></li>
+        <li><code>text</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Headers ids response
-        
+
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="getBoxByIdR"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="getBoxByIdR"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="get"><code class="huge"><span class="http-method">get</span> /state/{boxId}</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="get"><code class="huge"><span class="http-method">get</span> /state/{boxId}</code></pre></div>
     <div class="method-summary">Return box with given id (<span class="nickname">getBoxByIdR</span>)</div>
     <div class="method-notes"></div>
 
     <h3 class="field-label">Path parameters</h3>
     <div class="field-items">
-      <div class="param">boxId (required)</div>
-      
-            <div class="param-desc"><span class="param-type">Path Parameter</span> &mdash;  </div>    </div>  <!-- field-items -->
+        <div class="param">boxId (required)</div>
+
+        <div class="param-desc"><span class="param-type">Path Parameter</span> &mdash;  </div>    </div>  <!-- field-items -->
 
 
 
@@ -600,8 +600,8 @@
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      
-      String
+
+        String
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -611,30 +611,30 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>application/json</code></li>
+        <li><code>application/json</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Box response
-        <a href="#String">String</a>
+    <a href="#String">String</a>
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="getFullBlockByHeaderIdR"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="getFullBlockByHeaderIdR"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="get"><code class="huge"><span class="http-method">get</span> /history/{modifierId}</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="get"><code class="huge"><span class="http-method">get</span> /history/{modifierId}</code></pre></div>
     <div class="method-summary">Return full block with given {modifierId} (<span class="nickname">getFullBlockByHeaderIdR</span>)</div>
     <div class="method-notes"></div>
 
     <h3 class="field-label">Path parameters</h3>
     <div class="field-items">
-      <div class="param">modifierId (required)</div>
-      
-            <div class="param-desc"><span class="param-type">Path Parameter</span> &mdash;  </div>    </div>  <!-- field-items -->
+        <div class="param">modifierId (required)</div>
+
+        <div class="param-desc"><span class="param-type">Path Parameter</span> &mdash;  </div>    </div>  <!-- field-items -->
 
 
 
@@ -643,8 +643,8 @@
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      <a href="#BlockResponse">BlockResponse</a>
-      
+        <a href="#BlockResponse">BlockResponse</a>
+
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -654,30 +654,30 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>application/json</code></li>
+        <li><code>application/json</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Block response
-        <a href="#BlockResponse">BlockResponse</a>
+    <a href="#BlockResponse">BlockResponse</a>
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="getLastHeadersR"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="getLastHeadersR"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="get"><code class="huge"><span class="http-method">get</span> /history/lastHeaders/{quantity}</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="get"><code class="huge"><span class="http-method">get</span> /history/lastHeaders/{quantity}</code></pre></div>
     <div class="method-summary">Return {quantity} last headers (<span class="nickname">getLastHeadersR</span>)</div>
     <div class="method-notes"></div>
 
     <h3 class="field-label">Path parameters</h3>
     <div class="field-items">
-      <div class="param">quantity (required)</div>
-      
-            <div class="param-desc"><span class="param-type">Path Parameter</span> &mdash;  format: int32</div>    </div>  <!-- field-items -->
+        <div class="param">quantity (required)</div>
+
+        <div class="param-desc"><span class="param-type">Path Parameter</span> &mdash;  format: int32</div>    </div>  <!-- field-items -->
 
 
 
@@ -686,8 +686,8 @@
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      array[<a href="#HeaderResponse">HeaderResponse</a>]
-      
+        array[<a href="#HeaderResponse">HeaderResponse</a>]
+
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -697,22 +697,22 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>application/json</code></li>
+        <li><code>application/json</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Headers response
-        
+
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="getUnconfirmedTransactionsR"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="getUnconfirmedTransactionsR"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="get"><code class="huge"><span class="http-method">get</span> /transactions/unconfirmed</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="get"><code class="huge"><span class="http-method">get</span> /transactions/unconfirmed</code></pre></div>
     <div class="method-summary">Return unconfirmed transactions (<span class="nickname">getUnconfirmedTransactionsR</span>)</div>
     <div class="method-notes"></div>
 
@@ -722,17 +722,17 @@
 
     <h3 class="field-label">Query parameters</h3>
     <div class="field-items">
-      <div class="param">offset (optional)</div>
-      
-            <div class="param-desc"><span class="param-type">Query Parameter</span> &mdash;  format: int32</div>      <div class="param">limit (optional)</div>
-      
-            <div class="param-desc"><span class="param-type">Query Parameter</span> &mdash;  format: int32</div>    </div>  <!-- field-items -->
+        <div class="param">offset (optional)</div>
+
+        <div class="param-desc"><span class="param-type">Query Parameter</span> &mdash;  format: int32</div>      <div class="param">limit (optional)</div>
+
+        <div class="param-desc"><span class="param-type">Query Parameter</span> &mdash;  format: int32</div>    </div>  <!-- field-items -->
 
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      array[<a href="#TransactionResponse">TransactionResponse</a>]
-      
+        array[<a href="#TransactionResponse">TransactionResponse</a>]
+
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -742,22 +742,22 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>application/json</code></li>
+        <li><code>application/json</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Unconfirmed transactions response
-        
+
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="getUtxosR"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="getUtxosR"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="get"><code class="huge"><span class="http-method">get</span> /wallet/utxos</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="get"><code class="huge"><span class="http-method">get</span> /wallet/utxos</code></pre></div>
     <div class="method-summary">Return wallet utxos (<span class="nickname">getUtxosR</span>)</div>
     <div class="method-notes"></div>
 
@@ -769,8 +769,8 @@
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      
-      List
+
+        List
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -780,22 +780,22 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>application/json</code></li>
+        <li><code>application/json</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Wallet utxos response
-        <a href="#List">List</a>
+    <a href="#List">List</a>
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="hashBlake2b"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="hashBlake2b"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="post"><code class="huge"><span class="http-method">post</span> /utils/hash/blake2b</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="post"><code class="huge"><span class="http-method">post</span> /utils/hash/blake2b</code></pre></div>
     <div class="method-summary">Return Blake2b hash of specified message (<span class="nickname">hashBlake2b</span>)</div>
     <div class="method-notes"></div>
 
@@ -803,14 +803,14 @@
     <h3 class="field-label">Consumes</h3>
     This API call consumes the following media types via the <span class="header">Content-Type</span> request header:
     <ul>
-      <li><code>*/*</code></li>
+        <li><code>*/*</code></li>
     </ul>
 
     <h3 class="field-label">Request body</h3>
     <div class="field-items">
-      <div class="param">body <a href="#string">string</a> (required)</div>
-      
-            <div class="param-desc"><span class="param-type">Body Parameter</span> &mdash;  </div>
+        <div class="param">body <a href="#string">string</a> (required)</div>
+
+        <div class="param-desc"><span class="param-type">Body Parameter</span> &mdash;  </div>
     </div>  <!-- field-items -->
 
 
@@ -818,8 +818,8 @@
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      
-      String
+
+        String
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -829,22 +829,22 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>*/*</code></li>
+        <li><code>*/*</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Base58-encoded 32 byte hash
-        <a href="#String">String</a>
+    <a href="#String">String</a>
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="infoR"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="infoR"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="get"><code class="huge"><span class="http-method">get</span> /wallet/info</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="get"><code class="huge"><span class="http-method">get</span> /wallet/info</code></pre></div>
     <div class="method-summary">Return wallet info (<span class="nickname">infoR</span>)</div>
     <div class="method-notes"></div>
 
@@ -856,8 +856,8 @@
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      <a href="#WalletInfoResponse">WalletInfoResponse</a>
-      
+        <a href="#WalletInfoResponse">WalletInfoResponse</a>
+
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -867,30 +867,30 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>application/json</code></li>
+        <li><code>application/json</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Wallet info response
-        <a href="#WalletInfoResponse">WalletInfoResponse</a>
+    <a href="#WalletInfoResponse">WalletInfoResponse</a>
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="length"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="length"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="get"><code class="huge"><span class="http-method">get</span> /utils/seed/{length}</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="get"><code class="huge"><span class="http-method">get</span> /utils/seed/{length}</code></pre></div>
     <div class="method-summary">Return random seed of length {length} (<span class="nickname">length</span>)</div>
     <div class="method-notes"></div>
 
     <h3 class="field-label">Path parameters</h3>
     <div class="field-items">
-      <div class="param">length (required)</div>
-      
-            <div class="param-desc"><span class="param-type">Path Parameter</span> &mdash;  format: int32</div>    </div>  <!-- field-items -->
+        <div class="param">length (required)</div>
+
+        <div class="param-desc"><span class="param-type">Path Parameter</span> &mdash;  format: int32</div>    </div>  <!-- field-items -->
 
 
 
@@ -899,8 +899,8 @@
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      
-      String
+
+        String
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -910,22 +910,22 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>*/*</code></li>
+        <li><code>*/*</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Random seed response
-        <a href="#String">String</a>
+    <a href="#String">String</a>
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
-  <div class="method"><a name="seedRoute"></a>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
+<div class="method"><a name="seedRoute"></a>
     <div class="method-path">
-    <a class="up" href="#__Methods">Up</a>
-    <pre class="get"><code class="huge"><span class="http-method">get</span> /utils/seed</code></pre></div>
+        <a class="up" href="#__Methods">Up</a>
+        <pre class="get"><code class="huge"><span class="http-method">get</span> /utils/seed</code></pre></div>
     <div class="method-summary">Return random seed of length 32 (<span class="nickname">seedRoute</span>)</div>
     <div class="method-notes"></div>
 
@@ -937,8 +937,8 @@
 
     <h3 class="field-label">Return type</h3>
     <div class="return-type">
-      
-      String
+
+        String
     </div>
 
     <!--Todo: process Response Object and its headers, schema, examples -->
@@ -948,24 +948,24 @@
     This API call produces the following media types according to the <span class="header">Accept</span> request header;
     the media type will be conveyed by the <span class="header">Content-Type</span> response header.
     <ul>
-      <li><code>*/*</code></li>
+        <li><code>*/*</code></li>
     </ul>
 
     <h3 class="field-label">Responses</h3>
     <h4 class="field-label">200</h4>
     Random seed response
-        <a href="#String">String</a>
+    <a href="#String">String</a>
     <h4 class="field-label">500</h4>
     Internal server error
-        <a href="#"></a>
-  </div> <!-- method -->
-  <hr/>
+    <a href="#"></a>
+</div> <!-- method -->
+<hr/>
 
-  <h2><a name="__Models">Models</a></h2>
-  [ Jump to <a href="#__Methods">Methods</a> ]
+<h2><a name="__Models">Models</a></h2>
+[ Jump to <a href="#__Methods">Methods</a> ]
 
-  <h3>Table of Contents</h3>
-  <ol>
+<h3>Table of Contents</h3>
+<ol>
     <li><a href="#ADProofsResponse"><code>ADProofsResponse</code></a></li>
     <li><a href="#AssetBoxResponse"><code>AssetBoxResponse</code></a></li>
     <li><a href="#BlockResponse"><code>BlockResponse</code></a></li>
@@ -993,236 +993,236 @@
     <li><a href="#TransactionResponse"><code>TransactionResponse</code></a></li>
     <li><a href="#WalletInfoResponse"><code>WalletInfoResponse</code></a></li>
     <li><a href="#WalletInfoResponse_balances"><code>WalletInfoResponse_balances</code></a></li>
-  </ol>
+</ol>
 
-  <div class="model">
+<div class="model">
     <h3><a name="ADProofsResponse"><code>ADProofsResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">headerId (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">proof </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">digest </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">headerId (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">proof </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">digest </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="AssetBoxResponse"><code>AssetBoxResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">typeId </div><div class="param-desc"><span class="param-type"><a href="#ByteArray">byte[]</a></span>  format: byte</div>
-<div class="param">proposition </div><div class="param-desc"><span class="param-type"><a href="#PropositionResponse">PropositionResponse</a></span>  </div>
-<div class="param">id </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">nonce </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
-<div class="param">value </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
-<div class="param">tokenId (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">typeId </div><div class="param-desc"><span class="param-type"><a href="#ByteArray">byte[]</a></span>  format: byte</div>
+        <div class="param">proposition </div><div class="param-desc"><span class="param-type"><a href="#PropositionResponse">PropositionResponse</a></span>  </div>
+        <div class="param">id </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">nonce </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
+        <div class="param">value </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
+        <div class="param">tokenId (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="BlockResponse"><code>BlockResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">header </div><div class="param-desc"><span class="param-type"><a href="#HeaderResponse">HeaderResponse</a></span>  </div>
-<div class="param">payload </div><div class="param-desc"><span class="param-type"><a href="#PayloadResponse">PayloadResponse</a></span>  </div>
-<div class="param">adProofs (optional)</div><div class="param-desc"><span class="param-type"><a href="#ADProofsResponse">ADProofsResponse</a></span>  </div>
+        <div class="param">header </div><div class="param-desc"><span class="param-type"><a href="#HeaderResponse">HeaderResponse</a></span>  </div>
+        <div class="param">payload </div><div class="param-desc"><span class="param-type"><a href="#PayloadResponse">PayloadResponse</a></span>  </div>
+        <div class="param">adProofs (optional)</div><div class="param-desc"><span class="param-type"><a href="#ADProofsResponse">ADProofsResponse</a></span>  </div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="CandidateBlockResponse"><code>CandidateBlockResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">parentOpt (optional)</div><div class="param-desc"><span class="param-type"><a href="#HeaderResponse">HeaderResponse</a></span>  </div>
-<div class="param">adProofBytes </div><div class="param-desc"><span class="param-type"><a href="#ByteArray">array[byte[]]</a></span>  format: byte</div>
-<div class="param">stateRoot (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">version (optional)</div><div class="param-desc"><span class="param-type"><a href="#ByteArray">byte[]</a></span>  format: byte</div>
-<div class="param">transactions </div><div class="param-desc"><span class="param-type"><a href="#TransactionResponse">array[TransactionResponse]</a></span>  </div>
-<div class="param">timestamp (optional)</div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
-<div class="param">difficulty </div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  format: int32</div>
+        <div class="param">parentOpt (optional)</div><div class="param-desc"><span class="param-type"><a href="#HeaderResponse">HeaderResponse</a></span>  </div>
+        <div class="param">adProofBytes </div><div class="param-desc"><span class="param-type"><a href="#ByteArray">array[byte[]]</a></span>  format: byte</div>
+        <div class="param">stateRoot (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">version (optional)</div><div class="param-desc"><span class="param-type"><a href="#ByteArray">byte[]</a></span>  format: byte</div>
+        <div class="param">transactions </div><div class="param-desc"><span class="param-type"><a href="#TransactionResponse">array[TransactionResponse]</a></span>  </div>
+        <div class="param">timestamp (optional)</div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
+        <div class="param">difficulty </div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  format: int32</div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="DataBoxResponse"><code>DataBoxResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">typeId </div><div class="param-desc"><span class="param-type"><a href="#ByteArray">byte[]</a></span>  format: byte</div>
-<div class="param">proposition </div><div class="param-desc"><span class="param-type"><a href="#PropositionResponse">PropositionResponse</a></span>  </div>
-<div class="param">id </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">nonce </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
-<div class="param">data </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">typeId </div><div class="param-desc"><span class="param-type"><a href="#ByteArray">byte[]</a></span>  format: byte</div>
+        <div class="param">proposition </div><div class="param-desc"><span class="param-type"><a href="#PropositionResponse">PropositionResponse</a></span>  </div>
+        <div class="param">id </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">nonce </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
+        <div class="param">data </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="DirectiveResponse"><code>DirectiveResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-          </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+    </div>  <!-- field-items -->
+</div>
+<div class="model">
     <h3><a name="EncryBaseBoxResponse"><code>EncryBaseBoxResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-          </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+    </div>  <!-- field-items -->
+</div>
+<div class="model">
     <h3><a name="EquihashSolutionResponse"><code>EquihashSolutionResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">ints </div><div class="param-desc"><span class="param-type"><a href="#object">array[Object]</a></span>  </div>
+        <div class="param">ints </div><div class="param-desc"><span class="param-type"><a href="#object">array[Object]</a></span>  </div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="Function1RequestContextFutureRouteResult"><code>Function1RequestContextFutureRouteResult</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-          </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+    </div>  <!-- field-items -->
+</div>
+<div class="model">
     <h3><a name="HeaderResponse"><code>HeaderResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">id </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">version </div><div class="param-desc"><span class="param-type"><a href="#ByteArray">byte[]</a></span>  format: byte</div>
-<div class="param">parentId </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">adProofsRoot </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">payloadId </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">stateRoot </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">txRoot </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">nonce </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
-<div class="param">timestamp </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
-<div class="param">height </div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  format: int32</div>
-<div class="param">difficulty </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
-<div class="param">equihashSolution </div><div class="param-desc"><span class="param-type"><a href="#EquihashSolutionResponse">EquihashSolutionResponse</a></span>  </div>
+        <div class="param">id </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">version </div><div class="param-desc"><span class="param-type"><a href="#ByteArray">byte[]</a></span>  format: byte</div>
+        <div class="param">parentId </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">adProofsRoot </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">payloadId </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">stateRoot </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">txRoot </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">nonce </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
+        <div class="param">timestamp </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
+        <div class="param">height </div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  format: int32</div>
+        <div class="param">difficulty </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
+        <div class="param">equihashSolution </div><div class="param-desc"><span class="param-type"><a href="#EquihashSolutionResponse">EquihashSolutionResponse</a></span>  </div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="InputResponse"><code>InputResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">boxId </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">contract </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">proofs </div><div class="param-desc"><span class="param-type"><a href="#ProofResponse">array[ProofResponse]</a></span>  </div>
+        <div class="param">boxId </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">contract </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">proofs </div><div class="param-desc"><span class="param-type"><a href="#ProofResponse">array[ProofResponse]</a></span>  </div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="MapStringString"><code>MapStringString</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">empty </div><div class="param-desc"><span class="param-type"><a href="#boolean">Boolean</a></span>  </div>
-<div class="param">traversableAgain (optional)</div><div class="param-desc"><span class="param-type"><a href="#boolean">Boolean</a></span>  </div>
+        <div class="param">empty </div><div class="param-desc"><span class="param-type"><a href="#boolean">Boolean</a></span>  </div>
+        <div class="param">traversableAgain (optional)</div><div class="param-desc"><span class="param-type"><a href="#boolean">Boolean</a></span>  </div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="MinerStatusResponse"><code>MinerStatusResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">isMining </div><div class="param-desc"><span class="param-type"><a href="#boolean">Boolean</a></span>  </div>
-<div class="param">candidateBlock (optional)</div><div class="param-desc"><span class="param-type"><a href="#CandidateBlockResponse">CandidateBlockResponse</a></span>  </div>
+        <div class="param">isMining </div><div class="param-desc"><span class="param-type"><a href="#boolean">Boolean</a></span>  </div>
+        <div class="param">candidateBlock (optional)</div><div class="param-desc"><span class="param-type"><a href="#CandidateBlockResponse">CandidateBlockResponse</a></span>  </div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="PayloadResponse"><code>PayloadResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">headerId (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">transactions </div><div class="param-desc"><span class="param-type"><a href="#TransactionResponse">array[TransactionResponse]</a></span>  </div>
+        <div class="param">headerId (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">transactions </div><div class="param-desc"><span class="param-type"><a href="#TransactionResponse">array[TransactionResponse]</a></span>  </div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="PeerInfoResponse"><code>PeerInfoResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">address </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">name (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">connectionType (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">address </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">name (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">connectionType (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="ProofResponse"><code>ProofResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">serializedValue (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">tag (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">serializedValue (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">tag (optional)</div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="PropositionResponse"><code>PropositionResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">contractHash </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">contractHash </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="SeqDirectiveResponse"><code>SeqDirectiveResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-          </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+    </div>  <!-- field-items -->
+</div>
+<div class="model">
     <h3><a name="SeqEncryBaseBoxResponse"><code>SeqEncryBaseBoxResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-          </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+    </div>  <!-- field-items -->
+</div>
+<div class="model">
     <h3><a name="SeqInputResponse"><code>SeqInputResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-          </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+    </div>  <!-- field-items -->
+</div>
+<div class="model">
     <h3><a name="SeqObject"><code>SeqObject</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-          </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+    </div>  <!-- field-items -->
+</div>
+<div class="model">
     <h3><a name="SeqProofResponse"><code>SeqProofResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-          </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+    </div>  <!-- field-items -->
+</div>
+<div class="model">
     <h3><a name="SeqTransactionResponse"><code>SeqTransactionResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-          </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+    </div>  <!-- field-items -->
+</div>
+<div class="model">
     <h3><a name="TokenIssuingBoxResponse"><code>TokenIssuingBoxResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">typeId </div><div class="param-desc"><span class="param-type"><a href="#ByteArray">byte[]</a></span>  format: byte</div>
-<div class="param">proposition </div><div class="param-desc"><span class="param-type"><a href="#PropositionResponse">PropositionResponse</a></span>  </div>
-<div class="param">id </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">nonce </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
+        <div class="param">typeId </div><div class="param-desc"><span class="param-type"><a href="#ByteArray">byte[]</a></span>  format: byte</div>
+        <div class="param">proposition </div><div class="param-desc"><span class="param-type"><a href="#PropositionResponse">PropositionResponse</a></span>  </div>
+        <div class="param">id </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">nonce </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="TransactionResponse"><code>TransactionResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">fee </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
-<div class="param">id </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
-<div class="param">timestamp </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
-<div class="param">inputs </div><div class="param-desc"><span class="param-type"><a href="#InputResponse">array[InputResponse]</a></span>  </div>
-<div class="param">directives </div><div class="param-desc"><span class="param-type"><a href="#DirectiveResponse">array[DirectiveResponse]</a></span>  </div>
-<div class="param">outputs </div><div class="param-desc"><span class="param-type"><a href="#EncryBaseBoxResponse">array[EncryBaseBoxResponse]</a></span>  </div>
-<div class="param">defaultProofOpt (optional)</div><div class="param-desc"><span class="param-type"><a href="#ProofResponse">ProofResponse</a></span>  </div>
+        <div class="param">fee </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
+        <div class="param">id </div><div class="param-desc"><span class="param-type"><a href="#string">String</a></span>  </div>
+        <div class="param">timestamp </div><div class="param-desc"><span class="param-type"><a href="#long">Long</a></span>  format: int64</div>
+        <div class="param">inputs </div><div class="param-desc"><span class="param-type"><a href="#InputResponse">array[InputResponse]</a></span>  </div>
+        <div class="param">directives </div><div class="param-desc"><span class="param-type"><a href="#DirectiveResponse">array[DirectiveResponse]</a></span>  </div>
+        <div class="param">outputs </div><div class="param-desc"><span class="param-type"><a href="#EncryBaseBoxResponse">array[EncryBaseBoxResponse]</a></span>  </div>
+        <div class="param">defaultProofOpt (optional)</div><div class="param-desc"><span class="param-type"><a href="#ProofResponse">ProofResponse</a></span>  </div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="WalletInfoResponse"><code>WalletInfoResponse</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">balances </div><div class="param-desc"><span class="param-type"><a href="#WalletInfoResponse_balances">WalletInfoResponse_balances</a></span>  </div>
-<div class="param">utxosQty </div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  format: int32</div>
+        <div class="param">balances </div><div class="param-desc"><span class="param-type"><a href="#WalletInfoResponse_balances">WalletInfoResponse_balances</a></span>  </div>
+        <div class="param">utxosQty </div><div class="param-desc"><span class="param-type"><a href="#integer">Integer</a></span>  format: int32</div>
     </div>  <!-- field-items -->
-  </div>
-  <div class="model">
+</div>
+<div class="model">
     <h3><a name="WalletInfoResponse_balances"><code>WalletInfoResponse_balances</code></a> <a class="up" href="#__Models">Up</a></h3>
-    
+
     <div class="field-items">
-      <div class="param">empty (optional)</div><div class="param-desc"><span class="param-type"><a href="#boolean">Boolean</a></span>  </div>
-<div class="param">traversableAgain (optional)</div><div class="param-desc"><span class="param-type"><a href="#boolean">Boolean</a></span>  </div>
+        <div class="param">empty (optional)</div><div class="param-desc"><span class="param-type"><a href="#boolean">Boolean</a></span>  </div>
+        <div class="param">traversableAgain (optional)</div><div class="param-desc"><span class="param-type"><a href="#boolean">Boolean</a></span>  </div>
     </div>  <!-- field-items -->
-  </div>
-  </body>
+</div>
+</body>
 </html>

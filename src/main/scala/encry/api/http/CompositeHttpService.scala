@@ -19,8 +19,8 @@ case class CompositeHttpService(system: ActorSystem, routes: Seq[ApiRoute], sett
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   val compositeRoute: Route = routes.map(_.route).reduce(_ ~ _) ~
-  path("swagger") {
-    getFromResource("swagger-ui/index.html")
-  } ~ getFromResourceDirectory("swagger-ui") ~ SwaggerRoute.routes ~ redirectToSwagger
+    path("swagger") {
+      getFromResource("swagger-ui/index.html")
+    } ~ getFromResourceDirectory("swagger-ui") ~ SwaggerRoute.routes ~ redirectToSwagger
 
 }

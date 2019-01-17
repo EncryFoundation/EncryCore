@@ -21,9 +21,8 @@ val databaseDependencies = Seq(
 )
 
 val apiDependencies = Seq(
-  "javax.ws.rs" % "javax.ws.rs-api" % "2.0.1",
-  "com.github.swagger-akka-http" %% "swagger-akka-http" % "2.0.0",
-  "io.swagger" %% "swagger-scala-module" % "1.0.4",
+  "io.swagger" %% "swagger-scala-module" % "1.0.3",
+  "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.10.0",
   "com.typesafe.akka" %% "akka-http" % akkaHttpVersion
 )
 
@@ -118,8 +117,7 @@ val opts = Seq(
   "-XX:+AlwaysPreTouch",
   "-XX:+PerfDisableSharedMem",
   "-XX:+ParallelRefProcEnabled",
-  "-XX:+UseStringDeduplication",
-  "-XX:MaxMetaspaceSize=512m")
+  "-XX:+UseStringDeduplication")
 
 javaOptions in run ++= opts
 
