@@ -50,6 +50,22 @@ case class WalletVersionalLevelDB(override val db: DB) extends VersionalLevelDB[
     elementsBuffer
   }
 
+  def getBoxes(qty: Int): Seq[EncryBaseBox] = {
+    var elementsBuffer: Seq[(Array[Byte], Array[Byte])] = Seq.empty
+    val iterator = db.iterator()
+    iterator.seekToFirst()
+    while (iterator.hasNext && elementsBuffer.size < qty) {
+      val nextElem = iterator.next()
+      if (nextElem.getKey sameElements WalletVersionalLevelDB.BalancesKey) elementsBuffer
+      else elementsBuffer = elementsBuffer :+ (nextElem.getKey -> nextElem.getValue)
+    }
+    iterator.seekToLast()
+    elementsBuffer.map{case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head)}
+      .collect{
+        case Success(box) => box
+      }
+  }
+
   def getBoxById(id: ADKey): Option[EncryBaseBox] = StateModifierSerializer.parseBytes(db.get(id), id.head).toOption
 
   def getTokenBalanceById(id: TokenId): Option[Amount] = getBalances

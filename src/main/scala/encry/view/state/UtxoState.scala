@@ -218,8 +218,14 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         }
       }
 
-      if (!validBalance) Invalid(Seq(MalformedModifierError(s"Non-positive balance in $tx")))
-      else if (bxs.length != tx.inputs.length) Invalid(Seq(MalformedModifierError(s"Box not found")))
+      if (!validBalance) {
+        logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Non-positive balance in $tx")
+        Invalid(Seq(MalformedModifierError(s"Non-positive balance in $tx")))
+      }
+      else if (bxs.length != tx.inputs.length) {
+        logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Box not found")
+        Invalid(Seq(MalformedModifierError(s"Box not found")))
+      }
       else Valid
     } else tx.semanticValidity
 
