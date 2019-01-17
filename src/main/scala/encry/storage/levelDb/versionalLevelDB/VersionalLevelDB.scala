@@ -37,6 +37,7 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
                    currentNodesList: List[Version[D]] = versionsList,
                    diffs: Seq[D] = Seq.empty,
                    persistantProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Seq[D] = {
+    logger.info(s"currentNodesList: ${currentNodesList.map(_.toString).mkString("\n")}")
     if (currentNodesList.nonEmpty && targetNodeId == currentNodesList.last.modifierId) diffs
     else if (currentNodesList.nonEmpty)
       getDiffsPath(
