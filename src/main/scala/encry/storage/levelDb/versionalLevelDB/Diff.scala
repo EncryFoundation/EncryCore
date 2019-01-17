@@ -25,8 +25,6 @@ case class WalletDiff(boxesToRemove: Seq[ADKey],
                       boxesToAdd: Seq[EncryBaseBox],
                       balanceChanges: Map[String, Long]) extends RevertabaleDiff[WalletDiff] with StrictLogging{
   override def revert(persistantProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): WalletDiff = {
-    logger.info(s"This: ${this}")
-    logger.info(s"this.boxesToRemove: ${this.boxesToRemove.map(Algos.encode).mkString(",")}")
     this.copy(
       boxesToAdd = this.boxesToRemove.flatMap(boxId => persistantProver.unauthenticatedLookup(boxId)
         .map(bytes => StateModifierSerializer.parseBytes(bytes, boxId.head))).collect { case Success(x) => x },
