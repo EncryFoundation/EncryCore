@@ -71,8 +71,8 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
   }
 
   private def checkRollbackPoint(rollbackPoint: ModifierId, nodesList: List[Version[D]] = versionsList): Boolean = {
-    if (nodesList.last.modifierId sameElements rollbackPoint) true
-    else if (nodesList.isEmpty) false
+    if (nodesList.isEmpty) false
+    else if (nodesList.last.modifierId sameElements rollbackPoint) true
     else checkRollbackPoint(rollbackPoint, nodesList.init)
   }
 }
