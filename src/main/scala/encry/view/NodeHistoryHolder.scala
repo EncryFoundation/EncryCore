@@ -70,7 +70,9 @@ class NodeHistoryHolder(var history: EncryHistory, settings: EncryAppSettings) e
             }
             if (history.contains(pmod.id) || ModifiersCache.contains(key(pmod.id)))
               logWarn(s"Received modifier ${pmod.encodedId} that is already in history")
-            else ModifiersCache.put(key(pmod.id), pmod, history)
+            else {
+              ModifiersCache.put(key(pmod.id), pmod, history)
+            }
         }
         logInfo(s"Cache before(${ModifiersCache.size})")
         computeApplications()
@@ -81,7 +83,7 @@ class NodeHistoryHolder(var history: EncryHistory, settings: EncryAppSettings) e
   }
 
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!history.contains(pmod.id)) {
-    logInfo(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
+    logInfo(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeHistoryHolder")
     if (settings.influxDB.isDefined) context.system
       .actorSelection("user/statsSender") !
       StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())

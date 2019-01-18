@@ -56,15 +56,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
 
   if (settings.influxDB.isDefined) {
     context.system.scheduler.schedule(10.second, 1.second) {
-      nodeHistoryHolder ! GetFromCurrentHistory { history =>
-        val txsInLastBlock: Int = history.bestBlockOpt.map(x => x.payload.transactions.size).getOrElse(0)
-        val txsInMempool: Int = nodeView.mempool.unconfirmed.values.size
-        val diffBtw: Int = txsInMempool - txsInLastBlock
-
-        context.system.actorSelection("user/statsSender") ! TransactionsStatMessage(txsInLastBlock, history.bestBlockHeight)
-        context.system.actorSelection("user/statsSender") ! MempoolStat(txsInMempool)
-        context.system.actorSelection("user/statsSender") ! DiffBtwMempoolAndLastBlockTxs(diffBtw)
-      }
+      context.system.actorSelection("user/statsSender") ! MempoolStat(nodeView.mempool.unconfirmed.values.size)
     }
   }
 
@@ -100,12 +92,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
     case CompareViews(peer, modifierTypeId, modifierIds) if modifierTypeId == Transaction.ModifierTypeId =>
       sender() ! RequestFromLocal(peer, modifierTypeId, nodeView.mempool.notIn(modifierIds))
     case msg: CompareViews => nodeHistoryHolder.forward(msg)
-    case _: FromCurrentHistory[_] =>
     case a: Any =>
       logError(s"Strange input: $a")
   }
-
-  def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
   def updateNodeView(updatedHistory: Option[EncryHistory] = None,
                      updatedState: Option[StateType] = None,
@@ -218,7 +207,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
         val startPoint: Long = System.currentTimeMillis()
         val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
           updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
-        nodeHistoryHolder ! HistoryUpdateFromNVH(newHistory, false)
         if (settings.influxDB.isDefined)
           context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
         newStateTry match {
