@@ -24,7 +24,10 @@ case class WalletVersionalLevelDB(override val db: DB) extends VersionalLevelDB[
   def id: ModifierId = versionsList.lastOption.map(_.modifierId).getOrElse(ModifierId @@ Array.fill(32)(0: Byte))
 
   override def add(modifier: NodeViewModifier): Unit = {
-    if (versionsList.size + 1 > maxRollbackDepth) versionsList = versionsList.tail
+    if (versionsList.size + 1 > maxRollbackDepth) {
+
+      versionsList = versionsList.tail
+    }
     val diffs = WalletVersionalLevelDB.getDiffs(modifier)
     applyDiff(diffs.tail.foldLeft(diffs.head)(_ ++ _))
     val newModifiersTree = Version[WalletDiff](modifier.id, diffs)
@@ -84,6 +87,7 @@ case class WalletVersionalLevelDB(override val db: DB) extends VersionalLevelDB[
     }
     val diff = WalletDiff(spentBxs.map(_.id), bxsToInsert, newBalances)
     val treeNode = Version[WalletDiff](modifierId, Seq(diff))
+    if (versionsList.size + 1 > maxRollbackDepth) versionsList = versionsList.tail
     versionsList = versionsList :+ treeNode
     applyDiff(diff)
   }
