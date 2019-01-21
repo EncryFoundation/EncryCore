@@ -2,6 +2,7 @@ package encry.storage.levelDb.versionalLevelDB
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.NodeViewModifier
+import encry.settings.Constants
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDB.BrunchNum
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.view.history.History.Height
@@ -9,11 +10,15 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.Algos.HF
 import org.iq80.leveldb.DB
 import scorex.crypto.hash.Digest32
+
 import scala.util.Try
 
 trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
 
   val db: DB
+
+  //TODO: Maybe get this param from settings?
+  val maxRollbackDepth: Int = Constants.Chain.MaxRollbackDepth
 
   var versionsList: List[Version[D]] = List.empty[Version[D]]
 
