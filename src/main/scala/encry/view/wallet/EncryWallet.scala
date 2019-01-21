@@ -47,7 +47,7 @@ case class EncryWallet(walletStore: DB, accountManager: AccountManager) {
   }
 
   def rollback(to: VersionTag, prover: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Try[Unit] =
-    walletStorage.rollbackTo(ModifierId @@ to.untag(VersionTag), prover)
+    walletStorage.tryRollbackTo(ModifierId @@ to.untag(VersionTag), prover)
 
   def getBalances: Seq[(String, Long)] = walletStorage.getBalances.toSeq
 }

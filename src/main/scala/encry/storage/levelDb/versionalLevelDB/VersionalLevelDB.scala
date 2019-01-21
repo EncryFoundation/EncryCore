@@ -54,29 +54,34 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
     else diffs
   }
 
-  def rollbackTo(rollbackPoint: ModifierId,
-                 prover: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
-                 diffsPath: Seq[D] = Seq.empty[D]): Try[Unit] = Try {
+  def tryRollbackTo(rollbackPoint: ModifierId,
+                    prover: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
+                    diffsPath: Seq[D] = Seq.empty[D]): Try[Unit] = Try {
     if (checkRollbackPoint(rollbackPoint)) {
-      if (versionsList.last.modifierId == rollbackPoint) {
-        applyDiff(diffsPath.tail.foldLeft(diffsPath.head)(_ ++ _))
-      }
-      else {
-        val diffs = getDiffsPath(rollbackPoint, persistantProver = prover)
-        if (versionsList.nonEmpty) {
-          versionsList = versionsList.init
-          rollbackTo(rollbackPoint, prover,
-            //TODO: Remove if
-            if (diffsPath.isEmpty) diffs else diffsPath)
-        }
-        else diffsPath
-      }
+      rollbackTo(rollbackPoint, prover, diffsPath)
     }
     else throw new Exception(s"Impossible to rollback to: ${Algos.encode(rollbackPoint)}.\n")
   }
 
+  def rollbackTo(rollbackPoint: ModifierId,
+                 prover: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
+                 diffsPath: Seq[D] = Seq.empty[D]): Unit =
+    if (versionsList.last.modifierId == rollbackPoint) {
+      applyDiff(diffsPath.tail.foldLeft(diffsPath.head)(_ ++ _))
+    }
+    else {
+      val diffs = getDiffsPath(rollbackPoint, persistantProver = prover)
+      if (versionsList.nonEmpty) {
+        versionsList = versionsList.init
+        rollbackTo(rollbackPoint, prover,
+          //TODO: Remove if
+          if (diffsPath.isEmpty) diffs else diffsPath)
+      }
+      else diffsPath
+  }
+
   private def checkRollbackPoint(rollbackPoint: ModifierId, nodesList: List[Version[D]] = versionsList): Boolean = {
-    logger.info(s"Going to find rollback point in: ${nodesList.map(v => Algos.encode(v.modifierId)).mkString(",")}")
+    logger.info(s"Going to find rollback point (${Algos.encode(rollbackPoint)}) in versionsList.size(${versionsList.length}): ${nodesList.map(v => Algos.encode(v.modifierId)).mkString(",")}")
     if (nodesList.isEmpty) {
       logger.info(s"VersionalLevelDb: Rollback point ${Algos.encode(rollbackPoint)} doesn't exist!")
       false
