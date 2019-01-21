@@ -65,8 +65,12 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
 
   def rollbackTo(rollbackPoint: ModifierId,
                  prover: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
-                 diffsPath: Seq[D] = Seq.empty[D]): Unit =
-    if (versionsList.last.modifierId == rollbackPoint) {
+                 diffsPath: Seq[D] = Seq.empty[D]): Unit = {
+    logger.info(s"Goint to rollback to: ${Algos.encode(rollbackPoint)}")
+    logger.info(s"Current diffs path contains ${diffsPath.size} elems is: ${diffsPath.mkString(",")}")
+    logger.info(s"Current version list contains: ${versionsList.mkString(",")}")
+    logger.info(s"Last version is: ${Algos.encode(versionsList.last.modifierId)}")
+    if (versionsList.last.modifierId sameElements rollbackPoint) {
       applyDiff(diffsPath.tail.foldLeft(diffsPath.head)(_ ++ _))
     }
     else {
@@ -78,6 +82,7 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
           if (diffsPath.isEmpty) diffs else diffsPath)
       }
       else diffsPath
+    }
   }
 
   private def checkRollbackPoint(rollbackPoint: ModifierId, nodesList: List[Version[D]] = versionsList): Boolean = {
