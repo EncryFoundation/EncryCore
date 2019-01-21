@@ -72,11 +72,14 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
         else diffsPath
       }
     }
-    else throw new Exception(s"Impossible to rollback to: ${Algos.encode(rollbackPoint)}")
+    else throw new Exception(s"Impossible to rollback to: ${Algos.encode(rollbackPoint)}\n")
   }
 
   private def checkRollbackPoint(rollbackPoint: ModifierId, nodesList: List[Version[D]] = versionsList): Boolean = {
-    if (nodesList.isEmpty) false
+    if (nodesList.isEmpty) {
+      logger.info(s"VersionalLevelDb: Rollback point ${Algos.encode(rollbackPoint)} doesn't exist!")
+      false
+    }
     else if (nodesList.last.modifierId sameElements rollbackPoint) true
     else checkRollbackPoint(rollbackPoint, nodesList.init)
   }
