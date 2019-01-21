@@ -70,19 +70,9 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
     logger.info(s"Current diffs path contains ${diffsPath.size} elems is: ${diffsPath.mkString(",")}")
     logger.info(s"Current version list contains: ${versionsList.mkString(",")}")
     logger.info(s"Last version is: ${Algos.encode(versionsList.last.modifierId)}")
-    if (versionsList.last.modifierId sameElements rollbackPoint) {
-      applyDiff(diffsPath.tail.foldLeft(diffsPath.head)(_ ++ _))
-    }
-    else {
-      val diffs = getDiffsPath(rollbackPoint, persistantProver = prover)
-      if (versionsList.nonEmpty) {
-        versionsList = versionsList.init
-        rollbackTo(rollbackPoint, prover,
-          //TODO: Remove if
-          if (diffsPath.isEmpty) diffs else diffsPath)
-      }
-      else diffsPath
-    }
+    val diffs = getDiffsPath(rollbackPoint, persistantProver = prover)
+    versionsList = versionsList.reverse.dropWhile(ver => !(ver.modifierId sameElements rollbackPoint)).reverse
+    applyDiff(diffs.tail.foldLeft(diffs.head)(_ ++ _))
   }
 
   private def checkRollbackPoint(rollbackPoint: ModifierId, nodesList: List[Version[D]] = versionsList): Boolean = {
