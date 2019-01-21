@@ -76,6 +76,7 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
   }
 
   private def checkRollbackPoint(rollbackPoint: ModifierId, nodesList: List[Version[D]] = versionsList): Boolean = {
+    logger.info(s"Going to find rollback point in: ${nodesList.map(v => Algos.encode(v.modifierId)).mkString(",")}")
     if (nodesList.isEmpty) {
       logger.info(s"VersionalLevelDb: Rollback point ${Algos.encode(rollbackPoint)} doesn't exist!")
       false
