@@ -194,7 +194,7 @@ class WalletVersionalLevelDBTest extends PropSpec with Matchers with EncryGenera
       blocksToWallet.dropRight(rollbackLength).last.id shouldEqual walletVersionalDB.id
   }
 
-  property("Rollback of 10 blocks then add 5 blocks. With spending txs") {
+  property("Rollback of 10 blocks then add 5 blocks. With spending txs.") {
 
     val rollbackLength = 10
 
