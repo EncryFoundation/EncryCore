@@ -39,9 +39,8 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
   def getDiffsPath(targetNodeId: ModifierId,
                    currentNodesList: List[Version[D]] = versionsList,
                    diffs: Seq[D] = Seq.empty,
-                   persistantProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Seq[D] = {
-    if (currentNodesList.nonEmpty && targetNodeId == currentNodesList.last.modifierId) diffs
-    else if (currentNodesList.nonEmpty)
+                   persistantProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Seq[D] =
+    if (currentNodesList.nonEmpty && targetNodeId != currentNodesList.last.modifierId)
       getDiffsPath(
         targetNodeId,
         currentNodesList.init,
@@ -49,7 +48,6 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
         persistantProver
       )
     else diffs
-  }
 
   def tryRollbackTo(rollbackPoint: ModifierId,
                     prover: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
