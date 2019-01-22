@@ -211,10 +211,6 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           val intrinsicBalance: Amount = balanceSheet.getOrElse(Constants.IntrinsicTokenId, 0L)
           balanceSheet.updated(Constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
         }.map { case (tokenId, amount) => Algos.encode(tokenId) -> amount }
-        logger.info("Debit:")
-        logger.info(debitB.map{case(tokenId, amount) => s"$tokenId:$amount"}.mkString("\n"))
-        logger.info("creditB:")
-        logger.info(creditB.map{case(tokenId, amount) => s"$tokenId:$amount"}.mkString("\n"))
         creditB.forall { case (tokenId, amount) =>
           if (tokenId == Algos.encode(Constants.IntrinsicTokenId))
             debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
