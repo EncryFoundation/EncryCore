@@ -15,8 +15,6 @@ class MinerWalletBalanceTest extends AsyncFunSuite with Matchers {
   test("Miner balance should increase ") {
 
     val heightToCheck = 5
-
-
     val supplyAtHeight = (0 to heightToCheck).foldLeft(0: Long) {
       case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i)
     }
