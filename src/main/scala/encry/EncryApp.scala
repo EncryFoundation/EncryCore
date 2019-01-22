@@ -38,6 +38,7 @@ object EncryApp extends App with Logging {
   implicit val ec: ExecutionContextExecutor = system.dispatcher
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
+  println(settings.wallet.map(_.seed))
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
   lazy val dbService: DBService = DBService()
 
