@@ -193,7 +193,7 @@ case class Docker(suiteConfig: Config = empty,
       }
       .getOrElse(HostConfig.builder())
       .portBindings(portBindings)
-      .memory(1L << 30) //limit memory to 1G
+      .memory(4294967296L) //limit memory to 4G
       .build()
 
     val networkingConfig = ContainerConfig.NetworkingConfig
