@@ -1,4 +1,5 @@
 package encry.storage.levelDb.versionalLevelDB
+
 import com.google.common.primitives.Longs
 import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
 import encry.modifiers.history.Block
@@ -24,10 +25,7 @@ case class WalletVersionalLevelDB(override val db: DB) extends VersionalLevelDB[
   def id: ModifierId = versionsList.lastOption.map(_.modifierId).getOrElse(ModifierId @@ Array.fill(32)(0: Byte))
 
   override def add(modifier: NodeViewModifier): Unit = {
-    if (versionsList.size + 1 > maxRollbackDepth) {
-
-      versionsList = versionsList.tail
-    }
+    if (versionsList.size + 1 > maxRollbackDepth) versionsList = versionsList.tail
     val diffs = WalletVersionalLevelDB.getDiffs(modifier)
     applyDiff(diffs.tail.foldLeft(diffs.head)(_ ++ _))
     val newModifiersTree = Version[WalletDiff](modifier.id, diffs)
@@ -36,8 +34,8 @@ case class WalletVersionalLevelDB(override val db: DB) extends VersionalLevelDB[
 
   def getAllBoxes: Seq[EncryBaseBox] =
     getAll
-      .map{case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head)}
-      .collect{
+      .map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
+      .collect {
         case Success(box) => box
       }
 
@@ -64,8 +62,8 @@ case class WalletVersionalLevelDB(override val db: DB) extends VersionalLevelDB[
       else elementsBuffer = elementsBuffer :+ (nextElem.getKey -> nextElem.getValue)
     }
     iterator.seekToLast()
-    elementsBuffer.map{case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head)}
-      .collect{
+    elementsBuffer.map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
+      .collect {
         case Success(box) => box
       }
   }
@@ -83,7 +81,7 @@ case class WalletVersionalLevelDB(override val db: DB) extends VersionalLevelDB[
     val newBalances: Map[String, Amount] = {
       val toRemoveFromBalance = BalanceCalculator.balanceSheet(spentBxs).mapValues(_ * -1)
       val toAddToBalance = BalanceCalculator.balanceSheet(newBxs)
-      (toAddToBalance |+| toRemoveFromBalance).map{case (tokenId, value) => Algos.encode(tokenId) -> value}
+      (toAddToBalance |+| toRemoveFromBalance).map { case (tokenId, value) => Algos.encode(tokenId) -> value }
     }
     val diff = WalletDiff(spentBxs.map(_.id), bxsToInsert, newBalances)
     val treeNode = Version[WalletDiff](modifierId, Seq(diff))
@@ -131,7 +129,7 @@ object WalletVersionalLevelDB {
       val toDelete = tx.inputs.map(_.boxId)
       val toAdd = tx.newBoxes.toList
       val balances = BalanceCalculator.balanceSheet(toAdd)
-      Seq(WalletDiff(toDelete, toAdd, balances.map{case (tokenId, value) => Algos.encode(tokenId) -> value}))
+      Seq(WalletDiff(toDelete, toAdd, balances.map { case (tokenId, value) => Algos.encode(tokenId) -> value }))
     case _ => Seq.empty
   }
 }
