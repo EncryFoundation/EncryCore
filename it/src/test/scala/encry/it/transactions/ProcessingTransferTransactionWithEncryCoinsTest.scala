@@ -36,7 +36,7 @@ class ProcessingTransferTransactionWithEncryCoinsTest extends AsyncFunSuite
     val mnemonicKey: String       = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
     val privKey: PrivateKey25519  = createPrivKey(Some(mnemonicKey))
     val recipientAddress: Address = PublicKey25519(Curve25519.createKeyPair(Random.randomBytes())._2).address.address
-    val waitTime: FiniteDuration  = 10.minutes
+    val waitTime: FiniteDuration  = 30.minutes
 
     val supplyAtHeight: Long = (0 to secondHeightToWait).foldLeft(0: Long) {
       case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i)
