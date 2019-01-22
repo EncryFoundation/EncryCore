@@ -26,6 +26,7 @@ class DataTransactionTest extends AsyncFunSuite with Matchers with ScalaFutures 
     val mnemonicKey: String      = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
     val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
     val waitTime: FiniteDuration = 30.minutes
+
     val fee: Long                = scala.util.Random.nextInt(500)
 
     val docker: Docker   = Docker()
