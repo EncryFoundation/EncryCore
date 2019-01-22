@@ -6,7 +6,7 @@ import org.encryfoundation.common.Algos
 case class Version[D <: Diff](modifierId: ModifierId,
                               diffs: Seq[D]) {
 
-  def printTree: String = s"Version of diff is: ${Algos.encode(modifierId)}"
+  def printTree: String = s"Version of diff is:::: ${Algos.encode(modifierId)}"
 }
 
 object Version {
