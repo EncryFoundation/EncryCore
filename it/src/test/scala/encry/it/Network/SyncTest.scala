@@ -25,10 +25,21 @@ class SyncTest extends AsyncFunSuite with Matchers with ScalaFutures with Strict
       .withFallback(Configs.offlineGeneration(true))
       .withFallback(Configs.nodeName("node2"))
 
-    val nodeFirst: List[Node] = docker.startNodes(Seq(configForFirstNode))
+    val firstNode: List[Node] = docker.startNodes(Seq(configForFirstNode))
 
-    Await.result(nodeFirst.head.waitForHeadersHeight(firstHeightToWait), waitTime)
+    Await.result(firstNode.head.waitForHeadersHeight(firstHeightToWait), waitTime)
 
+    val secondNode = docker.startNodes(Seq(configForSecondNode))
+
+    Await.result(secondNode.head.waitForHeadersHeight(secondHeightToWait), waitTime)
+
+    val node1Address: Seq[(String, Int)] = Seq((firstNode.head.nodeIp, firstNode.head.nodePort))
+    val node2Address: Seq[(String, Int)] = Seq((secondNode.head.nodeIp, secondNode.head.nodePort))
+    val configForThirdNode: Config = Configs.knownPeers(node1Address ++ node2Address)
+      .withFallback(Configs.offlineGeneration(false))
+      .withFallback(Configs.nodeName("node3"))
+
+    val thirdNode: List[Node] = docker.startNodes(Seq(configForThirdNode))
 
     Future().map { _ =>
       true shouldBe true

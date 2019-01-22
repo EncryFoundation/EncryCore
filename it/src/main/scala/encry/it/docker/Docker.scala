@@ -4,11 +4,9 @@ import java.io.FileOutputStream
 import java.lang
 import java.net.{InetAddress, InetSocketAddress, URL}
 import java.nio.file.{Files, Paths}
-import java.util.Collections._
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{Collections, Properties, UUID, List => JList, Map => JMap}
-
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
@@ -23,7 +21,6 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.it.configs.Configs
 import encry.settings.EncryAppSettings
 import org.asynchttpclient.Dsl._
-
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -33,8 +30,8 @@ import scala.util.Random
 import scala.util.control.NonFatal
 
 case class Docker(suiteConfig: Config = empty,
-             tag: String = "",
-             enableProfiling: Boolean = false) extends AutoCloseable with StrictLogging {
+                  tag: String = "",
+                  enableProfiling: Boolean = false) extends AutoCloseable with StrictLogging {
 
   import Docker._
 
@@ -49,11 +46,21 @@ case class Docker(suiteConfig: Config = empty,
     .setRequestTimeout(10000))
 
   private def uuidShort: String = UUID.randomUUID().hashCode().toHexString
+
   private val networkName: String = Docker.networkNamePrefix + uuidShort
   private val networkSeed: Int = Random.nextInt(0x100000) << 4 | 0x0A000000
   private val networkPrefix: String = s"${InetAddress.getByAddress(Ints.toByteArray(networkSeed)).getHostAddress}/28"
   private val isStopped: AtomicBoolean = new AtomicBoolean(false)
   val network: Network = createNetwork(3)
+
+  def disconnectFromNetwork(node: Node): Unit = disconnectFromNetwork(node.containerId)
+
+  private def disconnectFromNetwork(containerId: String): Unit = client.disconnectFromNetwork(containerId, network.id())
+
+  def connectToNetwork(nodes: Seq[Node]): Unit = {
+    nodes.foreach(node => connectToNetwork(node.containerId,))
+    Await.result(Future.traverse(nodes)(connectToAll), 1.minute)
+  }
 
   def waitForStartupBlocking(nodes: List[Node]): List[Node] = {
     logger.debug("Waiting for nodes to start")
@@ -61,7 +68,9 @@ case class Docker(suiteConfig: Config = empty,
   }
 
   def waitForStartup(nodes: List[Node]): Future[List[Node]] = {
-    Future.sequence(nodes map { _.waitForStartup })
+    Future.sequence(nodes map {
+      _.waitForStartup
+    })
   }
 
   def ipForNode(nodeNumber: Int): String = {
@@ -84,6 +93,7 @@ case class Docker(suiteConfig: Config = empty,
 
   @tailrec private def waitForNetwork(containerId: String, maxTry: Int = 5): AttachedNetwork = {
     def errMsg = s"Container $containerId has not connected to the network ${network.name()}"
+
     val containerInfo = client.inspectContainer(containerId)
     val networks = containerInfo.networkSettings().networks().asScala
     if (networks.contains(network.name())) {
@@ -125,7 +135,7 @@ case class Docker(suiteConfig: Config = empty,
         logger.debug(s"Creating network $networkName for $tag")
         // Specify the network manually because of race conditions: https://github.com/moby/moby/issues/20648
         val r = client.createNetwork(buildNetworkConfig())
-        Option(r.warnings()).foreach(logger.warn(_))
+        Option(r.warnings()).foreach(logger.warn)
         createNetwork(maxRetry - 1)
     }
   } catch {
@@ -165,12 +175,9 @@ case class Docker(suiteConfig: Config = empty,
   private def dumpContainers(containers: java.util.List[Container], label: String = "Containers"): Unit = {
     val x =
       if (containers.isEmpty) "No"
-      else
-        "\n" + containers.asScala
-          .map { x =>
-            s"Container(${x.id()}, status: ${x.status()}, names: ${x.names().asScala.mkString(", ")})"
-          }
-          .mkString("\n")
+      else "\n" + containers.asScala.map { x =>
+          s"Container(${x.id()}, status: ${x.status()}, names: ${x.names().asScala.mkString(", ")})"
+        }.mkString("\n")
 
     logger.debug(s"$label: $x")
   }
@@ -226,7 +233,7 @@ case class Docker(suiteConfig: Config = empty,
         )
 
         val r = client.createContainer(containerConfig, containerName)
-        Option(r.warnings().asScala).toSeq.flatten.foreach(logger.warn(_))
+        Option(r.warnings().asScala).toSeq.flatten.foreach(logger.warn)
         r.id()
       }
       val attachedNetwork = connectToNetwork(containerId, ip)
@@ -307,7 +314,7 @@ object Docker {
     p.asScala
       .map {
         case (k, v) if v.contains(" ") => k -> s"""\"$v\""""
-        case x                         => x
+        case x => x
       }
       .map { case (k, v) => s"-Dencry.$k=$v" }
       .mkString(" ")
@@ -318,4 +325,3 @@ object Docker {
                       hostNetworkAddress: InetSocketAddress,
                       containerNetworkAddress: InetSocketAddress)
 }
-
