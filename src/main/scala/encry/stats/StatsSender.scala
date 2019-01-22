@@ -42,10 +42,6 @@ class StatsSender extends Actor {
 
   influxDB.setRetentionPolicy("autogen")
 
-  influxDB.write(InfluxPort, s"txsDiff,nodeName=$nodeName value=1")
-
-  println("Send!")
-
   val modifiersToApply: mutable.Map[String, (ModifierTypeId, Long)] = mutable.Map[String, (ModifierTypeId, Long)]()
 
   override def preStart(): Unit =
