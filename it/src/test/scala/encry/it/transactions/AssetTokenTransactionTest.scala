@@ -41,6 +41,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite with Matchers with ScalaFu
     val tokenAmount: Int          = scala.util.Random.nextInt(500)
     val recipientAddress: Address = PublicKey25519(Curve25519.createKeyPair(Random.randomBytes())._2).address.address
 
+
     val docker: Docker = Docker()
     val config: Config = Configs.mining(true)
       .withFallback(Configs.offlineGeneration(true))
