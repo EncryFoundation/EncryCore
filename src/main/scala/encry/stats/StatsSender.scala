@@ -38,7 +38,13 @@ class StatsSender extends Actor {
   val influxDB: InfluxDB =
     InfluxDBFactory.connect(InfluxURL, InfluxLogin, InfluxPassword)
 
+  println(influxDB.ping())
+
   influxDB.setRetentionPolicy("autogen")
+
+  influxDB.write(InfluxPort, s"txsDiff,nodeName=$nodeName value=1")
+
+  println("Send!")
 
   val modifiersToApply: mutable.Map[String, (ModifierTypeId, Long)] = mutable.Map[String, (ModifierTypeId, Long)]()
 
