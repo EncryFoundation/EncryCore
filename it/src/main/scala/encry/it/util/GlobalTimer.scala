@@ -8,9 +8,8 @@ import scala.util.control.NonFatal
 object GlobalTimer {
 
   val timer: Timer = new HashedWheelTimer()
-  sys.addShutdownHook {
-    timer.stop()
-  }
+
+  sys.addShutdownHook { timer.stop() }
 
   implicit class TimerExt(val timer: Timer) extends AnyVal {
     def schedule[A](f: => Future[A], delay: FiniteDuration): Future[A] = {
@@ -25,7 +24,9 @@ object GlobalTimer {
 
     def sleep(term: FiniteDuration): Future[Unit] = schedule(Future.successful(()), term)
 
-    def retryUntil[A](f: => Future[A], cond: A => Boolean, retryInterval: FiniteDuration)(implicit ec: ExecutionContext): Future[A] =
+    def retryUntil[A](f: => Future[A],
+                      cond: A => Boolean,
+                      retryInterval: FiniteDuration)(implicit ec: ExecutionContext): Future[A] =
       f.flatMap(v => if (cond(v)) Future.successful(v) else schedule(retryUntil(f, cond, retryInterval), retryInterval))
   }
 }

@@ -15,7 +15,7 @@ class SyncTest extends AsyncFunSuite with Matchers with ScalaFutures with Strict
 
     val firstHeightToWait: Int = 30
     val secondHeightToWait: Int = 30
-    val waitTime: FiniteDuration  = 1.minutes
+    val waitTime: FiniteDuration = 30.minutes
     val docker: Docker = Docker()
     val configForFirstNode: Config = Configs.mining(true)
       .withFallback(Configs.offlineGeneration(true))

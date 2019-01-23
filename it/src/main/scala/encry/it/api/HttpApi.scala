@@ -1,7 +1,10 @@
 package encry.it.api
 
 import java.io.IOException
+import java.net.InetSocketAddress
 import java.util.concurrent.TimeoutException
+
+import encry.it.docker.Node
 import encry.it.util.GlobalTimer._
 import encry.modifiers.history.{Block, Header}
 import encry.modifiers.mempool.Transaction
@@ -9,11 +12,13 @@ import encry.modifiers.state.box.EncryBaseBox
 import io.circe.Decoder.Result
 import io.circe.parser.parse
 import io.circe.syntax._
+import io.circe.generic.auto._
 import io.circe.{Decoder, Encoder, Json}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import org.slf4j.{Logger, LoggerFactory}
+
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -140,21 +145,59 @@ trait HttpApi {
 
   def waitForStartup: Future[this.type] = get("/info").map(_ => this)
 
-  def waitForFullHeight(expectedHeight: Int, retryingInterval: FiniteDuration = 1.second): Future[Int] = {
+  def waitForFullHeight(expectedHeight: Int, retryingInterval: FiniteDuration = 1.second): Future[Int] =
     waitFor[Int](_.fullHeight, h => h >= expectedHeight, retryingInterval)
-  }
 
-  def waitForHeadersHeight(expectedHeight: Int, retryingInterval: FiniteDuration = 1.second): Future[Int] = {
+  def waitForHeadersHeight(expectedHeight: Int, retryingInterval: FiniteDuration = 1.second): Future[Int] =
     waitFor[Int](_.headersHeight, h => h >= expectedHeight, retryingInterval)
-  }
 
-  def waitFor[A](f: this.type => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] = {
+  def waitFor[A](f: this.type => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] =
     timer.retryUntil(f(this), cond, retryInterval)
-  }
 
-  def connect(addressAndPort: String): Future[Unit] = post("/peers/connect", addressAndPort).map(_ => ())
+  def connect(address: InetSocketAddress): Future[Unit] =
+    post("/peers/connect", s"${address.getHostName}:${address.getPort}").map(_ => ())
 
   def postJson[A: Encoder](path: String, body: A): Future[Response] =
     post(path, body.asJson.toString())
+
+  def connectedPeers: Future[Seq[Peer]] = get("/peers/connected").flatMap { r =>
+    val response: Json = jsonAnswerAs[Json](r.getResponseBody)
+    val eitherPeers: Result[List[Peer]] = response.hcursor.as[List[Peer]]
+    eitherPeers.fold[Future[List[Peer]]](
+      e => Future.failed(new Exception(s"Error getting `peers` from /peers/connected response: $e\n$response", e)),
+      maybePeer => Future.successful(maybePeer)
+    )
+  }
+
+  def waitForSameBlockHeadesAt(height: Int, retryInterval: FiniteDuration = 5.seconds): Future[Boolean] = {
+
+    def waitHeight: Future[Boolean] = waitFor[Int](s"all heights >= $height")(retryInterval)(_.height, _.forall(_ >= height))
+
+    def waitSameBlockHeaders: Future[Boolean] =
+      waitFor[BlockHeaders](s"same blocks at height = $height")(retryInterval)(_.blockHeadersAt(height), { blocks =>
+        val sig = blocks.map(_.signature)
+        sig.forall(_ == sig.head)
+      })
+
+    for {
+      _ <- waitHeight
+      r <- waitSameBlockHeaders
+    } yield r
+  }
+
+  def waitFor[A](desc: String)
+                (retryInterval: FiniteDuration)
+                (request: Node => Future[A], cond: Iterable[A] => Boolean): Future[Boolean] = {
+    def retry: Future[Boolean] = timer.schedule(waitFor(desc)(retryInterval)(request, cond), retryInterval)
+
+    Future
+      .traverse(nodes)(request)
+      .map(cond)
+      .recover { case _ => false }
+      .flatMap {
+        case true => Future.successful(true)
+        case false => retry
+      }
+  }
 
 }

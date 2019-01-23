@@ -7,6 +7,7 @@ import java.nio.file.{Files, Paths}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{Collections, Properties, UUID, List => JList, Map => JMap}
+
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
@@ -21,8 +22,10 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.it.configs.Configs
 import encry.settings.EncryAppSettings
 import org.asynchttpclient.Dsl._
+
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, blocking}
@@ -58,24 +61,13 @@ case class Docker(suiteConfig: Config = empty,
   private def disconnectFromNetwork(containerId: String): Unit = client.disconnectFromNetwork(containerId, network.id())
 
   def connectToNetwork(nodes: Seq[Node]): Unit = {
-    nodes.foreach(node => connectToNetwork(node.containerId,))
+    nodes.foreach { node =>
+      val nodeNumber: Int =
+        node.settings.network.nodeName.map(_.replace("node", "").toInt).getOrElse(0)
+      val ip: String = ipForNode(nodeNumber)
+      connectToNetwork(node.containerId, ip)
+    }
     Await.result(Future.traverse(nodes)(connectToAll), 1.minute)
-  }
-
-  def waitForStartupBlocking(nodes: List[Node]): List[Node] = {
-    logger.debug("Waiting for nodes to start")
-    Await.result(waitForStartup(nodes), nodes.size * 90.seconds)
-  }
-
-  def waitForStartup(nodes: List[Node]): Future[List[Node]] = {
-    Future.sequence(nodes map {
-      _.waitForStartup
-    })
-  }
-
-  def ipForNode(nodeNumber: Int): String = {
-    val addressBytes = Ints.toByteArray(nodeNumber & 0xF | networkSeed)
-    InetAddress.getByAddress(addressBytes).getHostAddress
   }
 
   private def connectToNetwork(containerId: String, ip: String): AttachedNetwork = {
@@ -89,6 +81,83 @@ case class Docker(suiteConfig: Config = empty,
     )
     logger.info(s"Connecting to network. ContainerId: $containerId and ip: $ip")
     waitForNetwork(containerId)
+  }
+
+  def ipForNode(nodeNumber: Int): String = {
+    val addressBytes = Ints.toByteArray(nodeNumber & 0xF | networkSeed)
+    InetAddress.getByAddress(addressBytes).getHostAddress
+  }
+
+  private def endpointConfigFor(ip: String): EndpointConfig = {
+    EndpointConfig.builder()
+      .ipAddress(ip)
+      .ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
+      .build()
+  }
+
+  private def connectToAll(node: Node): Future[Unit] = {
+    def connectToOne(address: InetSocketAddress): Future[Unit] = {
+      for {
+        _              <- node.connect(address)
+        _              <- Future(blocking(Thread.sleep(1.seconds.toMillis)))
+        connectedPeers <- node.connectedPeers
+        _ <- {
+          val connectedAddresses: Seq[String] =
+            connectedPeers.map(_.address.replaceAll("""^.*/([\d\.]+).+$""", "$1")).sorted
+          logger.debug(s"Looking for ${address.getHostName} in $connectedAddresses")
+          if (connectedAddresses.contains(address.getHostName)) Future.successful(())
+          else {
+            logger.debug(s"Not found ${address.getHostName}, retrying")
+            connectToOne(address)
+          }
+        }
+      } yield ()
+    }
+
+    val seedAddresses: mutable.Set[InetSocketAddress] = nodes.asScala
+      .filterNot(_.name == node.name)
+      .filterNot { node =>
+        // Exclude disconnected
+        client.inspectContainer(node.containerId).networkSettings().networks().isEmpty
+      }.map(_.containerNetworkAddress)
+
+    if (seedAddresses.isEmpty) Future.successful(())
+    else Future.traverse(seedAddresses)(connectToOne).map(_ => ())
+  }
+
+  private def getNodeInfo(containerId: String, settings: EncryAppSettings): NodeInfo = {
+    val restApiPort: Int = settings.restApi.bindAddress.getPort
+    val networkPort: Int = settings.network.bindAddress.getPort
+    val containerInfo: ContainerInfo = inspectContainer(containerId)
+    val ports: ImmutableMap[String, JList[PortBinding]] = containerInfo.networkSettings().ports()
+    val ipAddress: String = containerInfo.networkSettings().networks().get(network.name()).ipAddress()
+
+    NodeInfo(
+      new URL(s"http://localhost:${extractHostPort(ports, restApiPort)}"),
+      new InetSocketAddress("localhost", extractHostPort(ports, networkPort)),
+      new InetSocketAddress(ipAddress, networkPort)
+    )
+  }
+
+  private def inspectContainer(containerId: String): ContainerInfo = {
+    val containerInfo = client.inspectContainer(containerId)
+    if (containerInfo.networkSettings().networks().asScala.contains(network.name())) containerInfo
+    else {
+      logger.debug(s"Container $containerId has not connected to the network ${network.name()} yet, retry")
+      Thread.sleep(1000)
+      inspectContainer(containerId)
+    }
+  }
+
+  def waitForStartupBlocking(nodes: List[Node]): List[Node] = {
+    logger.debug("Waiting for nodes to start")
+    Await.result(waitForStartup(nodes), nodes.size * 90.seconds)
+  }
+
+  def waitForStartup(nodes: List[Node]): Future[List[Node]] = {
+    Future.sequence(nodes map {
+      _.waitForStartup
+    })
   }
 
   @tailrec private def waitForNetwork(containerId: String, maxTry: Int = 5): AttachedNetwork = {
@@ -165,13 +234,6 @@ case class Docker(suiteConfig: Config = empty,
       .map { n => s"subnet=${n.subnet()}, ip range=${n.ipRange()}" }
       .mkString(", ")
 
-  private def endpointConfigFor(ip: String): EndpointConfig = {
-    EndpointConfig.builder()
-      .ipAddress(ip)
-      .ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
-      .build()
-  }
-
   private def dumpContainers(containers: java.util.List[Container], label: String = "Containers"): Unit = {
     val x =
       if (containers.isEmpty) "No"
@@ -219,30 +281,34 @@ case class Docker(suiteConfig: Config = empty,
 
   def startNodeInternal(nodeConfig: Config): Node =
     try {
-      val settings = EncryAppSettings.fromConfig(nodeConfig.withFallback(configTemplate))
-      val nodeNumber = settings.network.nodeName.map(_.replace("node", "").toInt).getOrElse(0)
-      val ip = ipForNode(nodeNumber)
-
-      val containerConfig = buildPeerContainerConfig(nodeConfig, EncryAppSettings.fromConfig(nodeConfig), ip)
-
-      val containerId = {
-        val containerName = networkName + "-" + settings.network.nodeName.getOrElse("NodeWithoutName") + "-" + uuidShort
+      val settings: EncryAppSettings = EncryAppSettings.fromConfig(nodeConfig.withFallback(configTemplate))
+      val nodeNumber: Int = settings.network.nodeName.map(_.replace("node", "").toInt).getOrElse(0)
+      val ip: String = ipForNode(nodeNumber)
+      val containerConfig: ContainerConfig = buildPeerContainerConfig(nodeConfig, EncryAppSettings.fromConfig(nodeConfig), ip)
+      val containerId: String = {
+        val containerName: String = networkName + "-" + settings.network.nodeName.getOrElse("NodeWithoutName") + "-" + uuidShort
         dumpContainers(
           client.listContainers(DockerClient.ListContainersParam.filter("name", containerName)),
           "Containers with same name"
         )
-
-        val r = client.createContainer(containerConfig, containerName)
+        val r: ContainerCreation = client.createContainer(containerConfig, containerName)
         Option(r.warnings().asScala).toSeq.flatten.foreach(logger.warn)
         r.id()
       }
-      val attachedNetwork = connectToNetwork(containerId, ip)
+      val attachedNetwork: AttachedNetwork = connectToNetwork(containerId, ip)
       client.startContainer(containerId)
-      val containerInfo = client.inspectContainer(containerId)
-      val ports = containerInfo.networkSettings().ports()
-      val hostPort = extractHostPort(ports, 9001)
-      val hostRestApiPort = extractHostPort(ports, 9051) //get port from settings
-      val node = new Node(nodeConfig, hostRestApiPort, containerId, attachedNetwork.ipAddress(), hostPort, http)
+      val containerInfo: ContainerInfo = client.inspectContainer(containerId)
+      val ports: ImmutableMap[String, JList[PortBinding]] = containerInfo.networkSettings().ports()
+      val hostPort: Int = extractHostPort(ports, 9001)
+      val hostRestApiPort: Int = extractHostPort(ports, 9051) //get port from settings
+      val node: Node = new Node(
+        nodeConfig,
+        hostRestApiPort,
+        containerId,
+        attachedNetwork.ipAddress(),
+        hostPort, http,
+        getNodeInfo(containerId, settings)
+      )
       nodes.add(node)
       logger.debug(s"Started $containerId -> ${node.name}")
       node
@@ -252,7 +318,6 @@ case class Docker(suiteConfig: Config = empty,
         dumpContainers(client.listContainers())
         throw e
     }
-
 
   def extractHostPort(portBindingMap: JMap[String, JList[PortBinding]], containerPort: Int): Int =
     portBindingMap.get(s"$containerPort/tcp").get(0).hostPort().toInt
