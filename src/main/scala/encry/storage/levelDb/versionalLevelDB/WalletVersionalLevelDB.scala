@@ -8,7 +8,7 @@ import encry.modifiers.state.box.Box.Amount
 import encry.utils.{BalanceCalculator, BoxFilter}
 import encry.utils.CoreTaggedTypes.ModifierId
 import org.encryfoundation.common.Algos
-import org.iq80.leveldb.DB
+import org.iq80.leveldb.{DB, ReadOptions}
 import cats.syntax.semigroup._
 import cats.instances.all._
 import encry.modifiers.state.StateModifierSerializer
@@ -40,28 +40,33 @@ case class WalletVersionalLevelDB(override val db: DB) extends VersionalLevelDB[
       }
 
   override def getAll: Seq[(Array[Byte], Array[Byte])] = {
+
+    val readOptions = new ReadOptions()
+    readOptions.snapshot(db.getSnapshot)
     var elementsBuffer: Seq[(Array[Byte], Array[Byte])] = Seq.empty
-    val iterator = db.iterator()
+    val iterator = db.iterator(readOptions)
     iterator.seekToFirst()
     while (iterator.hasNext) {
       val nextElem = iterator.next()
       if (nextElem.getKey sameElements WalletVersionalLevelDB.BalancesKey) elementsBuffer
       else elementsBuffer = elementsBuffer :+ (nextElem.getKey -> nextElem.getValue)
     }
-    iterator.seekToLast()
+    readOptions.snapshot().close()
     elementsBuffer
   }
 
   def getBoxes(qty: Int): Seq[EncryBaseBox] = {
+    val readOptions = new ReadOptions()
+    readOptions.snapshot(db.getSnapshot)
     var elementsBuffer: Seq[(Array[Byte], Array[Byte])] = Seq.empty
-    val iterator = db.iterator()
+    val iterator = db.iterator(readOptions)
     iterator.seekToFirst()
     while (iterator.hasNext && elementsBuffer.size < qty) {
       val nextElem = iterator.next()
       if (nextElem.getKey sameElements WalletVersionalLevelDB.BalancesKey) elementsBuffer
       else elementsBuffer = elementsBuffer :+ (nextElem.getKey -> nextElem.getValue)
     }
-    iterator.seekToLast()
+    readOptions.snapshot().close()
     elementsBuffer.map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
       .collect {
         case Success(box) => box
