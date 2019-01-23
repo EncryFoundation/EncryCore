@@ -11,7 +11,7 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
+trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging with AutoCloseable {
 
   val db: DB
 
@@ -74,4 +74,6 @@ trait VersionalLevelDB[D <: RevertabaleDiff[D]] extends StrictLogging {
     else if (nodesList.last.modifierId sameElements rollbackPoint) true
     else checkRollbackPoint(rollbackPoint, nodesList.init)
   }
+
+  override def close(): Unit = db.close()
 }

@@ -69,6 +69,53 @@ class WalletVersionalLevelDBTest extends PropSpec with Matchers with EncryGenera
     walletVersionalDB.getBalances.head._2 shouldEqual correctBalance
   }
 
+  property("Applying 35 blocks. Restart levelDB. Balance should be the same ") {
+
+    val blocksToWallet: Seq[Block] = (0 until 35).foldLeft(generateDummyHistory, Seq.empty[Block]) {
+      case ((prevHistory, blocks), _) =>
+        val block: Block = generateNextBlock(prevHistory)
+        prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block) -> (blocks :+ block)
+    }._2
+
+    val dir = FileHelper.getRandomTempDir
+    if (!dir.exists()) dir.mkdirs()
+
+    val db: DB = LevelDbFactory.factory.open(dir, new Options)
+
+    val correctBalance = blocksToWallet.foldLeft(0: Long) {
+      case (balance, block) =>
+        val newBalance = balance + block.payload.transactions.map(_.newBoxes.map(_.asInstanceOf[AssetBox].amount).sum).sum
+        logger.info(s"After applying block: ${Algos.encode(block.id)} wallet should be: $newBalance")
+        newBalance
+    }
+
+    //init wallet tree
+
+    val walletVersionalDB = WalletVersionalLevelDB(db)
+
+    //add blocks to wallet
+
+    blocksToWallet.foreach(walletVersionalDB.add)
+
+    //check correct balance
+
+    walletVersionalDB.getBalances.head._2 shouldEqual correctBalance
+
+    //close db
+
+    walletVersionalDB.close()
+
+    //restart
+
+    val newDb: DB = LevelDbFactory.factory.open(dir, new Options)
+
+    val newWalletVersionalDB = WalletVersionalLevelDB(newDb)
+
+    //check balance
+
+    newWalletVersionalDB.getBalances.head._2 shouldEqual correctBalance
+  }
+
 
   property("Rollback of 10 block. Only coinbase txs") {
 
