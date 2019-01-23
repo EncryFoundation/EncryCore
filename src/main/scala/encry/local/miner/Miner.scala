@@ -74,6 +74,7 @@ class Miner extends Actor with Logging {
           produceCandidate()
       }
     case DisableMining if context.children.nonEmpty =>
+      logInfo(s"Sender: ${sender()}")
       logInfo("Received DisableMining msg")
       killAllWorkers()
       candidateOpt = None
