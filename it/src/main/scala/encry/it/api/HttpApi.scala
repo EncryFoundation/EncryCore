@@ -174,7 +174,7 @@ trait HttpApi {
     def waitHeight: Future[Boolean] = waitFor[Int](s"all heights >= $height")(retryInterval)(_.height, _.forall(_ >= height))
 
     def waitSameBlockHeaders: Future[Boolean] =
-      waitFor[BlockHeaders](s"same blocks at height = $height")(retryInterval)(_.blockHeadersAt(height), { blocks =>
+      waitFor[Block](s"same blocks at height = $height")(retryInterval)(_.blockHeadersAt(height), { blocks =>
         val sig = blocks.map(_.signature)
         sig.forall(_ == sig.head)
       })
