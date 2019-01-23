@@ -5,6 +5,7 @@ import java.net.InetAddress
 import java.util
 import java.text.SimpleDateFormat
 import akka.actor.Actor
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
@@ -17,10 +18,9 @@ import org.influxdb.{InfluxDB, InfluxDBFactory}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class StatsSender extends Actor {
+class StatsSender extends Actor with StrictLogging {
 
   var modifiersToDownload: Map[String, (ModifierTypeId, Long)] = Map()
-
 
   val nodeName: String = settings.network.nodeName match {
     case Some(value) => value
@@ -126,7 +126,7 @@ class StatsSender extends Actor {
       modifiersToDownload = modifiersToDownload ++ modifiers.map(mod => (Algos.encode(mod), (modifierTypeId, System.currentTimeMillis())))
 
     case GetModifiers(_: ModifierTypeId, modifiers: Seq[ModifierId]) =>
-      modifiers.foreach(downloadedModifierId =>
+      modifiers.foreach { downloadedModifierId =>
         modifiersToDownload.get(Algos.encode(downloadedModifierId)).foreach { dowloadInfo =>
           influxDB.write(
             InfluxPort,
@@ -135,7 +135,7 @@ class StatsSender extends Actor {
           )
           modifiersToDownload = modifiersToDownload - Algos.encode(downloadedModifierId)
         }
-      )
+      }
     case NewBlockAppended(isHeader, success) if nodeName.exists(_.isDigit) =>
       val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
       influxDB.write(InfluxPort,s"""newBlockAppended,success=$success,isHeader=$isHeader,nodeName=$nodeName value=$nodeNumber""")
