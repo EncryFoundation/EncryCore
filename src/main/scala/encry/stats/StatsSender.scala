@@ -14,6 +14,7 @@ import encry.stats.StatsSender._
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
 import org.influxdb.{InfluxDB, InfluxDBFactory}
+
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -37,8 +38,6 @@ class StatsSender extends Actor {
 
   val influxDB: InfluxDB =
     InfluxDBFactory.connect(InfluxURL, InfluxLogin, InfluxPassword)
-
-  println(influxDB.ping())
 
   influxDB.setRetentionPolicy("autogen")
 
