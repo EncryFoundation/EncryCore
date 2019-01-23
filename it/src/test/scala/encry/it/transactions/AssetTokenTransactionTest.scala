@@ -35,7 +35,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite
     .withFallback(Configs.nodeName("node1")))
 
   test("Create and send asset token transaction. Check new token's balance." +
-    " Send tokens. Check new balance.") {
+    " Send tokens. Check new balance") {
 
     val firstHeightToWait: Int = 5
     val secondHeightToWait: Int = 8
