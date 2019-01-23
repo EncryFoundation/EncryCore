@@ -56,7 +56,7 @@ class Miner extends Actor with Logging {
   def needNewCandidate(b: Block): Boolean =
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(id => Algos.encode(id) == Algos.encode(b.header.id))
 
-  override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
+  override def receive: Receive = if (settings.node.mining && syncingDone) miningEnabled else miningDisabled
 
   def mining: Receive = {
     case StartMining if context.children.nonEmpty & syncingDone =>
@@ -75,8 +75,6 @@ class Miner extends Actor with Logging {
       }
     case StartMining => logInfo("Can't start mining because of chain is not synced!")
     case DisableMining if context.children.nonEmpty =>
-      logInfo(s"Sender: ${sender()}")
-      logInfo("Received DisableMining msg")
       killAllWorkers()
       candidateOpt = None
       context.become(miningDisabled)
@@ -112,7 +110,6 @@ class Miner extends Actor with Logging {
       self ! StartMining
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty, candidateOpt)
     case FullBlockChainSynced =>
-      logInfo("Received FullBlockChainSynced")
       syncingDone = true
       if (settings.node.mining) self ! EnableMining
     case DisableMining | SemanticallySuccessfulModifier(_) =>

@@ -321,8 +321,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]] extends Actor with
                 newHistory.bestHeaderOpt.foreach(header =>
                   context.actorSelection("/user/statsSender") !
                     BestHeaderInChain(header, System.currentTimeMillis()))
-              logInfo(s"newHistory.isFullChainSynced: ${newHistory.isFullChainSynced}")
-              logInfo(s"receivedAll: ${receivedAll}")
               if (newHistory.isFullChainSynced && receivedAll)
                 Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
               updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
