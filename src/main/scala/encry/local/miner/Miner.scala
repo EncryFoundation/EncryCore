@@ -59,10 +59,10 @@ class Miner extends Actor with Logging {
   override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
 
   def mining: Receive = {
-    case StartMining if context.children.nonEmpty =>
+    case StartMining if context.children.nonEmpty & syncingDone =>
       killAllWorkers()
       self ! StartMining
-    case StartMining =>
+    case StartMining if syncingDone =>
       for (i <- 0 until numberOfWorkers) yield context.actorOf(
         Props(classOf[Worker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
       candidateOpt match {
@@ -73,6 +73,7 @@ class Miner extends Actor with Logging {
           logInfo("Candidate is empty! Producing new candidate!")
           produceCandidate()
       }
+    case StartMining => logInfo("Can't start mining because of chain is not synced!")
     case DisableMining if context.children.nonEmpty =>
       logInfo(s"Sender: ${sender()}")
       logInfo("Received DisableMining msg")
