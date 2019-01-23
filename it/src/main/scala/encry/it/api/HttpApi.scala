@@ -9,6 +9,7 @@ import encry.it.util.GlobalTimer._
 import encry.modifiers.history.{Block, Header}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.EncryBaseBox
+import encry.utils.CoreTaggedTypes.ModifierId
 import io.circe.Decoder.Result
 import io.circe.parser.parse
 import io.circe.syntax._
@@ -100,7 +101,7 @@ trait HttpApi {
     val eitherBalance = response.hcursor.downField("balances").as[Map[String, String]]
     eitherBalance.fold[Future[Map[String, Long]]](
       e => Future.failed(new Exception(s"Error getting `balances` from /info response: $e\n$response", e)),
-      maybeBalance => Future.successful(maybeBalance.map{case (token, balance) => token -> balance.toLong})
+      maybeBalance => Future.successful(maybeBalance.map { case (token, balance) => token -> balance.toLong })
     )
   }
 
@@ -169,14 +170,17 @@ trait HttpApi {
     )
   }
 
-  def waitForSameBlockHeadesAt(height: Int, retryInterval: FiniteDuration = 5.seconds): Future[Boolean] = {
+  def waitForSameBlockHeadersAt(nodes: Seq[Node], height: Int, retryInterval: FiniteDuration = 5.seconds): Future[Boolean] = {
 
-    def waitHeight: Future[Boolean] = waitFor[Int](s"all heights >= $height")(retryInterval)(_.height, _.forall(_ >= height))
+    def waitHeight: Future[Boolean] =
+      waitFor[Int](s"all heights >= $height", nodes)(retryInterval)(x => x.fullHeight, k => Future(k.forall(_ >= height)))
 
     def waitSameBlockHeaders: Future[Boolean] =
-      waitFor[Block](s"same blocks at height = $height")(retryInterval)(_.blockHeadersAt(height), { blocks =>
-        val sig = blocks.map(_.signature)
-        sig.forall(_ == sig.head)
+      waitFor[List[String]](s"same blocks at height = $height", nodes)(retryInterval)(_.getHeadersIdAtHeight(height), { blocks =>
+        val a: Future[Iterable[Seq[Block]]] =
+          Future.sequence(blocks.flatMap(x => x.map(x => Future.sequence(nodes.map(_.getBlock(x))))))
+        val sig: Future[Iterable[ModifierId]] = a.map(_.flatMap(_.map(x => x.id)))
+        sig.map(k => k.forall(x => x == k.head))
       })
 
     for {
@@ -185,19 +189,15 @@ trait HttpApi {
     } yield r
   }
 
-  def waitFor[A](desc: String)
+  def waitFor[A](desc: String, nodes: Seq[Node])
                 (retryInterval: FiniteDuration)
-                (request: Node => Future[A], cond: Iterable[A] => Boolean): Future[Boolean] = {
-    def retry: Future[Boolean] = timer.schedule(waitFor(desc)(retryInterval)(request, cond), retryInterval)
+                (request: Node => Future[A], cond: Iterable[A] => Future[Boolean]): Future[Boolean] = {
+    def retry: Future[Boolean] = timer.schedule(waitFor(desc, nodes)(retryInterval)(request, cond), retryInterval)
 
-    Future
-      .traverse(nodes)(request)
-      .map(cond)
-      .recover { case _ => false }
+    Future.traverse(nodes)(request).map(cond).recover { case _ => false }
       .flatMap {
         case true => Future.successful(true)
         case false => retry
       }
   }
-
 }

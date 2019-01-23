@@ -13,8 +13,8 @@ class SyncTest extends AsyncFunSuite with Matchers with ScalaFutures with Strict
 
   test("Node have to choose other node with highest blocks height.") {
 
-    val firstHeightToWait: Int = 30
-    val secondHeightToWait: Int = 30
+    val firstHeightToWait: Int = 40
+    val secondHeightToWait: Int = 20
     val waitTime: FiniteDuration = 30.minutes
     val docker: Docker = Docker()
     val configForFirstNode: Config = Configs.mining(true)
@@ -41,8 +41,10 @@ class SyncTest extends AsyncFunSuite with Matchers with ScalaFutures with Strict
 
     val thirdNode: List[Node] = docker.startNodes(Seq(configForThirdNode))
 
-    Future().map { _ =>
-      true shouldBe true
+    val listNode: List[Node] = firstNode ::: thirdNode
+
+    listNode.head.waitForSameBlockHeadersAt(listNode, 40).map {result =>
+      result shouldBe true
     }
   }
 }

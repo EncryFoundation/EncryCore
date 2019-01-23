@@ -199,7 +199,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
     .map(d => Height @@ Ints.fromByteArray(d))
 
   /**
-    * @param height - block height
+    * @param height - header height
     * @return ids of headers on chosen height.
     *         Seq.empty we don't have any headers on this height
     *         single id if no forks on this height
