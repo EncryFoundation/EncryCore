@@ -96,7 +96,7 @@ class Miner extends Actor with Logging {
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
-    case _ =>
+    case msg => logInfo(s"Miner dead letter: ${FullBlockChainSynced}")
   }
 
   def miningEnabled: Receive =
@@ -112,6 +112,7 @@ class Miner extends Actor with Logging {
       self ! StartMining
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty, candidateOpt)
     case FullBlockChainSynced =>
+      logInfo("Received FullBlockChainSynced")
       syncingDone = true
       if (settings.node.mining) self ! EnableMining
     case DisableMining | SemanticallySuccessfulModifier(_) =>
