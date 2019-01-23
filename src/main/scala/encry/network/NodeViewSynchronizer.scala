@@ -107,7 +107,7 @@ class NodeViewSynchronizer extends Actor with Logging {
       }
     case StopSync => deliveryManager ! StopSync
     case ContinueSync => deliveryManager ! ContinueSync
-    case a: Any => logError(s"Strange input (sender: ${sender()}): ${a.getClass}\n" + a)
+    case a: Any => logError(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
   }
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
