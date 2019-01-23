@@ -42,7 +42,7 @@ class Miner extends Actor with Logging {
   var startTime: Long = System.currentTimeMillis()
   var sleepTime: Long = System.currentTimeMillis()
   var candidateOpt: Option[CandidateBlock] = None
-  var syncingDone: Boolean = false
+  var syncingDone: Boolean = settings.node.offlineGeneration
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
 
