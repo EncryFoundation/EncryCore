@@ -31,6 +31,7 @@ class NodeViewSynchronizer extends Actor with Logging {
   var historyReaderOpt: Option[EncryHistory] = None
   var mempoolReaderOpt: Option[Mempool] = None
   val invSpec: InvSpec = new InvSpec(settings.network.maxInvObjects)
+  var chainSynced: Boolean = false
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
   val deliveryManager: ActorRef =
     context.actorOf(Props(classOf[DeliveryManager]), "deliveryManager")
@@ -80,6 +81,7 @@ class NodeViewSynchronizer extends Actor with Logging {
         case _ =>
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == RequestModifierSpec.MessageCode =>
+      if (chainSynced)
         historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
           val objs: Seq[NodeViewModifier] = invData._1 match {
             case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
@@ -89,6 +91,8 @@ class NodeViewSynchronizer extends Actor with Logging {
             s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
           self ! ResponseFromLocal(remote, invData._1, objs)
         }
+      else logInfo(s"Peer ${remote} requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
+        s"node is not synced, so ignore msg")
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
       logDebug(s"Got inv message from ${remote.socketAddress}")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
@@ -98,12 +102,14 @@ class NodeViewSynchronizer extends Actor with Logging {
       deliveryManager ! RequestFromLocal(peer, modifierTypeId, modifierIds)
     case StartMining => deliveryManager ! StartMining
     case DisableMining => deliveryManager ! DisableMining
-    case FullBlockChainSynced => deliveryManager ! FullBlockChainSynced
+    case FullBlockChainSynced =>
+      chainSynced = true
+      deliveryManager ! FullBlockChainSynced
     case ResponseFromLocal(peer, _, modifiers: Seq[NodeViewModifier]) =>
       if (modifiers.nonEmpty) {
         val m: (ModifierTypeId, Map[ModifierId, Array[Byte]]) =
           modifiers.head.modifierTypeId -> modifiers.map(m => m.id -> m.bytes).toMap
-        peer.handlerRef ! Message(ModifiersSpec, Right(m), None)
+        if (m._1 != Payload.modifierTypeId) peer.handlerRef ! Message(ModifiersSpec, Right(m), None)
       }
     case StopSync => deliveryManager ! StopSync
     case ContinueSync => deliveryManager ! ContinueSync
@@ -111,7 +117,8 @@ class NodeViewSynchronizer extends Actor with Logging {
   }
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
-    networkController ! SendToNetwork(Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None), Broadcast)
+    if (chainSynced)
+      networkController ! SendToNetwork(Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None), Broadcast)
 
 }
 
