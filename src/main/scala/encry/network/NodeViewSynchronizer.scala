@@ -81,7 +81,9 @@ class NodeViewSynchronizer extends Actor with Logging {
         case _ =>
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == RequestModifierSpec.MessageCode =>
-      if (chainSynced)
+      logInfo(s"Get request from remote peer. chainSynced = ${chainSynced}")
+      if (chainSynced) {
+        logInfo(s"historyReaderOpt: ${historyReaderOpt}")
         historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
           val objs: Seq[NodeViewModifier] = invData._1 match {
             case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
@@ -91,6 +93,7 @@ class NodeViewSynchronizer extends Actor with Logging {
             s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
           self ! ResponseFromLocal(remote, invData._1, objs)
         }
+      }
       else logInfo(s"Peer ${remote} requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
         s"node is not synced, so ignore msg")
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
@@ -109,7 +112,7 @@ class NodeViewSynchronizer extends Actor with Logging {
       if (modifiers.nonEmpty) {
         val m: (ModifierTypeId, Map[ModifierId, Array[Byte]]) =
           modifiers.head.modifierTypeId -> modifiers.map(m => m.id -> m.bytes).toMap
-        if (m._1 != Payload.modifierTypeId) peer.handlerRef ! Message(ModifiersSpec, Right(m), None)
+        peer.handlerRef ! Message(ModifiersSpec, Right(m), None)
       }
     case StopSync => deliveryManager ! StopSync
     case ContinueSync => deliveryManager ! ContinueSync
