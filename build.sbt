@@ -91,14 +91,6 @@ resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repos
   "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/",
   "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/")
 
-fork := true
-
-fork in run := true
-
-outputStrategy := Some(StdoutOutput)
-
-connectInput in run := true
-
 evictionWarningOptions in update := EvictionWarningOptions.default
   .withWarnTransitiveEvictions(false)
   .withWarnDirectEvictions(false)
@@ -120,6 +112,12 @@ val opts = Seq(
   "-XX:+UseStringDeduplication")
 
 javaOptions in run ++= opts
+
+fork := true
+
+outputStrategy := Some(StdoutOutput)
+
+connectInput in run := true
 
 assemblyJarName in assembly := "EncryCore.jar"
 

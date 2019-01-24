@@ -42,7 +42,7 @@ class Miner extends Actor with Logging {
   var startTime: Long = System.currentTimeMillis()
   var sleepTime: Long = System.currentTimeMillis()
   var candidateOpt: Option[CandidateBlock] = None
-  var syncingDone: Boolean = false
+  var syncingDone: Boolean = settings.node.offlineGeneration
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
 
@@ -56,13 +56,13 @@ class Miner extends Actor with Logging {
   def needNewCandidate(b: Block): Boolean =
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(id => Algos.encode(id) == Algos.encode(b.header.id))
 
-  override def receive: Receive = if (settings.node.mining) miningEnabled else miningDisabled
+  override def receive: Receive = if (settings.node.mining && syncingDone) miningEnabled else miningDisabled
 
   def mining: Receive = {
-    case StartMining if context.children.nonEmpty =>
+    case StartMining if context.children.nonEmpty & syncingDone =>
       killAllWorkers()
       self ! StartMining
-    case StartMining =>
+    case StartMining if syncingDone =>
       for (i <- 0 until numberOfWorkers) yield context.actorOf(
         Props(classOf[Worker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
       candidateOpt match {
@@ -73,8 +73,8 @@ class Miner extends Actor with Logging {
           logInfo("Candidate is empty! Producing new candidate!")
           produceCandidate()
       }
+    case StartMining => logInfo("Can't start mining because of chain is not synced!")
     case DisableMining if context.children.nonEmpty =>
-      logInfo("Received DisableMining msg")
       killAllWorkers()
       candidateOpt = None
       context.become(miningDisabled)
@@ -94,7 +94,7 @@ class Miner extends Actor with Logging {
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
-    case _ =>
+    case msg => logInfo(s"Miner dead letter: ${FullBlockChainSynced}")
   }
 
   def miningEnabled: Receive =

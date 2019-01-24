@@ -10,7 +10,7 @@ import org.scalatest.{Matchers, PropSpec}
 
 class EncryHistoryTest extends PropSpec with Matchers with InstanceFactory with EncryGenerator {
 
-  property("PreGenesis height test check") {
+  property("PreGenesis height test check.") {
 
     val history: EncryHistory = generateDummyHistory
 
