@@ -135,9 +135,13 @@ object PeerManager {
 
   }
 
-  def checkPossibilityToAddPeer(address: InetSocketAddress): Boolean =
+  def checkPossibilityToAddPeer(address: InetSocketAddress): Boolean = {
+    logInfo(s"Check possibility to add $address. " +
+      s"settings.network.knownPeers.contains(address): ${settings.network.knownPeers.contains(address)}." +
+      s"settings.network.connectOnlyWithKnownPeers.getOrElse(false): ${settings.network.connectOnlyWithKnownPeers.getOrElse(false)}")
     (settings.network.connectOnlyWithKnownPeers.getOrElse(false) && settings.network.knownPeers.contains(address)) ||
       !settings.network.connectOnlyWithKnownPeers.getOrElse(false)
+  }
 }
 
 case class PeerInfo(lastSeen: Long, nodeName: Option[String] = None, connectionType: Option[ConnectionType] = None)
