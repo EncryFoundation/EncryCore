@@ -1,16 +1,18 @@
 package encry.view.state
 
 import java.io.File
+
 import akka.actor.ActorRef
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
 import encry.modifiers.state.box._
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
-import encry.utils.Logging
 import io.iohk.iodb.Store
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scorex.crypto.encode.Base16
+
 import scala.util.Try
 
 trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
@@ -46,7 +48,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   override type NVCT = this.type
 }
 
-object EncryState extends Logging {
+object EncryState extends StrictLogging {
 
   def initialStateBoxes: IndexedSeq[AssetBox] = IndexedSeq(AssetBox(EncryProposition.open, -9, 0))
 
@@ -61,9 +63,9 @@ object EncryState extends Logging {
   def generateGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
     val supplyBoxes: List[EncryBaseBox] = EncryState.initialStateBoxes.toList
     UtxoState.genesis(supplyBoxes, stateDir, nodeViewHolderRef).ensuring(us => {
-      logInfo(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
-      logInfo(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
-      logInfo(s"Generated UTXO state with ${supplyBoxes.size} boxes inside.")
+      logger.info(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
+      logger.info(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
+      logger.info(s"Generated UTXO state with ${supplyBoxes.size} boxes inside.")
       us.rootHash.sameElements(afterGenesisStateDigest) && us.version.sameElements(genesisStateVersion)
     })
   }

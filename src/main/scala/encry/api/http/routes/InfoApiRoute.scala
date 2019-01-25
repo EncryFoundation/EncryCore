@@ -16,7 +16,6 @@ import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
 import scala.concurrent.Future
-import scala.util.control.NonFatal
 
 case class InfoApiRoute(readersHolder: ActorRef,
                         miner: ActorRef,
@@ -40,7 +39,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
       readers <- readersF
       currentTime <- timeProvider.time()
       launchTime <- launchTimeFuture
-      storage <- storageInfo
+      storage = storageInfo
       nodeUptime = currentTime - launchTime
     } yield InfoApiRoute.makeInfoJson(nodeId, minerInfo, connectedPeers, readers, getStateType, getNodeName,
       getAddress, storage, nodeUptime, getConnectionWithPeers)
@@ -54,33 +53,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
   private def getNodeName: String = appSettings.network.nodeName
     .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + appSettings.network.bindAddress.getPort)
 
-  private def storageInfo: Future[String] = for {
-    recoveryStatus <- restoreInfo
-  } yield {
-    (appSettings.levelDb, appSettings.postgres) match {
-      case (Some(LevelDbSettings(levelDbSave, levelDbRestore, _)),
-      Some(PostgresSettings(_, _, _, _, pgSave, pgRestore, _, _))) =>
-        if ((levelDbSave || (levelDbRestore && (!recoveryStatus))) && (pgSave || (pgRestore && (!recoveryStatus))))
-          s"LevelDb(${if (levelDbSave) "write" else ""} ${if (levelDbRestore && (!recoveryStatus)) "read" else ""}), " +
-            s"Postgres(${if (pgSave) "write" else ""} ${if (pgRestore && (!recoveryStatus)) "read" else ""})"
-        else if (levelDbSave || (levelDbRestore && (!recoveryStatus)))
-          s"LevelDb(${if (levelDbSave) "write" else ""} ${if (levelDbRestore && (!recoveryStatus)) "read" else ""})"
-        else if (pgSave || (pgRestore && (!recoveryStatus)))
-          s"Postgres(${if (pgSave) "write" else ""} ${if (pgRestore && (!recoveryStatus)) "read" else ""})"
-        else ""
-      case (Some(LevelDbSettings(save, restore, _)), None) if save || restore =>
-        if (save && (restore && !recoveryStatus)) "LevelDb(read, write)"
-        else if (save && !restore) "LevelDb(write)"
-        else if (!save && (restore && !recoveryStatus)) "LevelDb(read)"
-        else ""
-      case (None, Some(PostgresSettings(_, _, _, _, save, restore, _, _))) if save || restore =>
-        if (save && (restore && !recoveryStatus)) "Postgres(read, write)"
-        else if (save && !restore) "Postgres(write)"
-        else if (!save && (restore && !recoveryStatus)) "Postgres(read)"
-        else ""
-      case _ => ""
-    }
-  }
+  private def storageInfo: String = if (appSettings.postgres.exists(_.enableSave)) "Postgres(write)" else ""
 
   private def restoreInfo: Future[Boolean] = (peerManager ? GetRecoveryStatus).mapTo[Boolean]
 

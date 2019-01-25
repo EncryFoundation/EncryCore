@@ -1,6 +1,7 @@
 package encry.view.history.processors
 
 import com.google.common.primitives.Ints
+import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.{forceStopApplication, settings, system}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.consensus.History.ProgressInfo
@@ -11,18 +12,19 @@ import encry.modifiers.history._
 import encry.settings.Constants._
 import encry.settings.{Constants, NodeSettings}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.utils.{Logging, NetworkTimeProvider}
+import encry.utils.NetworkTimeProvider
 import encry.validation.{ModifierValidator, ValidationResult}
 import encry.view.history.History.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import supertagged.@@
+
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
 
-trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
+trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   protected val nodeSettings: NodeSettings
   protected val timeProvider: NetworkTimeProvider
@@ -65,7 +67,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
       requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
     else if (!isHeadersChainSynced && isNewHeader(header)) {
       // Headers chain is synced after this header. Start downloading full blocks
-      logInfo(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
+      logger.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
       isHeadersChainSyncedVar = true
       blockDownloadProcessor.updateBestBlock(header)
       Seq.empty
@@ -119,7 +121,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
             if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
           ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
         case None =>
-          logError("Should always have best header after header application")
+          logger.error("Should always have best header after header application")
           forceStopApplication()
       }
     case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
@@ -127,7 +129,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
 
   private def getHeaderInfoUpdate(header: Header): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)],
     EncryPersistentModifier)] = if (header.isGenesis) {
-    logInfo(s"Initialize header chain with genesis header ${header.encodedId}")
+    logger.info(s"Initialize header chain with genesis header ${header.encodedId}")
     Option(Seq(
       BestHeaderKey -> ByteArrayWrapper(header.id),
       heightIdsKey(Constants.Chain.GenesisHeight) -> ByteArrayWrapper(header.id),
@@ -161,7 +163,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
     * header ids at this height */
   private def bestBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
     val prevHeight = bestHeaderHeight
-    logInfo(s"New best header ${h.encodedId} with score: $score." +
+    logger.info(s"New best header ${h.encodedId} with score: $score." +
       s" New height: ${h.height}, old height: $prevHeight")
     val self: (ByteArrayWrapper, ByteArrayWrapper) =
       heightIdsKey(h.height) -> ByteArrayWrapper((Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray)
@@ -178,7 +180,7 @@ trait BlockHeaderProcessor extends Logging { //scalastyle:ignore
 
   /** Row to storage, that put this orphaned block id to the end of header ids at this height */
   private def orphanedBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
-    logInfo(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
+    logger.info(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
     Seq(heightIdsKey(h.height) -> ByteArrayWrapper((headerIdsAtHeight(h.height) :+ h.id).flatten.toArray))
   }
 

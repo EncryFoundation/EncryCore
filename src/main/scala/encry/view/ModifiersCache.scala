@@ -1,28 +1,25 @@
 package encry.view
 
 import java.util.concurrent.ConcurrentHashMap
+
+import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.settings
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.Header
-import encry.utils.CoreTaggedTypes.ModifierId
-import encry.utils.Logging
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.EncryHistory
 import org.encryfoundation.common.Algos
+
 import scala.collection.concurrent.TrieMap
-import scala.collection.immutable.SortedMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
 
-object ModifiersCache extends Logging {
+object ModifiersCache extends StrictLogging {
 
   private type Key = mutable.WrappedArray[Byte]
 
   private val cache: TrieMap[Key, EncryPersistentModifier] = TrieMap[Key, EncryPersistentModifier]()
-  private var cleaning: Boolean = settings.postgres.forall(postgres => !postgres.enableRestore) &&
-    settings.levelDb.forall(levelDb => !levelDb.enableRestore)
 
-  def setCleaningToTrue(): Unit = cleaning = true
 
   def size: Int = cache.size
 
@@ -32,7 +29,7 @@ object ModifiersCache extends Logging {
 
   def put(key: Key, value: EncryPersistentModifier, history: EncryHistory): Unit = if (!contains(key)) {
     cache.put(key, value)
-    if (size > settings.node.modifiersCacheSize && cleaning) cache.find {
+    if (size > settings.node.modifiersCacheSize) cache.find {
       case (_, value) => history.testApplicable(value) match {
         case Success(_) => false
         case Failure(_: RecoverableModifierError) => false
@@ -42,7 +39,7 @@ object ModifiersCache extends Logging {
   }
 
   def remove(key: Key): Option[EncryPersistentModifier] = {
-    logInfo(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains : ${cache.get(key).isDefined}")
+    logger.info(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains: ${cache.get(key).isDefined}")
     cache.remove(key).map { removed =>
       removed
     }
@@ -71,7 +68,7 @@ object ModifiersCache extends Logging {
           if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) =>
           true
         case _ =>
-          logError(s"Try to apply: ${Algos.encode(k.toArray)} and result is: ${isApplicable(k)}")
+          logger.error(s"Try to apply: ${Algos.encode(k.toArray)} and result is: ${isApplicable(k)}")
           isApplicable(k)
       }
     }.map { case (k, _) => k }

@@ -1,8 +1,10 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.Actor
 import akka.persistence.RecoveryCompleted
+import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
@@ -10,16 +12,15 @@ import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, 
 import encry.network.PeerConnectionHandler._
 import encry.network.PeerManager.ReceivableMessages._
 import encry.network.PeerManager._
-import encry.utils.Logging
+
 import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.util.Random
 
-class PeerManager extends Actor with Logging {
+class PeerManager extends Actor with StrictLogging {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
   var connectingPeers: Set[InetSocketAddress] = Set.empty
-  var recoveryCompleted: Boolean = !(settings.levelDb.exists(_.enableRestore) || settings.postgres.exists(_.enableRestore))
   var nodes: Map[InetSocketAddress, PeerInfo] = Map.empty
 
   addKnownPeersToPeersDatabase()
@@ -27,7 +28,6 @@ class PeerManager extends Actor with Logging {
   override def receive: Receive = {
     case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
     case GetAllPeers => sender() ! knownPeers()
-    case GetRecoveryStatus => sender() ! recoveryCompleted
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
       if (!isSelf(address, None) &&
         checkPossibilityToAddPeer(address) &&
@@ -39,18 +39,18 @@ class PeerManager extends Actor with Logging {
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
     case DoConnecting(remote, direction) =>
       if (connectingPeers.contains(remote) && direction != Incoming) {
-        logInfo(s"Trying to connect twice to $remote, going to drop the duplicate connection")
+        logger.info(s"Trying to connect twice to $remote, going to drop the duplicate connection")
         sender() ! CloseConnection
       }
       else if (direction != Incoming) {
-        logInfo(s"Connecting to $remote")
+        logger.info(s"Connecting to $remote")
         connectingPeers += remote
       }
       sender() ! StartInteraction
     case Handshaked(peer) =>
       if (peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress))
         peer.handlerRef ! CloseConnection
-      else if (checkPossibilityToAddPeerWRecovery(peer.socketAddress) && !connectedPeers.contains(peer.socketAddress)) {
+      else if (checkPossibilityToAddPeer(peer.socketAddress) && !connectedPeers.contains(peer.socketAddress)) {
         self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
         connectedPeers += (peer.socketAddress -> peer)
         nodeViewSynchronizer ! HandshakedPeer(peer)
@@ -69,13 +69,9 @@ class PeerManager extends Actor with Logging {
       if (connectedPeers.size + connectingPeers.size <= settings.network.maxConnections)
         randomPeer.filter(address => !connectedPeers.exists(_._1 == address) &&
           !connectingPeers.exists(_.getHostName == address.getHostName) &&
-          checkPossibilityToAddPeerWRecovery(address) &&
+          checkPossibilityToAddPeer(address) &&
           checkDuplicateIP(address)
         ).foreach { address => sender() ! ConnectTo(address) }
-    case RecoveryCompleted =>
-      logInfo("Received RecoveryCompleted")
-      recoveryCompleted = true
-      addKnownPeersToPeersDatabase()
   }
 
   def isSelf(address: InetSocketAddress, declaredAddress: Option[InetSocketAddress]): Boolean =
@@ -93,9 +89,6 @@ class PeerManager extends Actor with Logging {
 
   def checkDuplicateIP(address: InetSocketAddress): Boolean =
     !connectedPeers.map(_._1.getAddress).toSet.contains(address.getAddress)
-
-  def checkPossibilityToAddPeerWRecovery(address: InetSocketAddress): Boolean =
-    checkPossibilityToAddPeer(address) && recoveryCompleted
 
   def addOrUpdateKnownPeer(address: InetSocketAddress, peerInfo: PeerInfo): Unit = {
     val updatedPeerInfo: PeerInfo = nodes.get(address).fold(peerInfo) { dbPeerInfo =>

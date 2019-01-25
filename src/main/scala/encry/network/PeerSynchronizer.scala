@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.Actor
 import akka.pattern.ask
 import akka.util.Timeout
@@ -9,11 +10,12 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, Registe
 import encry.network.message.{GetPeersSpec, Message, PeersSpec}
 import PeerManager._
 import PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
-import encry.utils.Logging
+import com.typesafe.scalalogging.StrictLogging
+
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class PeerSynchronizer extends Actor with Logging {
+class PeerSynchronizer extends Actor with StrictLogging {
 
   implicit val timeout: Timeout = Timeout(settings.network.syncTimeout.getOrElse(5 seconds))
 
@@ -30,7 +32,7 @@ class PeerSynchronizer extends Actor with Logging {
       if spec.messageCode == PeersSpec.messageCode =>
       peers.filter(checkPossibilityToAddPeer).foreach(isa =>
         peerManager ! AddOrUpdatePeer(isa, None, Some(remote.direction)))
-      logDebug(s"Got new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
+      logger.debug(s"Got new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
     case DataFromPeer(spec, _, remote) if spec.messageCode == GetPeersSpec.messageCode =>
       (peerManager ? RandomPeers(3))
         .mapTo[Seq[InetSocketAddress]]
@@ -39,10 +41,10 @@ class PeerSynchronizer extends Actor with Logging {
             if (remote.socketAddress.getAddress.isSiteLocalAddress) true
             else !address.getAddress.isSiteLocalAddress && address != remote.socketAddress
           })
-          logInfo(s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
+          logger.info(s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
           networkController ! SendToNetwork(Message(PeersSpec, Right(correctPeers), None), SendToPeer(remote))
-          logDebug(s"Send to ${remote.socketAddress} peers message which contains next peers: ${peers.mkString(",")}")
+          logger.debug(s"Send to ${remote.socketAddress} peers message which contains next peers: ${peers.mkString(",")}")
         }
-    case nonsense: Any => logWarn(s"PeerSynchronizer: got something strange $nonsense")
+    case nonsense: Any => logger.warn(s"PeerSynchronizer: got something strange $nonsense")
   }
 }

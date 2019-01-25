@@ -3,9 +3,9 @@ package encry.api.http.routes
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
+import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.settings.RESTApiSettings
-import encry.utils.Logging
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.EncryHistory
 import encry.view.mempool.Mempool
@@ -13,11 +13,12 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
+
 import scala.concurrent.Future
 
 case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
                               restApiSettings: RESTApiSettings)(implicit val context: ActorRefFactory)
-  extends EncryBaseApiRoute with FailFastCirceSupport with Logging {
+  extends EncryBaseApiRoute with FailFastCirceSupport with StrictLogging {
 
   override val route: Route = pathPrefix("wallet") { infoR ~ getUtxosR }
 

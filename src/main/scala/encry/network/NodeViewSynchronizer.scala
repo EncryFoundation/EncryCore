@@ -1,7 +1,9 @@
 package encry.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.{Actor, ActorRef, Props}
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.EncryApp._
 import encry.consensus.History._
@@ -21,12 +23,11 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeV
 import encry.view.history.{EncryHistory, EncryHistoryReader, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.{Mempool, MempoolReader}
 import encry.view.state.StateReader
-import encry.utils.Logging
 import encry.utils.Utils._
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.Proposition
 
-class NodeViewSynchronizer extends Actor with Logging {
+class NodeViewSynchronizer extends Actor with StrictLogging {
 
   var historyReaderOpt: Option[EncryHistory] = None
   var mempoolReaderOpt: Option[Mempool] = None
@@ -66,7 +67,7 @@ class NodeViewSynchronizer extends Actor with Logging {
     case DisconnectedPeer(remote) => deliveryManager ! DisconnectedPeer(remote)
     case DataFromPeer(spec, syncInfo: EncrySyncInfo@unchecked, remote)
       if spec.messageCode == EncrySyncInfoMessageSpec.messageCode =>
-      logInfo(s"Got sync message from ${remote.socketAddress} with " +
+      logger.info(s"Got sync message from ${remote.socketAddress} with " +
         s"${syncInfo.lastHeaderIds.size} headers. Head's headerId is " +
         s"${Algos.encode(syncInfo.lastHeaderIds.headOption.getOrElse(Array.emptyByteArray))}.")
       historyReaderOpt match {
@@ -74,9 +75,9 @@ class NodeViewSynchronizer extends Actor with Logging {
           val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, settings.network.networkChunkSize)
           val ext: ModifierIds = extensionOpt.getOrElse(Seq())
           val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
-          logInfo(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
+          logger.info(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}")
-          if (!(extensionOpt.nonEmpty || comparison != Younger)) logWarn("Extension is empty while comparison is younger")
+          if (!(extensionOpt.nonEmpty || comparison != Younger)) logger.warn("Extension is empty while comparison is younger")
           deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
       }
@@ -88,7 +89,7 @@ class NodeViewSynchronizer extends Actor with Logging {
             case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
             case _: ModifierTypeId => invData._2.flatMap(id => readers._1.modifierById(id))
           }
-          logDebug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
+          logger.debug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
             s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
           self ! ResponseFromLocal(remote, invData._1, objs)
         }
@@ -96,7 +97,7 @@ class NodeViewSynchronizer extends Actor with Logging {
       else logInfo(s"Peer ${remote} requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
         s"node is not synced, so ignore msg")
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
-      logDebug(s"Got inv message from ${remote.socketAddress}")
+      logger.debug(s"Got inv message from ${remote.socketAddress}")
       nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       deliveryManager ! DataFromPeer(spec, data: ModifiersData@unchecked, remote)
@@ -115,7 +116,7 @@ class NodeViewSynchronizer extends Actor with Logging {
       }
     case StopSync => deliveryManager ! StopSync
     case ContinueSync => deliveryManager ! ContinueSync
-    case a: Any => logError(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
+    case a: Any => logger.error(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
   }
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =

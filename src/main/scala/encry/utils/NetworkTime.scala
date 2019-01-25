@@ -1,8 +1,11 @@
 package encry.utils
 
 import java.net.InetAddress
+
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.NetworkTime.Time
 import org.apache.commons.net.ntp.{NTPUDPClient, TimeInfo}
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.Future
@@ -20,7 +23,7 @@ protected case class NetworkTime(offset: NetworkTime.Offset, lastUpdate: Network
 
 case class NetworkTimeProviderSettings(server: String, updateEvery: FiniteDuration, timeout: FiniteDuration)
 
-class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) extends Logging {
+class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) extends StrictLogging {
 
   private var state: State = Right(NetworkTime(0L, 0L))
   private var delta: Time = 0L
@@ -49,7 +52,7 @@ class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) extends Logg
         val state: Either[(NetworkTime, Future[NetworkTime]), NetworkTime] =
           if (time > nt.lastUpdate + ntpSettings.updateEvery.toMillis) {
             Left(nt -> Future(updateOffSet()).map { mbOffset =>
-              logInfo("New offset adjusted: " + mbOffset)
+              logger.info("New offset adjusted: " + mbOffset)
               val offset = mbOffset.getOrElse(nt.offset)
               NetworkTime(offset, NetworkTime.localWithOffset(offset))
             })
@@ -60,7 +63,7 @@ class NetworkTimeProvider(ntpSettings: NetworkTimeProviderSettings) extends Logg
           .map(networkTime => NetworkTime.localWithOffset(networkTime.offset) -> Right(networkTime))
           .recover {
             case NonFatal(th) =>
-              logWarn(s"Failed to evaluate networkTimeFuture $th")
+              logger.warn(s"Failed to evaluate networkTimeFuture $th")
               NetworkTime.localWithOffset(nt.offset) -> Left(nt -> networkTimeFuture)
           }
     }

@@ -1,22 +1,23 @@
 package encry.view.history.storage
 
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.HistoryModifierSerializer
 import encry.storage.EncryStorage
-import encry.utils.Logging
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.serialization.Serializer
+
 import scala.util.{Failure, Random, Success}
 
-class HistoryStorage(override val store: Store, val objectsStore: Store) extends EncryStorage with Logging {
+class HistoryStorage(override val store: Store, val objectsStore: Store) extends EncryStorage with StrictLogging {
 
   def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
     objectsStore.get(ByteArrayWrapper(id)).flatMap { res =>
       HistoryModifierSerializer.parseBytes(res.data) match {
         case Success(b) => Some(b)
         case Failure(e) =>
-          logWarn(s"Failed to parse block from db: $e")
+          logger.warn(s"Failed to parse block from db: $e")
           None
       }
     }

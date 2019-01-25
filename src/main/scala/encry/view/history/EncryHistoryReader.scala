@@ -1,5 +1,6 @@
 package encry.view.history
 
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History._
 import encry.consensus.ModifierSemanticValidity
@@ -10,16 +11,16 @@ import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
 import encry.EncryApp.settings
-import encry.utils.Logging
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
+
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
 trait EncryHistoryReader extends BlockHeaderProcessor
   with BlockPayloadProcessor
   with BaseADProofProcessor
-  with Logging {
+  with StrictLogging {
 
   protected val nodeSettings: NodeSettings
 
@@ -194,7 +195,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
       case None if contains(modifierId) => ModifierSemanticValidity.Unknown
       case None => ModifierSemanticValidity.Absent
       case m =>
-        logError(s"Incorrect validity status: $m")
+        logger.error(s"Incorrect validity status: $m")
         ModifierSemanticValidity.Absent
     }
 }
