@@ -68,7 +68,7 @@ object ModifiersCache extends StrictLogging {
           if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) =>
           true
         case _ =>
-          logger.error(s"Try to apply: ${Algos.encode(k.toArray)} and result is: ${isApplicable(k)}")
+          //logger.error(s"Try to apply: ${Algos.encode(k.toArray)} and result is: ${isApplicable(k)}")
           isApplicable(k)
       }
     }.map { case (k, _) => k }

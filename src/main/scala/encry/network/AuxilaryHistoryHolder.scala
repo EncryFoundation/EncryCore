@@ -2,8 +2,11 @@ package encry.network
 
 import java.io.File
 
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef}
 import com.typesafe.scalalogging.StrictLogging
+import encry.consensus.History.ProgressInfo
+import encry.modifiers.EncryPersistentModifier
+import encry.network.AuxilaryHistoryHolder.{Append, AuxHistoryChanged, ReportModifierInvalid, ReportModifierValid}
 import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.utils.NetworkTimeProvider
 import encry.view.history.EncryHistory
@@ -12,11 +15,22 @@ import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStatePro
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
 
-class AuxilaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends Actor with StrictLogging {
+class AuxilaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvider, syncronizer: ActorRef)
+  extends Actor with StrictLogging {
 
   val history: EncryHistory = readOrGenerate(settings, ntp)
 
-  override def receive: Receive = ???
+  override def receive: Receive = {
+    case Append(mod) =>
+      history.append(mod)
+      syncronizer ! AuxHistoryChanged(history)
+    case ReportModifierValid(mod) =>
+      history.reportModifierIsValid(mod)
+      syncronizer ! AuxHistoryChanged(history)
+    case ReportModifierInvalid(mod, progressInfo) =>
+      history.reportModifierIsInvalid(mod, progressInfo)
+      syncronizer ! AuxHistoryChanged(history)
+  }
 
   def readOrGenerate(settings: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistory = {
 
@@ -67,4 +81,11 @@ class AuxilaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvider
     history.closeStorage()
   }
 
+}
+
+object AuxilaryHistoryHolder {
+  case class ReportModifierValid(mod: EncryPersistentModifier)
+  case class ReportModifierInvalid(mod: EncryPersistentModifier, progressInfo: ProgressInfo[EncryPersistentModifier])
+  case class Append(mod: EncryPersistentModifier)
+  case class AuxHistoryChanged(history: EncryHistory)
 }
