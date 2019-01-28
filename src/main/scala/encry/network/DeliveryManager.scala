@@ -182,12 +182,15 @@ class DeliveryManager extends Actor with Logging {
   def peerWhoDelivered(mid: ModifierId): Option[ConnectedPeer] = delivered.get(key(mid))
 
   def sendExtension(remote: ConnectedPeer, status: HistoryComparisonResult,
-                    extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit = extOpt match {
-    case None => logInfo(s"extOpt is empty for: $remote. Its status is: $status.")
-    case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
-      case (mid, mods) => networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
-    }
-  }
+                    extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit =
+    if (isBlockChainSynced)
+      extOpt match {
+        case None => logInfo(s"extOpt is empty for: $remote. Its status is: $status.")
+        case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
+          case (mid, mods) => networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
+        }
+     }
+    else logInfo(s"Peer's $remote hisotry is younger, but node is note synces, so ignore sending extentions")
 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     if (settings.influxDB.isDefined)
