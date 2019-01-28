@@ -92,6 +92,9 @@ class NetworkController extends Actor {
       context.actorOf(PeerConnectionHandler.props(messagesHandler, sender(), direction, externalSocketAddress, remote)
         .withDispatcher("network-dispatcher"))
       outgoing -= remote
+    case Connected(remote, local) =>
+      logInfo(s"Peer $remote trying to connect, but checkPossibilityToAddPeer(remote):" +
+        s" ${checkPossibilityToAddPeer(remote)}.")
     case CommandFailed(c: Connect) =>
       outgoing -= c.remoteAddress
       logInfo("Failed to connect to : " + c.remoteAddress)
