@@ -3,7 +3,7 @@ package encry.network
 import akka.actor.{Actor, Cancellable}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
-import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
+import encry.consensus.History.{HistoryComparisonResult, Older, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.mempool.Transaction
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -19,6 +19,7 @@ import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec
 import encry.view.mempool.Mempool
 import encry.utils.Logging
 import org.encryfoundation.common.Algos
+
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -191,7 +192,7 @@ class DeliveryManager extends Actor with Logging {
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     if (settings.influxDB.isDefined)
       context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
-    statusTracker.statuses.keys.foreach(expect(_, modifierTypeId, modifierIds))
+    statusTracker.statuses.filter(_._2 != Younger).keys.foreach(expect(_, modifierTypeId, modifierIds))
   }
 
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = if (isExpecting(mtid, mid)) {
