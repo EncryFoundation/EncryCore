@@ -45,7 +45,7 @@ class DeliveryManager extends Actor with Logging {
     statusTracker.scheduleSendSyncInfo()
     self ! SendLocalSyncInfo
     context.system.scheduler
-      .schedule(settings.network.modifierDeliverTimeCheck, settings.network.syncInterval)(self ! CheckModifiersToDownload)
+      .schedule(settings.network.modifierDeliverTimeCheck, settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
   }
 
   override def receive: Receive = syncCycle
@@ -125,7 +125,8 @@ class DeliveryManager extends Actor with Logging {
   )
 
   def expect(peer: ConnectedPeer, mTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit =
-    if ((mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining) || mTypeId != Transaction.ModifierTypeId) {
+    if (((mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining)
+      || mTypeId != Transaction.ModifierTypeId) && statusTracker.statuses.get(peer).exists(_ != Younger)) {
       val notYetRequestedIds: Seq[ModifierId] = modifierIds.foldLeft(Vector[ModifierId]()) {
         case (notYetRequested, modId) =>
           val modifierKey: ModifierIdAsKey = key(modId)
@@ -149,7 +150,7 @@ class DeliveryManager extends Actor with Logging {
   def reexpect(cp: ConnectedPeer, mTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
     val modifierKey: ModifierIdAsKey = key(modifierId)
     val peerAndHistoryOpt: Option[(ConnectedPeer, HistoryComparisonResult)] =
-      statusTracker.statuses.find(peer => peer._1.socketAddress == cp.socketAddress)
+      statusTracker.statuses.find(peer => peer._1.socketAddress == cp.socketAddress && peer._2 != Younger)
     cancellables.get(modifierKey) match {
       case Some(peerInfo) if peerInfo._2._2 < settings.network.maxDeliveryChecks && peerAndHistoryOpt.isDefined =>
         peerAndHistoryOpt.foreach { case (peer, _) =>
