@@ -12,6 +12,7 @@ import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.history.{ADProofs, Header, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
+import encry.network.AuxilaryHistoryHolder.AuxHistoryChanged
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
@@ -57,8 +58,8 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
     case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
     case SemanticallyFailedModification(mod, throwable) =>
     case ChangedState(reader) =>
+    case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
-      historyReaderOpt = Some(reader)
       deliveryManager ! ChangedHistory(reader)
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] =>
       mempoolReaderOpt = Some(reader)
