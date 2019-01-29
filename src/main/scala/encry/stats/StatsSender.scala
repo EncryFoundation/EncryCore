@@ -5,7 +5,6 @@ import java.net.InetAddress
 import java.util
 import java.text.SimpleDateFormat
 import java.util.Date
-
 import akka.actor.Actor
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{settings, timeProvider}
@@ -28,8 +27,6 @@ class StatsSender extends Actor {
     case Some(value) => value
     case None => InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort
   }
-
-  val dateFormat: SimpleDateFormat = new SimpleDateFormat("HH:mm:ss")
 
   val InfluxURL: String = settings.influxDB.map(_.url).getOrElse(throw new RuntimeException("url not specified"))
 
