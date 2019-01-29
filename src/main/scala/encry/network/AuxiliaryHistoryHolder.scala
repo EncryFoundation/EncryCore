@@ -3,10 +3,10 @@ package encry.network
 import java.io.File
 
 import akka.actor.{Actor, ActorRef}
-import com.typesafe.scalalogging.StrictLogging
+import com.typesafe.scalalogging.{Logger, StrictLogging}
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
-import encry.network.AuxilaryHistoryHolder.{Append, AuxHistoryChanged, ReportModifierInvalid, ReportModifierValid}
+import encry.network.AuxiliaryHistoryHolder._
 import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.utils.NetworkTimeProvider
 import encry.view.history.EncryHistory
@@ -15,10 +15,10 @@ import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStatePro
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
 
-class AuxilaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvider, syncronizer: ActorRef)
+class AuxiliaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvider, syncronizer: ActorRef)
   extends Actor with StrictLogging {
 
-  val history: EncryHistory = readOrGenerate(settings, ntp)
+  val history: EncryHistory = AuxiliaryHistoryHolder.readOrGenerate(settings, ntp)
 
   override def receive: Receive = {
     case Append(mod) =>
@@ -32,7 +32,28 @@ class AuxilaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvider
       syncronizer ! AuxHistoryChanged(history)
   }
 
-  def readOrGenerate(settings: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistory = {
+  override def postStop(): Unit = {
+    logger.warn(s"Stopping AuxiliaryHistoryHolder")
+    history.closeStorage()
+  }
+
+}
+
+object AuxiliaryHistoryHolder {
+
+  private def getHistoryIndexDir(settings: EncryAppSettings): File = {
+    val dir: File = new File(s"${settings.directory}/auxHistory/index")
+    dir.mkdirs()
+    dir
+  }
+
+  private def getHistoryObjectsDir(settings: EncryAppSettings): File = {
+    val dir: File = new File(s"${settings.directory}/auxHistory/objects")
+    dir.mkdirs()
+    dir
+  }
+
+  protected[AuxiliaryHistoryHolder] def readOrGenerate(settings: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistory = {
 
     val historyIndexDir: File = getHistoryIndexDir(settings)
     val historyObjectsDir: File = getHistoryObjectsDir(settings)
@@ -64,26 +85,6 @@ class AuxilaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvider
     history
   }
 
-  def getHistoryIndexDir(settings: EncryAppSettings): File = {
-    val dir: File = new File(s"${settings.directory}/auxHistory/index")
-    dir.mkdirs()
-    dir
-  }
-
-  def getHistoryObjectsDir(settings: EncryAppSettings): File = {
-    val dir: File = new File(s"${settings.directory}/auxHistory/objects")
-    dir.mkdirs()
-    dir
-  }
-
-  override def postStop(): Unit = {
-    logger.warn(s"Stopping AuxilaryHistoryHolder")
-    history.closeStorage()
-  }
-
-}
-
-object AuxilaryHistoryHolder {
   case class ReportModifierValid(mod: EncryPersistentModifier)
   case class ReportModifierInvalid(mod: EncryPersistentModifier, progressInfo: ProgressInfo[EncryPersistentModifier])
   case class Append(mod: EncryPersistentModifier)

@@ -13,7 +13,7 @@ import encry.modifiers._
 import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
 import encry.modifiers.state.box.EncryProposition
-import encry.network.AuxilaryHistoryHolder.{Append, ReportModifierInvalid, ReportModifierValid}
+import encry.network.AuxiliaryHistoryHolder.{Append, ReportModifierInvalid, ReportModifierValid}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.PeerConnectionHandler.ConnectedPeer

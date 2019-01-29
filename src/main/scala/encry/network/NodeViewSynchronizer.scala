@@ -12,7 +12,7 @@ import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.history.{ADProofs, Header, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
-import encry.network.AuxilaryHistoryHolder.AuxHistoryChanged
+import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
