@@ -96,15 +96,15 @@ evictionWarningOptions in update := EvictionWarningOptions.default
   .withWarnDirectEvictions(false)
   .withWarnScalaVersionEviction(false)
 
-logLevel := Level.Error
+logLevel := Level.Info
 val opts = Seq(
   "-server",
-  "-Xms4G",
-  "-Xmx4G",
+  "-Xms6G",
+  "-Xmx6G",
   "-XX:+ExitOnOutOfMemoryError",
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
-  "-XX:+UseG1GC",
+  "-XX:+UseConcMarkSweepGC",
   "-XX:+UseNUMA",
   "-XX:+AlwaysPreTouch",
   "-XX:+PerfDisableSharedMem",

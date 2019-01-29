@@ -3,7 +3,7 @@ package encry.network
 import akka.actor.{Actor, Cancellable}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
-import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
+import encry.consensus.History.{HistoryComparisonResult, Older, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.mempool.Transaction
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -19,6 +19,7 @@ import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec
 import encry.view.mempool.Mempool
 import encry.utils.Logging
 import org.encryfoundation.common.Algos
+
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -44,7 +45,7 @@ class DeliveryManager extends Actor with Logging {
     statusTracker.scheduleSendSyncInfo()
     self ! SendLocalSyncInfo
     context.system.scheduler
-      .schedule(settings.network.modifierDeliverTimeCheck, settings.network.syncInterval)(self ! CheckModifiersToDownload)
+      .schedule(settings.network.modifierDeliverTimeCheck, settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
   }
 
   override def receive: Receive = syncCycle
@@ -124,7 +125,8 @@ class DeliveryManager extends Actor with Logging {
   )
 
   def expect(peer: ConnectedPeer, mTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit =
-    if ((mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining) || mTypeId != Transaction.ModifierTypeId) {
+    if (((mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining)
+      || mTypeId != Transaction.ModifierTypeId) && statusTracker.statuses.get(peer).exists(_ != Younger)) {
       val notYetRequestedIds: Seq[ModifierId] = modifierIds.foldLeft(Vector[ModifierId]()) {
         case (notYetRequested, modId) =>
           val modifierKey: ModifierIdAsKey = key(modId)
@@ -148,7 +150,7 @@ class DeliveryManager extends Actor with Logging {
   def reexpect(cp: ConnectedPeer, mTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
     val modifierKey: ModifierIdAsKey = key(modifierId)
     val peerAndHistoryOpt: Option[(ConnectedPeer, HistoryComparisonResult)] =
-      statusTracker.statuses.find(peer => peer._1.socketAddress == cp.socketAddress)
+      statusTracker.statuses.find(peer => peer._1.socketAddress == cp.socketAddress && peer._2 != Younger)
     cancellables.get(modifierKey) match {
       case Some(peerInfo) if peerInfo._2._2 < settings.network.maxDeliveryChecks && peerAndHistoryOpt.isDefined =>
         peerAndHistoryOpt.foreach { case (peer, _) =>
@@ -181,17 +183,20 @@ class DeliveryManager extends Actor with Logging {
   def peerWhoDelivered(mid: ModifierId): Option[ConnectedPeer] = delivered.get(key(mid))
 
   def sendExtension(remote: ConnectedPeer, status: HistoryComparisonResult,
-                    extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit = extOpt match {
-    case None => logInfo(s"extOpt is empty for: $remote. Its status is: $status.")
-    case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
-      case (mid, mods) => networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
-    }
-  }
+                    extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit =
+    if (isBlockChainSynced)
+      extOpt match {
+        case None => logInfo(s"extOpt is empty for: $remote. Its status is: $status.")
+        case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
+          case (mid, mods) => networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
+        }
+     }
+    else logInfo(s"Peer's $remote hisotry is younger, but node is note synces, so ignore sending extentions")
 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     if (settings.influxDB.isDefined)
       context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
-    statusTracker.statuses.keys.foreach(expect(_, modifierTypeId, modifierIds))
+    statusTracker.statuses.filter(_._2 != Younger).keys.foreach(expect(_, modifierTypeId, modifierIds))
   }
 
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = if (isExpecting(mtid, mid)) {
