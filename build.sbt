@@ -104,7 +104,7 @@ val opts = Seq(
   "-XX:+ExitOnOutOfMemoryError",
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
-  "-XX:+UseG1GC",
+  "-XX:+UseConcMarkSweepGC",
   "-XX:+UseNUMA",
   "-XX:+AlwaysPreTouch",
   "-XX:+PerfDisableSharedMem",
