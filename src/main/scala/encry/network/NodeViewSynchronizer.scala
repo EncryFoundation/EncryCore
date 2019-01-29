@@ -83,7 +83,7 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
         case _ =>
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == RequestModifierSpec.MessageCode =>
-      logInfo(s"Get request from remote peer. chainSynced = ${chainSynced}")
+      logger.info(s"Get request from remote peer. chainSynced = ${chainSynced}")
       if (chainSynced) {
         historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
           val objs: Seq[NodeViewModifier] = invData._1 match {
@@ -95,7 +95,7 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
           self ! ResponseFromLocal(remote, invData._1, objs)
         }
       }
-      else logInfo(s"Peer ${remote} requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
+      else logger.info(s"Peer ${remote} requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
         s"node is not synced, so ignore msg")
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
       logger.debug(s"Got inv message from ${remote.socketAddress}")

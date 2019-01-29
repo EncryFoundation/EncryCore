@@ -96,7 +96,7 @@ class NetworkController extends Actor with StrictLogging {
         .withDispatcher("network-dispatcher"))
       outgoing -= remote
     case Connected(remote, local) =>
-      logInfo(s"Peer $remote trying to connect, but checkPossibilityToAddPeer(remote):" +
+      logger.info(s"Peer $remote trying to connect, but checkPossibilityToAddPeer(remote):" +
         s" ${checkPossibilityToAddPeer(remote)}.")
     case CommandFailed(c: Connect) =>
       outgoing -= c.remoteAddress
