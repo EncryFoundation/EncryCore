@@ -4,8 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.settings
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.{Block, Payload}
-import encry.modifiers.history.{Block, Header}
+import encry.modifiers.history.{Block, Header, Payload}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.history.Header
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
@@ -22,7 +21,6 @@ object ModifiersCache extends StrictLogging {
 
   private val cache: TrieMap[Key, EncryPersistentModifier] = TrieMap[Key, EncryPersistentModifier]()
   private var headersCollection: SortedMap[Int, List[ModifierId]] = SortedMap[Int, List[ModifierId]]()
-
 
   def size: Int = cache.size
 
@@ -62,6 +60,7 @@ object ModifiersCache extends StrictLogging {
 
   def findCandidateKey(history: EncryHistory): List[Key] = {
     val historyBestHeaderHeight: Int = history.bestHeaderHeight
+    val historyBestBlockHeight: Int = history.bestBlockHeight
 
     def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier) match {
       case Failure(_: RecoverableModifierError) => false
@@ -86,6 +85,7 @@ object ModifiersCache extends StrictLogging {
     val bestHeadersIds: List[Key] = headerIds match {
       case Some(value) =>
         headersCollection = headersCollection - (historyBestHeaderHeight + 1)
+        logger.info(s"HeadersCollection size is: ${headersCollection.size}")
         value.map(m => cache.get(m)).collect {
           case Some(v: Header)
             if (v.parentId sameElements history.bestHeaderOpt.map(_.id).getOrElse(Array.emptyByteArray))
@@ -98,7 +98,31 @@ object ModifiersCache extends StrictLogging {
         List[Key]()
     }
     if (bestHeadersIds.nonEmpty) bestHeadersIds
-    else {
+    else if (historyBestHeaderHeight - historyBestBlockHeight > 0) {
+      val payloadId: Option[Key] = history.headerIdsAtHeight(historyBestBlockHeight + 1).headOption match {
+        case Some(id) =>
+          val header: Option[Header] = history.modifierById(id).collect { case header: Header => header }
+          val modFromCache: Option[EncryPersistentModifier] = cache.get {
+            val payloadId: Array[Byte] = header.map(_.payloadId).getOrElse(Array.emptyByteArray)
+            new mutable.WrappedArray.ofByte(payloadId).asInstanceOf[Key]
+          }
+          val applicablePayloadKey: Option[Key] = modFromCache.collect { case p: Payload if isApplicable(p.id) =>
+            logger.info(s"Find new payload for next best header: ${Algos.encode(p.id)}")
+            val k: Key = new mutable.WrappedArray.ofByte(p.id)
+            k
+          }
+          applicablePayloadKey
+        case None =>
+          logger.info(s"No payloads for current history")
+          None
+      }
+      val payloadKey: List[Key] = List(payloadId).collect { case Some(k: Key) => k }
+      if (payloadKey.isEmpty) {
+        logger.info(s"PayloadKeys is empty. Starting exhaustiveSearch")
+        exhaustiveSearch
+      }
+      else payloadKey
+    } else {
       logger.info(s"Starting exhaustiveSearch")
       exhaustiveSearch
     }
