@@ -83,7 +83,6 @@ class NodeViewSynchronizer extends Actor with Logging {
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == RequestModifierSpec.MessageCode =>
       logInfo(s"Get request from remote peer. chainSynced = ${chainSynced}")
       if (chainSynced) {
-        logInfo(s"historyReaderOpt: ${historyReaderOpt}")
         historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
           val objs: Seq[NodeViewModifier] = invData._1 match {
             case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(invData._2)
