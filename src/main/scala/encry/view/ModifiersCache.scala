@@ -42,7 +42,7 @@ object ModifiersCache extends Logging {
   }
 
   def remove(key: Key): Option[EncryPersistentModifier] = {
-    logInfo(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains: ${cache.get(key).isDefined}")
+    logInfo(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains : ${cache.get(key).isDefined}")
     cache.remove(key).map { removed =>
       removed
     }
