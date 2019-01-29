@@ -123,7 +123,7 @@ object ModifiersCache extends StrictLogging {
       }
       else payloadKey
     } else {
-      logger.info(s"Starting exhaustiveSearch.")
+      logger.info(s"Starting exhaustiveSearch")
       exhaustiveSearch
     }
   }
