@@ -30,7 +30,6 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
-
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -130,13 +129,15 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       logger.error(s"Strange input: $a")
   }
 
-  def computeApplications(): Unit =
-    ModifiersCache.popCandidate(nodeView.history) match {
-      case Some(payload) =>
-        pmodModify(payload)
-        computeApplications()
-      case None => Unit
+  //todo refactor loop
+  def computeApplications(): Unit = {
+    val mods = ModifiersCache.popCandidate(nodeView.history)
+    if (mods.nonEmpty) {
+      mods.foreach(mod => pmodModify(mod))
+      computeApplications()
     }
+    else Unit
+  }
 
   def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 

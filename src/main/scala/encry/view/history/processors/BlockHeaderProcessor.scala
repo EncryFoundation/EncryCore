@@ -19,7 +19,6 @@ import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import supertagged.@@
-
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try

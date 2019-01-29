@@ -131,8 +131,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
     Block(header, Payload(header.id, txs), None)
   }
 
-  def generateDummyHistory: EncryHistory = {
-    val settings: EncryAppSettings = EncryAppSettings.read
+  def generateDummyHistory(settings: EncryAppSettings): EncryHistory = {
 
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
