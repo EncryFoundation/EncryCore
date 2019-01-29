@@ -118,12 +118,12 @@ object ModifiersCache extends StrictLogging {
       }
       val payloadKey: List[Key] = List(payloadId).collect { case Some(k: Key) => k }
       if (payloadKey.isEmpty) {
-        logger.info(s"PayloadKeys is empty. Starting exhaustiveSearch")
+        logger.info(s"PayloadKeys is empty. Starting exhaustiveSearch.")
         exhaustiveSearch
       }
       else payloadKey
     } else {
-      logger.info(s"Starting exhaustiveSearch")
+      logger.info(s"Starting exhaustiveSearch.")
       exhaustiveSearch
     }
   }
