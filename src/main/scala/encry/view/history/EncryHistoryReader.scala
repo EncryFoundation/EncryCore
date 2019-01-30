@@ -64,7 +64,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
       case Some(id) =>
         //We are on different forks now.
         //Return Younger, because we can send blocks from our fork that other node can download.
-        if (si.lastHeaderIds.exists(contains)) Younger
+        if (si.lastHeaderIds.forall(contains)) Younger
         //Return Fork, because of we contains only part of remote node history
         else if (!si.lastHeaderIds.forall(contains)) Fork
         else Unknown //We don't have any of id's from other's node sync info in history.
