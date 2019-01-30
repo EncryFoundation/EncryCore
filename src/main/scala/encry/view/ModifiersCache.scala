@@ -4,7 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.settings
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.{Block, Header, Payload}
+import encry.modifiers.history.{Block, Payload}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.history.Header
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
@@ -59,8 +59,6 @@ object ModifiersCache extends StrictLogging {
   override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
 
   def findCandidateKey(history: EncryHistory): List[Key] = {
-    val historyBestHeaderHeight: Int = history.bestHeaderHeight
-    val historyBestBlockHeight: Int = history.bestBlockHeight
 
     def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier) match {
       case Failure(_: RecoverableModifierError) => false
@@ -81,10 +79,10 @@ object ModifiersCache extends StrictLogging {
       }
     }).collect { case Some(v) => v._1 }
 
-    val headerIds: Option[List[ModifierId]] = headersCollection.get(historyBestHeaderHeight + 1)
+    val headerIds: Option[List[ModifierId]] = headersCollection.get(history.bestHeaderHeight + 1)
     val bestHeadersIds: List[Key] = headerIds match {
       case Some(value) =>
-        headersCollection = headersCollection - (historyBestHeaderHeight + 1)
+        headersCollection = headersCollection - (history.bestHeaderHeight + 1)
         logger.info(s"HeadersCollection size is: ${headersCollection.size}")
         value.map(m => cache.get(m)).collect {
           case Some(v: Header)
@@ -98,8 +96,8 @@ object ModifiersCache extends StrictLogging {
         List[Key]()
     }
     if (bestHeadersIds.nonEmpty) bestHeadersIds
-    else if (historyBestHeaderHeight - historyBestBlockHeight > 0) {
-      val payloadId: Option[Key] = history.headerIdsAtHeight(historyBestBlockHeight + 1).headOption match {
+    else if (history.bestHeaderHeight - history.bestBlockHeight > 0) {
+      val payloadId: Option[Key] = history.headerIdsAtHeight(history.bestBlockHeight + 1).headOption match {
         case Some(id) =>
           val header: Option[Header] = history.modifierById(id).collect { case header: Header => header }
           val modFromCache: Option[EncryPersistentModifier] = cache.get {
