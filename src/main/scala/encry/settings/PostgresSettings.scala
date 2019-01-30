@@ -5,6 +5,4 @@ case class PostgresSettings(host: String,
                             password: String,
                             maxPoolSize: Int,
                             enableSave: Boolean = false,
-                            enableRestore: Boolean = false,
-                            restoreBatchSize: Option[Int] = None,
                             writingGap: Option[Int] = None)

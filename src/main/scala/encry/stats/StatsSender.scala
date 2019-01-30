@@ -11,7 +11,6 @@ import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
 import encry.modifiers.history.Header
 import encry.stats.StatsSender._
-import encry.stats.LoggingActor.LogMessage
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
 import org.influxdb.{InfluxDB, InfluxDBFactory}
@@ -58,16 +57,6 @@ class StatsSender extends Actor {
     case TransactionsStatMessage(num, height) =>
       influxDB.write(InfluxPort, s"numOfTxsInBlock,nodeName=$nodeName value=$num,height=$height")
 
-    case LogMessage(logLevel, logMessage, logTime) => influxDB.write(InfluxPort,
-      s"""logsFromNode,nodeName=$nodeName,logLevel=${
-        logLevel match {
-          case "Info" => 1
-          case "Debug" => 2
-          case "Warn" => 3
-          case "Error" => 4
-          case _ => 4
-        }
-      } value="[${sdf.format(logTime)}] $logMessage"""")
     case HeightStatistics(bestHeaderHeight, bestBlockHeight) =>
       influxDB.write(InfluxPort,
         s"chainStat,nodeName=$nodeName value=$bestHeaderHeight,bestBlockHeight=$bestBlockHeight")

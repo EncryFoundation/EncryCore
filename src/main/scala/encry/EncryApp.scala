@@ -1,12 +1,14 @@
 package encry
 
 import java.net.InetAddress
+
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.ExceptionHandler
 import akka.stream.ActorMaterializer
+import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.routes._
 import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
 import encry.cli.ConsoleListener
@@ -18,8 +20,8 @@ import encry.local.miner.Miner.StartMining
 import encry.network.message._
 import encry.network.{PeerManager, _}
 import encry.settings.EncryAppSettings
-import encry.stats.{KafkaActor, LoggingActor, StatsSender, Zombie}
-import encry.utils.{Logging, NetworkTimeProvider}
+import encry.stats.{KafkaActor, StatsSender, Zombie}
+import encry.utils.NetworkTimeProvider
 import encry.view.{EncryNodeViewHolder, ReadersHolder}
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
@@ -31,7 +33,7 @@ import scala.concurrent.duration._
 import scala.io.Source
 import scala.language.postfixOps
 
-object EncryApp extends App with Logging {
+object EncryApp extends App with StrictLogging {
 
   implicit val system: ActorSystem = ActorSystem()
   implicit val materializer: ActorMaterializer = ActorMaterializer()
@@ -56,7 +58,9 @@ object EncryApp extends App with Logging {
     )
   }
 
-  lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props()
+  lazy val auxHistoryHolder: ActorRef = system.actorOf(Props(new AuxiliaryHistoryHolder(settings, timeProvider, nodeViewSynchronizer))
+    .withDispatcher("aux-history-dispatcher"), "auxHistoryHolder")
+  lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props(auxHistoryHolder)
     .withDispatcher("nvh-dispatcher").withMailbox("nvh-mailbox"), "nodeViewHolder")
   val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
@@ -73,25 +77,15 @@ object EncryApp extends App with Logging {
   if (settings.influxDB.isDefined) system.actorOf(Props[StatsSender], "statsSender")
   if (settings.kafka.exists(_.sendToKafka))
     system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
-  if (settings.postgres.exists(_.enableSave) || settings.postgres.exists(_.enableRestore) ) {
-    if (settings.postgres.exists(_.enableSave))
-      system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")
-    if (settings.postgres.exists(_.enableRestore)) {
-      system.actorOf(Props(classOf[PostgresRestore], dbService, nodeViewHolder), "postgresRestore")
-      if (!settings.levelDb.exists(_.enableRestore)) system.actorSelection("/user/postgresRestore") ! StartRecovery
-    }
-  }
-  if (settings.levelDb.exists(_.enableSave) || settings.levelDb.exists(_.enableRestore))
-    system.actorOf(Props[ModifiersHolder], "modifiersHolder")
+  if (settings.postgres.exists(_.enableSave)) system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")
+
   if (settings.node.mining) miner ! StartMining
   if (settings.node.useCli) {
     system.actorOf(Props[ConsoleListener], "cliListener")
     system.actorSelection("/user/cliListener") ! StartListening
   }
-  if (settings.node.loggingMode != "off") {
-    system.actorOf(Props[LoggingActor], "loggingActor")
-    system.actorOf(Props[Zombie], "zombie")
-  }
+
+  system.actorOf(Props[Zombie], "zombie")
 
   if (settings.restApi.enabled.getOrElse(false)) {
     import akka.http.scaladsl.model.StatusCodes._
@@ -100,7 +94,7 @@ object EncryApp extends App with Logging {
       ExceptionHandler {
         case e: Exception =>
           extractUri { uri =>
-            logInfo(s"Request to $uri could not be handled normally due to: $e")
+            logger.info(s"Request to $uri could not be handled normally due to: $e")
             complete(HttpResponse(InternalServerError, entity = "Internal server error"))
           }
       }

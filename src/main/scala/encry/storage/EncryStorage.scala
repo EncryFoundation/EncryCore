@@ -1,12 +1,13 @@
 package encry.storage
 
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.VersionTag
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.Algos
-import scala.util.{Failure, Success, Try}
-import encry.utils.Logging
 
-trait EncryStorage extends AutoCloseable with Logging {
+import scala.util.{Failure, Success, Try}
+
+trait EncryStorage extends AutoCloseable with StrictLogging {
 
   val store: Store
 
@@ -31,7 +32,7 @@ trait EncryStorage extends AutoCloseable with Logging {
     }
 
   override def close(): Unit = {
-    logInfo("Closing storage")
+    logger.info("Closing storage")
     store.close()
   }
 }
