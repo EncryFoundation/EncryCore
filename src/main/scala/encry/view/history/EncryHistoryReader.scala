@@ -177,7 +177,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     loop(2, HeaderChain(Seq(header2)))
   }
 
-  /** Finds common block and sub-chains with `otherChain`. */
+  /** Finds common block and sub-chains with `otherChain`.*/
   protected[history] def commonBlockThenSuffixes(otherChain: HeaderChain,
                                                  startHeader: Header,
                                                  limit: Int): (HeaderChain, HeaderChain) = {
