@@ -88,6 +88,7 @@ object ModifiersCache extends StrictLogging {
             logger.info(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
             new mutable.WrappedArray.ofByte(v.id)
         }
+
       case None =>
         logger.info(s"No best header in cache")
         List[Key]()
