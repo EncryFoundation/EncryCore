@@ -61,10 +61,12 @@ trait EncryHistoryReader extends BlockHeaderProcessor
         Older //Our best header is in other node best chain, but not at the last position
       case Some(_) if si.lastHeaderIds.isEmpty =>
         Younger //Other history is empty, our contain some headers
-      case Some(_) =>
+      case Some(id) =>
         //We are on different forks now.
         //Return Younger, because we can send blocks from our fork that other node can download.
-        if (si.lastHeaderIds.view.exists(contains)) Younger
+        if (si.lastHeaderIds.forall(contains)) Younger
+        //Return Fork, because of we contains only part of remote node history
+        else if (!si.lastHeaderIds.forall(contains)) Fork
         else Unknown //We don't have any of id's from other's node sync info in history.
       //We don't know whether we can sync with it and what blocks to send in Inv message.
       case None if si.lastHeaderIds.isEmpty => Equal //Both nodes do not keep any blocks
@@ -175,7 +177,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     loop(2, HeaderChain(Seq(header2)))
   }
 
-  /** Finds common block and sub-chains with `otherChain`. */
+  /** Finds common block and sub-chains with `otherChain`.*/
   protected[history] def commonBlockThenSuffixes(otherChain: HeaderChain,
                                                  startHeader: Header,
                                                  limit: Int): (HeaderChain, HeaderChain) = {
