@@ -32,10 +32,9 @@ object ModifiersCache extends StrictLogging {
     cache.put(key, value)
     value match {
       case header: Header =>
-        val currentHeight: Block.Height = header.height
-        val possibleHeadersAtCurrentHeight: List[ModifierId] = headersCollection.getOrElse(currentHeight, List())
+        val possibleHeadersAtCurrentHeight: List[ModifierId] = headersCollection.getOrElse(header.height, List())
         val updatedHeadersAtCurrentHeight: List[ModifierId] = header.id :: possibleHeadersAtCurrentHeight
-        headersCollection = headersCollection.updated(currentHeight, updatedHeadersAtCurrentHeight)
+        headersCollection = headersCollection.updated(header.height, updatedHeadersAtCurrentHeight)
       case _ =>
     }
     if (size > settings.node.modifiersCacheSize) cache.find {
