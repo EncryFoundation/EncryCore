@@ -61,7 +61,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
         Older //Our best header is in other node best chain, but not at the last position
       case Some(_) if si.lastHeaderIds.isEmpty =>
         Younger //Other history is empty, our contain some headers
-      case Some(_) =>
+      case Some(id) =>
         //We are on different forks now.
         //Return Younger, because we can send blocks from our fork that other node can download.
         if (si.lastHeaderIds.forall(contains)) Younger
