@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.InetAddress
-
 import akka.actor.{Actor, Cancellable}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
@@ -105,8 +104,8 @@ class DeliveryManager extends Actor with StrictLogging {
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
         else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
       }
-    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
-      requestDownload(modifierTypeId, Seq(modifierId))
+    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]) =>
+      requestDownload(modifierTypeId, modifierIds)
     case FullBlockChainSynced => isBlockChainSynced = true
     case StartMining => isMining = true
     case DisableMining => isMining = false
@@ -126,7 +125,6 @@ class DeliveryManager extends Actor with StrictLogging {
     peer.handlerRef ! Message(EncrySyncInfoMessageSpec, Right(syncInfo), None)
   )
 
-  //todo: refactor
   def expect(peer: ConnectedPeer, mTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit =
     if (((mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining)
       || mTypeId != Transaction.ModifierTypeId) && statusTracker.statuses.get(peer).exists(_ != Younger)) {
@@ -193,14 +191,16 @@ class DeliveryManager extends Actor with StrictLogging {
 
   def sendExtension(remote: ConnectedPeer, status: HistoryComparisonResult,
                     extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit =
-    if (isBlockChainSynced)
-      extOpt match {
-        case None => logger.info(s"extOpt is empty for: $remote. Its status is: $status.")
-        case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
-          case (mid, mods) => networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
-        }
-     }
-    else logger.info(s"Peer's $remote hisotry is younger, but node is note synces, so ignore sending extentions")
+    if (isBlockChainSynced) extOpt match {
+      case None => logger.info(s"extOpt is empty for: $remote. Its status is: $status.")
+      case Some(ext) =>
+        println(s"ext size: ${ext.size}")
+        ext.groupBy(_._1).mapValues(_.map(_._2)).foreach { case (mid, mods) =>
+          println(s"mods in inv message size: ${mods.size}. Status is; $status")
+        networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
+      }
+    }
+    else logger.info(s"Peer's $remote history is younger, but node is note synces, so ignore sending extentions")
 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     if (settings.influxDB.isDefined)

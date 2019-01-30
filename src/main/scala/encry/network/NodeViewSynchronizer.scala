@@ -51,8 +51,8 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
       if (mod.isInstanceOf[Header] || mod.isInstanceOf[Payload] || mod.isInstanceOf[ADProofs]) &&
         historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
     case SyntacticallySuccessfulModifier(_) =>
-    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
-      deliveryManager ! DownloadRequest(modifierTypeId, modifierId)
+    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]) =>
+      deliveryManager ! DownloadRequest(modifierTypeId, modifierIds)
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
     case SyntacticallyFailedModification(_, _) =>
     case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
@@ -110,6 +110,7 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
       chainSynced = true
       deliveryManager ! FullBlockChainSynced
     case ResponseFromLocal(peer, _, modifiers: Seq[NodeViewModifier]) =>
+      println(modifiers.size)
       if (modifiers.nonEmpty) {
         val m: (ModifierTypeId, Map[ModifierId, Array[Byte]]) =
           modifiers.head.modifierTypeId -> modifiers.map(m => m.id -> m.bytes).toMap

@@ -20,6 +20,8 @@ class AuxiliaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvide
 
   val history: EncryHistory = AuxiliaryHistoryHolder.readOrGenerate(settings, ntp)
 
+  //override def preStart(): Unit = syncronizer ! AuxHistoryChanged(history)
+
   override def receive: Receive = {
     case Append(mod) =>
       history.append(mod)
