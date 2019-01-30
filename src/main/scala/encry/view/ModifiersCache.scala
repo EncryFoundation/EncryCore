@@ -4,7 +4,6 @@ import java.util.concurrent.ConcurrentHashMap
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.settings
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.Block
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.history.Header
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
@@ -85,7 +84,7 @@ object ModifiersCache extends StrictLogging {
         value.map(cache.get(_)).collect {
           case Some(v: Header)
             if (v.parentId sameElements history.bestHeaderOpt.map(_.id).getOrElse(Array.emptyByteArray))
-              && isApplicable(v.id) =>
+              && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
             logger.info(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
             new mutable.WrappedArray.ofByte(v.id)
         }
@@ -93,8 +92,16 @@ object ModifiersCache extends StrictLogging {
         logger.info(s"No best header in cache")
         List[Key]()
     }
-
     if (bestHeadersIds.nonEmpty) bestHeadersIds
-    else exhaustiveSearch
+    else history.headerIdsAtHeight(history.bestBlockHeight + 1).headOption match {
+      case Some(id) => history.modifierById(id) match {
+        case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
+          List(new mutable.WrappedArray.ofByte(header.payloadId))
+        case _ => exhaustiveSearch
+      }
+      case None =>
+        logger.info(s"No payloads for current history")
+        exhaustiveSearch
+    }
   }
 }
