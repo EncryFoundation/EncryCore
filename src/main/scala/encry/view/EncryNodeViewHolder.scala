@@ -395,7 +395,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
 
 object EncryNodeViewHolder {
 
-  case class DownloadRequest(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]) extends NodeViewHolderEvent
+  case class DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: Seq[ModifierId]) extends NodeViewHolderEvent
 
   case class CurrentView[HIS, MS, VL, MP](history: HIS, state: MS, vault: VL, pool: MP)
 

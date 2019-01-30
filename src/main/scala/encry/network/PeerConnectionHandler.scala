@@ -110,7 +110,6 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
     case msg: message.Message[_] =>
       def sendOutMessage(): Unit = {
         logger.info("Send message " + msg.spec + " to " + remote)
-
         connection ! Write(ByteString(Ints.toByteArray(msg.bytes.length) ++ msg.bytes))
       }
 
