@@ -4,7 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.settings
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.{Block, Payload}
+import encry.modifiers.history.Block
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.history.Header
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
@@ -49,7 +49,7 @@ object ModifiersCache extends StrictLogging {
 
   def remove(key: Key): Option[EncryPersistentModifier] = {
     logger.info(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains: ${cache.get(key).isDefined}")
-    cache.remove(key).map(removed => removed)
+    cache.remove(key)
   }
 
   def popCandidate(history: EncryHistory): List[EncryPersistentModifier] = synchronized {
@@ -79,50 +79,23 @@ object ModifiersCache extends StrictLogging {
       }
     }).collect { case Some(v) => v._1 }
 
-    val headerIds: Option[List[ModifierId]] = headersCollection.get(history.bestHeaderHeight + 1)
-    val bestHeadersIds: List[Key] = headerIds match {
+    val bestHeadersIds: List[Key] = headersCollection.get(history.bestHeaderHeight + 1) match {
       case Some(value) =>
         headersCollection = headersCollection - (history.bestHeaderHeight + 1)
         logger.info(s"HeadersCollection size is: ${headersCollection.size}")
-        value.map(m => cache.get(m)).collect {
+        value.map(cache.get(_)).collect {
           case Some(v: Header)
             if (v.parentId sameElements history.bestHeaderOpt.map(_.id).getOrElse(Array.emptyByteArray))
               && isApplicable(v.id) =>
             logger.info(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
-            new mutable.WrappedArray.ofByte(v.id).asInstanceOf[Key]
+            new mutable.WrappedArray.ofByte(v.id)
         }
       case None =>
         logger.info(s"No best header in cache")
         List[Key]()
     }
+
     if (bestHeadersIds.nonEmpty) bestHeadersIds
-    else if (history.bestHeaderHeight - history.bestBlockHeight > 0) {
-      val payloadId: Option[Key] = history.headerIdsAtHeight(history.bestBlockHeight + 1).headOption match {
-        case Some(id) =>
-          val header: Option[Header] = history.modifierById(id).collect { case header: Header => header }
-          val modFromCache: Option[EncryPersistentModifier] = cache.get {
-            val payloadId: Array[Byte] = header.map(_.payloadId).getOrElse(Array.emptyByteArray)
-            new mutable.WrappedArray.ofByte(payloadId).asInstanceOf[Key]
-          }
-          val applicablePayloadKey: Option[Key] = modFromCache.collect { case p: Payload if isApplicable(p.id) =>
-            logger.info(s"Find new payload for next best header: ${Algos.encode(p.id)}")
-            val k: Key = new mutable.WrappedArray.ofByte(p.id)
-            k
-          }
-          applicablePayloadKey
-        case None =>
-          logger.info(s"No payloads for current history")
-          None
-      }
-      val payloadKey: List[Key] = List(payloadId).collect { case Some(k: Key) => k }
-      if (payloadKey.isEmpty) {
-        logger.info(s"PayloadKeys is empty. Starting exhaustiveSearch.")
-        exhaustiveSearch
-      }
-      else payloadKey
-    } else {
-      logger.info(s"Starting exhaustiveSearch")
-      exhaustiveSearch
-    }
+    else exhaustiveSearch
   }
 }
