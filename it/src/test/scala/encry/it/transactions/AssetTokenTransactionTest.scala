@@ -42,7 +42,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite
     val thirdHeightToWait: Int = 11
     val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
     val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
-    val waitTime: FiniteDuration = 2.minutes
+    val waitTime: FiniteDuration = 30.minutes
     val amount: Int = scala.util.Random.nextInt(2000)
     val fee: Int = scala.util.Random.nextInt(500)
     val createdTokensAmount: Int = scala.util.Random.nextInt(2000)
