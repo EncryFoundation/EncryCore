@@ -91,7 +91,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite
       val transactionFromChain: Transaction = blockByHeaders.flatMap(_.payload.transactions.init).head
 
       transactionFromChain.id shouldEqual transaction.id
-      checkBalance shouldEqual false
+      checkBalance shouldEqual true
       txsNum shouldEqual (secondHeightToWait - firstHeightToWait + 1)
 
       val getBoxesAgain: Seq[EncryBaseBox] = Await.result(dockerNodes().head.outputs, waitTime)
