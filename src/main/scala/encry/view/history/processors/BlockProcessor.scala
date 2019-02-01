@@ -57,10 +57,12 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     case toProcess @ ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
       val prevBest: Block = bestBlockOpt.get
+      println(s"${Algos.encode(prevBest.id)} -> ${Algos.encode(fullBlock.parentId)}")
       val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
+      println(s"toApplyFunction - ${toApply.lengthCompare(newChain.length - 1) != 0} if TRUE -> nonBestBlock")
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
         //application of this block leads to full chain with higher score
@@ -103,6 +105,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
 
   private def nonBestBlock: BlockProcessing = {
     case params =>
+      logger.info(s"\n\n nonBestBlock ${bestBlockOpt.nonEmpty && isBetterChain(params.newBestHeader.id)} \n\n")
       //Orphaned block or full chain is not initialized yet
       logger.info(s"Appending ${params.fullBlock.encodedId}. Height: ${params.fullBlock.header.height} as a non best block.")
       logStatus(Seq(), Seq(), params.fullBlock, None)
