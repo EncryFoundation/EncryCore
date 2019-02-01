@@ -1,5 +1,7 @@
 package encry.network
 
+import java.net.InetAddress
+
 import akka.actor.{Actor, Cancellable}
 import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
@@ -20,6 +22,7 @@ import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec
 import encry.view.mempool.Mempool
 import org.encryfoundation.common.Algos
 
+import scala.collection.immutable.{HashSet, TreeSet}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -29,8 +32,8 @@ class DeliveryManager extends Actor with StrictLogging {
 
   var delivered: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty
   var deliveredSpam: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty
-  var peers: Map[ModifierIdAsKey, Seq[ConnectedPeer]] = Map.empty
-  var cancellables: Map[ModifierIdAsKey, (ConnectedPeer, (Cancellable, Int))] = Map.empty
+  var cancellables: Map[InetAddress, Map[ModifierId, (Cancellable, Int)]] = Map.empty
+  var requestedModifiers: Map[ModifierId, Int] = Map.empty
   var mempoolReaderOpt: Option[Mempool] = None
   var historyReaderOpt: Option[EncryHistory] = None
   var isBlockChainSynced: Boolean = false
@@ -75,10 +78,10 @@ class DeliveryManager extends Actor with StrictLogging {
       else reexpect(peer, modifierTypeId, modifierId)
     case CheckModifiersToDownload =>
       historyReaderOpt.foreach { h =>
-        val currentQueue: Iterable[ModifierId] = cancellables.keys.map(ModifierId @@ _.toArray)
+        val currentQueue: Iterable[ModifierId] = requestedModifiers.keys
         val newIds: Seq[(ModifierTypeId, ModifierId)] =
           h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
-            .filter(modId => !cancellables.keySet.contains(key(modId._2)))
+            .filterNot(modId => requestedModifiers.contains(modId._2))
         if (newIds.nonEmpty) newIds.groupBy(_._1).foreach {
           case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) => requestDownload(modId, ids.map(_._2))
         } else context.become(syncCycle)
@@ -124,6 +127,7 @@ class DeliveryManager extends Actor with StrictLogging {
     peer.handlerRef ! Message(EncrySyncInfoMessageSpec, Right(syncInfo), None)
   )
 
+  //todo: refactor
   def expect(peer: ConnectedPeer, mTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit =
     if (((mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining)
       || mTypeId != Transaction.ModifierTypeId) && statusTracker.statuses.get(peer).exists(_ != Younger)) {
@@ -131,50 +135,60 @@ class DeliveryManager extends Actor with StrictLogging {
         case (notYetRequested, modId) =>
           val modifierKey: ModifierIdAsKey = key(modId)
           if (historyReaderOpt.forall(history => !history.contains(modId) && !delivered.contains(key(modId)))) {
-            if (!cancellables.contains(modifierKey)) notYetRequested :+ modId
-            else {
-              peers = peers.updated(modifierKey, (peers.getOrElse(modifierKey, Seq()) :+ peer).distinct)
-              notYetRequested
-            }
+            notYetRequested :+ modId
           } else notYetRequested
       }
-      if (notYetRequestedIds.nonEmpty)
+      if (notYetRequestedIds.nonEmpty) {
+        logger.info(s"Send request to ${peer.socketAddress.getAddress} for modifiers of type $mTypeId with ids: " +
+          s"${modifierIds.map(Algos.encode).mkString(",")}")
         peer.handlerRef ! Message(requestModifierSpec, Right(mTypeId -> notYetRequestedIds), None)
+      }
       notYetRequestedIds.foreach { id =>
         val cancellable: Cancellable = context.system.scheduler
           .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(peer, mTypeId, id))
-        cancellables = cancellables.updated(key(id), (peer, (cancellable, 0)))
+        val peerMap = cancellables.getOrElse(peer.socketAddress.getAddress, Map.empty)
+          .updated(id, cancellable -> 0)
+        cancellables = cancellables.updated(peer.socketAddress.getAddress, peerMap)
       }
     }
 
+  //todo: refactor
   def reexpect(cp: ConnectedPeer, mTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
     val modifierKey: ModifierIdAsKey = key(modifierId)
     val peerAndHistoryOpt: Option[(ConnectedPeer, HistoryComparisonResult)] =
       statusTracker.statuses.find(peer => peer._1.socketAddress == cp.socketAddress && peer._2 != Younger)
-    cancellables.get(modifierKey) match {
-      case Some(peerInfo) if peerInfo._2._2 < settings.network.maxDeliveryChecks && peerAndHistoryOpt.isDefined =>
-        peerAndHistoryOpt.foreach { case (peer, _) =>
-          logger.debug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: " +
-            s"$mTypeId with id: ${Algos.encode(modifierId)}")
-          peer.handlerRef ! Message(requestModifierSpec, Right(mTypeId -> Seq(modifierId)), None)
-          val cancellable: Cancellable = context.system.scheduler
-            .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mTypeId, modifierId))
-          peerInfo._2._1.cancel()
-          cancellables = cancellables.updated(modifierKey, peer -> (cancellable, peerInfo._2._2 + 1))
+    cancellables.get(cp.socketAddress.getAddress) match {
+      case Some(modifiersInfo) =>
+        modifiersInfo.get(modifierId) match {
+          case Some(modifierInfo)=>
+            peerAndHistoryOpt.foreach { peerInfo =>
+              if (modifierInfo._2 < settings.network.maxDeliveryChecks && requestedModifiers.contains(modifierId)) {
+                logger.debug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: " +
+                  s"$mTypeId with id: ${Algos.encode(modifierId)}")
+                peerInfo._1.handlerRef ! Message(requestModifierSpec, Right(mTypeId -> Seq(modifierId)), None)
+                val cancellable: Cancellable = context.system.scheduler
+                  .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mTypeId, modifierId))
+                modifierInfo._1.cancel()
+                val peerMap = cancellables.getOrElse(peerInfo._1.socketAddress.getAddress, Map.empty)
+                  .updated(modifierId, cancellable -> (modifierInfo._2 + 1))
+                cancellables = cancellables.updated(peerInfo._1.socketAddress.getAddress, peerMap)
+              } else {
+                val peerMap = {
+                  cancellables.getOrElse(peerInfo._1.socketAddress.getAddress, Map.empty) - modifierId
+                }
+                cancellables = cancellables.updated(peerInfo._1.socketAddress.getAddress, peerMap)
+                requestedModifiers.get(modifierId).foreach{qtyOfRequests =>
+                  if (qtyOfRequests - 1 == 0) requestedModifiers = requestedModifiers - modifierId
+                }
+              }
+            }
+          case None => // Do nothing
         }
-      case Some(_) =>
-        cancellables -= modifierKey
-        peers.get(modifierKey).foreach { downloadPeers =>
-          downloadPeers.headOption.foreach { nextPeer =>
-            peers = peers.updated(modifierKey, downloadPeers.filter(_ != nextPeer))
-            expect(nextPeer, mTypeId, Seq(modifierId))
-          }
-        }
-      case None =>
+      case None => // Do nothing
     }
   }
 
-  def isExpecting(mtid: ModifierTypeId, mid: ModifierId): Boolean = cancellables.contains(key(mid))
+  def isExpecting(mtid: ModifierTypeId, mid: ModifierId): Boolean = requestedModifiers.keys.toList.contains(mid)
 
   def deleteSpam(mids: Seq[ModifierId]): Unit = for (id <- mids) deliveredSpam -= key(id)
 
@@ -200,10 +214,14 @@ class DeliveryManager extends Actor with StrictLogging {
   }
 
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = if (isExpecting(mtid, mid)) {
+    //todo: refactor
+    logger.info(s"Get modifier of id: ${Algos.encode(mid)} from ${cp.socketAddress.getAddress}")
     delivered = delivered.updated(key(mid), cp)
-    cancellables.get(key(mid)).foreach(_._2._1.cancel())
-    cancellables -= key(mid)
-    peers -= key(mid)
+    cancellables.get(cp.socketAddress.getAddress).foreach(_.get(mid).foreach(_._1.cancel()))
+    val peerMap = cancellables.getOrElse(cp.socketAddress.getAddress, Map.empty)
+    peerMap.get(mid).foreach(_._1.cancel())
+    val peerMapWithoutModifier = peerMap - mid
+    cancellables = cancellables.updated(cp.socketAddress.getAddress, peerMapWithoutModifier)
   }
   else deliveredSpam = deliveredSpam - key(mid) + (key(mid) -> cp)
 
