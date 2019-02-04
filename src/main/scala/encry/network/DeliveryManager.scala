@@ -20,7 +20,8 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.Mempool
 import org.encryfoundation.common.Algos
-import scala.collection.immutable.HashSet
+
+import scala.collection.immutable.{HashSet, TreeMap}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -29,6 +30,8 @@ class DeliveryManager extends Actor with StrictLogging {
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
   var delivered: HashSet[ModifierIdAsKey] = HashSet.empty[ModifierIdAsKey]
+  var deliveredModifiersMap: Map[ModifierIdAsKey, Seq[InetAddress]] =
+    Map.empty[ModifierIdAsKey, Seq[InetAddress]]
   var deliveredSpam: Map[ModifierIdAsKey, ConnectedPeer] = Map.empty
   var cancellables: Map[InetAddress, Map[ModifierId, (Cancellable, Int)]] = Map.empty
   var requestedModifiers: Map[ModifierId, Int] = Map.empty
@@ -83,7 +86,10 @@ class DeliveryManager extends Actor with StrictLogging {
           h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
             .filterNot(modId => requestedModifiers.contains(modId._2))
         if (newIds.nonEmpty) newIds.groupBy(_._1).foreach {
-          case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) => requestDownload(modId, ids.map(_._2))
+          case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) => {
+            logger.info(s"Request from delivery manager of type $modId with ids: ${ids.map(id => Algos.encode(id._2)).mkString(",")}")
+            requestDownload(modId, ids.map(_._2))
+          }
         } else context.become(syncCycle)
       }
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
@@ -101,13 +107,18 @@ class DeliveryManager extends Actor with StrictLogging {
           s": ${spam.keys.map(Algos.encode)}")
         deleteSpam(spam.keys.toSeq)
       }
-      fm.values.foreach(modifierSer => nodeViewHolder ! ModifiersFromRemote(typeId, Seq(modifierSer)))
+      fm.foreach{modifierSer =>
+        val newPeersMap =
+          deliveredModifiersMap.getOrElse(key(modifierSer._1), Seq.empty[InetAddress]) :+ remote.socketAddress.getAddress
+        deliveredModifiersMap = deliveredModifiersMap.updated(key(modifierSer._1), newPeersMap)
+        nodeViewHolder ! ModifiersFromRemote(typeId, Seq(modifierSer._2))
+      }
       historyReaderOpt.foreach { h =>
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
         else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
       }
-    case DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: Seq[ModifierId]) =>
-      requestDownload(modifierTypeId, modifiersId)
+    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId, prevModifier: Option[ModifierId]) =>
+      priorityRequest(modifierTypeId, Seq(modifierId), prevModifier)
     case FullBlockChainSynced => isBlockChainSynced = true
     case StartMining => isMining = true
     case DisableMining => isMining = false
@@ -203,6 +214,20 @@ class DeliveryManager extends Actor with StrictLogging {
     }
     else logger.info(s"Peer's $remote history is younger, but node is note synces, so ignore sending extentions")
 
+  def priorityRequest(modifierTypeId: ModifierTypeId,
+                      modifierIds: Seq[ModifierId],
+                      prevMod: Option[ModifierId]): Unit =
+    if (prevMod.exists(id => deliveredModifiersMap.contains(key(id)))) {
+      prevMod.foreach(id => deliveredModifiersMap.get(key(id)) match {
+        case Some(peersSeq) =>
+          logger.info(s"Make priority request to seq: ${peersSeq} for modifiers ${modifierIds.map(Algos.encode).mkString(",")}")
+          val peersHandlers = statusTracker.statuses.keys.filter(ph => peersSeq.contains(ph.socketAddress.getAddress))
+          deliveredModifiersMap = deliveredModifiersMap - key(id)
+          peersHandlers.foreach(ph => expect(ph, modifierTypeId, modifierIds))
+        case None => requestDownload(modifierTypeId, modifierIds)
+      })
+    } else requestDownload(modifierTypeId, modifierIds)
+
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     if (settings.influxDB.isDefined)
       context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
@@ -225,6 +250,9 @@ class DeliveryManager extends Actor with StrictLogging {
 object DeliveryManager {
 
   case object FullBlockChainSynced
+
   case object StopSync
+
   case object ContinueSync
+
 }

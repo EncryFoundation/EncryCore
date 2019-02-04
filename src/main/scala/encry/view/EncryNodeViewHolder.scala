@@ -173,10 +173,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     }
   }
 
-  def requestDownloads(pi: ProgressInfo[EncryPersistentModifier]): Unit =
-    pi.toDownload.groupBy(_._1).foreach {
-      case (tId, ids) => nodeViewSynchronizer ! DownloadRequest(tId, ids.map(_._2))
-    }
+  def requestDownloads(pi: ProgressInfo[EncryPersistentModifier]): Unit = {
+    logger.info(s"Request download from nvh fom mods of type " +
+      s"${pi.toDownload.map{ case (typeId, id) => s"($typeId: ${Algos.encode(id)})"}.mkString(",")}")
+    pi.toDownload.foreach { case (tid, id) => nodeViewSynchronizer ! DownloadRequest(tid, id, pi.branchPoint) }
+  }
 
   def trimChainSuffix(suffix: IndexedSeq[EncryPersistentModifier], rollbackPoint: ModifierId):
   IndexedSeq[EncryPersistentModifier] = {
@@ -394,7 +395,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
 
 object EncryNodeViewHolder {
 
-  case class DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: Seq[ModifierId]) extends NodeViewHolderEvent
+  case class DownloadRequest(modifierTypeId: ModifierTypeId,
+                             modifierId: ModifierId,
+                             prevModifier: Option[ModifierId] = None) extends NodeViewHolderEvent
 
   case class CurrentView[HIS, MS, VL, MP](history: HIS, state: MS, vault: VL, pool: MP)
 
