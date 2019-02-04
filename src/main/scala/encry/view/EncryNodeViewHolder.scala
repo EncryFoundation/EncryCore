@@ -173,10 +173,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     }
   }
 
-  def requestDownloads(pi: ProgressInfo[EncryPersistentModifier]): Unit = {
-    logger.info(s"Request download from nvh fom mods of type " +
+  def requestDownloads(pi: ProgressInfo[EncryPersistentModifier], prevModId: Option[ModifierId] = None): Unit = {
+    logger.info(s"++++Request download from nvh fom mods of type " +
       s"${pi.toDownload.map{ case (typeId, id) => s"($typeId: ${Algos.encode(id)})"}.mkString(",")}")
-    pi.toDownload.foreach { case (tid, id) => nodeViewSynchronizer ! DownloadRequest(tid, id, pi.branchPoint) }
+    logger.info(s"++++PrevMod: ${prevModId.map(Algos.encode)}")
+    pi.toDownload.foreach { case (tid, id) => nodeViewSynchronizer ! DownloadRequest(tid, id, prevModId) }
   }
 
   def trimChainSuffix(suffix: IndexedSeq[EncryPersistentModifier], rollbackPoint: ModifierId):
@@ -292,7 +293,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         } else {
           if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.modifierTypeId) context.system
             .actorSelection("user/statsSender") ! NewBlockAppended(true, true)
-          requestDownloads(progressInfo)
+          requestDownloads(progressInfo, Some(pmod.id))
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Failure(e) =>

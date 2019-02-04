@@ -111,6 +111,8 @@ class DeliveryManager extends Actor with StrictLogging {
         val newPeersMap =
           deliveredModifiersMap.getOrElse(key(modifierSer._1), Seq.empty[InetAddress]) :+ remote.socketAddress.getAddress
         deliveredModifiersMap = deliveredModifiersMap.updated(key(modifierSer._1), newPeersMap)
+        logger.info(s"Update deliveredModifiersMap for key ${Algos.encode(modifierSer._1)} now:" +
+          s" ${deliveredModifiersMap.getOrElse(key(modifierSer._1), Seq.empty[InetAddress])}")
         nodeViewHolder ! ModifiersFromRemote(typeId, Seq(modifierSer._2))
       }
       historyReaderOpt.foreach { h =>
@@ -216,7 +218,9 @@ class DeliveryManager extends Actor with StrictLogging {
 
   def priorityRequest(modifierTypeId: ModifierTypeId,
                       modifierIds: Seq[ModifierId],
-                      prevMod: Option[ModifierId]): Unit =
+                      prevMod: Option[ModifierId]): Unit = {
+    logger.info(s"Trying to send priority request for modifiers ${modifierIds.map(Algos.encode).mkString(",")}")
+    logger.info(s"Prevmod is: ${prevMod.map(Algos.encode)}")
     if (prevMod.exists(id => deliveredModifiersMap.contains(key(id)))) {
       prevMod.foreach(id => deliveredModifiersMap.get(key(id)) match {
         case Some(peersSeq) =>
@@ -227,6 +231,7 @@ class DeliveryManager extends Actor with StrictLogging {
         case None => requestDownload(modifierTypeId, modifierIds)
       })
     } else requestDownload(modifierTypeId, modifierIds)
+  }
 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     if (settings.influxDB.isDefined)
