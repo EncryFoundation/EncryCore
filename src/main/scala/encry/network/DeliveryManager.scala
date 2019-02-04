@@ -73,7 +73,7 @@ class DeliveryManager extends Actor with StrictLogging {
     case HandshakedPeer(remote) => statusTracker.updateStatus(remote, Unknown)
     case DisconnectedPeer(remote) => statusTracker.clearStatus(remote)
     case CheckDelivery(peer, modifierTypeId, modifierId) =>
-      if (isDelivered(modifierId)) delivered -= key(modifierId)
+      if (delivered.contains(key(modifierId))) delivered -= key(modifierId)
       else reexpect(peer, modifierTypeId, modifierId)
     case CheckModifiersToDownload =>
       historyReaderOpt.foreach { h =>
@@ -132,7 +132,6 @@ class DeliveryManager extends Actor with StrictLogging {
       || mTypeId != Transaction.ModifierTypeId) && statusTracker.statuses.get(peer).exists(_ != Younger)) {
       val notYetRequestedIds: Seq[ModifierId] = modifierIds.foldLeft(Vector[ModifierId]()) {
         case (notYetRequested, modId) =>
-          val modifierKey: ModifierIdAsKey = key(modId)
           if (historyReaderOpt.forall(history => !history.contains(modId) && !delivered.contains(key(modId)))) {
             notYetRequested :+ modId
           } else notYetRequested
@@ -191,8 +190,6 @@ class DeliveryManager extends Actor with StrictLogging {
   def deleteSpam(mids: Seq[ModifierId]): Unit = for (id <- mids) deliveredSpam -= key(id)
 
   def isSpam(mid: ModifierId): Boolean = deliveredSpam contains key(mid)
-
-  def isDelivered(mid: ModifierId): Boolean = delivered.contains(key(mid))
 
   def sendExtension(remote: ConnectedPeer, status: HistoryComparisonResult,
                     extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit =
