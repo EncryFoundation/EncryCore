@@ -1,8 +1,9 @@
 package encry.it
 
+import com.typesafe.config.Config
 import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
-import encry.it.docker.Docker
+import encry.it.docker.NodesFromDocker
 import encry.settings.Constants._
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
@@ -10,7 +11,11 @@ import org.scalatest.{AsyncFunSuite, Matchers}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class MinerWalletBalanceTest extends AsyncFunSuite with Matchers {
+class MinerWalletBalanceTest extends AsyncFunSuite with Matchers with NodesFromDocker {
+
+  override protected def nodeConfigs: Seq[Config] = Seq(Configs.mining(true)
+    .withFallback(Configs.offlineGeneration(true))
+    .withFallback(Configs.nodeName("node1")))
 
   test("Miner balance should increase ") {
 
@@ -19,17 +24,10 @@ class MinerWalletBalanceTest extends AsyncFunSuite with Matchers {
       case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i)
     }
 
-    val docker = Docker()
-    val config = Configs.mining(true)
-      .withFallback(Configs.knownPeers(Seq.empty))
-      .withFallback(Configs.offlineGeneration(true))
-      .withFallback(Configs.nodeName("node1234"))
-
-    val nodes = docker.startNodes(Seq(config))
-    val height = nodes.head.waitForHeadersHeight(heightToCheck)
+    val height = dockerNodes().head.waitForHeadersHeight(heightToCheck)
     Await.result(height, 30.minutes)
     height map { _ =>
-      val res = Await.result(nodes.head.balances, 30.minutes)
+      val res = Await.result(dockerNodes().head.balances, 30.minutes)
         .find(_._1 == Algos.encode(IntrinsicTokenId))
         .map(_._2 == supplyAtHeight)
         .get
