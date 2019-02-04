@@ -122,7 +122,8 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
     if (chainSynced)
-      networkController ! SendToNetwork(Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None), Broadcast)
+      networkController !
+        SendToNetwork(Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None), Broadcast)
 
 }
 

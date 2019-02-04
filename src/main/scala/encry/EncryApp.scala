@@ -123,7 +123,9 @@ object EncryApp extends App with StrictLogging {
   def commonSupervisorStrategy: OneForOneStrategy = OneForOneStrategy(
     maxNrOfRetries = 5,
     withinTimeRange = 60 seconds) {
-    case _ => Restart
+    case a =>
+      logger.info(s"${a.getCause} -> ${a.getStackTrace}")
+      Restart
   }
 
 }

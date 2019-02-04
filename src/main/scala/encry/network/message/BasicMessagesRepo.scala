@@ -40,12 +40,13 @@ class InvSpec(maxInvObjects: Int) extends MessageSpec[InvData] {
 
   override def parseBytes(bytes: Array[Byte]): Try[InvData] = Try {
     val count: Int = Ints.fromByteArray(bytes.slice(1, 5))
-    require(count > 0, "empty inv list")
-    require(count <= maxInvObjects, s"more invs than $maxInvObjects in a message")
-    val elems = (0 until count).map { c =>
-      ModifierId @@ bytes.slice(5 + c * NodeViewModifier.ModifierIdSize, 5 + (c + 1) * NodeViewModifier.ModifierIdSize)
+    if (count < 0 || count <= maxInvObjects) throw new RuntimeException("Invalid inv message")
+    else {
+      val elems = (0 until count).map(c =>
+        ModifierId @@ bytes.slice(5 + c * NodeViewModifier.ModifierIdSize, 5 + (c + 1) * NodeViewModifier.ModifierIdSize)
+      )
+      ModifierTypeId @@ bytes.head -> elems
     }
-    ModifierTypeId @@ bytes.head -> elems
   }
 
   override def toBytes(data: InvData): Array[Byte] = {

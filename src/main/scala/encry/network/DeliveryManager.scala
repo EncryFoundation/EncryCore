@@ -58,7 +58,10 @@ class DeliveryManager extends Actor with StrictLogging {
     case SendLocalSyncInfo =>
       if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2)
         logger.info("Trying to send sync info too often")
-      else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
+      else {
+        logger.info(s"Send sync message for all peers!")
+        historyReaderOpt.foreach(r => sendSync(r.syncInfo))
+      }
     case StopSync => context.become(netMessages)
   }
 
@@ -197,7 +200,8 @@ class DeliveryManager extends Actor with StrictLogging {
       extOpt match {
         case None => logger.info(s"extOpt is empty for: $remote. Its status is: $status.")
         case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
-          case (mid, mods) => networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
+          case (mid, mods) => networkController !
+            SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
         }
      }
     else logger.info(s"Peer's $remote hisotry is younger, but node is note synces, so ignore sending extentions")
