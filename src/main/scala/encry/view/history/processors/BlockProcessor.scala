@@ -103,8 +103,8 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
 
   private def nonBestBlock: BlockProcessing = {
     case params =>
-      logger.info(s"\n\n nonBestBlock ${bestBlockOpt.nonEmpty && isBetterChain(params.newBestHeader.id)} \n\n")
       //Orphaned block or full chain is not initialized yet
+      logger.info(s"Appending ${params.fullBlock.encodedId}. Height: ${params.fullBlock.header.height} as a non best block.")
       logStatus(Seq(), Seq(), params.fullBlock, None)
       historyStorage.bulkInsert(storageVersion(params.newModRow), Seq.empty, Seq(params.newModRow))
       ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
