@@ -39,38 +39,38 @@ object HandshakeSerializer extends Serializer[Handshake] {
   override def parseBytes(bytes: Array[Byte]): Try[Handshake] = Try {
     var position = 0
     val appNameSize = bytes.head
-    require(appNameSize > 0)
+    if (appNameSize < 0) throw new RuntimeException("Handshake - appNameSize have to be more than 0.")
+    else {
+      position += 1
 
-    position += 1
+      position += appNameSize
 
-    val an: String = new String(bytes.slice(position, position + appNameSize))
-    position += appNameSize
+      val av: Version = ApplicationVersionSerializer.parseBytes(
+        bytes.slice(position, position + ApplicationVersionSerializer.SerializedVersionLength)).get
+      position += ApplicationVersionSerializer.SerializedVersionLength
 
-    val av: Version = ApplicationVersionSerializer.parseBytes(
-      bytes.slice(position, position + ApplicationVersionSerializer.SerializedVersionLength)).get
-    position += ApplicationVersionSerializer.SerializedVersionLength
+      val nodeNameSize: Byte = bytes.slice(position, position + 1).head
+      position += 1
 
-    val nodeNameSize: Byte = bytes.slice(position, position + 1).head
-    position += 1
+      val nodeName: String = new String(bytes.slice(position, position + nodeNameSize))
+      position += nodeNameSize
 
-    val nodeName: String = new String(bytes.slice(position, position + nodeNameSize))
-    position += nodeNameSize
-
-    val fas: Int = Ints.fromByteArray(bytes.slice(position, position + 4))
-    position += 4
-
-    val isaOpt: Option[InetSocketAddress] = if (fas > 0) {
-      val fa: Array[Byte] = bytes.slice(position, position + fas - 4)
-      position += fas - 4
-
-      val port: Int = Ints.fromByteArray(bytes.slice(position, position + 4))
+      val fas: Int = Ints.fromByteArray(bytes.slice(position, position + 4))
       position += 4
 
-      Some(new InetSocketAddress(InetAddress.getByAddress(fa), port))
-    } else None
+      val isaOpt: Option[InetSocketAddress] = if (fas > 0) {
+        val fa: Array[Byte] = bytes.slice(position, position + fas - 4)
+        position += fas - 4
 
-    val time: Long = Longs.fromByteArray(bytes.slice(position, position + 8))
+        val port: Int = Ints.fromByteArray(bytes.slice(position, position + 4))
+        position += 4
 
-    Handshake(av, nodeName, isaOpt, time)
+        Some(new InetSocketAddress(InetAddress.getByAddress(fa), port))
+      } else None
+
+      val time: Long = Longs.fromByteArray(bytes.slice(position, position + 8))
+
+      Handshake(av, nodeName, isaOpt, time)
+    }
   }
 }
