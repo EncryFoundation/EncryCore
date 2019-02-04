@@ -120,7 +120,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
             if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
           ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
         case None =>
-          println("Should always have best header after header application")
+          logger.error("Should always have best header after header application")
           forceStopApplication()
       }
     case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
@@ -138,7 +138,6 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     scoreOf(header.parentId).map { parentScore =>
       val score: BigInt @@ ConsensusTaggedTypes.Difficulty.Tag =
         Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
-      logger.info(s"\n $score for ${Algos.encode(header.id)} \n")
       val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
         if ((header.height > bestHeaderHeight) ||
           (header.height == bestHeaderHeight && score > bestHeadersChainScore))
@@ -151,7 +150,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         if ((header.height > bestHeaderHeight) ||
           (header.height == bestHeaderHeight && score > bestHeadersChainScore)) bestBlockHeaderIdsRow(header, score)
         else {
-          //if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(header)
+          if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(header)
           orphanedBlockHeaderIdsRow(header, score)
         }
       (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
@@ -195,9 +194,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   private def bestHeadersChainScore: BigInt = scoreOf(bestHeaderIdOpt.get).get
 
-  protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage.get(headerScoreKey(id)).map{ d =>
-    BigInt(d)
-  }
+  protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))
 
   def heightOf(id: ModifierId): Option[Height] = historyStorage.get(headerHeightKey(id))
     .map(d => Height @@ Ints.fromByteArray(d))

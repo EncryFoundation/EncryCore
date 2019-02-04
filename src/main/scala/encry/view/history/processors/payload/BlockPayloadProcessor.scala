@@ -10,14 +10,13 @@ import scala.util.Try
 
 trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcessor {
 
-  val historyStorage: HistoryStorage
+  protected val historyStorage: HistoryStorage
 
   protected val adState: Boolean
 
   override protected def process(payload: Payload): ProgressInfo[EncryPersistentModifier] =
     getBlockByPayload(payload)
       .flatMap { block =>
-        println(s"Payload processor: ${block.header.height - bestBlockHeight >= 2 + network.maxInvObjects} if true -> NONE")
         if (block.header.height - bestBlockHeight >= 2 + network.maxInvObjects) None
         else Some(processBlock(block, payload))
       }.getOrElse(putToHistory(payload))
