@@ -127,6 +127,7 @@ class DeliveryManager extends Actor with StrictLogging {
     peer.handlerRef ! Message(EncrySyncInfoMessageSpec, Right(syncInfo), None)
   )
 
+  //todo: refactor
   def expect(peer: ConnectedPeer, mTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit =
     if (((mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining)
       || mTypeId != Transaction.ModifierTypeId) && statusTracker.statuses.get(peer).exists(_ != Younger)) {
