@@ -1,5 +1,8 @@
 package encry.view.wallet
 
+import java.net.InetSocketAddress
+
+import encry.EncryApp.settings
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.{Block, Header, Payload}
@@ -15,7 +18,17 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read
 
-  property("Balance count (intrinsic coins only)") {
+  property("Balance count (intrinsic coins only).") {
+
+    val l = List(List(List(1)))
+
+    println(l.flatMap(i => i))
+
+    val address = new InetSocketAddress("172.16.11.12", 5356)
+
+    val result = settings.network.knownPeers.map(_.getAddress).contains(address.getAddress)
+
+    println(result)
 
     val walletStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
 
