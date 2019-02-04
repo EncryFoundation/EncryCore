@@ -63,8 +63,8 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
       mod match {
         case block: Block =>
           modifiersRequestCache = Map(block.header.id -> block.header, block.payload.id -> block.payload)
-          broadcastModifierInv(block.header.id)
-          broadcastModifierInv(block.payload.id)
+          broadcastModifierInv(block.header)
+          broadcastModifierInv(block.payload)
         case tx: Transaction =>
           modifiersRequestCache = modifiersRequestCache.updated(tx.id, tx)
           broadcastModifierInv(tx)
