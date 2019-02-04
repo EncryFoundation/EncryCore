@@ -119,8 +119,8 @@ class DeliveryManager extends Actor with StrictLogging {
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
         else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
       }
-    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId, prevModifier: Option[ModifierId]) =>
-      priorityRequest(modifierTypeId, Seq(modifierId), prevModifier)
+    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
+      requestDownload(modifierTypeId, Seq(modifierId))
     case FullBlockChainSynced => isBlockChainSynced = true
     case StartMining => isMining = true
     case DisableMining => isMining = false

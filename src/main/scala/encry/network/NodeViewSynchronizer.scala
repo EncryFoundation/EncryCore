@@ -32,7 +32,7 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
 
   var historyReaderOpt: Option[EncryHistory] = None
   var mempoolReaderOpt: Option[Mempool] = None
-  var modifiersRequestCache: Map[ModifierId, NodeViewModifier] = Map.empty
+  var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   val invSpec: InvSpec = new InvSpec(settings.network.maxInvObjects)
   var chainSynced: Boolean = false
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
@@ -54,22 +54,7 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
     case SyntacticallySuccessfulModifier(mod) =>
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId, prevModifier: Option[ModifierId]) =>
       deliveryManager ! DownloadRequest(modifierTypeId, modifierId, prevModifier)
-    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId, prevModifier: Option[ModifierId]) =>
-      deliveryManager ! DownloadRequest(modifierTypeId, modifierId, prevModifier)
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
-    case SyntacticallyFailedModification(mod, throwable) =>
-    case SemanticallySuccessfulModifier(mod) =>
-      logger.info(s"Get mod to broadcast: ${Algos.encode(mod.id)} of type ${mod.modifierTypeId}")
-      mod match {
-        case block: Block =>
-          modifiersRequestCache = Map(block.header.id -> block.header, block.payload.id -> block.payload)
-          broadcastModifierInv(block.header)
-          broadcastModifierInv(block.payload)
-        case tx: Transaction =>
-          modifiersRequestCache = modifiersRequestCache.updated(tx.id, tx)
-          broadcastModifierInv(tx)
-        case _ => logger.info("")
-      }
     case SemanticallyFailedModification(mod, throwable) =>
     case ChangedState(reader) =>
     case SyntacticallyFailedModification(_, _) =>
@@ -108,11 +93,11 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == RequestModifierSpec.MessageCode =>
       logger.info(s"Get request from remote peer. chainSynced = $chainSynced")
       if (chainSynced) {
-        val inRequestCache: Map[ModifierId, NodeViewModifier] =
-          invData._2.flatMap(id => modifiersRequestCache.get(id).map(mod => mod.id -> mod)).toMap
-        logger.info(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.map(Algos.encode).mkString(",")}")
+        val inRequestCache: Map[String, NodeViewModifier] =
+          invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
+        logger.info(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
         self ! ResponseFromLocal(remote, invData._1, inRequestCache.values.toSeq)
-        val nonInRequestCache = invData._2.filterNot(inRequestCache.contains)
+        val nonInRequestCache = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
         if (nonInRequestCache.nonEmpty)
         historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
           val objs: Seq[NodeViewModifier] = invData._1 match {

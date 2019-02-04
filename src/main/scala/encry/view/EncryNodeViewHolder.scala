@@ -173,11 +173,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     }
   }
 
-  def requestDownloads(pi: ProgressInfo[EncryPersistentModifier], prevModId: Option[ModifierId] = None): Unit = {
+  def requestDownloads(pi: ProgressInfo[EncryPersistentModifier]): Unit = {
     logger.info(s"++++Request download from nvh fom mods of type " +
       s"${pi.toDownload.map{ case (typeId, id) => s"($typeId: ${Algos.encode(id)})"}.mkString(",")}")
-    logger.info(s"++++PrevMod: ${prevModId.map(Algos.encode)}")
-    pi.toDownload.foreach { case (tid, id) => nodeViewSynchronizer ! DownloadRequest(tid, id, prevModId) }
+    pi.toDownload.foreach { case (tid, id) => nodeViewSynchronizer ! DownloadRequest(tid, id) }
   }
 
   def trimChainSuffix(suffix: IndexedSeq[EncryPersistentModifier], rollbackPoint: ModifierId):
@@ -293,7 +292,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         } else {
           if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.modifierTypeId) context.system
             .actorSelection("user/statsSender") ! NewBlockAppended(true, true)
-          requestDownloads(progressInfo, Some(pmod.id))
+          requestDownloads(progressInfo)
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Failure(e) =>
@@ -396,9 +395,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
 
 object EncryNodeViewHolder {
 
-  case class DownloadRequest(modifierTypeId: ModifierTypeId,
-                             modifierId: ModifierId,
-                             prevModifier: Option[ModifierId] = None) extends NodeViewHolderEvent
+  case class DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) extends NodeViewHolderEvent
 
   case class CurrentView[HIS, MS, VL, MP](history: HIS, state: MS, vault: VL, pool: MP)
 
