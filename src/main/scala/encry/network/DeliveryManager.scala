@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.InetAddress
+
 import akka.actor.{Actor, Cancellable}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
@@ -20,9 +21,11 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.Mempool
 import org.encryfoundation.common.Algos
+
 import scala.collection.immutable.HashSet
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 class DeliveryManager extends Actor with StrictLogging {
 
