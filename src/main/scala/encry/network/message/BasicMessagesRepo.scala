@@ -61,7 +61,6 @@ class InvSpec(maxInvObjects: Int) extends MessageSpec[InvData] {
 
     require(data._2.nonEmpty, "empty inv list")
     require(data._2.size <= maxInvObjects, s"more invs than $maxInvObjects in a message")
-
     data._2.foreach(e => require(e.length == NodeViewModifier.ModifierIdSize))
     Bytes.concat(Array(data._1), Ints.toByteArray(data._2.size), concatBytes(data._2))
   }
