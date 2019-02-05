@@ -216,23 +216,6 @@ class DeliveryManager extends Actor with StrictLogging {
     }
     else logger.info(s"Peer's $remote history is younger, but node is note synces, so ignore sending extentions")
 
-  def priorityRequest(modifierTypeId: ModifierTypeId,
-                      modifierIds: Seq[ModifierId],
-                      prevMod: Option[ModifierId]): Unit = {
-    logger.info(s"Trying to send priority request for modifiers ${modifierIds.map(Algos.encode).mkString(",")}")
-    logger.info(s"Prevmod is: ${prevMod.map(Algos.encode)}")
-    if (prevMod.exists(id => deliveredModifiersMap.contains(key(id)))) {
-      prevMod.foreach(id => deliveredModifiersMap.get(key(id)) match {
-        case Some(peersSeq) =>
-          logger.info(s"Make priority request to seq: ${peersSeq} for modifiers ${modifierIds.map(Algos.encode).mkString(",")}")
-          val peersHandlers = statusTracker.statuses.keys.filter(ph => peersSeq.contains(ph.socketAddress.getAddress))
-          deliveredModifiersMap = deliveredModifiersMap - key(id)
-          peersHandlers.foreach(ph => expect(ph, modifierTypeId, modifierIds))
-        case None => requestDownload(modifierTypeId, modifierIds)
-      })
-    } else requestDownload(modifierTypeId, modifierIds)
-  }
-
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     if (settings.influxDB.isDefined)
       context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
