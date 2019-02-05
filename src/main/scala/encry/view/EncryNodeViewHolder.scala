@@ -173,7 +173,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     }
   }
 
-  def requestDownloads(pi: ProgressInfo[EncryPersistentModifier]): Unit = {
+  def requestDownloads(pi: ProgressInfo[EncryPersistentModifier], previousModifier: Option[ModifierId] = None): Unit = {
     logger.info(s"++++Request download from nvh fom mods of type " +
       s"${pi.toDownload.map{ case (typeId, id) => s"($typeId: ${Algos.encode(id)})"}.mkString(",")}")
     pi.toDownload.foreach { case (tid, id) => nodeViewSynchronizer ! DownloadRequest(tid, id) }
@@ -197,7 +197,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
                                  alternativeProgressInfo: Option[ProgressInfo[EncryPersistentModifier]],
                                  suffix: IndexedSeq[EncryPersistentModifier])
 
-    requestDownloads(progressInfo)
+    requestDownloads(progressInfo, None)
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
     val (stateToApplyTry: Try[StateType], suffixTrimmed: IndexedSeq[EncryPersistentModifier]) =
       if (progressInfo.chainSwitchingNeeded) {
@@ -292,7 +292,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         } else {
           if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.modifierTypeId) context.system
             .actorSelection("user/statsSender") ! NewBlockAppended(true, true)
-          requestDownloads(progressInfo)
+          requestDownloads(progressInfo, Some(pmod.id))
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Failure(e) =>
@@ -395,7 +395,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
 
 object EncryNodeViewHolder {
 
-  case class DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) extends NodeViewHolderEvent
+  case class DownloadRequest(modifierTypeId: ModifierTypeId,
+                             modifierId: ModifierId,
+                             previousModifier: Option[ModifierId] = None) extends NodeViewHolderEvent
 
   case class CurrentView[HIS, MS, VL, MP](history: HIS, state: MS, vault: VL, pool: MP)
 

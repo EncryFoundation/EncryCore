@@ -119,7 +119,11 @@ class DeliveryManager extends Actor with StrictLogging {
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
         else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
       }
-    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
+    case DownloadRequest(modifierTypeId: ModifierTypeId,
+                         modifierId: ModifierId,
+                         previousModifier: Option[ModifierId]) if previousModifier.isDefined =>
+      priorityRequest(modifierTypeId, Seq(modifierId), previousModifier.get)
+    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId, previousModifier: Option[ModifierId]) =>
       requestDownload(modifierTypeId, Seq(modifierId))
     case FullBlockChainSynced => isBlockChainSynced = true
     case StartMining => isMining = true
@@ -215,6 +219,22 @@ class DeliveryManager extends Actor with StrictLogging {
         }
     }
     else logger.info(s"Peer's $remote history is younger, but node is note synces, so ignore sending extentions")
+
+  def priorityRequest(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId], previousModifier: ModifierId): Unit = {
+    logger.info("Trying to get priority request")
+    deliveredModifiersMap.get(key(previousModifier)) match {
+      case Some(addresses) if addresses.nonEmpty =>
+        logger.info(s"Prev sender exists: ${addresses}")
+        statusTracker.statuses.find(_._1.socketAddress.getAddress == addresses.head) match {
+          case Some(ph) =>
+            logger.info("Handler exists!")
+            deliveredModifiersMap = deliveredModifiersMap - key(previousModifier)
+            expect(ph._1, modifierTypeId, modifierIds)
+          case None => requestDownload(modifierTypeId, modifierIds)
+        }
+      case None => requestDownload(modifierTypeId, modifierIds)
+    }
+  }
 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     if (settings.influxDB.isDefined)
