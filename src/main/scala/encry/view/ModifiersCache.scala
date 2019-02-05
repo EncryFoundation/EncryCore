@@ -46,7 +46,7 @@ object ModifiersCache extends StrictLogging {
   }
 
   def remove(key: Key): Option[EncryPersistentModifier] = {
-    logger.info(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains: ${cache.get(key).isDefined}")
+    logger.info(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains: ${cache.get(key).isDefined}.")
     cache.remove(key)
   }
 

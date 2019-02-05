@@ -1,9 +1,8 @@
 package encry.network
 
 import java.io.File
-
 import akka.actor.{Actor, ActorRef}
-import com.typesafe.scalalogging.{Logger, StrictLogging}
+import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
 import encry.network.AuxiliaryHistoryHolder._

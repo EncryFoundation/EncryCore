@@ -106,7 +106,7 @@ class NetworkController extends Actor with StrictLogging {
 
   override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse {
     case RegisterMessagesHandler(specs, handler) =>
-      logger.info( s"Registering handlers for ${specs.map(s => s.messageCode -> s.messageName)}")
+      logger.info(s"Registering handlers for ${specs.map(s => s.messageCode -> s.messageName)}")
       messageHandlers += specs.map(_.messageCode) -> handler
     case CommandFailed(cmd: Tcp.Command) => context.actorSelection("/user/statsSender") ! "Failed to execute command : " + cmd
     case nonsense: Any => logger.warn(s"NetworkController: got something strange $nonsense")

@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.InetAddress
-
 import akka.actor.{Actor, Cancellable}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
@@ -46,8 +45,10 @@ class DeliveryManager extends Actor with StrictLogging {
   override def preStart(): Unit = {
     statusTracker.scheduleSendSyncInfo()
     self ! SendLocalSyncInfo
-    context.system.scheduler
-      .schedule(settings.network.modifierDeliverTimeCheck, settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
+    context.system.scheduler.schedule(
+      settings.network.modifierDeliverTimeCheck,
+      settings.network.modifierDeliverTimeCheck
+    )(self ! CheckModifiersToDownload)
   }
 
   override def receive: Receive = syncCycle
@@ -105,8 +106,8 @@ class DeliveryManager extends Actor with StrictLogging {
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
         else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
       }
-    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
-      requestDownload(modifierTypeId, Seq(modifierId))
+    case DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: Seq[ModifierId]) =>
+      requestDownload(modifierTypeId, modifiersId)
     case FullBlockChainSynced => isBlockChainSynced = true
     case StartMining => isMining = true
     case DisableMining => isMining = false
@@ -193,14 +194,14 @@ class DeliveryManager extends Actor with StrictLogging {
 
   def sendExtension(remote: ConnectedPeer, status: HistoryComparisonResult,
                     extOpt: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit =
-    if (isBlockChainSynced)
-      extOpt match {
-        case None => logger.info(s"extOpt is empty for: $remote. Its status is: $status.")
-        case Some(ext) => ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
-          case (mid, mods) => networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
+    if (isBlockChainSynced) extOpt match {
+      case None => logger.info(s"extOpt is empty for: $remote. Its status is: $status.")
+      case Some(ext) =>
+        ext.groupBy(_._1).mapValues(_.map(_._2)).foreach { case (mid, mods) =>
+          networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
         }
-     }
-    else logger.info(s"Peer's $remote hisotry is younger, but node is note synces, so ignore sending extentions")
+    }
+    else logger.info(s"Peer's $remote history is younger, but node is note synces, so ignore sending extentions")
 
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     if (settings.influxDB.isDefined)
@@ -224,9 +225,6 @@ class DeliveryManager extends Actor with StrictLogging {
 object DeliveryManager {
 
   case object FullBlockChainSynced
-
   case object StopSync
-
   case object ContinueSync
-
 }

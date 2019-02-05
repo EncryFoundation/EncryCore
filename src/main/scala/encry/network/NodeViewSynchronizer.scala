@@ -50,14 +50,14 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
     case SyntacticallySuccessfulModifier(mod)
       if (mod.isInstanceOf[Header] || mod.isInstanceOf[Payload] || mod.isInstanceOf[ADProofs]) &&
         historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
-    case SyntacticallySuccessfulModifier(mod) =>
-    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
-      deliveryManager ! DownloadRequest(modifierTypeId, modifierId)
+    case SyntacticallySuccessfulModifier(_) =>
+    case DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: Seq[ModifierId]) =>
+      deliveryManager ! DownloadRequest(modifierTypeId, modifiersId)
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
-    case SyntacticallyFailedModification(mod, throwable) =>
+    case SyntacticallyFailedModification(_, _) =>
     case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
-    case SemanticallyFailedModification(mod, throwable) =>
-    case ChangedState(reader) =>
+    case SemanticallyFailedModification(_, _) =>
+    case ChangedState(_) =>
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       deliveryManager ! ChangedHistory(reader)
@@ -83,7 +83,7 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
         case _ =>
       }
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == RequestModifierSpec.MessageCode =>
-      logger.info(s"Get request from remote peer. chainSynced = ${chainSynced}")
+      logger.info(s"Get request from remote peer. chainSynced = $chainSynced")
       if (chainSynced) {
         historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
           val objs: Seq[NodeViewModifier] = invData._1 match {
@@ -95,7 +95,7 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
           self ! ResponseFromLocal(remote, invData._1, objs)
         }
       }
-      else logger.info(s"Peer ${remote} requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
+      else logger.info(s"Peer $remote requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
         s"node is not synced, so ignore msg")
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
       logger.debug(s"Got inv message from ${remote.socketAddress}")
