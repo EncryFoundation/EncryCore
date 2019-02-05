@@ -52,8 +52,8 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
       if (mod.isInstanceOf[Header] || mod.isInstanceOf[Payload] || mod.isInstanceOf[ADProofs]) &&
         historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
     case SyntacticallySuccessfulModifier(mod) =>
-    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId, prevModifier: Option[ModifierId]) =>
-      deliveryManager ! DownloadRequest(modifierTypeId, modifierId, prevModifier)
+    case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId, previousModifier: Option[ModifierId]) =>
+      deliveryManager ! DownloadRequest(modifierTypeId, modifierId, previousModifier)
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
     case SemanticallyFailedModification(mod, throwable) =>
     case ChangedState(reader) =>
