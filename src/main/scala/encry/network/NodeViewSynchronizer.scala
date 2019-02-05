@@ -114,7 +114,8 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
         s"node is not synced, so ignore msg")
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
       logger.info(s"Got inv message from ${remote.socketAddress} with modifiers: ${invData._2.map(Algos.encode).mkString(",")} ")
-      nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
+      //todo: Ban node that send payload id?
+      if (invData._1 != Payload.modifierTypeId) nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       deliveryManager ! DataFromPeer(spec, data: ModifiersData@unchecked, remote)
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
