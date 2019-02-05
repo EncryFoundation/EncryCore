@@ -50,7 +50,8 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
   override def receive: Receive = {
     case SyntacticallySuccessfulModifier(mod)
       if (mod.isInstanceOf[Header] || mod.isInstanceOf[Payload] || mod.isInstanceOf[ADProofs]) &&
-        historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
+        historyReaderOpt.exists(_.isHeadersChainSynced) =>
+      logger.info(s"SyntacticallySuccessfulModifier on node view sync with id: ${Algos.encode(mod.id)}")
     case SyntacticallySuccessfulModifier(mod) =>
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId, previousModifier: Option[ModifierId]) =>
       deliveryManager ! DownloadRequest(modifierTypeId, modifierId, previousModifier)
@@ -137,8 +138,9 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
   }
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
-    if (chainSynced)
+    if (chainSynced) {
       networkController ! SendToNetwork(Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None), Broadcast)
+    }
 
 }
 
