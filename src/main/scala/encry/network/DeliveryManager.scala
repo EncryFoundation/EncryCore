@@ -165,6 +165,7 @@ class DeliveryManager extends Actor with StrictLogging {
         val peerMap = cancellables.getOrElse(peer.socketAddress.getAddress, Map.empty)
           .updated(id, cancellable -> 0)
         cancellables = cancellables.updated(peer.socketAddress.getAddress, peerMap)
+        requestedModifiers = requestedModifiers.updated(id, requestedModifiers.getOrElse(id, 0) + 1)
       }
     }
 

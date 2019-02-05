@@ -2,6 +2,7 @@ package encry.view.history
 
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.{Block, Header}
+import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
 import encry.settings.Constants
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.EncryGenerator
@@ -11,6 +12,8 @@ import org.scalatest.{Matchers, PropSpec}
 class EncryHistoryTest extends PropSpec with Matchers with InstanceFactory with EncryGenerator {
 
   property("PreGenesis height test check.") {
+
+    val a = Some(None)
 
 //    val history: EncryHistory = generateDummyHistory
 
