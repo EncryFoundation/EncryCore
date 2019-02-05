@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
-
 import akka.actor._
 import akka.io.Tcp.SO.KeepAlive
 import akka.io.Tcp._
@@ -17,7 +16,6 @@ import PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.NetworkSettings
 import encry.view.history.EncrySyncInfoMessageSpec
-
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
@@ -45,13 +43,13 @@ class NetworkController extends Actor with StrictLogging {
 
   logger.info(s"Declared address: $externalSocketAddress")
 
-  IO(Tcp) ! Bind(self, networkSettings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
+  IO(Tcp) ! Bind(self, networkSettings.bindAddress, options = KeepAlive(true) :: Nil)
 
   override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
 
   def bindingLogic: Receive = {
-    case Bound(_) =>
-      logger.info("Successfully bound to the port " + networkSettings.bindAddress.getPort)
+    case Bound(localAddress) =>
+      logger.info(s"Successfully bound to the address: $localAddress.")
       context.system.scheduler.schedule(600.millis, 5.seconds)(peerManager ! CheckPeers)
     case CommandFailed(_: Bind) =>
       logger.info("Network port " + networkSettings.bindAddress.getPort + " already in use!")
@@ -95,7 +93,7 @@ class NetworkController extends Actor with StrictLogging {
       context.actorOf(PeerConnectionHandler.props(messagesHandler, sender(), direction, externalSocketAddress, remote)
         .withDispatcher("network-dispatcher"))
       outgoing -= remote
-    case Connected(remote, local) =>
+    case Connected(remote, _) =>
       logger.info(s"Peer $remote trying to connect, but checkPossibilityToAddPeer(remote):" +
         s" ${checkPossibilityToAddPeer(remote)}.")
     case CommandFailed(c: Connect) =>
@@ -108,7 +106,8 @@ class NetworkController extends Actor with StrictLogging {
     case RegisterMessagesHandler(specs, handler) =>
       logger.info(s"Registering handlers for ${specs.map(s => s.messageCode -> s.messageName)}")
       messageHandlers += specs.map(_.messageCode) -> handler
-    case CommandFailed(cmd: Tcp.Command) => context.actorSelection("/user/statsSender") ! "Failed to execute command : " + cmd
+    case CommandFailed(cmd: Tcp.Command) =>
+      context.actorSelection("/user/statsSender") ! "Failed to execute command : " + cmd
     case nonsense: Any => logger.warn(s"NetworkController: got something strange $nonsense")
   }
 }
