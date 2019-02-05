@@ -27,6 +27,7 @@ import encry.view.state.StateReader
 import encry.utils.Utils._
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.Proposition
+import scala.concurrent.duration._
 
 class NodeViewSynchronizer extends Actor with StrictLogging {
 
@@ -37,6 +38,8 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
   val deliveryManager: ActorRef =
     context.actorOf(Props(classOf[DeliveryManager]), "deliveryManager")
+
+  system.scheduler.schedule(10.seconds, 10.seconds)(logger.info(s"Current hiistory: ${historyReaderOpt.isDefined}"))
 
   override def preStart(): Unit = {
     val messageSpecs: Seq[MessageSpec[_]] = Seq(invSpec, requestModifierSpec, ModifiersSpec, EncrySyncInfoMessageSpec)
@@ -58,7 +61,9 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
     case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
     case SemanticallyFailedModification(_, _) =>
     case ChangedState(_) =>
-    case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
+    case AuxHistoryChanged(history) =>
+      historyReaderOpt = Some(history)
+      logger.info(s"New history on SincActor : ${historyReaderOpt.isDefined} from $sender")
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       deliveryManager ! ChangedHistory(reader)
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] =>
