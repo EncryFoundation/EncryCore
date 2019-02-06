@@ -68,7 +68,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
           val hb: Array[Byte] = Handshake(Version(settings.network.appVersion), settings.network.nodeName
             .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort),
             ownSocketAddress, time).bytes
-          connection ! Tcp.Write(ByteString(hb))
+          connection ! Tcp.Write(ByteString(hb), )
           logger.info(s"Handshake sent to $remote")
           handshakeSent = true
           if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
