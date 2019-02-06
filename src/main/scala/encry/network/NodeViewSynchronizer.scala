@@ -14,7 +14,7 @@ import encry.modifiers.mempool.Transaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
-import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
+import encry.network.DeliveryManager.{ContinueSync, DeleteModIdFromDelivaeryMap, FullBlockChainSynced, StopSync}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
