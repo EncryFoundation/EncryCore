@@ -9,7 +9,7 @@ import encry.EncryApp._
 import encry.consensus.History._
 import encry.consensus.SyncInfo
 import encry.local.miner.Miner.{DisableMining, StartMining}
-import encry.modifiers.history.{ADProofs, Header, Payload}
+import encry.modifiers.history.{ADProofs, Block, Header, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
@@ -49,13 +49,18 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
   override def receive: Receive = {
     case SyntacticallySuccessfulModifier(mod)
       if (mod.isInstanceOf[Header] || mod.isInstanceOf[Payload] || mod.isInstanceOf[ADProofs]) &&
-        historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
+        historyReaderOpt.exists(_.isHeadersChainSynced) =>
     case SyntacticallySuccessfulModifier(_) =>
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: Seq[ModifierId]) =>
       deliveryManager ! DownloadRequest(modifierTypeId, modifiersId)
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
     case SyntacticallyFailedModification(_, _) =>
-    case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
+    case SemanticallySuccessfulModifier(mod) =>
+      mod match {
+        case block: Block => broadcastModifierInv(block.id)
+        case tx: Transaction => broadcastModifierInv(tx.id)
+        case mod => logger.info("Broadcast only block or tx id")
+      }
     case SemanticallyFailedModification(_, _) =>
     case ChangedState(_) =>
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
