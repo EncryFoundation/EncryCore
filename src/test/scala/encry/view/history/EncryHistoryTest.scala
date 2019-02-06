@@ -13,8 +13,6 @@ class EncryHistoryTest extends PropSpec with Matchers with InstanceFactory with 
 
   property("PreGenesis height test check.") {
 
-    val a = Some(None)
-
 //    val history: EncryHistory = generateDummyHistory
 
 //    history.bestHeaderHeight shouldEqual Constants.Chain.PreGenesisHeight

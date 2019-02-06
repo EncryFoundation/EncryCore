@@ -129,15 +129,4 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     applyTry.isSuccess shouldBe true
   }
-
-  property("FilterValid(txs) should return only valid txs") {
-
-    val bxs = TestHelper.genAssetBoxes
-
-    val bh = BoxHolder(bxs)
-
-    val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None)
-
-    println(state.persistentProver.avlProver.toString)
-  }
 }
