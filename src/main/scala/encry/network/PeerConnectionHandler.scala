@@ -68,7 +68,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
           val hb: Array[Byte] = Handshake(Version(settings.network.appVersion), settings.network.nodeName
             .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort),
             ownSocketAddress, time).bytes
-          connection ! Tcp.Write(ByteString(hb))
+          connection ! Tcp.Write(ByteString(hb), NoAck)
           logger.info(s"Handshake sent to $remote")
           handshakeSent = true
           if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
@@ -110,7 +110,7 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
     case msg: message.Message[_] =>
       def sendOutMessage(): Unit = {
         logger.info("Send message " + msg.spec + " to " + remote)
-        connection ! Write(ByteString(Ints.toByteArray(msg.bytes.length) ++ msg.bytes))
+        connection ! Write(ByteString(Ints.toByteArray(msg.bytes.length) ++ msg.bytes), NoAck)
       }
 
       settings.network.addedMaxDelay match {
