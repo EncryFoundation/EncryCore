@@ -49,7 +49,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     ADProofs.modifierTypeId -> ADProofSerializer,
     Transaction.ModifierTypeId -> TransactionSerializer
   )
-  //system.scheduler.schedule(10.seconds, 60.seconds, nodeViewSynchronizer, AuxHistoryChanged(nodeView.history))
+  system.scheduler.schedule(10.seconds, 60.seconds, nodeViewSynchronizer, AuxHistoryChanged(nodeView.history))
 
   if (settings.influxDB.isDefined) {
     context.system.scheduler.schedule(5.second, 5.second) {
