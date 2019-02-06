@@ -261,7 +261,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
           context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
         logger.info(s"Going to apply modifications to the state: $progressInfo")
         nodeViewSynchronizer ! SyntacticallySuccessfulModifier(pmod)
-        //nodeViewSynchronizer ! AuxHistoryChanged(nodeView.history)
+        nodeViewSynchronizer ! AuxHistoryChanged(nodeView.history)
         if (progressInfo.toApply.nonEmpty) {
           val startPoint: Long = System.currentTimeMillis()
           val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
