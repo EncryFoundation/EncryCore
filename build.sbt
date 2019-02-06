@@ -152,3 +152,4 @@ sourceGenerators in Compile += Def.task {
 
 val encry = (project in file(".")).settings(settings: _*)
 lazy val it = project.dependsOn(encry)
+lazy val benchmarks = project.dependsOn(encry % "test->test").enablePlugins(JmhPlugin)
