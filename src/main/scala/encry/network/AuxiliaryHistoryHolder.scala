@@ -22,13 +22,13 @@ class AuxiliaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvide
   override def receive: Receive = {
     case Append(mod) =>
       history.append(mod)
-      //syncronizer ! AuxHistoryChanged(history)
+      syncronizer ! AuxHistoryChanged(history)
     case ReportModifierValid(mod) =>
       history.reportModifierIsValid(mod)
-      //syncronizer ! AuxHistoryChanged(history)
+      syncronizer ! AuxHistoryChanged(history)
     case ReportModifierInvalid(mod, progressInfo) =>
       history.reportModifierIsInvalid(mod, progressInfo)
-      //syncronizer ! AuxHistoryChanged(history)
+      syncronizer ! AuxHistoryChanged(history)
   }
 
   override def postStop(): Unit = {
