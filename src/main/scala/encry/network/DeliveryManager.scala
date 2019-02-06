@@ -116,8 +116,8 @@ class DeliveryManager extends Actor with StrictLogging {
         deliveredModifiersMap = deliveredModifiersMap.updated(key(modifierSer._1), newPeersMap)
         logger.info(s"Update deliveredModifiersMap for key ${Algos.encode(modifierSer._1)} now:" +
           s" ${deliveredModifiersMap.getOrElse(key(modifierSer._1), Seq.empty[InetAddress])}")
-        val notDelivered = modifiers.filter{case (id, _) => delivered.get(key(id)).contains(1)}
-        nodeViewHolder ! ModifiersFromRemote(typeId, notDelivered.values.toSeq)
+        if (delivered.get(key(modifierSer._1)).contains(1))
+          nodeViewHolder ! ModifiersFromRemote(typeId, Seq(modifierSer._2))
       }
       historyReaderOpt.foreach { h =>
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
