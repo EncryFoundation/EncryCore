@@ -71,9 +71,12 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     val coinbaseApplyTry: Try[Unit] = applyTry(Seq(coinbase), totalFees + EncrySupplyController.supplyAt(height))
 
     regularApplyTry.flatMap(_ => coinbaseApplyTry).map { _ =>
-      if (!expectedDigest.sameElements(persistentProver.digest))
+      if (!expectedDigest.sameElements(persistentProver.digest)) {
+        println(s"Digest after txs application is wrong. ${Algos.encode(expectedDigest)} expected, " +
+          s"${Algos.encode(persistentProver.digest)} given")
         throw new Exception(s"Digest after txs application is wrong. ${Algos.encode(expectedDigest)} expected, " +
           s"${Algos.encode(persistentProver.digest)} given")
+      } else println(s"Succsessfully applied")
     }
   }
 
@@ -82,7 +85,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     case block: Block =>
       logger.info(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height")
-      system.actorSelection("user/statsSender") ! TxsInBlock(block.payload.transactions.size)
+      //system.actorSelection("user/statsSender") ! TxsInBlock(block.payload.transactions.size)
       applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] =
           metadata(VersionTag !@@ block.id, block.header.stateRoot, Height @@ block.header.height, block.header.timestamp)

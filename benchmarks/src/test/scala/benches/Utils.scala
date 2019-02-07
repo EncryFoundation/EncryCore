@@ -13,6 +13,7 @@ import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.modifiers.state.box.Box.Amount
 import encry.settings.Constants
 import encry.utils.CoreTaggedTypes.ModifierId
+import encry.utils.Mnemonic
 import encry.view.history.History.Height
 import encry.view.state.{BoxHolder, EncryState, UtxoState}
 import io.iohk.iodb.LSMStore
@@ -21,21 +22,28 @@ import org.encryfoundation.common.Algos.HF
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.transaction.EncryAddress.Address
 import org.encryfoundation.common.transaction.Pay2PubKeyAddress
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue}
-import scorex.crypto.hash.Digest32
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, SerializedAdProof}
+import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
+
 import scala.util.{Random => R}
 
 object Utils {
 
-  def generateNextBlock(prevBlock: Block): Block = {
-    val txs = genValidPaymentTxs(1000) ++ Seq(coinbaseTransaction)
+  def generateNextBlock(prevBlock: Block, state: UtxoState, box: Seq[AssetBox]): Block = {
+
+    val txs: Seq[Transaction] = box.map(b => TransactionFactory.defaultPaymentTransactionScratch(privKey, 11,
+      11L, IndexedSeq(b), randomAddress, 111)
+    ) ++ Seq(coinbaseTransaction)
+
+    val (_: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(txs).get
+
     val header = Header(
       1.toByte,
       prevBlock.id,
       Digest32 @@ Random.randomBytes(32),
-      ADDigest @@ Random.randomBytes(33),
+      adDigest,
       Payload.rootHash(txs.map(_.id)),
       System.currentTimeMillis(),
       prevBlock.header.height + 1,
@@ -90,14 +98,14 @@ object Utils {
     )
   }
 
-  def genValidPaymentTxs(qty: Int): Seq[Transaction] = {
+  def genValidPaymentTxs(qty: Int, box: AssetBox): Seq[Transaction] = {
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
     val now = System.currentTimeMillis()
 
     keys.map { k =>
-      val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genAssetBox(k.publicImage.address.address))
-      TransactionFactory.defaultPaymentTransactionScratch(k, 4300,
-        now + scala.util.Random.nextInt(5000), useBoxes, randomAddress, 1000000)
+      val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(box)
+      TransactionFactory.defaultPaymentTransactionScratch(k, 11,
+        now + scala.util.Random.nextInt(5000), useBoxes, randomAddress, 111)
     }
   }
 
@@ -109,10 +117,14 @@ object Utils {
   def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None): AssetBox =
     AssetBox(EncryProposition.addressLocked(address), R.nextLong(), amount, tokenIdOpt)
 
+
+  def genHardcodedBox(address: Address): AssetBox =
+    AssetBox(EncryProposition.addressLocked(address), 1000L, 10000000L, None)
+
   def randomAddress: Address = Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address
 
   lazy val coinbaseTransaction: Transaction = {
-    TransactionFactory.coinbaseTransactionScratch(secret.publicImage, System.currentTimeMillis(), 10L, 0, Height @@ 100)
+    TransactionFactory.coinbaseTransactionScratch(privKey.publicImage, System.currentTimeMillis(), 10L, 0, Height @@ 100)
   }
 
   val secrets: Seq[PrivateKey25519] = genKeys(1000)
@@ -129,4 +141,19 @@ object Utils {
 
   val secret: PrivateKey25519 = secrets.head
   val publicKey: PublicKey25519 = secret.publicImage
+
+  val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
+  val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
+
+  def createPrivKey(seed: Option[String]): PrivateKey25519 = {
+    val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
+      Blake2b256.hash(
+        seed.map { Mnemonic.seedFromMnemonic(_) }
+          .getOrElse {
+            val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
+            Mnemonic.seedFromMnemonic(phrase)
+          })
+    )
+    PrivateKey25519(privateKey, publicKey)
+  }
 }

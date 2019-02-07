@@ -5,27 +5,25 @@ import benches.StateBench.BenchState
 import encry.modifiers.history.Block
 import org.openjdk.jmh.annotations._
 import benches.Utils._
+import encry.modifiers.state.box.AssetBox
 import encry.view.state.{BoxHolder, UtxoState}
-import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 import org.openjdk.jmh.infra.Blackhole
-import scorex.utils.Random
+import org.openjdk.jmh.profile.GCProfiler
+import org.openjdk.jmh.runner.{Runner, RunnerException}
+import org.openjdk.jmh.runner.options.OptionsBuilder
+import scala.collection.immutable
 
-@OutputTimeUnit(TimeUnit.SECONDS)
-@BenchmarkMode(Array(Mode.AverageTime))
-@Threads(4)
-@Fork(1)
-@Warmup(iterations = 15)
-@Measurement(iterations = 20)
 class StateBench {
 
   @Benchmark
   def applyBlocksToTheState(stateBench: BenchState, bh: Blackhole): Unit = {
     bh.consume {
-      stateBench.blocks.foreach { block =>
-        stateBench.state.get.applyBlockTransactions(
-          block.payload.transactions,
-          ADDigest @@ Random.randomBytes(33)
-        )
+      stateBench.blocks.foldLeft(stateBench.state2) { case (state, block) =>
+        //val (_: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(block.transactions).get
+        println(1)
+        state.applyModifier(block).get
       }
     }
   }
@@ -33,27 +31,49 @@ class StateBench {
 
 object StateBench {
 
+  @throws[RunnerException]
+  def main(args: Array[String]): Unit = {
+    val opt = new OptionsBuilder()
+      .include(".*" + classOf[StateBench].getSimpleName + ".*")
+      .forks(1)
+      .threads(4)
+      .warmupIterations(10)
+      .measurementIterations(10)
+      .mode(Mode.AverageTime)
+      .timeUnit(TimeUnit.SECONDS)
+      .addProfiler(classOf[GCProfiler])
+      .build
+    new Runner(opt).run
+  }
+
   @State(Scope.Benchmark)
   class BenchState {
 
-    var state: Option[UtxoState] = None
+    val initial10000Boxes: immutable.IndexedSeq[AssetBox] = (0 to 10000).map(_ =>
+      genHardcodedBox(privKey.publicImage.address.address)
+    )
+
+    var state: UtxoState = generatedState
 
     var blocks: Vector[Block] = Vector[Block]()
 
-    @Setup
-    def generatedState(): Unit = {
-      val bh: BoxHolder = BoxHolder(Seq())
-      state = Some(utxoFromBoxHolder(bh, getRandomTempDir, None))
+    var state2: UtxoState = generatedState
+
+    def generatedState: UtxoState = {
+      val bh: BoxHolder = BoxHolder(initial10000Boxes)
+      utxoFromBoxHolder(bh, getRandomTempDir, None)
     }
 
     @Setup
     def generateNBlocks(): Unit = {
       val genesisBlock: Block = generateGenesisBlock
-      blocks = genesisBlock +: (0 to 1000).foldLeft(Vector[Block](), genesisBlock) {
-        case ((list, block), _) =>
-          val nextBlock: Block = generateNextBlock(block)
-          (nextBlock +: list, nextBlock)
+      blocks = genesisBlock +: (0 to 100).foldLeft(Vector[Block](), genesisBlock, state, initial10000Boxes) {
+        case ((list, block, stateL, boxes), _) =>
+          val nextBlock: Block = generateNextBlock(block, stateL, boxes.takeRight(100))
+          val stateN: UtxoState = stateL.applyModifier(block).get
+          (nextBlock +: list, nextBlock, stateN, boxes.dropRight(100))
       }._1
     }
   }
+
 }
