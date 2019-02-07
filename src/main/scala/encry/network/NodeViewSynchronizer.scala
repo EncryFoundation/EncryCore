@@ -74,7 +74,7 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
     case DataFromPeer(spec, syncInfo: EncrySyncInfo@unchecked, remote)
       if spec.messageCode == EncrySyncInfoMessageSpec.messageCode =>
       logger.info(s"Got sync message from ${remote.socketAddress} with " +
-        s"${syncInfo.lastHeaderIds.size} headers. Head's headerId is " +
+        s"${syncInfo.lastHeaderIds.size} headers. Head's headerId is: " +
         s"${Algos.encode(syncInfo.lastHeaderIds.headOption.getOrElse(Array.emptyByteArray))}.")
       historyReaderOpt match {
         case Some(historyReader) =>
