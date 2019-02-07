@@ -30,7 +30,7 @@ import scala.util.{Random => R}
 object Utils {
 
   def generateNextBlock(prevBlock: Block): Block = {
-    val txs = genValidPaymentTxs(100) ++ Seq(coinbaseTransaction)
+    val txs = genValidPaymentTxs(1000) ++ Seq(coinbaseTransaction)
     val header = Header(
       1.toByte,
       prevBlock.id,
@@ -71,7 +71,7 @@ object Utils {
 
     val header = genHeader.copy(parentId = Header.GenesisParentId, height = Constants.Chain.GenesisHeight)
 
-    Block(header, Payload(header.id, Seq.empty), None)
+    Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
   }
 
   def genHeader: Header = {

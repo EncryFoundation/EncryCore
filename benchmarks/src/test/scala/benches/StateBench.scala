@@ -10,12 +10,12 @@ import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import org.openjdk.jmh.infra.Blackhole
 import scorex.utils.Random
 
-@OutputTimeUnit(TimeUnit.NANOSECONDS)
+@OutputTimeUnit(TimeUnit.SECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
-@Threads(2)
+@Threads(4)
 @Fork(1)
-@Warmup(iterations = 10)
-@Measurement(iterations = 10)
+@Warmup(iterations = 15)
+@Measurement(iterations = 20)
 class StateBench {
 
   @Benchmark
