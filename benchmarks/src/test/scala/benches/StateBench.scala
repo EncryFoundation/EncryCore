@@ -49,7 +49,9 @@ object StateBench {
   @State(Scope.Benchmark)
   class BenchState {
 
-    val initial10000Boxes: immutable.IndexedSeq[AssetBox] = (0 to 10000).map(_ =>
+    val boxesNumber: Int = 10000
+
+    val initialBoxes: IndexedSeq[AssetBox] = (0 to boxesNumber).map(_ =>
       genHardcodedBox(privKey.publicImage.address.address)
     )
 
@@ -60,18 +62,18 @@ object StateBench {
     var state2: UtxoState = generatedState
 
     def generatedState: UtxoState = {
-      val bh: BoxHolder = BoxHolder(initial10000Boxes)
+      val bh: BoxHolder = BoxHolder(initialBoxes)
       utxoFromBoxHolder(bh, getRandomTempDir, None)
     }
 
     @Setup
     def generateNBlocks(): Unit = {
       val genesisBlock: Block = generateGenesisBlock
-      blocks = genesisBlock +: (0 to 100).foldLeft(Vector[Block](), genesisBlock, state, initial10000Boxes) {
+      blocks = genesisBlock +: (0 until 100).foldLeft(Vector[Block](), genesisBlock, state, initialBoxes) {
         case ((list, block, stateL, boxes), _) =>
-          val nextBlock: Block = generateNextBlock(block, stateL, boxes.takeRight(100))
+          val nextBlock: Block = generateNextBlock(block, stateL, boxes.take(100))
           val stateN: UtxoState = stateL.applyModifier(block).get
-          (nextBlock +: list, nextBlock, stateN, boxes.dropRight(100))
+          (nextBlock +: list, nextBlock, stateN, boxes.drop(100))
       }._1
     }
   }

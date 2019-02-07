@@ -119,14 +119,14 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
   }
 
   def generateProofs(txs: Seq[Transaction]): Try[(SerializedAdProof, ADDigest)] = Try {
-    logger.info(s"Generating proof for ${txs.length} transactions ...")
+    println(s"Generating proof for ${txs.length} transactions ...")
     val rootHash: ADDigest = persistentProver.digest
     if (txs.isEmpty) throw new Exception("Got empty transaction sequence")
     else if (!storage.version.exists(_.sameElements(rootHash)))
       throw new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}")
     persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofs.toModification))
   }.flatten.recoverWith[(SerializedAdProof, ADDigest)] { case e =>
-    logger.warn(s"Failed to generate ADProof cause $e")
+    println(s"Failed to generate ADProof cause $e")
     Failure(e)
   }
 
