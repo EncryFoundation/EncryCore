@@ -57,8 +57,8 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
     case SyntacticallyFailedModification(_, _) =>
     case SemanticallySuccessfulModifier(mod) =>
       mod match {
-        case block: Block => broadcastModifierInv(block.id)
-        case tx: Transaction => broadcastModifierInv(tx.id)
+        case block: Block => broadcastModifierInv(block.header)
+        case tx: Transaction => broadcastModifierInv(tx)
         case mod => logger.info("Broadcast only block or tx id")
       }
     case SemanticallyFailedModification(_, _) =>
