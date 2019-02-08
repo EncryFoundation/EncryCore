@@ -1,6 +1,7 @@
 package benches
 
 import java.util.concurrent.TimeUnit
+
 import benches.StateBench.BenchState
 import encry.modifiers.history.Block
 import org.openjdk.jmh.annotations._
@@ -11,7 +12,7 @@ import encry.view.state.{BoxHolder, UtxoState}
 import org.openjdk.jmh.infra.Blackhole
 import org.openjdk.jmh.profile.GCProfiler
 import org.openjdk.jmh.runner.{Runner, RunnerException}
-import org.openjdk.jmh.runner.options.OptionsBuilder
+import org.openjdk.jmh.runner.options.{OptionsBuilder, TimeValue, VerboseMode}
 
 class StateBench {
 
@@ -39,6 +40,8 @@ object StateBench {
       .mode(Mode.AverageTime)
       .timeUnit(TimeUnit.SECONDS)
       .addProfiler(classOf[GCProfiler])
+      .verbosity(VerboseMode.EXTRA)
+      .warmupTime(TimeValue.minutes(20))
       .build
     new Runner(opt).run
   }

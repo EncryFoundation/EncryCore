@@ -2,6 +2,7 @@ package benches
 
 import java.io.File
 import java.util.concurrent.TimeUnit
+
 import benches.HistoryReadFileBench.BenchStateHistory
 import benches.Utils._
 import com.typesafe.scalalogging.StrictLogging
@@ -12,7 +13,7 @@ import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import org.openjdk.jmh.profile.GCProfiler
 import org.openjdk.jmh.runner.{Runner, RunnerException}
-import org.openjdk.jmh.runner.options.OptionsBuilder
+import org.openjdk.jmh.runner.options.{OptionsBuilder, TimeValue}
 
 class HistoryReadFileBench {
 
@@ -20,7 +21,6 @@ class HistoryReadFileBench {
   def readOrGenerateHistoryBench(benchStateHistory: BenchStateHistory, bh: Blackhole): Unit = {
     bh.consume {
       val history: EncryHistory = generateHistory(benchStateHistory.settings, benchStateHistory.tmpDir)
-      history.closeStorage()
     }
   }
 }
@@ -38,6 +38,8 @@ object HistoryReadFileBench extends StrictLogging {
       .mode(Mode.AverageTime)
       .timeUnit(TimeUnit.SECONDS)
       .addProfiler(classOf[GCProfiler])
+      .timeout(TimeValue.minutes(20))
+      .warmupTime(TimeValue.minutes(20))
       .build
     new Runner(opt).run
   }
@@ -45,19 +47,19 @@ object HistoryReadFileBench extends StrictLogging {
   @State(Scope.Benchmark)
   class BenchStateHistory {
 
-    val blocksNumber: Int = 10000
+    val blocksNumber: Int = 5000
     val settings: EncryAppSettings = EncryAppSettings.read
     val tmpDir: File = getRandomTempDir
 
     @Setup
     def initializeHistory(): Unit = {
       val tmpHistory: EncryHistory = generateHistory(settings, tmpDir)
-      val historyBlocks: EncryHistory = (0 until blocksNumber).foldLeft(tmpHistory) {
+      (0 until blocksNumber).foldLeft(tmpHistory) {
         case (prevHistory, _) =>
           val block: Block = generateNextBlock(prevHistory)
           prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
       }
-      historyBlocks.closeStorage()
     }
   }
+
 }
