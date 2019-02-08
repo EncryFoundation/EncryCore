@@ -130,12 +130,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     .ensuring(_.forall(_.id sameElements id), s"Modifier ${Algos.encode(id)} id mismatch")
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T] = modifierById(id) match {
-    case Some(m: T@unchecked) if m.isInstanceOf[T] =>
-      println("234")
-      Some(m)
-    case _ =>
-      println(s"${Algos.encode(id)}")
-      None
+    case Some(m: T@unchecked) if m.isInstanceOf[T] => Some(m)
+    case _ => None
   }
 
   def getBlock(header: Header): Option[Block] =
