@@ -60,7 +60,9 @@ object EncryState extends StrictLogging {
 
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
-  def generateGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef], settings: EncryAppSettings): UtxoState = {
+  def generateGenesisUtxoState(stateDir: File,
+                               nodeViewHolderRef: Option[ActorRef],
+                               settings: EncryAppSettings): UtxoState = {
     val supplyBoxes: List[EncryBaseBox] = EncryState.initialStateBoxes.toList
     UtxoState.genesis(supplyBoxes, stateDir, nodeViewHolderRef, settings).ensuring(us => {
       logger.info(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")

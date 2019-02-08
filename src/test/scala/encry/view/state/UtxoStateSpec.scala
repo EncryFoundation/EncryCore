@@ -1,11 +1,9 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
 import encry.avltree
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
-import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
@@ -26,7 +24,10 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
   val settings: EncryAppSettings = EncryAppSettings.read
 
-  def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef], settings: EncryAppSettings): UtxoState = {
+  def utxoFromBoxHolder(bh: BoxHolder,
+                        dir: File,
+                        nodeViewHolderRef: Option[ActorRef],
+                        settings: EncryAppSettings): UtxoState = {
     val p = new avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
@@ -38,7 +39,15 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
       PersistentBatchAVLProver.create(p, storage).get
     }
 
-    new UtxoState(persistentProver, EncryState.genesisStateVersion, Constants.Chain.GenesisHeight, stateStore, 0L, None, settings)
+    new UtxoState(
+      persistentProver,
+      EncryState.genesisStateVersion,
+      Constants.Chain.GenesisHeight,
+      stateStore,
+      0L,
+      None,
+      settings
+    )
   }
 
   property("Proofs for transaction") {
@@ -59,7 +68,14 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val fees: Amount = regularTransactions.map(_.fee).sum
 
-    val coinbase: Transaction = TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, 25L, fees, Height @@ 100)
+    val coinbase: Transaction = TransactionFactory
+      .coinbaseTransactionScratch(
+        secret.publicImage,
+        timestamp,
+        25L,
+        fees,
+        Height @@ 100
+      )
 
     val transactions: Seq[Transaction] = regularTransactions.sortBy(_.timestamp) :+ coinbase
 

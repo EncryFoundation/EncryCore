@@ -26,7 +26,6 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.Algos.HF
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
-
 import scala.util.{Failure, Success, Try}
 
 class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
@@ -94,7 +93,8 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         val proofBytes: SerializedAdProof = persistentProver.generateProofAndUpdateStorage(meta)
         val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
 
-        if (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest) onAdProofGenerated(ADProofs(block.header.id, proofBytes))
+        if (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest)
+          onAdProofGenerated(ADProofs(block.header.id, proofBytes))
         logger.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with" +
           s" root hash ${Algos.encode(rootHash)}")
 
@@ -107,7 +107,15 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         else if (!(block.header.stateRoot sameElements persistentProver.digest))
           throw new Exception("Calculated stateRoot is not equal to the declared one.")
 
-        new UtxoState(persistentProver, VersionTag !@@ block.id, Height @@ block.header.height, stateStore, lastBlockTimestamp, nodeViewHolderRef, settings)
+        new UtxoState(
+          persistentProver,
+          VersionTag !@@ block.id,
+          Height @@ block.header.height,
+          stateStore,
+          lastBlockTimestamp,
+          nodeViewHolderRef,
+          settings
+        )
       }.recoverWith[UtxoState] { case e =>
         logger.info(s"Failed to apply block with header ${block.header.encodedId} to UTXOState with root" +
           s" ${Algos.encode(rootHash)}: $e")
@@ -115,7 +123,15 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
       }
 
     case header: Header =>
-      Success(new UtxoState(persistentProver, VersionTag !@@ header.id, height, stateStore, lastBlockTimestamp, nodeViewHolderRef, settings))
+      Success(new UtxoState(
+        persistentProver,
+        VersionTag !@@ header.id,
+        height,
+        stateStore,
+        lastBlockTimestamp,
+        nodeViewHolderRef,
+        settings
+      ))
 
     case _ => Failure(new Exception("Got Modifier of unknown type."))
   }
@@ -139,7 +155,15 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         val rollbackResult: Try[UtxoState] = persistentProver.rollback(ADDigest @@ v.data).map { _ =>
           val stateHeight: Int = stateStore.get(ByteArrayWrapper(UtxoState.bestHeightKey))
             .map(d => Ints.fromByteArray(d.data)).getOrElse(Constants.Chain.GenesisHeight)
-          new UtxoState(persistentProver, version, Height @@ stateHeight, stateStore, lastBlockTimestamp, nodeViewHolderRef, settings)
+          new UtxoState(
+            persistentProver,
+            version,
+            Height @@ stateHeight,
+            stateStore,
+            lastBlockTimestamp,
+            nodeViewHolderRef,
+            settings
+          )
         }
         stateStore.clean(Constants.DefaultKeepVersions)
         rollbackResult
@@ -165,7 +189,8 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
               if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
                 defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc :+ bx else acc
             case (Some(bx), Some(defaultProof)) =>
-              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, Seq(defaultProof))) acc :+ bx else acc
+              if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract, Seq(defaultProof)))
+                acc :+ bx else acc
             case (Some(bx), defaultProofOpt) =>
               if (bx.proposition.canUnlock(Context(tx, bx, stateView), input.realContract,
                 defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
@@ -216,12 +241,21 @@ object UtxoState extends StrictLogging {
     val lastBlockTimestamp: Amount = stateStore.get(ByteArrayWrapper(lastBlockTimeKey))
       .map(d => Longs.fromByteArray(d.data)).getOrElse(0L)
     val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF] = {
-      val bp: encry.avltree.BatchAVLProver[Digest32, HF] = new encry.avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
+      val bp: encry.avltree.BatchAVLProver[Digest32, HF] =
+        new encry.avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
       val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
       val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(stateStore, np)(Algos.hash)
       PersistentBatchAVLProver.create(bp, storage).getOrElse(throw new Error("Fatal: Failed to create persistent prover"))
     }
-    new UtxoState(persistentProver, VersionTag @@ stateVersion, Height @@ stateHeight, stateStore, lastBlockTimestamp, nodeViewHolderRef, settings)
+    new UtxoState(
+      persistentProver,
+      VersionTag @@ stateVersion,
+      Height @@ stateHeight,
+      stateStore,
+      lastBlockTimestamp,
+      nodeViewHolderRef,
+      settings
+    )
   }
 
   private def metadata(modId: VersionTag,
@@ -237,7 +271,10 @@ object UtxoState extends StrictLogging {
     Seq(idStateDigestIdxElem, stateDigestIdIdxElem, bestVersion, stateHeight, lastBlockTimestamp)
   }
 
-  def genesis(boxes: List[EncryBaseBox], stateDir: File, nodeViewHolderRef: Option[ActorRef], settings: EncryAppSettings): UtxoState = {
+  def genesis(boxes: List[EncryBaseBox],
+              stateDir: File,
+              nodeViewHolderRef: Option[ActorRef],
+              settings: EncryAppSettings): UtxoState = {
     val p: BatchAVLProver[Digest32, HF] =
       new BatchAVLProver[Digest32, Algos.HF](keyLength = EncryBox.BoxIdSize, valueLengthOpt = None)
     boxes.foreach(b => p.performOneOperation(encry.avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
@@ -248,9 +285,20 @@ object UtxoState extends StrictLogging {
     logger.info(s"Generating UTXO State with ${boxes.size} boxes")
 
     val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF] = PersistentBatchAVLProver.create(
-      p, storage, metadata(EncryState.genesisStateVersion, p.digest, Constants.Chain.PreGenesisHeight, 0L), paranoidChecks = true
+      p,
+      storage,
+      metadata(EncryState.genesisStateVersion, p.digest, Constants.Chain.PreGenesisHeight, 0L),
+      paranoidChecks = true
     ).getOrElse(throw new Error("Fatal: Failed to create persistent prover"))
 
-    new UtxoState(persistentProver, EncryState.genesisStateVersion, Constants.Chain.PreGenesisHeight, stateStore, 0L, nodeViewHolderRef, settings)
+    new UtxoState(
+      persistentProver,
+      EncryState.genesisStateVersion,
+      Constants.Chain.PreGenesisHeight,
+      stateStore,
+      0L,
+      nodeViewHolderRef,
+      settings
+    )
   }
 }
