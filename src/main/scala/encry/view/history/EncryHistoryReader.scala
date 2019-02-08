@@ -39,11 +39,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     * Complete block of the best chain with transactions.
     * Always None for an SPV mode, Some(fullBLock) for fullnode regime after initial bootstrap.
     */
-  def bestBlockOpt: Option[Block] =
-    bestBlockIdOpt.flatMap { id =>
-      println(s"${Algos.encode(id)}")
-      typedModifierById[Header](id)
-    }.flatMap(getBlock)
+  def bestBlockOpt: Option[Block] = bestBlockIdOpt.flatMap(id => typedModifierById[Header](id)).flatMap(getBlock)
 
   /** @return ids of count headers starting from offset */
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
@@ -130,12 +126,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   def lastHeaders(count: Int): HeaderChain = bestHeaderOpt
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(HeaderChain.empty)
 
-  def modifierById(id: ModifierId): Option[EncryPersistentModifier] = {
-    val a = historyStorage.modifierById(id)
-      .ensuring(_.forall(_.id sameElements id), s"Modifier ${Algos.encode(id)} id mismatch")
-    println(s"modifierById -> ${a.get}")
-    a
-  }
+  def modifierById(id: ModifierId): Option[EncryPersistentModifier] = historyStorage.modifierById(id)
+    .ensuring(_.forall(_.id sameElements id), s"Modifier ${Algos.encode(id)} id mismatch")
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T] = modifierById(id) match {
     case Some(m: T@unchecked) if m.isInstanceOf[T] =>
@@ -149,13 +141,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   def getBlock(header: Header): Option[Block] =
     (typedModifierById[Payload](header.payloadId), typedModifierById[ADProofs](header.adProofsId)) match {
       case (Some(txs), Some(proofs)) => Some(Block(header, txs, Some(proofs)))
-      case (Some(txs), None) if !nodeSettings.stateMode.isDigest =>
-        val bl = Block(header, txs, None)
-        println(s"${bl}")
-        Some(bl)
-      case _ =>
-        println(s"None -> getBlock")
-        None
+      case (Some(txs), None) if !nodeSettings.stateMode.isDigest => Some(Block(header, txs, None))
+      case _ => None
     }
 
   /**

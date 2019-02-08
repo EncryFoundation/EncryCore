@@ -33,7 +33,6 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
     modifierValidation(m, typedModifierById[Header](m.headerId))
 
   private def putToHistory(payload: Payload): ProgressInfo[EncryPersistentModifier] = {
-    println("putToHistory")
     historyStorage.insertObjects(Seq(payload))
     ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }

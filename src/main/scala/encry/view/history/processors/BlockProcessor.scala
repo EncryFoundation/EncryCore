@@ -19,11 +19,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   import BlockProcessor._
 
   /** Id of header that contains transactions and proofs */
-  override def bestBlockIdOpt: Option[ModifierId] = {
-    val a = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
-    //println(s"${Algos.encode(a.get)}")
-    a
-  }
+  override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
 
   protected def getBlock(h: Header): Option[Block]
 
@@ -134,14 +130,8 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
                             updateHeaderInfo: Boolean = false): Unit = {
     val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeaderId)
     val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-      if (updateHeaderInfo) {
-        println(s"updateHeaderInfo -> updateStorage -> ${BestBlockKey}")
-        Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)
-      }
-      else {
-        println(s"updateHeaderInfo -> updateStorage -> -> ELSE _> ${BestBlockKey}")
-        Seq(BestBlockKey -> bestFullHeaderIdWrapped)
-      }
+      if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)
+      else Seq(BestBlockKey -> bestFullHeaderIdWrapped)
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
   }
 

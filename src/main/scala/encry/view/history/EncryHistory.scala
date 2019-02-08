@@ -107,7 +107,6 @@ trait EncryHistory extends EncryHistoryReader {
                 continuationHeaderChains(branchPoint.header, h => getBlock(h).isDefined && !invalidatedHeaders.contains(h))
                   .maxBy(chain => scoreOf(chain.last.id).getOrElse(BigInt(0)))
                   .flatMap(h => getBlock(h))
-              println(s"///fdgdkfnmgls ${BestBlockKey} ->")
               val changedLinks: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
                 Seq(BestBlockKey -> ByteArrayWrapper(validChain.last.id), BestHeaderKey -> ByteArrayWrapper(newBestHeader.id))
               val toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = validityRow ++ changedLinks
@@ -130,10 +129,8 @@ trait EncryHistory extends EncryHistoryReader {
   private def markModifierValid(modifier: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] =
     modifier match {
       case block: Block =>
-        println(s"${block}")
         val nonMarkedIds: Seq[ModifierId] = (Seq(block.header.id, block.payload.id) ++ block.adProofsOpt.map(_.id))
           .filter(id => historyStorage.get(validityKey(id)).isEmpty)
-        println(s"01 -> ${nonMarkedIds.size}")
         if (nonMarkedIds.nonEmpty) {
           historyStorage.
           insert(validityKey(nonMarkedIds.head), nonMarkedIds.map(id => validityKey(id) -> ByteArrayWrapper(Array(1.toByte))))}

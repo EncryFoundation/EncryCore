@@ -79,16 +79,18 @@ object Utils {
     Block(header, Payload(header.id, txs), None)
   }
 
-  def generateNextBlock(history: EncryHistory, prevBlock: Block): Block = {
-
-    val previousHeaderId: ModifierId = prevBlock.header.id
+  def generateNextBlock(history: EncryHistory,
+                        difficultyDiff: BigInt = 0,
+                        prevId: Option[ModifierId] = None): Block = {
+    val previousHeaderId: ModifierId =
+      prevId.getOrElse(history.bestHeaderOpt.map(_.id).getOrElse(Header.GenesisParentId))
     val requiredDifficulty: Difficulty = history.bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
       .getOrElse(Constants.Chain.InitialDifficulty)
-    val txs = genValidPaymentTxs(100) ++ Seq(coinbaseTransaction(prevBlock.header.height))
+    val txs = genValidPaymentTxs(R.nextInt(100)) ++ Seq(coinbaseTransaction)
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.bestHeaderHeight + 1,
-      difficulty = requiredDifficulty,
+      difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff),
       transactionsRoot = Payload.rootHash(txs.map(_.id))
     )
     Block(header, Payload(header.id, txs), None)
@@ -163,6 +165,16 @@ object Utils {
     amount = 1,
     height = Height @@ height
   )
+
+  lazy val coinbaseTransaction: Transaction = {
+    TransactionFactory.coinbaseTransactionScratch(
+      privKey.publicImage,
+      System.currentTimeMillis(),
+      10L,
+      0,
+      Height @@ 100
+    )
+  }
 
   val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
   val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
