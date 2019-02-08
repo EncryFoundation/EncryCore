@@ -23,6 +23,7 @@ object Equihash {
     digest.update(arr, 0, arr.length)
   }
 
+  //todo: takes a lot of time
   def hashSolution[T <: Digest](digest: T, solution: EquihashSolution): Unit = solution.ints map {
     hashXi(digest, _)
   }

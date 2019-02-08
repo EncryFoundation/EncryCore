@@ -101,7 +101,7 @@ object ModifiersCache extends StrictLogging {
         case _ => exhaustiveSearch
       }
       case None =>
-        logger.info(s"No payloads for current history")
+        logger.debug(s"No payloads for current history")
         exhaustiveSearch
     }
   }

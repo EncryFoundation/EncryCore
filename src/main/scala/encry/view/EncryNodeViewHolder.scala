@@ -100,10 +100,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         }
         logger.debug(s"Cache before(${ModifiersCache.size})")
         computeApplications()
+        if (ModifiersCache.isEmpty) nodeViewSynchronizer ! SendLocalSyncInfo
         logger.debug(s"Cache after(${ModifiersCache.size})")
       }
-    case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
-    case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
+    case lt: LocallyGeneratedTransaction[EncryProposition, Transaction]@unchecked => txModify(lt.tx)
+    case lm: LocallyGeneratedModifier[EncryPersistentModifier]@unchecked =>
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod)
     case GetDataFromCurrentView(f) =>
@@ -153,7 +154,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   }
 
   def extractTransactions(mod: EncryPersistentModifier): Seq[Transaction] = mod match {
-    case tcm: TransactionsCarryingPersistentNodeViewModifier[EncryProposition, Transaction] => tcm.transactions
+    case tcm: TransactionsCarryingPersistentNodeViewModifier[EncryProposition, Transaction]@unchecked => tcm.transactions
     case _ => Seq()
   }
 
@@ -197,7 +198,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
 
     requestDownloads(progressInfo, None)
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
-    val (stateToApplyTry: Try[StateType], suffixTrimmed: IndexedSeq[EncryPersistentModifier]) =
+    val (stateToApplyTry: Try[StateType], suffixTrimmed: IndexedSeq[EncryPersistentModifier]@unchecked) =
       if (progressInfo.chainSwitchingNeeded) {
         branchingPointOpt.map { branchPoint =>
           if (!state.version.sameElements(branchPoint))
