@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.InetAddress
+
 import akka.actor.{Actor, Cancellable}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
@@ -232,6 +233,15 @@ class DeliveryManager extends Actor with StrictLogging {
                 }
               }
           case None => // Do nothing
+            val peerMap = {
+              cancellables.getOrElse(cp.socketAddress.getAddress, Map.empty) - modifierId
+            }
+            cancellables = cancellables.updated(cp.socketAddress.getAddress, peerMap)
+            requestedModifiers.get(key(modifierId)).foreach{qtyOfRequests =>
+              if (qtyOfRequests - 1 == 0) {
+                requestedModifiers = requestedModifiers - key(modifierId)
+              }
+            }
         }
       case None => // Do nothing
     }
