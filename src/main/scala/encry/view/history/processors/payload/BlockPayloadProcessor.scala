@@ -5,10 +5,12 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{ADProofs, Block, Header, Payload}
 import encry.view.history.processors.BlockProcessor
 import encry.view.history.storage.HistoryStorage
-import encry.EncryApp.settings.network
+import encry.settings.EncryAppSettings
 import scala.util.Try
 
 trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcessor {
+
+  protected val settings: EncryAppSettings
 
   protected val historyStorage: HistoryStorage
 
@@ -17,7 +19,7 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
   override protected def process(payload: Payload): ProgressInfo[EncryPersistentModifier] =
     getBlockByPayload(payload)
       .flatMap { block =>
-        if (block.header.height - bestBlockHeight >= 2 + network.maxInvObjects) None
+        if (block.header.height - bestBlockHeight >= 2 + settings.network.maxInvObjects) None
         else Some(processBlock(block, payload))
       }.getOrElse(putToHistory(payload))
 
@@ -31,6 +33,7 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
     modifierValidation(m, typedModifierById[Header](m.headerId))
 
   private def putToHistory(payload: Payload): ProgressInfo[EncryPersistentModifier] = {
+    println("putToHistory")
     historyStorage.insertObjects(Seq(payload))
     ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }

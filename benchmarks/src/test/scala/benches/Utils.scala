@@ -8,11 +8,17 @@ import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.history.{ADProofs, Block, Header, Payload}
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
+import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
-import encry.settings.{Constants, EncryAppSettings}
+import encry.settings.{Constants, EncryAppSettings, NodeSettings}
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.utils.Mnemonic
+import encry.utils.TestHelper.Props
+import encry.utils.{Mnemonic, NetworkTimeProvider}
+import encry.view.history.EncryHistory
 import encry.view.history.History.Height
+import encry.view.history.processors.payload.BlockPayloadProcessor
+import encry.view.history.processors.proofs.FullStateProofProcessor
+import encry.view.history.storage.HistoryStorage
 import encry.view.state.{BoxHolder, EncryState, UtxoState}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.Algos
@@ -20,7 +26,7 @@ import org.encryfoundation.common.Algos.HF
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.transaction.EncryAddress.Address
 import org.encryfoundation.common.transaction.Pay2PubKeyAddress
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, SerializedAdProof}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
@@ -28,7 +34,7 @@ import scala.util.{Random => R}
 
 object Utils {
 
-  def generateGenesisBlock(state: UtxoState): Block = {
+  def generateGenesisBlockValidForState(state: UtxoState): Block = {
     val txs = Seq(coinbaseTransaction(0))
     val (adProofN: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(txs).get
     val adPN: Digest32 = ADProofs.proofDigest(adProofN)
@@ -41,7 +47,12 @@ object Utils {
     Block(header, Payload(header.id, txs), None)
   }
 
-  def generateNextBlock(prevBlock: Block, state: UtxoState, box: Seq[AssetBox]): Block = {
+  def generateGenesisBlock: Block = {
+    val header = genHeader.copy(parentId = Header.GenesisParentId, height = Constants.Chain.GenesisHeight)
+    Block(header, Payload(header.id, Seq(coinbaseTransaction(0))), None)
+  }
+
+  def generateNextBlockValidForState(prevBlock: Block, state: UtxoState, box: Seq[AssetBox]): Block = {
     val txs: Seq[Transaction] = box.map(b =>
       TransactionFactory.defaultPaymentTransactionScratch(
         privKey,
@@ -67,6 +78,33 @@ object Utils {
     )
     Block(header, Payload(header.id, txs), None)
   }
+
+  def generateNextBlock(history: EncryHistory, prevBlock: Block): Block = {
+
+    val previousHeaderId: ModifierId = prevBlock.header.id
+    val requiredDifficulty: Difficulty = history.bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
+      .getOrElse(Constants.Chain.InitialDifficulty)
+    val txs = genValidPaymentTxs(100) ++ Seq(coinbaseTransaction(prevBlock.header.height))
+    val header = genHeader.copy(
+      parentId = previousHeaderId,
+      height = history.bestHeaderHeight + 1,
+      difficulty = requiredDifficulty,
+      transactionsRoot = Payload.rootHash(txs.map(_.id))
+    )
+    Block(header, Payload(header.id, txs), None)
+  }
+
+  def genValidPaymentTxs(qty: Int): Seq[Transaction] = {
+    val now = System.currentTimeMillis()
+    (0 until qty).map {_ =>
+      val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genAssetBox(privKey.publicImage.address.address))
+      TransactionFactory.defaultPaymentTransactionScratch(privKey, Props.txFee,
+        now + scala.util.Random.nextInt(5000), useBoxes, randomAddress, Props.boxValue)
+    }
+  }
+
+  def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None): AssetBox =
+    AssetBox(EncryProposition.addressLocked(address), R.nextLong(), amount, tokenIdOpt)
 
   def utxoFromBoxHolder(bh: BoxHolder,
                         dir: File,
@@ -141,5 +179,20 @@ object Utils {
           })
     )
     PrivateKey25519(privateKey, publicKey)
+  }
+
+  def generateHistory(settingsEncry: EncryAppSettings, file: File): EncryHistory = {
+
+    val indexStore: LSMStore = new LSMStore(file, keepVersions = 0)
+    val objectsStore: LSMStore = new LSMStore(file, keepVersions = 0)
+    val storage: HistoryStorage = new HistoryStorage(indexStore, objectsStore)
+    val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
+
+    new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
+      override protected val settings: EncryAppSettings = settingsEncry
+      override protected val nodeSettings: NodeSettings = settings.node
+      override protected val historyStorage: HistoryStorage = storage
+      override protected val timeProvider: NetworkTimeProvider = ntp
+    }
   }
 }

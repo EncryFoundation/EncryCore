@@ -107,6 +107,7 @@ trait EncryHistory extends EncryHistoryReader {
                 continuationHeaderChains(branchPoint.header, h => getBlock(h).isDefined && !invalidatedHeaders.contains(h))
                   .maxBy(chain => scoreOf(chain.last.id).getOrElse(BigInt(0)))
                   .flatMap(h => getBlock(h))
+              println(s"///fdgdkfnmgls ${BestBlockKey} ->")
               val changedLinks: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
                 Seq(BestBlockKey -> ByteArrayWrapper(validChain.last.id), BestHeaderKey -> ByteArrayWrapper(newBestHeader.id))
               val toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = validityRow ++ changedLinks
@@ -129,8 +130,10 @@ trait EncryHistory extends EncryHistoryReader {
   private def markModifierValid(modifier: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] =
     modifier match {
       case block: Block =>
+        println(s"${block}")
         val nonMarkedIds: Seq[ModifierId] = (Seq(block.header.id, block.payload.id) ++ block.adProofsOpt.map(_.id))
           .filter(id => historyStorage.get(validityKey(id)).isEmpty)
+        println(s"01 -> ${nonMarkedIds.size}")
         if (nonMarkedIds.nonEmpty) {
           historyStorage.
           insert(validityKey(nonMarkedIds.head), nonMarkedIds.map(id => validityKey(id) -> ByteArrayWrapper(Array(1.toByte))))}
@@ -171,29 +174,32 @@ object EncryHistory {
     dir
   }
 
-  def readOrGenerate(settings: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistory = {
+  def readOrGenerate(settingsEncry: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistory = {
 
-    val historyIndexDir: File = getHistoryIndexDir(settings)
-    val historyObjectsDir: File = getHistoryObjectsDir(settings)
+    val historyIndexDir: File = getHistoryIndexDir(settingsEncry)
+    val historyObjectsDir: File = getHistoryObjectsDir(settingsEncry)
     val indexStore: LSMStore = new LSMStore(historyIndexDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(historyObjectsDir, keepVersions = 0)
     val storage: HistoryStorage = new HistoryStorage(indexStore, objectsStore)
 
-    val history: EncryHistory = (settings.node.stateMode.isDigest, settings.node.verifyTransactions) match {
+    val history: EncryHistory = (settingsEncry.node.stateMode.isDigest, settingsEncry.node.verifyTransactions) match {
       case (true, true) =>
         new EncryHistory with ADStateProofProcessor with BlockPayloadProcessor {
+          override protected val settings: EncryAppSettings = settingsEncry
           override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
         }
       case (false, true) =>
         new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
+          override protected val settings: EncryAppSettings = settingsEncry
           override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
         }
       case (true, false) =>
         new EncryHistory with ADStateProofProcessor with EmptyBlockPayloadProcessor {
+          override protected val settings: EncryAppSettings = settingsEncry
           override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp

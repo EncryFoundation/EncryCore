@@ -21,6 +21,7 @@ class StateBench {
       val innerState: UtxoState =
         utxoFromBoxHolder(stateBench.boxesHolder.get, getRandomTempDir, None, stateBench.settings)
       stateBench.chain.foldLeft(innerState) { case (state, block) => state.applyModifier(block).get }
+      innerState.stateStore.close()
     }
   }
 }
@@ -33,8 +34,8 @@ object StateBench {
       .include(".*" + classOf[StateBench].getSimpleName + ".*")
       .forks(1)
       .threads(1)
-      .warmupIterations(10)
-      .measurementIterations(10)
+      .warmupIterations(5)
+      .measurementIterations(5)
       .mode(Mode.AverageTime)
       .timeUnit(TimeUnit.SECONDS)
       .addProfiler(classOf[GCProfiler])
@@ -45,9 +46,13 @@ object StateBench {
   @State(Scope.Benchmark)
   class BenchState {
 
-    val boxesNumber: Int = 100000
+    /**
+      * Total number of boxes must be equal to total number of transactions.
+      * (boxesNumber = blocksNumber * transactionsNumber).
+      */
+    val totalBoxesNumber: Int = 100000
     val blocksNumber: Int = 1000
-    val transactionsNumber: Int = 100
+    val transactionsNumberInEachBlock: Int = 100
 
     var initialBoxes: IndexedSeq[AssetBox] = IndexedSeq.empty[AssetBox]
     var boxesHolder: Option[BoxHolder] = None
@@ -57,16 +62,16 @@ object StateBench {
 
     @Setup
     def createStateForBenchmark(): Unit = {
-      initialBoxes = (0 until boxesNumber).map(nonce => genHardcodedBox(privKey.publicImage.address.address, nonce))
+      initialBoxes = (0 until totalBoxesNumber).map(nonce => genHardcodedBox(privKey.publicImage.address.address, nonce))
       boxesHolder = Some(BoxHolder(initialBoxes))
       state1 = Some(utxoFromBoxHolder(boxesHolder.get, getRandomTempDir, None, settings))
-      val genesisBlock: Block = generateGenesisBlock(state1.get)
+      val genesisBlock: Block = generateGenesisBlockValidForState(state1.get)
       state1.get.applyModifier(genesisBlock)
       chain = genesisBlock +: (0 until blocksNumber).foldLeft(Vector[Block](), genesisBlock, state1.get, initialBoxes) {
         case ((vector, block, stateL, boxes), _) =>
-          val nextBlock: Block = generateNextBlock(block, stateL, boxes.take(transactionsNumber))
+          val nextBlock: Block = generateNextBlockValidForState(block, stateL, boxes.take(transactionsNumberInEachBlock))
           val stateN: UtxoState = stateL.applyModifier(nextBlock).get
-          (vector :+ nextBlock, nextBlock, stateN, boxes.drop(transactionsNumber))
+          (vector :+ nextBlock, nextBlock, stateN, boxes.drop(transactionsNumberInEachBlock))
       }._1
     }
   }

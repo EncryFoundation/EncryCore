@@ -2,7 +2,7 @@ package encry.view.history.processors
 
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.{forceStopApplication, settings, system}
+import encry.EncryApp.{forceStopApplication, system}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ConsensusTaggedTypes, ModifierSemanticValidity, _}
@@ -10,7 +10,7 @@ import encry.local.explorer.BlockListener.NewOrphaned
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history._
 import encry.settings.Constants._
-import encry.settings.{Constants, NodeSettings}
+import encry.settings.{Constants, EncryAppSettings}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.utils.NetworkTimeProvider
 import encry.validation.{ModifierValidator, ValidationResult}
@@ -25,14 +25,14 @@ import scala.util.Try
 
 trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
-  protected val nodeSettings: NodeSettings
+  protected val settings: EncryAppSettings
   protected val timeProvider: NetworkTimeProvider
   private val difficultyController: PowLinearController.type = PowLinearController
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
   protected val BestHeaderKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(Header.modifierTypeId))
   protected val BestBlockKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(-1))
   protected val historyStorage: HistoryStorage
-  lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(nodeSettings)
+  lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node)
   private var isHeadersChainSyncedVar: Boolean = false
 
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
@@ -61,7 +61,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   /** Checks, whether it's time to download full chain and return toDownload modifiers */
   protected def toDownload(header: Header): Seq[(ModifierTypeId, ModifierId)] =
-    if (!nodeSettings.verifyTransactions) Seq.empty // Regime that do not download and verify transaction
+    if (!settings.node.verifyTransactions) Seq.empty // Regime that do not download and verify transaction
     else if (header.height >= blockDownloadProcessor.minimalBlockHeight)
       requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
     else if (!isHeadersChainSynced && isNewHeader(header)) {
@@ -73,8 +73,8 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     } else Seq.empty
 
   private def requiredModifiersForHeader(h: Header): Seq[(ModifierTypeId, ModifierId)] =
-    if (!nodeSettings.verifyTransactions) Seq.empty
-    else if (nodeSettings.stateMode.isDigest)
+    if (!settings.node.verifyTransactions) Seq.empty
+    else if (settings.node.stateMode.isDigest)
       Seq((Payload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId))
     else Seq((Payload.modifierTypeId, h.payloadId))
 
@@ -117,7 +117,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       bestHeaderIdOpt match {
         case Some(bestHeaderId) =>
           val toProcess: Seq[Header] =
-            if (nodeSettings.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
+            if (settings.node.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
           ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
         case None =>
           logger.error("Should always have best header after header application")
