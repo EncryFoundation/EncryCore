@@ -1,14 +1,13 @@
 package encry.network
 
 import java.net.InetAddress
-
 import akka.actor.{Actor, Cancellable}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
 import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.mempool.Transaction
-import encry.network.DeliveryManager.{ContinueSync, DeleteModIdFromDelivaeryMap, FullBlockChainSynced, StopSync}
+import encry.network.DeliveryManager.{DeleteModIdFromDelivaeryMap, FullBlockChainSynced}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, SendToNetwork}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
@@ -21,8 +20,6 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.Mempool
 import org.encryfoundation.common.Algos
-
-import scala.collection.immutable.{HashSet, TreeMap}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -64,7 +61,6 @@ class DeliveryManager extends Actor with StrictLogging {
       if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2)
         logger.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
-    case StopSync => context.become(netMessages)
   }
 
   def netMessages: Receive = {
@@ -139,9 +135,6 @@ class DeliveryManager extends Actor with StrictLogging {
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       historyReaderOpt = Some(reader)
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] => mempoolReaderOpt = Some(reader)
-    case ContinueSync =>
-      context.become(syncCycle)
-      self ! SendLocalSyncInfo
   }
 
   def sendSync(syncInfo: EncrySyncInfo): Unit = statusTracker.peersToSyncWith().foreach(peer =>
@@ -265,10 +258,6 @@ class DeliveryManager extends Actor with StrictLogging {
 object DeliveryManager {
 
   case object FullBlockChainSynced
-
-  case object StopSync
-
-  case object ContinueSync
 
   case class DeleteModIdFromDelivaeryMap(id: ModifierId)
 }

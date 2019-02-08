@@ -1,10 +1,8 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.EncryApp._
 import encry.consensus.History._
 import encry.consensus.SyncInfo
@@ -13,18 +11,19 @@ import encry.modifiers.history.{ADProofs, Block, Header, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
-import encry.network.NodeViewSynchronizer.ReceivableMessages._
-import encry.network.DeliveryManager.{ContinueSync, DeleteModIdFromDelivaeryMap, FullBlockChainSynced, StopSync}
+import encry.network.DeliveryManager.{DeleteModIdFromDelivaeryMap, FullBlockChainSynced}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
+import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.message._
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
+import encry.utils.Utils._
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.history.{EncryHistory, EncryHistoryReader, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.{Mempool, MempoolReader}
 import encry.view.state.StateReader
-import encry.utils.Utils._
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.Proposition
 
@@ -132,8 +131,6 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
           modifiers.head.modifierTypeId -> modifiers.map(m => m.id -> m.bytes).toMap
         peer.handlerRef ! Message(ModifiersSpec, Right(m), None)
       }
-    case StopSync => deliveryManager ! StopSync
-    case ContinueSync => deliveryManager ! ContinueSync
     case a: Any => logger.error(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
   }
 

@@ -72,7 +72,7 @@ object ModifiersCache extends StrictLogging {
         case _: Header if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) => true
         case _ =>
           val isApplicableMod: Boolean = isApplicable(k)
-          logger.error(s"Try to apply: ${Algos.encode(k.toArray)} and result is: $isApplicableMod")
+          logger.debug(s"Try to apply: ${Algos.encode(k.toArray)} and result is: $isApplicableMod")
           isApplicableMod
       }
     }).collect { case Some(v) => v._1 }
@@ -90,7 +90,7 @@ object ModifiersCache extends StrictLogging {
         }
 
       case None =>
-        logger.info(s"No best header in cache")
+        logger.debug(s"No best header in cache")
         List[Key]()
     }
     if (bestHeadersIds.nonEmpty) bestHeadersIds

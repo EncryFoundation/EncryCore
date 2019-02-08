@@ -13,8 +13,8 @@ import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
 import encry.modifiers.state.box.EncryProposition
 import encry.network.AuxiliaryHistoryHolder.{Append, ReportModifierInvalid, ReportModifierValid}
+import encry.network.DeliveryManager.FullBlockChainSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
-import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
@@ -83,7 +83,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
 
   override def receive: Receive = {
     case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
-      if (ModifiersCache.isEmpty && nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! StopSync
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
           case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
@@ -99,10 +98,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
               logger.warn(s"Received modifier ${pmod.encodedId} that is already in history")
             else ModifiersCache.put(key(pmod.id), pmod, nodeView.history)
         }
-        logger.info(s"Cache before(${ModifiersCache.size})")
+        logger.debug(s"Cache before(${ModifiersCache.size})")
         computeApplications()
-        if (ModifiersCache.isEmpty || !nodeView.history.isHeadersChainSynced) nodeViewSynchronizer ! ContinueSync
-        logger.info(s"Cache after(${ModifiersCache.size})")
+        logger.debug(s"Cache after(${ModifiersCache.size})")
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction] => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier] =>
