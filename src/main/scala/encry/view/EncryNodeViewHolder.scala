@@ -318,7 +318,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
     val state: StateType = {
       if (settings.node.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings.node)
-      else EncryState.generateGenesisUtxoState(stateDir, Some(self))
+      else EncryState.generateGenesisUtxoState(stateDir, Some(self), settings)
     }.asInstanceOf[StateType]
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)

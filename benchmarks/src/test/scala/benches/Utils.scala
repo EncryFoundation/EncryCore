@@ -1,17 +1,16 @@
 package benches
 
 import java.io.File
-
 import akka.actor.ActorRef
 import encry.avltree
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.crypto.equihash.EquihashSolution
-import encry.modifiers.history.{Block, Header, Payload}
+import encry.modifiers.history.{ADProofs, Block, Header, Payload}
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.modifiers.state.box.Box.Amount
-import encry.settings.Constants
+import encry.settings.{Constants, EncryAppSettings}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.Mnemonic
 import encry.view.history.History.Height
@@ -26,23 +25,42 @@ import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, S
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
-
 import scala.util.{Random => R}
 
 object Utils {
 
+  def generateGenesisBlock(state: UtxoState): Block = {
+    val txs = Seq(coinbaseTransaction(0))
+    val (adProofN: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(txs).get
+    val adPN: Digest32 = ADProofs.proofDigest(adProofN)
+    val header = genHeader.copy(
+      parentId = Header.GenesisParentId,
+      adProofsRoot = adPN,
+      stateRoot = adDigest,
+      height = Constants.Chain.GenesisHeight
+    )
+    Block(header, Payload(header.id, txs), None)
+  }
+
   def generateNextBlock(prevBlock: Block, state: UtxoState, box: Seq[AssetBox]): Block = {
 
-    val txs: Seq[Transaction] = box.map(b => TransactionFactory.defaultPaymentTransactionScratch(privKey, 11,
-      11L, IndexedSeq(b), randomAddress, 111)
-    ) ++ Seq(coinbaseTransaction)
+    val txs: Seq[Transaction] = box.map(b =>
+      TransactionFactory.defaultPaymentTransactionScratch(
+        privKey,
+        fee = 11,
+        timestamp = 11L,
+        useBoxes = IndexedSeq(b),
+        recipient = randomAddress,
+        amount = 111
+      )) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
 
-    val (_: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(txs).get
+    val (adProofN: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(txs).get
+    val adPN: Digest32 = ADProofs.proofDigest(adProofN)
 
     val header = Header(
       1.toByte,
       prevBlock.id,
-      Digest32 @@ Random.randomBytes(32),
+      adPN,
       adDigest,
       Payload.rootHash(txs.map(_.id)),
       System.currentTimeMillis(),
@@ -54,7 +72,7 @@ object Utils {
     Block(header, Payload(header.id, txs), None)
   }
 
-  def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
+  def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef], settings: EncryAppSettings): UtxoState = {
     val p = new avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
@@ -66,20 +84,13 @@ object Utils {
       PersistentBatchAVLProver.create(p, storage).get
     }
 
-    new UtxoState(persistentProver, EncryState.genesisStateVersion, Constants.Chain.GenesisHeight, stateStore, 0L, None)
+    new UtxoState(persistentProver, EncryState.genesisStateVersion, Constants.Chain.GenesisHeight, stateStore, 0L, None, settings)
   }
 
   def getRandomTempDir: File = {
     val dir = java.nio.file.Files.createTempDirectory("encry_test_" + R.alphanumeric.take(15).mkString).toFile
     dir.deleteOnExit()
     dir
-  }
-
-  def generateGenesisBlock: Block = {
-
-    val header = genHeader.copy(parentId = Header.GenesisParentId, height = Constants.Chain.GenesisHeight)
-
-    Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
   }
 
   def genHeader: Header = {
@@ -118,14 +129,19 @@ object Utils {
     AssetBox(EncryProposition.addressLocked(address), R.nextLong(), amount, tokenIdOpt)
 
 
-  def genHardcodedBox(address: Address): AssetBox =
-    AssetBox(EncryProposition.addressLocked(address), 1000L, 10000000L, None)
+  def genHardcodedBox(address: Address, nonce: Long): AssetBox =
+    AssetBox(EncryProposition.addressLocked(address), nonce, 10000000L, None)
 
   def randomAddress: Address = Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address
 
-  lazy val coinbaseTransaction: Transaction = {
-    TransactionFactory.coinbaseTransactionScratch(privKey.publicImage, System.currentTimeMillis(), 10L, 0, Height @@ 100)
-  }
+  def coinbaseTransaction(height: Int): Transaction = TransactionFactory.coinbaseTransactionScratch(
+    privKey.publicImage,
+    System.currentTimeMillis(),
+    supply = 10L,
+    amount = 1,
+    height = Height @@ height
+  )
+
 
   val secrets: Seq[PrivateKey25519] = genKeys(1000)
 
@@ -148,7 +164,9 @@ object Utils {
   def createPrivKey(seed: Option[String]): PrivateKey25519 = {
     val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
       Blake2b256.hash(
-        seed.map { Mnemonic.seedFromMnemonic(_) }
+        seed.map {
+          Mnemonic.seedFromMnemonic(_)
+        }
           .getOrElse {
             val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
             Mnemonic.seedFromMnemonic(phrase)
