@@ -55,8 +55,8 @@ object StateBench {
       * (boxesNumber = blocksNumber * transactionsNumber).
       */
     val totalBoxesNumber: Int = 500000
-    val blocksNumber: Int = 500000
-    val transactionsNumberInEachBlock: Int = 1
+    val blocksNumber: Int = 50000
+    val transactionsNumberInEachBlock: Int = 10
 
     var initialBoxes: IndexedSeq[AssetBox] = IndexedSeq.empty[AssetBox]
     var boxesHolder: Option[BoxHolder] = None

@@ -49,7 +49,7 @@ object HistoryReadFileBench extends StrictLogging {
   @State(Scope.Benchmark)
   class BenchStateHistory {
 
-    val blocksNumber: Int = 10000
+    val blocksNumber: Int = 5000
     val settings: EncryAppSettings = EncryAppSettings.read
     val tmpDir: File = getRandomTempDir
 
@@ -58,10 +58,10 @@ object HistoryReadFileBench extends StrictLogging {
       var tmpHistory: EncryHistory = generateHistory(settings, tmpDir)
       (0 until blocksNumber).foldLeft(tmpHistory) {
         case (prevHistory, t) =>
-          if (t % 3000 == 0) {
-            tmpHistory.closeStorage()
-            tmpHistory = generateHistory(settings, tmpDir)
-          }
+//          if (t % 3000 == 0) {
+//            tmpHistory.closeStorage()
+//            tmpHistory = generateHistory(settings, tmpDir)
+//          }
           val block: Block = generateNextBlock(prevHistory)
           prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
       }
