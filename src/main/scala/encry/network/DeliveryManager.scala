@@ -52,19 +52,7 @@ class DeliveryManager extends Actor with StrictLogging {
       .schedule(settings.network.syncInterval, settings.network.syncInterval)(self ! CheckModifiersToDownload)
   }
 
-  override def receive: Receive = syncSending orElse netMessages
-
-  def syncSending: Receive = {
-    case SendLocalSyncInfo =>
-      if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2)
-        logger.info("Trying to send sync info too often")
-      else {
-        logger.info(s"Trying to send local sync. historyReaderOpt: ${historyReaderOpt}")
-        historyReaderOpt.foreach(r => sendSync(r.syncInfo))
-      }
-  }
-
-  def netMessages: Receive = {
+  override def receive: Receive = {
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       statusTracker.updateStatus(remote, status)
       status match {
@@ -135,7 +123,7 @@ class DeliveryManager extends Actor with StrictLogging {
       }
       historyReaderOpt.foreach { h =>
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
-        else if (h.isHeadersChainSynced && !h.isFullChainSynced) self ! CheckModifiersToDownload
+        //else if (h.isHeadersChainSynced && !h.isFullChainSynced) self ! CheckModifiersToDownload
       }
     case DownloadRequest(modifierTypeId: ModifierTypeId,
                          modifierId: ModifierId,
@@ -150,7 +138,7 @@ class DeliveryManager extends Actor with StrictLogging {
       if (statusTracker.elapsedTimeSinceLastSync() < settings.network.syncInterval.toMillis / 2)
         logger.info("Trying to send sync info too often")
       else {
-        logger.info(s"Trying to send local sync. historyReaderOpt: ${historyReaderOpt}")
+        logger.info(s"Trying to send local sync2. historyReaderOpt: ${historyReaderOpt}")
         historyReaderOpt.foreach(r => sendSync(r.syncInfo))
       }
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
