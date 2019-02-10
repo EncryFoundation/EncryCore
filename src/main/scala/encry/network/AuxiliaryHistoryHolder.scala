@@ -67,6 +67,7 @@ object AuxiliaryHistoryHolder {
           override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
+          override protected val auxHistory: Boolean = true
         }
       case (false, true) =>
         new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
@@ -74,6 +75,7 @@ object AuxiliaryHistoryHolder {
           override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
+          override protected val auxHistory: Boolean = true
         }
       case (true, false) =>
         new EncryHistory with ADStateProofProcessor with EmptyBlockPayloadProcessor {
@@ -81,6 +83,7 @@ object AuxiliaryHistoryHolder {
           override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
+          override protected val auxHistory: Boolean = true
         }
       case m => throw new Error(s"Unsupported settings ADState=:${m._1}, verifyTransactions=:${m._2}, ")
     }
