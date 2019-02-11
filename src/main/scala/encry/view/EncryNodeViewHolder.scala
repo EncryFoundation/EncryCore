@@ -200,7 +200,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
           if (!state.version.sameElements(branchPoint))
             state.rollbackTo(branchPoint) -> trimChainSuffix(suffixApplied, ModifierId !@@ branchPoint)
           else Success(state) -> IndexedSeq()
-        }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty")))
+        }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty.")))
       } else Success(state) -> suffixApplied
 
     stateToApplyTry match {
