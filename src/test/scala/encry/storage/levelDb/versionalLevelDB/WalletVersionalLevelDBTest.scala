@@ -7,6 +7,7 @@ import encry.modifiers.InstanceFactory
 import encry.modifiers.history.Block
 import encry.modifiers.state.StateModifierSerializer
 import encry.modifiers.state.box.AssetBox
+import encry.settings.EncryAppSettings
 import encry.utils.{EncryGenerator, FileHelper}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.Algos
@@ -19,6 +20,7 @@ class WalletVersionalLevelDBTest extends PropSpec with Matchers with EncryGenera
 
   type HF = Blake2b256.type
   implicit val hf: HF = Blake2b256
+  val settings: EncryAppSettings = EncryAppSettings.read
 
   def amountInBlocks(blocks: Seq[Block], prover: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Long = {
     val toAdd = blocks.map(_.payload.transactions.map(_.newBoxes.collect { case ab: AssetBox => ab.amount }.sum).sum).sum
@@ -37,7 +39,7 @@ class WalletVersionalLevelDBTest extends PropSpec with Matchers with EncryGenera
 
   property("Applying 35 blocks. Wallet balance should increase") {
 
-    val blocksToWallet: Seq[Block] = (0 until 35).foldLeft(generateDummyHistory, Seq.empty[Block]) {
+    val blocksToWallet: Seq[Block] = (0 until 35).foldLeft(generateDummyHistory(settings), Seq.empty[Block]) {
       case ((prevHistory, blocks), _) =>
         val block: Block = generateNextBlock(prevHistory)
         prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block) -> (blocks :+ block)
@@ -71,7 +73,7 @@ class WalletVersionalLevelDBTest extends PropSpec with Matchers with EncryGenera
 
   property("Applying 35 blocks. Restart levelDB. Balance should be the same ") {
 
-    val blocksToWallet: Seq[Block] = (0 until 35).foldLeft(generateDummyHistory, Seq.empty[Block]) {
+    val blocksToWallet: Seq[Block] = (0 until 35).foldLeft(generateDummyHistory(settings), Seq.empty[Block]) {
       case ((prevHistory, blocks), _) =>
         val block: Block = generateNextBlock(prevHistory)
         prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block) -> (blocks :+ block)
@@ -126,7 +128,7 @@ class WalletVersionalLevelDBTest extends PropSpec with Matchers with EncryGenera
       new BatchAVLProver[Digest32, HF](
         keyLength = 32, valueLengthOpt = None), storage).get
 
-    val blocksToWallet: Seq[Block] = (0 until 35).foldLeft(generateDummyHistory, Seq.empty[Block]) {
+    val blocksToWallet: Seq[Block] = (0 until 35).foldLeft(generateDummyHistory(settings), Seq.empty[Block]) {
       case ((prevHistory, blocks), _) =>
         val block: Block = generateNextBlock(prevHistory, txsQty = 0)
         prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block) -> (blocks :+ block)
