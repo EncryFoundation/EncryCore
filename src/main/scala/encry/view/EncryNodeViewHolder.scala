@@ -100,7 +100,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         }
         logger.debug(s"Cache before(${ModifiersCache.size})")
         computeApplications()
-        if (ModifiersCache.isEmpty) nodeViewSynchronizer ! SendLocalSyncInfo
         logger.debug(s"Cache after(${ModifiersCache.size})")
       }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction]@unchecked => txModify(lt.tx)

@@ -73,7 +73,6 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
       deliveryManager ! ChangedHistory(reader)
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] =>
       mempoolReaderOpt = Some(reader)
-    case SendLocalSyncInfo => deliveryManager ! SendLocalSyncInfo
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
     case DisconnectedPeer(remote) => deliveryManager ! DisconnectedPeer(remote)
     case DataFromPeer(spec, syncInfo: EncrySyncInfo@unchecked, remote)

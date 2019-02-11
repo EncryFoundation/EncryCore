@@ -7,9 +7,9 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
 import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
-import encry.modifiers.history.{Block, Header, Payload}
+import encry.modifiers.history.Header
 import encry.modifiers.mempool.Transaction
-import encry.network.DeliveryManager.{ContinueSync, FullBlockChainSynced, StopSync}
+import encry.network.DeliveryManager.FullBlockChainSynced
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
@@ -50,7 +50,6 @@ class DeliveryManager extends Actor with StrictLogging {
     val messageSpecs: Seq[MessageSpec[_]] = Seq(ModifiersSpec)
     networkController ! RegisterMessagesHandler(messageSpecs, self)
     statusTracker.scheduleSendSyncInfo()
-    self ! SendLocalSyncInfo
     context.system.scheduler.schedule(
       settings.network.modifierDeliverTimeCheck,
       settings.network.modifierDeliverTimeCheck
@@ -67,32 +66,15 @@ class DeliveryManager extends Actor with StrictLogging {
       }
     case HandshakedPeer(remote) => statusTracker.updateStatus(remote, Unknown)
     case DisconnectedPeer(remote) => statusTracker.clearStatus(remote)
-    case SemanticallySuccessfulModifier(mod) =>
-      mod match {
-        case block: Block =>
-          logger.info(s"Modifier ${Algos.encode(mod.id)} mark as valid! Delete from delivery map")
-          deliveredModifiersMap = deliveredModifiersMap - key(block.header.id)
-          deliveredModifiersMap = deliveredModifiersMap - key(block.payload.id)
-        case header: Header if !isBlockChainSynced =>
-          logger.info(s"Chain is not synced, so we should't remember headers id ${Algos.encode(header.id)}")
-          deliveredModifiersMap = deliveredModifiersMap - key(header.id)
-        case payload: Payload if !isBlockChainSynced =>
-          logger.info(s"Chain is not synced, so we should't remember payload id ${Algos.encode(payload.id)}")
-          deliveredModifiersMap = deliveredModifiersMap - key(payload.id)
-        case _ =>
-      }
     case CheckDelivery(peer, modifierTypeId, modifierId) =>
       if (delivered.contains(key(modifierId))) delivered -= key(modifierId)
       else reexpect(peer, modifierTypeId, modifierId)
     case CheckModifiersToDownload =>
       historyReaderOpt.foreach { h =>
-        logger.info(s"Get CheckModifiersToDownload msg. Current max height in history is: ${h.bestBlockHeight}")
-        val currentQueue: Iterable[ModifierId] = requestedModifiers.keys.map(mod => ModifierId @@ mod.toArray)
-        logger.info(s"Awaiting for: ${currentQueue.map(Algos.encode).mkString(",")}")
+        val currentQueue: Iterable[ModifierId] = requestedModifiers.keys.map(modId => ModifierId @@ modId.toArray)
         val newIds: Seq[(ModifierTypeId, ModifierId)] =
           h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
             .filterNot(modId => requestedModifiers.contains(key(modId._2)))
-        logger.info(s"Should download: ${newIds.map(mod => Algos.encode(mod._2)).mkString(",")}")
         if (newIds.nonEmpty) newIds.groupBy(_._1).foreach {
           case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) => requestDownload(modId, ids.map(_._2))
         }
@@ -118,8 +100,8 @@ class DeliveryManager extends Actor with StrictLogging {
         else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
       }
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: Seq[ModifierId], previousModifier: Option[ModifierId]) =>
-      if (previousModifier.isEmpty) requestDownload(modifierTypeId, modifiersId)
-      else priorityRequest(modifierTypeId, modifiersId, previousModifier.get)
+      if (previousModifier.isDefined && isBlockChainSynced) priorityRequest(modifierTypeId, modifiersId, previousModifier.get)
+      else requestDownload(modifierTypeId, modifiersId)
     case FullBlockChainSynced => isBlockChainSynced = true
     case StartMining => isMining = true
     case DisableMining => isMining = false
@@ -128,11 +110,8 @@ class DeliveryManager extends Actor with StrictLogging {
         logger.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
-      if (historyReaderOpt.isEmpty) self ! SendLocalSyncInfo
       historyReaderOpt = Some(reader)
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] => mempoolReaderOpt = Some(reader)
-    case ContinueSync =>
-      self ! SendLocalSyncInfo
   }
 
   def sendSync(syncInfo: EncrySyncInfo): Unit = statusTracker.peersToSyncWith().foreach(peer =>
@@ -159,8 +138,6 @@ class DeliveryManager extends Actor with StrictLogging {
           .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(peer, mTypeId, id))
         val peerMap = cancellables.getOrElse(peer.socketAddress.getAddress, Map.empty)
           .updated(key(id), cancellable -> 0)
-        val prevReq = requestedModifiers.getOrElse(key(id), 0) + 1
-        requestedModifiers = requestedModifiers.updated(key(id), prevReq)
         cancellables = cancellables.updated(peer.socketAddress.getAddress, peerMap)
       }
     }
@@ -242,33 +219,21 @@ class DeliveryManager extends Actor with StrictLogging {
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = if (isExpecting(mtid, mid)) {
     //todo: refactor
     logger.debug(s"Get modifier of id: ${Algos.encode(mid)} from ${cp.socketAddress.getAddress}")
-    requestedModifiers = requestedModifiers - key(mid)
     delivered = delivered + key(mid)
     val peerMap = cancellables.getOrElse(cp.socketAddress.getAddress, Map.empty)
     peerMap.get(key(mid)).foreach(_._1.cancel())
     val peerMapWithoutModifier = peerMap - key(mid)
     cancellables = cancellables.updated(cp.socketAddress.getAddress, peerMapWithoutModifier)
-    logger.info(s"Update deliveredModifierMap for mod ${Algos.encode(mid)}")
-    mtid match {
-      case Header.modifierTypeId if isBlockChainSynced =>
-        val prevdevMap = deliveredModifiersMap.getOrElse(key(mid), Seq.empty) :+ cp.socketAddress.getAddress
-        deliveredModifiersMap = deliveredModifiersMap.updated(key(mid), prevdevMap)
-      case Payload.modifierTypeId if isBlockChainSynced =>
-        val prevdevMap = deliveredModifiersMap.getOrElse(key(mid), Seq.empty) :+ cp.socketAddress.getAddress
-        deliveredModifiersMap = deliveredModifiersMap.updated(key(mid), prevdevMap)
-      case mod => logger.info(s"Blockchain i snot synced, so we shouldn't remember delivered mod ${Algos.encode(mid)}")
+    if (isBlockChainSynced && mtid == Header.modifierTypeId) {
+      val peersWhoDelivered = deliveredModifiersMap.getOrElse(key(mid), Seq.empty) :+ cp.socketAddress.getAddress
+      deliveredModifiersMap = deliveredModifiersMap.updated(key(mid), peersWhoDelivered)
     }
   }
-  else {
-    logger.info(s"Don't expecting: ${Algos.encode(mid)}")
-    deliveredSpam = deliveredSpam - key(mid) + (key(mid) -> cp)
-  }
+  else deliveredSpam = deliveredSpam - key(mid) + (key(mid) -> cp)
 
 }
 
 object DeliveryManager {
 
   case object FullBlockChainSynced
-  case object StopSync
-  case object ContinueSync
 }
