@@ -26,6 +26,7 @@ import org.encryfoundation.common.Algos
 import scala.collection.immutable.HashSet
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.Random
 
 class DeliveryManager extends Actor with StrictLogging {
 
@@ -215,7 +216,13 @@ class DeliveryManager extends Actor with StrictLogging {
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     if (settings.influxDB.isDefined)
       context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
-    statusTracker.statuses.filter(_._2 != Younger).keys.foreach(expect(_, modifierTypeId, modifierIds))
+    if (!isBlockChainSynced) {
+      Random.shuffle(statusTracker.statuses.filter(_._2 != Younger)).headOption.foreach(
+        expect(_, modifierTypeId, modifierIds)
+      )
+    } else {
+      statusTracker.statuses.filter(_._2 != Younger).keys.foreach(expect(_, modifierTypeId, modifierIds))
+    }
   }
 
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = if (isExpecting(mtid, mid)) {
