@@ -2,10 +2,8 @@ package benches
 
 import java.io.File
 import java.util.concurrent.TimeUnit
-
 import benches.HistoryReadFileBench.BenchStateHistory
 import benches.Utils._
-import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.history.Block
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
@@ -26,7 +24,7 @@ class HistoryReadFileBench {
   }
 }
 
-object HistoryReadFileBench extends StrictLogging {
+object HistoryReadFileBench {
 
   @throws[RunnerException]
   def main(args: Array[String]): Unit = {
@@ -39,9 +37,9 @@ object HistoryReadFileBench extends StrictLogging {
       .mode(Mode.AverageTime)
       .timeUnit(TimeUnit.SECONDS)
       .verbosity(VerboseMode.EXTRA)
-      //.addProfiler(classOf[GCProfiler])
+      .addProfiler(classOf[GCProfiler])
       .warmupTime(TimeValue.milliseconds(500))
-      .measurementTime(TimeValue.milliseconds(500))
+      .measurementTime(TimeValue.minutes(2))
       .build
     new Runner(opt).run
   }
@@ -49,23 +47,22 @@ object HistoryReadFileBench extends StrictLogging {
   @State(Scope.Benchmark)
   class BenchStateHistory {
 
-    val blocksNumber: Int = 5000
+    val blocksNumber: Int = 15000
+    val transactionsNumber: Int = 10
     val settings: EncryAppSettings = EncryAppSettings.read
     val tmpDir: File = getRandomTempDir
 
     @Setup
     def initializeHistory(): Unit = {
-      var tmpHistory: EncryHistory = generateHistory(settings, tmpDir)
-      (0 until blocksNumber).foldLeft(tmpHistory) {
-        case (prevHistory, t) =>
-//          if (t % 3000 == 0) {
-//            tmpHistory.closeStorage()
-//            tmpHistory = generateHistory(settings, tmpDir)
-//          }
-          val block: Block = generateNextBlock(prevHistory)
-          prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
-      }
-      tmpHistory.closeStorage()
+      val initialHistory: EncryHistory = generateHistory(settings, tmpDir)
+      val resultedHistory: (EncryHistory, Option[Block]) = (0 until blocksNumber)
+        .foldLeft(initialHistory, Option.empty[Block]) { case ((prevHistory, prevBlock), _) =>
+          val block: Block =
+            generateNextBlockValidForHistory(prevHistory, 0, prevBlock, transactionsNumber)
+          (prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block),
+            Some(block))
+        }
+      resultedHistory._1.closeStorage()
     }
   }
 }

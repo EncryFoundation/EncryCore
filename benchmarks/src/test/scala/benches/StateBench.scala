@@ -1,7 +1,6 @@
 package benches
 
 import java.util.concurrent.TimeUnit
-
 import benches.StateBench.BenchState
 import encry.modifiers.history.Block
 import org.openjdk.jmh.annotations._
@@ -42,7 +41,7 @@ object StateBench {
       .addProfiler(classOf[GCProfiler])
       .verbosity(VerboseMode.EXTRA)
       .warmupTime(TimeValue.milliseconds(500))
-      .measurementTime(TimeValue.milliseconds(500))
+      .measurementTime(TimeValue.minutes(10))
       .build
     new Runner(opt).run
   }
@@ -55,8 +54,8 @@ object StateBench {
       * (boxesNumber = blocksNumber * transactionsNumber).
       */
     val totalBoxesNumber: Int = 500000
-    val blocksNumber: Int = 50000
-    val transactionsNumberInEachBlock: Int = 10
+    val blocksNumber: Int = 10000
+    val transactionsNumberInEachBlock: Int = 50
 
     var initialBoxes: IndexedSeq[AssetBox] = IndexedSeq.empty[AssetBox]
     var boxesHolder: Option[BoxHolder] = None
@@ -75,9 +74,9 @@ object StateBench {
         case ((vector, block, stateL, boxes), t) =>
           val nextBlock: Block = generateNextBlockValidForState(block, stateL, boxes.take(transactionsNumberInEachBlock))
           val stateN: UtxoState = stateL.applyModifier(nextBlock).get
-          //if (t == blocksNumber - 1) stateN.closeStorage()
           (vector :+ nextBlock, nextBlock, stateN, boxes.drop(transactionsNumberInEachBlock))
       }._1
+      state1.get.closeStorage()
     }
   }
 }

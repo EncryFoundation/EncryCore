@@ -2,8 +2,6 @@ package benches
 
 import java.io.File
 import java.util.concurrent.TimeUnit
-
-import benches.StateBench.BenchState
 import benches.StateFileReadBench.BenchStateFileRead
 import benches.Utils._
 import encry.modifiers.history.Block
@@ -43,7 +41,7 @@ object StateFileReadBench {
       .addProfiler(classOf[GCProfiler])
       .verbosity(VerboseMode.EXTRA)
       .warmupTime(TimeValue.milliseconds(500))
-      .measurementTime(TimeValue.milliseconds(500))
+      .measurementTime(TimeValue.minutes(5))
       .build
     new Runner(opt).run
   }
@@ -77,7 +75,6 @@ object StateFileReadBench {
         case ((vector, block, stateL, boxes), _) =>
           val nextBlock: Block = generateNextBlockValidForState(block, stateL, boxes.take(transactionsNumberInEachBlock))
           val stateN: UtxoState = stateL.applyModifier(nextBlock).get
-          //if (t == blocksNumber - 1) stateN.closeStorage()
           (vector :+ nextBlock, nextBlock, stateN, boxes.drop(transactionsNumberInEachBlock))
       }._3)
       state1.get.closeStorage()

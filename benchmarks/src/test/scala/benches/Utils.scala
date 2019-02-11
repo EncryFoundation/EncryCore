@@ -47,9 +47,9 @@ object Utils {
     Block(header, Payload(header.id, txs), None)
   }
 
-  def generateGenesisBlock: Block = {
+  def generateGenesisBlockValidForHistory: Block = {
     val header = genHeader.copy(parentId = Header.GenesisParentId, height = Constants.Chain.GenesisHeight)
-    Block(header, Payload(header.id, Seq(coinbaseTransaction(0))), None)
+    Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
   }
 
   def generateNextBlockValidForState(prevBlock: Block, state: UtxoState, box: Seq[AssetBox]): Block = {
@@ -79,14 +79,14 @@ object Utils {
     Block(header, Payload(header.id, txs), None)
   }
 
-  def generateNextBlock(history: EncryHistory,
-                        difficultyDiff: BigInt = 0,
-                        prevId: Option[ModifierId] = None): Block = {
-    val previousHeaderId: ModifierId =
-      prevId.getOrElse(history.bestHeaderOpt.map(_.id).getOrElse(Header.GenesisParentId))
-    val requiredDifficulty: Difficulty = history.bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
+  def generateNextBlockValidForHistory(history: EncryHistory,
+                                       difficultyDiff: BigInt = 0,
+                                       prevBlock: Option[Block],
+                                       transactionsNumber: Int): Block = {
+    val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
+    val requiredDifficulty: Difficulty = prevBlock.map(b => history.requiredDifficultyAfter(b.header))
       .getOrElse(Constants.Chain.InitialDifficulty)
-    val txs = genValidPaymentTxs(R.nextInt(100)) ++ Seq(coinbaseTransaction)
+    val txs = genValidPaymentTxs(transactionsNumber) ++ Seq(coinbaseTransaction)
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.bestHeaderHeight + 1,
@@ -98,7 +98,7 @@ object Utils {
 
   def genValidPaymentTxs(qty: Int): Seq[Transaction] = {
     val now = System.currentTimeMillis()
-    (0 until qty).map {_ =>
+    (0 until qty).map { _ =>
       val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genAssetBox(privKey.publicImage.address.address))
       TransactionFactory.defaultPaymentTransactionScratch(privKey, Props.txFee,
         now + scala.util.Random.nextInt(5000), useBoxes, randomAddress, Props.boxValue)
