@@ -117,9 +117,17 @@ class DeliveryManager extends Actor with StrictLogging {
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] => mempoolReaderOpt = Some(reader)
   }
 
-  def sendSync(syncInfo: EncrySyncInfo): Unit = statusTracker.peersToSyncWith().foreach(peer =>
-    peer.handlerRef ! Message(EncrySyncInfoMessageSpec, Right(syncInfo), None)
-  )
+  /**
+    * If node is not synced, send sync info to random peer, overwise to all known peers
+    * @param syncInfo
+    */
+  def sendSync(syncInfo: EncrySyncInfo): Unit = {
+    if (isBlockChainSynced) statusTracker.peersToSyncWith().foreach(peer =>
+      peer.handlerRef ! Message(EncrySyncInfoMessageSpec, Right(syncInfo), None)
+    ) else Random.shuffle(statusTracker.peersToSyncWith()).headOption.foreach(peer =>
+      peer.handlerRef ! Message(EncrySyncInfoMessageSpec, Right(syncInfo), None)
+    )
+  }
 
   //todo: refactor
   def expect(peer: ConnectedPeer, mTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit =
@@ -213,16 +221,21 @@ class DeliveryManager extends Actor with StrictLogging {
     }
   }
 
+  /**
+    * If node is not synced, send request to random peer with non-younger history, overwise to all peers with
+    * non-younger history
+    * @param modifierTypeId
+    * @param modifierIds
+    */
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     if (settings.influxDB.isDefined)
       context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
-    if (!isBlockChainSynced) {
-      Random.shuffle(statusTracker.statuses.filter(_._2 != Younger)).headOption.foreach(
-        expect(_, modifierTypeId, modifierIds)
+    if (!isBlockChainSynced)
+      Random.shuffle(statusTracker.statuses.filter(_._2 != Younger)).headOption.foreach(pI =>
+        expect(pI._1, modifierTypeId, modifierIds)
       )
-    } else {
+    else
       statusTracker.statuses.filter(_._2 != Younger).keys.foreach(expect(_, modifierTypeId, modifierIds))
-    }
   }
 
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = if (isExpecting(mtid, mid)) {

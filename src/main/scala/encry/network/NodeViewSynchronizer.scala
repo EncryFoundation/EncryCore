@@ -96,7 +96,7 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
       if (chainSynced) {
         val inRequestCache: Map[String, NodeViewModifier] =
           invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
-        logger.info(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
+        logger.debug(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
         self ! ResponseFromLocal(remote, invData._1, inRequestCache.values.toSeq)
         val nonInRequestCache = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
         if (nonInRequestCache.nonEmpty)
@@ -105,7 +105,7 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
             case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(nonInRequestCache)
             case _: ModifierTypeId => nonInRequestCache.flatMap(id => readers._1.modifierById(id))
           }
-          logger.info(s"nonInRequestCache(${objs.size}): ${objs.map(mod => Algos.encode(mod.id)).mkString(",")}")
+          logger.debug(s"nonInRequestCache(${objs.size}): ${objs.map(mod => Algos.encode(mod.id)).mkString(",")}")
           logger.debug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
             s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
           self ! ResponseFromLocal(remote, invData._1, objs)
