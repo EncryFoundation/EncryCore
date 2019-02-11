@@ -169,7 +169,7 @@ class DeliveryManager extends Actor with StrictLogging {
                 }
                 cancellables = cancellables.updated(peerInfo._1.socketAddress.getAddress, peerMap)
                 requestedModifiers.get(key(modifierId)).foreach{qtyOfRequests =>
-                  if (qtyOfRequests._1 - 1 == 0) requestedModifiers = requestedModifiers - key(modifierId)
+                  if (qtyOfRequests - 1 == 0) requestedModifiers = requestedModifiers - key(modifierId)
                 }
               }
             }
