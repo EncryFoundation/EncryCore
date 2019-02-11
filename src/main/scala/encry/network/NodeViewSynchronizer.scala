@@ -47,10 +47,6 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
   }
 
   override def receive: Receive = {
-    case SyntacticallySuccessfulModifier(mod)
-      if (mod.isInstanceOf[Header] || mod.isInstanceOf[Payload] || mod.isInstanceOf[ADProofs]) &&
-        historyReaderOpt.exists(_.isHeadersChainSynced) =>
-    case SyntacticallySuccessfulModifier(_) =>
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: Seq[ModifierId]) =>
       deliveryManager ! DownloadRequest(modifierTypeId, modifiersId)
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
@@ -59,7 +55,7 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
       mod match {
         case block: Block => broadcastModifierInv(block.header)
         case tx: Transaction => broadcastModifierInv(tx)
-        case mod => logger.info("Broadcast only block or tx id")
+        case _ => //Do nothing
       }
     case SemanticallyFailedModification(_, _) =>
     case ChangedState(_) =>
