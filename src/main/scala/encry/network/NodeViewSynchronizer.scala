@@ -9,7 +9,7 @@ import encry.EncryApp._
 import encry.consensus.History._
 import encry.consensus.SyncInfo
 import encry.local.miner.Miner.{DisableMining, StartMining}
-import encry.modifiers.history.{ADProofs, Header, Payload}
+import encry.modifiers.history.{ADProofs, Block, Header, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
@@ -47,15 +47,16 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
   }
 
   override def receive: Receive = {
-    case SyntacticallySuccessfulModifier(mod)
-      if (mod.isInstanceOf[Header] || mod.isInstanceOf[Payload] || mod.isInstanceOf[ADProofs]) &&
-        historyReaderOpt.exists(_.isHeadersChainSynced) => broadcastModifierInv(mod)
-    case SyntacticallySuccessfulModifier(_) =>
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: Seq[ModifierId]) =>
       deliveryManager ! DownloadRequest(modifierTypeId, modifiersId)
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
     case SyntacticallyFailedModification(_, _) =>
-    case SemanticallySuccessfulModifier(mod) => broadcastModifierInv(mod)
+    case SemanticallySuccessfulModifier(mod) =>
+      mod match {
+        case block: Block => broadcastModifierInv(block.header)
+        case tx: Transaction => broadcastModifierInv(tx)
+        case _ => //Do nothing
+      }
     case SemanticallyFailedModification(_, _) =>
     case ChangedState(_) =>
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
@@ -69,7 +70,7 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
     case DataFromPeer(spec, syncInfo: EncrySyncInfo@unchecked, remote)
       if spec.messageCode == EncrySyncInfoMessageSpec.messageCode =>
       logger.info(s"Got sync message from ${remote.socketAddress} with " +
-        s"${syncInfo.lastHeaderIds.size} headers. Head's headerId is " +
+        s"${syncInfo.lastHeaderIds.size} headers. Head's headerId is: " +
         s"${Algos.encode(syncInfo.lastHeaderIds.headOption.getOrElse(Array.emptyByteArray))}.")
       historyReaderOpt match {
         case Some(historyReader) =>
