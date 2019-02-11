@@ -80,5 +80,4 @@ object StateFileReadBench {
       state1.get.closeStorage()
     }
   }
-
 }
