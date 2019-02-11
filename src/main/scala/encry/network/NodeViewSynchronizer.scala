@@ -66,9 +66,7 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
       }
     case SemanticallyFailedModification(_, _) =>
     case ChangedState(_) =>
-    case AuxHistoryChanged(history) =>
-      logger.info("Get history from aux!")
-      historyReaderOpt = Some(history)
+    case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       deliveryManager ! ChangedHistory(reader)
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] =>
