@@ -94,7 +94,9 @@ class DeliveryManager extends Actor with StrictLogging {
           s": ${spam.keys.map(Algos.encode)}")
         deleteSpam(spam.keys.toSeq)
       }
-      fm.values.foreach(modifierSer => nodeViewHolder ! ModifiersFromRemote(typeId, Seq(modifierSer)))
+      fm.filterNot{ case (modId, _) => historyReaderOpt.contains(modId)}
+        .values
+        .foreach(modifierSer => nodeViewHolder ! ModifiersFromRemote(typeId, Seq(modifierSer)))
       historyReaderOpt.foreach { h =>
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
         else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
@@ -167,7 +169,7 @@ class DeliveryManager extends Actor with StrictLogging {
                 }
                 cancellables = cancellables.updated(peerInfo._1.socketAddress.getAddress, peerMap)
                 requestedModifiers.get(key(modifierId)).foreach{qtyOfRequests =>
-                  if (qtyOfRequests - 1 == 0) requestedModifiers = requestedModifiers - key(modifierId)
+                  if (qtyOfRequests._1 - 1 == 0) requestedModifiers = requestedModifiers - key(modifierId)
                 }
               }
             }
