@@ -7,9 +7,10 @@ import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVL
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.history.{ADProofs, Block, Header, Payload}
-import encry.modifiers.mempool.{Transaction, TransactionFactory}
+import encry.modifiers.mempool.directive.TransferDirective
+import encry.modifiers.mempool.{Transaction, TransactionFactory, UnsignedTransaction}
 import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.{AssetBox, EncryProposition}
+import encry.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.TestHelper.Props
@@ -23,10 +24,11 @@ import encry.view.state.{BoxHolder, EncryState, UtxoState}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.Algos.HF
-import org.encryfoundation.common.crypto.PrivateKey25519
+import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import org.encryfoundation.common.transaction.EncryAddress.Address
-import org.encryfoundation.common.transaction.Pay2PubKeyAddress
+import org.encryfoundation.common.transaction.{Input, Pay2PubKeyAddress, Proof, PubKeyLockedContract}
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, SerializedAdProof}
+import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
@@ -54,13 +56,13 @@ object Utils {
 
   def generateNextBlockValidForState(prevBlock: Block, state: UtxoState, box: Seq[AssetBox]): Block = {
     val txs: Seq[Transaction] = box.map(b =>
-      TransactionFactory.defaultPaymentTransactionScratch(
+      defaultPaymentTransactionScratch(
         privKey,
-        fee = 11,
+        fee = 111,
         timestamp = 11L,
         useBoxes = IndexedSeq(b),
         recipient = randomAddress,
-        amount = 111
+        amount = 10000
       )) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
     val (adProofN: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(txs).get
     val adPN: Digest32 = ADProofs.proofDigest(adProofN)
@@ -100,7 +102,7 @@ object Utils {
     val now = System.currentTimeMillis()
     (0 until qty).map { _ =>
       val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genAssetBox(privKey.publicImage.address.address))
-      TransactionFactory.defaultPaymentTransactionScratch(privKey, Props.txFee,
+      defaultPaymentTransactionScratch(privKey, Props.txFee,
         now + scala.util.Random.nextInt(5000), useBoxes, randomAddress, Props.boxValue)
     }
   }
@@ -127,7 +129,8 @@ object Utils {
       stateStore,
       0L,
       None,
-      settings
+      settings,
+      None
     )
   }
 
@@ -191,6 +194,33 @@ object Utils {
           })
     )
     PrivateKey25519(privateKey, publicKey)
+  }
+
+  def defaultPaymentTransactionScratch(privKey: PrivateKey25519,
+                                       fee: Amount,
+                                       timestamp: Long,
+                                       useBoxes: IndexedSeq[MonetaryBox],
+                                       recipient: Address,
+                                       amount: Amount,
+                                       tokenIdOpt: Option[ADKey] = None): Transaction = {
+    val pubKey: PublicKey25519 = privKey.publicImage
+    val uInputs: IndexedSeq[Input] = useBoxes
+      .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes)))).toIndexedSeq
+    val change: Amount = useBoxes.map(_.amount).sum - (amount + fee)
+    val directives: IndexedSeq[TransferDirective] =
+      if (change > 0) IndexedSeq(
+        TransferDirective(recipient, amount, tokenIdOpt),
+        TransferDirective(pubKey.address.address, change / 4, tokenIdOpt),
+        TransferDirective(pubKey.address.address, change / 4, tokenIdOpt),
+        TransferDirective(pubKey.address.address, change / 4, tokenIdOpt),
+        TransferDirective(pubKey.address.address, change / 4, tokenIdOpt)
+      )
+      else IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt))
+
+    val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, directives)
+    val signature: Signature25519 = privKey.sign(uTransaction.messageToSign)
+
+    uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
   }
 
   def generateHistory(settingsEncry: EncryAppSettings, file: File): EncryHistory = {

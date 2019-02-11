@@ -72,7 +72,9 @@ object EncryApp extends App with StrictLogging {
     Kamon.addReporter(new InfluxDBReporter())
     SystemMetrics.startCollecting()
   }
-  if (settings.influxDB.isDefined) system.actorOf(Props[StatsSender], "statsSender")
+  val influxRef: Option[ActorRef] =
+    if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender], "statsSender"))
+    else None
   if (settings.kafka.exists(_.sendToKafka))
     system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
   if (settings.postgres.exists(_.enableSave)) system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")

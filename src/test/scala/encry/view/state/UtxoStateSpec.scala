@@ -27,7 +27,8 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
   def utxoFromBoxHolder(bh: BoxHolder,
                         dir: File,
                         nodeViewHolderRef: Option[ActorRef],
-                        settings: EncryAppSettings): UtxoState = {
+                        settings: EncryAppSettings,
+                        statsSenderRef: Option[ActorRef]): UtxoState = {
     val p = new avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
@@ -46,7 +47,8 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
       stateStore,
       0L,
       None,
-      settings
+      settings,
+      None
     )
   }
 
@@ -59,7 +61,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val bh: BoxHolder = BoxHolder(initialBoxes)
 
-    val state: UtxoState = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None, settings)
+    val state: UtxoState = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None, settings, None)
 
     val regularTransactions: Seq[Transaction] = initialBoxes.map { bx =>
       TransactionFactory.defaultPaymentTransactionScratch(
@@ -90,7 +92,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val bh = BoxHolder(bxs)
 
-    val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None, settings)
+    val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None, settings, None)
 
     val factory = TestHelper
     val keys = factory.genKeys(TestHelper.Props.keysQty)
@@ -129,7 +131,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val bh = BoxHolder(bxs)
 
-    val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None, settings)
+    val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None, settings, None)
 
     val factory = TestHelper
     val keys = factory.genKeys(TestHelper.Props.keysQty)

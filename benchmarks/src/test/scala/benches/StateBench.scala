@@ -71,7 +71,7 @@ object StateBench {
       val genesisBlock: Block = generateGenesisBlockValidForState(state1.get)
       state1.get.applyModifier(genesisBlock)
       chain = genesisBlock +: (0 until blocksNumber).foldLeft(Vector[Block](), genesisBlock, state1.get, initialBoxes) {
-        case ((vector, block, stateL, boxes), t) =>
+        case ((vector, block, stateL, boxes), _) =>
           val nextBlock: Block = generateNextBlockValidForState(block, stateL, boxes.take(transactionsNumberInEachBlock))
           val stateN: UtxoState = stateL.applyModifier(nextBlock).get
           (vector :+ nextBlock, nextBlock, stateN, boxes.drop(transactionsNumberInEachBlock))
