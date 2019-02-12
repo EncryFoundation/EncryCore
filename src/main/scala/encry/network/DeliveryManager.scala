@@ -242,6 +242,7 @@ class DeliveryManager extends Actor with StrictLogging {
     delivered = delivered + key(mid)
     val peerMap = cancellables.getOrElse(cp.socketAddress.getAddress, Map.empty)
     peerMap.get(key(mid)).foreach(_._1.cancel())
+    requestedModifiers = requestedModifiers - key(mid)
     val peerMapWithoutModifier = peerMap - key(mid)
     cancellables = cancellables.updated(cp.socketAddress.getAddress, peerMapWithoutModifier)
     if (isBlockChainSynced && mtid == Header.modifierTypeId) {
