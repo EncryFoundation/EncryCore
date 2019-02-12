@@ -102,11 +102,9 @@ class DeliveryManager extends Actor with StrictLogging {
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
         else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
       }
-    case DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: Seq[ModifierId], previousModifier: Option[ModifierId]) =>
-      logger.info(s"Download request in delManager. Prev mod: ${previousModifier.map(Algos.encode)}")
-      logger.info(s"isBlockChainSynced: $isBlockChainSynced")
-      if (previousModifier.isDefined && isBlockChainSynced) priorityRequest(modifierTypeId, modifiersId, previousModifier.get)
-      else requestDownload(modifierTypeId, modifiersId)
+    case DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: ModifierId, previousModifier: Option[ModifierId]) =>
+      if (previousModifier.isDefined && isBlockChainSynced) priorityRequest(modifierTypeId, Seq(modifiersId), previousModifier.get)
+      else requestDownload(modifierTypeId, Seq(modifiersId))
     case FullBlockChainSynced => isBlockChainSynced = true
     case StartMining => isMining = true
     case DisableMining => isMining = false
@@ -152,6 +150,8 @@ class DeliveryManager extends Actor with StrictLogging {
         val peerMap = cancellables.getOrElse(peer.socketAddress.getAddress, Map.empty)
           .updated(key(id), cancellable -> 0)
         cancellables = cancellables.updated(peer.socketAddress.getAddress, peerMap)
+        val reqAttempts = requestedModifiers.getOrElse(key(id), 0) + 1
+        requestedModifiers = requestedModifiers.updated(key(id), reqAttempts)
       }
     }
 
@@ -181,6 +181,7 @@ class DeliveryManager extends Actor with StrictLogging {
                 cancellables = cancellables.updated(peerInfo._1.socketAddress.getAddress, peerMap)
                 requestedModifiers.get(key(modifierId)).foreach{qtyOfRequests =>
                   if (qtyOfRequests - 1 == 0) requestedModifiers = requestedModifiers - key(modifierId)
+                  else requestedModifiers = requestedModifiers.updated(key(modifierId), qtyOfRequests - 1)
                 }
               }
             }
@@ -207,21 +208,17 @@ class DeliveryManager extends Actor with StrictLogging {
      }
     else logger.info(s"Peer's $remote hisotry is younger, but node is note synces, so ignore sending extentions")
 
-  def priorityRequest(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId], previousModifier: ModifierId): Unit = {
-    logger.info("Trying to get priority request")
+  def priorityRequest(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId], previousModifier: ModifierId): Unit =
     deliveredModifiersMap.get(key(previousModifier)) match {
       case Some(addresses) if addresses.nonEmpty =>
-        logger.info(s"Prev sender exists: ${addresses}")
         statusTracker.statuses.find(_._1.socketAddress.getAddress == addresses.head) match {
           case Some(ph) =>
-            logger.info("Handler exists!")
             deliveredModifiersMap = deliveredModifiersMap - key(previousModifier)
             expect(ph._1, modifierTypeId, modifierIds)
           case None => requestDownload(modifierTypeId, modifierIds)
         }
       case None => requestDownload(modifierTypeId, modifierIds)
     }
-  }
 
   /**
     * If node is not synced, send request to random peer with non-younger history, overwise to all peers with
@@ -242,7 +239,6 @@ class DeliveryManager extends Actor with StrictLogging {
 
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = if (isExpecting(mtid, mid)) {
     //todo: refactor
-    logger.debug(s"Get modifier of id: ${Algos.encode(mid)} from ${cp.socketAddress.getAddress}")
     delivered = delivered + key(mid)
     val peerMap = cancellables.getOrElse(cp.socketAddress.getAddress, Map.empty)
     peerMap.get(key(mid)).foreach(_._1.cancel())
