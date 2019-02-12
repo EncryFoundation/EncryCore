@@ -287,6 +287,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         } else {
           if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.modifierTypeId) context.system
             .actorSelection("user/statsSender") ! NewBlockAppended(true, true)
+          logger.info(s"Make priority req from nvh. Prevmod: ${Algos.encode(pmod.id)}")
           requestDownloads(progressInfo, Some(pmod.id))
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }

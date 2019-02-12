@@ -103,6 +103,8 @@ class DeliveryManager extends Actor with StrictLogging {
         else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
       }
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: Seq[ModifierId], previousModifier: Option[ModifierId]) =>
+      logger.info(s"Download request in delManager. Prev mod: ${previousModifier.map(Algos.encode)}")
+      logger.info(s"isBlockChainSynced: $isBlockChainSynced")
       if (previousModifier.isDefined && isBlockChainSynced) priorityRequest(modifierTypeId, modifiersId, previousModifier.get)
       else requestDownload(modifierTypeId, modifiersId)
     case FullBlockChainSynced => isBlockChainSynced = true
