@@ -171,29 +171,32 @@ object EncryHistory {
     dir
   }
 
-  def readOrGenerate(settings: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistory = {
+  def readOrGenerate(settingsEncry: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistory = {
 
-    val historyIndexDir: File = getHistoryIndexDir(settings)
-    val historyObjectsDir: File = getHistoryObjectsDir(settings)
+    val historyIndexDir: File = getHistoryIndexDir(settingsEncry)
+    val historyObjectsDir: File = getHistoryObjectsDir(settingsEncry)
     val indexStore: LSMStore = new LSMStore(historyIndexDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(historyObjectsDir, keepVersions = 0)
     val storage: HistoryStorage = new HistoryStorage(indexStore, objectsStore)
 
-    val history: EncryHistory = (settings.node.stateMode.isDigest, settings.node.verifyTransactions) match {
+    val history: EncryHistory = (settingsEncry.node.stateMode.isDigest, settingsEncry.node.verifyTransactions) match {
       case (true, true) =>
         new EncryHistory with ADStateProofProcessor with BlockPayloadProcessor {
+          override protected val settings: EncryAppSettings = settingsEncry
           override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
         }
       case (false, true) =>
         new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
+          override protected val settings: EncryAppSettings = settingsEncry
           override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
         }
       case (true, false) =>
         new EncryHistory with ADStateProofProcessor with EmptyBlockPayloadProcessor {
+          override protected val settings: EncryAppSettings = settingsEncry
           override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp

@@ -131,15 +131,16 @@ trait InstanceFactory extends Keys with EncryGenerator {
     Block(header, Payload(header.id, txs), None)
   }
 
-  def generateDummyHistory(settings: EncryAppSettings): EncryHistory = {
+  def generateDummyHistory(settingsEncry: EncryAppSettings): EncryHistory = {
 
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val storage: HistoryStorage = new HistoryStorage(indexStore, objectsStore)
 
-    val ntp: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
+    val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
     new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
+      override protected val settings: EncryAppSettings = settingsEncry
       override protected val nodeSettings: NodeSettings = settings.node
       override protected val historyStorage: HistoryStorage = storage
       override protected val timeProvider: NetworkTimeProvider = ntp

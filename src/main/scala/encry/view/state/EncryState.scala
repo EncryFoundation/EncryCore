@@ -60,9 +60,12 @@ object EncryState extends StrictLogging {
 
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
-  def generateGenesisUtxoState(stateDir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
+  def generateGenesisUtxoState(stateDir: File,
+                               nodeViewHolderRef: Option[ActorRef],
+                               settings: EncryAppSettings,
+                               statsSenderRef: Option[ActorRef]): UtxoState = {
     val supplyBoxes: List[EncryBaseBox] = EncryState.initialStateBoxes.toList
-    UtxoState.genesis(supplyBoxes, stateDir, nodeViewHolderRef).ensuring(us => {
+    UtxoState.genesis(supplyBoxes, stateDir, nodeViewHolderRef, settings, statsSenderRef).ensuring(us => {
       logger.info(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
       logger.info(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
       logger.info(s"Generated UTXO state with ${supplyBoxes.size} boxes inside.")
@@ -73,13 +76,16 @@ object EncryState extends StrictLogging {
   def generateGenesisDigestState(stateDir: File, settings: NodeSettings): DigestState =
     DigestState.create(Some(genesisStateVersion), Some(afterGenesisStateDigest), stateDir, settings)
 
-  def readOrGenerate(settings: EncryAppSettings, nodeViewHolderRef: Option[ActorRef]): EncryState[_] = {
+  def readOrGenerate(settings: EncryAppSettings,
+                     nodeViewHolderRef: Option[ActorRef],
+                     statsSenderRef: Option[ActorRef]): EncryState[_] = {
     val stateDir: File = getStateDir(settings)
     stateDir.mkdirs()
     settings.node.stateMode match {
       case StateMode.Digest => DigestState.create(None, None, stateDir, settings.node)
-      case StateMode.Utxo if stateDir.listFiles().nonEmpty => UtxoState.create(stateDir, nodeViewHolderRef)
-      case _ => EncryState.generateGenesisUtxoState(stateDir, nodeViewHolderRef)
+      case StateMode.Utxo if stateDir.listFiles().nonEmpty =>
+        UtxoState.create(stateDir, nodeViewHolderRef, settings, statsSenderRef)
+      case _ => EncryState.generateGenesisUtxoState(stateDir, nodeViewHolderRef, settings, statsSenderRef)
     }
   }
 }

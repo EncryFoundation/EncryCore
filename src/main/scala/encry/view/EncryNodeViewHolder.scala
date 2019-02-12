@@ -315,7 +315,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
     val state: StateType = {
       if (settings.node.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings.node)
-      else EncryState.generateGenesisUtxoState(stateDir, Some(self))
+      else EncryState.generateGenesisUtxoState(stateDir, Some(self), settings, influxRef)
     }.asInstanceOf[StateType]
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
@@ -329,7 +329,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
       val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
       val state: StateType =
-        restoreConsistentState(EncryState.readOrGenerate(settings, Some(self)).asInstanceOf[StateType], history)
+        restoreConsistentState(EncryState.readOrGenerate(settings, Some(self), influxRef).asInstanceOf[StateType], history)
       Some(NodeView(history, state, wallet, memPool))
     } catch {
       case ex: Throwable =>
@@ -349,7 +349,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       (version, digest) match {
         case (Some(_), Some(_)) if settings.node.stateMode.isDigest =>
           DigestState.create(version, digest, dir, settings.node)
-        case _ => EncryState.readOrGenerate(settings, Some(self))
+        case _ => EncryState.readOrGenerate(settings, Some(self), influxRef)
       }
     }.asInstanceOf[StateType]
       .ensuring(_.rootHash sameElements digest.getOrElse(EncryState.afterGenesisStateDigest), "State root is incorrect")

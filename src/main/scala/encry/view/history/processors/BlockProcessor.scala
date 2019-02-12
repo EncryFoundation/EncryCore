@@ -1,7 +1,7 @@
 package encry.view.history.processors
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.{settings, system}
+import encry.EncryApp.system
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.consensus.ModifierSemanticValidity.Invalid
@@ -11,6 +11,7 @@ import encry.modifiers.history.{Block, Header, HeaderChain}
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
+
 import scala.util.{Failure, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
@@ -28,7 +29,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
 
   /** Process full block when we have one.
     *
-    * @param fullBlock - block to process
+    * @param fullBlock  - block to process
     * @param modToApply - new part of the block we want to apply
     * @return ProgressInfo required for State to process to be consistent with History
     */
@@ -36,7 +37,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
                              modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
     val newBestAfterThis: Header = bestFullChain.last.header
-    processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, nodeSettings.blocksToKeep))
+    processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, settings.node.blocksToKeep))
   }
 
   private def processing: BlockProcessing =
@@ -54,7 +55,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   }
 
   private def processBetterChain: BlockProcessing = {
-    case toProcess @ ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
+    case toProcess@ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
       val prevBest: Block = bestBlockOpt.get
       val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
@@ -70,9 +71,9 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
         val updateBestHeader: Boolean =
           (fullBlock.header.height > bestHeaderHeight) || (
             (fullBlock.header.height == bestHeaderHeight) &&
-            scoreOf(fullBlock.id)
-              .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
-              .getOrElse(false))
+              scoreOf(fullBlock.id)
+                .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
+                .getOrElse(false))
         updateStorage(newModRow, newBestHeader.id, updateBestHeader)
 
         if (settings.postgres.exists(_.enableSave))
@@ -97,7 +98,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
       heightOfThisHeader <- typedModifierById[Header](id).map(_.height)
       prevBestScore <- scoreOf(bestFullBlockId)
       score <- scoreOf(id)
-   } yield (bestBlockHeight < heightOfThisHeader) || (bestBlockHeight == heightOfThisHeader && score > prevBestScore)
+    } yield (bestBlockHeight < heightOfThisHeader) || (bestBlockHeight == heightOfThisHeader && score > prevBestScore)
     isBetter getOrElse false
   }
 
@@ -129,8 +130,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
                             updateHeaderInfo: Boolean = false): Unit = {
     val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeaderId)
     val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-      if (updateHeaderInfo)
-        Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)
+      if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)
       else Seq(BestBlockKey -> bestFullHeaderIdWrapped)
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
   }

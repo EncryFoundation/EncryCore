@@ -38,7 +38,8 @@ val testingDependencies = Seq(
   "com.typesafe.akka" %% "akka-testkit" % "2.4.+" % Test,
   "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % Test,
   "org.scalacheck" %% "scalacheck" % "1.13.+" % Test,
-  "org.mockito" % "mockito-core" % "2.19.1" % Test
+  "org.mockito" % "mockito-core" % "2.19.1" % Test,
+  "org.openjdk.jmh" % "jmh-generator-annprocess" % "1.21" % Test
 )
 
 lazy val monitoringDependencies = Seq(
@@ -152,3 +153,6 @@ sourceGenerators in Compile += Def.task {
 
 val encry = (project in file(".")).settings(settings: _*)
 lazy val it = project.dependsOn(encry)
+lazy val benchmarks = (project in file("benchmarks"))
+  .dependsOn(encry % "compile->compile;test->test")
+  .enablePlugins(JmhPlugin)

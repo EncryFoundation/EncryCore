@@ -94,7 +94,7 @@ class Miner extends Actor with StrictLogging {
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
-    case msg => logger.info(s"Miner dead letter: ${FullBlockChainSynced}")
+    case msg => logger.info(s"Miner dead letter: $FullBlockChainSynced")
   }
 
   def miningEnabled: Receive =
@@ -127,7 +127,7 @@ class Miner extends Actor with StrictLogging {
     case c: CandidateBlock => procCandidateBlock(c)
     case cEnv: CandidateEnvelope if cEnv.c.nonEmpty => procCandidateBlock(cEnv.c.get)
     case _: CandidateEnvelope =>
-      logger.debug( "Received empty CandidateEnvelope, going to suspend mining for a while")
+      logger.debug("Received empty CandidateEnvelope, going to suspend mining for a while")
       self ! DisableMining
   }
 
