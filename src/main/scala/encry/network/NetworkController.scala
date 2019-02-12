@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
-
 import akka.actor._
 import akka.io.Tcp.SO.KeepAlive
 import akka.io.Tcp._
@@ -17,7 +16,6 @@ import PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.NetworkSettings
 import encry.view.history.EncrySyncInfoMessageSpec
-
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
@@ -75,17 +73,15 @@ class NetworkController extends Actor with StrictLogging {
   }
 
   def peerLogic: Receive = {
-    case ConnectTo(remote)
-      if checkPossibilityToAddPeer(remote) =>
-      logger.info(s"Connecting to: $remote")
+    ///TODO: Duplicate `checkPossibilityToAddPeer` logic
+    case ConnectTo(remote) if checkPossibilityToAddPeer(remote) =>
       outgoing += remote
       IO(Tcp) ! Connect(remote,
         localAddress = externalSocketAddress,
         options = KeepAlive(true) :: Nil,
         timeout = Some(networkSettings.connectionTimeout),
         pullMode = true)
-    case Connected(remote, local)
-      if checkPossibilityToAddPeer(remote) =>
+    case Connected(remote, local) if checkPossibilityToAddPeer(remote) =>
       val direction: ConnectionType = if (outgoing.contains(remote)) Outgoing else Incoming
       val logMsg: String = direction match {
         case Incoming => s"New incoming connection from $remote established (bound to local $local)"
@@ -108,7 +104,8 @@ class NetworkController extends Actor with StrictLogging {
     case RegisterMessagesHandler(specs, handler) =>
       logger.info(s"Registering handlers for ${specs.map(s => s.messageCode -> s.messageName)}")
       messageHandlers += specs.map(_.messageCode) -> handler
-    case CommandFailed(cmd: Tcp.Command) => context.actorSelection("/user/statsSender") ! "Failed to execute command : " + cmd
+    case CommandFailed(cmd: Tcp.Command) =>
+      context.actorSelection("/user/statsSender") ! "Failed to execute command : " + cmd
     case nonsense: Any => logger.warn(s"NetworkController: got something strange $nonsense")
   }
 }
@@ -129,5 +126,4 @@ object NetworkController {
     case class ConnectTo(address: InetSocketAddress)
 
   }
-
 }

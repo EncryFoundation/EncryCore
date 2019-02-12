@@ -45,7 +45,8 @@ object ConsoleListener {
   ))
 
   private val appCmds = Map("app" -> Map(
-    "help" -> Help
+    "help" -> Help,
+    "peer" -> AddPeer
   ))
 
   private val walletCmds = Map("wallet" -> Map(

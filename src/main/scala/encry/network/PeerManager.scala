@@ -1,18 +1,16 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
-
 import akka.actor.Actor
-import akka.persistence.RecoveryCompleted
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
+import encry.cli.commands.AddPeer.PeerFromCli
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
 import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, StartInteraction}
 import encry.network.PeerConnectionHandler._
 import encry.network.PeerManager.ReceivableMessages._
 import encry.network.PeerManager._
-
 import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.util.Random
@@ -22,10 +20,15 @@ class PeerManager extends Actor with StrictLogging {
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
   var connectingPeers: Set[InetSocketAddress] = Set.empty
   var nodes: Map[InetSocketAddress, PeerInfo] = Map.empty
+  val knownPeersObj: KnownPeers.type = KnownPeers
 
   addKnownPeersToPeersDatabase()
 
   override def receive: Receive = {
+    case PeerFromCli(address) =>
+      knownPeersObj.knownPeers = knownPeersObj.knownPeers :+ address
+      if (checkDuplicateIP(address))
+        context.system.actorSelection("/user/networkController") ! ConnectTo(address)
     case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
     case GetAllPeers => sender() ! knownPeers()
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
@@ -82,6 +85,7 @@ class PeerManager extends Actor with StrictLogging {
       (InetAddress.getLocalHost.getAddress sameElements address.getAddress.getAddress) ||
       (InetAddress.getLoopbackAddress.getAddress sameElements address.getAddress.getAddress)
 
+  /// TODO: REMOVE THIS
   def addKnownPeersToPeersDatabase(): Future[Unit] = if (nodes.isEmpty) timeProvider.time().map { time =>
     settings.network.knownPeers.filterNot(isSelf(_, None)).foreach(addOrUpdateKnownPeer(_, PeerInfo(time, None)))
     Unit
@@ -130,8 +134,13 @@ object PeerManager {
 
   def checkPossibilityToAddPeer(address: InetSocketAddress): Boolean =
     (settings.network.connectOnlyWithKnownPeers.getOrElse(false) &&
-      settings.network.knownPeers.map(_.getAddress).contains(address.getAddress)) ||
+      KnownPeers.knownPeers.map(_.getAddress).contains(address.getAddress)) ||
       !settings.network.connectOnlyWithKnownPeers.getOrElse(false)
 }
 
+/// TODO: REMOVE THIS
 case class PeerInfo(lastSeen: Long, nodeName: Option[String] = None, connectionType: Option[ConnectionType] = None)
+
+case object KnownPeers {
+  var knownPeers: Seq[InetSocketAddress] = settings.network.knownPeers
+}
