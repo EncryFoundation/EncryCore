@@ -203,7 +203,7 @@ object Utils {
                                        recipient: Address,
                                        amount: Amount,
                                        tokenIdOpt: Option[ADKey] = None,
-                                       numOfOutputs: Long = 5): Transaction = {
+                                       numOfOutputs: Int = 5): Transaction = {
     val pubKey: PublicKey25519 = privKey.publicImage
     val uInputs: IndexedSeq[Input] = useBoxes
       .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes)))).toIndexedSeq
