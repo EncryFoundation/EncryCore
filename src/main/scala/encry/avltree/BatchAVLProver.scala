@@ -5,7 +5,6 @@ import com.typesafe.scalalogging.StrictLogging
 import org.encryfoundation.common.utils.TaggedTypes._
 import scorex.crypto.hash.{Blake2b256, CryptographicHash, Digest}
 import scorex.utils.ByteArray
-
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Failure, Random, Success, Try}

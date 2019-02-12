@@ -5,10 +5,9 @@ import akka.actor.ActorRef
 import encry.avltree
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
-import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
-import encry.settings.Constants
+import encry.settings.{Constants, EncryAppSettings}
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
 import encry.view.history.History.Height
 import io.iohk.iodb.LSMStore
@@ -23,7 +22,13 @@ import scorex.utils.Random
 
 class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
-  def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef]): UtxoState = {
+  val settings: EncryAppSettings = EncryAppSettings.read
+
+  def utxoFromBoxHolder(bh: BoxHolder,
+                        dir: File,
+                        nodeViewHolderRef: Option[ActorRef],
+                        settings: EncryAppSettings,
+                        statsSenderRef: Option[ActorRef]): UtxoState = {
     val p = new avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
 
@@ -35,7 +40,16 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
       PersistentBatchAVLProver.create(p, storage).get
     }
 
-    new UtxoState(persistentProver, EncryState.genesisStateVersion, Constants.Chain.GenesisHeight, stateStore, 0L, None)
+    new UtxoState(
+      persistentProver,
+      EncryState.genesisStateVersion,
+      Constants.Chain.GenesisHeight,
+      stateStore,
+      0L,
+      None,
+      settings,
+      None
+    )
   }
 
   property("Proofs for transaction") {
@@ -47,7 +61,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val bh: BoxHolder = BoxHolder(initialBoxes)
 
-    val state: UtxoState = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None)
+    val state: UtxoState = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None, settings, None)
 
     val regularTransactions: Seq[Transaction] = initialBoxes.map { bx =>
       TransactionFactory.defaultPaymentTransactionScratch(
@@ -56,7 +70,14 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val fees: Amount = regularTransactions.map(_.fee).sum
 
-    val coinbase: Transaction = TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, 25L, fees, Height @@ 100)
+    val coinbase: Transaction = TransactionFactory
+      .coinbaseTransactionScratch(
+        secret.publicImage,
+        timestamp,
+        25L,
+        fees,
+        Height @@ 100
+      )
 
     val transactions: Seq[Transaction] = regularTransactions.sortBy(_.timestamp) :+ coinbase
 
@@ -71,7 +92,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val bh = BoxHolder(bxs)
 
-    val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None)
+    val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None, settings, None)
 
     val factory = TestHelper
     val keys = factory.genKeys(TestHelper.Props.keysQty)
@@ -110,7 +131,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val bh = BoxHolder(bxs)
 
-    val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None)
+    val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None, settings, None)
 
     val factory = TestHelper
     val keys = factory.genKeys(TestHelper.Props.keysQty)

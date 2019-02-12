@@ -39,8 +39,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     * Complete block of the best chain with transactions.
     * Always None for an SPV mode, Some(fullBLock) for fullnode regime after initial bootstrap.
     */
-  def bestBlockOpt: Option[Block] =
-    bestBlockIdOpt.flatMap(id => typedModifierById[Header](id)).flatMap(getBlock)
+  def bestBlockOpt: Option[Block] = bestBlockIdOpt.flatMap(id => typedModifierById[Header](id)).flatMap(getBlock)
 
   /** @return ids of count headers starting from offset */
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
@@ -127,9 +126,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   def lastHeaders(count: Int): HeaderChain = bestHeaderOpt
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(HeaderChain.empty)
 
-  def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
-    historyStorage.modifierById(id)
-      .ensuring(_.forall(_.id sameElements id), s"Modifier ${Algos.encode(id)} id mismatch")
+  def modifierById(id: ModifierId): Option[EncryPersistentModifier] = historyStorage.modifierById(id)
+    .ensuring(_.forall(_.id sameElements id), s"Modifier ${Algos.encode(id)} id mismatch")
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T] = modifierById(id) match {
     case Some(m: T@unchecked) if m.isInstanceOf[T] => Some(m)
@@ -176,7 +174,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     loop(2, HeaderChain(Seq(header2)))
   }
 
-  /** Finds common block and sub-chains with `otherChain`.*/
+  /** Finds common block and sub-chains with `otherChain`. */
   protected[history] def commonBlockThenSuffixes(otherChain: HeaderChain,
                                                  startHeader: Header,
                                                  limit: Int): (HeaderChain, HeaderChain) = {
