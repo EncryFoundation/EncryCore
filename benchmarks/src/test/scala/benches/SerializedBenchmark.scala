@@ -57,13 +57,14 @@ object SerializedBenchmark extends StrictLogging {
       initialBoxes = (0 until totalBoxesNumber).map(_ => genAssetBox(privKey.publicImage.address.address))
 
       (0 until totalBoxesNumber / numberOfInputs).foldLeft(initialBoxes) { case (boxes, _) =>
-        val tx: Transaction = createTxForTxSerializerWithInputsOutputs(
+        val tx: Transaction = defaultPaymentTransactionScratch(
           privKey,
           fee = 111,
           timestamp = 11L,
           useBoxes = boxes.take(numberOfInputs),
           recipient = randomAddress,
-          amount = 10000
+          amount = 10000,
+          numOfOutputs = 200
         )
         initialTransactions = tx +: initialTransactions
         boxes.drop(numberOfInputs)
