@@ -56,13 +56,14 @@ object EncryApp extends App with StrictLogging {
     )
   }
 
-  lazy val auxHistoryHolder: ActorRef = system.actorOf(Props(new AuxiliaryHistoryHolder(settings, timeProvider, nodeViewSynchronizer))
+  lazy val auxHistoryHolder: ActorRef =
+    system.actorOf(Props(new AuxiliaryHistoryHolder(settings, timeProvider, nodeViewSynchronizer))
     .withDispatcher("aux-history-dispatcher"), "auxHistoryHolder")
   lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props(auxHistoryHolder), "nodeViewHolder")
   val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
     .withDispatcher("network-dispatcher"), "networkController")
-  lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
+  lazy val peerManager: ActorRef = system.actorOf(Props(classOf[PeerManager], networkController), "peerManager")
   lazy val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[NodeViewSynchronizer]), "nodeViewSynchronizer")
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
@@ -126,5 +127,4 @@ object EncryApp extends App with StrictLogging {
     withinTimeRange = 60 seconds) {
     case _ => Restart
   }
-
 }

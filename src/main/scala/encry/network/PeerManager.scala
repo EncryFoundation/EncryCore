@@ -1,7 +1,7 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
 import encry.cli.commands.AddPeer.PeerFromCli
@@ -15,7 +15,7 @@ import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.util.Random
 
-class PeerManager extends Actor with StrictLogging {
+class PeerManager(networkControllerRef: ActorRef) extends Actor with StrictLogging {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
   var connectingPeers: Set[InetSocketAddress] = Set.empty
@@ -26,8 +26,7 @@ class PeerManager extends Actor with StrictLogging {
   override def receive: Receive = {
     case PeerFromCli(address) =>
       KnownPeers.add(address)
-      if (checkDuplicateIP(address))
-        context.system.actorSelection("/user/networkController") ! ConnectTo(address)
+      if (checkDuplicateIP(address)) networkControllerRef ! ConnectTo(address)
     case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
     case GetAllPeers => sender() ! knownPeers()
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
