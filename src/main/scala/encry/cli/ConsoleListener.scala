@@ -45,7 +45,7 @@ object ConsoleListener {
   ))
 
   private val appCmds = Map("app" -> Map(
-    "help" -> Help,
+    "help" -> Help
   ))
 
   private val settingsCmds = Map("settings" -> Map(
