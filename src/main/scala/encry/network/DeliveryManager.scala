@@ -95,9 +95,8 @@ class DeliveryManager extends Actor with StrictLogging {
           s": ${spam.keys.map(Algos.encode)}")
         deleteSpam(spam.keys.toSeq)
       }
-      fm.filterNot{ case (modId, _) => historyReaderOpt.contains(modId)}
-        .values
-        .foreach(modifierSer => nodeViewHolder ! ModifiersFromRemote(typeId, Seq(modifierSer)))
+      val filteredModifiers = fm.filterNot{ case (modId, _) => historyReaderOpt.contains(modId)}.values.toSeq
+      if (filteredModifiers.nonEmpty)nodeViewHolder ! ModifiersFromRemote(typeId, filteredModifiers)
       historyReaderOpt.foreach { h =>
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
         else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
