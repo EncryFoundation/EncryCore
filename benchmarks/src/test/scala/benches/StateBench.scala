@@ -50,7 +50,7 @@ object StateBench {
   class BenchState {
 
     /**
-      * Total number of boxes must be equal to total number of transactions.
+      * Total number of boxes must be equal or more to total number of transactions.
       * (boxesNumber = blocksNumber * transactionsNumber).
       */
     val totalBoxesNumber: Int = 500000

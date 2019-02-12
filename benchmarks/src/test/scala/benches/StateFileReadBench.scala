@@ -17,7 +17,7 @@ import org.openjdk.jmh.runner.options.{OptionsBuilder, TimeValue, VerboseMode}
 class StateFileReadBench {
 
   @Benchmark
-  def applyBlocksToTheState(stateBench: BenchStateFileRead, bh: Blackhole): Unit = {
+  def generateStateBench(stateBench: BenchStateFileRead, bh: Blackhole): Unit = {
     bh.consume {
       val localState: UtxoState =
         utxoFromBoxHolder(stateBench.boxesHolder.get, stateBench.tmpDir, None, stateBench.settings)
@@ -50,7 +50,7 @@ object StateFileReadBench {
   class BenchStateFileRead {
 
     /**
-      * Total number of boxes must be equal to total number of transactions.
+      * Total number of boxes must be equal or more to total number of transactions.
       * (boxesNumber = blocksNumber * transactionsNumber).
       */
     val totalBoxesNumber: Int = 300000

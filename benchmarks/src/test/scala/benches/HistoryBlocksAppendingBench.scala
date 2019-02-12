@@ -15,7 +15,7 @@ import org.openjdk.jmh.runner.options.{OptionsBuilder, TimeValue, VerboseMode}
 class HistoryBlocksAppendingBench {
 
   @Benchmark
-  def readOrGenerateHistoryBench(benchStateHistory: BenchStateHistoryAppendingBlocks, bh: Blackhole): Unit = {
+  def appendBlocksToHistoryBench(benchStateHistory: BenchStateHistoryAppendingBlocks, bh: Blackhole): Unit = {
     bh.consume {
       val history: EncryHistory = generateHistory(benchStateHistory.settings, getRandomTempDir)
       benchStateHistory.blocks.foldLeft(history) { case (historyL, block) =>

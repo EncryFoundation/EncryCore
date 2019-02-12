@@ -16,7 +16,7 @@ import org.openjdk.jmh.runner.options.{OptionsBuilder, TimeValue, VerboseMode}
 class HistoryReadFileBench {
 
   @Benchmark
-  def readOrGenerateHistoryBench(benchStateHistory: BenchStateHistory, bh: Blackhole): Unit = {
+  def generateHistoryBench(benchStateHistory: BenchStateHistory, bh: Blackhole): Unit = {
     bh.consume {
       val history: EncryHistory = generateHistory(benchStateHistory.settings, benchStateHistory.tmpDir)
       history.closeStorage()
