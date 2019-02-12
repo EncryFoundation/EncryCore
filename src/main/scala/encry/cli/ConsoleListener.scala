@@ -49,6 +49,10 @@ object ConsoleListener {
     "peer" -> AddPeer
   ))
 
+  private val settingsCmds = Map("settings" -> Map(
+    "addPeer" -> AddPeer
+  ))
+
   private val walletCmds = Map("wallet" -> Map(
     "addrs" -> PrintAddresses,
     "createKey" -> CreateKey,
@@ -59,5 +63,5 @@ object ConsoleListener {
   ))
 
   val cmdDictionary: Map[String, Map[String, Command]] =
-    ConsoleListener.nodeCmds ++ ConsoleListener.appCmds ++ ConsoleListener.walletCmds
+    ConsoleListener.nodeCmds ++ ConsoleListener.appCmds ++ ConsoleListener.walletCmds ++ ConsoleListener.settingsCmds
 }

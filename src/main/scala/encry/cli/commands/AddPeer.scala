@@ -9,7 +9,7 @@ import scala.concurrent.Future
 
 /**
   * Command "app peer add -host=<addr[String]> -port=<addr[String]>"
-  * app peer -host='0.0.0.0' -port=0000
+  * settings addPeer -host='0.0.0.0' -port=0000
   */
 object AddPeer extends Command {
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
