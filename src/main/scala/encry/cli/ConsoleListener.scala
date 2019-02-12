@@ -46,7 +46,6 @@ object ConsoleListener {
 
   private val appCmds = Map("app" -> Map(
     "help" -> Help,
-    "peer" -> AddPeer
   ))
 
   private val settingsCmds = Map("settings" -> Map(
