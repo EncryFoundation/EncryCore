@@ -135,6 +135,8 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       headerHeightKey(header.id) -> ByteArrayWrapper(Ints.toByteArray(Constants.Chain.GenesisHeight)),
       headerScoreKey(header.id) -> ByteArrayWrapper(header.difficulty.toByteArray)), header)
   } else {
+    logger.info(s"Process header ${Algos.encode(header.id)} on height ${header.height}")
+    logger.info(s"Score of parent is: ${scoreOf(header.parentId)}")
     scoreOf(header.parentId).map { parentScore =>
       val score: BigInt @@ ConsensusTaggedTypes.Difficulty.Tag =
         Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
