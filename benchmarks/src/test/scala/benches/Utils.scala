@@ -210,7 +210,7 @@ object Utils {
     val change: Amount = useBoxes.map(_.amount).sum - (amount + fee)
     val directives: IndexedSeq[TransferDirective] =
       if (change > 0) TransferDirective(recipient, amount, tokenIdOpt) +: (0 until numOfOutputs)
-        .map(_ => TransferDirective(pubKey.address.address, change / 200, tokenIdOpt))
+        .map(_ => TransferDirective(pubKey.address.address, change / numOfOutputs, tokenIdOpt))
       else IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt))
 
     val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, directives)
