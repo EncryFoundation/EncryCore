@@ -47,11 +47,6 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
   }
 
   override def receive: Receive = {
-    case SyntacticallySuccessfulModifier(mod)
-      if (mod.isInstanceOf[Header] || mod.isInstanceOf[Payload] || mod.isInstanceOf[ADProofs]) &&
-        historyReaderOpt.exists(_.isHeadersChainSynced) =>
-      logger.info(s"SyntacticallySuccessfulModifier on node view sync with id: ${Algos.encode(mod.id)}")
-    case SyntacticallySuccessfulModifier(mod) =>
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId, previousModifier: Option[ModifierId]) =>
       deliveryManager ! DownloadRequest(modifierTypeId, modifierId, previousModifier)
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
@@ -190,8 +185,6 @@ object NodeViewSynchronizer {
 
     case class SemanticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable)
       extends ModificationOutcome
-
-    case class SyntacticallySuccessfulModifier[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends ModificationOutcome
 
     case class SemanticallySuccessfulModifier[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends ModificationOutcome
   }
