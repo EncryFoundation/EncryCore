@@ -20,13 +20,12 @@ class PeerManager extends Actor with StrictLogging {
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
   var connectingPeers: Set[InetSocketAddress] = Set.empty
   var nodes: Map[InetSocketAddress, PeerInfo] = Map.empty
-  val knownPeersObj: KnownPeers.type = KnownPeers
 
   addKnownPeersToPeersDatabase()
 
   override def receive: Receive = {
     case PeerFromCli(address) =>
-      knownPeersObj.knownPeers = knownPeersObj.knownPeers :+ address
+      KnownPeers.add(address)
       if (checkDuplicateIP(address))
         context.system.actorSelection("/user/networkController") ! ConnectTo(address)
     case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
@@ -143,4 +142,6 @@ case class PeerInfo(lastSeen: Long, nodeName: Option[String] = None, connectionT
 
 case object KnownPeers {
   var knownPeers: Seq[InetSocketAddress] = settings.network.knownPeers
+
+  def add(add: InetSocketAddress): Unit = knownPeers = knownPeers :+ add
 }
