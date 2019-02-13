@@ -5,11 +5,12 @@ import encry.modifiers.mempool._
 import encry.modifiers.state.box.EncryProposition
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest, TransactionsCarryingPersistentNodeViewModifier}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
+import io.circe.{Decoder, Encoder, HCursor}
+import org.apache.commons.lang.ArrayUtils
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, LeafData}
+import org.encryfoundation.common.utils.TaggedTypes.LeafData
 import scorex.crypto.hash.Digest32
 import scala.util.Try
 
@@ -62,7 +63,8 @@ object PayloadSerializer extends Serializer[Payload] {
     Bytes.concat(
       obj.headerId,
       Ints.toByteArray(obj.transactions.size),
-      obj.transactions.map(tx => Ints.toByteArray(tx.bytes.length) ++ tx.bytes).reduceLeft(_ ++ _)
+      obj.transactions.map(tx => ArrayUtils.addAll(Ints.toByteArray(tx.bytes.length),tx.bytes))
+        .foldLeft(Array.emptyByteArray){case (acc, txBytes) => ArrayUtils.addAll(acc, txBytes)}
     )
 
   override def parseBytes(bytes: Array[Byte]): Try[Payload] = Try {
@@ -72,7 +74,7 @@ object PayloadSerializer extends Serializer[Payload] {
     val txs: Seq[Transaction] = (0 until txQty).foldLeft(Seq[Transaction](), 0) { case ((acc, shift), _) =>
       val len: Int = Ints.fromByteArray(leftBytes.slice(shift, shift + 4))
       TransactionSerializer
-        .parseBytes(leftBytes.slice(shift + 4, shift + 4 + len)).map(d => (acc :+ d, shift + 4 + len))
+        .parseBytes(ArrayUtils.subarray(leftBytes, shift + 4, shift + 4 + len)).map(d => (acc :+ d, shift + 4 + len))
         .getOrElse(throw new Exception("Serialization failed."))
     }._1
     Payload(ModifierId @@ headerId, txs)

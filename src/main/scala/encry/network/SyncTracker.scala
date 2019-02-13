@@ -26,7 +26,7 @@ case class SyncTracker(deliveryManager: ActorRef,
   def scheduleSendSyncInfo(): Unit = {
     schedule.foreach(_.cancel())
     schedule = Some(context.system.scheduler.schedule(
-      networkSettings.modifierDeliverTimeCheck, networkSettings.syncInterval)(deliveryManager ! SendLocalSyncInfo)
+      networkSettings.syncInterval, networkSettings.syncInterval)(deliveryManager ! SendLocalSyncInfo)
     )
   }
 

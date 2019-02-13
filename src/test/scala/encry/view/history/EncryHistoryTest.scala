@@ -2,6 +2,7 @@ package encry.view.history
 
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.{Block, Header}
+import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
 import encry.settings.Constants
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.EncryGenerator

@@ -14,4 +14,5 @@ object CoreTaggedTypes {
   type ModifierId = ModifierId.Type
 
   type VersionTag = VersionTag.Type
+
 }

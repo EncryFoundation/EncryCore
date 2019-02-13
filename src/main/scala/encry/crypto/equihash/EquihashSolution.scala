@@ -1,5 +1,6 @@
 package encry.crypto.equihash
 
+import java.util
 import com.google.common.primitives.Ints
 import encry.settings.Constants
 import io.circe.{Decoder, Encoder, HCursor}
@@ -34,7 +35,8 @@ object EquihashSolutionsSerializer extends Serializer[EquihashSolution] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[EquihashSolution] = Try {
-    val seq = for { i <- bytes.indices by Ints.BYTES } yield { Ints.fromByteArray(bytes.slice(i, i + Ints.BYTES)) }
+    val seq = for { i <- bytes.indices by Ints.BYTES } yield
+      {Ints.fromByteArray(util.Arrays.copyOfRange(bytes, i, i + Ints.BYTES)) }
     EquihashSolution(seq)
   }
 }

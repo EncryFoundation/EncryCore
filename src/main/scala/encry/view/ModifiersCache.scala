@@ -90,7 +90,7 @@ object ModifiersCache extends StrictLogging {
         }
 
       case None =>
-        logger.info(s"No best header in cache")
+        logger.debug(s"No best header in cache")
         List[Key]()
     }
     if (bestHeadersIds.nonEmpty) bestHeadersIds
@@ -101,7 +101,7 @@ object ModifiersCache extends StrictLogging {
         case _ => exhaustiveSearch
       }
       case None =>
-        logger.info(s"No payloads for current history")
+        logger.debug(s"No payloads for current history")
         exhaustiveSearch
     }
   }

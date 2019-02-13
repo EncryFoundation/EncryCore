@@ -2,6 +2,7 @@ package encry.crypto.equihash
 
 import java.math.BigInteger
 import java.nio.{ByteBuffer, ByteOrder}
+import org.apache.commons.lang.ArrayUtils
 import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import scala.collection.mutable.ArrayBuffer
@@ -11,14 +12,18 @@ object Equihash {
   private val wordSize: Int = 32
   private val byteSize: Int = 8
 
-  def nonceToLeBytes(nonce: BigInt): Array[Byte] =
-    (for (i <- 0 to 7) yield littleEndianIntToByteArray((nonce >> 32 * i).intValue())).reduce(_ ++ _)
+  def nonceToLeBytes(nonce: BigInt): Array[Byte] = {
+    val res = for (i <- 0 to 7) yield littleEndianIntToByteArray((nonce >> 32 * i).intValue())
+    res.fold(Array.emptyByteArray){case (acc, nextArr) => ArrayUtils.addAll(acc, nextArr)}
+  }
+
 
   def hashNonce[T <: Digest](digest: T, nonce: BigInt): Unit = {
     val arr: Array[Byte] = nonceToLeBytes(nonce)
     digest.update(arr, 0, arr.length)
   }
 
+  //todo: takes a lot of time
   def hashSolution[T <: Digest](digest: T, solution: EquihashSolution): Unit = solution.ints map {
     hashXi(digest, _)
   }
