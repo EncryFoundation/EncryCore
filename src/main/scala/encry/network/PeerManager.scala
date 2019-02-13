@@ -125,7 +125,7 @@ object PeerManager {
 /// TODO: REMOVE THIS
 case class PeerInfo(lastSeen: Long, nodeName: Option[String] = None, connectionType: Option[ConnectionType] = None)
 
-case object CheckPeersObj {
+object CheckPeersObj {
   def checkPossibilityToAddPeer(address: InetSocketAddress,
                                 collectionToCheck: Set[InetSocketAddress],
                                 encryAppSettings: EncryAppSettings): Boolean =
