@@ -22,10 +22,10 @@ import scala.util.control.NonFatal
 class DBService extends StrictLogging {
 
   def processBlock(block: Block): Future[Int] = runAsync(processBlockQuery(block), "processBlock")
-    .map { count =>
-      logger.info(s"Successfully wrote block on height ${block.header.height} as best chain")
-      count
-    }
+      .map { count =>
+        logger.info(s"Successfully wrote block on height ${block.header.height} as best chain")
+        count
+      }
 
 
   def markAsRemovedFromMainChain(ids: List[ModifierId]): Future[Int] =
