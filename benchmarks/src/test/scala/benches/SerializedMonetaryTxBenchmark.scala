@@ -38,7 +38,7 @@ object SerializedMonetaryTxBenchmark {
       .verbosity(VerboseMode.EXTRA)
       .addProfiler(classOf[GCProfiler])
       .warmupTime(TimeValue.milliseconds(500))
-      .measurementTime(TimeValue.minutes(2))
+      .measurementTime(TimeValue.milliseconds(500))
       .build
     new Runner(opt).run
   }
@@ -46,7 +46,7 @@ object SerializedMonetaryTxBenchmark {
   @State(Scope.Benchmark)
   class SerializedMonetaryBenchState {
 
-    val totalBoxesNumber: Int = 10000
+    val totalBoxesNumber: Int = 100000
     val numberOfInputs: Int = 25
     val numberOfOutputs: Int = 25
 

@@ -37,14 +37,14 @@ object SerializedDataTxBenchmark {
       .verbosity(VerboseMode.EXTRA)
       .addProfiler(classOf[GCProfiler])
       .warmupTime(TimeValue.milliseconds(500))
-      .measurementTime(TimeValue.minutes(2))
+      .measurementTime(TimeValue.milliseconds(500))
       .build
     new Runner(opt).run
   }
 
   @State(Scope.Benchmark)
   class SerializedDataBenchState {
-    val totalBoxesNumber: Int = 10000
+    val totalBoxesNumber: Int = 100000
     val numberOfInputs: Int = 25
     val numberOfOutputs: Int = 25
     val bytesQty: Int = 999

@@ -236,8 +236,7 @@ object Utils {
 
   def generateAssetTransactions(boxes: IndexedSeq[AssetBox],
                                 numberOfInputs: Int,
-                                numberOfOutputs: Int,
-                                bytesQty: Int): Vector[Transaction] =
+                                numberOfOutputs: Int): Vector[Transaction] =
     (0 until boxes.size / numberOfInputs).foldLeft(boxes, Vector.empty[Transaction]) {
       case ((boxesLocal, transactions), _) =>
         val tx: Transaction = assetIssuingTransactionScratch(
