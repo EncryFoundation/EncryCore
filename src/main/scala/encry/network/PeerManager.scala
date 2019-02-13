@@ -1,7 +1,7 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
-import akka.actor.{Actor, ActorRef}
+import akka.actor.Actor
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
 import encry.cli.commands.AddPeer.PeerFromCli
