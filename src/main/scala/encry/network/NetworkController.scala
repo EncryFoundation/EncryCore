@@ -10,10 +10,10 @@ import encry.EncryApp._
 import encry.network.NetworkController.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
 import encry.network.message.Message.MessageCode
-import PeerManager._
 import encry.network.message.{Message, MessageHandler}
 import PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import com.typesafe.scalalogging.StrictLogging
+import encry.cli.commands.AddPeer.PeerFromCli
 import encry.settings.NetworkSettings
 import encry.view.history.EncrySyncInfoMessageSpec
 import scala.collection.JavaConverters._
@@ -24,11 +24,13 @@ import scala.util.{Failure, Success, Try}
 class NetworkController extends Actor with StrictLogging {
 
   val networkSettings: NetworkSettings = settings.network
-  context.actorOf(Props[PeerSynchronizer].withDispatcher("network-dispatcher"), "peerSynchronizer")
+  val peerSynchronizer: ActorRef =
+    context.actorOf(Props[PeerSynchronizer].withDispatcher("network-dispatcher"), "peerSynchronizer")
   val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
   var messageHandlers: Map[Seq[MessageCode], ActorRef] = Map.empty
   var outgoing: Set[InetSocketAddress] = Set.empty
   lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse None
+  var knownPeersCollection: Set[InetSocketAddress] = settings.network.knownPeers.toSet
 
   if (!networkSettings.localOnly.getOrElse(false)) {
     networkSettings.declaredAddress.foreach { myAddress =>
@@ -74,14 +76,19 @@ class NetworkController extends Actor with StrictLogging {
 
   def peerLogic: Receive = {
     ///TODO: Duplicate `checkPossibilityToAddPeer` logic
-    case ConnectTo(remote) if checkPossibilityToAddPeer(remote) =>
+    case ConnectTo(remote) if CheckPeersObj.checkPossibilityToAddPeer(remote, knownPeersCollection, settings) =>
       outgoing += remote
       IO(Tcp) ! Connect(remote,
         localAddress = externalSocketAddress,
         options = KeepAlive(true) :: Nil,
         timeout = Some(networkSettings.connectionTimeout),
         pullMode = true)
-    case Connected(remote, local) if checkPossibilityToAddPeer(remote) =>
+    case PeerFromCli(address) =>
+      knownPeersCollection = knownPeersCollection + address
+      peerManager ! PeerFromCli(address)
+      peerSynchronizer ! PeerFromCli(address)
+      self ! ConnectTo(address)
+    case Connected(remote, local) if CheckPeersObj.checkPossibilityToAddPeer(remote, knownPeersCollection, settings) =>
       val direction: ConnectionType = if (outgoing.contains(remote)) Outgoing else Incoming
       val logMsg: String = direction match {
         case Incoming => s"New incoming connection from $remote established (bound to local $local)"
@@ -93,7 +100,7 @@ class NetworkController extends Actor with StrictLogging {
       outgoing -= remote
     case Connected(remote, local) =>
       logger.info(s"Peer $remote trying to connect, but checkPossibilityToAddPeer(remote):" +
-        s" ${checkPossibilityToAddPeer(remote)}.")
+        s" ${CheckPeersObj.checkPossibilityToAddPeer(remote, knownPeersCollection, settings)}.")
     case CommandFailed(c: Connect) =>
       outgoing -= c.remoteAddress
       logger.info("Failed to connect to : " + c.remoteAddress)
@@ -124,6 +131,5 @@ object NetworkController {
     case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)
 
     case class ConnectTo(address: InetSocketAddress)
-
   }
 }

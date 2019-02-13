@@ -1,8 +1,7 @@
 package encry.cli.commands
 
 import java.net.InetSocketAddress
-import encry.EncryApp.system
-import scala.concurrent.ExecutionContext.Implicits.global
+import encry.EncryApp._
 import encry.cli.{Ast, Response}
 import encry.settings.EncryAppSettings
 import scala.concurrent.Future
@@ -16,7 +15,7 @@ object AddPeer extends Command {
     val host: String = args.requireArg[Ast.Str]("host").s
     val port: Long = args.requireArg[Ast.Num]("port").i
     val peer: InetSocketAddress = new InetSocketAddress(host, port.toInt)
-    system.actorSelection("/user/peerManager") ! PeerFromCli(peer)
+    networkController ! PeerFromCli(peer)
     Future(Some(Response("Peer added!")))
   }
 
