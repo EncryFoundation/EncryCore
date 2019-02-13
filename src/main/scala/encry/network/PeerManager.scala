@@ -121,7 +121,7 @@ object PeerManager {
   }
 }
 
-/// TODO: REMOVE THIS
+// TODO: REMOVE THIS
 case class PeerInfo(lastSeen: Long, nodeName: Option[String] = None, connectionType: Option[ConnectionType] = None)
 
 object CheckPeersObj {
