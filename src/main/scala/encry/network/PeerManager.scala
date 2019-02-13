@@ -15,7 +15,7 @@ import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.util.Random
 
-class PeerManager(networkControllerRef: ActorRef) extends Actor with StrictLogging {
+class PeerManager extends Actor with StrictLogging {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
   var connectingPeers: Set[InetSocketAddress] = Set.empty
