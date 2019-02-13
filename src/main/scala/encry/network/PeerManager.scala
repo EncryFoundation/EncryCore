@@ -34,8 +34,7 @@ class PeerManager(networkControllerRef: ActorRef) extends Actor with StrictLoggi
         CheckPeersObj.checkPossibilityToAddPeer(address, knownPeersCollection, settings) &&
         checkDuplicateIP(address)) timeProvider
         .time()
-        .map { time => addOrUpdateKnownPeer(address, PeerInfo(time, peerNameOpt, connTypeOpt))
-        }
+        .map(time => addOrUpdateKnownPeer(address, PeerInfo(time, peerNameOpt, connTypeOpt)))
     case RandomPeers(howMany: Int) => sender() ! Random.shuffle(knownPeers().keys.toSeq).take(howMany)
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
     case DoConnecting(remote, direction) =>
