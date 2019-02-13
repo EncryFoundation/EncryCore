@@ -56,13 +56,14 @@ object EncryApp extends App with StrictLogging {
     )
   }
 
-  lazy val auxHistoryHolder: ActorRef = system.actorOf(Props(new AuxiliaryHistoryHolder(settings, timeProvider, nodeViewSynchronizer))
+  lazy val auxHistoryHolder: ActorRef =
+    system.actorOf(Props(new AuxiliaryHistoryHolder(settings, timeProvider, nodeViewSynchronizer))
     .withDispatcher("aux-history-dispatcher"), "auxHistoryHolder")
   lazy val nodeViewHolder: ActorRef = system.actorOf(EncryNodeViewHolder.props(auxHistoryHolder), "nodeViewHolder")
   val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
     .withDispatcher("network-dispatcher"), "networkController")
-  lazy val peerManager: ActorRef = system.actorOf(Props[PeerManager], "peerManager")
+  lazy val peerManager: ActorRef = system.actorOf(Props(classOf[PeerManager]), "peerManager")
   lazy val nodeViewSynchronizer: ActorRef =
     system.actorOf(Props(classOf[NodeViewSynchronizer]), "nodeViewSynchronizer")
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
@@ -76,7 +77,9 @@ object EncryApp extends App with StrictLogging {
     else None
   if (settings.kafka.exists(_.sendToKafka))
     system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
-  if (settings.postgres.exists(_.enableSave)) system.actorOf(Props(classOf[BlockListener], dbService, nodeViewHolder).withDispatcher("block-listener-dispatcher"), "blockListener")
+  if (settings.postgres.exists(_.enableSave))
+    system.actorOf(Props(classOf[BlockListener], dbService, nodeViewHolder)
+      .withDispatcher("block-listener-dispatcher"), "blockListener")
 
   if (settings.node.mining) miner ! StartMining
   if (settings.node.useCli) {
@@ -126,5 +129,4 @@ object EncryApp extends App with StrictLogging {
     withinTimeRange = 60 seconds) {
     case _ => Restart
   }
-
 }
