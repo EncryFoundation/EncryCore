@@ -62,7 +62,6 @@ object HistoryBenches {
     val transactionsNumber: Int = 10
     val settings: EncryAppSettings = EncryAppSettings.read
     val tmpDir: File = getRandomTempDir
-
     val initialHistory: EncryHistory = generateHistory(settings, tmpDir)
 
     val resultedHistory: (EncryHistory, Option[Block], Vector[Block]) =
