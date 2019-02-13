@@ -12,11 +12,12 @@ import encry.settings.EncryAppSettings
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetNodeViewChanges
 import encry.view.history.EncryHistoryReader
 
+import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolder: ActorRef) extends Actor with StrictLogging {
+class BlockListener(dbService: DBService, nodeViewHolder: ActorRef) extends Actor with StrictLogging {
 
   val settings: EncryAppSettings = EncryAppSettings.read
 
@@ -48,22 +49,23 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
       if (dbHeight <= currentHistoryHeight && currentHistoryHeight >= writingGap) {
         context.become(uploadGap(history, history.bestBlockOpt.map(_.header.height).getOrElse(0) - writingGap))
         self ! UploadToDbOnHeight(if (dbHeight == 0) 0 else dbHeight + 1)
-      } else context.become(operating(history, Vector.empty, dbHeight))
+      } else context.become(operating(history, mutable.LinkedHashSet(), dbHeight))
     }
     case NewBestBlock(_) =>
   }
 
-  def operating(history: EncryHistoryReader, pending: Vector[Int] = Vector(), lastUploaded: Int): Receive =
+  def operating(history: EncryHistoryReader, pending: mutable.LinkedHashSet[Int] = mutable.LinkedHashSet(), lastUploaded: Int): Receive =
     orphanedAndChainSwitching.orElse {
       case NewBestBlock(newHeight) =>
         nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
 
-        val newPending: Seq[Height] =
-          if (newHeight != 0 && newHeight - writingGap - lastUploaded > 1) (lastUploaded + 1 until (newHeight - writingGap)).toVector
-          else Vector[Int]()
+        val newPending: mutable.LinkedHashSet[Height] =
+          if (newHeight != 0 && newHeight - writingGap - lastUploaded > 1) mutable.LinkedHashSet(lastUploaded + 1 until (newHeight - writingGap):_*)
+          else mutable.LinkedHashSet()
 
         bestBlockOptAtHeight(history, newHeight - writingGap) match {
-          case Some(block) if newPending.isEmpty => dbService.processBlock(block).foreach { _ =>
+          case Some(block) if newPending.isEmpty =>
+            dbService.processBlock(block).foreach { _ =>
             self ! LastUploaded(newHeight - writingGap)
           }
           case Some(block) =>
@@ -71,13 +73,13 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
             context.become(operating(history, pending ++ newPending, lastUploaded))
           case None if newHeight - writingGap >= 0 =>
             logger.info(s"Block on height ${newHeight - writingGap} not found, adding to pending list")
-            context.become(operating(history, (pending :+ (newHeight - writingGap)) ++ newPending, lastUploaded))
+            context.become(operating(history, (pending += (newHeight - writingGap)) ++ newPending, lastUploaded))
           case None =>
         }
       case ChangedHistory(newHistory) =>
-        if (pending.nonEmpty) context.become(operating(newHistory, tryToUploadPending(newHistory,pending), lastUploaded))
+        if (pending.nonEmpty) context.become(operating(newHistory, tryToUploadPending(newHistory, pending.toVector), lastUploaded))
         else context.become(operating(newHistory, pending, lastUploaded))
-      case LastUploaded(h) => context.become(operating(history, pending, h))
+      case LastUploaded(h) => context.become(operating(history, pending - h, h))
   }
 
   def uploadGap(history: EncryHistoryReader, currentHeight: Int, pending: Vector[Int] = Vector()): Receive =
@@ -92,7 +94,8 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
           }
         }
       case UploadToDbOnHeight(_) => nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
-      case ChangedHistory(newHistory) => context.become(operating(newHistory, pending, newHistory.bestBlockOpt.map(_.header.height).getOrElse(0)))
+      case ChangedHistory(newHistory) =>
+        context.become(operating(newHistory, mutable.LinkedHashSet(pending:_*), newHistory.bestBlockOpt.map(_.header.height).getOrElse(0)))
       case NewBestBlock(height) => context.become(uploadGap(history, currentHeight, pending :+ height))
     }
 
@@ -102,8 +105,8 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
       .flatMap(history.typedModifierById[Header])
       .flatMap(history.getBlock)
 
-  def tryToUploadPending(history: EncryHistoryReader, pending: Vector[Int]): Vector[Int] =
-    pending.map(height => (bestBlockOptAtHeight(history, height), height)).foldLeft(Vector[Int]()) {
+  def tryToUploadPending(history: EncryHistoryReader, pending: Vector[Int]): mutable.LinkedHashSet[Int] = {
+    val res = pending.map(height => (bestBlockOptAtHeight(history, height), height)).foldLeft(Vector[Int]()) {
       case (notFound, (blockOpt, height)) =>
         blockOpt match {
           case Some(block) =>
@@ -112,8 +115,9 @@ class BlockListener(dbService: DBService, readersHolder: ActorRef, nodeViewHolde
             notFound
           case None => notFound :+ height
         }
-      }
-
+    }
+    mutable.LinkedHashSet(res:_*)
+  }
 }
 
 object BlockListener {

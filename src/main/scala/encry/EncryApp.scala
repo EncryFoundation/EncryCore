@@ -76,7 +76,7 @@ object EncryApp extends App with StrictLogging {
     else None
   if (settings.kafka.exists(_.sendToKafka))
     system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
-  if (settings.postgres.exists(_.enableSave)) system.actorOf(Props(classOf[BlockListener], dbService, readersHolder, nodeViewHolder), "blockListener")
+  if (settings.postgres.exists(_.enableSave)) system.actorOf(Props(classOf[BlockListener], dbService, nodeViewHolder).withDispatcher("block-listener-dispatcher"), "blockListener")
 
   if (settings.node.mining) miner ! StartMining
   if (settings.node.useCli) {

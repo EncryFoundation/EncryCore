@@ -18,6 +18,8 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
 
   import BlockProcessor._
 
+  protected val auxHistory: Boolean = false
+
   /** Id of header that contains transactions and proofs */
   override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
 
@@ -76,7 +78,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
                 .getOrElse(false))
         updateStorage(newModRow, newBestHeader.id, updateBestHeader)
 
-        if (settings.postgres.exists(_.enableSave))
+        if (settings.postgres.exists(_.enableSave) && !auxHistory)
           system.actorSelection("/user/blockListener") ! NewBestBlock(fullBlock.header.height)
 
         if (blocksToKeep >= 0) {
