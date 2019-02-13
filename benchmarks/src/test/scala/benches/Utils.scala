@@ -2,6 +2,7 @@ package benches
 
 import java.io.File
 import akka.actor.ActorRef
+import com.typesafe.scalalogging.StrictLogging
 import encry.avltree
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
@@ -34,7 +35,10 @@ import scorex.utils.Random
 import scala.collection.immutable
 import scala.util.{Random => R}
 
-object Utils {
+object Utils extends StrictLogging {
+
+  val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
+  val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
 
   def generateGenesisBlockValidForState(state: UtxoState): Block = {
     val txs = Seq(coinbaseTransaction(0))
@@ -54,31 +58,42 @@ object Utils {
     Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
   }
 
-  def generateNextBlockValidForState(prevBlock: Block, state: UtxoState, box: Seq[AssetBox]): Block = {
-    val txs: Seq[Transaction] = box.map(b =>
-      defaultPaymentTransactionScratch(
-        privKey,
-        fee = 111,
-        timestamp = 11L,
-        useBoxes = IndexedSeq(b),
-        recipient = randomAddress,
-        amount = 10000
-      )) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
-    val (adProofN: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(txs).get
+  def generateNextBlockValidForState(prevBlock: Block,
+                                     state: UtxoState,
+                                     box: Seq[AssetBox],
+                                     transactionsNumberInEachBlock: Int,
+                                     numberOfInputsInOneTransaction: Int,
+                                     numberOfOutputsInOneTransaction: Int): Block = {
+
+    val transactions: Seq[Transaction] = (0 until transactionsNumberInEachBlock).foldLeft(box, Seq.empty[Transaction]) {
+      case ((boxes, transactionsL), _) =>
+        val tx: Transaction = defaultPaymentTransactionScratch(
+          privKey,
+          fee = 111,
+          timestamp = 11L,
+          useBoxes = boxes.take(numberOfInputsInOneTransaction).toIndexedSeq,
+          recipient = randomAddress,
+          amount = 10000,
+          numOfOutputs = numberOfOutputsInOneTransaction
+        )
+        (boxes.drop(numberOfInputsInOneTransaction), transactionsL :+ tx)
+    }._2 ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
+    logger.info(s"Number of generated transactions: ${transactions.size}.")
+    val (adProofN: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(transactions).get
     val adPN: Digest32 = ADProofs.proofDigest(adProofN)
     val header = Header(
       1.toByte,
       prevBlock.id,
       adPN,
       adDigest,
-      Payload.rootHash(txs.map(_.id)),
+      Payload.rootHash(transactions.map(_.id)),
       System.currentTimeMillis(),
       prevBlock.header.height + 1,
       R.nextLong(),
       Difficulty @@ BigInt(1),
       EquihashSolution(Seq(1, 3))
     )
-    Block(header, Payload(header.id, txs), None)
+    Block(header, Payload(header.id, transactions), None)
   }
 
   def generateNextBlockValidForHistory(history: EncryHistory,
@@ -178,9 +193,6 @@ object Utils {
       Height @@ 100
     )
   }
-
-  val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
-  val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
 
   def createPrivKey(seed: Option[String]): PrivateKey25519 = {
     val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
@@ -357,5 +369,4 @@ object Utils {
       override protected val timeProvider: NetworkTimeProvider = ntp
     }
   }
-
 }

@@ -20,7 +20,6 @@ class SerializedMonetaryTxBenchmark {
   @Benchmark
   def serializePaymentTransactionsBench(stateBench: SerializedMonetaryBenchState, bh: Blackhole): Unit =
     bh.consume(stateBench.initialTransactions.map(tx => tx.bytes))
-
 }
 
 object SerializedMonetaryTxBenchmark {
