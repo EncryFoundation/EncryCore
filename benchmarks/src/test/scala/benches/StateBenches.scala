@@ -44,14 +44,14 @@ object StateBenches {
       .include(".*" + classOf[StateBenches].getSimpleName + ".*")
       .forks(1)
       .threads(1)
-      .warmupIterations(1)
-      .measurementIterations(1)
+      .warmupIterations(10)
+      .measurementIterations(10)
       .mode(Mode.AverageTime)
       .timeUnit(TimeUnit.SECONDS)
       .addProfiler(classOf[GCProfiler])
       .verbosity(VerboseMode.EXTRA)
       .warmupTime(TimeValue.milliseconds(500))
-      .measurementTime(TimeValue.minutes(1))
+      .measurementTime(TimeValue.minutes(5))
       .build
     new Runner(opt).run
   }
@@ -60,14 +60,13 @@ object StateBenches {
   class StateBenchState {
 
     /**
-      * Total number of boxes must be equal or more to transactionsNumberInEachBlock / numberOfInputsInOneTransaction.
-      * (boxesNumber = blocksNumber * transactionsNumber * numberOfInputsInOneTransaction).
+      * (totalBoxesNumber >= blocksNumber * transactionsNumberInEachBlock * numberOfInputsInOneTransaction)!
       */
-    val totalBoxesNumber: Int = 100000
-    val blocksNumber: Int = 100
-    val transactionsNumberInEachBlock: Int = 10
-    val numberOfInputsInOneTransaction: Int = 10
-    val numberOfOutputsInOneTransaction: Int = 50
+    val totalBoxesNumber: Int = 5000
+    val blocksNumber: Int = 10
+    val transactionsNumberInEachBlock: Int = 25
+    val numberOfInputsInOneTransaction: Int = 20
+    val numberOfOutputsInOneTransaction: Int = 100
 
     val settings: EncryAppSettings = EncryAppSettings.read
     val tmpDir: File = getRandomTempDir

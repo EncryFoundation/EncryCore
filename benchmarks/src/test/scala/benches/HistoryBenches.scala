@@ -43,14 +43,14 @@ object HistoryBenches {
       .include(".*" + classOf[HistoryBenches].getSimpleName + ".*")
       .forks(1)
       .threads(1)
-      .warmupIterations(1)
-      .measurementIterations(1)
+      .warmupIterations(5)
+      .measurementIterations(10)
       .mode(Mode.AverageTime)
       .timeUnit(TimeUnit.SECONDS)
       .verbosity(VerboseMode.EXTRA)
       .addProfiler(classOf[GCProfiler])
       .warmupTime(TimeValue.milliseconds(500))
-      .measurementTime(TimeValue.minutes(1))
+      .measurementTime(TimeValue.minutes(10))
       .build
     new Runner(opt).run
   }
@@ -58,7 +58,7 @@ object HistoryBenches {
   @State(Scope.Benchmark)
   class HistoryBenchState {
 
-    val blocksNumber: Int = 1500
+    val blocksNumber: Int = 15000
     val transactionsNumber: Int = 10
     val settings: EncryAppSettings = EncryAppSettings.read
     val tmpDir: File = getRandomTempDir

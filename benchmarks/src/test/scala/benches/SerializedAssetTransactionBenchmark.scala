@@ -14,11 +14,11 @@ import org.openjdk.jmh.runner.options.{OptionsBuilder, TimeValue, VerboseMode}
 class SerializedAssetTransactionBenchmark {
 
   @Benchmark
-  def deserializeDataTransactionsBench(stateBench: SerializedAssetBenchState, bh: Blackhole): Unit =
+  def deserializeAssetTransactionsBench(stateBench: SerializedAssetBenchState, bh: Blackhole): Unit =
     bh.consume(stateBench.serializedTransactions.map(b => TransactionSerializer.parseBytes(b)))
 
   @Benchmark
-  def serializeDataTransactionsBench(stateBench: SerializedAssetBenchState, bh: Blackhole): Unit =
+  def serializeAssetTransactionsBench(stateBench: SerializedAssetBenchState, bh: Blackhole): Unit =
     bh.consume(stateBench.initialTransactions.map(tx => tx.bytes))
 }
 
@@ -51,6 +51,8 @@ object SerializedAssetTransactionBenchmark {
     var initialBoxes: IndexedSeq[AssetBox] = IndexedSeq.empty[AssetBox]
     var initialTransactions: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
     var serializedTransactions: IndexedSeq[Array[Byte]] = IndexedSeq.empty[Array[Byte]]
+
+    val a = Seq
 
     @Setup
     def createStateForBenchmark(): Unit = {
