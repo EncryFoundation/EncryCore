@@ -52,8 +52,6 @@ object SerializedAssetTransactionBenchmark {
     var initialTransactions: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
     var serializedTransactions: IndexedSeq[Array[Byte]] = IndexedSeq.empty[Array[Byte]]
 
-    val a = Seq
-
     @Setup
     def createStateForBenchmark(): Unit = {
       initialBoxes = generateInitialBoxes(totalBoxesNumber)
