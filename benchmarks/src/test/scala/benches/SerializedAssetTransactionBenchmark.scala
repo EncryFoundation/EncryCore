@@ -59,4 +59,5 @@ object SerializedAssetTransactionBenchmark {
       serializedTransactions = initialTransactions.map(tx => tx.bytes)
     }
   }
+
 }
