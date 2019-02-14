@@ -46,7 +46,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     .flatMap(h => headerIdsAtHeight(h).headOption)
 
   /**
-    * Whether another's node syncinfo shows that another node is ahead or behind ours
+    * Whether another's node syncInfo shows that another node is ahead or behind ours
     *
     * @param si other's node sync info
     * @return Equal if nodes have the same history, Younger if another node is behind, Older if a new node is ahead

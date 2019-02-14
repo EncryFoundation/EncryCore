@@ -1,15 +1,15 @@
 package encry.network
 
-import java.net.InetAddress
+import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.{Actor, Cancellable}
+import akka.actor.{Actor, ActorRef, Cancellable}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.{networkController, nodeViewHolder, settings}
 import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.history.Header
 import encry.modifiers.mempool.Transaction
-import encry.network.DeliveryManager.FullBlockChainSynced
+import encry.network.DeliveryManager._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
@@ -28,7 +28,7 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
-class DeliveryManager extends Actor with StrictLogging {
+class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogging {
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
@@ -44,6 +44,21 @@ class DeliveryManager extends Actor with StrictLogging {
   val invSpec: InvSpec = new InvSpec(settings.network.maxInvObjects)
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
   val statusTracker: SyncTracker = SyncTracker(self, context, settings.network)
+
+  /**
+    * ?!
+    * Maybe will be better to use construction like:
+    * Vector[InetSocketAddress -> PeerConnectionInformation]
+    * PeerConnectionInformation(f[A], trusted)
+    * ?!
+    */
+  var peersInformationTracker: Vector[PeerConnectionInformation] = Vector.empty[PeerConnectionInformation]
+
+  /**
+    * (INT, INT, LONG) -> REQUESTED, RECEIVED, TIMEOUT
+    */
+  val peersInfoMap: Map[InetSocketAddress, (Int, Int, Long)] = Map.empty[InetSocketAddress, (Int, Int, Long)]
+
 
   def key(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
@@ -87,16 +102,26 @@ class DeliveryManager extends Actor with StrictLogging {
       val modifiers: Map[ModifierId, Array[Byte]] = data._2
       val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
         modifiers partition { case (id, _) => isSpam(id) }
-      if (settings.influxDB.isDefined)
-        context.actorSelection("/user/statsSender") ! GetModifiers(typeId, modifiers.keys.toSeq)
+      influxRef.foreach(_ ! GetModifiers(typeId, modifiers.keys.toSeq))
       for ((id, _) <- modifiers) receive(typeId, id, remote)
       if (spam.nonEmpty) {
         logger.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
           s": ${spam.keys.map(Algos.encode)}")
         deleteSpam(spam.keys.toSeq)
       }
-      val filteredModifiers = fm.filterNot{ case (modId, _) => historyReaderOpt.contains(modId)}.values.toSeq
-      if (filteredModifiers.nonEmpty)nodeViewHolder ! ModifiersFromRemote(typeId, filteredModifiers)
+      val filteredModifiers: Seq[Array[Byte]] = fm.filterNot { case (modId, _) => historyReaderOpt.contains(modId) }.values.toSeq
+
+      /**
+        * Right now will mark as valid all filtered! Next time have to mark valid only applicable to history mods!
+        * *-* TEST *-* -> val validModNum = historyReaderOpt.map(h => filteredModifiers.map(m => h.testApplicable(m)))
+        */
+      if (filteredModifiers.nonEmpty) {
+        nodeViewHolder ! ModifiersFromRemote(typeId, filteredModifiers)
+
+        val currentPeerStatus: (Int, Int, Long) = peersInfoMap.getOrElse(remote.socketAddress, (0, 0, 0L))
+        peersInfoMap.updated(remote.socketAddress,
+          (currentPeerStatus._1, currentPeerStatus._2 + filteredModifiers.size, currentPeerStatus._3))
+      }
       historyReaderOpt.foreach { h =>
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
         else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
@@ -117,13 +142,16 @@ class DeliveryManager extends Actor with StrictLogging {
   }
 
   /**
-    * If node is not synced, send sync info to random peer, overwise to all known peers
+    * If node is not synced, send sync info to random peer, otherwise to all known peers
+    *
     * @param syncInfo
     */
   def sendSync(syncInfo: EncrySyncInfo): Unit = {
-    if (isBlockChainSynced) statusTracker.peersToSyncWith().foreach(peer =>
-      peer.handlerRef ! Message(EncrySyncInfoMessageSpec, Right(syncInfo), None)
-    ) else Random.shuffle(statusTracker.peersToSyncWith()).headOption.foreach(peer =>
+    if (isBlockChainSynced)
+      statusTracker.peersToSyncWith().foreach(peer =>
+        peer.handlerRef ! Message(EncrySyncInfoMessageSpec, Right(syncInfo), None)
+      )
+    else Random.shuffle(statusTracker.peersToSyncWith()).headOption.foreach(peer =>
       peer.handlerRef ! Message(EncrySyncInfoMessageSpec, Right(syncInfo), None)
     )
   }
@@ -146,10 +174,12 @@ class DeliveryManager extends Actor with StrictLogging {
       notYetRequestedIds.foreach { id =>
         val cancellable: Cancellable = context.system.scheduler
           .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(peer, mTypeId, id))
-        val peerMap = cancellables.getOrElse(peer.socketAddress.getAddress, Map.empty)
+        ///TODO: If modId comes here twice, it's schedule will be always 0
+        val peerMap: Map[ModifierIdAsKey, (Cancellable, Int)] = cancellables
+          .getOrElse(peer.socketAddress.getAddress, Map.empty)
           .updated(key(id), cancellable -> 0)
         cancellables = cancellables.updated(peer.socketAddress.getAddress, peerMap)
-        val reqAttempts = requestedModifiers.getOrElse(key(id), 0) + 1
+        val reqAttempts: Int = requestedModifiers.getOrElse(key(id), 0) + 1
         requestedModifiers = requestedModifiers.updated(key(id), reqAttempts)
       }
     }
@@ -161,7 +191,7 @@ class DeliveryManager extends Actor with StrictLogging {
     cancellables.get(cp.socketAddress.getAddress) match {
       case Some(modifiersInfo) =>
         modifiersInfo.get(key(modifierId)) match {
-          case Some(modifierInfo)=>
+          case Some(modifierInfo) =>
             peerAndHistoryOpt.foreach { peerInfo =>
               if (modifierInfo._2 < settings.network.maxDeliveryChecks && requestedModifiers.contains(key(modifierId))) {
                 logger.debug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: " +
@@ -178,7 +208,7 @@ class DeliveryManager extends Actor with StrictLogging {
                   cancellables.getOrElse(peerInfo._1.socketAddress.getAddress, Map.empty) - key(modifierId)
                 }
                 cancellables = cancellables.updated(peerInfo._1.socketAddress.getAddress, peerMap)
-                requestedModifiers.get(key(modifierId)).foreach{qtyOfRequests =>
+                requestedModifiers.get(key(modifierId)).foreach { qtyOfRequests =>
                   if (qtyOfRequests - 1 == 0) requestedModifiers = requestedModifiers - key(modifierId)
                   else requestedModifiers = requestedModifiers.updated(key(modifierId), qtyOfRequests - 1)
                 }
@@ -204,7 +234,7 @@ class DeliveryManager extends Actor with StrictLogging {
         ext.groupBy(_._1).mapValues(_.map(_._2)).foreach { case (mid, mods) =>
           networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
         }
-     }
+    }
     else logger.info(s"Peer's $remote hisotry is younger, but node is note synces, so ignore sending extentions")
 
   def priorityRequest(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId], previousModifier: ModifierId): Unit =
@@ -222,18 +252,38 @@ class DeliveryManager extends Actor with StrictLogging {
   /**
     * If node is not synced, send request to random peer with non-younger history, overwise to all peers with
     * non-younger history
+    *
     * @param modifierTypeId
     * @param modifierIds
     */
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     if (settings.influxDB.isDefined)
       context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
-    if (!isBlockChainSynced)
-      Random.shuffle(statusTracker.statuses.filter(_._2 != Younger)).headOption.foreach(pI =>
-        expect(pI._1, modifierTypeId, modifierIds)
-      )
-    else
-      statusTracker.statuses.filter(_._2 != Younger).keys.foreach(expect(_, modifierTypeId, modifierIds))
+    if (!isBlockChainSynced) {
+
+      /**
+        * Better put this logic into expect function!
+        */
+      val peer: Option[(ConnectedPeer, HistoryComparisonResult)] = Random.shuffle(statusTracker.statuses
+        .filter(_._2 != Younger)).headOption
+
+      peer.foreach(pI =>
+        expect(pI._1, modifierTypeId, modifierIds))
+
+      val a: (Int, Int, Long) = peersInfoMap(peer.get._1.socketAddress)
+
+      peersInfoMap.updated(peer.get._1.socketAddress, (a._1 + modifierIds.size, a._2, a._3))
+
+    }
+    else {
+      statusTracker.statuses.filter(_._2 != Younger).keys.foreach { peer =>
+        expect(peer, modifierTypeId, modifierIds)
+
+        val a: (Int, Int, Long) = peersInfoMap(peer.socketAddress)
+
+        peersInfoMap.updated(peer.socketAddress, (a._1 + modifierIds.size, a._2, a._3))
+      }
+    }
   }
 
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit = if (isExpecting(mtid, mid)) {
@@ -256,4 +306,27 @@ class DeliveryManager extends Actor with StrictLogging {
 object DeliveryManager {
 
   case object FullBlockChainSynced
+
+  case class PeerConnectionInformation(address: InetSocketAddress,
+                                       f: Map[InetSocketAddress, (Int, Int)] => PeerPriority,
+                                       priority: PeerPriority) {
+
+    def f(peer: InetSocketAddress, peersCI: Map[InetSocketAddress, (Int, Int)]): PeerPriority =
+      peersCI.find(k => peer == k._1).map { case (_, (requested, valid)) =>
+        if (valid / requested >= 0.66) HighPriority else LowPriority
+      }.getOrElse(InitialPriority)
+
+    def updateInformation(peerPriority: PeerPriority): PeerConnectionInformation =
+      PeerConnectionInformation(address, f, peerPriority)
+
+  }
+
+  sealed trait PeerPriority
+
+  case object HighPriority extends PeerPriority
+
+  case object LowPriority extends PeerPriority
+
+  case object InitialPriority extends PeerPriority
+
 }
