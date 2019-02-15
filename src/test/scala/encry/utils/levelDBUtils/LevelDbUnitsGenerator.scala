@@ -4,6 +4,7 @@ import encry.storage.levelDb.versionalLevelDB.LevelDbElem
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.utils.Random
+import scala.util.{Random => ScalaRandom}
 
 trait LevelDbUnitsGenerator {
 
@@ -27,5 +28,39 @@ trait LevelDbUnitsGenerator {
         List((0 until qtyOfElemsToInsert).map(_ => genRandomInsertValue()): _*),
         Seq.empty[VersionalLevelDbKey]
       ) :: acc
+    }
+
+  /**
+    * Generate list of levelDb elems, where each next elem delete random elem of previous insertions
+    * @param qty
+    * @param qtyOfElemsToInsert
+    * @return
+    */
+  def generateRandomLevelDbElemsWithRandomDeletions(qty: Int, qtyOfElemsToInsert: Int): Seq[LevelDbElem] =
+    (0 until qty).foldLeft(Seq.empty[LevelDbElem], Seq.empty[VersionalLevelDbKey]) {
+      case ((acc, keys), _) =>
+        val elemsToInsert = List((0 until qtyOfElemsToInsert).map(_ => genRandomInsertValue()): _*)
+        val randomElemToDelete = keys(ScalaRandom.nextInt(keys.length))
+        (acc :+ LevelDbElem(
+          LevelDBVersion @@ ByteArrayWrapper(Random.randomBytes()),
+          elemsToInsert,
+          Seq(randomElemToDelete)
+        )) -> (keys.filter(_ != randomElemToDelete) ++ elemsToInsert.map(_._1))
+    }._1
+
+  /**
+    * Generate list of levelDb elems, where each next elem delete all inserts of previous
+    * @param qty
+    * @param qtyOfElemsToInsert
+    * @return
+    */
+  def generateRandomLevelDbElemsWithLinkedDeletions(qty: Int, qtyOfElemsToInsert: Int): Seq[LevelDbElem] =
+    (0 until qty).foldLeft(Seq.empty[LevelDbElem]) {
+      case (acc, _) =>
+        acc :+ LevelDbElem(
+          LevelDBVersion @@ ByteArrayWrapper(Random.randomBytes()),
+          List((0 until qtyOfElemsToInsert).map(_ => genRandomInsertValue()): _*),
+          acc.lastOption.map(_.elemsToInsert.map(_._1)).getOrElse(Seq.empty[VersionalLevelDbKey])
+        )
     }
 }
