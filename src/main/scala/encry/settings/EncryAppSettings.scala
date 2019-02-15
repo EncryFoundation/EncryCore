@@ -17,6 +17,7 @@ case class EncryAppSettings(directory: String,
                             ntp: NetworkTimeProviderSettings,
                             postgres: Option[PostgresSettings],
                             influxDB: Option[InfluxDBSettings],
+                            levelDB: LevelDBSettings,
                             monitoringSettings: Option[MonitoringSettings])
 
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader with StrictLogging {
@@ -69,6 +70,7 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     val ntpSettings = config.as[NetworkTimeProviderSettings](s"$configPath.ntp")
     val postgresSettings = config.as[Option[PostgresSettings]](s"$configPath.postgres")
     val influxSettings = config.as[Option[InfluxDBSettings]](s"$configPath.influxDB")
+    val levelDb = config.as[LevelDBSettings](s"$configPath.levelDB")
     val monitoringSettings = config.as[Option[MonitoringSettings]](s"$configPath.monitoringSettings")
 
     EncryAppSettings(
@@ -81,6 +83,7 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
       ntpSettings,
       postgresSettings,
       influxSettings,
+      levelDb,
       monitoringSettings
     )
   }
@@ -92,8 +95,6 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
 }
 
 case class WalletSettings(password: String, seed: Option[String])
-
-case class LevelDbSettings(enableSave: Boolean, enableRestore: Boolean, batchSize: Int)
 
 case class KafkaSettings(sendToKafka: Boolean, topicName: String, groupId: String, kafkaBrokers: String)
 

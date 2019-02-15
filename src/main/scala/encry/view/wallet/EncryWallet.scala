@@ -11,7 +11,6 @@ import encry.settings.{Constants, EncryAppSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB, WalletVersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.{ModifierId, VersionTag}
 import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.iq80.leveldb.{DB, Options}
 
@@ -63,7 +62,7 @@ object EncryWallet extends StrictLogging {
     keysDir.mkdirs()
     val db: DB = LevelDbFactory.factory.open(walletDir, new Options)
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 33)
-    val walletStorage = WalletVersionalLevelDBCompanion(db)
+    val walletStorage = WalletVersionalLevelDBCompanion(db, settings.levelDB)
     EncryWallet(walletStorage, AccountManager(accountManagerStore))
   }
 }

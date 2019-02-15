@@ -8,7 +8,7 @@ import encry.modifiers.state.StateModifierSerializer
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.EncryBaseBox
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
-import encry.settings.Constants
+import encry.settings.{Constants, LevelDBSettings}
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion._
 import encry.utils.{BalanceCalculator, ByteStr}
 import encry.utils.CoreTaggedTypes.ModifierId
@@ -20,11 +20,11 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Success
 
-case class WalletVersionalLevelDB(db: DB) extends StrictLogging {
+case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLogging {
 
   import WalletVersionalLevelDBCompanion._
 
-  val levelDb: VersionalLevelDB = VersionalLevelDB(db)
+  val levelDb: VersionalLevelDB = VersionalLevelDB(db, settings)
 
   def getAllBoxes: Seq[EncryBaseBox] = levelDb.getAll
       .map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes.data, key.data.head) }
@@ -80,8 +80,8 @@ object WalletVersionalLevelDBCompanion extends StrictLogging {
     BALANCE_KEY -> VersionalLevelDbValue @@ new ByteArrayWrapper(Array.emptyByteArray)
   )
 
-  def apply(levelDb: DB): WalletVersionalLevelDB = {
-    val db = WalletVersionalLevelDB(levelDb)
+  def apply(levelDb: DB, settings: LevelDBSettings): WalletVersionalLevelDB = {
+    val db = WalletVersionalLevelDB(levelDb, settings)
     db.levelDb.recoverOrInit(INIT_MAP)
     db
   }
