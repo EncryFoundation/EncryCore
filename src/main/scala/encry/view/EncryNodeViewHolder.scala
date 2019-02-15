@@ -265,8 +265,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
               val newMemPool: Mempool =
                 updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)
               if (progressInfo.chainSwitchingNeeded)
-                nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get,
-                  newMinState.asInstanceOf[UtxoState].persistentProver).get
+                nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
               else nodeView.wallet
               blocksApplied.foreach(nodeView.wallet.scanPersistent)
               logger.info(s"Persistent modifier ${pmod.encodedId} applied successfully")

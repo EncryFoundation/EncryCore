@@ -203,11 +203,10 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         }
 
       val validBalance: Boolean = {
-        val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(bxs).map {
-          case (tokenId, amount) => Algos.encode(tokenId) -> amount
-        }
+        val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(bxs).map{case (key, value) => Algos.encode(key) -> value}
         val creditB: Map[String, Amount] = {
-          val balanceSheet: Map[TokenId, Amount] = BalanceCalculator.balanceSheet(tx.newBoxes, excludeTokenIssuance = true)
+          val balanceSheet: Map[TokenId, Amount] =
+            BalanceCalculator.balanceSheet(tx.newBoxes, excludeTokenIssuance = true)
           val intrinsicBalance: Amount = balanceSheet.getOrElse(Constants.IntrinsicTokenId, 0L)
           balanceSheet.updated(Constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
         }.map { case (tokenId, amount) => Algos.encode(tokenId) -> amount }

@@ -1,79 +1,41 @@
 package encry.storage.levelDb.versionalLevelDB
 
-import com.google.common.primitives.Longs
-import encry.modifiers.{EncryPersistentModifier, NodeViewModifier}
-import encry.modifiers.history.Block
-import encry.modifiers.mempool.Transaction
-import encry.modifiers.state.box.Box.Amount
-import encry.utils.{BalanceCalculator, BoxFilter}
-import encry.utils.CoreTaggedTypes.ModifierId
-import org.encryfoundation.common.Algos
-import org.iq80.leveldb.{DB, ReadOptions}
-import cats.syntax.semigroup._
 import cats.instances.all._
+import cats.syntax.semigroup._
+import com.google.common.primitives.Longs
+import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.state.StateModifierSerializer
+import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.EncryBaseBox
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
+import encry.settings.Constants
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion._
+import encry.utils.{BalanceCalculator, ByteStr}
+import encry.utils.CoreTaggedTypes.ModifierId
+import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
+import org.iq80.leveldb.DB
+import scorex.crypto.hash.Digest32
 
 import scala.util.Success
 
-case class WalletVersionalLevelDB(override val db: DB) extends VersionalLevelDB[WalletDiff] {
+case class WalletVersionalLevelDB(db: DB) extends StrictLogging {
 
-  import WalletVersionalLevelDB._
+  import WalletVersionalLevelDBCompanion._
 
-  def id: ModifierId = versionsList.lastOption.map(_.modifierId).getOrElse(ModifierId @@ Array.fill(32)(0: Byte))
+  val levelDb: VersionalLevelDB = VersionalLevelDB(db)
 
-  override def add(modifier: NodeViewModifier): Unit = {
-    if (versionsList.size + 1 > maxRollbackDepth) versionsList = versionsList.tail
-    val diffs = WalletVersionalLevelDB.getDiffs(modifier)
-    applyDiff(diffs.tail.foldLeft(diffs.head)(_ ++ _))
-    val newModifiersTree = Version[WalletDiff](modifier.id, diffs)
-    versionsList = versionsList :+ newModifiersTree
-  }
-
-  def getAllBoxes: Seq[EncryBaseBox] =
-    getAll
-      .map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
+  def getAllBoxes: Seq[EncryBaseBox] = levelDb.getAll
+      .map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes.data, key.data.head) }
       .collect {
         case Success(box) => box
       }
 
-  override def getAll: Seq[(Array[Byte], Array[Byte])] = {
-
-    val readOptions = new ReadOptions()
-    readOptions.snapshot(db.getSnapshot)
-    var elementsBuffer: Seq[(Array[Byte], Array[Byte])] = Seq.empty
-    val iterator = db.iterator(readOptions)
-    iterator.seekToFirst()
-    while (iterator.hasNext) {
-      val nextElem = iterator.next()
-      if (nextElem.getKey sameElements WalletVersionalLevelDB.BalancesKey) elementsBuffer
-      else elementsBuffer = elementsBuffer :+ (nextElem.getKey -> nextElem.getValue)
-    }
-    readOptions.snapshot().close()
-    elementsBuffer
+  def getBoxById(id: ADKey): Option[EncryBaseBox] = {
+    levelDb.get(VersionalLevelDbKey @@ new ByteArrayWrapper(id))
+      .flatMap(wrappedBx => StateModifierSerializer.parseBytes(wrappedBx.data, id.head).toOption)
   }
-
-  def getBoxes(qty: Int): Seq[EncryBaseBox] = {
-    val readOptions = new ReadOptions()
-    readOptions.snapshot(db.getSnapshot)
-    var elementsBuffer: Seq[(Array[Byte], Array[Byte])] = Seq.empty
-    val iterator = db.iterator(readOptions)
-    iterator.seekToFirst()
-    while (iterator.hasNext && elementsBuffer.size < qty) {
-      val nextElem = iterator.next()
-      if (nextElem.getKey sameElements WalletVersionalLevelDB.BalancesKey) elementsBuffer
-      else elementsBuffer = elementsBuffer :+ (nextElem.getKey -> nextElem.getValue)
-    }
-    readOptions.snapshot().close()
-    elementsBuffer.map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
-      .collect {
-        case Success(box) => box
-      }
-  }
-
-  def getBoxById(id: ADKey): Option[EncryBaseBox] = StateModifierSerializer.parseBytes(db.get(id), id.head).toOption
 
   def getTokenBalanceById(id: TokenId): Option[Amount] = getBalances
     .find(_._1 sameElements Algos.encode(id))
@@ -81,60 +43,46 @@ case class WalletVersionalLevelDB(override val db: DB) extends VersionalLevelDB[
 
   def containsBox(id: ADKey): Boolean = getBoxById(id).isDefined
 
+  def rollback(modId: ModifierId): Unit = levelDb.rollbackTo(LevelDBVersion @@ new ByteArrayWrapper(modId.untag(ModifierId)))
+
   def updateWallet(modifierId: ModifierId, newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]): Unit = {
     val bxsToInsert: Seq[EncryBaseBox] = newBxs.filter(bx => !spentBxs.contains(bx))
     val newBalances: Map[String, Amount] = {
-      val toRemoveFromBalance = BalanceCalculator.balanceSheet(spentBxs).mapValues(_ * -1)
-      val toAddToBalance = BalanceCalculator.balanceSheet(newBxs)
-      (toAddToBalance |+| toRemoveFromBalance).map { case (tokenId, value) => Algos.encode(tokenId) -> value }
+      val toRemoveFromBalance = BalanceCalculator.balanceSheet(spentBxs).map{case (key, value) => ByteStr(key) -> value * -1}
+      val toAddToBalance = BalanceCalculator.balanceSheet(newBxs).map{case (key, value) => ByteStr(key) -> value}
+      val prevBalance = getBalances.map{case (id, value) => ByteStr(Algos.decode(id).get) -> value}
+      (toAddToBalance |+| toRemoveFromBalance |+| prevBalance).map { case (tokenId, value) => tokenId.toString -> value }
     }
-    val diff = WalletDiff(spentBxs.map(_.id), bxsToInsert, newBalances)
-    val treeNode = Version[WalletDiff](modifierId, Seq(diff))
-    if (versionsList.size + 1 > maxRollbackDepth) versionsList = versionsList.tail
-    versionsList = versionsList :+ treeNode
-    applyDiff(diff)
+    val newBalanceKeyValue = BALANCE_KEY -> VersionalLevelDbValue @@
+      new ByteArrayWrapper(newBalances.foldLeft(Array.emptyByteArray) { case (acc, (id, balance)) =>
+        acc ++ Algos.decode(id).get ++ Longs.toByteArray(balance)
+       })
+    levelDb.insert(LevelDbElem(LevelDBVersion @@ new ByteArrayWrapper(modifierId.untag(ModifierId)),
+      newBalanceKeyValue :: bxsToInsert.map(bx => (VersionalLevelDbKey @@ new ByteArrayWrapper(bx.id.untag(ADKey)),
+        VersionalLevelDbValue @@ new ByteArrayWrapper(bx.bytes))).toList,
+      spentBxs.map(elem => VersionalLevelDbKey @@ new ByteArrayWrapper(elem.id.untag(ADKey))))
+    )
   }
 
-  def applyDiff(diff: WalletDiff): Unit = {
-    val batch = db.createWriteBatch()
-    diff.boxesToRemove.foreach(key => batch.delete(key))
-    diff.boxesToAdd.foreach(box => batch.put(box.id, box.bytes))
-    val previousBalances: Map[String, Amount] = getBalances
-    val newBalances: Map[String, Amount] = diff.balanceChanges |+| previousBalances
-    batch.put(BalancesKey, newBalances.foldLeft(Array.empty[Byte]) { case (acc, (id, balance)) =>
-      acc ++ Algos.decode(id).get ++ Longs.toByteArray(balance)
-    })
-    db.write(batch)
-    batch.close()
-  }
-
-  def getBalances: Map[String, Amount] = {
-    val balances = db.get(BalancesKey)
-    if (balances == null) Map.empty
-    else balances
-      .sliding(40, 40)
-      .map(ch => Algos.encode(ch.take(32)) -> Longs.fromByteArray(ch.takeRight(8)))
-      .toMap
-  }
+  def getBalances: Map[String, Amount] =
+    levelDb.get(BALANCE_KEY)
+      .map(_.data.sliding(40, 40)
+        .map(ch => Algos.encode(ch.take(32)) -> Longs.fromByteArray(ch.takeRight(8)))
+        .toMap).getOrElse(Map.empty)
 }
 
-object WalletVersionalLevelDB {
+object WalletVersionalLevelDBCompanion extends StrictLogging {
 
-  val BalancesKey: Array[Byte] = Algos.hash("balances")
+  val BALANCE_KEY: VersionalLevelDbKey =
+    VersionalLevelDbKey @@ new ByteArrayWrapper(Algos.hash("BALANCE_KEY").untag(Digest32))
 
-  def apply(db: DB): WalletVersionalLevelDB = {
-    val tree = new WalletVersionalLevelDB(db)
-    if (tree.db.get(BalancesKey) == null) db.put(BalancesKey, Array.emptyByteArray)
-    tree
-  }
+  val INIT_MAP: Map[VersionalLevelDbKey, VersionalLevelDbValue] = Map(
+    BALANCE_KEY -> VersionalLevelDbValue @@ new ByteArrayWrapper(Array.emptyByteArray)
+  )
 
-  def getDiffs(modifier: NodeViewModifier): Seq[WalletDiff] = modifier match {
-    case block: Block => block.payload.transactions.flatMap(getDiffs)
-    case tx: Transaction =>
-      val toDelete = tx.inputs.map(_.boxId)
-      val toAdd = tx.newBoxes.toList
-      val balances = BalanceCalculator.balanceSheet(toAdd)
-      Seq(WalletDiff(toDelete, toAdd, balances.map { case (tokenId, value) => Algos.encode(tokenId) -> value }))
-    case _ => Seq.empty
+  def apply(levelDb: DB): WalletVersionalLevelDB = {
+    val db = WalletVersionalLevelDB(levelDb)
+    db.levelDb.recoverOrInit(INIT_MAP)
+    db
   }
 }

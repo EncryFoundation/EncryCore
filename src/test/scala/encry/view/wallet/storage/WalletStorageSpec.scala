@@ -14,6 +14,7 @@ class WalletStorageSpec extends PropSpec with Matchers {
 
   property("Complex value unpacking from storage") {
 
+
     val values: Seq[Array[Byte]] = Seq(Array.fill(32)(1: Byte), Array.fill(32)(2: Byte), Array.fill(32)(3: Byte))
 
     val packedValues: ByteArrayWrapper = new ByteArrayWrapper(values.foldLeft(Array[Byte]())(_ ++ _))

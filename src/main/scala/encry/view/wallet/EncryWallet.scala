@@ -1,23 +1,23 @@
 package encry.view.wallet
 
 import java.io.File
+
+import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.Block
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.{EncryBaseBox, EncryProposition}
-import encry.settings.EncryAppSettings
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB}
+import encry.settings.{Constants, EncryAppSettings}
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB, WalletVersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.{ModifierId, VersionTag}
 import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.Algos.HF
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.iq80.leveldb.{DB, Options}
-import scorex.crypto.hash.Digest32
+
 import scala.util.Try
 
-case class EncryWallet(walletStore: DB, accountManager: AccountManager) {
-
-  val walletStorage: WalletVersionalLevelDB = WalletVersionalLevelDB(walletStore)
+case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: AccountManager) extends StrictLogging {
 
   def publicKeys: Set[PublicKey25519] = accountManager.publicAccounts.toSet
 
@@ -39,20 +39,18 @@ case class EncryWallet(walletStore: DB, accountManager: AccountManager) {
               }
             (nBxs ++ newBxsL) -> (sBxs ++ spendBxsIdsL)
         }
-
       walletStorage.updateWallet(modifier.id, newBxs, spentBxs)
       this
 
     case _ => this
   }
 
-  def rollback(to: VersionTag, prover: encry.avltree.PersistentBatchAVLProver[Digest32, HF]): Try[Unit] =
-    walletStorage.tryRollbackTo(ModifierId @@ to.untag(VersionTag), prover)
+  def rollback(to: VersionTag): Try[Unit] = Try(walletStorage.rollback(ModifierId @@ to.untag(VersionTag)))
 
   def getBalances: Seq[(String, Long)] = walletStorage.getBalances.toSeq
 }
 
-object EncryWallet {
+object EncryWallet extends StrictLogging {
 
   def getWalletDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/wallet")
 
@@ -65,6 +63,7 @@ object EncryWallet {
     keysDir.mkdirs()
     val db: DB = LevelDbFactory.factory.open(walletDir, new Options)
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 33)
-    EncryWallet(db, AccountManager(accountManagerStore))
+    val walletStorage = WalletVersionalLevelDBCompanion(db)
+    EncryWallet(walletStorage, AccountManager(accountManagerStore))
   }
 }

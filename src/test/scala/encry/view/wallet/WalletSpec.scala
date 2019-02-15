@@ -1,19 +1,20 @@
 package encry.view.wallet
 
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.{AssetBox, MonetaryBox}
 import encry.settings.{Constants, EncryAppSettings}
-import encry.storage.levelDb.versionalLevelDB.LevelDbFactory
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDBCompanion}
 import encry.utils.TestHelper.Props
 import encry.utils.{EncryGenerator, FileHelper}
 import io.iohk.iodb.LSMStore
 import org.iq80.leveldb.{DB, Options}
 import org.scalatest.{Matchers, PropSpec}
 
-class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator {
+class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator with StrictLogging {
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read
 
@@ -29,7 +30,9 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val accountManager: AccountManager = AccountManager(accountManagerStore)
 
-    val wallet: EncryWallet = EncryWallet(db, accountManager)
+    val walletStorage = WalletVersionalLevelDBCompanion.apply(db)
+
+    val wallet: EncryWallet = EncryWallet(walletStorage, accountManager)
 
     val validTxs: Seq[Transaction] = genValidPaymentTxsToAddr(4, accountManager.mandatoryAccount.publicImage.address.address)
 
@@ -80,7 +83,9 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val keyManager: AccountManager = AccountManager(accountManagerStore)
 
-    val wallet: EncryWallet = EncryWallet(db, keyManager)
+    val walletStorage = WalletVersionalLevelDBCompanion(db)
+
+    val wallet: EncryWallet = EncryWallet(walletStorage, keyManager)
 
     val validTxs: Seq[Transaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.mandatoryAccount.publicImage.address.address)
 
