@@ -7,6 +7,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
 import encry.network.PeerConnectionHandler._
+import encry.network.SyncTracker.{PeerPriority, _}
 import encry.settings.NetworkSettings
 import encry.utils.NetworkTime.Time
 
@@ -18,7 +19,8 @@ case class SyncTracker(deliveryManager: ActorRef,
                        context: ActorContext,
                        networkSettings: NetworkSettings) extends StrictLogging {
 
-  var statuses: Map[ConnectedPeer, HistoryComparisonResult] = Map.empty
+  var statuses: Map[ConnectedPeer, (HistoryComparisonResult, PeerPriority)] = Map.empty
+
   private var schedule: Option[Cancellable] = None
   private val lastSyncSentTime: mutable.Map[ConnectedPeer, Time] = mutable.Map[ConnectedPeer, Time]()
   private var lastSyncInfoSentTime: Time = 0L
@@ -31,8 +33,9 @@ case class SyncTracker(deliveryManager: ActorRef,
   }
 
   def updateStatus(peer: ConnectedPeer, status: HistoryComparisonResult): Unit = {
+    val priority: PeerPriority = statuses.getOrElse(peer, (Unknown, InitialPriority()))._2
     val seniorsBefore: Int = numOfSeniors()
-    statuses = statuses.updated(peer, status)
+    statuses = statuses.updated(peer, (status, priority))
     val seniorsAfter: Int = numOfSeniors()
     if (seniorsBefore > 0 && seniorsAfter == 0) {
       logger.info("Syncing is done, switching to stable regime")
@@ -62,7 +65,7 @@ case class SyncTracker(deliveryManager: ActorRef,
   private def outdatedPeers(): Seq[ConnectedPeer] =
     lastSyncSentTime.filter(t => (System.currentTimeMillis() - t._2).millis > networkSettings.syncInterval).keys.toSeq
 
-  private def numOfSeniors(): Int = statuses.count(_._2 == Older)
+  private def numOfSeniors(): Int = statuses.count(_._2._1 == Older)
 
   /**
     * Return the peers to which this node should send a sync signal, including:
@@ -71,8 +74,8 @@ case class SyncTracker(deliveryManager: ActorRef,
     */
   def peersToSyncWith(): Seq[ConnectedPeer] = {
     val outdated: Seq[ConnectedPeer] = outdatedPeers()
-    lazy val unknowns: IndexedSeq[ConnectedPeer] = statuses.filter(_._2 == Unknown).keys.toIndexedSeq
-    lazy val olders: IndexedSeq[ConnectedPeer] = statuses.filter(_._2 == Older).keys.toIndexedSeq
+    lazy val unknowns: IndexedSeq[ConnectedPeer] = statuses.filter(_._2._1 == Unknown).keys.toIndexedSeq
+    lazy val olders: IndexedSeq[ConnectedPeer] = statuses.filter(_._2._1 == Older).keys.toIndexedSeq
     lazy val nonOutdated: IndexedSeq[ConnectedPeer] =
       if (olders.nonEmpty) olders(scala.util.Random.nextInt(olders.size)) +: unknowns else unknowns
     val peers: Seq[ConnectedPeer] = if (outdated.nonEmpty) outdated
@@ -81,4 +84,26 @@ case class SyncTracker(deliveryManager: ActorRef,
     peers.foreach(updateLastSyncSentTime)
     peers
   }
+}
+
+object SyncTracker {
+
+  sealed trait PeerPriority
+
+  case class HighPriority(priority: Double = 1) extends PeerPriority {
+    override def toString = "HighPriority"
+  }
+
+  case class LowPriority(priority: Double = 0.5) extends PeerPriority {
+    override def toString = "LowPriority"
+  }
+
+  case class BadNode(priority: Double = 0.3) extends PeerPriority {
+    override def toString = "BadNode"
+  }
+
+  case class InitialPriority(priority: Double = 0) extends PeerPriority {
+    override def toString = "InitialPriority"
+  }
+
 }

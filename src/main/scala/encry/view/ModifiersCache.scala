@@ -46,7 +46,7 @@ object ModifiersCache extends StrictLogging {
   }
 
   def remove(key: Key): Option[EncryPersistentModifier] = {
-    logger.info(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains: ${cache.get(key).isDefined}.")
+//    logger.info(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains: ${cache.get(key).isDefined}.")
     cache.remove(key)
   }
 
@@ -72,7 +72,7 @@ object ModifiersCache extends StrictLogging {
         case _: Header if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) => true
         case _ =>
           val isApplicableMod: Boolean = isApplicable(k)
-          logger.debug(s"Try to apply: ${Algos.encode(k.toArray)} and result is: $isApplicableMod")
+//          logger.debug(s"Try to apply: ${Algos.encode(k.toArray)} and result is: $isApplicableMod")
           isApplicableMod
       }
     }).collect { case Some(v) => v._1 }
@@ -80,12 +80,12 @@ object ModifiersCache extends StrictLogging {
     val bestHeadersIds: List[Key] = headersCollection.get(history.bestHeaderHeight + 1) match {
       case Some(value) =>
         headersCollection = headersCollection - (history.bestHeaderHeight + 1)
-        logger.info(s"HeadersCollection size is: ${headersCollection.size}")
+//        logger.info(s"HeadersCollection size is: ${headersCollection.size}")
         value.map(cache.get(_)).collect {
           case Some(v: Header)
             if (v.parentId sameElements history.bestHeaderOpt.map(_.id).getOrElse(Array.emptyByteArray))
               && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
-            logger.info(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
+//            logger.info(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
             new mutable.WrappedArray.ofByte(v.id)
         }
 

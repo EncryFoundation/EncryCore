@@ -162,8 +162,8 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     * header ids at this height */
   private def bestBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
     val prevHeight = bestHeaderHeight
-    logger.info(s"New best header ${h.encodedId} with score: $score." +
-      s" New height: ${h.height}, old height: $prevHeight")
+//    logger.info(s"New best header ${h.encodedId} with score: $score." +
+//      s" New height: ${h.height}, old height: $prevHeight")
     val self: (ByteArrayWrapper, ByteArrayWrapper) =
       heightIdsKey(h.height) -> ByteArrayWrapper((Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray)
     val parentHeaderOpt: Option[Header] = typedModifierById[Header](h.parentId)

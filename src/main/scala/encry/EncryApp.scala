@@ -55,7 +55,9 @@ object EncryApp extends App with StrictLogging {
       ModifiersSpec
     )
   }
-
+  val influxRef: Option[ActorRef] =
+    if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender], "statsSender"))
+    else None
   lazy val auxHistoryHolder: ActorRef =
     system.actorOf(Props(new AuxiliaryHistoryHolder(settings, timeProvider, nodeViewSynchronizer))
     .withDispatcher("aux-history-dispatcher"), "auxHistoryHolder")
@@ -65,16 +67,13 @@ object EncryApp extends App with StrictLogging {
     .withDispatcher("network-dispatcher"), "networkController")
   lazy val peerManager: ActorRef = system.actorOf(Props(classOf[PeerManager]), "peerManager")
   lazy val nodeViewSynchronizer: ActorRef =
-    system.actorOf(Props(classOf[NodeViewSynchronizer]), "nodeViewSynchronizer")
+    system.actorOf(Props(classOf[NodeViewSynchronizer], influxRef), "nodeViewSynchronizer")
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
   if (settings.monitoringSettings.exists(_.kamonEnabled)) {
     Kamon.reconfigure(EncryAppSettings.allConfig)
     Kamon.addReporter(new InfluxDBReporter())
     SystemMetrics.startCollecting()
   }
-  val influxRef: Option[ActorRef] =
-    if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender], "statsSender"))
-    else None
   if (settings.kafka.exists(_.sendToKafka))
     system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
   if (settings.postgres.exists(_.enableSave))

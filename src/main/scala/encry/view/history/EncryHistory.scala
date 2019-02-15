@@ -33,7 +33,7 @@ trait EncryHistory extends EncryHistoryReader {
 
   /** Appends modifier to the history if it is applicable. */
   def append(modifier: EncryPersistentModifier): Try[(EncryHistory, ProgressInfo[EncryPersistentModifier])] = {
-    logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
+    //logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Try {
       modifier match {
         case header: Header => (this, process(header))
@@ -52,7 +52,7 @@ trait EncryHistory extends EncryHistoryReader {
   /** Report some modifier as valid or invalid semantically */
   def reportModifierIsInvalid(modifier: EncryPersistentModifier, progressInfo: ProgressInfo[EncryPersistentModifier]):
   (EncryHistory, ProgressInfo[EncryPersistentModifier]) = {
-    logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
+    //logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
     this -> markModifierInvalid(modifier)
   }
 

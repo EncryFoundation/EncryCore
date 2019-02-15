@@ -48,8 +48,8 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store,
       additionalData.map { case (k, v) => ByteArrayWrapper(k) -> ByteArrayWrapper(v) }
     val toUpdateWithWrapped: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = toUpdate ++ toUpdateWrapped
     val toRemoveMerged: List[ByteArrayWrapper] = toRemove.filterNot(toUpdate.map(_._1).intersect(toRemove).contains)
-    logger.info(s"Update storage to version ${digestWrapper.data}: ${toUpdateWithWrapped.size} elements to insert," +
-      s" ${toRemove.size} elements to remove")
+//    logger.info(s"Update storage to version ${digestWrapper.data}: ${toUpdateWithWrapped.size} elements to insert," +
+//      s" ${toRemove.size} elements to remove")
     store.update(digestWrapper, toRemoveMerged, toUpdateWithWrapped)
   }.recoverWith { case e =>
     logger.info(s"Failed to update tree: $e")

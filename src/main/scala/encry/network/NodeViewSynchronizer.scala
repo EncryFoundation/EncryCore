@@ -27,7 +27,7 @@ import encry.view.state.StateReader
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.Proposition
 
-class NodeViewSynchronizer extends Actor with StrictLogging {
+class NodeViewSynchronizer(influxRef: Option[ActorRef]) extends Actor with StrictLogging {
 
   var historyReaderOpt: Option[EncryHistory] = None
   var mempoolReaderOpt: Option[Mempool] = None
@@ -36,7 +36,7 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
   var chainSynced: Boolean = false
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
   val deliveryManager: ActorRef =
-    context.actorOf(Props(classOf[DeliveryManager]), "deliveryManager")
+    context.actorOf(Props(classOf[DeliveryManager], influxRef), "deliveryManager")
 
   override def preStart(): Unit = {
     val messageSpecs: Seq[MessageSpec[_]] = Seq(invSpec, requestModifierSpec, ModifiersSpec, EncrySyncInfoMessageSpec)
@@ -107,7 +107,7 @@ class NodeViewSynchronizer extends Actor with StrictLogging {
       else logger.info(s"Peer $remote requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
         s"node is not synced, so ignore msg")
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
-      logger.info(s"Got inv message from ${remote.socketAddress} with modifiers: ${invData._2.map(Algos.encode).mkString(",")} ")
+      //logger.info(s"Got inv message from ${remote.socketAddress} with modifiers: ${invData._2.map(Algos.encode).mkString(",")} ")
       //todo: Ban node that send payload id?
       if (invData._1 != Payload.modifierTypeId) nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
