@@ -2,6 +2,7 @@ package encry.storage.levelDb.versionalLevelDB
 
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
+
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.LevelDBSettings
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, _}
@@ -77,7 +78,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     //Ids of all elements, deleted by newElem
     batch.put(versionDeletionsKey(newElem.version), newElem.elemsToDelete.flatMap(_.untag(LevelDBVersion)).toArray)
     //Set resolve flag for version to false
-    batch.put((SERVICE_PREFIX +: newElem.version) ++ RESOLVED_PREFIX, Array[Byte](0: Byte))
+    batch.put(versionResolvedKey(newElem.version), Array[Byte](0: Byte))
     newElem.elemsToInsert.foreach{
       case (elemKey, elemValue) =>
         /**
@@ -108,7 +109,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     val result = getCurrentElementsKeys
       .foldLeft(List.empty[(VersionalLevelDbKey, VersionalLevelDbValue)]) {
         case (acc, nextKey) =>
-          nextKey -> VersionalLevelDbValue @@ db.get(ACCESSIBLE_KEY_PREFIX +: nextKey, readOptions) :: acc
+          nextKey -> VersionalLevelDbValue @@ db.get(accessableElementKey(nextKey), readOptions) :: acc
       }
     readOptions.snapshot().close()
     result
@@ -170,13 +171,13 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     logger.info("Max version qty. Delete last!")
     // get all acceptable keys
     val versions = versionsList
-    val versionKeys = db.get(VERSION_PREFIX +: versionToDelete, readOptions)
+    val versionKeys = db.get(versionKey(versionToDelete), readOptions)
     // remove all allias elements
     splitValue2elems(32, versionKeys).foreach{elemKey =>
-      batch.delete((ACCESSIBLE_KEY_PREFIX +: versionToDelete) ++ elemKey)
+      batch.delete(accessableElementKeyForVersion(versionToDelete, VersionalLevelDbKey @@ elemKey))
     }
     // remove last version in versions list
-    batch.delete(VERSION_PREFIX +: versionToDelete)
+    batch.delete(versionKey(versionToDelete))
     // update versions list
     batch.put(VERSIONS_LIST, versions.filterNot(_ == versionToDelete)
       .foldLeft(Array.emptyByteArray){case (acc, key) => acc ++ key})
@@ -211,7 +212,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     val result: List[VersionalLevelDbKey] =
       splitValue2elems(
         KEY_SIZE*2 + 1,
-        db.get((VERSION_PREFIX +: DELETION_PREFIX) ++ currentVersion, readOptions)
+        db.get(versionDeletionsKey(currentVersion), readOptions)
       ).map(elem => VersionalLevelDbKey @@ elem)
     readOptions.snapshot().close()
     //logger.info(s"CurrentKeys: ${result.map(key => Algos.encode(key)).mkString(",")}")
@@ -314,6 +315,7 @@ object VersionalLevelDBCompanion {
     CURRENT_VERSION_KEY -> VersionalLevelDbValue @@ INIT_VERSION,
     CURRENT_VERSION_LIST_KEY -> VersionalLevelDbValue @@ Array.emptyByteArray,
     VERSIONS_LIST -> VersionalLevelDbValue @@ Array.emptyByteArray,
+    versionResolvedKey(INIT_VERSION) ->  VersionalLevelDbValue @@ Array(1: Byte),
     ACCESS_FLAG -> VersionalLevelDbValue @@ Array(1: Byte)
   )
 
@@ -323,12 +325,20 @@ object VersionalLevelDBCompanion {
     db
   }
   
-  def versionDeletionsKey(version: LevelDBVersion): Array[Byte] = (VERSION_PREFIX +: DELETION_PREFIX) ++ version
-  
-  def versionKey(version: LevelDBVersion): Array[Byte] = VERSION_PREFIX +: version
+  def versionDeletionsKey(version: LevelDBVersion): VersionalLevelDbKey =
+    VersionalLevelDbKey @@ ((VERSION_PREFIX +: DELETION_PREFIX) ++ version)
 
-  def accessableElementKeyForVersion(version: LevelDBVersion, elemKey: VersionalLevelDbKey): Array[Byte] =
-    (ACCESSIBLE_KEY_PREFIX +: version) ++ elemKey
+  def versionResolvedKey(version: LevelDBVersion): VersionalLevelDbKey =
+    VersionalLevelDbKey @@ ((SERVICE_PREFIX +: RESOLVED_PREFIX) ++ version)
+  
+  def versionKey(version: LevelDBVersion): VersionalLevelDbKey =
+    VersionalLevelDbKey @@ (VERSION_PREFIX +: version)
+
+  def accessableElementKeyForVersion(version: LevelDBVersion, elemKey: VersionalLevelDbKey): VersionalLevelDbKey =
+    VersionalLevelDbKey @@ ((ACCESSIBLE_KEY_PREFIX +: version) ++ elemKey)
+
+  def accessableElementKey(elemKey: VersionalLevelDbKey): VersionalLevelDbKey =
+    VersionalLevelDbKey @@ (ACCESSIBLE_KEY_PREFIX +: elemKey)
 
   def splitValue2elems(elemSize: Int, value: Array[Byte]): List[Array[Byte]] = value.sliding(32, 32).toList
 }
