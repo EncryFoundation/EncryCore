@@ -27,14 +27,14 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
   val levelDb: VersionalLevelDB = VersionalLevelDB(db, settings)
 
   def getAllBoxes: Seq[EncryBaseBox] = levelDb.getAll
-      .map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes.data, key.data.head) }
+      .map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
       .collect {
         case Success(box) => box
       }
 
   def getBoxById(id: ADKey): Option[EncryBaseBox] = {
-    levelDb.get(VersionalLevelDbKey @@ new ByteArrayWrapper(id))
-      .flatMap(wrappedBx => StateModifierSerializer.parseBytes(wrappedBx.data, id.head).toOption)
+    levelDb.get(VersionalLevelDbKey @@ id.untag(ADKey))
+      .flatMap(wrappedBx => StateModifierSerializer.parseBytes(wrappedBx, id.head).toOption)
   }
 
   def getTokenBalanceById(id: TokenId): Option[Amount] = getBalances
@@ -43,7 +43,7 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
 
   def containsBox(id: ADKey): Boolean = getBoxById(id).isDefined
 
-  def rollback(modId: ModifierId): Unit = levelDb.rollbackTo(LevelDBVersion @@ new ByteArrayWrapper(modId.untag(ModifierId)))
+  def rollback(modId: ModifierId): Unit = levelDb.rollbackTo(LevelDBVersion @@ modId.untag(ModifierId))
 
   def updateWallet(modifierId: ModifierId, newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]): Unit = {
     val bxsToInsert: Seq[EncryBaseBox] = newBxs.filter(bx => !spentBxs.contains(bx))
@@ -54,19 +54,19 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
       (toAddToBalance |+| toRemoveFromBalance |+| prevBalance).map { case (tokenId, value) => tokenId.toString -> value }
     }
     val newBalanceKeyValue = BALANCE_KEY -> VersionalLevelDbValue @@
-      new ByteArrayWrapper(newBalances.foldLeft(Array.emptyByteArray) { case (acc, (id, balance)) =>
+      newBalances.foldLeft(Array.emptyByteArray) { case (acc, (id, balance)) =>
         acc ++ Algos.decode(id).get ++ Longs.toByteArray(balance)
-       })
-    levelDb.insert(LevelDbElem(LevelDBVersion @@ new ByteArrayWrapper(modifierId.untag(ModifierId)),
-      newBalanceKeyValue :: bxsToInsert.map(bx => (VersionalLevelDbKey @@ new ByteArrayWrapper(bx.id.untag(ADKey)),
-        VersionalLevelDbValue @@ new ByteArrayWrapper(bx.bytes))).toList,
-      spentBxs.map(elem => VersionalLevelDbKey @@ new ByteArrayWrapper(elem.id.untag(ADKey))))
+       }
+    levelDb.insert(LevelDbElem(LevelDBVersion @@ modifierId.untag(ModifierId),
+      newBalanceKeyValue :: bxsToInsert.map(bx => (VersionalLevelDbKey @@ bx.id.untag(ADKey),
+        VersionalLevelDbValue @@ bx.bytes)).toList,
+      spentBxs.map(elem => VersionalLevelDbKey @@ elem.id.untag(ADKey)))
     )
   }
 
   def getBalances: Map[String, Amount] =
     levelDb.get(BALANCE_KEY)
-      .map(_.data.sliding(40, 40)
+      .map(_.sliding(40, 40)
         .map(ch => Algos.encode(ch.take(32)) -> Longs.fromByteArray(ch.takeRight(8)))
         .toMap).getOrElse(Map.empty)
 }
@@ -74,10 +74,10 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
 object WalletVersionalLevelDBCompanion extends StrictLogging {
 
   val BALANCE_KEY: VersionalLevelDbKey =
-    VersionalLevelDbKey @@ new ByteArrayWrapper(Algos.hash("BALANCE_KEY").untag(Digest32))
+    VersionalLevelDbKey @@ Algos.hash("BALANCE_KEY").untag(Digest32)
 
   val INIT_MAP: Map[VersionalLevelDbKey, VersionalLevelDbValue] = Map(
-    BALANCE_KEY -> VersionalLevelDbValue @@ new ByteArrayWrapper(Array.emptyByteArray)
+    BALANCE_KEY -> VersionalLevelDbValue @@ Array.emptyByteArray
   )
 
   def apply(levelDb: DB, settings: LevelDBSettings): WalletVersionalLevelDB = {

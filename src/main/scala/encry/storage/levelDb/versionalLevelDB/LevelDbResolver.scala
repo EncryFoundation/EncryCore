@@ -16,13 +16,4 @@ import scala.concurrent.Future
   * reference
   * @param db
   */
-object LevelDbResolver {
 
-  /**
-    * Resolve references in versions
-    * @return
-    */
-  def resolve(): Future[Unit] = Future {
-
-  }
-}

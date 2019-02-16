@@ -4,4 +4,4 @@ import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDB
 
 case class LevelDbElem(version: LevelDBVersion,
                        elemsToInsert: List[(VersionalLevelDbKey, VersionalLevelDbValue)],
-                       elemsToDelete: Seq[VersionalLevelDbKey])
+                       elemsToDelete: Seq[VersionalLevelDbKey] = Seq.empty)

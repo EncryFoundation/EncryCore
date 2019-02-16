@@ -37,7 +37,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     val keysToInsert: Seq[VersionalLevelDbKey] = levelDbElems.flatMap(_.elemsToInsert.map(_._1))
 
     val valuesHashes: List[ByteArrayWrapper] =
-      levelDbElems.flatMap(_.elemsToInsert.map(elem => new ByteArrayWrapper(Algos.hash(elem._2.data))))
+      levelDbElems.flatMap(_.elemsToInsert.map(elem => new ByteArrayWrapper(Algos.hash(elem._2))))
 
     levelDbElems.foreach(vldbInit.insert)
 
@@ -58,7 +58,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     //Check correctness of values
 
     reopendVLDB.getAll
-      .forall{case (_, elemValue) => valuesHashes.contains(new ByteArrayWrapper(Algos.hash(elemValue.data)))} shouldBe true
+      .forall{case (_, elemValue) => valuesHashes.contains(new ByteArrayWrapper(Algos.hash(elemValue)))} shouldBe true
   }
 
   /**
@@ -67,9 +67,9 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     */
   property("LevelDB should recover to last version after linked deletions") {
 
-    val maxVersions = Random.nextInt(300)
+    val maxVersions = Random.nextInt(1000)
 
-    val levelDbElemsQty = Random.nextInt(maxVersions)
+    val levelDbElemsQty = Random.nextInt(maxVersions) + 1
 
     val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
 
@@ -84,7 +84,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     val correctKeys: Seq[VersionalLevelDbKey] = levelDbElems.last.elemsToInsert.map(_._1)
 
     val correctValues: Seq[ByteArrayWrapper] =
-      levelDbElems.last.elemsToInsert.map{case (_, elem) => new ByteArrayWrapper(Algos.hash(elem.data))}
+      levelDbElems.last.elemsToInsert.map{case (_, elem) => new ByteArrayWrapper(Algos.hash(elem))}
 
     val incorrectKeys: Seq[VersionalLevelDbKey] = levelDbElems.init.flatMap(_.elemsToInsert.map(_._1))
 
@@ -107,20 +107,22 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     //Check correctness of values
 
     reopendVLDB.getAll
-      .forall{case (_, elemValue) => correctValues.contains(new ByteArrayWrapper(Algos.hash(elemValue.data)))} shouldBe true
+      .forall{case (_, elemValue) => correctValues.contains(new ByteArrayWrapper(Algos.hash(elemValue)))} shouldBe true
 
     //Check that impossible to get deleted keys
 
     val allElemsInDB = reopendVLDB.getAll.map(_._1)
+
+    println(s"Inac keys: ${reopendVLDB.inaccessibleKeys.map(elem => Algos.encode(elem)).mkString(",")}")
 
     incorrectKeys.forall(key => !allElemsInDB.contains(key)) shouldBe true
   }
 
   property("Level db should always contains not more than maxVersionParam") {
 
-    val maxVersions = Random.nextInt(10)
+    val maxVersions = Random.nextInt(1000)
 
-    val levelDbElemsQty = 11 + Random.nextInt(300)
+    val levelDbElemsQty = 11 + Random.nextInt(1000)
 
     val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
 
@@ -134,8 +136,8 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     levelDbElems.foreach(vldbInit.insert)
 
-    vldbInit.versionsList.length shouldEqual maxVersions
+    Thread.sleep(1000)
 
-    Thread.sleep(100000)
+    vldbInit.versionsList.length shouldEqual maxVersions
   }
 }
