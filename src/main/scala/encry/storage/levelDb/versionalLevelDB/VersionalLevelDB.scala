@@ -35,18 +35,6 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
   def currentVersion: LevelDBVersion = LevelDBVersion @@ db.get(CURRENT_VERSION_KEY)
 
   /**
-    * First check ACCESS_FLAG:
-    * if 1:
-    *   Trying to get elem from db, first check if db contains elem by alias key ("version" ++ "elemKey"):
-    *   if true - return elem
-    *   else check if db contains elem by key "elemKey"
-    *     if true - return elem
-    *     else None
-    * if 0:
-    *   get inaccessibleKeys in all versions, and check if elem key contains in this seq
-    *   if true:
-    *     return None
-    *   else: goto (if 1)
     * @param elemKey
     * @return
     */
@@ -55,15 +43,17 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     readOptions.snapshot(db.getSnapshot)
     val possibleToGet = if (db.get(ACCESS_FLAG, readOptions).last == (0: Byte)) {
       !versionsList.flatMap(version =>
-        splitValue2elems(32, db.get(version, readOptions)).map(key => new ByteArrayWrapper(key))
+        splitValue2elems(32, db.get(versionKey(version), readOptions)).map(key => new ByteArrayWrapper(key))
       ).contains(elemKey)
     } else true
     val possibleElem = if (possibleToGet) {
-        if (db.get((ACCESSIBLE_KEY_PREFIX +: currentVersion) ++ elemKey, readOptions) != null)
-          Some(VersionalLevelDbValue @@ db.get(currentVersion ++ elemKey))
-        else if (db.get(ACCESSIBLE_KEY_PREFIX +: elemKey, readOptions) != null)
+        if (db.get(ACCESSIBLE_KEY_PREFIX +: elemKey, readOptions) != null)
           Some(VersionalLevelDbValue @@ db.get(elemKey))
-        else None
+        else
+          versionsList.find(version => db.get(accessableElementKeyForVersion(version, elemKey)) != null)
+            .map(versionKey =>
+              VersionalLevelDbValue @@  db.get(accessableElementKeyForVersion(versionKey, elemKey))
+            )
     } else None
     readOptions.snapshot().close()
     possibleElem
@@ -91,19 +81,11 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     newElem.elemsToInsert.foreach{
       case (elemKey, elemValue) =>
         /**
-          * Check if db contains elem by key "elemkey":
-          * if true:
-          *   - Compare their hashes:
-          *       if they are equal - do not put value, otherwise put by key (ACCESSIBLE_KEY_PREFIX +: "version" ++ "elemKey")
-          * else:
-          *   - put elem by key (ACCESSIBLE_KEY_PREFIX +: "elemKey")
+          * Put elem by key (ACCESSIBLE_KEY_PREFIX +: "version" ++ "elemKey")
           */
-        if (db.get(ACCESSIBLE_KEY_PREFIX +: elemKey, readOptions) != null) {
-          val elem = db.get(ACCESSIBLE_KEY_PREFIX +: elemKey, readOptions)
-          if (new ByteArrayWrapper(Algos.hash(elem)) != new ByteArrayWrapper(Algos.hash(elemValue))) {
-            batch.put((ACCESSIBLE_KEY_PREFIX +: newElem.version) ++ elemKey, elemValue)
-          }
-        } else batch.put(ACCESSIBLE_KEY_PREFIX +: elemKey, elemValue)
+        if (db.get(accessableElementKeyForVersion(newElem.version, elemKey), readOptions) != null) {
+          throw new Exception(s"Duplicate key: ${Algos.encode(elemKey)}")
+        } else batch.put(accessableElementKeyForVersion(newElem.version, elemKey), elemValue)
     }
     //set access flag to false, means that resolver doesn't resolve element's access flags for this version
     batch.put(ACCESS_FLAG, Array[Byte](0))
@@ -111,8 +93,8 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     db.write(batch)
     batch.close()
     readOptions.snapshot().close()
-    resolverTasks.add(newElem.version)
-    if (!resolverStarted.get()) insertResolver()
+//    resolverTasks.add(newElem.version)
+//    if (!resolverStarted.get()) insertResolver()
     clean()
   }
 
@@ -143,7 +125,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     readOptions.snapshot(db.getSnapshot)
     val batch = db.createWriteBatch()
     val versionToResolve: LevelDBVersion = resolverTasks.poll()
-    //val getDeletions = db.get()
+    val getDeletions = db.get(versionDeletionsKey(versionToResolve))
     //Check size of resolverTasks, is empty - set ACCESS_FLAG to true, disable resolver.
     //if nonEmpty, continue resolving
     if (resolverTasks.isEmpty) {
@@ -344,6 +326,9 @@ object VersionalLevelDBCompanion {
   def versionDeletionsKey(version: LevelDBVersion): Array[Byte] = (VERSION_PREFIX +: DELETION_PREFIX) ++ version
   
   def versionKey(version: LevelDBVersion): Array[Byte] = VERSION_PREFIX +: version
+
+  def accessableElementKeyForVersion(version: LevelDBVersion, elemKey: VersionalLevelDbKey): Array[Byte] =
+    (ACCESSIBLE_KEY_PREFIX +: version) ++ elemKey
 
   def splitValue2elems(elemSize: Int, value: Array[Byte]): List[Array[Byte]] = value.sliding(32, 32).toList
 }
