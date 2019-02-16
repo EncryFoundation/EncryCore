@@ -113,9 +113,9 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     val allElemsInDB = reopendVLDB.getAll.map(_._1)
 
-    println(s"Inac keys: ${reopendVLDB.inaccessibleKeys.map(elem => Algos.encode(elem)).mkString(",")}")
-
     incorrectKeys.forall(key => !allElemsInDB.contains(key)) shouldBe true
+
+    println(reopendVLDB.print())
   }
 
   property("Level db should always contains not more than maxVersionParam") {
@@ -136,13 +136,32 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     levelDbElems.foreach(vldbInit.insert)
 
-    //Thread.sleep(100000)
-
-    do {
-      println("1")
-    } while (!vldbInit.resolverTasks.isEmpty)
-
     vldbInit.versionsList().length shouldEqual maxVersions
+  }
 
+  property("deleted key from deleted version should not exist") {
+
+    val maxVersions = 10
+
+    val levelDbElemsQty = 13
+
+    val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
+
+    val tempDir = FileHelper.getRandomTempDir
+
+    val levelDBInit = LevelDbFactory.factory.open(tempDir, new Options)
+
+    val vldbInit = VersionalLevelDBCompanion(levelDBInit, dummyLevelDBSettings)
+
+    val levelDbElems = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, Random.nextInt(300))
+
+    levelDbElems.foreach(vldbInit.insert)
+
+    vldbInit.get(levelDbElems.head.elemsToInsert.head._1) shouldEqual None
+
+    println(Algos.encode(levelDbElems.last.elemsToInsert.head._1))
+
+    vldbInit.get(levelDbElems.last.elemsToInsert.head._1).map(data => Algos.hash(data)) shouldEqual
+      Algos.hash(levelDbElems.last.elemsToInsert.head._2)
   }
 }
