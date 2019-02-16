@@ -21,7 +21,10 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
 
   //Resolver tasks, contains versions in which keys should bew resolved
   // if resolverTasks empty - resolver set ACCESS_FLAG to 1
-  var resolverTasks: ConcurrentLinkedQueue[LevelDBVersion] = new ConcurrentLinkedQueue[LevelDBVersion]()
+  val resolverTasks: ConcurrentLinkedQueue[LevelDBVersion] = new ConcurrentLinkedQueue[LevelDBVersion]()
+
+  //Collect queue of versions, which should be deleted
+  var toDeleteTask: ConcurrentLinkedQueue[LevelDBVersion] = new ConcurrentLinkedQueue[LevelDBVersion]()
 
   //Describe resolver status, if it is false - resolver "sleep", otherwise - busy
   var resolverStarted: AtomicBoolean = new AtomicBoolean(false)
@@ -34,14 +37,8 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     res
   }
 
-  def versionsList: List[LevelDBVersion] = {
-    val readOptions = new ReadOptions()
-    readOptions.snapshot(db.getSnapshot)
-    val result =
+  def versionsList(readOptions: ReadOptions = new ReadOptions()): List[LevelDBVersion] =
       splitValue2elems(KEY_SIZE, db.get(VERSIONS_LIST, readOptions)).map(elem => LevelDBVersion @@ elem)
-    readOptions.snapshot().close()
-    result
-  }
 
   def currentVersion: LevelDBVersion = LevelDBVersion @@ db.get(CURRENT_VERSION_KEY)
 
@@ -54,10 +51,10 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
     val possibleElem = if (!isDBresolved) {
-      if (!versionsList.flatMap(version =>
+      if (!versionsList(readOptions).flatMap(version =>
         splitValue2elems(32, db.get(versionKey(version), readOptions)).map(key => new ByteArrayWrapper(key))
       ).contains(elemKey)) {
-        versionsList.find(version => db.get(accessableElementKeyForVersion(version, elemKey)) != null)
+        versionsList(readOptions).find(version => db.get(accessableElementKeyForVersion(version, elemKey)) != null)
           .map(versionKey =>
             VersionalLevelDbValue @@  db.get(accessableElementKeyForVersion(versionKey, elemKey))
           )
@@ -86,7 +83,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     //Set current version to newElem.version
     batch.put(CURRENT_VERSION_KEY, newElem.version)
     //Insert new version to versions list
-    batch.put(VERSIONS_LIST, newElem.version.untag(LevelDBVersion) ++ versionsList.flatMap(_.untag(LevelDBVersion)))
+    batch.put(VERSIONS_LIST, newElem.version.untag(LevelDBVersion) ++ versionsList(readOptions).flatMap(_.untag(LevelDBVersion)))
     //Ids of all elements, added by newElem
     batch.put(versionKey(newElem.version), newElem.elemsToInsert.map(_._1).flatMap(_.untag(LevelDBVersion)).toArray)
     //Ids of all elements, deleted by newElem
@@ -173,33 +170,40 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
   }
 
   /**
-    * cleanIfPossible - if versionsList.size > levelDB.maxVersions, delete last
+    * cleanIfPossible - if versionsList(readOptions).size > levelDB.maxVersions, delete last
     * also, delete elems without some ref
     */
   //TODO: Delete non alias elements without ref
-  def clean(): Future[Unit] = Future {
+  def clean(): Unit =  {
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
     val batch = db.createWriteBatch()
-    val versions = versionsList
+    val versions = versionsList().map(ver => new ByteArrayWrapper(ver))
     logger.info(s"Current versions size: ${versions.length}")
     if (versions.length > settings.maxVersions) {
-      logger.info("Max version qty. Delete last!")
-      deleteVersion(versions.last)
+      logger.info(s"Max version qty. Delete last!. Should del: ${versions.length - settings.maxVersions} versions")
+      logger.info(versions.takeRight(versions.length - settings.maxVersions).map(v => Algos.encode(v.data)).mkString(","))
+      val versionToDelete = versions.takeRight(versions.length - settings.maxVersions)
+      versionToDelete.foreach { v =>
+        logger.info(s"Delete version: ${Algos.encode(v.data)}.Should del: ${versions.length - settings.maxVersions} versions")
+        batch.delete(versionKey(LevelDBVersion @@ v.data))
+        // update versions list
+      }
+      batch.put(VERSIONS_LIST, versions.filterNot(versionToDelete.contains)
+        .foldLeft(Array.emptyByteArray){case (acc, key) => acc ++ key.data})
     }
     db.write(batch)
     batch.close()
     readOptions.snapshot().close()
   }
 
-  private def deleteVersion(versionToDelete: LevelDBVersion): Unit = {
-    logger.info(s"Delete version: ${Algos.encode(versionToDelete)}")
+  private def deleteVersion(versionToDelete: LevelDBVersion) = {
     val readOptions = new ReadOptions()
+    logger.info(s"Delete version: ${Algos.encode(versionToDelete)}. Current size: ${versionsList(readOptions).length}. Maxsize: ${settings.maxVersions}")
     readOptions.snapshot(db.getSnapshot)
     val batch = db.createWriteBatch()
-    logger.info("Max version qty. Delete last!")
     // get all acceptable keys
-    val versions = versionsList
+    val versions = versionsList(readOptions)
     val versionKeys = db.get(versionKey(versionToDelete), readOptions)
     // remove all allias elements
     splitValue2elems(32, versionKeys).foreach{elemKey =>
@@ -208,7 +212,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     // remove last version in versions list
     batch.delete(versionKey(versionToDelete))
     // update versions list
-    batch.put(VERSIONS_LIST, versions.filterNot(_ == versionToDelete)
+    batch.put(VERSIONS_LIST, versions.filterNot(_ sameElements versionToDelete)
       .foldLeft(Array.emptyByteArray){case (acc, key) => acc ++ key})
     db.write(batch)
     batch.close()
@@ -253,7 +257,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     * @param rollbackPoint
     */
   def rollbackTo(rollbackPoint: LevelDBVersion): Unit =
-    if (versionsList.contains(rollbackPoint)) {
+    if (versionsList().contains(rollbackPoint)) {
       val batch = db.createWriteBatch()
       batch.put(CURRENT_VERSION_KEY, rollbackPoint)
       db.write(batch)
