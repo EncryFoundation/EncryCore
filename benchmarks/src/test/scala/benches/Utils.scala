@@ -1,6 +1,7 @@
 package benches
 
 import java.io.File
+
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.avltree
@@ -13,8 +14,10 @@ import encry.modifiers.mempool.{Transaction, TransactionFactory, UnsignedTransac
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.LevelDBVersion
+import encry.storage.levelDb.versionalLevelDB.{LevelDbElem, LevelDbFactory, VersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.utils.{Mnemonic, NetworkTimeProvider}
+import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
 import encry.view.history.EncryHistory
 import encry.view.history.History.Height
 import encry.view.history.processors.payload.BlockPayloadProcessor
@@ -29,9 +32,11 @@ import org.encryfoundation.common.transaction.EncryAddress.Address
 import org.encryfoundation.common.transaction.{Input, Pay2PubKeyAddress, Proof, PubKeyLockedContract}
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
+import org.iq80.leveldb.Options
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
+
 import scala.collection.immutable
 import scala.util.{Random => R}
 
@@ -39,6 +44,16 @@ object Utils extends StrictLogging {
 
   val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
   val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
+
+  def generateRandomLevelDbElemsWithoutDeletions(qty: Int, qtyOfElemsToInsert: Int): List[LevelDbElem] =
+    (0 until qty).foldLeft(List.empty[LevelDbElem]) {
+      case (acc, i) =>
+        logger.info(s"create $i elem")
+        LevelDbElem(
+          LevelDBVersion @@ Random.randomBytes(),
+          List((0 until qtyOfElemsToInsert).map(_ => genRandomInsertValue()): _*)
+        ) :: acc
+    }
 
   def generateGenesisBlockValidForState(state: UtxoState): Block = {
     val txs = Seq(coinbaseTransaction(0))
@@ -357,9 +372,12 @@ object Utils extends StrictLogging {
 
   def generateHistory(settingsEncry: EncryAppSettings, file: File): EncryHistory = {
 
-    val indexStore: LSMStore = new LSMStore(file, keepVersions = 0)
-    val objectsStore: LSMStore = new LSMStore(file, keepVersions = 0)
-    val storage: HistoryStorage = new HistoryStorage(indexStore, objectsStore)
+    val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
+    val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
+    val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
+    val vldbInit = VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB)
+    val storage: HistoryStorage = new HistoryStorage(vldbInit, objectsStore)
+
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
     new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
