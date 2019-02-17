@@ -76,6 +76,7 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
   }
 
   override def receive: Receive = {
+    case GetStatusTrackerPeer => sender() ! statusTracker.statuses
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       statusTracker.updateStatus(remote, status)
       status match {
@@ -88,9 +89,7 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
     case CheckDelivery(peer, modifierTypeId, modifierId) =>
       val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer, (0, 0))
       if (delivered.contains(key(modifierId))) {
-        logger.info(s"CheckDelivery if collection before: ${peersNetworkCommunication.map(x => (x, x._2._1 -> x._2._2)).mkString(",")}")
         peersNetworkCommunication = peersNetworkCommunication.updated(peer, (requestReceiveStat._1 + 1, requestReceiveStat._2 + 1))
-        logger.info(s"CheckDelivery if collection after: ${peersNetworkCommunication.map(x => (x, x._2._1 -> x._2._2)).mkString(",")}")
         delivered -= key(modifierId)
       } else {
         logger.info(s"CheckDelivery else collection before: ${peersNetworkCommunication.map(x => (x, x._2._1 -> x._2._2)).mkString(",")}")
@@ -267,14 +266,13 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
     influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
     if (!isBlockChainSynced) {
-      println(2)
       logger.info(s"Unsorted peers: ${
         statusTracker.statuses
           .map(x => x._1 -> (PeerPriorityStatus.toString(x._2._2), x._2._1)).mkString(",")
       }")
       val a: Vector[(ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus))] = statusTracker.statuses
         .filter(_._2._1 != Younger)
-        .toVector.sortBy(_._2._2)
+        .toVector.sortBy(_._2._2).reverse
       logger.info(s"Sorted peers: ${a.map(x => x._1 -> (PeerPriorityStatus.toString(x._2._2), x._2._1)).mkString(",")}")
       a.headOption.map(_._1)
         .foreach { pI =>
@@ -282,12 +280,10 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
           expect(pI, modifierTypeId, modifierIds)
         }
     }
-    else {
-      println(1)
+    else
       statusTracker.statuses
         .filter(x => x._2._1 != Younger)
         .keys.foreach(peer => expect(peer, modifierTypeId, modifierIds))
-    }
   }
 
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit =
@@ -331,5 +327,7 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
 object DeliveryManager {
 
   case object FullBlockChainSynced
+
+  case object GetStatusTrackerPeer
 
 }

@@ -100,16 +100,18 @@ object SyncTracker {
 
     private val criterionForHighP: Double = 0.75
     private val criterionForLowP: Double = 0.50
-    private val criterionForInitialP: Int = 0
 
     def definePriorityStatus(requested: Int, received: Int): PeerPriorityStatus = {
-      val a: Double = received / received
-      a match {
-        case t if t > criterionForHighP => HighPriority
-        case t if t > criterionForLowP => LowPriority
-        case t if t == criterionForInitialP => InitialPriority
+      println(s"req = $requested, received = $received")
+      val a: Double = received.toDouble / requested
+      println(a)
+      val b = a match {
+        case t if t >= criterionForHighP => HighPriority
+        case t if t >= criterionForLowP => LowPriority
         case _ => BadNode
       }
+      println(PeerPriorityStatus.toString(b))
+      b
     }
 
     def toString(priority: PeerPriorityStatus): String = priority match {
