@@ -142,9 +142,9 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
   property("deleted key from deleted version should not exist") {
 
-    val maxVersions = 10
+    val maxVersions = Random.nextInt(1000)
 
-    val levelDbElemsQty = 13
+    val levelDbElemsQty = Random.nextInt(1000) + maxVersions
 
     val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
 
@@ -160,13 +160,37 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     var isResolved = vldbInit.isDBresolved()
 
-//    do {
-//      isResolved = vldbInit.isDBresolved()
-//    } while (!vldbInit.isDBresolved())
-
     vldbInit.get(levelDbElems.head.elemsToInsert.head._1) shouldEqual None
 
     vldbInit.get(levelDbElems.last.elemsToInsert.head._1).map(data => Algos.hash(data)).get shouldEqual
       Algos.hash(levelDbElems.last.elemsToInsert.head._2)
+  }
+
+  property("Check that after rollback, it is impossible to get last generated version") {
+
+    val maxVersions = 10
+
+    val levelDbElemsQty = 9
+
+    val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
+
+    val tempDir = FileHelper.getRandomTempDir
+
+    val levelDBInit = LevelDbFactory.factory.open(tempDir, new Options)
+
+    val vldbInit = VersionalLevelDBCompanion(levelDBInit, dummyLevelDBSettings)
+
+    val levelDbElems = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, Random.nextInt(300))
+
+    levelDbElems.foreach(vldbInit.insert)
+
+    var isResolved = vldbInit.isDBresolved()
+
+    vldbInit.rollbackTo(levelDbElems(6).version)
+
+    vldbInit.get(levelDbElems(7).elemsToInsert.head._1) shouldEqual None
+
+    vldbInit.get(levelDbElems(6).elemsToInsert.head._1).map(data => Algos.hash(data)).get shouldEqual
+      Algos.hash(levelDbElems(6).elemsToInsert.head._2)
   }
 }
