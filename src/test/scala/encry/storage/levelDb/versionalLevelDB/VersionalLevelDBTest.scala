@@ -159,9 +159,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     vldbInit.get(levelDbElems.head.elemsToInsert.head._1) shouldEqual None
 
-    println(Algos.encode(levelDbElems.last.elemsToInsert.head._1))
-
-    vldbInit.get(levelDbElems.last.elemsToInsert.head._1).map(data => Algos.hash(data)) shouldEqual
+    vldbInit.get(levelDbElems.last.elemsToInsert.head._1).map(data => Algos.hash(data)).get shouldEqual
       Algos.hash(levelDbElems.last.elemsToInsert.head._2)
   }
 }

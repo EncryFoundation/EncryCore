@@ -2,13 +2,14 @@ package encry.storage.levelDb.versionalLevelDB
 
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
+
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.LevelDBSettings
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, _}
 import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.lang.ArrayUtils
 import org.encryfoundation.common.Algos
-import org.iq80.leveldb.{DB, ReadOptions}
+import org.iq80.leveldb.{DB, ReadOptions, WriteBatch}
 import supertagged.TaggedType
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -61,7 +62,11 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
           )
       } else None
     } else None
-    if (isDBresolved(readOptions) && possibleElem.isEmpty && !(db.get(userKey(elemKey)).head == INACCESSIBLE_KEY_PREFIX)) {
+    if (db.get(userKey(elemKey)) != null &&
+      isDBresolved(readOptions) &&
+      possibleElem.isEmpty &&
+      db.get(userKey(elemKey)).headOption.contains(ACCESSIBLE_KEY_PREFIX)) {
+      logger.info(s"Trying to get access key ${Algos.encode(elemKey)}")
       val lastElemVersion: LevelDBVersion =
         LevelDBVersion @@ ArrayUtils.subarray(db.get(userKey(elemKey), readOptions), 1, 32)
       if (db.get(accessableElementKeyForVersion(lastElemVersion, elemKey)) != null)
@@ -100,15 +105,14 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
           * if db contains elem, just insert elem
           */
         if (db.get(userKey(elemKey)) == null) {
-          batch.put(userKey(elemKey), ACCESSIBLE_KEY_PREFIX +: newElem.version)
+          batch.put(userKey(elemKey), Array(ACCESSIBLE_KEY_PREFIX))
           logger.info(s"Insert key: ${Algos.encode(elemKey)}")
-          batch.put(accessableElementKeyForVersion(newElem.version, elemKey), elemValue)
-        } else {
-          batch.put(accessableElementKeyForVersion(newElem.version, elemKey), elemValue)
         }
+        batch.put(accessableElementKeyForVersion(newElem.version, elemKey), elemValue)
     }
     //set access flag to false, means that resolver doesn't resolve element's access flags for this version
     batch.put(ACCESS_FLAG, Array[Byte](0))
+    logger.info("Set ACCESS_FLAG to 0 in insert")
     //write batch
     db.write(batch)
     batch.close()
@@ -144,23 +148,29 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
   def insertResolver(): Future[Unit] = Future {
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
-    val batch = db.createWriteBatch()
+    val batch: WriteBatch = db.createWriteBatch()
     val versionToResolve: LevelDBVersion = insertResolverTasks.poll()
+    insertResolverStarted.getAndSet(true)
     logger.info(s"Init insert resolver for ${Algos.encode(versionToResolve)}")
-    val getDeletions = splitValue2elems(KEY_SIZE,db.get(versionDeletionsKey(versionToResolve), readOptions))
-    val insertions = splitValue2elems(KEY_SIZE, db.get(versionToResolve, readOptions))
+    val deletions = splitValue2elems(KEY_SIZE,db.get(versionDeletionsKey(versionToResolve), readOptions))
+    logger.info(s"Deletions of version: ${deletions.map(Algos.encode).mkString(",")}")
+    val insertions = splitValue2elems(KEY_SIZE, db.get(versionKey(versionToResolve), readOptions))
+    logger.info(s"Insertions of version: ${insertions.map(Algos.encode).mkString(",")}")
     insertions.foreach { elemKey =>
       val accessMap = db.get(userKey(VersionalLevelDbKey @@ elemKey), readOptions).tail
+      logger.info(s"Previous access map in insert ${Algos.encode(elemKey)}: ${splitValue2elems(KEY_SIZE, accessMap).map(Algos.encode).mkString(",")}")
       batch.put(elemKey, (ACCESSIBLE_KEY_PREFIX +: versionToResolve) ++ accessMap)
     }
-    getDeletions.foreach{ elemKey =>
+    deletions.foreach{ elemKey =>
       val accessMap = db.get(userKey(VersionalLevelDbKey @@ elemKey), readOptions).tail
+      logger.info(s"Previous access map for deletions ${Algos.encode(elemKey)}: ${splitValue2elems(KEY_SIZE, accessMap).map(Algos.encode).mkString(",")}")
+      logger.info(s"Set INACCESSIBLE_KEY_PREFIX to elem: ${Algos.encode(elemKey)}")
       batch.put(elemKey, INACCESSIBLE_KEY_PREFIX +: accessMap)
     }
     //Check size of resolverTasks, is empty - set ACCESS_FLAG to true, disable resolver.
     //if nonEmpty, continue resolving
     if (insertResolverTasks.isEmpty) {
-      db.put(ACCESS_FLAG, Array[Byte](1: Byte))
+      checkDbresolving(batch)
       insertResolverStarted.compareAndSet(true, false)
       db.write(batch)
       batch.close()
@@ -174,6 +184,14 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
   }
 
   /**
+    * Db is resolved if resolvers "sleep"
+    */
+  def checkDbresolving(batch: WriteBatch): Unit =
+    if (!insertResolverStarted.get() && !deleteResolverStarted.get()) {
+      db.put(ACCESS_FLAG, Array[Byte](1: Byte))
+    }
+
+  /**
     * Remove unused keys
     * if version elems keys is "resolved". Set key "SERVICE_PREFIX :: versrion ++ RESOLVED" prefix to true (1:Byte)
     * @return
@@ -184,6 +202,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     readOptions.snapshot(db.getSnapshot)
     val batch = db.createWriteBatch()
     val versionToResolve: LevelDBVersion = deleteResolverTasks.poll()
+    deleteResolverStarted.getAndSet(true)
     logger.info(s"Init del resolver for ver: ${Algos.encode(versionToResolve)}")
     val wrappedVer: ByteArrayWrapper = new ByteArrayWrapper(versionToResolve)
     val deletionsByThisVersion = getInaccessiableKeysInVersion(versionToResolve, readOptions)
@@ -199,7 +218,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     //Check size of resolverTasks, is empty - set ACCESS_FLAG to true, disable resolver.
     //if nonEmpty, continue resolving
     if (deleteResolverTasks.isEmpty) {
-      db.put(ACCESS_FLAG, Array[Byte](1: Byte))
+      checkDbresolving(batch)
       deleteResolverStarted.compareAndSet(true, false)
       db.write(batch)
       batch.close()
