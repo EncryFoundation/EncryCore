@@ -7,7 +7,8 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
 import encry.network.PeerConnectionHandler._
-import encry.network.SyncTracker.{PeerPriority, _}
+import encry.network.SyncTracker.PeerPriorityStatus
+import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
 import encry.settings.NetworkSettings
 import encry.utils.NetworkTime.Time
 
@@ -19,7 +20,7 @@ case class SyncTracker(deliveryManager: ActorRef,
                        context: ActorContext,
                        networkSettings: NetworkSettings) extends StrictLogging {
 
-  var statuses: Map[ConnectedPeer, (HistoryComparisonResult, PeerPriority)] = Map.empty
+  var statuses: Map[ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus)] = Map.empty
 
   private var schedule: Option[Cancellable] = None
   private val lastSyncSentTime: mutable.Map[ConnectedPeer, Time] = mutable.Map[ConnectedPeer, Time]()
@@ -33,7 +34,7 @@ case class SyncTracker(deliveryManager: ActorRef,
   }
 
   def updateStatus(peer: ConnectedPeer, status: HistoryComparisonResult): Unit = {
-    val priority: PeerPriority = statuses.getOrElse(peer, (Unknown, InitialPriority()))._2
+    val priority: PeerPriorityStatus = statuses.getOrElse(peer, (Unknown, PeerPriorityStatus.InitialPriority))._2
     val seniorsBefore: Int = numOfSeniors()
     statuses = statuses.updated(peer, (status, priority))
     val seniorsAfter: Int = numOfSeniors()
@@ -88,22 +89,35 @@ case class SyncTracker(deliveryManager: ActorRef,
 
 object SyncTracker {
 
-  sealed trait PeerPriority
+  object PeerPriorityStatus {
 
-  case class HighPriority(priority: Double = 1) extends PeerPriority {
-    override def toString = "HighPriority"
-  }
+    type PeerPriorityStatus = Int
 
-  case class LowPriority(priority: Double = 0.5) extends PeerPriority {
-    override def toString = "LowPriority"
-  }
+    val HighPriority: PeerPriorityStatus = 4
+    val LowPriority: PeerPriorityStatus = 3
+    val InitialPriority: PeerPriorityStatus = 2
+    val BadNode: PeerPriorityStatus = 1
 
-  case class BadNode(priority: Double = 0.3) extends PeerPriority {
-    override def toString = "BadNode"
-  }
+    private val criterionForHighP: Double = 0.75
+    private val criterionForLowP: Double = 0.50
+    private val criterionForInitialP: Int = 0
 
-  case class InitialPriority(priority: Double = 0) extends PeerPriority {
-    override def toString = "InitialPriority"
+    def definePriorityStatus(requested: Int, received: Int): PeerPriorityStatus = {
+      val a: Double = received / received
+      a match {
+        case t if t > criterionForHighP => HighPriority
+        case t if t > criterionForLowP => LowPriority
+        case t if t == criterionForInitialP => InitialPriority
+        case _ => BadNode
+      }
+    }
+
+    def toString(priority: PeerPriorityStatus): String = priority match {
+      case 1 => "BadNode"
+      case 2 => "InitialPriority"
+      case 3 => "LowPriority"
+      case 4 => "HighPriority"
+    }
   }
 
 }

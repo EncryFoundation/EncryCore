@@ -1,7 +1,6 @@
 package encry.network
 
-import java.net.{InetAddress, InetSocketAddress}
-
+import java.net.InetAddress
 import akka.actor.{Actor, ActorRef, Cancellable}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
@@ -13,6 +12,7 @@ import encry.network.DeliveryManager._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
+import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
 import encry.network.SyncTracker._
 import encry.network.message.BasicMsgDataTypes.ModifiersData
 import encry.network.message._
@@ -23,11 +23,9 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.Mempool
 import org.encryfoundation.common.Algos
-
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
 class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogging {
@@ -58,7 +56,7 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
 
   private type Requested = Int
   private type Received = Int
-  private var peersNetworkCommunication: Map[ConnectedPeer, (Requested, Received)] = Map.empty
+  var peersNetworkCommunication: Map[ConnectedPeer, (Requested, Received)] = Map.empty
 
   system.scheduler.schedule(
     settings.network.updatePriorityTime.seconds,
@@ -93,13 +91,6 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
         logger.info(s"CheckDelivery if collection before: ${peersNetworkCommunication.map(x => (x, x._2._1 -> x._2._2)).mkString(",")}")
         peersNetworkCommunication = peersNetworkCommunication.updated(peer, (requestReceiveStat._1 + 1, requestReceiveStat._2 + 1))
         logger.info(s"CheckDelivery if collection after: ${peersNetworkCommunication.map(x => (x, x._2._1 -> x._2._2)).mkString(",")}")
-        //        logger.info(s"\nCurrent modId: ${Algos.encode(modifierId)} was delivered for the peer: ${peer.socketAddress}" +
-//          s" Before peer state: $requestReceiveStat" +
-//          s". Current peer state: ${peersNetworkCommunication.getOrElse(peer, (0, 0))}" +
-//          s"Update stat:" +
-//          s" +1 to request + 1 ti received. " +
-//          s"Current peersNetworkCommunication collection statuses are: Peer, Requested -> Received" +
-//          s"${peersNetworkCommunication.map(x => (x, x._2._1 -> x._2._2)).mkString(",")} \n")
         delivered -= key(modifierId)
       } else {
         logger.info(s"CheckDelivery else collection before: ${peersNetworkCommunication.map(x => (x, x._2._1 -> x._2._2)).mkString(",")}")
@@ -204,7 +195,7 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
 
   //todo: refactor
   def reexpect(cp: ConnectedPeer, mTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
-    val peerAndHistoryOpt: Option[(ConnectedPeer, (HistoryComparisonResult, PeerPriority))] =
+    val peerAndHistoryOpt: Option[(ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus))] =
       statusTracker.statuses.find { case (peer, (comparisonResult, _)) =>
         peer.socketAddress == cp.socketAddress && comparisonResult != Younger
       }
@@ -274,30 +265,35 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
     * @param modifierIds
     */
   def requestDownload(modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
-    if (settings.influxDB.isDefined)
-      context.actorSelection("/user/statsSender") ! SendDownloadRequest(modifierTypeId, modifierIds)
+    influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
     if (!isBlockChainSynced) {
-      val peer: Option[ConnectedPeer] = statusTracker.statuses
-        .filter(_._2._1 != Younger).map(v => v._1 -> v._2._2).toList.collect {
-        case (peer1, priority: HighPriority) => peer1 -> priority.priority
-        case (peer1, priority: LowPriority) => peer1 -> priority.priority
-        case (peer1, priority: BadNode) => peer1 -> priority.priority
-        case (peer1, priority: InitialPriority) => peer1 -> priority.priority
-      }.sortBy(_._2).headOption.map(_._1)
-      peer.foreach(pI => expect(pI, modifierTypeId, modifierIds))
-
+      println(2)
+      logger.info(s"Unsorted peers: ${
+        statusTracker.statuses
+          .map(x => x._1 -> (PeerPriorityStatus.toString(x._2._2), x._2._1)).mkString(",")
+      }")
+      val a: Vector[(ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus))] = statusTracker.statuses
+        .filter(_._2._1 != Younger)
+        .toVector.sortBy(_._2._2)
+      logger.info(s"Sorted peers: ${a.map(x => x._1 -> (PeerPriorityStatus.toString(x._2._2), x._2._1)).mkString(",")}")
+      a.headOption.map(_._1)
+        .foreach { pI =>
+          logger.info(s"Sending request to the ${pI.socketAddress}")
+          expect(pI, modifierTypeId, modifierIds)
+        }
     }
-    else statusTracker.statuses.filter(x => x._2._1 != Younger).keys.foreach(peer => expect(peer, modifierTypeId, modifierIds))
+    else {
+      println(1)
+      statusTracker.statuses
+        .filter(x => x._2._1 != Younger)
+        .keys.foreach(peer => expect(peer, modifierTypeId, modifierIds))
+    }
   }
 
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit =
     if (isExpecting(mtid, mid)) {
       val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(cp, (0, 0))
       peersNetworkCommunication = peersNetworkCommunication.updated(cp, (requestReceiveStat._1 + 1, requestReceiveStat._2 + 1))
-      //      logger.info(s"\nCurrent modId: ${Algos.encode(mid)} is RECEIVED. Update stat:" +
-//        s" +1 to request + 1 ti received. " +
-//        s"Current peersNetworkCommunication collection statuses are: Peer, Requested -> Received" +
-//        s"${peersNetworkCommunication.map(x => (x, x._2._1 -> x._2._2)).mkString(",")} \n")
       //todo: refactor
       delivered = delivered + key(mid)
       val peerMap: Map[ModifierIdAsKey, (Cancellable, Requested)] =
@@ -315,21 +311,17 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
 
   def updatePeersPriorityStatus(): Unit = {
     peersNetworkCommunication.foreach { case (peer, (requested, received)) =>
-      logger.info(s"peer: ${peer.socketAddress}")
-      val priority: PeerPriority = received / requested match {
-        case a if a > 0.66 => HighPriority()
-        case a if a > 0.33 => LowPriority()
-        case a => BadNode()
-      }
-      val currentStatus: Option[(HistoryComparisonResult, PeerPriority)] = statusTracker.statuses.get(peer)
-      currentStatus match {
+      statusTracker.statuses.get(peer) match {
         case Some(v) =>
-          logger.info(s"Update peers priority: peer :${peer.socketAddress} has new priority: ${priority.toString}" +
-          s" instead of old: ${v._2.toString}")
+          val priority: PeerPriorityStatus = PeerPriorityStatus.definePriorityStatus(requested, received)
+          logger.info(s"Updating ${peer.socketAddress} priority. New priority is ${PeerPriorityStatus.toString(priority)}" +
+            s" instead of old: ${PeerPriorityStatus.toString(v._2)}")
           statusTracker.statuses = statusTracker.statuses.updated(peer, (v._1, priority))
-          logger.info(s"StatusTracker: ${statusTracker.statuses.map(x => x._1 -> (x._2._2, x._2._1)).mkString(",")}")
-        case None =>
-          logger.info(s"No such peer in status tracker!")
+          logger.info(s"StatusTracker: ${
+            statusTracker.statuses.map(x =>
+              x._1 -> (PeerPriorityStatus.toString(x._2._2), x._2._1)).mkString(",")
+          }")
+        case None => logger.info(s"No such peer in status tracker!")
       }
     }
     peersNetworkCommunication = Map.empty[ConnectedPeer, (Requested, Received)]
