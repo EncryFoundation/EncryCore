@@ -1,5 +1,6 @@
 package encry.storage.levelDb.versionalLevelDB
 
+import com.typesafe.scalalogging.StrictLogging
 import encry.settings.LevelDBSettings
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.utils.FileHelper
@@ -12,7 +13,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scala.concurrent.Await
 import scala.util.Random
 
-class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGenerator {
+class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGenerator with StrictLogging{
 
   /**
     * Check correctness of data stored in level db, after insert(no deletions), close and init.
@@ -156,6 +157,12 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     val levelDbElems = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, Random.nextInt(300))
 
     levelDbElems.foreach(vldbInit.insert)
+
+    var isResolved = vldbInit.isDBresolved()
+
+//    do {
+//      isResolved = vldbInit.isDBresolved()
+//    } while (!vldbInit.isDBresolved())
 
     vldbInit.get(levelDbElems.head.elemsToInsert.head._1) shouldEqual None
 

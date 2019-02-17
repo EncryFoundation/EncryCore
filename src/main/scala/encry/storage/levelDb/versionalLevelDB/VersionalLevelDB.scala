@@ -62,19 +62,22 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
           )
       } else None
     } else None
-    if (db.get(userKey(elemKey)) != null &&
+    val possibleElemInResolved = if (db.get(userKey(elemKey)) != null &&
       isDBresolved(readOptions) &&
       possibleElem.isEmpty &&
       db.get(userKey(elemKey)).headOption.contains(ACCESSIBLE_KEY_PREFIX)) {
-      logger.info(s"Trying to get access key ${Algos.encode(elemKey)}")
       val lastElemVersion: LevelDBVersion =
-        LevelDBVersion @@ ArrayUtils.subarray(db.get(userKey(elemKey), readOptions), 1, 32)
-      if (db.get(accessableElementKeyForVersion(lastElemVersion, elemKey)) != null)
-        Some(VersionalLevelDbValue @@ db.get(accessableElementKeyForVersion(lastElemVersion, elemKey)))
+        LevelDBVersion @@ ArrayUtils.subarray(db.get(userKey(elemKey), readOptions), 1, 33)
+      logger.info(s"Elem version is: ${Algos.encode(lastElemVersion)}")
+      logger.info(s"trying to get ${Algos.encode(elemKey)} by key: ${Algos.encode(accessableElementKeyForVersion(lastElemVersion, elemKey))}")
+      logger.info(s"Result of get: ${db.get(accessableElementKeyForVersion(lastElemVersion, elemKey), readOptions)}")
+      if (db.get(accessableElementKeyForVersion(lastElemVersion, elemKey), readOptions) != null) {
+        Some(VersionalLevelDbValue @@ db.get(accessableElementKeyForVersion(lastElemVersion, elemKey), readOptions))
+      }
       else None
     } else None
     readOptions.snapshot().close()
-    possibleElem
+    if (possibleElem.isEmpty) possibleElemInResolved else possibleElem
   }
 
   /**
@@ -108,6 +111,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
           batch.put(userKey(elemKey), Array(ACCESSIBLE_KEY_PREFIX))
           logger.info(s"Insert key: ${Algos.encode(elemKey)}")
         }
+        logger.info(s"Put ${Algos.encode(elemKey)} by key: ${Algos.encode(accessableElementKeyForVersion(newElem.version, elemKey))}")
         batch.put(accessableElementKeyForVersion(newElem.version, elemKey), elemValue)
     }
     //set access flag to false, means that resolver doesn't resolve element's access flags for this version
@@ -150,6 +154,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     readOptions.snapshot(db.getSnapshot)
     val batch: WriteBatch = db.createWriteBatch()
     val versionToResolve: LevelDBVersion = insertResolverTasks.poll()
+    logger.info("Set insertResolverStarted to true")
     insertResolverStarted.getAndSet(true)
     logger.info(s"Init insert resolver for ${Algos.encode(versionToResolve)}")
     val deletions = splitValue2elems(KEY_SIZE,db.get(versionDeletionsKey(versionToResolve), readOptions))
@@ -158,20 +163,22 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     logger.info(s"Insertions of version: ${insertions.map(Algos.encode).mkString(",")}")
     insertions.foreach { elemKey =>
       val accessMap = db.get(userKey(VersionalLevelDbKey @@ elemKey), readOptions).tail
-      logger.info(s"Previous access map in insert ${Algos.encode(elemKey)}: ${splitValue2elems(KEY_SIZE, accessMap).map(Algos.encode).mkString(",")}")
-      batch.put(elemKey, (ACCESSIBLE_KEY_PREFIX +: versionToResolve) ++ accessMap)
+      logger.info(s"Previous access map in insert ${Algos.encode(elemKey)}|version: ${Algos.encode(versionToResolve)}: ${splitValue2elems(KEY_SIZE, accessMap).map(Algos.encode).mkString(",")}")
+      batch.put(userKey(VersionalLevelDbKey @@ elemKey), (ACCESSIBLE_KEY_PREFIX +: versionToResolve) ++ accessMap)
     }
     deletions.foreach{ elemKey =>
       val accessMap = db.get(userKey(VersionalLevelDbKey @@ elemKey), readOptions).tail
       logger.info(s"Previous access map for deletions ${Algos.encode(elemKey)}: ${splitValue2elems(KEY_SIZE, accessMap).map(Algos.encode).mkString(",")}")
       logger.info(s"Set INACCESSIBLE_KEY_PREFIX to elem: ${Algos.encode(elemKey)}")
-      batch.put(elemKey, INACCESSIBLE_KEY_PREFIX +: accessMap)
+      batch.put(userKey(VersionalLevelDbKey @@ elemKey), INACCESSIBLE_KEY_PREFIX +: accessMap)
     }
     //Check size of resolverTasks, is empty - set ACCESS_FLAG to true, disable resolver.
     //if nonEmpty, continue resolving
     if (insertResolverTasks.isEmpty) {
-      checkDbresolving(batch)
+      logger.info("insertResolverTasks is empty")
+      logger.info(s"insertResolverStarted: ${insertResolverStarted.get()}")
       insertResolverStarted.compareAndSet(true, false)
+      checkDbresolving(batch)
       db.write(batch)
       batch.close()
       readOptions.snapshot().close()
@@ -218,8 +225,8 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     //Check size of resolverTasks, is empty - set ACCESS_FLAG to true, disable resolver.
     //if nonEmpty, continue resolving
     if (deleteResolverTasks.isEmpty) {
-      checkDbresolving(batch)
       deleteResolverStarted.compareAndSet(true, false)
+      checkDbresolving(batch)
       db.write(batch)
       batch.close()
       readOptions.snapshot().close()
