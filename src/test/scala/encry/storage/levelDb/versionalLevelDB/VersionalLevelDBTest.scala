@@ -142,9 +142,9 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
   property("deleted key from deleted version should not exist") {
 
-    val maxVersions = Random.nextInt(1000)
+    val maxVersions = 10
 
-    val levelDbElemsQty = Random.nextInt(1000) + maxVersions
+    val levelDbElemsQty = 3 + maxVersions
 
     val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
 
@@ -158,19 +158,17 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     levelDbElems.foreach(vldbInit.insert)
 
-    var isResolved = vldbInit.isDBresolved()
-
     vldbInit.get(levelDbElems.head.elemsToInsert.head._1) shouldEqual None
 
     vldbInit.get(levelDbElems.last.elemsToInsert.head._1).map(data => Algos.hash(data)).get shouldEqual
       Algos.hash(levelDbElems.last.elemsToInsert.head._2)
   }
 
-  property("insertion of 1k elems") {
+  property("insertion of 4k elems") {
 
     val maxVersions = 100
 
-    val levelDbElemsQty = 1000
+    val levelDbElemsQty = 4000
 
     val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
 
@@ -183,8 +181,6 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     val levelDbElems = generateRandomLevelDbElemsWithoutDeletions(levelDbElemsQty, Random.nextInt(300))
 
     levelDbElems.foreach(vldbInit.insert)
-
-    var isResolved = vldbInit.isDBresolved()
 
     vldbInit.get(levelDbElems.head.elemsToInsert.head._1) shouldEqual None
 
@@ -209,8 +205,6 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     val levelDbElems = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, Random.nextInt(300))
 
     levelDbElems.foreach(vldbInit.insert)
-
-    var isResolved = vldbInit.isDBresolved()
 
     vldbInit.rollbackTo(levelDbElems(6).version)
 

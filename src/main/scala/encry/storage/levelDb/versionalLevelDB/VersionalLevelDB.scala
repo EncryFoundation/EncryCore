@@ -12,33 +12,7 @@ import org.encryfoundation.common.Algos
 import org.iq80.leveldb.{DB, ReadOptions, WriteBatch}
 import supertagged.TaggedType
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-
 case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLogging with AutoCloseable {
-
-  //Insert resolver tasks, contains versions in which keys should be resolved during insertion
-  // if resolverTasks empty - resolver set ACCESS_FLAG to 1
-  val insertResolverTasks: ConcurrentLinkedQueue[LevelDBVersion] = new ConcurrentLinkedQueue[LevelDBVersion]()
-
-  //Delete resolver tasks, contains versions in which keys should be resolved during deletion
-  val deleteResolverTasks: ConcurrentLinkedQueue[LevelDBVersion] = new ConcurrentLinkedQueue[LevelDBVersion]()
-
-  //Collect queue of versions, which should be deleted
-  var toDeleteTask: ConcurrentLinkedQueue[LevelDBVersion] = new ConcurrentLinkedQueue[LevelDBVersion]()
-
-  //Describe insert resolver status, if it is false - resolver "sleep", otherwise - busy
-  var insertResolverStarted: AtomicBoolean = new AtomicBoolean(false)
-
-  //Describe delete resolver status, if it is false - resolver "sleep", otherwise - busy
-  var deleteResolverStarted: AtomicBoolean = new AtomicBoolean(false)
-
-  //Describe rollback resolver status, if it is false - resolver "sleep", otherwise - busy
-  var rollbackResolverStarted: AtomicBoolean = new AtomicBoolean(false)
-
-  def isDBresolved(readOptions: ReadOptions = new ReadOptions()): Boolean = {
-    db.get(ACCESS_FLAG, readOptions).last == (1: Byte)
-  }
 
   def versionsList(readOptions: ReadOptions = new ReadOptions()): List[LevelDBVersion] =
       splitValue2elems(KEY_SIZE, db.get(VERSIONS_LIST, readOptions)).map(elem => LevelDBVersion @@ elem)
@@ -55,21 +29,8 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     //logger.info(s"Trying to get: ${Algos.encode(elemKey)}")
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
-    val possibleElem = if (!isDBresolved(readOptions)) {
-      //logger.info("DB is not resolved")
-      if (!versionsList(readOptions).flatMap(version =>
-        splitValue2elems(32, db.get(versionKey(version), readOptions)).map(key => new ByteArrayWrapper(key))
-      ).contains(elemKey)) {
-        versionsList(readOptions).find(version => db.get(accessableElementKeyForVersion(version, elemKey)) != null)
-          .map(versionKey =>
-            VersionalLevelDbValue @@  db.get(accessableElementKeyForVersion(versionKey, elemKey))
-          )
-      } else None
-    } else None
     //logger.info(s"(db.get(userKey(${Algos.encode(elemKey)})) != null: ${db.get(userKey(elemKey)) != null}")
     val possibleElemInResolved = if (db.get(userKey(elemKey)) != null &&
-      isDBresolved(readOptions) &&
-      possibleElem.isEmpty &&
       db.get(userKey(elemKey)).headOption.contains(ACCESSIBLE_KEY_PREFIX)) {
       //logger.info("DB is resolved")
       val lastElemVersion: LevelDBVersion =
@@ -82,7 +43,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       else None
     } else None
     readOptions.snapshot().close()
-    if (possibleElem.isEmpty) possibleElemInResolved else possibleElem
+    possibleElemInResolved
   }
 
   /**
@@ -91,16 +52,17 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     */
   //todo: refactor
   def insert(newElem: LevelDbElem): Unit = {
-    logger.info("2")
-    logger.info(s"put version: ${Algos.encode(newElem.version)}")
+    //logger.info("2")
+    //logger.info(s"put version: ${Algos.encode(newElem.version)}")
     //remove this best thread pause
-    do {logger.info(s"rollbackResolverStarted.get(): ${rollbackResolverStarted.get()}")} while (rollbackResolverStarted.get())
+    //do {logger.info(s"rollbackResolverStarted.get(): ${rollbackResolverStarted.get()}")} while (rollbackResolverStarted.get())
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
     val batch = db.createWriteBatch()
     //Set current version to newElem.version
     batch.put(CURRENT_VERSION_KEY, newElem.version)
     //Insert new version to versions list
+    //logger.info(s"versionsList(readOptions): ${versionsList(readOptions).length}")
     batch.put(VERSIONS_LIST, newElem.version.untag(LevelDBVersion) ++ versionsList(readOptions).flatMap(_.untag(LevelDBVersion)))
     //Ids of all elements, added by newElem
     batch.put(versionKey(newElem.version), newElem.elemsToInsert.map(_._1).flatMap(_.untag(LevelDBVersion)).toArray)
@@ -116,20 +78,27 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
           * if db contains elem, just insert elem
           */
         if (db.get(userKey(elemKey)) == null) {
-          batch.put(userKey(elemKey), Array(ACCESSIBLE_KEY_PREFIX))
+          batch.put(userKey(elemKey), ACCESSIBLE_KEY_PREFIX +: newElem.version)
+        } else {
+          val accessMap = db.get(userKey(elemKey), readOptions).tail
+          //      logger.info(s"Get map by key: ${Algos.encode(userKey(VersionalLevelDbKey @@ elemKey))}. it contains: ${
+          //        splitValue2elems(32, accessMap).map(Algos.encode).mkString(",")
+          //      }")
+          batch.put(userKey(elemKey), (ACCESSIBLE_KEY_PREFIX +: newElem.version) ++ accessMap)
         }
-        //logger.info(s"Put ${Algos.encode(accessableElementKeyForVersion(newElem.version, elemKey))}")
         batch.put(accessableElementKeyForVersion(newElem.version, elemKey), elemValue)
+        //logger.info(s"Put ${Algos.encode(accessableElementKeyForVersion(newElem.version, elemKey))}")
+    }
+    newElem.elemsToDelete.foreach{ elemKey =>
+      val accessMap = db.get(userKey(elemKey), readOptions).tail
+      batch.put(userKey(elemKey), INACCESSIBLE_KEY_PREFIX +: accessMap)
     }
     //set access flag to false, means that resolver doesn't resolve element's access flags for this version
-    batch.put(ACCESS_FLAG, Array[Byte](0))
+    //batch.put(ACCESS_FLAG, Array[Byte](0))
     //write batch
-    db.write(batch)
-    batch.close()
-    readOptions.snapshot().close()
-    insertResolverTasks.add(newElem.version)
-    if (!insertResolverStarted.get()) initInsertResolver()
-    clean()
+//    insertResolverTasks.add(newElem.version)
+//    if (!insertResolverStarted.get()) initInsertResolver()
+    clean(batch, readOptions)
   }
 
   /**
@@ -137,7 +106,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     * @return
     */
   def getAll: List[(VersionalLevelDbKey, VersionalLevelDbValue)] = {
-    logger.info("3")
+    //logger.info("3")
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
     val result = getCurrentElementsKeys
@@ -149,73 +118,12 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     result
   }
 
-  //Start resolver
-  /**
-    * Trying to resolve db keys(set correct access flags), based on current version.
-    * if version elems keys is "resolved". Set key "SERVICE_PREFIX :: versrion ++ RESOLVED" prefix to true (1:Byte)
-    * @return
-    */
-  //todo: refactor
-  def insertResolver(): Unit =  {
-    logger.info("4")
-    val readOptions = new ReadOptions()
-    readOptions.snapshot(db.getSnapshot)
-    val batch: WriteBatch = db.createWriteBatch()
-    val versionToResolve: LevelDBVersion = insertResolverTasks.poll()
-    logger.info(s"Resolve ${Algos.encode(versionToResolve)}")
-    val deletions = splitValue2elems(KEY_SIZE,db.get(versionDeletionsKey(versionToResolve), readOptions))
-    val insertions = splitValue2elems(KEY_SIZE, db.get(versionKey(versionToResolve), readOptions))
-    insertions.foreach { elemKey =>
-      val accessMap = db.get(userKey(VersionalLevelDbKey @@ elemKey), readOptions).tail
-//      logger.info(s"Get map by key: ${Algos.encode(userKey(VersionalLevelDbKey @@ elemKey))}. it contains: ${
-//        splitValue2elems(32, accessMap).map(Algos.encode).mkString(",")
-//      }")
-      batch.put(userKey(VersionalLevelDbKey @@ elemKey), (ACCESSIBLE_KEY_PREFIX +: versionToResolve) ++ accessMap)
-    }
-    deletions.foreach{ elemKey =>
-      val accessMap = db.get(userKey(VersionalLevelDbKey @@ elemKey), readOptions).tail
-      batch.put(userKey(VersionalLevelDbKey @@ elemKey), INACCESSIBLE_KEY_PREFIX +: accessMap)
-    }
-    //Check size of resolverTasks, is empty - set ACCESS_FLAG to true, disable resolver.
-    //if nonEmpty, continue resolving
-    db.write(batch)
-    batch.close()
-    readOptions.snapshot().close()
-    initInsertResolver()
-  }
-
-  def initInsertResolver(): Future[Unit] = Future {
-    logger.info("5")
-    if (!insertResolverTasks.isEmpty) {
-      insertResolverStarted.compareAndSet(false, true)
-      insertResolver()
-    } else {
-      insertResolverStarted.compareAndSet(true, false)
-      val batch = db.createWriteBatch()
-      checkDbresolving(batch)
-      db.write(batch)
-      batch.close()
-      logger.info("insertResolverTasks is empty!")
-    }
-  }
-
-  /**
-    * Db is resolved if resolvers "sleep"
-    */
-  def checkDbresolving(batch: WriteBatch): Unit = {
-    logger.info("6")
-    if (!insertResolverStarted.get() && !deleteResolverStarted.get()) {
-      db.put(ACCESS_FLAG, Array[Byte](1: Byte))
-    }
-  }
-
   /**
     * Remove all insertions of version after rollbackPoint
     * @return
     */
-  def rollbackResolver(versionsToResolve: List[LevelDBVersion]): Future[Unit] = Future {
-    logger.info("7")
-    rollbackResolverStarted.set(true)
+  def rollbackResolver(versionsToResolve: List[LevelDBVersion]): Unit =  {
+    //logger.info("7")
     if (versionsToResolve.nonEmpty) {
       val versionToResolve = versionsToResolve.head
       val readOptions = new ReadOptions()
@@ -247,8 +155,6 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       writeBatch.close()
       readOptions.snapshot().close()
       rollbackResolver(versionsToResolve.tail)
-    } else {
-      rollbackResolverStarted.set(false)
     }
   }
 
@@ -258,13 +164,8 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     * @return
     */
   //todo: refactor
-  def deleteResolver(): Future[Unit] = Future {
-    logger.info("8")
-    val readOptions = new ReadOptions()
-    readOptions.snapshot(db.getSnapshot)
-    val batch = db.createWriteBatch()
-    val versionToResolve: LevelDBVersion = deleteResolverTasks.poll()
-    deleteResolverStarted.set(true)
+  def deleteResolver(versionToResolve: LevelDBVersion, batch: WriteBatch, readOptions: ReadOptions): Unit = {
+    //logger.info("8")
     val wrappedVer: ByteArrayWrapper = new ByteArrayWrapper(versionToResolve)
     val deletionsByThisVersion = getInaccessiableKeysInVersion(versionToResolve, readOptions)
     deletionsByThisVersion.foreach{key =>
@@ -278,18 +179,6 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     }
     //Check size of resolverTasks, is empty - set ACCESS_FLAG to true, disable resolver.
     //if nonEmpty, continue resolving
-    if (deleteResolverTasks.isEmpty) {
-      deleteResolverStarted.compareAndSet(true, false)
-      db.write(batch)
-      checkDbresolving(batch)
-      batch.close()
-      readOptions.snapshot().close()
-    } else {
-      db.write(batch)
-      batch.close()
-      deleteResolver()
-      readOptions.snapshot().close()
-    }
   }
 
   /**
@@ -297,25 +186,18 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     * also, delete elems without some ref
     */
   //TODO: Delete non alias elements without ref
-  def clean(): Unit =  {
-    logger.info("9")
-    val readOptions = new ReadOptions()
-    readOptions.snapshot(db.getSnapshot)
-    val batch = db.createWriteBatch()
+  def clean(batch: WriteBatch, readOptions: ReadOptions): Unit =  {
+    //logger.info("9")
     val versions = versionsList().map(ver => new ByteArrayWrapper(ver))
     if (versions.length > settings.maxVersions) {
       val versionToDelete = versions.takeRight(versions.length - settings.maxVersions).reverse
-      versionToDelete.foreach { v =>
-        deleteResolverTasks.add(LevelDBVersion @@ v.data)
-        // update versions list
-      }
+      versionToDelete.foreach(ver => deleteResolver(LevelDBVersion @@ ver.data, batch, readOptions))
       batch.put(VERSIONS_LIST, versions.filterNot(versionToDelete.contains)
         .foldLeft(Array.emptyByteArray){case (acc, key) => acc ++ key.data})
     }
     db.write(batch)
     batch.close()
     readOptions.snapshot().close()
-    deleteResolver()
   }
 
   /**
@@ -339,14 +221,14 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
   }
 
   def inaccessibleKeys(readOptions: ReadOptions = new ReadOptions()): List[VersionalLevelDbKey] = {
-    logger.info("11")
+    //logger.info("11")
     val currentVersions = versionsList(readOptions)
     currentVersions.flatMap(version => getInaccessiableKeysInVersion(version, readOptions))
     //logger.info(s"CurrentKeys: ${result.map(key => Algos.encode(key)).mkString(",")}")
   }
 
   def getInaccessiableKeysInVersion(version: LevelDBVersion, readOptions: ReadOptions): List[VersionalLevelDbKey] = {
-    logger.info("12")
+    //logger.info("12")
     splitValue2elems(
       KEY_SIZE,
       db.get(versionDeletionsKey(version), readOptions)
@@ -373,7 +255,6 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       val verToDelete = allVerWrapped.takeWhile(_ != versionsBeforeRollback)
       //Insert new version to versions list
       batch.put(VERSIONS_LIST, versionsBeforeRollback)
-      batch.put(ACCESS_FLAG, Array(0: Byte))
       db.write(batch)
       rollbackResolver(verToDelete.map(LevelDBVersion @@ _.data))
       batch.close()
@@ -477,9 +358,6 @@ object VersionalLevelDBCompanion {
   //Key, which set concatenation of fixed length keys, witch contains all acceptable versions
   val VERSIONS_LIST: VersionalLevelDbKey =
     VersionalLevelDbKey @@ (SERVICE_PREFIX +: Algos.hash("VERSIONS"))
-  //Key, which describe that all access prefixes are resolved correctly
-  val ACCESS_FLAG: VersionalLevelDbKey =
-    VersionalLevelDbKey @@ (SERVICE_PREFIX +: Algos.hash("ACCESS_KEY"))
 
   /**
     * Initial keys
@@ -489,7 +367,6 @@ object VersionalLevelDBCompanion {
     CURRENT_VERSION_LIST_KEY -> VersionalLevelDbValue @@ Array.emptyByteArray,
     VERSIONS_LIST -> VersionalLevelDbValue @@ Array.emptyByteArray,
     versionResolvedKey(INIT_VERSION) ->  VersionalLevelDbValue @@ Array(1: Byte),
-    ACCESS_FLAG -> VersionalLevelDbValue @@ Array(1: Byte)
   )
 
   def apply(levelDb: DB, settings: LevelDBSettings, initValues: Map[VersionalLevelDbKey, VersionalLevelDbValue] = Map.empty): VersionalLevelDB = {
