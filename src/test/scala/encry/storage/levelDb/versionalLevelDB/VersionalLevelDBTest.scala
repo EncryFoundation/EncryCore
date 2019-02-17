@@ -166,6 +166,32 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
       Algos.hash(levelDbElems.last.elemsToInsert.head._2)
   }
 
+  property("insertion of 1k elems") {
+
+    val maxVersions = 100
+
+    val levelDbElemsQty = 1000
+
+    val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
+
+    val tempDir = FileHelper.getRandomTempDir
+
+    val levelDBInit = LevelDbFactory.factory.open(tempDir, new Options)
+
+    val vldbInit = VersionalLevelDBCompanion(levelDBInit, dummyLevelDBSettings)
+
+    val levelDbElems = generateRandomLevelDbElemsWithoutDeletions(levelDbElemsQty, Random.nextInt(300))
+
+    levelDbElems.foreach(vldbInit.insert)
+
+    var isResolved = vldbInit.isDBresolved()
+
+    vldbInit.get(levelDbElems.head.elemsToInsert.head._1) shouldEqual None
+
+    vldbInit.get(levelDbElems.last.elemsToInsert.head._1).map(data => Algos.hash(data)).get shouldEqual
+      Algos.hash(levelDbElems.last.elemsToInsert.head._2)
+  }
+
   property("Check that after rollback, it is impossible to get last generated version") {
 
     val maxVersions = 10

@@ -1,12 +1,14 @@
 package encry.utils.levelDBUtils
 
+import com.typesafe.scalalogging.StrictLogging
 import encry.storage.levelDb.versionalLevelDB.LevelDbElem
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.utils.Random
+
 import scala.util.{Random => ScalaRandom}
 
-trait LevelDbUnitsGenerator {
+trait LevelDbUnitsGenerator extends StrictLogging {
 
   val defaultKeySize: Int = 32
   val defaultValueSize: Int = 256
@@ -23,10 +25,12 @@ trait LevelDbUnitsGenerator {
 
   def generateRandomLevelDbElemsWithoutDeletions(qty: Int, qtyOfElemsToInsert: Int): List[LevelDbElem] =
     (0 until qty).foldLeft(List.empty[LevelDbElem]) {
-      case (acc, _) => LevelDbElem(
-        LevelDBVersion @@ Random.randomBytes(),
-        List((0 until qtyOfElemsToInsert).map(_ => genRandomInsertValue()): _*)
-      ) :: acc
+      case (acc, i) =>
+        logger.info(s"create $i elem")
+        LevelDbElem(
+          LevelDBVersion @@ Random.randomBytes(),
+          List((0 until qtyOfElemsToInsert).map(_ => genRandomInsertValue()): _*)
+        ) :: acc
     }
 
   /**

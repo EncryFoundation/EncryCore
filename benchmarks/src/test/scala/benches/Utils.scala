@@ -14,7 +14,7 @@ import encry.modifiers.mempool.{Transaction, TransactionFactory, UnsignedTransac
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.LevelDBVersion
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbElem, LevelDbFactory, VersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
@@ -44,6 +44,19 @@ object Utils extends StrictLogging {
 
   val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
   val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
+
+  val defaultKeySize: Int = 32
+  val defaultValueSize: Int = 256
+
+  def generateRandomKey(keySize: Int = defaultKeySize): VersionalLevelDbKey =
+    VersionalLevelDbKey @@ Random.randomBytes(keySize)
+
+  def generateRandomValue(valueSize: Int = defaultValueSize): VersionalLevelDbValue =
+    VersionalLevelDbValue @@ Random.randomBytes(valueSize)
+
+  def genRandomInsertValue(keySize: Int = defaultKeySize,
+                           valueSize: Int = defaultValueSize): (VersionalLevelDbKey, VersionalLevelDbValue) =
+    (generateRandomKey(keySize), generateRandomValue(valueSize))
 
   def generateRandomLevelDbElemsWithoutDeletions(qty: Int, qtyOfElemsToInsert: Int): List[LevelDbElem] =
     (0 until qty).foldLeft(List.empty[LevelDbElem]) {

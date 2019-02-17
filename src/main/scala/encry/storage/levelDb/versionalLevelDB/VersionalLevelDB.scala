@@ -51,7 +51,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     */
   //TODO: a lot None
   def get(elemKey: VersionalLevelDbKey): Option[VersionalLevelDbValue] = {
-    logger.info("1")
+    //logger.info("1")
     //logger.info(s"Trying to get: ${Algos.encode(elemKey)}")
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
@@ -75,6 +75,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       val lastElemVersion: LevelDBVersion =
         LevelDBVersion @@ ArrayUtils.subarray(db.get(userKey(elemKey), readOptions), 1, 33)
       //logger.info(s"Last version key: ${Algos.encode(lastElemVersion)}")
+      //logger.info(s"Trying to get val by key: ${Algos.encode(accessableElementKeyForVersion(lastElemVersion, elemKey))}")
       if (db.get(accessableElementKeyForVersion(lastElemVersion, elemKey), readOptions) != null) {
         Some(VersionalLevelDbValue @@ db.get(accessableElementKeyForVersion(lastElemVersion, elemKey), readOptions))
       }
@@ -91,6 +92,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
   //todo: refactor
   def insert(newElem: LevelDbElem): Unit = {
     logger.info("2")
+    logger.info(s"put version: ${Algos.encode(newElem.version)}")
     //remove this best thread pause
     do {logger.info(s"rollbackResolverStarted.get(): ${rollbackResolverStarted.get()}")} while (rollbackResolverStarted.get())
     val readOptions = new ReadOptions()
@@ -116,6 +118,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         if (db.get(userKey(elemKey)) == null) {
           batch.put(userKey(elemKey), Array(ACCESSIBLE_KEY_PREFIX))
         }
+        //logger.info(s"Put ${Algos.encode(accessableElementKeyForVersion(newElem.version, elemKey))}")
         batch.put(accessableElementKeyForVersion(newElem.version, elemKey), elemValue)
     }
     //set access flag to false, means that resolver doesn't resolve element's access flags for this version
@@ -159,10 +162,14 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     readOptions.snapshot(db.getSnapshot)
     val batch: WriteBatch = db.createWriteBatch()
     val versionToResolve: LevelDBVersion = insertResolverTasks.poll()
+    logger.info(s"Resolve ${Algos.encode(versionToResolve)}")
     val deletions = splitValue2elems(KEY_SIZE,db.get(versionDeletionsKey(versionToResolve), readOptions))
     val insertions = splitValue2elems(KEY_SIZE, db.get(versionKey(versionToResolve), readOptions))
     insertions.foreach { elemKey =>
       val accessMap = db.get(userKey(VersionalLevelDbKey @@ elemKey), readOptions).tail
+//      logger.info(s"Get map by key: ${Algos.encode(userKey(VersionalLevelDbKey @@ elemKey))}. it contains: ${
+//        splitValue2elems(32, accessMap).map(Algos.encode).mkString(",")
+//      }")
       batch.put(userKey(VersionalLevelDbKey @@ elemKey), (ACCESSIBLE_KEY_PREFIX +: versionToResolve) ++ accessMap)
     }
     deletions.foreach{ elemKey =>
