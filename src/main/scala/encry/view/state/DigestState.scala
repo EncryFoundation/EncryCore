@@ -42,7 +42,7 @@ class DigestState protected(override val version: VersionTag,
           .getOrElse(Failure(new Exception("Proofs are empty"))))
       }.flatten match {
         case s: Success[_] =>
-          //logger.info(s"Valid modifier applied to DigestState: ${block.encodedId}")
+          logger.info(s"Valid modifier applied to DigestState: ${block.encodedId}")
           s
         case Failure(e) =>
           logger.warn(s"Modifier $mod is not valid: $e")

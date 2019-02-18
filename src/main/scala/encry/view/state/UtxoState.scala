@@ -96,8 +96,8 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
 
         if (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest)
           onAdProofGenerated(ADProofs(block.header.id, proofBytes))
-//        logger.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with" +
-//          s" root hash ${Algos.encode(rootHash)}")
+        logger.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with" +
+          s" root hash ${Algos.encode(rootHash)}")
 
         if (!stateStore.get(ByteArrayWrapper(block.id)).exists(_.data sameElements block.header.stateRoot))
           throw new Exception("Storage kept roothash is not equal to the declared one.")

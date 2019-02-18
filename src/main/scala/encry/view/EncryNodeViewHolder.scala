@@ -94,8 +94,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
                 case _ =>
               }
             }
-            if (nodeView.history.contains(pmod.id) || ModifiersCache.contains(key(pmod.id))) {}
-              //logger.warn(s"Received modifier ${pmod.encodedId} that is already in history")
+            if (nodeView.history.contains(pmod.id) || ModifiersCache.contains(key(pmod.id)))
+              logger.warn(s"Received modifier ${pmod.encodedId} that is already in history")
             else ModifiersCache.put(key(pmod.id), pmod, nodeView.history)
         }
         logger.debug(s"Cache before(${ModifiersCache.size})")
@@ -244,7 +244,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   }
 
   def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
-    //logger.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
+    logger.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
     if (settings.influxDB.isDefined) context.system
       .actorSelection("user/statsSender") !
       StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
@@ -253,7 +253,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       case Success((historyBeforeStUpdate, progressInfo)) =>
         if (settings.influxDB.isDefined)
           context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
-        //logger.info(s"Going to apply modifications to the state: $progressInfo")
+        logger.info(s"Going to apply modifications to the state: $progressInfo")
         if (progressInfo.toApply.nonEmpty) {
           val startPoint: Long = System.currentTimeMillis()
           val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
@@ -268,7 +268,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
                 nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
               else nodeView.wallet
               blocksApplied.foreach(newVault.scanPersistent)
-              //logger.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
+              logger.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
               if (progressInfo.chainSwitchingNeeded)
                 context.actorSelection("/user/blockListener") !
                   ChainSwitching(progressInfo.toRemove.map(_.id))
