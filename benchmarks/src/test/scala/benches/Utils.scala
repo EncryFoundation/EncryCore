@@ -15,7 +15,7 @@ import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
-import encry.storage.levelDb.versionalLevelDB.{LevelDbElem, LevelDbFactory, VersionalLevelDBCompanion}
+import encry.storage.levelDb.versionalLevelDB.{LevelDbElem, LevelDbFactory, VersionalLevelDB, VersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
 import encry.view.history.EncryHistory
@@ -127,11 +127,10 @@ object Utils extends StrictLogging {
   def generateNextBlockValidForHistory(history: EncryHistory,
                                        difficultyDiff: BigInt = 0,
                                        prevBlock: Option[Block],
-                                       transactionsNumber: Int): Block = {
+                                       txs: Seq[Transaction]): Block = {
     val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
     val requiredDifficulty: Difficulty = prevBlock.map(b => history.requiredDifficultyAfter(b.header))
       .getOrElse(Constants.Chain.InitialDifficulty)
-    val txs = genValidPaymentTxs(transactionsNumber) ++ Seq(coinbaseTransaction)
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.bestHeaderHeight + 1,
@@ -159,17 +158,18 @@ object Utils extends StrictLogging {
                         settings: EncryAppSettings): UtxoState = {
     val p = new avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
-    val stateStore = new LSMStore(dir, keySize = 32, keepVersions = 10)
+    val reopenedLevelDb = LevelDbFactory.factory.open(dir, new Options)
+    val vldb = VersionalLevelDB(reopenedLevelDb, settings.levelDB)
     val persistentProver: avltree.PersistentBatchAVLProver[Digest32, HF] = {
       val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
-      val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(stateStore, np)(Algos.hash)
+      val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(vldb, np)(Algos.hash)
       PersistentBatchAVLProver.create(p, storage).get
     }
     new UtxoState(
       persistentProver,
       EncryState.genesisStateVersion,
       Constants.Chain.GenesisHeight,
-      stateStore,
+      vldb,
       0L,
       None,
       settings,
@@ -389,7 +389,7 @@ object Utils extends StrictLogging {
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
     val vldbInit = VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB)
-    val storage: HistoryStorage = new HistoryStorage(vldbInit, objectsStore)
+    val storage: HistoryStorage = new HistoryStorage(vldbInit)
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
