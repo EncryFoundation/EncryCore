@@ -81,7 +81,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
   }
 
   override def receive: Receive = {
-    case GetStatusTrackerPeer => sender() ! statusTracker.statuses
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       statusTracker.updateStatus(remote, status)
       status match {
@@ -92,10 +91,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case HandshakedPeer(remote) => statusTracker.updateStatus(remote, Unknown)
     case DisconnectedPeer(remote) => statusTracker.clearStatus(remote)
     case CheckDelivery(peer, modifierTypeId, modifierId) =>
-      val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer, (0, 0))
       if (delivered.contains(key(modifierId))) {
-        peersNetworkCommunication =
-          peersNetworkCommunication.updated(peer, (requestReceiveStat._1, requestReceiveStat._2 + 1))
+        incrementReceive(peer)
         delivered -= key(modifierId)
       } else reexpect(peer, modifierTypeId, modifierId)
     case CheckModifiersToDownload =>
@@ -141,6 +138,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       historyReaderOpt = Some(reader)
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] => mempoolReaderOpt = Some(reader)
+    case GetStatusTrackerPeer => sender() ! statusTracker.statuses
   }
 
   /**
@@ -172,8 +170,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         logger.info(s"Send request to ${peer.socketAddress.getAddress} for modifiers of type $mTypeId " +
           s"with ${modifierIds.size} ids.")
         peer.handlerRef ! Message(requestModifierSpec, Right(mTypeId -> notYetRequestedIds), None)
-        val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer, (0, 0))
-        peersNetworkCommunication = peersNetworkCommunication.updated(peer, (requestReceiveStat._1 + 1, requestReceiveStat._2))
+        incrementRequest(peer)
       }
       notYetRequestedIds.foreach { id =>
         val cancellable: Cancellable = context.system.scheduler
@@ -203,9 +200,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
                 logger.debug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: " +
                   s"$mTypeId with id: ${Algos.encode(modifierId)}")
                 peerInfo._1.handlerRef ! Message(requestModifierSpec, Right(mTypeId -> Seq(modifierId)), None)
-                val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peerInfo._1, (0, 0))
-                peersNetworkCommunication =
-                  peersNetworkCommunication.updated(peerInfo._1, (requestReceiveStat._1 + 1, requestReceiveStat._2))
+                incrementRequest(cp)
                 val cancellable: Cancellable = context.system.scheduler
                   .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mTypeId, modifierId))
                 modifierInfo._1.cancel()
@@ -269,11 +264,12 @@ class DeliveryManager(influxRef: Option[ActorRef],
         statusTracker.statuses
           .map(x => x._1 -> (PeerPriorityStatus.toString(x._2._2), x._2._1)).mkString(",")
       }")
-      val a: Vector[(ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus))] = statusTracker.statuses
+      val sortedPeers: Vector[(ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus))] = statusTracker.statuses
         .filter(_._2._1 != Younger)
         .toVector.sortBy(_._2._2).reverse
-      logger.info(s"Sorted peers: ${a.map(x => x._1 -> (PeerPriorityStatus.toString(x._2._2), x._2._1)).mkString(",")}")
-      a.headOption.map(_._1)
+      logger.info(s"Sorted peers: ${sortedPeers.map(x =>
+        x._1 -> (PeerPriorityStatus.toString(x._2._2), x._2._1)).mkString(",")}")
+      sortedPeers.headOption.map(_._1)
         .foreach { pI =>
           logger.info(s"Sending request to the ${pI.socketAddress}")
           expect(pI, modifierTypeId, modifierIds)
@@ -287,9 +283,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit =
     if (isExpecting(mtid, mid)) {
-      val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(cp, (0, 0))
-      peersNetworkCommunication =
-        peersNetworkCommunication.updated(cp, (requestReceiveStat._1, requestReceiveStat._2 + 1))
+      incrementReceive(cp)
       //todo: refactor
       delivered = delivered + key(mid)
       val peerMap: Map[ModifierIdAsKey, (Cancellable, Requested)] =
@@ -321,6 +315,16 @@ class DeliveryManager(influxRef: Option[ActorRef],
       }
     }
     peersNetworkCommunication = Map.empty[ConnectedPeer, (Requested, Received)]
+  }
+
+  def incrementRequest(peer: ConnectedPeer): Unit = {
+    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer, (0, 0))
+    peersNetworkCommunication = peersNetworkCommunication.updated(peer, (requestReceiveStat._1 + 1, requestReceiveStat._2))
+  }
+
+  def incrementReceive(peer: ConnectedPeer): Unit = {
+    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer, (0, 0))
+    peersNetworkCommunication = peersNetworkCommunication.updated(peer, (requestReceiveStat._1, requestReceiveStat._2 + 1))
   }
 }
 
