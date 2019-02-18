@@ -5,6 +5,7 @@ import benches.SerializedMonetaryTxBenchmark.SerializedMonetaryBenchState
 import benches.Utils._
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
 import encry.modifiers.state.box.AssetBox
+import encryBenchmark.Settings
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import org.openjdk.jmh.profile.GCProfiler
@@ -24,20 +25,22 @@ class SerializedMonetaryTxBenchmark {
 
 object SerializedMonetaryTxBenchmark {
 
+  val benchSettings: Settings = Settings.read
+
   @throws[RunnerException]
   def main(args: Array[String]): Unit = {
     val opt = new OptionsBuilder()
       .include(".*" + classOf[SerializedMonetaryTxBenchmark].getSimpleName + ".*")
       .forks(1)
       .threads(1)
-      .warmupIterations(10)
-      .measurementIterations(10)
+      .warmupIterations(benchSettings.benchesSettings.warmUpIterations)
+      .measurementIterations(benchSettings.benchesSettings.measurementIterations)
       .mode(Mode.AverageTime)
       .timeUnit(TimeUnit.SECONDS)
       .verbosity(VerboseMode.EXTRA)
       .addProfiler(classOf[GCProfiler])
-      .warmupTime(TimeValue.milliseconds(500))
-      .measurementTime(TimeValue.milliseconds(500))
+      .warmupTime(TimeValue.milliseconds(benchSettings.benchesSettings.warmUpTime))
+      .measurementTime(TimeValue.milliseconds(benchSettings.benchesSettings.measurementTime))
       .build
     new Runner(opt).run
   }
@@ -45,18 +48,19 @@ object SerializedMonetaryTxBenchmark {
   @State(Scope.Benchmark)
   class SerializedMonetaryBenchState {
 
-    val totalBoxesNumber: Int = 100000
-    val numberOfInputs: Int = 25
-    val numberOfOutputs: Int = 25
-
     var initialBoxes: IndexedSeq[AssetBox] = IndexedSeq.empty[AssetBox]
     var initialTransactions: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
     var serializedTransactions: IndexedSeq[Array[Byte]] = IndexedSeq.empty[Array[Byte]]
 
     @Setup
     def createStateForBenchmark(): Unit = {
-      initialBoxes = generateInitialBoxes(totalBoxesNumber)
-      initialTransactions = generatePaymentTransactions(initialBoxes, numberOfInputs, numberOfOutputs)
+      initialBoxes = generateInitialBoxes(benchSettings.serializedMonetaryBenchSettings.totalBoxesNumber)
+      initialTransactions =
+        generatePaymentTransactions(
+          initialBoxes,
+          benchSettings.serializedMonetaryBenchSettings.numberOfInputs,
+          benchSettings.serializedMonetaryBenchSettings.numberOfOutputs
+        )
       serializedTransactions = initialTransactions.map(tx => tx.bytes)
     }
   }
