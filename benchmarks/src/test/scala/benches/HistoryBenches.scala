@@ -80,5 +80,4 @@ object HistoryBenches {
 
     val blocks: Vector[Block] = resultedHistory._3
   }
-
 }
