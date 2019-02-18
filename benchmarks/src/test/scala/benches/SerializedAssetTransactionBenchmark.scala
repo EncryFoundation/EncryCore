@@ -5,6 +5,7 @@ import benches.SerializedAssetTransactionBenchmark.SerializedAssetBenchState
 import benches.Utils._
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
 import encry.modifiers.state.box.AssetBox
+import encryBenchmark.Settings
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import org.openjdk.jmh.profile.GCProfiler
@@ -14,15 +15,17 @@ import org.openjdk.jmh.runner.options.{OptionsBuilder, TimeValue, VerboseMode}
 class SerializedAssetTransactionBenchmark {
 
   @Benchmark
-  def deserializeDataTransactionsBench(stateBench: SerializedAssetBenchState, bh: Blackhole): Unit =
+  def deserializeAssetTransactionsBench(stateBench: SerializedAssetBenchState, bh: Blackhole): Unit =
     bh.consume(stateBench.serializedTransactions.map(b => TransactionSerializer.parseBytes(b)))
 
   @Benchmark
-  def serializeDataTransactionsBench(stateBench: SerializedAssetBenchState, bh: Blackhole): Unit =
+  def serializeAssetTransactionsBench(stateBench: SerializedAssetBenchState, bh: Blackhole): Unit =
     bh.consume(stateBench.initialTransactions.map(tx => tx.bytes))
 }
 
 object SerializedAssetTransactionBenchmark {
+
+  val benchSettings: Settings = Settings.read
 
   @throws[RunnerException]
   def main(args: Array[String]): Unit = {
@@ -30,23 +33,20 @@ object SerializedAssetTransactionBenchmark {
       .include(".*" + classOf[SerializedAssetTransactionBenchmark].getSimpleName + ".*")
       .forks(1)
       .threads(1)
-      .warmupIterations(10)
-      .measurementIterations(10)
+      .warmupIterations(benchSettings.benchesSettings.warmUpIterations)
+      .measurementIterations(benchSettings.benchesSettings.measurementIterations)
       .mode(Mode.AverageTime)
       .timeUnit(TimeUnit.SECONDS)
       .verbosity(VerboseMode.EXTRA)
       .addProfiler(classOf[GCProfiler])
-      .warmupTime(TimeValue.milliseconds(500))
-      .measurementTime(TimeValue.milliseconds(500))
+      .warmupTime(TimeValue.milliseconds(benchSettings.benchesSettings.warmUpTime))
+      .measurementTime(TimeValue.milliseconds(benchSettings.benchesSettings.measurementTime))
       .build
     new Runner(opt).run
   }
 
   @State(Scope.Benchmark)
   class SerializedAssetBenchState {
-    val totalBoxesNumber: Int = 100000
-    val numberOfInputs: Int = 25
-    val numberOfOutputs: Int = 25
 
     var initialBoxes: IndexedSeq[AssetBox] = IndexedSeq.empty[AssetBox]
     var initialTransactions: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
@@ -54,8 +54,13 @@ object SerializedAssetTransactionBenchmark {
 
     @Setup
     def createStateForBenchmark(): Unit = {
-      initialBoxes = generateInitialBoxes(totalBoxesNumber)
-      initialTransactions = generateAssetTransactions(initialBoxes, numberOfInputs, numberOfOutputs)
+      initialBoxes = generateInitialBoxes(benchSettings.serializedAssetBenchSettings.totalBoxesNumber)
+      initialTransactions =
+        generateAssetTransactions(
+          initialBoxes,
+          benchSettings.serializedAssetBenchSettings.numberOfInputs,
+          benchSettings.serializedAssetBenchSettings.numberOfOutputs
+        )
       serializedTransactions = initialTransactions.map(tx => tx.bytes)
     }
   }
