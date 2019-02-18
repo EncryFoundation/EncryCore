@@ -1,9 +1,9 @@
 package encry.network
 
 import java.net.InetSocketAddress
-import akka.actor.{Actor, ActorRef, Props}
+
+import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp._
 import encry.consensus.History._
 import encry.consensus.SyncInfo
 import encry.local.miner.Miner.{DisableMining, StartMining}
@@ -17,6 +17,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.message._
+import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.utils.Utils._
 import encry.view.EncryNodeViewHolder.DownloadRequest
@@ -27,7 +28,11 @@ import encry.view.state.StateReader
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.Proposition
 
-class NodeViewSynchronizer(influxRef: Option[ActorRef]) extends Actor with StrictLogging {
+class NodeViewSynchronizer(influxRef: Option[ActorRef],
+                           nodeViewHolderRef: ActorRef,
+                           networkControllerRef: ActorRef,
+                           system: ActorSystem,
+                           settings: EncryAppSettings) extends Actor with StrictLogging {
 
   var historyReaderOpt: Option[EncryHistory] = None
   var mempoolReaderOpt: Option[Mempool] = None
@@ -36,14 +41,14 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef]) extends Actor with Stric
   var chainSynced: Boolean = false
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
   val deliveryManager: ActorRef =
-    context.actorOf(Props(classOf[DeliveryManager], influxRef), "deliveryManager")
+    context.actorOf(Props(classOf[DeliveryManager], influxRef, nodeViewHolderRef, networkControllerRef, system, settings), "deliveryManager")
 
   override def preStart(): Unit = {
     val messageSpecs: Seq[MessageSpec[_]] = Seq(invSpec, requestModifierSpec, ModifiersSpec, EncrySyncInfoMessageSpec)
-    networkController ! RegisterMessagesHandler(messageSpecs, self)
+    networkControllerRef ! RegisterMessagesHandler(messageSpecs, self)
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
-    nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = true)
+    nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = true)
   }
 
   override def receive: Receive = {
@@ -109,7 +114,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef]) extends Actor with Stric
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
       //logger.info(s"Got inv message from ${remote.socketAddress} with modifiers: ${invData._2.map(Algos.encode).mkString(",")} ")
       //todo: Ban node that send payload id?
-      if (invData._1 != Payload.modifierTypeId) nodeViewHolder ! CompareViews(remote, invData._1, invData._2)
+      if (invData._1 != Payload.modifierTypeId) nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       deliveryManager ! DataFromPeer(spec, data: ModifiersData@unchecked, remote)
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
@@ -130,7 +135,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef]) extends Actor with Stric
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
     if (chainSynced) {
-      networkController ! SendToNetwork(Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None), Broadcast)
+      networkControllerRef ! SendToNetwork(Message(invSpec, Right(m.modifierTypeId -> Seq(m.id)), None), Broadcast)
     }
 
 }

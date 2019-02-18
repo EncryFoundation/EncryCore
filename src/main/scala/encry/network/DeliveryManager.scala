@@ -1,9 +1,8 @@
 package encry.network
 
 import java.net.InetAddress
-import akka.actor.{Actor, ActorRef, Cancellable}
+import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable}
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp._
 import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.history.Header
@@ -23,12 +22,18 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec}
 import encry.view.mempool.Mempool
 import org.encryfoundation.common.Algos
+import encry.settings.EncryAppSettings
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.mutable
 import scala.util.Random
 
-class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogging {
+class DeliveryManager(influxRef: Option[ActorRef],
+                      nodeViewHolderRef: ActorRef,
+                      networkControllerRef: ActorRef,
+                      system: ActorSystem,
+                      settings: EncryAppSettings) extends Actor with StrictLogging {
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
@@ -67,7 +72,7 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
 
   override def preStart(): Unit = {
     val messageSpecs: Seq[MessageSpec[_]] = Seq(ModifiersSpec)
-    networkController ! RegisterMessagesHandler(messageSpecs, self)
+    networkControllerRef ! RegisterMessagesHandler(messageSpecs, self)
     statusTracker.scheduleSendSyncInfo()
     context.system.scheduler.schedule(
       settings.network.modifierDeliverTimeCheck,
@@ -89,21 +94,10 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
     case CheckDelivery(peer, modifierTypeId, modifierId) =>
       val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer, (0, 0))
       if (delivered.contains(key(modifierId))) {
-        peersNetworkCommunication = peersNetworkCommunication.updated(peer, (requestReceiveStat._1 + 1, requestReceiveStat._2 + 1))
+        peersNetworkCommunication =
+          peersNetworkCommunication.updated(peer, (requestReceiveStat._1, requestReceiveStat._2 + 1))
         delivered -= key(modifierId)
-      } else {
-        logger.info(s"CheckDelivery else collection before: ${peersNetworkCommunication.map(x => (x, x._2._1 -> x._2._2)).mkString(",")}")
-        peersNetworkCommunication = peersNetworkCommunication.updated(peer, (requestReceiveStat._1 + 1, requestReceiveStat._2))
-        logger.info(s"CheckDelivery else collection after: ${peersNetworkCommunication.map(x => (x, x._2._1 -> x._2._2)).mkString(",")}")
-        logger.info(s"\nCurrent modId: ${Algos.encode(modifierId)} is not yet delivered." +
-          s" Before peer state: $requestReceiveStat" +
-          s". Current peer state: ${peersNetworkCommunication.getOrElse(peer, (0, 0))}" +
-          s" Update stat:" +
-          s" +1 to request + 0 ti received. " +
-          s"Current peersNetworkCommunication collection statuses are: Peer, Requested -> Received" +
-          s"${peersNetworkCommunication.map(x => (x, x._2._1 -> x._2._2)).mkString(",")} \n")
-        reexpect(peer, modifierTypeId, modifierId)
-      }
+      } else reexpect(peer, modifierTypeId, modifierId)
     case CheckModifiersToDownload =>
       historyReaderOpt.foreach { h =>
         val currentQueue: Iterable[ModifierId] = requestedModifiers.keys.map(modId => ModifierId @@ modId.toArray)
@@ -129,7 +123,7 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
         deleteSpam(spam.keys.toSeq)
       }
       val filteredModifiers: Seq[Array[Byte]] = fm.filterNot { case (modId, _) => historyReaderOpt.contains(modId) }.values.toSeq
-      if (filteredModifiers.nonEmpty) nodeViewHolder ! ModifiersFromRemote(typeId, filteredModifiers)
+      if (filteredModifiers.nonEmpty) nodeViewHolderRef ! ModifiersFromRemote(typeId, filteredModifiers)
       historyReaderOpt.foreach { h =>
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
         else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
@@ -178,6 +172,8 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
         logger.info(s"Send request to ${peer.socketAddress.getAddress} for modifiers of type $mTypeId " +
           s"with ${modifierIds.size} ids.")
         peer.handlerRef ! Message(requestModifierSpec, Right(mTypeId -> notYetRequestedIds), None)
+        val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer, (0, 0))
+        peersNetworkCommunication = peersNetworkCommunication.updated(peer, (requestReceiveStat._1 + 1, requestReceiveStat._2))
       }
       notYetRequestedIds.foreach { id =>
         val cancellable: Cancellable = context.system.scheduler
@@ -207,6 +203,9 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
                 logger.debug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: " +
                   s"$mTypeId with id: ${Algos.encode(modifierId)}")
                 peerInfo._1.handlerRef ! Message(requestModifierSpec, Right(mTypeId -> Seq(modifierId)), None)
+                val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peerInfo._1, (0, 0))
+                peersNetworkCommunication =
+                  peersNetworkCommunication.updated(peerInfo._1, (requestReceiveStat._1 + 1, requestReceiveStat._2))
                 val cancellable: Cancellable = context.system.scheduler
                   .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mTypeId, modifierId))
                 modifierInfo._1.cancel()
@@ -240,7 +239,7 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
       case None => logger.info(s"extOpt is empty for: $remote. Its status is: $status.")
       case Some(ext) =>
         ext.groupBy(_._1).mapValues(_.map(_._2)).foreach { case (mid, mods) =>
-          networkController ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
+          networkControllerRef ! SendToNetwork(Message(invSpec, Right(mid -> mods), None), SendToPeer(remote))
         }
     } else logger.info(s"Peer's $remote hisotry is younger, but node is note synces, so ignore sending extentions")
 
@@ -289,7 +288,8 @@ class DeliveryManager(influxRef: Option[ActorRef]) extends Actor with StrictLogg
   def receive(mtid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit =
     if (isExpecting(mtid, mid)) {
       val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(cp, (0, 0))
-      peersNetworkCommunication = peersNetworkCommunication.updated(cp, (requestReceiveStat._1 + 1, requestReceiveStat._2 + 1))
+      peersNetworkCommunication =
+        peersNetworkCommunication.updated(cp, (requestReceiveStat._1, requestReceiveStat._2 + 1))
       //todo: refactor
       delivered = delivered + key(mid)
       val peerMap: Map[ModifierIdAsKey, (Cancellable, Requested)] =
