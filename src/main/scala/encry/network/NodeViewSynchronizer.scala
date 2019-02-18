@@ -1,13 +1,12 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
 import encry.consensus.SyncInfo
 import encry.local.miner.Miner.{DisableMining, StartMining}
-import encry.modifiers.history.{ADProofs, Block, Header, Payload}
+import encry.modifiers.history.{Block, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
@@ -40,8 +39,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   val invSpec: InvSpec = new InvSpec(settings.network.maxInvObjects)
   var chainSynced: Boolean = false
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
-  val deliveryManager: ActorRef =
-    context.actorOf(Props(classOf[DeliveryManager], influxRef, nodeViewHolderRef, networkControllerRef, system, settings), "deliveryManager")
+  val deliveryManager: ActorRef = context.actorOf(
+      Props(classOf[DeliveryManager], influxRef, nodeViewHolderRef, networkControllerRef, system, settings),
+    "deliveryManager")
 
   override def preStart(): Unit = {
     val messageSpecs: Seq[MessageSpec[_]] = Seq(invSpec, requestModifierSpec, ModifiersSpec, EncrySyncInfoMessageSpec)
@@ -55,8 +55,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId, previousModifier: Option[ModifierId]) =>
       deliveryManager ! DownloadRequest(modifierTypeId, modifierId, previousModifier)
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
-    case SemanticallyFailedModification(mod, throwable) =>
-    case ChangedState(reader) =>
+    case SemanticallyFailedModification(_, _) =>
+    case ChangedState(_) =>
     case SyntacticallyFailedModification(_, _) =>
     case SemanticallySuccessfulModifier(mod) =>
       mod match {
