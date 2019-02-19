@@ -9,7 +9,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.HistoryComparisonResult
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.Block
-import encry.network.DeliveryManager.GetStatusTrackerPeer
+import encry.network.DeliveryManager.{FullBlockChainSynced, GetStatusTrackerPeer}
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.HandshakedPeer
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
@@ -27,28 +27,20 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 
 /**
-  * This test simulates DeliveryManager behaviour connected with the logic of choosing nodes relative to priority.
+  * This test simulates DeliveryManager behaviour connected with updating nodes priority while blockChain synced.
   *
-  * First - send handshake message from peer1.
+  * Send handshake to the Delivery Manager from peer1, peer2, peer3.
   * Send downloadRequest for N modifiers to the Delivery manager.
-  * Delivery manager must send requestModifier message for N modifiers to peer1.
+  * Delivery manager must send requestModifier message for N modifiers to all peers.
   * Send N valid requested modifiers to the Delivery manager from peer1.
-  * Check on Delivery manager that peer1 priority is HighPriority(4).
-  *
-  * Second - send handshake message from peer2.
-  * Send downloadRequest for N modifiers to the Delivery manager.
-  * Delivery manager must send requestModifier message for M modifiers to peer1.
-  * Send M - K where ((M - K) / M) < LowPriority valid requested modifiers to the Delivery manager from peer1.
-  * Check on Delivery manager that peer1 priority is BadNode(1).
-  *
-  * Third - send downloadRequest for N modifiers to the delivery manager.
-  * Delivery manager must send requestModifier message for M modifiers to peer2.
-  * Send M valid requested modifiers to the Delivery manager from peer2.
-  * Check peer1 priority on this node - must be BadNode(1).
-  * Check peer2 priority on this node - must be HighPriority(4).
+  * Send N / 2 valid requested modifiers to the Delivery manager from peer2.
+  * Send 0 valid requested modifiers to the Delivery manager from peer3.
+  * Check on Delivery manager that peer1 priorities is HighPriority(4).
+  * Check on Delivery manager that peer2 priorities is LowPriority(3).
+  * Check on Delivery manager that peer3 priorities is BadNode(1).
   */
 
-class PrioritySeveralNodesCommunicationTest extends TestKit(ActorSystem("MySpecN"))
+class DifferentPrioritiesSyncedChainTest extends TestKit(ActorSystem("MySpecN"))
   with ImplicitSender
   with FlatSpecLike
   with Matchers
@@ -65,9 +57,11 @@ class PrioritySeveralNodesCommunicationTest extends TestKit(ActorSystem("MySpecN
   val dm: ActorRef = system
     .actorOf(Props(classOf[DeliveryManager], None, TestProbe().ref, TestProbe().ref, system, settings))
 
-  "Several nodes test" should "show right behavior" in {
+  "Priority synced chain test" should "show shows right behavior" in {
 
-    val blocksV: Vector[Block] = (0 until 20).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
+    dm ! FullBlockChainSynced
+
+    val blocksV: Vector[Block] = (0 until 10).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
       case ((prevHistory, blocks), _) =>
         val block: Block = generateNextBlock(prevHistory)
         (prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block),
@@ -76,6 +70,7 @@ class PrioritySeveralNodesCommunicationTest extends TestKit(ActorSystem("MySpecN
 
     val newPeer1 = new InetSocketAddress("172.16.12.10", 9001)
     val newPeer2 = new InetSocketAddress("172.16.13.10", 9001)
+    val newPeer3 = new InetSocketAddress("172.16.14.10", 9001)
 
     val cP1: ConnectedPeer =
       ConnectedPeer(newPeer1, dm, Incoming,
@@ -89,65 +84,40 @@ class PrioritySeveralNodesCommunicationTest extends TestKit(ActorSystem("MySpecN
           "peer2", Some(newPeer2), System.currentTimeMillis())
       )
 
+    val cP3: ConnectedPeer =
+      ConnectedPeer(newPeer3, dm, Incoming,
+        Handshake(Version(1.toByte, 2.toByte, 3.toByte),
+          "peer3", Some(newPeer3), System.currentTimeMillis())
+      )
+
     dm ! HandshakedPeer(cP1)
+    dm ! HandshakedPeer(cP2)
+    dm ! HandshakedPeer(cP3)
 
-    blocksV.take(10).foldLeft(Option.empty[ModifierId]) { case (prevModId, currBlock) =>
-      dm ! DownloadRequest(ModifierTypeId @@ (101: Byte), currBlock.header.id, prevModId)
-      Some(currBlock.header.id)
-    }
+    blocksV.foreach(block => dm ! DownloadRequest(ModifierTypeId @@ (101: Byte), block.header.id, None))
 
-    val coll1: Map[ModifierId, Array[Byte]] = blocksV.take(10).map(b => b.header).map { h => h.id -> h.bytes }.toMap
+    val coll1: Map[ModifierId, Array[Byte]] = blocksV.map(b => b.header).map { h => h.id -> h.bytes }.toMap
 
     val message1: (Byte @@ CoreTaggedTypes.ModifierTypeId.Tag, Map[ModifierId, Array[Byte]]) =
       ModifierTypeId @@ (101: Byte) -> coll1
 
-    dm ! DataFromPeer(ModifiersSpec, message1, cP1)
-
-    Thread.sleep(10000)
-
-    val result1 = Await.result(
-      (dm ? GetStatusTrackerPeer).mapTo[Map[ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus)]],
-      1.minutes
-    )
-
-    result1.get(cP1).map(_._2).get shouldEqual 4
-
-    dm ! HandshakedPeer(cP2)
-
-    blocksV.takeRight(10).foldLeft(Option.empty[ModifierId]) { case (prevModId, currBlock) =>
-      dm ! DownloadRequest(ModifierTypeId @@ (101: Byte), currBlock.header.id, prevModId)
-      Some(currBlock.header.id)
-    }
-
-    Thread.sleep(10000)
-
-    val result2 = Await.result(
-      (dm ? GetStatusTrackerPeer).mapTo[Map[ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus)]],
-      1.minutes
-    )
-
-    result2.get(cP1).map(_._2).get shouldEqual 1
-
-    blocksV.takeRight(10).foldLeft(Option.empty[ModifierId]) { case (prevModId, currBlock) =>
-      dm ! DownloadRequest(ModifierTypeId @@ (101: Byte), currBlock.header.id, prevModId)
-      Some(currBlock.header.id)
-    }
-
-    val coll2: Map[ModifierId, Array[Byte]] = blocksV.takeRight(10).map(b => b.header).map { h => h.id -> h.bytes }.toMap
+    val coll2: Map[ModifierId, Array[Byte]] = blocksV.take(5).map(b => b.header).map { h => h.id -> h.bytes }.toMap
 
     val message2: (Byte @@ CoreTaggedTypes.ModifierTypeId.Tag, Map[ModifierId, Array[Byte]]) =
       ModifierTypeId @@ (101: Byte) -> coll2
 
+    dm ! DataFromPeer(ModifiersSpec, message1, cP1)
     dm ! DataFromPeer(ModifiersSpec, message2, cP2)
 
     Thread.sleep(15000)
 
-    val result3 = Await.result(
+    val result = Await.result(
       (dm ? GetStatusTrackerPeer).mapTo[Map[ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus)]],
       1.minutes
     )
 
-    result3.get(cP1).map(_._2).get shouldEqual 1
-    result3.get(cP2).map(_._2).get shouldEqual 4
+    result.get(cP1).map(_._2).get shouldEqual 4
+    result.get(cP2).map(_._2).get shouldEqual 3
+    result.get(cP3).map(_._2).get shouldEqual 1
   }
 }

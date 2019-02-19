@@ -26,7 +26,17 @@ import supertagged.@@
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class PrioritySyncedChainTest extends TestKit(ActorSystem("MySpecN"))
+/**
+  * This test simulates DeliveryManager behaviour connected with updating nodes priority while blockChain synced.
+  *
+  * Send handshake to the Delivery Manager from peer1, peer2, peer3.
+  * Send downloadRequest for N modifiers to the Delivery manager.
+  * Delivery manager must send requestModifier message for N modifiers to all peers.
+  * Send N valid requested modifiers to the Delivery manager from all peers.
+  * Check on Delivery manager that peer1, peer2, peer3 priorities is HighPriority(4).
+  */
+
+class SamePrioritiesSyncedChainTest extends TestKit(ActorSystem("MySpecN"))
   with ImplicitSender
   with FlatSpecLike
   with Matchers

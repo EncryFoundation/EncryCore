@@ -23,6 +23,16 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
+/**
+  * This test simulates DeliveryManager behaviour connected with updating nodes priority while blockChain is not synced.
+  *
+  * Send handshake to the Delivery Manager from peer1.
+  * Send downloadRequest for N modifiers to the Delivery manager.
+  * Delivery manager must send requestModifier message for N modifiers to peer1.
+  * Do not send any modifiers to the Delivery manager from peer1.
+  * Check on Delivery manager that peer1 priority is BadNode(1).
+  */
+
 class BadPriorityTest extends TestKit(ActorSystem("MySpecN"))
   with ImplicitSender
   with FlatSpecLike

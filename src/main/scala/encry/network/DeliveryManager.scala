@@ -50,11 +50,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
   //todo check context
   val syncTracker: SyncTracker = SyncTracker(self, context, settings.network)
 
-  system.scheduler.schedule(
-    settings.network.updatePriorityTime.seconds,
-    settings.network.updatePriorityTime.seconds
-  )(syncTracker.updatePeersPriorityStatus())
-
   def key(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
   override def preStart(): Unit = {
@@ -65,6 +60,11 @@ class DeliveryManager(influxRef: Option[ActorRef],
       settings.network.modifierDeliverTimeCheck,
       settings.network.modifierDeliverTimeCheck
     )(self ! CheckModifiersToDownload)
+
+    system.scheduler.schedule(
+      settings.network.updatePriorityTime.seconds,
+      settings.network.updatePriorityTime.seconds
+    )(syncTracker.updatePeersPriorityStatus())
   }
 
   override def receive: Receive = {
@@ -110,10 +110,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       val filteredModifiers: Seq[Array[Byte]] = fm.filterNot { case (modId, _) =>
         historyReaderOpt.contains(modId)
       }.values.toSeq
-      if (filteredModifiers.nonEmpty) {
-        logger.info(s"Got new mods to the NVH from ${remote.socketAddress}")
-        nodeViewHolderRef ! ModifiersFromRemote(typeId, filteredModifiers)
-      }
+      if (filteredModifiers.nonEmpty) nodeViewHolderRef ! ModifiersFromRemote(typeId, filteredModifiers)
       historyReaderOpt.foreach { h =>
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
         else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
@@ -253,10 +250,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
     }
 
   /**
-    * If node is not synced, `requestDownload` sends request for the One peer which will be find by 2 criteria:
+    * If node is not synced, `requestDownload` sends request for the one peer which will be find by 2 criteria:
     * 1) HistoryComparisonResult != Younger.
-    * 2) PeerPriorityStatus sorted by peers priority.
-    * Otherwise this function sends requests for all known peers selected by 2 same criteria as above.
+    * 2) Choose peer with highest priority.
+    * Otherwise this function sends requests for all known peers selected by 1-st criterion as above.
     *
     * If there are no any peers, request won't be sent.
     *
@@ -274,7 +271,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       case coll: Vector[_] if coll.nonEmpty =>
         influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
         coll.foreach { case (peer, _) =>
-          logger.info(s"Send request download to the ${peer.socketAddress}.")
+          logger.debug(s"Sent download request to the ${peer.socketAddress}.")
           expect(peer, modifierTypeId, modifierIds)
         }
       case _ => logger.info(s"BlockChain is synced. There is no nodes, which we can connect with.")
@@ -282,7 +279,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
   def receive(mTid: ModifierTypeId, mid: ModifierId, cp: ConnectedPeer): Unit =
     if (isExpecting(mid, cp)) {
-      logger.info(s"Peer ${cp.socketAddress} got new modifier.")
+      logger.debug(s"Peer ${cp.socketAddress} got new modifier.")
       syncTracker.incrementReceive(cp)
       //todo: refactor
       delivered = delivered + key(mid)

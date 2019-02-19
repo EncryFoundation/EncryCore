@@ -26,6 +26,16 @@ import supertagged.@@
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
+/**
+  * This test simulates DeliveryManager behaviour connected with updating nodes priority while blockChain is not synced.
+  *
+  * Send handshake to the Delivery Manager from peer1.
+  * Send downloadRequest for N modifiers to the Delivery manager.
+  * Delivery manager must send requestModifier message for N modifiers to peer1.
+  * Send N / 2 valid requested modifiers to the Delivery manager from peer1.
+  * Check on Delivery manager that peer1 priority is LowPriority(3).
+  */
+
 class LowPriorityTest extends TestKit(ActorSystem("MySpecN"))
   with ImplicitSender
   with FlatSpecLike
