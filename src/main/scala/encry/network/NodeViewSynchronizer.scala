@@ -144,17 +144,17 @@ object NodeViewSynchronizer {
 
   object ReceivableMessages {
 
-    case object CheckModifiersToDownload
     case object SendLocalSyncInfo
-    case class  RequestFromLocal(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
-    case class  CheckDelivery(source: ConnectedPeer,
-                              modifierTypeId: ModifierTypeId,
-                              modifierId: ModifierId)
+    case object CheckModifiersToDownload
     case class  OtherNodeSyncingStatus[SI <: SyncInfo](remote: ConnectedPeer,
                                                        status: encry.consensus.History.HistoryComparisonResult,
                                                        extension: Option[Seq[(ModifierTypeId, ModifierId)]])
     case class  ResponseFromLocal[M <: NodeViewModifier]
     (source: ConnectedPeer, modifierTypeId: ModifierTypeId, localObjects: Seq[M])
+    case class  RequestFromLocal(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
+    case class  CheckDelivery(source: ConnectedPeer,
+                              modifierTypeId: ModifierTypeId,
+                              modifierId: ModifierId)
 
     trait PeerManagerEvent
     case class DisconnectedPeer(remote: InetSocketAddress) extends PeerManagerEvent
@@ -162,11 +162,11 @@ object NodeViewSynchronizer {
 
     trait NodeViewHolderEvent
     trait NodeViewChange extends NodeViewHolderEvent
+    case class ChangedHistory[HR <: EncryHistoryReader](reader: HR) extends NodeViewChange
+    case class ChangedMempool[MR <: MempoolReader](mempool: MR) extends NodeViewChange
     case class ChangedState[SR <: StateReader](reader: SR) extends NodeViewChange
     case class RollbackFailed(branchPointOpt: Option[VersionTag]) extends NodeViewHolderEvent
     case class RollbackSucceed(branchPointOpt: Option[VersionTag]) extends NodeViewHolderEvent
-    case class ChangedHistory[HR <: EncryHistoryReader](reader: HR) extends NodeViewChange
-    case class ChangedMempool[MR <: MempoolReader](mempool: MR) extends NodeViewChange
 
     trait ModificationOutcome extends NodeViewHolderEvent
     case class SyntacticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable)

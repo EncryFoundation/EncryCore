@@ -1,29 +1,30 @@
-package encry.network
+package encry.network.PriorityTests
 
 import java.net.InetSocketAddress
 import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import encry.consensus.History.HistoryComparisonResult
-import encry.network.DeliveryManager.GetStatusTrackerPeer
-import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
-import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
-import scala.concurrent.duration._
 import akka.pattern.ask
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
+import encry.consensus.History.HistoryComparisonResult
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.Block
+import encry.network.DeliveryManager.GetStatusTrackerPeer
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.HandshakedPeer
+import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
+import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
 import encry.network.message.ModifiersSpec
+import encry.network.{DeliveryManager, Handshake, Version}
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.utils.{CoreTaggedTypes, EncryGenerator}
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import supertagged.@@
 import scala.concurrent.Await
+import scala.concurrent.duration._
 
 class HighPriorityTest extends TestKit(ActorSystem("MySpecN"))
   with ImplicitSender
@@ -42,7 +43,7 @@ class HighPriorityTest extends TestKit(ActorSystem("MySpecN"))
   val dm: ActorRef = system
     .actorOf(Props(classOf[DeliveryManager], None, TestProbe().ref, TestProbe().ref, system, settings))
 
-  "High priority test" should "shows HighPriority ( 4 )" in {
+  "High priority test" should "show HighPriority ( 4 )" in {
 
     val blocksV: Vector[Block] = (0 until 10).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
       case ((prevHistory, blocks), _) =>
