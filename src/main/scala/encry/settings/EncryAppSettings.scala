@@ -13,6 +13,7 @@ case class EncryAppSettings(directory: String,
                             wallet: Option[WalletSettings],
                             kafka: Option[KafkaSettings],
                             network: NetworkSettings,
+                            storage: StorageSettings,
                             restApi: RESTApiSettings,
                             ntp: NetworkTimeProviderSettings,
                             postgres: Option[PostgresSettings],
@@ -67,6 +68,7 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     val kafkaSettings = config.as[Option[KafkaSettings]](s"$configPath.kafka")
     val networkSettings = config.as[NetworkSettings](s"$configPath.network")
     val restApiSettings = config.as[RESTApiSettings](s"$configPath.restApi")
+    val storageSettings = config.as[StorageSettings](s"$configPath.storage")
     val ntpSettings = config.as[NetworkTimeProviderSettings](s"$configPath.ntp")
     val postgresSettings = config.as[Option[PostgresSettings]](s"$configPath.postgres")
     val influxSettings = config.as[Option[InfluxDBSettings]](s"$configPath.influxDB")
@@ -79,6 +81,7 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
       walletSettings,
       kafkaSettings,
       networkSettings,
+      storageSettings,
       restApiSettings,
       ntpSettings,
       postgresSettings,
