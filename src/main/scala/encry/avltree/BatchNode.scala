@@ -31,10 +31,7 @@ sealed trait EncryProverNodes[D <: Digest] extends EncryNode[D] with KeyInVar {
 sealed trait VerifierNodes[D <: Digest] extends EncryNode[D]
 
 class LabelOnlyEncryNode[D <: Digest](l: D) extends VerifierNodes[D] {
-  labelOpt = {
-    logger.info(s"I am LabelOnlyEncryNode! My label is ${Algos.encode(l)} ")
-    Some(l)
-  }
+  labelOpt = Some(l)
 
   protected def computeLabel: D = l
 }

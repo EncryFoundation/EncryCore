@@ -130,14 +130,13 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def updateStorage(newModRow: EncryPersistentModifier,
                             bestFullHeaderId: ModifierId,
                             updateHeaderInfo: Boolean = false): Unit = {
-    val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeaderId)
-    val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-      if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)
-      else Seq(BestBlockKey -> bestFullHeaderIdWrapped)
+    val indicesToInsert: Seq[(Array[Byte], Array[Byte])] =
+      if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderId, BestHeaderKey -> bestFullHeaderId)
+      else Seq(BestBlockKey -> bestFullHeaderId)
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
   }
 
-  private def storageVersion(newModRow: EncryPersistentModifier) = ByteArrayWrapper(newModRow.id)
+  private def storageVersion(newModRow: EncryPersistentModifier) = newModRow.id
 
   protected def modifierValidation(m: EncryPersistentModifier, headerOpt: Option[Header]): Try[Unit] = {
     val minimalHeight: Int = blockDownloadProcessor.minimalBlockHeight

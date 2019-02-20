@@ -51,5 +51,5 @@ class IODBStorageSpecification extends PropSpec
     }
   }
 
-  property("VLDB") { storeTest(createVLDB(11)) }
+  property("VLDB") { storeTest(createVLDB(11, 32)) }
 }

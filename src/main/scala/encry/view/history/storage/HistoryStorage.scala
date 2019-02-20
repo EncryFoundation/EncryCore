@@ -1,22 +1,20 @@
 package encry.view.history.storage
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.HistoryModifierSerializer
-import encry.storage.EncryStorage
-import encry.storage.levelDb.versionalLevelDB.{LevelDbElem, VersionalLevelDB}
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey}
-import io.iohk.iodb.{ByteArrayWrapper, Store}
-import scorex.utils.{Random => ScorexRandom}
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.storage.{EncryStorage, VersionalStorage}
+import encry.utils.CoreTaggedTypes.ModifierId
 import org.encryfoundation.common.serialization.Serializer
+import scorex.utils.{Random => ScorexRandom}
 
-import scala.util.{Failure, Random, Success}
+import scala.util.{Failure, Success}
 
-class HistoryStorage(override val store: VersionalLevelDB) extends EncryStorage with StrictLogging {
+class HistoryStorage(override val store: VersionalStorage) extends EncryStorage with StrictLogging {
 
   def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
-    store.get(VersionalLevelDbKey @@ id.untag(ModifierId)).flatMap { res =>
+    store.get(StorageKey @@ id.untag(ModifierId)).flatMap { res =>
       HistoryModifierSerializer.parseBytes(res) match {
         case Success(b) => Some(b)
         case Failure(e) =>
@@ -27,26 +25,32 @@ class HistoryStorage(override val store: VersionalLevelDB) extends EncryStorage 
 
   def insertObjects(objectsToInsert: Seq[EncryPersistentModifier]): Unit =
     insert(
-      ByteArrayWrapper(objectsToInsert.head.id),
-      objectsToInsert.map(obj => ByteArrayWrapper(obj.id) -> ByteArrayWrapper(HistoryModifierSerializer.toBytes(obj))),
+      StorageVersion @@ objectsToInsert.head.id.untag(ModifierId),
+      objectsToInsert.map(obj =>
+        StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ HistoryModifierSerializer.toBytes(obj)
+      ).toList,
     )
 
-  def bulkInsert(version: ByteArrayWrapper,
-                 indexesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)],
+  def bulkInsert(version: Array[Byte],
+                 indexesToInsert: Seq[(Array[Byte], Array[Byte])],
                  objectsToInsert: Seq[EncryPersistentModifier]): Unit = {
-    insert(version, indexesToInsert ++
-      objectsToInsert.map(obj => ByteArrayWrapper(obj.id) -> ByteArrayWrapper(HistoryModifierSerializer.toBytes(obj))))
+    insert(
+      StorageVersion @@ version,
+      (indexesToInsert.map{case (key, value) =>
+        StorageKey @@ key -> StorageValue @@ value
+      } ++ objectsToInsert.map(obj =>
+        StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ HistoryModifierSerializer.toBytes(obj)
+      )).toList
+    )
   }
 
-  def containsObject(id: ModifierId): Boolean = store.get(VersionalLevelDbKey @@ id.untag(ModifierId)).isDefined
+  def containsObject(id: ModifierId): Boolean = store.get(StorageKey @@ id.untag(ModifierId)).isDefined
 
   def removeObjects(ids: Seq[ModifierId]): Unit =
     store.insert(
-      LevelDbElem(
-        LevelDBVersion @@ ScorexRandom.randomBytes(),
-        List.empty,
-        ids.map(elem => VersionalLevelDbKey @@ elem.untag(ModifierId))
-      )
+      StorageVersion @@ ScorexRandom.randomBytes(),
+      toInsert = List.empty,
+      ids.map(elem => StorageKey @@ elem.untag(ModifierId)).toList
     )
 
   def serializer: Serializer[EncryPersistentModifier] = HistoryModifierSerializer

@@ -26,7 +26,6 @@ trait LevelDbUnitsGenerator extends StrictLogging {
   def generateRandomLevelDbElemsWithoutDeletions(qty: Int, qtyOfElemsToInsert: Int): List[LevelDbElem] =
     (0 until qty).foldLeft(List.empty[LevelDbElem]) {
       case (acc, i) =>
-        logger.info(s"create $i elem")
         LevelDbElem(
           LevelDBVersion @@ Random.randomBytes(),
           List((0 until qtyOfElemsToInsert).map(_ => genRandomInsertValue()): _*)

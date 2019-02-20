@@ -1,8 +1,9 @@
 package encry.view.wallet.storage
 
 import encry.settings.LevelDBSettings
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
-import encry.storage.levelDb.versionalLevelDB.{LevelDbElem, LevelDbFactory, VersionalLevelDBCompanion}
+import encry.storage.levelDb.versionalLevelDB.{LevelDbElem, LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.FileHelper
 import encry.view.wallet.WalletStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
@@ -15,27 +16,22 @@ import scala.util.{Random, Try}
 
 class WalletStorageSpec extends PropSpec with Matchers {
 
-  val store: LSMStore = new LSMStore(FileHelper.getRandomTempDir)
   val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
   //todo: Get LevelDBSettings from settings
-  val vldbInit = VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(100))
+  val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(100)))
   val walletStorage: WalletStorage = new WalletStorage(vldbInit, Set.empty[PublicKey25519])
 
   property("Complex value unpacking from storage") {
 
-
     val values: Seq[Array[Byte]] = Seq(Array.fill(32)(1: Byte), Array.fill(32)(2: Byte), Array.fill(32)(3: Byte))
 
-    val packedValues: VersionalLevelDbValue = VersionalLevelDbValue @@ values.foldLeft(Array[Byte]())(_ ++ _)
+    val packedValues: StorageValue = StorageValue @@ values.foldLeft(Array[Byte]())(_ ++ _)
 
-    val key: VersionalLevelDbKey = VersionalLevelDbKey @@ scorex.utils.Random.randomBytes()
+    val key: StorageKey = StorageKey @@ scorex.utils.Random.randomBytes()
 
     walletStorage.store.insert(
-      LevelDbElem(
-        LevelDBVersion @@ ScorexRandom.randomBytes(),
-        List(key -> packedValues),
-        Seq.empty
-      )
+      StorageVersion @@ ScorexRandom.randomBytes(),
+      List(key -> packedValues)
     )
 
     def parseComplexValue(bytes: Array[Byte], unitLen: Int): Try[Seq[Array[Byte]]] = Try {
@@ -43,12 +39,10 @@ class WalletStorageSpec extends PropSpec with Matchers {
         .ensuring(bytes.length % unitLen == 0, "Value is inconsistent.")
     }
 
-    //todo:  bytearraywrapper -> Array[Byte]
-    def readComplexValue(key: ByteArrayWrapper, unitLen: Int): Option[Seq[Array[Byte]]] =
-      store.get(key).flatMap { v => parseComplexValue(v.data, unitLen).toOption
-      }
+    def readComplexValue(key: StorageKey, unitLen: Int): Option[Seq[Array[Byte]]] =
+      vldbInit.get(key).flatMap { v => parseComplexValue(v, unitLen).toOption }
 
-    val valuesUnpacked: Seq[Array[Byte]] = readComplexValue(ByteArrayWrapper(key), 32).get
+    val valuesUnpacked: Seq[Array[Byte]] = readComplexValue(key, 32).get
 
     values.size shouldEqual valuesUnpacked.size
 

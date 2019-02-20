@@ -7,7 +7,8 @@ import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
 import encry.network.AuxiliaryHistoryHolder._
 import encry.settings.{EncryAppSettings, NodeSettings}
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VersionalLevelDBCompanion}
+import encry.storage.VersionalStorage
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.NetworkTimeProvider
 import encry.view.history.EncryHistory
 import encry.view.history.EncryHistory.{getHistoryIndexDir, getHistoryObjectsDir}
@@ -64,8 +65,8 @@ object AuxiliaryHistoryHolder {
     val indexStore: LSMStore = new LSMStore(historyIndexDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(historyObjectsDir, keepVersions = 0)
     val levelDBInit = LevelDbFactory.factory.open(historyIndexDir, new Options)
-    val vldbInit = VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB)
-    val storage: HistoryStorage = new HistoryStorage(vldbInit)
+    val versionalStorage = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
+    val storage: HistoryStorage = new HistoryStorage(versionalStorage)
 
     val history: EncryHistory = (settingsEncry.node.stateMode.isDigest, settingsEncry.node.verifyTransactions) match {
       case (true, true) =>

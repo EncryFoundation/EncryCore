@@ -64,7 +64,6 @@ object Utils extends StrictLogging {
   def generateRandomLevelDbElemsWithoutDeletions(qty: Int, qtyOfElemsToInsert: Int): List[LevelDbElem] =
     (0 until qty).foldLeft(List.empty[LevelDbElem]) {
       case (acc, i) =>
-        logger.info(s"create $i elem")
         LevelDbElem(
           LevelDBVersion @@ Random.randomBytes(),
           List((0 until qtyOfElemsToInsert).map(_ => genRandomInsertValue()): _*)
@@ -397,7 +396,7 @@ object Utils extends StrictLogging {
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
-    val vldbInit = VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB)
+    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
     val storage: HistoryStorage = new HistoryStorage(vldbInit)
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)

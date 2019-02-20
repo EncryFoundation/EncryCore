@@ -43,14 +43,9 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
     val currentStorageVersion = store.currentVersion
     settings.storage.state match {
       case VersionalStorage.IODB =>
-        logger.info("iodb")
-        logger.info(s"currentStorageVersion: ${Algos.encode(currentStorageVersion)}|(${currentStorageVersion.length})")
-        logger.info(s"IODBWrapper.initVer: ${Algos.encode(IODBWrapper.initVer)}| (${IODBWrapper.initVer.length})")
-        logger.info(s"currentStorageVersion sameElements IODBWrapper.initVer: ${currentStorageVersion sameElements IODBWrapper.initVer}")
         if (currentStorageVersion sameElements IODBWrapper.initVer) None
         else Some(ADDigest @@ currentStorageVersion.untag(StorageVersion))
       case VersionalStorage.LevelDB =>
-        logger.info("level")
         if (currentStorageVersion sameElements VersionalLevelDBCompanion.INIT_VERSION(33)) None
         else Some(ADDigest @@ currentStorageVersion.untag(StorageVersion))
     }

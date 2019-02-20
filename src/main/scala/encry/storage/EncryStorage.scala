@@ -1,45 +1,32 @@
 package encry.storage
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
-import encry.storage.levelDb.versionalLevelDB.{LevelDbElem, VersionalLevelDB}
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.utils.CoreTaggedTypes.VersionTag
-import io.iohk.iodb.{ByteArrayWrapper}
+import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
+import scorex.crypto.hash.Digest32
 
-import scala.util.{Try}
+import scala.util.Try
 
 trait EncryStorage extends AutoCloseable with StrictLogging {
 
-  val store: VersionalLevelDB
+  val store: VersionalStorage
 
-  def insert(version: ByteArrayWrapper, toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit =
-    store.insert(
-      LevelDbElem(
-        LevelDBVersion @@ version.data,
-        toInsert.map{case (key, value) => VersionalLevelDbKey @@ key.data -> VersionalLevelDbValue @@ value.data}.toList
-      )
-    )
+  def insert(version: StorageVersion, toInsert: List[(StorageKey, StorageValue)]): Unit =
+    store.insert(version, toInsert)
 
-  def remove(version: ByteArrayWrapper, toRemove: Seq[ByteArrayWrapper]): Unit =
-    store.insert(
-      LevelDbElem(
-        LevelDBVersion @@ version.data,
-        List.empty,
-        toRemove.map(elem => VersionalLevelDbKey @@ elem.data)
-      )
-    )
+  def remove(version: StorageVersion, toRemove: List[StorageKey]): Unit =
+    store.insert(version, List.empty, toRemove)
 
-  def update(version: ByteArrayWrapper,
-             toRemove: Seq[ByteArrayWrapper],
-             toUpdate: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit = {
-    remove(version, toRemove)
-    insert(ByteArrayWrapper(Algos.hash(version.data)), toUpdate)
+  def update(version: StorageVersion,
+             toUpdate: List[(StorageKey, StorageValue)]): Unit = {
+    insert(StorageVersion @@ Algos.hash(version).untag(Digest32), toUpdate)
   }
 
-  def get(key: ByteArrayWrapper): Option[Array[Byte]] = store.get(VersionalLevelDbKey @@ key.data)
+  def get(key: StorageKey): Option[Array[Byte]] = store.get(key)
 
-  def rollbackTo(version: VersionTag): Try[Unit] = Try{store.rollbackTo(LevelDBVersion @@ version.untag(VersionTag))}
+  def rollbackTo(version: VersionTag): Try[Unit] = Try{store.rollbackTo(StorageVersion @@ version.untag(VersionTag))}
 
   override def close(): Unit = {
     logger.info("Closing storage")

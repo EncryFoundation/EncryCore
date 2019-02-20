@@ -10,6 +10,8 @@ trait VersionalStorage {
 
   def get(key: StorageKey): Option[StorageValue]
 
+  def getAll(): Iterator[(StorageKey, StorageValue)]
+
   def currentVersion: StorageVersion
 
   def versions: List[StorageVersion]

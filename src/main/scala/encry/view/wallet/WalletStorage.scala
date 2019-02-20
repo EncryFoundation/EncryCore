@@ -5,16 +5,15 @@ import encry.modifiers.state.StateModifierSerializer
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box._
-import encry.storage.EncryStorage
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDB
+import encry.storage.VersionalStorage.StorageKey
+import encry.storage.{EncryStorage, VersionalStorage}
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbKey
-import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scorex.crypto.hash.Digest32
 
-case class WalletStorage(store: VersionalLevelDB, publicKeys: Set[PublicKey25519]) extends EncryStorage {
+case class WalletStorage(store: VersionalStorage, publicKeys: Set[PublicKey25519]) extends EncryStorage {
 
   import WalletStorage._
 
@@ -44,7 +43,7 @@ case class WalletStorage(store: VersionalLevelDB, publicKeys: Set[PublicKey25519
 
 object WalletStorage {
 
-  val balancesKey: VersionalLevelDbKey = VersionalLevelDbKey @@ Algos.hash("balances").untag(Digest32)
+  val balancesKey: StorageKey = StorageKey @@ Algos.hash("balances").untag(Digest32)
 
-  def keyByBoxId(id: ADKey): VersionalLevelDbKey = VersionalLevelDbKey @@ id.untag(ADKey)
+  def keyByBoxId(id: ADKey): StorageKey = StorageKey @@ id.untag(ADKey)
 }

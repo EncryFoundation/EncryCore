@@ -35,9 +35,9 @@ trait TestHelper extends FileHelper {
 
   case class Data(p: PERSISTENT_PROVER, s: STORAGE)
 
-  def createVLDB(keepVersions: Int = 300): VersionalLevelDB = {
+  def createVLDB(keepVersions: Int = 300, keySize: Int = 33): VersionalLevelDB = {
     val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
-    VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(keepVersions, 33), keySize = 33)
+    VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(keepVersions, keySize), keySize = keySize)
   }
 
   def createQuickStore(keepVersions: Int = 0): VersionalLevelDB = {

@@ -51,7 +51,6 @@ object PersistentBatchAVLProver {
 
       override var avlProver: BatchAVLProver[D, HF] = avlBatchProver
       override val storage: VersionedAVLStorage[D] = versionedStorage
-      logger.info(s"version: ${storage.version.map(Algos.encode)}")
       (storage.version match {
         case Some(ver) => rollback(ver).get
         case None => generateProofAndUpdateStorage(additionalData) //to initialize storage and clear prover's state

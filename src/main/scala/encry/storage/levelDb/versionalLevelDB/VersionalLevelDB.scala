@@ -58,8 +58,6 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     batch.put(versionKey(newElem.version), newElem.elemsToInsert.map(_._1).flatMap(_.untag(LevelDBVersion)).toArray)
     //Ids of all elements, deleted by newElem
     batch.put(versionDeletionsKey(newElem.version), newElem.elemsToDelete.flatMap(_.untag(LevelDBVersion)).toArray)
-    //Set resolve flag for version to false
-    batch.put(versionResolvedKey(newElem.version), Array[Byte](0: Byte))
     newElem.elemsToInsert.foreach {
       case (elemKey, elemValue) =>
 
@@ -184,7 +182,6 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     readOptions.snapshot(db.getSnapshot)
     val versions = versionsList(readOptions).map(ver => new ByteArrayWrapper(ver))
     if (versions.length > settings.maxVersions) {
-      logger.info("versions.length >= settings.maxVersions: true")
       val versionToDelete = versions.last
       batch.put(VERSIONS_LIST, versions.init
         .foldLeft(Array.emptyByteArray) { case (acc, key) => acc ++ key.data })
@@ -335,7 +332,6 @@ object VersionalLevelDBCompanion {
   val USER_KEY_PREFIX: Byte = 4
 
   val DELETION_PREFIX = Algos.hash("DELETION_SET")
-  val RESOLVED_PREFIX = Algos.hash("RESOLVED")
 
   // Initial version id
   def INIT_VERSION(KEY_SIZE: Int = DEFAULT_VERSION_KEY_SIZE): LevelDBVersion = LevelDBVersion @@ Array.fill(KEY_SIZE)(0: Byte)
@@ -359,7 +355,6 @@ object VersionalLevelDBCompanion {
     VERSIONS_LIST -> VersionalLevelDbValue @@ INIT_VERSION(keySize),
     VersionalLevelDbKey @@ INIT_VERSION(keySize).untag(LevelDBVersion) -> VersionalLevelDbValue @@ Array.emptyByteArray,
     versionDeletionsKey(INIT_VERSION(keySize)) -> VersionalLevelDbValue @@ Array.emptyByteArray,
-    versionResolvedKey(INIT_VERSION(keySize)) -> VersionalLevelDbValue @@ Array(1: Byte),
   )
 
   def apply(levelDb: DB,
@@ -373,9 +368,6 @@ object VersionalLevelDBCompanion {
 
   def versionDeletionsKey(version: LevelDBVersion): VersionalLevelDbKey =
     VersionalLevelDbKey @@ ((VERSION_PREFIX +: DELETION_PREFIX) ++ version)
-
-  def versionResolvedKey(version: LevelDBVersion): VersionalLevelDbKey =
-    VersionalLevelDbKey @@ ((SERVICE_PREFIX +: RESOLVED_PREFIX) ++ version)
 
   def versionKey(version: LevelDBVersion): VersionalLevelDbKey =
     VersionalLevelDbKey @@ (VERSION_PREFIX +: version)

@@ -350,6 +350,6 @@ class VersionedAVLStorageSpecification extends PropSpec
   }
 
   property("Persistence AVL batch prover (VLDB backed) - save additional info") {
-    testAddInfoSaving(createVLDB _)
+    testAddInfoSaving(_ => createVLDB())
   }
 }

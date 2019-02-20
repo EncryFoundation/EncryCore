@@ -7,7 +7,7 @@ import encry.modifiers.state.Keys
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VersionalLevelDBCompanion}
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
 import encry.view.history.EncryHistory
@@ -165,7 +165,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
-    val vldbInit = VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB)
+    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
     val storage: HistoryStorage = new HistoryStorage(vldbInit)
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)

@@ -32,6 +32,9 @@ case class IODBWrapper(store: Store) extends VersionalStorage {
     )
   }
 
+  override def getAll(): Iterator[(StorageKey, StorageValue)] =
+    store.getAll().map{case (key, value) => StorageKey @@ key.data -> StorageValue @@ value.data}
+
   override def close(): Unit = store.close()
 }
 

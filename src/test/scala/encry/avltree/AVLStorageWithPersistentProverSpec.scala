@@ -5,7 +5,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import org.scalatest.{Matchers, PropSpec}
 import encry.avltree.benchmark.IODBBenchmark.getRandomTempDir
-import encry.settings.EncryAppSettings
+import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.FileHelper
 import org.iq80.leveldb.Options
@@ -24,7 +24,7 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
   protected lazy val storage: VersionedAVLStorage[Digest32] = {
     val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
     val settingsEncry = EncryAppSettings.read
-    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
+    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(100, 33), keySize = 33))
     new VersionedAVLStorage(vldbInit, np, settingsEncry)
   }
 
