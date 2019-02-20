@@ -34,7 +34,7 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
     val topHeight: Int = Ints.fromByteArray(store.get(StorageKey @@ TopNodeHeight.data).get)
     top -> topHeight
   }.recoverWith { case e =>
-    logger.info(s"Failed to recover tree for digest ${Algos.encode(version)}: $e")
+    logger.info(s"Failed to recover tree for digest ${Algos.encode(version)} : $e")
     Failure(e)
   }
 
