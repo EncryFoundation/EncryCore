@@ -48,7 +48,7 @@ class HighPriorityTest extends TestKit(ActorSystem("MySpecN"))
 
   override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 
-  implicit lazy val timeout: Timeout = Timeout(1.minutes)
+  implicit val timeout: Timeout = Timeout(1.minutes)
   val settings: EncryAppSettings = EncryAppSettings.read
   val dm: ActorRef = system
     .actorOf(Props(classOf[DeliveryManager], None, TestProbe().ref, TestProbe().ref, system, settings))
