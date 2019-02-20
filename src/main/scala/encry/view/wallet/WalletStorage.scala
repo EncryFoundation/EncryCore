@@ -6,22 +6,25 @@ import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box._
 import encry.storage.EncryStorage
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDB
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbKey
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
+import scorex.crypto.hash.Digest32
 
-case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends EncryStorage {
+case class WalletStorage(store: VersionalLevelDB, publicKeys: Set[PublicKey25519]) extends EncryStorage {
 
   import WalletStorage._
 
   def getBoxById(id: ADKey): Option[EncryBaseBox] = store.get(keyByBoxId(id))
-    .flatMap(d => StateModifierSerializer.parseBytes(d.data, id.head).toOption)
+    .flatMap(d => StateModifierSerializer.parseBytes(d, id.head).toOption)
 
   def allBoxes: Seq[EncryBaseBox] = store.getAll
     .filter(_._2 != balancesKey)
     .foldLeft(Seq[EncryBaseBox]()) { case (acc, id) =>
-      getBoxById(ADKey @@ id._1.data).map(bx => acc :+ bx).getOrElse(acc)
+      getBoxById(ADKey @@ id._1.untag(VersionalLevelDbKey)).map(bx => acc :+ bx).getOrElse(acc)
     }
 
   def containsBox(id: ADKey): Boolean = getBoxById(id).isDefined
@@ -32,8 +35,7 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
 
   def getBalances: Map[TokenId, Amount] = store.get(balancesKey)
     .map {
-      _.data
-        .sliding(40, 40)
+      _.sliding(40, 40)
         .map(ch => ch.take(32) -> Longs.fromByteArray(ch.takeRight(8)))
     }
     .map(_.toMap)
@@ -42,7 +44,7 @@ case class WalletStorage(store: Store, publicKeys: Set[PublicKey25519]) extends 
 
 object WalletStorage {
 
-  val balancesKey: ByteArrayWrapper = ByteArrayWrapper(Algos.hash("balances"))
+  val balancesKey: VersionalLevelDbKey = VersionalLevelDbKey @@ Algos.hash("balances").untag(Digest32)
 
-  def keyByBoxId(id: ADKey): ByteArrayWrapper = ByteArrayWrapper(id)
+  def keyByBoxId(id: ADKey): VersionalLevelDbKey = VersionalLevelDbKey @@ id.untag(ADKey)
 }

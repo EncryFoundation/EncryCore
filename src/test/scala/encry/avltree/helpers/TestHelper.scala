@@ -1,9 +1,13 @@
 package encry.avltree.helpers
 
 import encry.avltree
-import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
+import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedAVLStorage}
+import encry.settings.{EncryAppSettings, LevelDBSettings}
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDB, VersionalLevelDBCompanion}
+import encry.utils.FileHelper
 import io.iohk.iodb.{LSMStore, QuickStore, Store}
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
+import org.iq80.leveldb.Options
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256, Digest32}
 
@@ -21,7 +25,7 @@ trait TestHelper extends FileHelper {
   type PROVER = avltree.BatchAVLProver[D, HF]
   type VERIFIER = avltree.BatchAVLVerifier[D, HF]
   type PERSISTENT_PROVER = avltree.PersistentBatchAVLProver[D, HF]
-  type STORAGE = VersionedIODBAVLStorage[D]
+  type STORAGE = VersionedAVLStorage[D]
 
   protected val KL: Int
   protected val VL: Int
@@ -31,17 +35,22 @@ trait TestHelper extends FileHelper {
 
   case class Data(p: PERSISTENT_PROVER, s: STORAGE)
 
-  def createLSMStore(keepVersions: Int = 0): Store = {
-    val dir = getRandomTempDir
-    new LSMStore(dir, keepVersions = keepVersions)
+  def createVLDB(keepVersions: Int = 300): VersionalLevelDB = {
+    val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
+    VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(keepVersions, 33), keySize = 33)
   }
 
-  def createQuickStore(keepVersions: Int = 0): Store = {
-    val dir = getRandomTempDir
-    new QuickStore(dir, keepVersions = keepVersions)
+  def createQuickStore(keepVersions: Int = 0): VersionalLevelDB = {
+    val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
+    VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(keepVersions))
   }
 
-  def createVersionedStorage(store: Store): STORAGE = new VersionedIODBAVLStorage(store, NodeParameters(KL, Some(VL), LL))
+  def createVersionedStorage(store: VersionalLevelDB, settings: EncryAppSettings): STORAGE =
+    new VersionedAVLStorage(
+      VLDBWrapper(store),
+      NodeParameters(KL, Some(VL), LL),
+      settings
+    )
 
   def createPersistentProver(storage: STORAGE): PERSISTENT_PROVER = {
     val prover = new avltree.BatchAVLProver[D, HF](KL, Some(VL))
@@ -51,15 +60,19 @@ trait TestHelper extends FileHelper {
   def createPersistentProver(storage: STORAGE, prover: PROVER): PERSISTENT_PROVER =
     PersistentBatchAVLProver.create[D, HF](prover, storage, paranoidChecks = true).get
 
-  def createPersistentProverWithLSM(keepVersions: Int = 0): PERSISTENT_PROVER = {
-    val store = createLSMStore(keepVersions)
-    val storage = createVersionedStorage(store)
+  def createPersistentProverWithVLDB(keepVersions: Int = 10000): PERSISTENT_PROVER = {
+    val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
+    val vldbInit = VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(keepVersions, 33), keySize = 33)
+    val settings = EncryAppSettings.read
+    val storage = createVersionedStorage(vldbInit, settings)
     createPersistentProver(storage)
   }
 
   def createPersistentProverWithQuick(keepVersions: Int = 0): PERSISTENT_PROVER = {
-    val store = createQuickStore(keepVersions)
-    val storage = createVersionedStorage(store)
+    val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
+    val vldbInit = VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(keepVersions))
+    val settings = EncryAppSettings.read
+    val storage = createVersionedStorage(vldbInit, settings)
     createPersistentProver(storage)
   }
 

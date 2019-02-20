@@ -1,17 +1,21 @@
 package encry.view.history
 
 import java.io.File
+
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history._
 import encry.settings._
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VersionalLevelDBCompanion}
 import encry.utils.NetworkTimeProvider
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.encryfoundation.common.Algos
+import org.iq80.leveldb.Options
+
 import scala.util.Try
 
 /** History implementation. It is processing persistent modifiers generated locally or received from the network.
@@ -177,7 +181,9 @@ object EncryHistory {
     val historyObjectsDir: File = getHistoryObjectsDir(settingsEncry)
     val indexStore: LSMStore = new LSMStore(historyIndexDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(historyObjectsDir, keepVersions = 0)
-    val storage: HistoryStorage = new HistoryStorage(indexStore, objectsStore)
+    val levelDBInit = LevelDbFactory.factory.open(historyIndexDir, new Options)
+    val vldbInit = VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB)
+    val storage: HistoryStorage = new HistoryStorage(vldbInit)
 
     val history: EncryHistory = (settingsEncry.node.stateMode.isDigest, settingsEncry.node.verifyTransactions) match {
       case (true, true) =>

@@ -1,13 +1,19 @@
 package encry.avltree
 
+import com.typesafe.scalalogging.StrictLogging
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.LevelDBVersion
+import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import scorex.crypto.hash._
+
 import scala.util.Try
 
-trait PersistentBatchAVLProver[D <: Digest, HF <: CryptographicHash[D]] {
+trait PersistentBatchAVLProver[D <: Digest, HF <: CryptographicHash[D]] extends StrictLogging{
 
   var avlProver: BatchAVLProver[D, HF]
-  val storage: VersionedIODBAVLStorage[D]
+  val storage: VersionedAVLStorage[D]
 
   def digest: ADDigest = avlProver.digest
 
@@ -36,15 +42,16 @@ object PersistentBatchAVLProver {
   K <: Array[Byte],
   V <: Array[Byte]](
                      avlBatchProver: BatchAVLProver[D, HF],
-                     versionedStorage: VersionedIODBAVLStorage[D],
+                     versionedStorage: VersionedAVLStorage[D],
                      additionalData: Seq[(K, V)],
                      paranoidChecks: Boolean
                    ): Try[PersistentBatchAVLProver[D, HF]] = Try {
 
-    new PersistentBatchAVLProver[D, HF] {
-      override var avlProver: BatchAVLProver[D, HF] = avlBatchProver
-      override val storage: VersionedIODBAVLStorage[D] = versionedStorage
+    new PersistentBatchAVLProver[D, HF] with StrictLogging{
 
+      override var avlProver: BatchAVLProver[D, HF] = avlBatchProver
+      override val storage: VersionedAVLStorage[D] = versionedStorage
+      logger.info(s"version: ${storage.version.map(Algos.encode)}")
       (storage.version match {
         case Some(ver) => rollback(ver).get
         case None => generateProofAndUpdateStorage(additionalData) //to initialize storage and clear prover's state
@@ -57,7 +64,7 @@ object PersistentBatchAVLProver {
 
   def create[D <: Digest, HF <: CryptographicHash[D]](
                                                        avlBatchProver: BatchAVLProver[D, HF],
-                                                       versionedStorage: VersionedIODBAVLStorage[D],
+                                                       versionedStorage: VersionedAVLStorage[D],
                                                        paranoidChecks: Boolean = false
                                                      ): Try[PersistentBatchAVLProver[D, HF]] =
     create(avlBatchProver, versionedStorage, Seq(), paranoidChecks)

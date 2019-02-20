@@ -5,7 +5,7 @@ import java.io.File
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.avltree
-import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
+import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedAVLStorage}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.history.{ADProofs, Block, Header, Payload}
@@ -13,9 +13,12 @@ import encry.modifiers.mempool.directive.{AssetIssuingDirective, DataDirective, 
 import encry.modifiers.mempool.{Transaction, TransactionFactory, UnsignedTransaction}
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
-import encry.settings.{Constants, EncryAppSettings, NodeSettings}
+import encry.settings.{Constants, EncryAppSettings, LevelDBSettings, NodeSettings}
+import encry.storage.VersionalStorage
+import encry.storage.VersionalStorage.StorageType
+import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
-import encry.storage.levelDb.versionalLevelDB.{LevelDbElem, LevelDbFactory, VersionalLevelDB, VersionalLevelDBCompanion}
+import encry.storage.levelDb.versionalLevelDB._
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
 import encry.view.history.EncryHistory
@@ -155,21 +158,27 @@ object Utils extends StrictLogging {
   def utxoFromBoxHolder(bh: BoxHolder,
                         dir: File,
                         nodeViewHolderRef: Option[ActorRef],
-                        settings: EncryAppSettings): UtxoState = {
+                        settings: EncryAppSettings,
+                        storageType: StorageType): UtxoState = {
     val p = new avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
-    val reopenedLevelDb = LevelDbFactory.factory.open(dir, new Options)
-    val vldb = VersionalLevelDB(reopenedLevelDb, settings.levelDB)
+    val versionalStorage = storageType match {
+      case VersionalStorage.IODB =>
+        IODBWrapper(new LSMStore(dir, keySize = 32, keepVersions = 10))
+      case VersionalStorage.LevelDB =>
+        val reopenedLevelDb = LevelDbFactory.factory.open(dir, new Options)
+        VLDBWrapper(VersionalLevelDBCompanion(reopenedLevelDb, LevelDBSettings(100, 33), keySize = 33))
+    }
     val persistentProver: avltree.PersistentBatchAVLProver[Digest32, HF] = {
       val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
-      val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(vldb, np)(Algos.hash)
+      val storage: VersionedAVLStorage[Digest32] = new VersionedAVLStorage(versionalStorage, np, settings)(Algos.hash)
       PersistentBatchAVLProver.create(p, storage).get
     }
     new UtxoState(
       persistentProver,
       EncryState.genesisStateVersion,
       Constants.Chain.GenesisHeight,
-      vldb,
+      versionalStorage,
       0L,
       None,
       settings,

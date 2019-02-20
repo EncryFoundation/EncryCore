@@ -66,4 +66,19 @@ trait LevelDbUnitsGenerator extends StrictLogging {
           acc.lastOption.map(_.elemsToInsert.map(_._1)).getOrElse(Seq.empty[VersionalLevelDbKey])
         )
     }
+
+  def generateRandomLevelDbElemsWithSameKeys(qty: Int, qtyOfElemsToInsert: Int): Seq[LevelDbElem] = {
+    (0 until qty).foldLeft(Seq.empty[LevelDbElem]) {
+      case (acc, _) =>
+        acc :+ LevelDbElem(
+          LevelDBVersion @@ Random.randomBytes(),
+          acc.lastOption
+            .map(_.elemsToInsert.map(elem => (elem._1, generateRandomValue())))
+            .getOrElse(
+              List((0 until qtyOfElemsToInsert).map(_ => genRandomInsertValue()): _*)
+            ),
+          Seq.empty[VersionalLevelDbKey]
+        )
+    }
+  }
 }

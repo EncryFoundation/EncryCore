@@ -96,6 +96,7 @@ object Block {
 object BlockSerializer extends Serializer[Block] {
 
   override def toBytes(obj: Block): Array[Byte] = {
+
     val headerBytes: Array[Byte] = obj.header.serializer.toBytes(obj.header)
     val payloadBytes: Array[Byte] = obj.payload.serializer.toBytes(obj.payload)
     val aDProofsBytes: Array[Byte] =

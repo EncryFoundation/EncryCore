@@ -11,6 +11,8 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history._
 import encry.settings.Constants._
 import encry.settings.{Constants, EncryAppSettings}
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.utils.NetworkTimeProvider
 import encry.validation.{ModifierValidator, ValidationResult}
@@ -19,6 +21,7 @@ import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import supertagged.@@
+
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
@@ -208,7 +211,10 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     *         First id is always from the best headers chain.
     */
   def headerIdsAtHeight(height: Int): Seq[ModifierId] =
-    ModifierId @@ historyStorage.store.get(heightIdsKey(height: Int)).map(_.data).getOrElse(Array()).grouped(32).toSeq
+    historyStorage.store.get(
+      VersionalLevelDbKey @@ heightIdsKey(height).data
+    ).map(elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq)
+      .getOrElse(Seq.empty[ModifierId])
 
   /**
     * @param limit       - maximum length of resulting HeaderChain

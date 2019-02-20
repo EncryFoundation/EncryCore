@@ -7,23 +7,27 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{ADProofs, Block, Header}
 import encry.modifiers.mempool.Transaction
-import encry.settings.{Constants, NodeSettings}
+import encry.settings.{Constants, LevelDBSettings, NodeSettings}
+import encry.storage.VersionalStorage
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
+import encry.storage.levelDb.versionalLevelDB._
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+import org.iq80.leveldb.Options
 
 import scala.util.{Failure, Success, Try}
 
 class DigestState protected(override val version: VersionTag,
                             override val rootHash: ADDigest,
-                            val stateStore: Store,
+                            val stateStore: VersionalStorage,
                             settings: NodeSettings)
   extends EncryState[DigestState] with ModifierValidation[EncryPersistentModifier] with StrictLogging {
 
-  stateStore.lastVersionID
-    .foreach(id => assert(version sameElements id.data, "`version` should always be equal to store.lastVersionID"))
+  assert(version sameElements stateStore.currentVersion, "`version` should always be equal to store.lastVersionID")
 
-  val maxRollbackDepth: Int = stateStore.rollbackVersions().size
+  val maxRollbackDepth: Int = stateStore.versions.size
 
   def validate(mod: EncryPersistentModifier): Try[Unit] = mod match {
     case block: Block =>
@@ -54,7 +58,10 @@ class DigestState protected(override val version: VersionTag,
 
   private def update(newVersion: VersionTag, newRootHash: ADDigest): Try[DigestState] = Try {
     val wrappedVersion: ByteArrayWrapper = ByteArrayWrapper(newVersion)
-    stateStore.update(wrappedVersion, toRemove = Seq(), toUpdate = Seq(wrappedVersion -> ByteArrayWrapper(newRootHash)))
+    stateStore.insert(
+      StorageVersion @@ wrappedVersion.data,
+      List(StorageKey @@ wrappedVersion.data -> StorageValue @@ newRootHash.untag(ADDigest))
+    )
     new DigestState(newVersion, newRootHash, stateStore, settings)
   }
 
@@ -76,16 +83,15 @@ class DigestState protected(override val version: VersionTag,
   override def rollbackTo(version: VersionTag): Try[DigestState] = {
     logger.info(s"Rollback Digest State to version ${Algos.encoder.encode(version)}")
     val wrappedVersion: ByteArrayWrapper = ByteArrayWrapper(version)
-    Try(stateStore.rollback(wrappedVersion)).map { _ =>
-      stateStore.clean(Constants.DefaultKeepVersions)
-      val rootHash: ADDigest = ADDigest @@ stateStore.get(wrappedVersion).get.data
+    Try(stateStore.rollbackTo(StorageVersion @@ wrappedVersion.data)).map { _ =>
+      val rootHash: ADDigest = ADDigest @@ stateStore.get(StorageKey @@ wrappedVersion.data).get.untag(VersionalLevelDbValue)
       logger.info(s"Rollback to version ${Algos.encoder.encode(version)} with roothash " +
         s"${Algos.encoder.encode(rootHash)}")
       new DigestState(version, rootHash, stateStore, settings)
     }
   }
 
-  override def rollbackVersions: Iterable[VersionTag] = stateStore.rollbackVersions().map(VersionTag @@ _.data)
+  override def rollbackVersions: Iterable[VersionTag] = stateStore.versions.map(VersionTag @@ _.untag(LevelDBVersion))
 }
 
 object DigestState {
@@ -94,23 +100,25 @@ object DigestState {
              rootHashOpt: Option[ADDigest],
              dir: File,
              settings: NodeSettings): DigestState = Try {
-    val store = new LSMStore(dir, keepVersions = Constants.DefaultKeepVersions)
+    val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
+    //todo: get leveldb settings from settings
+    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(100)))
 
     (versionOpt, rootHashOpt) match {
 
       case (Some(version), Some(rootHash)) =>
-        if (store.lastVersionID.isDefined && store.lastVersionID.forall(_.data sameElements version)) {
-          new DigestState(version, rootHash, store, settings)
+        if (vldbInit.currentVersion sameElements version) {
+          new DigestState(version, rootHash, vldbInit, settings)
         } else {
-          val inVersion: VersionTag = VersionTag @@ store.lastVersionID.map(_.data).getOrElse(version)
-          new DigestState(inVersion, rootHash, store, settings).update(version, rootHash).get //sync store
-        }.ensuring(store.lastVersionID.get.data.sameElements(version))
+          val inVersion: VersionTag = VersionTag @@ vldbInit.currentVersion.untag(LevelDBVersion)
+          new DigestState(inVersion, rootHash, vldbInit, settings).update(version, rootHash).get //sync store
+        }.ensuring(vldbInit.currentVersion.sameElements(version))
 
       case (None, None) =>
-        val version: VersionTag = VersionTag @@ store.lastVersionID.get.data
-        val rootHash: Array[Byte] = store.get(ByteArrayWrapper(version)).get.data
+        val version: VersionTag = VersionTag @@ vldbInit.currentVersion.untag(LevelDBVersion)
+        val rootHash: Array[Byte] = vldbInit.get(StorageKey @@ version.untag(VersionTag)).get
 
-        new DigestState(version, ADDigest @@ rootHash, store, settings)
+        new DigestState(version, ADDigest @@ rootHash, vldbInit, settings)
 
       case _ => throw new Exception("Unsupported argument combination.")
     }

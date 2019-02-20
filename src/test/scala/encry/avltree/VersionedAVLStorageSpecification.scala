@@ -1,6 +1,7 @@
 package encry.avltree
 
 import com.google.common.primitives.Longs
+import com.typesafe.scalalogging.StrictLogging
 import encry.avltree
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue}
@@ -8,18 +9,24 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import encry.avltree.helpers.TestHelper
+import encry.settings.EncryAppSettings
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDB
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbKey
+import org.encryfoundation.common.Algos
 import scorex.crypto.encode.{Base16, Base58}
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.utils.{Random => RandomBytes}
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Success, Try}
 
-class VersionedIODBAVLStorageSpecification extends PropSpec
+class VersionedAVLStorageSpecification extends PropSpec
   with PropertyChecks
   with GeneratorDrivenPropertyChecks
   with Matchers
-  with TestHelper {
+  with TestHelper
+  with StrictLogging {
 
   override protected val KL = 32
   override protected val VL = 8
@@ -47,16 +54,16 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
     prover.generateProofAndUpdateStorage()
 
     val digest = prover.digest
-    val digest58String = Base58.encode(digest)
+    val digest16String = Algos.encode(digest)
 
     ops(100, 200)
     prover.generateProofAndUpdateStorage()
 
-    Base58.encode(prover.digest) should not equal digest58String
+    Algos.encode(prover.digest) should not equal digest16String
 
     prover.rollback(digest)
 
-    Base58.encode(prover.digest) shouldEqual digest58String
+    Algos.encode(prover.digest) shouldEqual digest16String
 
     prover.checkTree(true)
   }
@@ -195,12 +202,14 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
       prover.generateProofAndUpdateStorage()
       prover.digest
     }
+
     noException should be thrownBy storage.rollbackVersions.foreach(v => prover.rollback(v).get)
   }
 
-  def testAddInfoSaving(createStore: (Int) => Store): Unit = {
+  def testAddInfoSaving(createStore: (Int) => VersionalLevelDB): Unit = {
     val store = createStore(1000)
-    val storage = createVersionedStorage(store)
+    val settings = EncryAppSettings.read
+    val storage = createVersionedStorage(store, settings)
     val prover = createPersistentProver(storage)
 
     implicit def arrayToWrapper(in: Array[Byte]): ByteArrayWrapper = ByteArrayWrapper(in)
@@ -229,29 +238,30 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
     prover.generateProofAndUpdateStorage(Seq(addInfo2))
 
 
-    store.get(addInfo1._1) shouldBe defined
-    store.get(addInfo2._1) shouldBe defined
+    store.get(VersionalLevelDbKey @@ addInfo1._1) shouldBe defined
+    store.get(VersionalLevelDbKey @@ addInfo2._1) shouldBe defined
 
     storage.rollback(digest2).get
 
-    store.get(addInfo1._1) shouldBe defined
-    store.get(addInfo2._1) shouldBe None
+    store.get(VersionalLevelDbKey @@ addInfo1._1) shouldBe defined
+    store.get(VersionalLevelDbKey @@ addInfo2._1) shouldBe None
 
     storage.rollback(digest1).get
 
-    store.get(addInfo1._1) shouldBe None
-    store.get(addInfo2._1) shouldBe None
+    store.get(VersionalLevelDbKey @@ addInfo1._1) shouldBe None
+    store.get(VersionalLevelDbKey @@ addInfo2._1) shouldBe None
 
   }
 
-  def removeFromLargerSetSingleRandomElementTest(createStore: (Int) => Store): Unit = {
+  def removeFromLargerSetSingleRandomElementTest(createStore: (Int) => VersionalLevelDB): Unit = {
     val minSetSize = 10000
     val maxSetSize = 200000
+    val settings = EncryAppSettings.read
 
     forAll(Gen.choose(minSetSize, maxSetSize), Arbitrary.arbBool.arbitrary) { case (cnt, generateProof) =>
       whenever(cnt > minSetSize) {
 
-        val store = createStore(0).ensuring(_.lastVersionID.isEmpty)
+        val store = createStore(0)
         val t = Try {
           var keys = IndexedSeq[ADKey]()
           val p = new BatchAVLProver[Digest32, HF](KL, Some(VL))
@@ -267,7 +277,7 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
           }
 
           if (generateProof) p.generateProof()
-          val storage = createVersionedStorage(store)
+          val storage = createVersionedStorage(store, settings)
           assert(storage.isEmpty)
 
           val prover = PersistentBatchAVLProver.create[D, HF](p, storage, paranoidChecks = true).get
@@ -299,91 +309,47 @@ class VersionedIODBAVLStorageSpecification extends PropSpec
 
   /**
     * All checks are being made with both underlying storage implementations
-    * 1 LSMStore
-    * 2 QuickStore
+    * 1 VLDB
     */
 
-  property("Persistence AVL batch prover (LSMStore backed) - parallel read-write") {
-    val prover = createPersistentProverWithLSM()
-    parallelReadTest(prover)
-  }
+//  property("Persistence AVL batch prover (VLDB backed) - parallel read-write") {
+//    val prover = createPersistentProverWithVLDB()
+//    parallelReadTest(prover)
+//  }
 
 
-  property("Persistence AVL batch prover (LSMStore backed) - blockchain workflow") {
-    val prover = createPersistentProverWithLSM()
+  property("Persistence AVL batch prover (VLDB backed) - blockchain workflow") {
+    val prover = createPersistentProverWithVLDB()
     blockchainWorkflowTest(prover)
   }
 
-  property("Persistence AVL batch prover (QuickStore backed) - blockchain workflow") {
-    quickTest {
-      val prover = createPersistentProverWithQuick()
-      blockchainWorkflowTest(prover)
-    }
-  }
-
-  property("Persistence AVL batch prover (LSMStore backed) - rollback") {
-    val prover = createPersistentProverWithLSM()
+  property("Persistence AVL batch prover (VLDB backed) - rollback") {
+    val prover = createPersistentProverWithVLDB()
     rollbackTest(prover)
   }
 
-  property("Persistence AVL batch prover (QuickStore backed) - rollback") {
-    quickTest {
-      val prover = createPersistentProverWithQuick()
-      rollbackTest(prover)
-    }
-  }
-
-
-  property("Persistence AVL batch prover (LSMStore backed) - basic test") {
-    val store = createLSMStore()
-    val storage = createVersionedStorage(store)
+  property("Persistence AVL batch prover (VLDB backed) - basic test") {
+    val store = createVLDB()
+    val settings = EncryAppSettings.read
+    val storage = createVersionedStorage(store, settings)
     val prover = createPersistentProver(storage)
     basicTest(prover, storage)
   }
 
-  property("Persistence AVL batch prover (QuickStore backed) - basic test") {
-    quickTest {
-      val store = createQuickStore()
-      val storage = createVersionedStorage(store)
-      val prover = createPersistentProver(storage)
-      basicTest(prover, storage)
-    }
-  }
-
-  property("Persistence AVL batch prover (LSMStore backed) - rollback version") {
-    val store = createLSMStore(1000)
-    val storage = createVersionedStorage(store)
+  property("Persistence AVL batch prover (VLDB backed) - rollback version") {
+    val store = createVLDB(1000)
+    val settings = EncryAppSettings.read
+    val storage = createVersionedStorage(store, settings)
     val prover = createPersistentProver(storage)
     rollbackVersionsTest(prover, storage)
   }
 
-  property("Persistence AVL batch prover (QuickStore backed) - rollback version") {
-    quickTest {
-      val store = createQuickStore(1000)
-      val storage = createVersionedStorage(store)
-      val prover = createPersistentProver(storage)
-      basicTest(prover, storage)
-    }
+
+  property("Persistence AVL batch prover (VLDB backed) - remove single random element from a large set") {
+    removeFromLargerSetSingleRandomElementTest(_ => createVLDB())
   }
 
-  property("Persistence AVL batch prover (LSM backed) - remove single random element from a large set") {
-    removeFromLargerSetSingleRandomElementTest(createLSMStore _)
+  property("Persistence AVL batch prover (VLDB backed) - save additional info") {
+    testAddInfoSaving(createVLDB _)
   }
-
-  property("Persistence AVL batch prover (QuickStore backed) - remove single random element from a large set") {
-    quickTest {
-      removeFromLargerSetSingleRandomElementTest(createQuickStore _)
-    }
-  }
-
-  property("Persistence AVL batch prover (LSM backed) - save additional info") {
-    testAddInfoSaving(createLSMStore _)
-  }
-
-  property("Persistence AVL batch prover (Quick Store backed) - save additional info") {
-    quickTest {
-      testAddInfoSaving(createQuickStore _)
-    }
-  }
-
 }

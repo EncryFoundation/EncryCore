@@ -11,8 +11,10 @@ import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
 import encry.EncryApp.settings
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbKey
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
+
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
@@ -188,9 +190,9 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   else EncrySyncInfo(lastHeaders(settings.network.syncPacketLength).headers.map(_.id))
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
-    historyStorage.store.get(validityKey(modifierId)) match {
-      case Some(b) if b.data.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
-      case Some(b) if b.data.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
+    historyStorage.store.get(VersionalLevelDbKey @@ validityKey(modifierId).data) match {
+      case Some(b) if b.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
+      case Some(b) if b.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
       case None if contains(modifierId) => ModifierSemanticValidity.Unknown
       case None => ModifierSemanticValidity.Absent
       case m =>

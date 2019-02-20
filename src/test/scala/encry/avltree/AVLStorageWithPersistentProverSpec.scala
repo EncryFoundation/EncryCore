@@ -5,8 +5,13 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import org.scalatest.{Matchers, PropSpec}
 import encry.avltree.benchmark.IODBBenchmark.getRandomTempDir
+import encry.settings.EncryAppSettings
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.utils.FileHelper
+import org.iq80.leveldb.Options
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.utils.Random
+
 import scala.util.{Failure, Try}
 
 class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
@@ -16,7 +21,12 @@ class AVLStorageWithPersistentProverSpec extends PropSpec with Matchers {
 
   private lazy val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
 
-  protected lazy val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(new LSMStore(getRandomTempDir), np)
+  protected lazy val storage: VersionedAVLStorage[Digest32] = {
+    val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
+    val settingsEncry = EncryAppSettings.read
+    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
+    new VersionedAVLStorage(vldbInit, np, settingsEncry)
+  }
 
   protected lazy val persistentProver: PersistentBatchAVLProver[Digest32, HF] =
     PersistentBatchAVLProver.create(

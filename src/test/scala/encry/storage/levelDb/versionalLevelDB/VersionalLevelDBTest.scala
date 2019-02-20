@@ -7,7 +7,7 @@ import encry.utils.FileHelper
 import encry.utils.levelDBUtils.LevelDbUnitsGenerator
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
-import org.iq80.leveldb.Options
+import org.iq80.leveldb.{Options, ReadOptions}
 import org.scalatest.{Matchers, PropSpec}
 
 import scala.concurrent.Await
@@ -140,11 +140,38 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     vldbInit.versionsList().length shouldEqual maxVersions
   }
 
+  property("Level db should return previous value of elem after rollback. Add elem by same key, several times") {
+
+    val maxVersions = 6
+
+    val levelDbElemsQty = 10
+
+    val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
+
+    val tempDir = FileHelper.getRandomTempDir
+
+    val levelDBInit = LevelDbFactory.factory.open(tempDir, new Options)
+
+    val vldbInit = VersionalLevelDBCompanion(levelDBInit, dummyLevelDBSettings)
+
+    val levelDBElems = generateRandomLevelDbElemsWithSameKeys(levelDbElemsQty,1)
+
+    levelDBElems.foreach(vldbInit.insert)
+
+    vldbInit.rollbackTo(levelDBElems(6).version)
+
+    logger.info("========================")
+    logger.info(s"VERSIONS: ${levelDBElems.map(elem => Algos.encode(elem.version)).mkString(",")}")
+    logger.info("========================")
+    Algos.hash(vldbInit.get(levelDBElems(6).elemsToInsert.head._1).get) shouldEqual
+      Algos.hash(levelDBElems(6).elemsToInsert.head._2)
+  }
+
   property("deleted key from deleted version should not exist") {
 
-    val maxVersions = 10
+    val maxVersions = 5
 
-    val levelDbElemsQty = 3 + maxVersions
+    val levelDbElemsQty = 3
 
     val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
 
@@ -158,41 +185,22 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     levelDbElems.foreach(vldbInit.insert)
 
-    vldbInit.get(levelDbElems.head.elemsToInsert.head._1) shouldEqual None
+    levelDbElems.last.elemsToInsert.forall{case (key, value) =>
+      vldbInit.get(key).exists(dbValue => Algos.hash(dbValue) sameElements Algos.hash(value))
+    } shouldBe true
 
-    vldbInit.get(levelDbElems.last.elemsToInsert.head._1).map(data => Algos.hash(data)).get shouldEqual
-      Algos.hash(levelDbElems.last.elemsToInsert.head._2)
-  }
-
-  property("insertion of 4k elems") {
-
-    val maxVersions = 100
-
-    val levelDbElemsQty = 4000
-
-    val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
-
-    val tempDir = FileHelper.getRandomTempDir
-
-    val levelDBInit = LevelDbFactory.factory.open(tempDir, new Options)
-
-    val vldbInit = VersionalLevelDBCompanion(levelDBInit, dummyLevelDBSettings)
-
-    val levelDbElems = generateRandomLevelDbElemsWithoutDeletions(levelDbElemsQty, Random.nextInt(300))
-
-    levelDbElems.foreach(vldbInit.insert)
-
-    vldbInit.get(levelDbElems.head.elemsToInsert.head._1) shouldEqual None
-
-    vldbInit.get(levelDbElems.last.elemsToInsert.head._1).map(data => Algos.hash(data)).get shouldEqual
-      Algos.hash(levelDbElems.last.elemsToInsert.head._2)
+    levelDbElems.last.elemsToDelete.forall{key =>
+      vldbInit.get(key) == Option.empty[VersionalLevelDbValue]
+    } shouldBe true
   }
 
   property("Check that after rollback, it is impossible to get last generated version") {
 
-    val maxVersions = 10
+    val maxVersions = Random.nextInt(1000) + 15
 
-    val levelDbElemsQty = 9
+    val levelDbElemsQty = Random.nextInt(maxVersions) + 10
+
+    val rollbackPointIdx = Random.nextInt(levelDbElemsQty) + 5
 
     val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
 
@@ -206,11 +214,23 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     levelDbElems.foreach(vldbInit.insert)
 
-    vldbInit.rollbackTo(levelDbElems(6).version)
+    vldbInit.rollbackTo(levelDbElems(rollbackPointIdx).version)
 
-    vldbInit.get(levelDbElems(7).elemsToInsert.head._1) shouldEqual None
+    levelDbElems(rollbackPointIdx).elemsToInsert.forall{case (key, value) =>
+      vldbInit.get(key).exists(dbValue => Algos.hash(dbValue) sameElements Algos.hash(value))
+    } shouldBe true
 
-    vldbInit.get(levelDbElems(6).elemsToInsert.head._1).map(data => Algos.hash(data)).get shouldEqual
-      Algos.hash(levelDbElems(6).elemsToInsert.head._2)
+    levelDbElems(rollbackPointIdx).elemsToDelete.forall{key =>
+      vldbInit.get(key) == Option.empty[VersionalLevelDbValue]
+    } shouldBe true
+
+    levelDbElems(rollbackPointIdx + 1).elemsToInsert.forall{case (key, _) =>
+      vldbInit.get(key) == Option.empty[VersionalLevelDbValue]
+    } shouldBe true
+
+    levelDbElems(rollbackPointIdx + 1).elemsToDelete.forall{key =>
+      vldbInit.get(key).isDefined
+    } shouldBe true
+
   }
 }

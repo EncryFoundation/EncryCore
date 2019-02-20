@@ -9,6 +9,10 @@ class EncryStateSpec extends PropSpec with Matchers with EncryGenerator {
 
   property("EncryState.genesisBoxes() output equality") {
 
+    val a = Seq(0,1,3,4,5)
+
+    println(a.dropWhile(_ != 1))
+
     val g1: Seq[AssetBox] = EncryState.initialStateBoxes
     val g2: Seq[AssetBox] = EncryState.initialStateBoxes
     val g3: Seq[AssetBox] = EncryState.initialStateBoxes

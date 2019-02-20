@@ -1,5 +1,7 @@
 package encry.settings
 
-case class StorageSettings(history: String,
-                           wallet: String,
-                           state: String)
+import encry.storage.VersionalStorage.StorageType
+
+case class StorageSettings(history: StorageType,
+                           wallet: StorageType,
+                           state: StorageType)
