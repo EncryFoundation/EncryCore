@@ -56,6 +56,7 @@ class NetworkController extends Actor with StrictLogging {
     }
   }
 
+
   logger.info(s"Declared address: $externalSocketAddress")
 
   IO(Tcp) ! Bind(self, networkSettings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)

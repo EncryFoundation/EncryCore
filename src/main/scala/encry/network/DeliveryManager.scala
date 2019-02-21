@@ -1,6 +1,7 @@
 package encry.network
 
-import java.net.InetAddress
+import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
@@ -22,6 +23,7 @@ import encry.view.history.{EncryHistory, EncrySyncInfo, EncrySyncInfoMessageSpec
 import encry.view.mempool.Mempool
 import org.encryfoundation.common.Algos
 import encry.settings.EncryAppSettings
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.collection.immutable.{HashMap, HashSet}
@@ -49,6 +51,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   val requestModifierSpec: RequestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
   //todo check context
   val syncTracker: SyncTracker = SyncTracker(self, context, settings.network)
+
 
   def key(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
@@ -110,7 +113,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       val filteredModifiers: Seq[Array[Byte]] = fm.filterNot { case (modId, _) =>
         historyReaderOpt.contains(modId)
       }.values.toSeq
-      if (filteredModifiers.nonEmpty) nodeViewHolderRef ! ModifiersFromRemote(typeId, filteredModifiers)
+      if (filteredModifiers.nonEmpty) nodeViewHolderRef ! ModifiersFromRemote(typeId, filteredModifiers, remote.socketAddress)
       historyReaderOpt.foreach { h =>
         if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
         else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
@@ -304,5 +307,7 @@ object DeliveryManager {
   case object FullBlockChainSynced
 
   case object GetStatusTrackerPeer
+
+  case class InvalidModifierFromPeer(peer: InetSocketAddress)
 
 }

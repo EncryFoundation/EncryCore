@@ -1,6 +1,8 @@
 package encry.view
 
 import java.io.File
+import java.net.InetSocketAddress
+
 import akka.actor.{Actor, ActorRef, Props}
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
@@ -13,7 +15,8 @@ import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
 import encry.modifiers.state.box.EncryProposition
 import encry.network.AuxiliaryHistoryHolder.{Append, ReportModifierInvalid, ReportModifierValid}
-import encry.network.DeliveryManager.FullBlockChainSynced
+import encry.network.DeliveryManager.{FullBlockChainSynced, InvalidModifierFromPeer}
+import encry.network.NetworkController.ReceivableMessages.PeerForBan
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
@@ -29,6 +32,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -82,10 +86,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   }
 
   override def receive: Receive = {
-    case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
+    case ModifiersFromRemote(modifierTypeId, remoteObjects, peer) =>
       modifierSerializers.get(modifierTypeId).foreach { companion =>
         remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
-          case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
+          case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId =>
+            if (!tx.semanticValidity.isSuccess) networkController ! PeerForBan(peer)
+            else txModify(tx)
           case pmod: EncryPersistentModifier@unchecked =>
             if (settings.influxDB.isDefined && nodeView.history.isFullChainSynced) {
               pmod match {
@@ -94,6 +100,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
                 case _ =>
               }
             }
+
+            pmod match {
+              case h: Header => if (isSemanticallyValid(header.id) != Invalid)
+              case b: Payload =>
+            }
+
             if (nodeView.history.contains(pmod.id) || ModifiersCache.contains(key(pmod.id)))
               logger.warn(s"Received modifier ${pmod.encodedId} that is already in history")
             else ModifiersCache.put(key(pmod.id), pmod, nodeView.history)
@@ -405,7 +417,7 @@ object EncryNodeViewHolder {
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    case class ModifiersFromRemote(modTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
+    case class ModifiersFromRemote(modTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]], peer: InetSocketAddress)
 
     case class LocallyGeneratedTransaction[P <: Proposition, EncryBaseTransaction](tx: EncryBaseTransaction)
 

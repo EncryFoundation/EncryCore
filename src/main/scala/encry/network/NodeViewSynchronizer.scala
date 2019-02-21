@@ -60,6 +60,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case ChangedState(_) =>
     case SyntacticallyFailedModification(_, _) =>
 
+
     case SemanticallySuccessfulModifier(mod) =>
       mod match {
         case block: Block => broadcastModifierInv(block.header)
