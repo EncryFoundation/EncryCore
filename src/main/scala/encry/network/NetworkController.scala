@@ -31,6 +31,19 @@ class NetworkController extends Actor with StrictLogging {
   var outgoing: Set[InetSocketAddress] = Set.empty
   lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse None
   var knownPeersCollection: Set[InetSocketAddress] = settings.network.knownPeers.toSet
+  var bannedPeers: Map[InetSocketAddress, Long] = Map.empty
+
+  val timeFromSettings: Long = 300000L
+
+  context.system.scheduler.schedule(1.seconds, 1.seconds) {
+    bannedPeers = cleanBannedPeers(bannedPeers)
+  }
+
+  def cleanBannedPeers(bP: Map[InetSocketAddress, Long]): Map[InetSocketAddress, Long] =
+    bP.filter { case (_, timer) => System.currentTimeMillis() > timer + timeFromSettings }
+
+  def addPeerToBannedList(peer: InetSocketAddress, bP: Map[InetSocketAddress, Long]): Map[InetSocketAddress, Long] =
+    bP.updated(peer, System.currentTimeMillis())
 
   if (!networkSettings.localOnly.getOrElse(false)) {
     networkSettings.declaredAddress.foreach { myAddress =>
@@ -76,7 +89,8 @@ class NetworkController extends Actor with StrictLogging {
 
   def peerLogic: Receive = {
     ///TODO: Duplicate `checkPossibilityToAddPeer` logic
-    case ConnectTo(remote) if CheckPeersObj.checkPossibilityToAddPeer(remote, knownPeersCollection, settings) =>
+    case ConnectTo(remote) if
+    CheckPeersObj.checkPossibilityToAddPeer(remote, knownPeersCollection, settings) && !bannedPeers.contains(remote) =>
       outgoing += remote
       IO(Tcp) ! Connect(remote,
         localAddress = externalSocketAddress,
@@ -88,7 +102,8 @@ class NetworkController extends Actor with StrictLogging {
       peerManager ! PeerFromCli(address)
       peerSynchronizer ! PeerFromCli(address)
       self ! ConnectTo(address)
-    case Connected(remote, local) if CheckPeersObj.checkPossibilityToAddPeer(remote, knownPeersCollection, settings) =>
+    case Connected(remote, local) if
+    CheckPeersObj.checkPossibilityToAddPeer(remote, knownPeersCollection, settings) && !bannedPeers.contains(remote) =>
       val direction: ConnectionType = if (outgoing.contains(remote)) Outgoing else Incoming
       val logMsg: String = direction match {
         case Incoming => s"New incoming connection from $remote established (bound to local $local)"
@@ -100,7 +115,8 @@ class NetworkController extends Actor with StrictLogging {
       outgoing -= remote
     case Connected(remote, _) =>
       logger.info(s"Peer $remote trying to connect, but checkPossibilityToAddPeer(remote):" +
-        s" ${CheckPeersObj.checkPossibilityToAddPeer(remote, knownPeersCollection, settings)}.")
+        s" ${CheckPeersObj.checkPossibilityToAddPeer(remote, knownPeersCollection, settings)} " +
+        s"or !contains in banned peers: ${!bannedPeers.contains(remote)}.")
     case CommandFailed(c: Connect) =>
       outgoing -= c.remoteAddress
       logger.info("Failed to connect to : " + c.remoteAddress)
@@ -111,6 +127,11 @@ class NetworkController extends Actor with StrictLogging {
     case RegisterMessagesHandler(specs, handler) =>
       logger.info(s"Registering handlers for ${specs.map(s => s.messageCode -> s.messageName)}")
       messageHandlers += specs.map(_.messageCode) -> handler
+    case PeerForBan(peer) =>
+      bannedPeers = addPeerToBannedList(peer, bannedPeers)
+      logger.info(s"Adding new peer $peer to the banned list. New banned peers collection is: ${
+        bannedPeers.mkString(",")
+      }.")
     case CommandFailed(cmd: Tcp.Command) =>
       context.actorSelection("/user/statsSender") ! "Failed to execute command : " + cmd
     case nonsense: Any => logger.warn(s"NetworkController: got something strange $nonsense")
@@ -131,5 +152,9 @@ object NetworkController {
     case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)
 
     case class ConnectTo(address: InetSocketAddress)
+
+    case class PeerForBan(peer: InetSocketAddress)
+
   }
+
 }

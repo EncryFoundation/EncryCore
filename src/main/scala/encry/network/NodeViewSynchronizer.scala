@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
@@ -11,7 +12,7 @@ import encry.modifiers.mempool.Transaction
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
 import encry.network.DeliveryManager.FullBlockChainSynced
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, PeerForBan, RegisterMessagesHandler, SendToNetwork}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.message.BasicMsgDataTypes.{InvData, ModifiersData}
@@ -58,13 +59,13 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case SemanticallyFailedModification(_, _) =>
     case ChangedState(_) =>
     case SyntacticallyFailedModification(_, _) =>
+
     case SemanticallySuccessfulModifier(mod) =>
       mod match {
         case block: Block => broadcastModifierInv(block.header)
         case tx: Transaction => broadcastModifierInv(tx)
         case _ => //Do nothing
       }
-    case SemanticallyFailedModification(_, _) =>
     case ChangedState(_) =>
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
@@ -113,8 +114,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         s"node is not synced, so ignore msg")
     case DataFromPeer(spec, invData: InvData@unchecked, remote) if spec.messageCode == InvSpec.MessageCode =>
       logger.info(s"Got inv message from ${remote.socketAddress} with modifiers: ${invData._2.map(Algos.encode).mkString(",")} ")
-      //todo: Ban node that send payload id?
-      if (invData._1 != Payload.modifierTypeId) nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
+      if (invData._1 == Payload.modifierTypeId) networkControllerRef ! PeerForBan(remote.socketAddress)
+      else nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
     case DataFromPeer(spec, data: ModifiersData@unchecked, remote) if spec.messageCode == ModifiersSpec.messageCode =>
       deliveryManager ! DataFromPeer(spec, data: ModifiersData@unchecked, remote)
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
@@ -145,35 +146,54 @@ object NodeViewSynchronizer {
   object ReceivableMessages {
 
     case object SendLocalSyncInfo
+
     case object CheckModifiersToDownload
-    case class  OtherNodeSyncingStatus[SI <: SyncInfo](remote: ConnectedPeer,
-                                                       status: encry.consensus.History.HistoryComparisonResult,
-                                                       extension: Option[Seq[(ModifierTypeId, ModifierId)]])
-    case class  ResponseFromLocal[M <: NodeViewModifier]
+
+    case class OtherNodeSyncingStatus[SI <: SyncInfo](remote: ConnectedPeer,
+                                                      status: encry.consensus.History.HistoryComparisonResult,
+                                                      extension: Option[Seq[(ModifierTypeId, ModifierId)]])
+
+    case class ResponseFromLocal[M <: NodeViewModifier]
     (source: ConnectedPeer, modifierTypeId: ModifierTypeId, localObjects: Seq[M])
-    case class  RequestFromLocal(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
-    case class  CheckDelivery(source: ConnectedPeer,
-                              modifierTypeId: ModifierTypeId,
-                              modifierId: ModifierId)
+
+    case class RequestFromLocal(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
+
+    case class CheckDelivery(source: ConnectedPeer,
+                             modifierTypeId: ModifierTypeId,
+                             modifierId: ModifierId)
 
     trait PeerManagerEvent
+
     case class DisconnectedPeer(remote: InetSocketAddress) extends PeerManagerEvent
+
     case class HandshakedPeer(remote: ConnectedPeer) extends PeerManagerEvent
 
     trait NodeViewHolderEvent
+
     trait NodeViewChange extends NodeViewHolderEvent
+
     case class ChangedHistory[HR <: EncryHistoryReader](reader: HR) extends NodeViewChange
+
     case class ChangedMempool[MR <: MempoolReader](mempool: MR) extends NodeViewChange
+
     case class ChangedState[SR <: StateReader](reader: SR) extends NodeViewChange
+
     case class RollbackFailed(branchPointOpt: Option[VersionTag]) extends NodeViewHolderEvent
+
     case class RollbackSucceed(branchPointOpt: Option[VersionTag]) extends NodeViewHolderEvent
 
     trait ModificationOutcome extends NodeViewHolderEvent
+
     case class SyntacticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable)
       extends ModificationOutcome
+
     case class SemanticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable)
       extends ModificationOutcome
+
     case class SuccessfulTransaction[P <: Proposition, TX <: Transaction](transaction: TX) extends ModificationOutcome
+
     case class SemanticallySuccessfulModifier[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends ModificationOutcome
+
   }
+
 }
