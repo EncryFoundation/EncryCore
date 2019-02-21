@@ -73,7 +73,7 @@ libraryDependencies ++= Seq(
   "commons-net" % "commons-net" % "3.6",
   "com.spotify" % "docker-client" % "8.11.0" % "test" classifier "shaded",
   "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.9.6",
-  "com.fasterxml.jackson.core"% "jackson-databind" % "2.9.6",
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.6",
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.6",
   "org.asynchttpclient" % "async-http-client" % "2.4.7",
   "com.spotify" % "docker-client" % "8.11.3",
@@ -83,13 +83,22 @@ libraryDependencies ++= Seq(
   "org.aspectj" % "aspectjweaver" % "1.9.2",
   "org.typelevel" % "cats-core_2.12" % "1.0.1",
   "org.typelevel" % "cats-kernel_2.12" % "1.0.1",
-  "org.typelevel" % "cats-macros_2.12" % "1.0.1"
+  "org.typelevel" % "cats-macros_2.12" % "1.0.1",
+  // "com.google.protobuf" % "protobuf-java" % "3.4.0",
+  "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion,
+  "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf",
+  "com.thesamet.scalapb" %% "scalapb-json4s" % "0.7.0"
 ) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
   "SonaType" at "https://oss.sonatype.org/content/groups/public",
   "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/",
-  "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/")
+  "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
+)
+
+PB.targets in Compile := Seq(
+  scalapb.gen() -> (sourceManaged in Compile).value
+)
 
 evictionWarningOptions in update := EvictionWarningOptions.default
   .withWarnTransitiveEvictions(false)
@@ -124,7 +133,7 @@ assemblyJarName in assembly := "EncryCore.jar"
 
 mainClass in assembly := Some("encry.EncryApp")
 
-test in assembly := { }
+test in assembly := {}
 
 assemblyMergeStrategy in assembly := {
   case "logback.xml" => MergeStrategy.first
