@@ -1,6 +1,7 @@
 package encry.network
 
 import java.io.File
+
 import akka.actor.{Actor, ActorRef}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.ProgressInfo
@@ -8,17 +9,18 @@ import encry.modifiers.EncryPersistentModifier
 import encry.network.AuxiliaryHistoryHolder._
 import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.VersionalStorage
+import encry.storage.iodb.versionalIODB.IODBWrapperForHistory
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.NetworkTimeProvider
 import encry.view.history.EncryHistory
-import encry.view.history.EncryHistory.{getHistoryIndexDir, getHistoryObjectsDir}
+import encry.view.history.EncryHistory.{getHistoryIndexDir, getHistoryObjectsDir, logger}
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
 import org.iq80.leveldb.Options
 
-class AuxiliaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvider, syncronizer: ActorRef)
+case class AuxiliaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvider, syncronizer: ActorRef)
   extends Actor with StrictLogging {
 
   val history: EncryHistory = AuxiliaryHistoryHolder.readOrGenerate(settings, ntp)
@@ -61,12 +63,17 @@ object AuxiliaryHistoryHolder {
   protected[AuxiliaryHistoryHolder] def readOrGenerate(settingsEncry: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistory = {
 
     val historyIndexDir: File = getHistoryIndexDir(settingsEncry)
-    val historyObjectsDir: File = getHistoryObjectsDir(settingsEncry)
-    val indexStore: LSMStore = new LSMStore(historyIndexDir, keepVersions = 0)
-    val objectsStore: LSMStore = new LSMStore(historyObjectsDir, keepVersions = 0)
-    val levelDBInit = LevelDbFactory.factory.open(historyIndexDir, new Options)
-    val versionalStorage = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
-    val storage: HistoryStorage = new HistoryStorage(versionalStorage)
+    val vldbInit = settingsEncry.storage.history match {
+      case VersionalStorage.IODB =>
+        val historyObjectsDir: File = getHistoryObjectsDir(settingsEncry)
+        val indexStore: LSMStore = new LSMStore(historyIndexDir, keepVersions = 0)
+        val objectsStore: LSMStore = new LSMStore(historyObjectsDir, keepVersions = 0)
+        IODBWrapperForHistory(indexStore, objectsStore)
+      case VersionalStorage.LevelDB =>
+        val levelDBInit = LevelDbFactory.factory.open(historyIndexDir, new Options)
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
+    }
+    val storage: HistoryStorage = new HistoryStorage(vldbInit)
 
     val history: EncryHistory = (settingsEncry.node.stateMode.isDigest, settingsEncry.node.verifyTransactions) match {
       case (true, true) =>

@@ -20,6 +20,7 @@ import encry.utils.BalanceCalculator
 import encry.stats.StatsSender.TxsInBlock
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageVersion}
+import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDB, VersionalLevelDBCompanion}
 import encry.validation.{MalformedModifierError, ValidationResult}
@@ -301,9 +302,16 @@ object UtxoState extends StrictLogging {
     val p: BatchAVLProver[Digest32, HF] =
       new BatchAVLProver[Digest32, Algos.HF](keyLength = EncryBox.BoxIdSize, valueLengthOpt = None)
     boxes.foreach(b => p.performOneOperation(encry.avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
-
-    val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
-    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 33), keySize = 33))
+    //check kind of storage
+    val vldbInit = settings.storage.state match {
+      case VersionalStorage.IODB =>
+        logger.info("Init state with iodb storage")
+        IODBWrapper(new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions))
+      case VersionalStorage.LevelDB =>
+        logger.info("Init state with levelDB storage")
+        val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 33), keySize = 33))
+    }
     val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
     val storage: VersionedAVLStorage[Digest32] = new VersionedAVLStorage(vldbInit, np, settings)(Algos.hash)
     logger.info(s"Generating UTXO State with ${boxes.size} boxes")
