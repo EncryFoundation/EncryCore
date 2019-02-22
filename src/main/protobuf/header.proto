@@ -1,12 +1,6 @@
 syntax = "proto3";
-import "scalapb/scalapb.proto";
 
 message Header {
-
-    message EquihashSolution {
-        uint32 ints = 1 [(scalapb.field).collection_type = "scala.collection.immutable.Seq"];
-    }
-
     bytes version = 1;
     bytes parentId = 2;
     bytes adProofsRoot = 3;
@@ -16,5 +10,4 @@ message Header {
     uint32 height = 7;
     uint64 nonce = 8;
     uint64 difficulty = 9;
-    EquihashSolution equihashSolution = 10;
 }

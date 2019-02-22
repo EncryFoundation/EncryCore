@@ -1,77 +1,47 @@
 syntax = "proto3";
-
-message Transaction {
-
-    message TransferDirective {
-        string address = 1;
-        uint64 amount = 2;
-        repeated bytes tokenIdOpt = 3;
-    }
-
-    message AssetIssuingDirective {
-        bytes contractHash = 1;
-        uint64 amount = 2;
-    }
-
-    message ScriptedAssetDirective {
-        bytes contractHash = 1;
-        uint64 amount = 2;
-        repeated bytes tokenIdOpt = 3;
-    }
-
-    message DataDirective {
-        bytes contractHash = 1;
-        bytes data = 2;
-    }
-
-    uint64 fee = 1;
-    uint64 timestamp = 2;
-    oneof directives {
-        TransferDirective directives = 20;
-        AssetIssuingDirective directives = 21;
-        ScriptedAssetDirective directives = 22;
-        DataDirective directives = 23;
-    }
-}
-
-message Input {
-    bytes boxId = 1;
-}
-
-message Proof {
-
-}
-
-
-fee: Amount,
-timestamp: Long,
-inputs: IndexedSeq[Input],
-directives: IndexedSeq[Directive],
-defaultProofOpt: Option[Proof]
-
-Bytes.concat(
-Longs.toByteArray(obj.fee),
-Longs.toByteArray(obj.timestamp),
-Shorts.toByteArray(obj.inputs.size.toShort),
-Shorts.toByteArray(obj.directives.size.toShort),
-obj.inputs.map(u => Shorts.toByteArray(u.bytes.length.toShort) ++ u.bytes).foldLeft(Array[Byte]())(_ ++ _),
-obj.directives.map { d =>
-val bytes: Array[Byte] = DirectiveSerializer.toBytes(d)
-Shorts.toByteArray(bytes.length.toShort) ++ bytes
-}.reduceLeft(_ ++ _),
-obj.defaultProofOpt.map(p => ProofSerializer.toBytes(p)).getOrElse(Array.empty)
-)
-
-
-case class Proof(value: BoxedValue, tagOpt: Option[String])
-
-Input(boxId: ADKey, contract: Either[CompiledContract, RegularContract], proofs: List[Proof])
-
-override def toBytes(obj: Input): Array[Byte] =
-if (obj.isUnsigned) toBytesWithoutProof(obj) else {
-val proofsBytes: Array[Byte] = obj.proofs.foldLeft(Array.empty[Byte]) { case (acc, proof) =>
-val proofBytes: Array[Byte] = ProofSerializer.toBytes(proof)
-acc ++ Shorts.toByteArray(proofBytes.length.toShort) ++ proofBytes
-}
-toBytesWithoutProof(obj) ++ Array(obj.proofs.size.toByte) ++ proofsBytes
-}
+/**import "scalapb/scalapb.proto";
+//
+//message Transaction {
+//
+//    message Proof {
+//         bytes proof = 20 [(scalapb.field).type = "org.encryfoundation.common.transaction.Proof"];
+//    }
+//
+////    uint64 fee = 1;
+////    uint64 timestamp = 2;
+////    repeated bytes inputs = 3 [(scalapb.field).collection_type = "scala.collection.immutable.IndexedSeq", (scalapb.field).type = "org.encryfoundation.common.transaction.Input"];
+////    repeated Directive directives = 10;
+////    Proof proof = 20;
+//}
+//
+//message Directive {
+//    message TransferDirective {
+//        string address = 1;
+//        uint64 amount = 2;
+//        repeated bytes tokenIdOpt = 3;
+//    }
+//
+//    message AssetIssuingDirective {
+//        bytes contractHash = 1;
+//        uint64 amount = 2;
+//    }
+//
+//    message ScriptedAssetDirective {
+//        bytes contractHash = 1;
+//        uint64 amount = 2;
+//        repeated bytes tokenIdOpt = 3;
+//    }
+//
+//    message DataDirective {
+//        bytes contractHash = 1;
+//        bytes data = 2;
+//    }
+//
+//    oneof directives {
+//        TransferDirective directiveT = 20;
+//        AssetIssuingDirective directiveA = 21;
+//        ScriptedAssetDirective directiveS = 22;
+//        DataDirective directiveD = 23;
+//    }
+//}
+**/

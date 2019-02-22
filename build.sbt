@@ -84,10 +84,7 @@ libraryDependencies ++= Seq(
   "org.typelevel" % "cats-core_2.12" % "1.0.1",
   "org.typelevel" % "cats-kernel_2.12" % "1.0.1",
   "org.typelevel" % "cats-macros_2.12" % "1.0.1",
-  // "com.google.protobuf" % "protobuf-java" % "3.4.0",
-  "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion,
-  "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf",
-  "com.thesamet.scalapb" %% "scalapb-json4s" % "0.7.0"
+  "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf"
 ) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
@@ -97,7 +94,11 @@ resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repos
 )
 
 PB.targets in Compile := Seq(
-  scalapb.gen() -> (sourceManaged in Compile).value
+  PB.gens.java -> (sourceManaged in Compile).value,
+  scalapb.gen(
+    flatPackage = false,
+    javaConversions = true
+  ) -> (sourceManaged in Compile).value
 )
 
 evictionWarningOptions in update := EvictionWarningOptions.default

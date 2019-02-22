@@ -1,1 +1,9 @@
 syntax = "proto3";
+
+message Payload {
+    /**    message EquihashSolution {
+            repeated uint32 ints = 1 [(scalapb.field).collection_type = "scala.collection.immutable.Seq"];
+        }
+    EquihashSolution equihashSolution = 10;
+    **/
+}
