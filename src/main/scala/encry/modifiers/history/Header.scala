@@ -1,7 +1,9 @@
 package encry.modifiers.history
 
+import HeaderProto.HeaderProtoMessage
 import cats.implicits._
 import com.google.common.primitives.{Ints, _}
+import com.google.protobuf.ByteString
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.crypto.equihash.{Equihash, EquihashSolution, EquihashSolutionsSerializer}
 import encry.modifiers.history.Block.{Height, Timestamp, Version}
@@ -18,6 +20,7 @@ import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
+
 import scala.util.Try
 
 case class Header(version: Version,
@@ -228,6 +231,30 @@ object Header {
 }
 
 object HeaderSerializer extends Serializer[Header] {
+
+  def toProto(header: Header): HeaderProtoMessage = HeaderProtoMessage()
+    .withVersion(ByteString.copyFrom(Array(header.version)))
+    .withParentId(ByteString.copyFrom(header.parentId))
+    .withAdProofsRoot(ByteString.copyFrom(header.stateRoot))
+    .withTransactionsRoot(ByteString.copyFrom(header.transactionsRoot))
+    .withTimestamp(header.timestamp)
+    .withHeight(header.height)
+    .withNonce(header.nonce)
+    .withDifficulty(header.difficulty.toLong)
+    .withEquihashSolution(EquihashSolution.toProto(header.equihashSolution))
+
+  def fromProto(headerM: HeaderProtoMessage): Header = Header(
+    headerM.version.byteAt(0),
+    ModifierId @@ headerM.parentId.toByteArray,
+    Digest32 @@ headerM.adProofsRoot.toByteArray,
+    ADDigest @@ headerM.stateRoot.toByteArray,
+    Digest32 @@ headerM.transactionsRoot.toByteArray,
+    headerM.timestamp,
+    headerM.height,
+    headerM.nonce,
+    Difficulty @@ BigInt(headerM.difficulty),
+    headerM.equihashSolution.map(m => EquihashSolution(m.ints)).get
+  )
 
   def bytesWithoutPow(h: Header): Array[Byte] =
     Bytes.concat(

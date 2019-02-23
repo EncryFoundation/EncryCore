@@ -1,5 +1,6 @@
 package encry.modifiers.history
 
+import BlockProto.BlockProtoMessage
 import com.google.common.primitives.{Bytes, Ints}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.mempool.directive.TransferDirective
@@ -11,6 +12,7 @@ import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
 import org.encryfoundation.common.serialization.Serializer
 import scorex.crypto.encode.Base16
+
 import scala.util.Try
 
 case class Block(header: Header,
@@ -94,6 +96,11 @@ object Block {
 }
 
 object BlockSerializer extends Serializer[Block] {
+
+//  def toProtobuf(block: Block) = BlockProtoMessage()
+//    .withHeader(block.header)
+//    .withPayload()
+//    .withAdProofsOpt()
 
   override def toBytes(obj: Block): Array[Byte] = {
 
