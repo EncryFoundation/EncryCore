@@ -11,7 +11,3 @@ resolvers += Resolver.bintrayRepo("kamon-io", "sbt-plugins")
 addSbtPlugin("se.marcuslonnberg" % "sbt-docker" % "1.4.1")
 
 addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.3.4")
-
-addSbtPlugin("com.thesamet" % "sbt-protoc" % "0.99.19")
-
-libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.8.4"
