@@ -7,7 +7,7 @@ message TransactionProtoMessage {
     uint64 timestamp = 2;
     repeated bytes inputs = 3 [(scalapb.field).collection_type = "scala.collection.immutable.IndexedSeq"];
     repeated Directive directives = 4 [(scalapb.field).collection_type = "scala.collection.immutable.IndexedSeq"];
-    Proof proof = 5;
+    bytes proof = 5;
 }
 
 message Directive {
@@ -39,8 +39,4 @@ message Directive {
         ScriptedAssetDirective scriptedAssetDirective = 3;
         DataDirective dataDirective = 4;
     }
-}
-
-message Proof {
-    bytes proof = 1;
 }

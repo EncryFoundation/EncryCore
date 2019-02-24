@@ -1,5 +1,7 @@
 package encry.modifiers.mempool
 
+import TransactionProto.TransactionProtoMessage
+import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.NodeViewModifier
 import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
@@ -110,6 +112,13 @@ object Transaction {
 object TransactionSerializer extends Serializer[Transaction] {
 
   case object SerializationException extends Exception("Serialization failed.")
+
+  def toProto(transaction: Transaction): TransactionProtoMessage = TransactionProtoMessage()
+    .withFee(transaction.fee)
+    .withTimestamp(transaction.timestamp)
+    .withInputs(transaction.inputs.map(x => ByteString.copyFrom(x.bytes)))
+    .withDirectives()
+    .withProof(transaction.defaultProofOpt.map(x => x.bytes).getOrElse(Array.emptyByteArray))
 
   override def toBytes(obj: Transaction): Array[Byte] = {
     Bytes.concat(
