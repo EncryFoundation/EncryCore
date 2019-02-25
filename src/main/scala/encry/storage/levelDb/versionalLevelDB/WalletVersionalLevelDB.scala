@@ -20,7 +20,7 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Success
 
-case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLogging {
+case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLogging with AutoCloseable {
 
   import WalletVersionalLevelDBCompanion._
 
@@ -69,6 +69,8 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
       .map(_.sliding(40, 40)
         .map(ch => Algos.encode(ch.take(32)) -> Longs.fromByteArray(ch.takeRight(8)))
         .toMap).getOrElse(Map.empty)
+
+  override def close(): Unit = levelDb.close()
 }
 
 object WalletVersionalLevelDBCompanion extends StrictLogging {
