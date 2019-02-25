@@ -8,7 +8,8 @@ import encry.modifiers.InstanceFactory
 import encry.modifiers.history.{Block, Header}
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, MonetaryBox}
+import encry.modifiers.state.box.TokenIssuingBox.TokenId
+import encry.modifiers.state.box._
 import encry.settings.Constants
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.TestHelper.Props
@@ -49,6 +50,12 @@ trait EncryGenerator {
 
   def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None): AssetBox =
     AssetBox(EncryProposition.addressLocked(address), ScRand.nextLong(), amount, tokenIdOpt)
+
+  def generateDataBox(address: Address, nonce: Long, data: Array[Byte]): DataBox =
+    DataBox(EncryProposition.addressLocked(address), nonce, data)
+
+  def generateTokenIssuingBox(address: Address, amount: Amount = 100000L, tokenIdOpt: ADKey): TokenIssuingBox =
+    TokenIssuingBox(EncryProposition.addressLocked(address), ScRand.nextLong(), amount, tokenIdOpt)
 
   def genTxOutputs(boxes: Traversable[EncryBaseBox]): IndexedSeq[ADKey] =
     boxes.foldLeft(IndexedSeq[ADKey]()) { case (s, box) =>

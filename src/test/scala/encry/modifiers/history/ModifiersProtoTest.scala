@@ -1,18 +1,20 @@
 package encry.modifiers.history
 
 import BlockProto.BlockProtoMessage
+import BoxesProto.BoxProtoMessage
 import HeaderProto.{EquihashSolutionMessage, HeaderProtoMessage}
 import PayloadProto.PayloadProtoMessage
 import TransactionProto.TransactionProtoMessage
 import encry.crypto.equihash.{EquihashSolution, EquihashSolutionsSerializer}
 import encry.modifiers.InstanceFactory
 import encry.modifiers.mempool.{Transaction, TransactionSerializer}
-import encry.modifiers.state.box.AssetBox
+import encry.modifiers.state.box.{AssetBox, DataBox, EncryBaseBox, TokenIssuingBox}
 import encry.settings.EncryAppSettings
 import encry.utils.EncryGenerator
 import encry.view.history.EncryHistory
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.Pay2PubKeyAddress
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.scalatest.{FunSuite, Matchers, PropSpec}
 import scorex.crypto.signatures.PublicKey
 import scorex.utils.Random
@@ -118,5 +120,38 @@ class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {
     println(s"block.toProto size = ${blockToProto.toByteArray.length} " +
       s"vs block.bytes = ${block.bytes.length}")
     block shouldEqual blockFromProto
+  }
+
+  property("Boxes toProto && fromProto test") {
+    val assetBox: AssetBox =
+      genAssetBox(Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address, 1000000L)
+    val assetBoxToProto: BoxProtoMessage = assetBox.toProto(assetBox)
+    val assetBoxFromProto: AssetBox = assetBox.fromProto(assetBoxToProto) match { case s: AssetBox => s }
+    println(s"assetBox.toProto size = ${assetBoxToProto.toByteArray.length} vs assetBox.bytes = ${assetBox.bytes.length}")
+    assetBox.proposition.contractHash shouldEqual assetBoxFromProto.proposition.contractHash
+    assetBox.nonce shouldEqual assetBoxFromProto.nonce
+    assetBox.amount shouldEqual assetBoxFromProto.amount
+    assetBox.tokenIdOpt shouldEqual assetBoxFromProto.tokenIdOpt
+
+    val dataBox: DataBox =
+      generateDataBox(Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address, 100000L, Random.randomBytes())
+    val dataBoxToProto: BoxProtoMessage = dataBox.toProto(dataBox)
+    val dataBoxFromProto: DataBox = dataBox.fromProto(dataBoxToProto) match { case s: DataBox => s }
+    println(s"dataBox.toProto size = ${dataBoxToProto.toByteArray.length} vs dataBox.bytes = ${dataBox.bytes.length}")
+    dataBox.proposition.contractHash shouldEqual dataBoxFromProto.proposition.contractHash
+    dataBox.nonce shouldEqual dataBoxFromProto.nonce
+    dataBox.data shouldEqual dataBoxFromProto.data
+
+    val tokenIssuingBox =
+      generateTokenIssuingBox(Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address,
+        1000000L, ADKey @@ Random.randomBytes())
+    val tokenIssuingBoxToProto: BoxProtoMessage = tokenIssuingBox.toProto(tokenIssuingBox)
+    val tokenIssuingBoxFromProto: TokenIssuingBox = tokenIssuingBox.fromProto(tokenIssuingBoxToProto) match { case s: TokenIssuingBox => s }
+    println(s"tokenIssuingBox.toProto size = ${tokenIssuingBoxToProto.toByteArray.length} " +
+      s"vs tokenIssuingBox.bytes = ${tokenIssuingBox.bytes.length}")
+    tokenIssuingBox.proposition.contractHash shouldEqual tokenIssuingBoxFromProto.proposition.contractHash
+    tokenIssuingBox.nonce shouldEqual tokenIssuingBoxFromProto.nonce
+    tokenIssuingBox.amount shouldEqual tokenIssuingBoxFromProto.amount
+    tokenIssuingBox.tokenId shouldEqual tokenIssuingBoxFromProto.tokenId
   }
 }

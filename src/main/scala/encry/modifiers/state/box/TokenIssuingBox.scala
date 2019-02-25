@@ -1,6 +1,9 @@
 package encry.modifiers.state.box
 
+import BoxesProto.BoxProtoMessage
+import BoxesProto.BoxProtoMessage.{AssetBoxProtoMessage, DataBoxProtoMessage, TokenIssuingBoxProtoMessage}
 import com.google.common.primitives.{Bytes, Longs, Shorts}
+import com.google.protobuf.ByteString
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
@@ -11,6 +14,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.prismlang.core.Types
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
+
 import scala.util.Try
 
 case class TokenIssuingBox(override val proposition: EncryProposition,
@@ -33,6 +37,29 @@ case class TokenIssuingBox(override val proposition: EncryProposition,
     PObject(baseFields ++ Map(
       "amount" -> PValue(amount, Types.PInt)
     ), tpe)
+
+  override def toProto(box: EncryBaseBox): BoxProtoMessage = {
+    val a = box match {
+      case s: TokenIssuingBox =>
+        TokenIssuingBoxProtoMessage()
+          .withAmount(s.amount)
+          .withEncryPropositionProtoMessage(EncryPropositionSerializer.toProto(s.proposition))
+          .withNonce(s.nonce)
+          .withTokenId(ByteString.copyFrom(s.tokenId))
+    }
+    BoxProtoMessage().withTokenIssuingBox(a)
+  }
+
+  override def fromProto(message: BoxProtoMessage): EncryBaseBox = {
+    val a = message.getTokenIssuingBox
+    TokenIssuingBox(
+      a.encryPropositionProtoMessage.map(x => EncryPropositionSerializer.fromProto(x)).get,
+      a.nonce,
+      a.amount,
+      a.tokenId.toByteArray
+    )
+  }
+
 }
 
 object TokenIssuingBox {
@@ -42,20 +69,20 @@ object TokenIssuingBox {
   val TypeId: BxTypeId = 3.toByte
 
   implicit val jsonEncoder: Encoder[TokenIssuingBox] = (bx: TokenIssuingBox) => Map(
-    "type"        -> TypeId.asJson,
-    "id"          -> Algos.encode(bx.id).asJson,
-    "tokenId"     -> Algos.encode(bx.tokenId).asJson,
+    "type" -> TypeId.asJson,
+    "id" -> Algos.encode(bx.id).asJson,
+    "tokenId" -> Algos.encode(bx.tokenId).asJson,
     "proposition" -> bx.proposition.asJson,
-    "nonce"       -> bx.nonce.asJson,
-    "amount"      -> bx.amount.asJson
+    "nonce" -> bx.nonce.asJson,
+    "amount" -> bx.amount.asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[TokenIssuingBox] = (c: HCursor) => {
     for {
       proposition <- c.downField("proposition").as[EncryProposition]
-      nonce       <- c.downField("nonce").as[Long]
-      amount      <- c.downField("amount").as[Long]
-      tokenId     <- c.downField("tokenId").as[String]
+      nonce <- c.downField("nonce").as[Long]
+      amount <- c.downField("amount").as[Long]
+      tokenId <- c.downField("tokenId").as[String]
     } yield TokenIssuingBox(
       proposition,
       nonce,

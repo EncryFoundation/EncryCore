@@ -1,5 +1,6 @@
 package encry.modifiers.state.box
 
+import BoxesProto.BoxProtoMessage
 import com.google.common.primitives.Longs
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import io.circe.{Decoder, DecodingFailure, Encoder}
@@ -13,6 +14,10 @@ trait EncryBaseBox extends Box[EncryProposition] with PConvertible {
   val typeId: BxTypeId
 
   val nonce: Long
+
+  def toProto(box: EncryBaseBox): BoxProtoMessage
+
+  def fromProto(message: BoxProtoMessage): EncryBaseBox
 
   override lazy val id: ADKey = ADKey @@ Algos.hash(Longs.toByteArray(nonce)).updated(0, typeId)
 

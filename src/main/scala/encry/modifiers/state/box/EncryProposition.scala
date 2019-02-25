@@ -1,5 +1,7 @@
 package encry.modifiers.state.box
 
+import BoxesProto.BoxProtoMessage.EncryPropositionProtoMessage
+import com.google.protobuf.ByteString
 import encry.settings.Constants
 import encry.view.history.History.Height
 import io.circe.{Decoder, Encoder, HCursor}
@@ -14,6 +16,7 @@ import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import org.encryfoundation.prismlang.core.wrapped.PValue
 import org.encryfoundation.prismlang.evaluator.Evaluator
 import scorex.crypto.signatures.PublicKey
+
 import scala.util.{Failure, Success, Try}
 
 case class EncryProposition(contractHash: ContractHash) extends Proposition {
@@ -61,6 +64,12 @@ object EncryProposition {
 }
 
 object EncryPropositionSerializer extends Serializer[EncryProposition] {
+
+  def toProto(encryProposition: EncryProposition): EncryPropositionProtoMessage = EncryPropositionProtoMessage()
+    .withContractHash(ByteString.copyFrom(encryProposition.contractHash))
+
+  def fromProto(message: EncryPropositionProtoMessage): EncryProposition =
+    EncryProposition(message.contractHash.toByteArray)
 
   override def toBytes(obj: EncryProposition): Array[Byte] = obj.contractHash
 

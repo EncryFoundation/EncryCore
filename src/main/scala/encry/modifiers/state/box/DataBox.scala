@@ -1,6 +1,9 @@
 package encry.modifiers.state.box
 
+import BoxesProto.BoxProtoMessage
+import BoxesProto.BoxProtoMessage.{AssetBoxProtoMessage, DataBoxProtoMessage}
 import com.google.common.primitives.{Bytes, Longs, Shorts}
+import com.google.protobuf.ByteString
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
@@ -8,6 +11,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.prismlang.core.Types
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
+
 import scala.util.Try
 
 /** Stores arbitrary data in EncryTL binary format. */
@@ -30,6 +34,26 @@ case class DataBox(override val proposition: EncryProposition,
     PObject(baseFields ++ Map(
       "data" -> PValue(data, Types.PCollection.ofByte)
     ), tpe)
+
+  override def toProto(box: EncryBaseBox): BoxProtoMessage = {
+    val a = box match {
+      case s: DataBox =>
+        DataBoxProtoMessage()
+          .withEncryPropositionProtoMessage(EncryPropositionSerializer.toProto(s.proposition))
+          .withNonce(s.nonce)
+        .withData(ByteString.copyFrom(s.data))
+    }
+    BoxProtoMessage().withDataBox(a)
+  }
+
+  override def fromProto(message: BoxProtoMessage): EncryBaseBox = {
+    val a = message.getDataBox
+    DataBox(
+      a.encryPropositionProtoMessage.map(x => EncryPropositionSerializer.fromProto(x)).get,
+      a.nonce,
+      a.data.toByteArray
+    )
+  }
 }
 
 object DataBox {

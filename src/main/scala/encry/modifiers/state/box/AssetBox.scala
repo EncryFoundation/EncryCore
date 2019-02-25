@@ -1,6 +1,9 @@
 package encry.modifiers.state.box
 
+import BoxesProto.BoxProtoMessage
+import BoxesProto.BoxProtoMessage.AssetBoxProtoMessage
 import com.google.common.primitives.{Bytes, Longs, Shorts}
+import com.google.protobuf.ByteString
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
@@ -11,6 +14,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.prismlang.core.Types
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
+
 import scala.util.Try
 
 /** Represents monetary asset of some type locked with some `proposition`.
@@ -36,6 +40,30 @@ case class AssetBox(override val proposition: EncryProposition,
       "amount" -> PValue(amount, Types.PInt),
       "tokenId" -> PValue(tokenIdOpt.getOrElse(Constants.IntrinsicTokenId), Types.PCollection.ofByte)
     ), tpe)
+
+  override def toProto(box: EncryBaseBox): BoxProtoMessage = {
+    val a = box match {
+      case s: AssetBox =>
+        AssetBoxProtoMessage()
+          .withAmount(s.amount)
+          .withEncryPropositionProtoMessage(EncryPropositionSerializer.toProto(s.proposition))
+          .withNonce(s.nonce)
+          .withTokenId(ByteString.copyFrom(s.tokenIdOpt.getOrElse(Array.emptyByteArray)))
+    }
+    BoxProtoMessage().withAssetBox(a)
+  }
+
+  override def fromProto(message: BoxProtoMessage): EncryBaseBox = {
+    val a = message.getAssetBox
+    AssetBox(
+      a.encryPropositionProtoMessage.map(x => EncryPropositionSerializer.fromProto(x)).get,
+      a.nonce,
+      a.amount,
+      a.tokenId.toByteArray match {
+        case a: Array[Byte] if a.isEmpty => Option.empty
+        case a => Some(a)
+      })
+  }
 }
 
 object AssetBox {
@@ -43,20 +71,20 @@ object AssetBox {
   val TypeId: BxTypeId = 1.toByte
 
   implicit val jsonEncoder: Encoder[AssetBox] = (bx: AssetBox) => Map(
-    "type"        -> TypeId.asJson,
-    "id"          -> Algos.encode(bx.id).asJson,
+    "type" -> TypeId.asJson,
+    "id" -> Algos.encode(bx.id).asJson,
     "proposition" -> bx.proposition.asJson,
-    "nonce"       -> bx.nonce.asJson,
-    "value"       -> bx.amount.asJson,
-    "tokenId"     -> bx.tokenIdOpt.map(id => Algos.encode(id)).asJson
+    "nonce" -> bx.nonce.asJson,
+    "value" -> bx.amount.asJson,
+    "tokenId" -> bx.tokenIdOpt.map(id => Algos.encode(id)).asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[AssetBox] = (c: HCursor) => {
     for {
       proposition <- c.downField("proposition").as[EncryProposition]
-      nonce       <- c.downField("nonce").as[Long]
-      amount      <- c.downField("value").as[Long]
-      tokenIdOpt  <- c.downField("tokenId").as[Option[String]]
+      nonce <- c.downField("nonce").as[Long]
+      amount <- c.downField("value").as[Long]
+      tokenIdOpt <- c.downField("tokenId").as[Option[String]]
     } yield AssetBox(
       proposition,
       nonce,

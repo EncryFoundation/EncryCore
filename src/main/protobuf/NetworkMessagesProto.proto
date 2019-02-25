@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+message SyncInfoMessageSpecMessageProto {
+
+}
+
+message InvSpecProtoMessage {
+
+}
+
+message ModifiersSpecMessageProto {
+
+}
+
+message GetPeersSpecMessageProto {
+
+}
+
+message PeersSpecMessageProto {
+
+}
+
+message NetworkMessageProto {
+
+}
