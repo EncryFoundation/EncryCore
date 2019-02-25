@@ -9,6 +9,8 @@ import org.encryfoundation.common.Algos
 import org.iq80.leveldb.{DB, ReadOptions}
 import supertagged.TaggedType
 
+import scala.annotation.tailrec
+
 case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLogging with AutoCloseable {
 
   def versionsList(readOptions: ReadOptions = new ReadOptions()): List[LevelDBVersion] =
@@ -60,7 +62,6 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     batch.put(versionDeletionsKey(newElem.version), newElem.elemsToDelete.flatMap(_.untag(LevelDBVersion)).toArray)
     newElem.elemsToInsert.foreach {
       case (elemKey, elemValue) =>
-
         /**
           * Put elem by key (ACCESSIBLE_KEY_PREFIX +: "version" ++ "elemKey")
           * First check contain db this elem or not. if no: insert elem, and insert init access map
@@ -108,7 +109,8 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     *
     * @return
     */
-  def rollbackResolver(versionsToResolve: List[LevelDBVersion]): Unit = {
+  @tailrec
+  private def rollbackResolver(versionsToResolve: List[LevelDBVersion]): Unit = {
     if (versionsToResolve.nonEmpty) {
       val versionToResolve = versionsToResolve.head
       val readOptions = new ReadOptions()
@@ -366,7 +368,7 @@ object VersionalLevelDBCompanion {
     CURRENT_VERSION_KEY -> VersionalLevelDbValue @@ INIT_VERSION(keySize),
     CURRENT_VERSION_LIST_KEY -> VersionalLevelDbValue @@ Array.emptyByteArray,
     VERSIONS_LIST -> VersionalLevelDbValue @@ INIT_VERSION(keySize),
-    VersionalLevelDbKey @@ INIT_VERSION(keySize).untag(LevelDBVersion) -> VersionalLevelDbValue @@ Array.emptyByteArray,
+    versionKey(INIT_VERSION(keySize)) -> VersionalLevelDbValue @@ Array.emptyByteArray,
     versionDeletionsKey(INIT_VERSION(keySize)) -> VersionalLevelDbValue @@ Array.emptyByteArray,
   )
 

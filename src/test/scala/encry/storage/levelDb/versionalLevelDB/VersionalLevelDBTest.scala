@@ -233,4 +233,26 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     } shouldBe true
 
   }
+
+  property("Size of user key shouldn't be greather then ((versions_list_size + 1)*version_key_size + 1)") {
+
+    val maxVersions = Random.nextInt(1000) + 15
+
+    val levelDbElemsQty = maxVersions + Random.nextInt(1000) + 10
+
+    val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
+
+    val tempDir = FileHelper.getRandomTempDir
+
+    val levelDBInit = LevelDbFactory.factory.open(tempDir, new Options)
+
+    val vldbInit = VersionalLevelDBCompanion(levelDBInit, dummyLevelDBSettings)
+
+    val levelDbElems: Seq[LevelDbElem] = generateRandomLevelDbElemsWithSameKeys(levelDbElemsQty, 2)
+
+    levelDbElems.foreach(vldbInit.insert)
+
+    vldbInit.db.get(VersionalLevelDBCompanion.userKey(levelDbElems.head.elemsToInsert.head._1)).length shouldEqual
+      ((maxVersions + 1) * dummyLevelDBSettings.versionKeySize + 1)
+  }
 }
