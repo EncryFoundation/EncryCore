@@ -14,7 +14,7 @@ import scorex.utils.{Random => ScorexRandom}
 
 import scala.util.{Failure, Random, Success}
 
-class HistoryStorage(override val store: VersionalStorage) extends EncryStorage with StrictLogging {
+case class HistoryStorage(override val store: VersionalStorage) extends EncryStorage with StrictLogging {
 
   def modifierById(id: ModifierId): Option[EncryPersistentModifier] = {
     val possibleMod = store match {
