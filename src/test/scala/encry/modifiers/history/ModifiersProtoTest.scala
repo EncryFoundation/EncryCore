@@ -126,7 +126,9 @@ class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {
     val assetBox: AssetBox =
       genAssetBox(Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address, 1000000L)
     val assetBoxToProto: BoxProtoMessage = assetBox.toProto(assetBox)
-    val assetBoxFromProto: AssetBox = assetBox.fromProto(assetBoxToProto) match { case s: AssetBox => s }
+    val assetBoxFromProto: AssetBox = assetBox.fromProto(assetBoxToProto) match {
+      case s: AssetBox => s
+    }
     println(s"assetBox.toProto size = ${assetBoxToProto.toByteArray.length} vs assetBox.bytes = ${assetBox.bytes.length}")
     assetBox.proposition.contractHash shouldEqual assetBoxFromProto.proposition.contractHash
     assetBox.nonce shouldEqual assetBoxFromProto.nonce
@@ -136,7 +138,9 @@ class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {
     val dataBox: DataBox =
       generateDataBox(Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address, 100000L, Random.randomBytes())
     val dataBoxToProto: BoxProtoMessage = dataBox.toProto(dataBox)
-    val dataBoxFromProto: DataBox = dataBox.fromProto(dataBoxToProto) match { case s: DataBox => s }
+    val dataBoxFromProto: DataBox = dataBox.fromProto(dataBoxToProto) match {
+      case s: DataBox => s
+    }
     println(s"dataBox.toProto size = ${dataBoxToProto.toByteArray.length} vs dataBox.bytes = ${dataBox.bytes.length}")
     dataBox.proposition.contractHash shouldEqual dataBoxFromProto.proposition.contractHash
     dataBox.nonce shouldEqual dataBoxFromProto.nonce
@@ -146,12 +150,37 @@ class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {
       generateTokenIssuingBox(Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address,
         1000000L, ADKey @@ Random.randomBytes())
     val tokenIssuingBoxToProto: BoxProtoMessage = tokenIssuingBox.toProto(tokenIssuingBox)
-    val tokenIssuingBoxFromProto: TokenIssuingBox = tokenIssuingBox.fromProto(tokenIssuingBoxToProto) match { case s: TokenIssuingBox => s }
+    val tokenIssuingBoxFromProto: TokenIssuingBox = tokenIssuingBox.fromProto(tokenIssuingBoxToProto) match {
+      case s: TokenIssuingBox => s
+    }
     println(s"tokenIssuingBox.toProto size = ${tokenIssuingBoxToProto.toByteArray.length} " +
       s"vs tokenIssuingBox.bytes = ${tokenIssuingBox.bytes.length}")
     tokenIssuingBox.proposition.contractHash shouldEqual tokenIssuingBoxFromProto.proposition.contractHash
     tokenIssuingBox.nonce shouldEqual tokenIssuingBoxFromProto.nonce
     tokenIssuingBox.amount shouldEqual tokenIssuingBoxFromProto.amount
     tokenIssuingBox.tokenId shouldEqual tokenIssuingBoxFromProto.tokenId
+  }
+
+  property("Test modifiers proto size vs bytes") {
+    val settings: EncryAppSettings = EncryAppSettings.read
+
+    val historyWith100Blocks: (EncryHistory, Vector[Block]) =
+      (0 until 100).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
+        case (prevHistory, _) =>
+          val block: Block = generateNextBlock(prevHistory._1)
+          (prevHistory._1.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block),
+            prevHistory._2 :+ block)
+      }
+    val a = historyWith100Blocks._2.map(x => BlockSerializer.toProto(x).toByteArray.length).sum
+    val b = historyWith100Blocks._2.map(x => x.bytes.length).sum
+    println(s"Block: toProto - ${a / 1024} kbytes, toBytes - ${b / 1024} kbytes")
+
+    val a1 = historyWith100Blocks._2.map(x => HeaderSerializer.toProto(x.header).toByteArray.length).sum
+    val b1 = historyWith100Blocks._2.map(x => x.header.bytes.length).sum
+    println(s"Header: toProto - ${a1 / 1024} kbytes, toBytes - ${b1 / 1024} kbytes")
+
+    val a2 = historyWith100Blocks._2.map(x => PayloadSerializer.toProto(x.payload).toByteArray.length).sum
+    val b2 = historyWith100Blocks._2.map(x => x.payload.bytes.length).sum
+    println(s"Payload: toProto - ${a2 / 1024} kbytes, toBytes - ${b2 / 1024} kbytes")
   }
 }
