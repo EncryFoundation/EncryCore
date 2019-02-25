@@ -1,6 +1,9 @@
 package encry.modifiers.mempool.directive
 
+import TransactionProto.DirectiveProtoMessage
+import TransactionProto.DirectiveProtoMessage.{ADKeyProto, TransferDirectiveProtoMessage}
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.Box.Amount
@@ -17,6 +20,7 @@ import scorex.crypto.encode.Base16
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scorex.crypto.hash.Digest32
 import supertagged.@@
+
 import scala.util.Try
 
 case class TransferDirective(address: Address,
@@ -37,6 +41,27 @@ case class TransferDirective(address: Address,
 
   override def toDbVersion(txId: ModifierId, numberInTx: Int): DirectiveDBVersion =
     DirectiveDBVersion(Base16.encode(txId), numberInTx, typeId, isValid, "", amount, address, tokenIdOpt.map(Base16.encode), "")
+
+  override def toProto(transferDirective: Directive): DirectiveProtoMessage = {
+    val a: TransferDirectiveProtoMessage = transferDirective match {
+      case s: TransferDirective =>
+        TransferDirectiveProtoMessage()
+          .withAddress(s.address)
+          .withAmount(s.amount)
+          .withTokenIdOpt(ADKeyProto()
+            .withTokenIdOpt(ByteString.copyFrom(s.tokenIdOpt.getOrElse(Array.emptyByteArray))))
+    }
+    DirectiveProtoMessage().withTransferDirective(a)
+  }
+
+  override def fromProto(message: DirectiveProtoMessage): TransferDirective = {
+    val a: TransferDirectiveProtoMessage = message.getTransferDirective
+    TransferDirective(
+      a.address,
+      a.amount,
+      a.tokenIdOpt.map(x => ADKey @@ x.tokenIdOpt.toByteArray)
+    )
+  }
 }
 
 object TransferDirective {
@@ -44,16 +69,16 @@ object TransferDirective {
   val TypeId: DTypeId = 1.toByte
 
   implicit val jsonEncoder: Encoder[TransferDirective] = (d: TransferDirective) => Map(
-    "typeId"  -> d.typeId.asJson,
+    "typeId" -> d.typeId.asJson,
     "address" -> d.address.toString.asJson,
-    "amount"  -> d.amount.asJson,
+    "amount" -> d.amount.asJson,
     "tokenId" -> d.tokenIdOpt.map(id => Algos.encode(id)).getOrElse("null").asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[TransferDirective] = (c: HCursor) => {
     for {
-      address    <- c.downField("address").as[String]
-      amount     <- c.downField("amount").as[Long]
+      address <- c.downField("address").as[String]
+      amount <- c.downField("amount").as[Long]
       tokenIdOpt <- c.downField("tokenId").as[Option[String]]
     } yield TransferDirective(
       address,

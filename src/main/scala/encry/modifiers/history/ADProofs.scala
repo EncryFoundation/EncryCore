@@ -1,6 +1,8 @@
 package encry.modifiers.history
 
+import BlockProto.AdProofsProtoMessage
 import com.google.common.primitives.Bytes
+import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.avltree.{BatchAVLVerifier, Insert, Modification, Remove}
 import encry.modifiers.state.box._
@@ -12,6 +14,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
+
 import scala.util.{Failure, Success, Try}
 
 case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
@@ -105,6 +108,15 @@ object ADProofs {
 }
 
 object ADProofSerializer extends Serializer[ADProofs] {
+
+  def toProto(adProofs: ADProofs): AdProofsProtoMessage = AdProofsProtoMessage()
+    .withHeaderId(ByteString.copyFrom(adProofs.headerId))
+    .withProofBytes(ByteString.copyFrom(adProofs.proofBytes))
+
+  def fromProto(message: AdProofsProtoMessage) = ADProofs(
+    ModifierId @@ message.headerId.toByteArray,
+    SerializedAdProof @@ message.proofBytes.toByteArray
+  )
 
   override def toBytes(obj: ADProofs): Array[Byte] = Bytes.concat(obj.headerId, obj.proofBytes)
 

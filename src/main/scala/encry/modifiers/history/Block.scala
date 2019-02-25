@@ -97,10 +97,16 @@ object Block {
 
 object BlockSerializer extends Serializer[Block] {
 
-//  def toProtobuf(block: Block) = BlockProtoMessage()
-//    .withHeader(block.header)
-//    .withPayload()
-//    .withAdProofsOpt()
+  def toProto(block: Block): BlockProtoMessage = BlockProtoMessage()
+    .withHeader(HeaderSerializer.toProto(block.header))
+    .withPayload(PayloadSerializer.toProto(block.payload))
+    .withAdProofsOpt(ADProofSerializer.toProto(block.adProofsOpt.get))
+
+  def fromProto(message: BlockProtoMessage): Block = Block(
+    message.header.map(x => HeaderSerializer.fromProto(x)).get,
+    message.payload.map(x => PayloadSerializer.fromProto(x)).get,
+    message.adProofsOpt.map(x => ADProofSerializer.fromProto(x))
+  )
 
   override def toBytes(obj: Block): Array[Byte] = {
 

@@ -1,6 +1,9 @@
 package encry.modifiers.mempool.directive
 
+import TransactionProto.DirectiveProtoMessage
+import TransactionProto.DirectiveProtoMessage.{ADKeyProto, ScriptedAssetDirectiveProtoMessage}
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.Box.Amount
@@ -15,6 +18,7 @@ import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
+
 import scala.util.Try
 
 case class ScriptedAssetDirective(contractHash: ContractHash,
@@ -34,6 +38,26 @@ case class ScriptedAssetDirective(contractHash: ContractHash,
 
   override def toDbVersion(txId: ModifierId, numberInTx: Int): DirectiveDBVersion =
     DirectiveDBVersion(Base16.encode(txId), numberInTx, typeId, isValid, Base16.encode(contractHash), amount, "", tokenIdOpt.map(Base16.encode), "")
+
+  override def toProto(directive: Directive): DirectiveProtoMessage = {
+    val b: ScriptedAssetDirectiveProtoMessage = directive match {
+      case s: ScriptedAssetDirective =>
+        ScriptedAssetDirectiveProtoMessage()
+          .withContractHash(ByteString.copyFrom(s.contractHash))
+          .withAmount(s.amount)
+          .withTokenIdOpt(ADKeyProto().withTokenIdOpt(ByteString.copyFrom(s.tokenIdOpt.getOrElse(Array.emptyByteArray))))
+    }
+    DirectiveProtoMessage().withScriptedAssetDirective(b)
+  }
+
+  def fromProto(message: DirectiveProtoMessage): Directive = {
+    val a = message.getScriptedAssetDirective
+    ScriptedAssetDirective(
+      a.contractHash.toByteArray,
+      a.amount,
+      a.tokenIdOpt.map(x => ADKey @@ x.tokenIdOpt.toByteArray)
+    )
+  }
 }
 
 object ScriptedAssetDirective {
@@ -41,16 +65,16 @@ object ScriptedAssetDirective {
   val TypeId: DTypeId = 3.toByte
 
   implicit val jsonEncoder: Encoder[ScriptedAssetDirective] = (d: ScriptedAssetDirective) => Map(
-    "typeId"       -> d.typeId.asJson,
+    "typeId" -> d.typeId.asJson,
     "contractHash" -> Algos.encode(d.contractHash).asJson,
-    "amount"       -> d.amount.asJson,
-    "tokenId"      -> d.tokenIdOpt.map(id => Algos.encode(id)).asJson
+    "amount" -> d.amount.asJson,
+    "tokenId" -> d.tokenIdOpt.map(id => Algos.encode(id)).asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[ScriptedAssetDirective] = (c: HCursor) => for {
     contractHash <- c.downField("contractHash").as[String]
-    amount       <- c.downField("amount").as[Long]
-    tokenIdOpt   <- c.downField("tokenId").as[Option[String]]
+    amount <- c.downField("amount").as[Long]
+    tokenIdOpt <- c.downField("tokenId").as[Option[String]]
   } yield Algos.decode(contractHash)
     .map(ch => ScriptedAssetDirective(ch, amount, tokenIdOpt.flatMap(id => Algos.decode(id).map(ADKey @@ _).toOption)))
     .getOrElse(throw new Exception("Decoding failed"))

@@ -1,10 +1,11 @@
 package encry.modifiers.mempool
 
+import TransactionProto.DirectiveProtoMessage.{AssetIssuingDirectiveProtoMessage, DataDirectiveProtoMessage, ScriptedAssetDirectiveProtoMessage, TransferDirectiveProtoMessage}
 import TransactionProto.TransactionProtoMessage
 import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.NodeViewModifier
-import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
+import encry.modifiers.mempool.directive._
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, DataBox}
 import encry.modifiers.state.box.EncryBaseBox
@@ -83,21 +84,21 @@ object Transaction {
   case class TransactionValidationException(s: String) extends Exception(s)
 
   implicit val jsonEncoder: Encoder[Transaction] = (tx: Transaction) => Map(
-    "id"              -> Algos.encode(tx.id).asJson,
-    "fee"             -> tx.fee.asJson,
-    "timestamp"       -> tx.timestamp.asJson,
-    "inputs"          -> tx.inputs.map(_.asJson).asJson,
-    "directives"      -> tx.directives.map(_.asJson).asJson,
-    "outputs"         -> tx.newBoxes.toSeq.map(_.asJson).asJson,
+    "id" -> Algos.encode(tx.id).asJson,
+    "fee" -> tx.fee.asJson,
+    "timestamp" -> tx.timestamp.asJson,
+    "inputs" -> tx.inputs.map(_.asJson).asJson,
+    "directives" -> tx.directives.map(_.asJson).asJson,
+    "outputs" -> tx.newBoxes.toSeq.map(_.asJson).asJson,
     "defaultProofOpt" -> tx.defaultProofOpt.map(_.asJson).asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[Transaction] = (c: HCursor) => {
     for {
-      fee             <- c.downField("fee").as[Long]
-      timestamp       <- c.downField("timestamp").as[Long]
-      inputs          <- c.downField("inputs").as[IndexedSeq[Input]]
-      directives      <- c.downField("directives").as[IndexedSeq[Directive]]
+      fee <- c.downField("fee").as[Long]
+      timestamp <- c.downField("timestamp").as[Long]
+      inputs <- c.downField("inputs").as[IndexedSeq[Input]]
+      directives <- c.downField("directives").as[IndexedSeq[Directive]]
       defaultProofOpt <- c.downField("defaultProofOpt").as[Option[Proof]]
     } yield Transaction(
       fee,
@@ -116,9 +117,57 @@ object TransactionSerializer extends Serializer[Transaction] {
   def toProto(transaction: Transaction): TransactionProtoMessage = TransactionProtoMessage()
     .withFee(transaction.fee)
     .withTimestamp(transaction.timestamp)
-    .withInputs(transaction.inputs.map(x => ByteString.copyFrom(x.bytes)))
-    .withDirectives()
-    .withProof(transaction.defaultProofOpt.map(x => x.bytes).getOrElse(Array.emptyByteArray))
+    .withInputs(transaction.inputs.map(in => ByteString.copyFrom(in.bytes)).to[scala.collection.immutable.IndexedSeq])
+    .withDirectives(transaction.directives.map {
+      case assetIssuingDirective: AssetIssuingDirective =>
+        assetIssuingDirective.toProto(assetIssuingDirective)
+      case dataDirective: DataDirective =>
+        dataDirective.toProto(dataDirective)
+      case transferDirective: TransferDirective =>
+        transferDirective.toProto(transferDirective)
+      case scriptedAssetDirective: ScriptedAssetDirective =>
+        scriptedAssetDirective.toProto(scriptedAssetDirective)
+    }.to[scala.collection.immutable.IndexedSeq])
+    .withProof(transaction.defaultProofOpt.map(x => ByteString.copyFrom(x.bytes)).getOrElse(ByteString.EMPTY))
+
+  def fromProto(message: TransactionProtoMessage): Transaction = Transaction(
+    message.fee,
+    message.timestamp,
+    message.inputs.map(x => InputSerializer.parseBytes(x.toByteArray).get),
+    message.directives.map { x =>
+      if (x.directives.isAssetIssuingDirective) {
+        val a = x.directives.assetIssuingDirective.get
+        AssetIssuingDirective(
+          a.contractHash.toByteArray,
+          a.amount
+        )
+      }
+      else if (x.directives.isDataDirective) {
+        val a = x.directives.dataDirective.get
+        DataDirective(
+          a.contractHash.toByteArray,
+          a.data.toByteArray
+        )
+      }
+      else if (x.directives.isScriptedAssetDirective) {
+        val a = x.directives.scriptedAssetDirective.get
+        ScriptedAssetDirective(
+          a.contractHash.toByteArray,
+          a.amount,
+          a.tokenIdOpt.map(x => ADKey @@ x.tokenIdOpt.toByteArray)
+        )
+      }
+      else {
+        val a = x.directives.transferDirective.get
+        TransferDirective(
+          a.address,
+          a.amount,
+          a.tokenIdOpt.map(x => ADKey @@ x.tokenIdOpt.toByteArray)
+        )
+      }
+    },
+    ProofSerializer.parseBytes(message.proof.toByteArray).toOption
+  )
 
   override def toBytes(obj: Transaction): Array[Byte] = {
     Bytes.concat(
@@ -223,10 +272,10 @@ case class InputDBVersion(id: String, txId: String, contractByteVersion: String,
     for {
       decodedId <- Base16.decode(id)
       decodedContractBytes <- Base16.decode(contractByteVersion)
-      decodedContract      <- InputSerializer.decodeEitherCompiledOrRegular(decodedContractBytes)
-      decodedBase16Proofs  <- if (proofs.length != 0) proofs.split(",").toList.traverse(Base16.decode)
-                              else Success(List.empty)
-      decodedProofs        <- decodedBase16Proofs.traverse(ProofSerializer.parseBytes)
+      decodedContract <- InputSerializer.decodeEitherCompiledOrRegular(decodedContractBytes)
+      decodedBase16Proofs <- if (proofs.length != 0) proofs.split(",").toList.traverse(Base16.decode)
+      else Success(List.empty)
+      decodedProofs <- decodedBase16Proofs.traverse(ProofSerializer.parseBytes)
     } yield {
       Input(ADKey @@ decodedId, decodedContract, decodedProofs)
     }

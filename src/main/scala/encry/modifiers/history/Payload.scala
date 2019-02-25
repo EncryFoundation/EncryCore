@@ -1,6 +1,8 @@
 package encry.modifiers.history
 
+import PayloadProto.PayloadProtoMessage
 import com.google.common.primitives.{Bytes, Ints}
+import com.google.protobuf.ByteString
 import encry.modifiers.mempool._
 import encry.modifiers.state.box.EncryProposition
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest, TransactionsCarryingPersistentNodeViewModifier}
@@ -12,6 +14,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.LeafData
 import scorex.crypto.hash.Digest32
+
 import scala.util.Try
 
 case class Payload(override val headerId: ModifierId, txs: Seq[Transaction])
@@ -58,6 +61,15 @@ object Payload {
 }
 
 object PayloadSerializer extends Serializer[Payload] {
+
+  def toProto(payload: Payload): PayloadProtoMessage = PayloadProtoMessage()
+    .withHeaderId(ByteString.copyFrom(payload.headerId))
+    .withTxs(payload.transactions.map(x => TransactionSerializer.toProto(x)))
+
+  def fromProto(message: PayloadProtoMessage): Payload = Payload(
+    ModifierId @@ message.headerId.toByteArray,
+    message.txs.map(x => TransactionSerializer.fromProto(x))
+  )
 
   override def toBytes(obj: Payload): Array[Byte] =
     Bytes.concat(

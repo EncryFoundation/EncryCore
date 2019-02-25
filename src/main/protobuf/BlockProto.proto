@@ -6,10 +6,10 @@ message BlockProtoMessage {
 
     HeaderProtoMessage header = 1;
     PayloadProtoMessage payload = 2;
-    AdProofsOpt adProofsOpt = 3;
+    AdProofsProtoMessage adProofsOpt = 3;
 }
 
-message AdProofsOpt {
+message AdProofsProtoMessage {
     bytes headerId = 1;
     bytes proofBytes = 2;
 }
