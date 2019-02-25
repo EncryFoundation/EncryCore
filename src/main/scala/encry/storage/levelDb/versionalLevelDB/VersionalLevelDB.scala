@@ -158,13 +158,26 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     val wrappedVer: ByteArrayWrapper = new ByteArrayWrapper(versionToResolve)
     val deletionsByThisVersion = getInaccessiableKeysInVersion(versionToResolve, readOptions)
     deletionsByThisVersion.foreach { key =>
-      val elemMap = db.get(userKey(key))
+      val elemMap = db.get(userKey(key), readOptions)
       val accessFlag = elemMap.head
       val elemVersions = splitValue2elems(settings.versionKeySize, elemMap.tail)
         .map(ver => new ByteArrayWrapper(ver))
         .filterNot(_ == wrappedVer)
       if (elemVersions.isEmpty) batch.delete(userKey(key))
       else batch.put(userKey(key), accessFlag +: elemVersions.foldLeft(Array.emptyByteArray) { case (acc, ver) => acc ++ ver.data })
+    }
+    val insertionsByThisVersion =
+      splitValue2elems(DEFAULT_USER_KEY_SIZE, db.get(versionKey(versionToResolve))).map(VersionalLevelDbKey @@ _)
+    insertionsByThisVersion.foreach{ elemKey =>
+      val elemInfo = db.get(userKey(elemKey))
+      val elemFlag = elemInfo.head
+      val elemMap = elemInfo.tail
+      val elemVersions = splitValue2elems(settings.versionKeySize, elemMap).map(ByteArrayWrapper.apply)
+      elemVersions.dropWhile(_ != wrappedVer).tail.foreach{
+        elemVerToDel => batch.delete(accessableElementKeyForVersion(LevelDBVersion @@ elemVerToDel.data, elemKey))
+      }
+      val newElemMap = elemVersions.takeWhile(_ != wrappedVer) :+ wrappedVer
+      batch.put(userKey(elemKey), elemFlag +: newElemMap.foldLeft(Array.emptyByteArray) { case (acc, ver) => acc ++ ver.data })
     }
     db.write(batch)
     batch.close()
