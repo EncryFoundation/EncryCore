@@ -63,7 +63,7 @@ object AuxiliaryHistoryHolder {
   protected[AuxiliaryHistoryHolder] def readOrGenerate(settingsEncry: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistory = {
 
     val historyIndexDir: File = getHistoryIndexDir(settingsEncry)
-    val vldbInit = settingsEncry.storage.history match {
+    val vldbInit = settingsEncry.storage.auxHistory match {
       case VersionalStorage.IODB =>
         val historyObjectsDir: File = getHistoryObjectsDir(settingsEncry)
         val indexStore: LSMStore = new LSMStore(historyIndexDir, keepVersions = 0)
