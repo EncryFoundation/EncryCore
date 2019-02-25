@@ -6,6 +6,7 @@ import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{Version
 import encry.utils.FileHelper
 import encry.utils.levelDBUtils.LevelDbUnitsGenerator
 import io.iohk.iodb.ByteArrayWrapper
+import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.Algos
 import org.iq80.leveldb.{Options, ReadOptions}
 import org.scalatest.{Matchers, PropSpec}
@@ -254,5 +255,28 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     vldbInit.db.get(VersionalLevelDBCompanion.userKey(levelDbElems.head.elemsToInsert.head._1)).length shouldEqual
       ((maxVersions + 1) * dummyLevelDBSettings.versionKeySize + 1)
+  }
+
+  property("Deleted element should be inaccessible") {
+
+    val maxVersions = Random.nextInt(10)
+
+    val levelDbElemsQty = maxVersions + Random.nextInt(1000) + 1000
+
+    val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
+
+    val tempDir = FileHelper.getRandomTempDir
+
+    val levelDBInit = LevelDbFactory.factory.open(tempDir, new Options)
+
+    val vldbInit = VersionalLevelDBCompanion(levelDBInit, dummyLevelDBSettings)
+
+    val levelDbElems: Seq[LevelDbElem] = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, 100)
+
+    levelDbElems.foreach(vldbInit.insert)
+
+    levelDbElems.head.elemsToInsert.forall{case (key, _) =>
+      vldbInit.db.get(VersionalLevelDBCompanion.accessableElementKeyForVersion(levelDbElems.head.version, key)) == null
+    } shouldEqual true
   }
 }

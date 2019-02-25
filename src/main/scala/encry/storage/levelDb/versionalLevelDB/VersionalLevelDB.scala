@@ -158,13 +158,18 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
     val wrappedVer: ByteArrayWrapper = new ByteArrayWrapper(versionToResolve)
+    val currentVersions: List[ByteArrayWrapper] = versionsList(readOptions).map(ByteArrayWrapper.apply)
     val deletionsByThisVersion = getInaccessiableKeysInVersion(versionToResolve, readOptions)
     deletionsByThisVersion.foreach { key =>
       val elemMap = db.get(userKey(key), readOptions)
       val accessFlag = elemMap.head
-      val elemVersions = splitValue2elems(settings.versionKeySize, elemMap.tail)
+      val wrappedVersions = splitValue2elems(settings.versionKeySize, elemMap.tail)
         .map(ver => new ByteArrayWrapper(ver))
-        .filterNot(_ == wrappedVer)
+      val elemVersions = wrappedVersions.filter(currentVersions.contains)
+      val toDeleteElemsVersions = wrappedVersions.filterNot(currentVersions.contains)
+      toDeleteElemsVersions.foreach(toDelWrapped =>
+        batch.delete(accessableElementKeyForVersion(LevelDBVersion @@ toDelWrapped.data, key))
+      )
       if (elemVersions.isEmpty) batch.delete(userKey(key))
       else batch.put(userKey(key), accessFlag +: elemVersions.foldLeft(Array.emptyByteArray) { case (acc, ver) => acc ++ ver.data })
     }
