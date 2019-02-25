@@ -1,6 +1,9 @@
 package encry.utils
 
 import encry.crypto.equihash.EquihashSolution
+import encry.modifiers.history.Header
+import encry.modifiers.mempool.directive.{AssetIssuingDirective, DataDirective, Directive, TransferDirective}
+import encry.modifiers.mempool.{Transaction, TransactionFactory, UnsignedTransaction}
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.{Block, Header}
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
@@ -9,17 +12,36 @@ import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, Mone
 import encry.settings.Constants
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.TestHelper.Props
-import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
+import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import org.encryfoundation.common.transaction.EncryAddress.Address
-import org.encryfoundation.common.transaction.Pay2PubKeyAddress
+import org.encryfoundation.common.transaction.{Input, Pay2PubKeyAddress, Proof, PubKeyLockedContract}
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey}
-import scorex.crypto.hash.Digest32
+import org.encryfoundation.prismlang.core.wrapped.BoxedValue
+import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
 
 import scala.util.{Random => ScRand}
 
 trait EncryGenerator {
+
+  val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
+  val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
+
+
+  def createPrivKey(seed: Option[String]): PrivateKey25519 = {
+    val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
+      Blake2b256.hash(
+        seed.map {
+          Mnemonic.seedFromMnemonic(_)
+        }
+          .getOrElse {
+            val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
+            Mnemonic.seedFromMnemonic(phrase)
+          })
+    )
+    PrivateKey25519(privateKey, publicKey)
+  }
 
   def timestamp: Long = System.currentTimeMillis()
 
@@ -133,5 +155,149 @@ trait EncryGenerator {
       Constants.Chain.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
+  }
+
+  def generatePaymentTransactions(boxes: IndexedSeq[AssetBox],
+                                  numberOfInputs: Int,
+                                  numberOfOutputs: Int): Vector[Transaction] =
+    (0 until boxes.size / numberOfInputs).foldLeft(boxes, Vector.empty[Transaction]) {
+      case ((boxesLocal, transactions), _) =>
+        val tx: Transaction = defaultPaymentTransactionScratch(
+          privKey,
+          fee = 111,
+          timestamp = 11L,
+          useBoxes = boxesLocal.take(numberOfInputs),
+          recipient = randomAddress,
+          amount = 10000,
+          numOfOutputs = numberOfOutputs
+        )
+        (boxesLocal.drop(numberOfInputs), transactions :+ tx)
+    }._2
+
+  def generateDataTransactions(boxes: IndexedSeq[AssetBox],
+                               numberOfInputs: Int,
+                               numberOfOutputs: Int,
+                               bytesQty: Int): Vector[Transaction] =
+    (0 until boxes.size / numberOfInputs).foldLeft(boxes, Vector.empty[Transaction]) {
+      case ((boxesLocal, transactions), _) =>
+        val tx: Transaction = dataTransactionScratch(
+          privKey,
+          fee = 111,
+          timestamp = 11L,
+          useOutputs = boxesLocal.take(numberOfInputs),
+          data = Random.randomBytes(bytesQty),
+          amount = 200L,
+          numOfOutputs = numberOfOutputs
+        )
+        (boxesLocal.drop(numberOfInputs), tx +: transactions)
+    }._2
+
+  def generateAssetTransactions(boxes: IndexedSeq[AssetBox],
+                                numberOfInputs: Int,
+                                numberOfOutputs: Int): Vector[Transaction] =
+    (0 until boxes.size / numberOfInputs).foldLeft(boxes, Vector.empty[Transaction]) {
+      case ((boxesLocal, transactions), _) =>
+        val tx: Transaction = assetIssuingTransactionScratch(
+          privKey,
+          fee = 111,
+          timestamp = 11L,
+          useOutputs = boxesLocal.take(numberOfInputs),
+          amount = 200L,
+          numOfOutputs = numberOfOutputs
+        )
+        (boxesLocal.drop(numberOfInputs), tx +: transactions)
+    }._2
+
+  def defaultPaymentTransactionScratch(privKey: PrivateKey25519,
+                                       fee: Amount,
+                                       timestamp: Long,
+                                       useBoxes: IndexedSeq[MonetaryBox],
+                                       recipient: Address,
+                                       amount: Amount,
+                                       tokenIdOpt: Option[ADKey] = None,
+                                       numOfOutputs: Int = 5): Transaction = {
+
+    val pubKey: PublicKey25519 = privKey.publicImage
+
+    val uInputs: IndexedSeq[Input] = useBoxes
+      .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes))))
+      .toIndexedSeq
+
+    val change: Amount = useBoxes.map(_.amount).sum - (amount + fee)
+
+    val directives: IndexedSeq[TransferDirective] =
+      if (change > 0) TransferDirective(recipient, amount, tokenIdOpt) +: (0 until numOfOutputs).map(_ =>
+        TransferDirective(pubKey.address.address, change / numOfOutputs, tokenIdOpt))
+      else IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt))
+
+    val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, directives)
+
+    val signature: Signature25519 = privKey.sign(uTransaction.messageToSign)
+
+    uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
+  }
+
+  def dataTransactionScratch(privKey: PrivateKey25519,
+                             fee: Long,
+                             timestamp: Long,
+                             useOutputs: IndexedSeq[MonetaryBox],
+                             amount: Long,
+                             data: Array[Byte],
+                             numOfOutputs: Int = 5): Transaction = {
+
+    val pubKey: PublicKey25519 = privKey.publicImage
+
+    val uInputs: IndexedSeq[Input] = useOutputs
+      .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes))))
+      .toIndexedSeq
+
+    val change: Amount = useOutputs.map(_.amount).sum - (amount + fee)
+
+    val directives: IndexedSeq[DataDirective] =
+      (0 until numOfOutputs).foldLeft(IndexedSeq.empty[DataDirective]) { case (directivesAll, _) =>
+        directivesAll :+ DataDirective(PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract.hash, data)
+      }
+
+    val newDirectives: IndexedSeq[Directive] =
+      if (change > 0) TransferDirective(pubKey.address.address, amount, None) +: (0 until numOfOutputs).map(_ =>
+        TransferDirective(pubKey.address.address, change / numOfOutputs, None)) ++: directives
+      else directives
+
+    val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, newDirectives)
+
+    val signature: Signature25519 = privKey.sign(uTransaction.messageToSign)
+
+    uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
+  }
+
+  def assetIssuingTransactionScratch(privKey: PrivateKey25519,
+                                     fee: Long,
+                                     timestamp: Long,
+                                     useOutputs: IndexedSeq[MonetaryBox],
+                                     amount: Long,
+                                     numOfOutputs: Int = 5): Transaction = {
+    val directives: IndexedSeq[AssetIssuingDirective] =
+      (0 until numOfOutputs).foldLeft(IndexedSeq.empty[AssetIssuingDirective]) { case (directivesAll, _) =>
+        directivesAll :+ AssetIssuingDirective(PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract.hash, amount)
+      }
+
+    val pubKey: PublicKey25519 = privKey.publicImage
+
+    val uInputs: IndexedSeq[Input] = useOutputs
+      .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes))))
+      .toIndexedSeq
+
+    val change: Amount = useOutputs.map(_.amount).sum - (amount + fee)
+
+    val newDirectives: IndexedSeq[Directive] =
+      if (change > 0) TransferDirective(pubKey.address.address, amount, None) +: (0 until numOfOutputs).map(_ =>
+        TransferDirective(pubKey.address.address, change / numOfOutputs, None)) ++: directives
+      else directives
+
+    val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, newDirectives)
+
+    val signature: Signature25519 = privKey.sign(uTransaction.messageToSign)
+
+    uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
   }
 }

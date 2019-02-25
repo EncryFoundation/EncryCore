@@ -100,7 +100,7 @@ object BlockSerializer extends Serializer[Block] {
   def toProto(block: Block): BlockProtoMessage = BlockProtoMessage()
     .withHeader(HeaderSerializer.toProto(block.header))
     .withPayload(PayloadSerializer.toProto(block.payload))
-    .withAdProofsOpt(ADProofSerializer.toProto(block.adProofsOpt.get))
+    .withAdProofsOpt(ADProofSerializer.toProto(block.adProofsOpt))
 
   def fromProto(message: BlockProtoMessage): Block = Block(
     message.header.map(x => HeaderSerializer.fromProto(x)).get,

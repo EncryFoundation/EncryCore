@@ -63,7 +63,10 @@ case class Header(version: Version,
 
   override def serializer: Serializer[M] = HeaderSerializer
 
-  override def toString: String = s"Header(id=$encodedId, height=$height, parent=${Algos.encode(parentId)})"
+  override def toString: String = s"Header(id=$encodedId, height=$height, parent=${Algos.encode(parentId)}, " +
+    s"version = $version, adProofsRoot = ${Algos.encode(adProofsRoot)}, stateRoot = ${Algos.encode(stateRoot)}, " +
+    s" transactionsRoot = ${Algos.encode(transactionsRoot)}, timestamp = $timestamp, nonce = $nonce, " +
+    s"difficulty = $difficulty)"
 }
 
 case class HeaderDBVersion(id: String,
@@ -235,7 +238,8 @@ object HeaderSerializer extends Serializer[Header] {
   def toProto(header: Header): HeaderProtoMessage = HeaderProtoMessage()
     .withVersion(ByteString.copyFrom(Array(header.version)))
     .withParentId(ByteString.copyFrom(header.parentId))
-    .withAdProofsRoot(ByteString.copyFrom(header.stateRoot))
+    .withAdProofsRoot(ByteString.copyFrom(header.adProofsRoot))
+    .withStateRoot(ByteString.copyFrom(header.stateRoot))
     .withTransactionsRoot(ByteString.copyFrom(header.transactionsRoot))
     .withTimestamp(header.timestamp)
     .withHeight(header.height)
@@ -244,7 +248,7 @@ object HeaderSerializer extends Serializer[Header] {
     .withEquihashSolution(EquihashSolution.toProto(header.equihashSolution))
 
   def fromProto(headerM: HeaderProtoMessage): Header = Header(
-    headerM.version.byteAt(0),
+    headerM.version.toByteArray.head,
     ModifierId @@ headerM.parentId.toByteArray,
     Digest32 @@ headerM.adProofsRoot.toByteArray,
     ADDigest @@ headerM.stateRoot.toByteArray,

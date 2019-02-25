@@ -109,9 +109,13 @@ object ADProofs {
 
 object ADProofSerializer extends Serializer[ADProofs] {
 
-  def toProto(adProofs: ADProofs): AdProofsProtoMessage = AdProofsProtoMessage()
-    .withHeaderId(ByteString.copyFrom(adProofs.headerId))
-    .withProofBytes(ByteString.copyFrom(adProofs.proofBytes))
+  def toProto(adProofs: Option[ADProofs]): AdProofsProtoMessage = {
+    if (adProofs.isDefined)
+    AdProofsProtoMessage()
+      .withHeaderId(ByteString.copyFrom(adProofs.get.headerId))
+      .withProofBytes(ByteString.copyFrom(adProofs.get.proofBytes))
+    else AdProofsProtoMessage.defaultInstance
+  }
 
   def fromProto(message: AdProofsProtoMessage) = ADProofs(
     ModifierId @@ message.headerId.toByteArray,
