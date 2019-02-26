@@ -22,9 +22,9 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     */
   property("LevelDB should recover to last version") {
 
-    val maxVersions = Random.nextInt(300)
+    val maxVersions = Random.nextInt(300) + 1
 
-    val levelDbElemsQty = Random.nextInt(maxVersions)
+    val levelDbElemsQty = Random.nextInt(maxVersions) + 1
 
     val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
 
@@ -34,7 +34,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     val vldbInit = VersionalLevelDBCompanion(levelDBInit, dummyLevelDBSettings)
 
-    val levelDbElems = generateRandomLevelDbElemsWithoutDeletions(levelDbElemsQty, Random.nextInt(300))
+    val levelDbElems = generateRandomLevelDbElemsWithoutDeletions(levelDbElemsQty, Random.nextInt(300) + 1)
 
     val keysToInsert: Seq[ByteArrayWrapper] = levelDbElems.flatMap(_.elemsToInsert.map(_._1)).map(ByteArrayWrapper.apply)
 
