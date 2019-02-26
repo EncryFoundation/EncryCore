@@ -98,7 +98,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     val result = getCurrentElementsKeys
       .foldLeft(List.empty[(VersionalLevelDbKey, VersionalLevelDbValue)]) {
         case (acc, nextKey) =>
-          nextKey -> VersionalLevelDbValue @@ db.get(accessableElementKey(nextKey), readOptions) :: acc
+          (nextKey -> get(nextKey).get) :: acc
       }
     readOptions.snapshot().close()
     result
@@ -221,11 +221,13 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
     val iter = db.iterator(readOptions)
+    iter.seekToFirst()
     var buffer: List[VersionalLevelDbKey] = List.empty[VersionalLevelDbKey]
     while (iter.hasNext) {
-      val nextKey = iter.peekNext().getKey
-      if (nextKey.head == USER_KEY_PREFIX && !inaccessibleKeys(readOptions).contains(nextKey.tail))
-        buffer ::= VersionalLevelDbKey @@ nextKey
+      val nextKey = iter.next().getKey
+      if (nextKey.head == USER_KEY_PREFIX && db.get(nextKey).headOption.contains(ACCESSIBLE_KEY_PREFIX)) {
+        buffer ::= VersionalLevelDbKey @@ nextKey.tail
+      }
     }
     readOptions.snapshot().close()
     buffer
