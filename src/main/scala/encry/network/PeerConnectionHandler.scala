@@ -3,6 +3,7 @@ package encry.network
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.ByteOrder
 
+import NetworkMessagesProto.HandshakeProtoMessage
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import akka.io.Tcp
 import akka.io.Tcp._
@@ -11,13 +12,15 @@ import com.google.common.primitives.Ints
 import encry.EncryApp.settings
 import encry.EncryApp._
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle, _}
-import encry.network.message.MessageHandler
+import encry.network.message.{Message, Message => _, _}
 import PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
+import SyntaxMessageProto.InetSocketAddressProtoMessage
 import com.typesafe.scalalogging.StrictLogging
+import com.google.protobuf.{ByteString => ProtoBytes}
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
-import scala.util.{Failure, Random, Success}
+import scala.util.{Failure, Random, Success, Try}
 
 class PeerConnectionHandler(messagesHandler: MessageHandler,
                             connection: ActorRef,
@@ -62,31 +65,30 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
   def startInteraction: Receive = {
     case StartInteraction =>
-      timeProvider
-        .time()
-        .map { time =>
-          val hb: Array[Byte] = Handshake(Version(settings.network.appVersion), settings.network.nodeName
+      timeProvider.time().map { time =>
+        val handshake: Handshake = Handshake(protocolToBytes(settings.network.appVersion),
+          settings.network.nodeName
             .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort),
-            ownSocketAddress, time).bytes
-          connection ! Tcp.Write(ByteString(hb))
-          logger.info(s"Handshake sent to $remote")
-          handshakeSent = true
-          if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
-        }
+          ownSocketAddress, time
+        )
+        connection ! Tcp.Write(serialize(handshake))
+        logger.info(s"Handshake sent to $remote")
+        handshakeSent = true
+        if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
+      }
   }
 
   def receivedData: Receive = {
-    case Received(data) =>
-      HandshakeSerializer.parseBytes(data.toArray) match {
-        case Success(handshake) =>
-          logger.info(s"Got a Handshake from $remote")
-          receivedHandshake = Some(handshake)
-          connection ! ResumeReading
-          if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
-        case Failure(t) =>
-          logger.info(s"Error during parsing a handshake: $t")
-          self ! CloseConnection
-      }
+    case Received(data) => deserialize(data) match {
+      case Success(handshake: Handshake) =>
+        logger.info(s"Got a Handshake from $remote")
+        receivedHandshake = Some(handshake)
+        connection ! ResumeReading
+        if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
+      case Failure(t) =>
+        logger.info(s"Error during parsing a handshake: $t")
+        self ! CloseConnection
+    }
   }
 
   def handshakeTimeout: Receive = {
@@ -107,27 +109,28 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
   }
 
   def workingCycleLocalInterface: Receive = {
-    case msg: message.Message[_] =>
+    case message: NetworkMessage =>
       def sendOutMessage(): Unit = {
-        logger.info("Send message " + msg.spec + " to " + remote)
-        connection ! Write(ByteString(Ints.toByteArray(msg.bytes.length) ++ msg.bytes))
+        logger.info("Send message " + message.messageName + " to " + remote)
+        connection ! Write(serialize(message))
       }
 
       settings.network.addedMaxDelay match {
-        case Some(delay) => context.system.scheduler.scheduleOnce(Random.nextInt(delay.toMillis.toInt).millis)(sendOutMessage())
+        case Some(delay) =>
+          context.system.scheduler.scheduleOnce(Random.nextInt(delay.toMillis.toInt).millis)(sendOutMessage())
         case None => sendOutMessage()
       }
   }
 
   def workingCycleRemoteInterface: Receive = {
     case Received(data) =>
-      val t: (List[ByteString], ByteString) = getPacket(chunksBuffer ++ data)
-      chunksBuffer = t._2
-      t._1.find { packet =>
-        messagesHandler.parseBytes(packet.toByteBuffer, selfPeer) match {
+      val packet: (List[ByteString], ByteString) = getPacket(chunksBuffer ++ data)
+      chunksBuffer = packet._2
+      packet._1.find { packet =>
+        deserialize(packet) match {
           case Success(message) =>
-            logger.info("Received message " + message.spec + " from " + remote)
-            networkController ! message
+            logger.info("Received message " + message.messageName + " from " + remote)
+            networkController ! Message(message, selfPeer)
             false
           case Failure(e) =>
             logger.info(s"Corrupted data from: " + remote + s"$e")
@@ -191,6 +194,30 @@ class PeerConnectionHandler(messagesHandler: MessageHandler,
 
     multiPacket(List[ByteString](), data)
   }
+
+  def serialize(message: NetworkMessage): ByteString = message match {
+    case handshake: Handshake => NetworkMessagesIds.HandShake +: Handshake.toProto(handshake)
+    case syncInfo: SyncInfoNetworkMessage => NetworkMessagesIds.SyncInfo +: SyncInfoNetworkMessage.toProto(syncInfo)
+    case inv: InvNetworkMessage => NetworkMessagesIds.Inv +: InvNetworkMessage.toProto(inv)
+    case requestModifier: RequestModifiersNetworkMessage =>
+      NetworkMessagesIds.RequestModifier +: RequestModifiersNetworkMessage.toProto(requestModifier)
+    case modifiers: ModifiersNetworkMessage => NetworkMessagesIds.Modifier +: ModifiersNetworkMessage.toProto(modifiers)
+    case _: GetPeersNetworkMessage => NetworkMessagesIds.GetPeers +: GetPeersNetworkMessage.toProto
+    case peers: PeersNetworkMessage => NetworkMessagesIds.Peers +: PeersNetworkMessage.toProto(peers)
+  }
+
+  def deserialize(bytes: ByteString): Try[NetworkMessage] = bytes.head match {
+    case NetworkMessagesIds.HandShake => Handshake.fromProto(bytes.tail)
+    case NetworkMessagesIds.SyncInfo => SyncInfoNetworkMessage.fromProto(bytes.tail)
+    case NetworkMessagesIds.Inv => InvNetworkMessage.fromProto(bytes.tail)
+    case NetworkMessagesIds.RequestModifier => RequestModifiersNetworkMessage.fromProto(bytes.tail)
+    case NetworkMessagesIds.Modifier => ModifiersNetworkMessage.fromProto(bytes.tail)
+    case NetworkMessagesIds.GetPeers => GetPeersNetworkMessage.fromProto(bytes.tail)
+    case NetworkMessagesIds.Peers => PeersNetworkMessage.fromProto(bytes.tail)
+    case wrongType => throw new Exception(s"There is no such deserializer for type: $wrongType!")
+  }
+
+  private def protocolToBytes(protocol: String): Array[Byte] = protocol.split("\\.").map(elem => elem.toByte)
 }
 
 object PeerConnectionHandler {

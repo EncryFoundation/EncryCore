@@ -17,3 +17,8 @@ message EitherToProto {
         bytes right = 2;
     }
 }
+
+message InetSocketAddressProtoMessage {
+    string host = 1;
+    uint32 port = 2;
+}

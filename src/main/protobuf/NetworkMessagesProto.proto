@@ -6,8 +6,8 @@ message SyncInfoProtoMessage {
 }
 
 message InvSpecProtoMessage {
-     bytes modifierTypeId = 1;
-     repeated bytes modifiers = 2;
+    bytes modifierTypeId = 1;
+    repeated bytes modifiers = 2;
 }
 
 message RequestModifiersSpecMessageProto {
@@ -20,17 +20,22 @@ message ModifiersSpecMessageProto {
     MapToProto map = 2;
 }
 
-message GetPeersSpecMessageProto { }
+message GetPeersSpecMessageProto {
+}
 
 message PeersSpecMessageProto {
-    repeated string peers = 1;
+
+    repeated InetSocketAddressProtoMessage peers = 1;
+}
+
+message HandshakeProtoMessage {
+    bytes protocolVersion = 1;
+    string nodeName = 2;
+    InetSocketAddressProtoMessage declaredAddress = 3;
+    uint64 time = 4;
 }
 
 message NetworkMessageProto {
-
-    message ConnectedPeerProto {
-        string source = 1;
-    }
 
     oneof spec {
         SyncInfoProtoMessage syncInfoProtoMessage = 1;
@@ -41,6 +46,6 @@ message NetworkMessageProto {
         PeersSpecMessageProto peersSpecMessageProto = 6;
     }
 
-    EitherToProto input = 7;
-    ConnectedPeerProto connectedPeerProto = 8;
+    bytes magic = 8;
+    bytes checksum = 7;
 }

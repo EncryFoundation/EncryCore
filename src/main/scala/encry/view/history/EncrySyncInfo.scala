@@ -1,12 +1,13 @@
 package encry.view.history
 
+import NetworkMessagesProto.SyncInfoProtoMessage
+import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.SyncInfo
 import encry.EncryApp.settings
 import encry.consensus.History.ModifierIds
 import encry.modifiers.NodeViewModifier
 import encry.modifiers.history.Header
-import encry.network.message.SyncInfoMessageSpec
 import org.encryfoundation.common.serialization.Serializer
 
 import scala.util.Try
@@ -18,6 +19,15 @@ case class EncrySyncInfo(lastHeaderIds: Seq[ModifierId]) extends SyncInfo {
   override def startingPoints: ModifierIds = lastHeaderIds.map(id => Header.modifierTypeId -> id)
 
   override lazy val serializer: Serializer[M] = EncrySyncInfoSerializer
+}
+
+object EncrySyncInfo {
+
+  def toProto(modifiers: Seq[ModifierId]): SyncInfoProtoMessage = SyncInfoProtoMessage()
+    .withLastHeaderIds(modifiers.map(x => ByteString.copyFrom(x)))
+
+  def fromProto(message: SyncInfoProtoMessage): EncrySyncInfo =
+    EncrySyncInfo(message.lastHeaderIds.map(x => ModifierId @@ x.toByteArray))
 }
 
 object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
@@ -39,10 +49,6 @@ object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
     result
   }
 
-  def toProto = ???
-
-  def fromProto = ???
-
   override def parseBytes(bytes: Array[Byte]): Try[EncrySyncInfo] = Try {
     require(bytes.length <= settings.network.syncPacketLength * NodeViewModifier.ModifierIdSize + 1)
 
@@ -52,4 +58,6 @@ object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
   }
 }
 
-object EncrySyncInfoMessageSpec extends SyncInfoMessageSpec[EncrySyncInfo](EncrySyncInfoSerializer.parseBytes)
+object EncrySyncInfoMessageSpec {
+
+}

@@ -62,6 +62,8 @@ class NetworkController extends Actor with StrictLogging {
     case Message(spec, Left(msgBytes), Some(remote)) =>
       spec.parseBytes(msgBytes) match {
         case Success(content) =>
+
+
           messageHandlers.find(_._1.contains(spec.messageCode)).map(_._2) match {
             case Some(handler) => handler ! DataFromPeer(spec, content, remote)
             case None => logger.error("No handlers found for message: " + spec.messageCode)
