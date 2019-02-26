@@ -3,6 +3,7 @@ package encry.storage.iodb.versionalIODB
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import io.iohk.iodb.Store
+import org.encryfoundation.common.Algos
 
 /**
   * Iodb db wrapper with object store, only for history
@@ -25,7 +26,10 @@ case class IODBWrapperForHistory(store: Store, objectStore: Store) extends Versi
 
   override def insert(version: StorageVersion,
                       toInsert: List[(StorageKey, StorageValue)],
-                      toDelete: List[StorageKey]): Unit = iodbWrapper.insert(version, toInsert, toDelete)
+                      toDelete: List[StorageKey]): Unit = {
+    if (toDelete.nonEmpty) iodbWrapper.insert(version, List.empty, toDelete)
+    iodbWrapper.insert(StorageVersion !@@ Algos.hash(version), toInsert)
+  }
 
   override def close(): Unit = {
     iodbWrapper.close()
