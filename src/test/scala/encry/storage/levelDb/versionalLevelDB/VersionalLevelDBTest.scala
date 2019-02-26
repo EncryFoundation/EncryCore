@@ -36,7 +36,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     val levelDbElems = generateRandomLevelDbElemsWithoutDeletions(levelDbElemsQty, Random.nextInt(300))
 
-    val keysToInsert: Seq[VersionalLevelDbKey] = levelDbElems.flatMap(_.elemsToInsert.map(_._1))
+    val keysToInsert: Seq[ByteArrayWrapper] = levelDbElems.flatMap(_.elemsToInsert.map(_._1)).map(ByteArrayWrapper.apply)
 
     val valuesHashes: List[ByteArrayWrapper] =
       levelDbElems.flatMap(_.elemsToInsert.map(elem => new ByteArrayWrapper(Algos.hash(elem._2))))
@@ -55,7 +55,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     //Check correctness of keys
 
-    reopendVLDB.getAll.forall{case (elemKey, _) => keysToInsert.contains(elemKey)} shouldBe true
+    reopendVLDB.getAll.forall{case (elemKey, _) => keysToInsert.contains(ByteArrayWrapper(elemKey))} shouldBe true
 
     //Check correctness of values
 
@@ -69,9 +69,9 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     */
   property("LevelDB should recover to last version after linked deletions") {
 
-    val maxVersions = Random.nextInt(1000)
+    val maxVersions = 10
 
-    val levelDbElemsQty = Random.nextInt(maxVersions) + 1
+    val levelDbElemsQty = 8
 
     val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
 
@@ -81,14 +81,14 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     val vldbInit = VersionalLevelDBCompanion(levelDBInit, dummyLevelDBSettings)
 
-    val levelDbElems = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, Random.nextInt(300))
+    val levelDbElems = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, 1)
 
-    val correctKeys: Seq[VersionalLevelDbKey] = levelDbElems.last.elemsToInsert.map(_._1)
+    val correctKeys: Seq[ByteArrayWrapper] = levelDbElems.last.elemsToInsert.map(_._1).map(ByteArrayWrapper.apply)
 
     val correctValues: Seq[ByteArrayWrapper] =
       levelDbElems.last.elemsToInsert.map{case (_, elem) => new ByteArrayWrapper(Algos.hash(elem))}
 
-    val incorrectKeys: Seq[VersionalLevelDbKey] = levelDbElems.init.flatMap(_.elemsToInsert.map(_._1))
+    val incorrectKeys: Seq[ByteArrayWrapper] = levelDbElems.init.flatMap(_.elemsToInsert.map(_._1)).map(ByteArrayWrapper.apply)
 
     levelDbElems.foreach(vldbInit.insert)
 
@@ -104,18 +104,21 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     //Check correctness of keys
 
-    reopendVLDB.getAll.forall{case (elemKey, _) => correctKeys.contains(elemKey)} shouldBe true
+    reopendVLDB.getAll.map(elem => ByteArrayWrapper.apply(elem._1)).
+      forall{case elemKey => correctKeys.contains(elemKey)} shouldBe true
 
     //Check correctness of values
 
     reopendVLDB.getAll
-      .forall{case (_, elemValue) => correctValues.contains(new ByteArrayWrapper(Algos.hash(elemValue)))} shouldBe true
+      .forall{case elemValue => correctValues.contains(new ByteArrayWrapper(Algos.hash(elemValue._2)))} shouldBe true
 
     //Check that impossible to get deleted keys
 
     val allElemsInDB = reopendVLDB.getAll.map(_._1)
 
-    incorrectKeys.forall(key => !allElemsInDB.contains(key)) shouldBe true
+    incorrectKeys.forall(key => {
+      !allElemsInDB.map(elem => new ByteArrayWrapper(elem)).contains(key)
+    }) shouldBe true
 
     println(reopendVLDB.print())
   }
@@ -161,9 +164,6 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     vldbInit.rollbackTo(levelDBElems(6).version)
 
-    logger.info("========================")
-    logger.info(s"VERSIONS: ${levelDBElems.map(elem => Algos.encode(elem.version)).mkString(",")}")
-    logger.info("========================")
     Algos.hash(vldbInit.get(levelDBElems(6).elemsToInsert.head._1).get) shouldEqual
       Algos.hash(levelDBElems(6).elemsToInsert.head._2)
   }
