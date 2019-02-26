@@ -15,7 +15,7 @@ import encry.utils.CoreTaggedTypes.ModifierId
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
-import org.iq80.leveldb.DB
+import org.iq80.leveldb.{DB, ReadOptions}
 import scorex.crypto.hash.Digest32
 
 import scala.util.Success
@@ -40,6 +40,23 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
   def getTokenBalanceById(id: TokenId): Option[Amount] = getBalances
     .find(_._1 sameElements Algos.encode(id))
     .map(_._2)
+
+  /**
+    * Get all elems, stored in currentVersion.
+    *
+    * @return
+    */
+  def getBoxes(qty: Int = 450): List[(VersionalLevelDbKey, VersionalLevelDbValue)] = {
+    val readOptions = new ReadOptions()
+    readOptions.snapshot(levelDb.db.getSnapshot)
+    val result = levelDb.getCurrentElementsKeys.take(qty)
+      .foldLeft(List.empty[(VersionalLevelDbKey, VersionalLevelDbValue)]) {
+        case (acc, nextKey) =>
+          (nextKey -> levelDb.get(nextKey).get) :: acc
+      }
+    readOptions.snapshot().close()
+    result
+  }
 
   def containsBox(id: ADKey): Boolean = getBoxById(id).isDefined
 
