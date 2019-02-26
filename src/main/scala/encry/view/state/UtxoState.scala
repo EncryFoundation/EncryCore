@@ -271,15 +271,6 @@ object UtxoState extends StrictLogging {
       val bp: encry.avltree.BatchAVLProver[Digest32, HF] =
         new encry.avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
       val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
-      val vldbInit = settings.storage.state match {
-        case VersionalStorage.IODB =>
-          logger.info("Init state with iodb storage")
-          IODBWrapper(new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions))
-        case VersionalStorage.LevelDB =>
-          logger.info("Init state with levelDB storage")
-          val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
-          VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 33), keySize = 33))
-      }
       val storage: VersionedAVLStorage[Digest32] = new VersionedAVLStorage(vldbInit, np, settings)(Algos.hash)
       PersistentBatchAVLProver.create(bp, storage).getOrElse(throw new Error("Fatal: Failed to create persistent prover"))
     }
