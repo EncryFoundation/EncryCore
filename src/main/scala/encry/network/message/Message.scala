@@ -15,6 +15,9 @@ case class Message[Content](spec: MessageSpec[Content],
     case Right(d) => spec.toBytes(d)
   }
 
+  def toProto = ???
+  def fromProto = ???
+
   lazy val dataLength: Int = dataBytes.length
 
   override type M = Message[Content]

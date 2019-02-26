@@ -1,25 +1,46 @@
 syntax = "proto3";
+import "SyntaxMessageProto.proto";
 
-message SyncInfoMessageSpecMessageProto {
-
+message SyncInfoProtoMessage {
+    repeated bytes lastHeaderIds = 1;
 }
 
 message InvSpecProtoMessage {
+     bytes modifierTypeId = 1;
+     repeated bytes modifiers = 2;
+}
 
+message RequestModifiersSpecMessageProto {
+    bytes modifierTypeId = 1;
+    repeated bytes modifiers = 2;
 }
 
 message ModifiersSpecMessageProto {
-
+    bytes modifierTypeId = 1;
+    MapToProto map = 2;
 }
 
-message GetPeersSpecMessageProto {
-
-}
+message GetPeersSpecMessageProto { }
 
 message PeersSpecMessageProto {
-
+    repeated string peers = 1;
 }
 
 message NetworkMessageProto {
 
+    message ConnectedPeerProto {
+        string source = 1;
+    }
+
+    oneof spec {
+        SyncInfoProtoMessage syncInfoProtoMessage = 1;
+        InvSpecProtoMessage invSpecProtoMessage = 2;
+        RequestModifiersSpecMessageProto requestModifiersSpecMessageProto = 3;
+        ModifiersSpecMessageProto modifiersSpecMessageProto = 4;
+        GetPeersSpecMessageProto getPeersSpecMessageProto = 5;
+        PeersSpecMessageProto peersSpecMessageProto = 6;
+    }
+
+    EitherToProto input = 7;
+    ConnectedPeerProto connectedPeerProto = 8;
 }

@@ -25,7 +25,7 @@ object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
   override def toBytes(obj: EncrySyncInfo): Array[Byte] = concatFixLengthBytes(obj.lastHeaderIds)
 
   def concatFixLengthBytes(seq: Traversable[Array[Byte]]): Array[Byte] = seq.headOption match {
-    case None       => Array[Byte]()
+    case None => Array[Byte]()
     case Some(head) => concatFixLengthBytes(seq, head.length)
   }
 
@@ -38,6 +38,10 @@ object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
     }
     result
   }
+
+  def toProto = ???
+
+  def fromProto = ???
 
   override def parseBytes(bytes: Array[Byte]): Try[EncrySyncInfo] = Try {
     require(bytes.length <= settings.network.syncPacketLength * NodeViewModifier.ModifierIdSize + 1)

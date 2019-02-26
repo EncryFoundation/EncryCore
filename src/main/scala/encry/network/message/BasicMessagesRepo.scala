@@ -21,6 +21,8 @@ class SyncInfoMessageSpec[SI <: SyncInfo](deserializer: Array[Byte] => Try[SI]) 
   override val messageCode: MessageCode = 65: Byte
   override val messageName: String = "Sync"
 
+
+
   override def parseBytes(bytes: Array[Byte]): Try[SI] = deserializer(bytes)
 
   override def toBytes(data: SI): Array[Byte] = data.bytes
@@ -37,6 +39,10 @@ class InvSpec(maxInvObjects: Int) extends MessageSpec[InvData] {
 
   override val messageCode: MessageCode = MessageCode
   override val messageName: String = MessageName
+
+  def toProto = ???
+
+  def fromProto = ???
 
   override def parseBytes(bytes: Array[Byte]): Try[InvData] = Try {
     val count: Int = Ints.fromByteArray(bytes.slice(1, 5))
@@ -79,6 +85,9 @@ class RequestModifierSpec(maxInvObjects: Int) extends MessageSpec[InvData] {
   override val messageName: String = MessageName
   private val invSpec: InvSpec = new InvSpec(maxInvObjects)
 
+  def toProto = ???
+  def fromProto = ???
+
   override def toBytes(typeAndId: InvData): Array[Byte] = invSpec.toBytes(typeAndId)
 
   override def parseBytes(bytes: Array[Byte]): Try[InvData] = invSpec.parseBytes(bytes)
@@ -89,6 +98,9 @@ object ModifiersSpec extends MessageSpec[ModifiersData] {
 
   override val messageCode: MessageCode = 33: Byte
   override val messageName: String = "Modifier"
+
+  def toProto = ???
+  def fromProto = ???
 
   override def parseBytes(bytes: Array[Byte]): Try[ModifiersData] = Try {
     val count: Int = Ints.fromByteArray(bytes.slice(1, 5))
@@ -120,6 +132,9 @@ object GetPeersSpec extends MessageSpec[Unit] {
   override val messageCode: Message.MessageCode = 1: Byte
   override val messageName: String = "GetPeers message"
 
+  def toProto = ???
+  def fromProto = ???
+
   override def parseBytes(bytes: Array[Byte]): Try[Unit] = Try(require(bytes.isEmpty, "Non-empty data for GetPeers"))
 
   override def toBytes(data: Unit): Array[Byte] = Array()
@@ -131,6 +146,9 @@ object PeersSpec extends MessageSpec[Seq[InetSocketAddress]] {
   private val DataLength: Int = 4
   override val messageCode: Message.MessageCode = 2: Byte
   override val messageName: String = "Peers message"
+
+  def toProto = ???
+  def fromProto = ???
 
   override def parseBytes(bytes: Array[Byte]): Try[Seq[InetSocketAddress]] = Try {
     val lengthBytes: Array[MessageCode] = util.Arrays.copyOfRange(bytes, 0, DataLength)
