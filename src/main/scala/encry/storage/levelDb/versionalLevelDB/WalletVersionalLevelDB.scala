@@ -46,7 +46,7 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
     *
     * @return
     */
-  def getBoxes(qty: Int = 450): List[(VersionalLevelDbKey, VersionalLevelDbValue)] = {
+  def getBoxes(qty: Int = 450): Seq[EncryBaseBox] = {
     val readOptions = new ReadOptions()
     readOptions.snapshot(levelDb.db.getSnapshot)
     val result = levelDb.getCurrentElementsKeys.take(qty)
@@ -55,7 +55,10 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
           (nextKey -> levelDb.get(nextKey).get) :: acc
       }
     readOptions.snapshot().close()
-    result
+    result.map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
+      .collect {
+        case Success(box) => box
+      }
   }
 
   def containsBox(id: ADKey): Boolean = getBoxById(id).isDefined
