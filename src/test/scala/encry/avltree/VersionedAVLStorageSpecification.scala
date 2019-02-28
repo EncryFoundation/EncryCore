@@ -337,7 +337,7 @@ class VersionedAVLStorageSpecification extends PropSpec
   }
 
   property("Persistence AVL batch prover (VLDB backed) - rollback version") {
-    val store = createVLDB(1000)
+    val store = createVLDB(20)
     val settings = EncryAppSettings.read
     val storage = createVersionedStorage(store, settings)
     val prover = createPersistentProver(storage)
