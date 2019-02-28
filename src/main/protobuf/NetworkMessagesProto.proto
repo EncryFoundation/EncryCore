@@ -1,6 +1,8 @@
 syntax = "proto3";
 import "SyntaxMessageProto.proto";
 
+///TODO naming!
+
 message SyncInfoProtoMessage {
     repeated bytes lastHeaderIds = 1;
 }
@@ -20,11 +22,9 @@ message ModifiersSpecMessageProto {
     MapToProto map = 2;
 }
 
-message GetPeersSpecMessageProto {
-}
+message GetPeersSpecMessageProto { }
 
 message PeersSpecMessageProto {
-
     repeated InetSocketAddressProtoMessage peers = 1;
 }
 
@@ -35,17 +35,16 @@ message HandshakeProtoMessage {
     uint64 time = 4;
 }
 
-message NetworkMessageProto {
-
-    oneof spec {
-        SyncInfoProtoMessage syncInfoProtoMessage = 1;
-        InvSpecProtoMessage invSpecProtoMessage = 2;
-        RequestModifiersSpecMessageProto requestModifiersSpecMessageProto = 3;
-        ModifiersSpecMessageProto modifiersSpecMessageProto = 4;
-        GetPeersSpecMessageProto getPeersSpecMessageProto = 5;
-        PeersSpecMessageProto peersSpecMessageProto = 6;
+message GeneralNetworkProtoMessage {
+    bytes MAGIC = 1;
+    bytes Checksum = 2;
+    oneof innerMessage {
+        SyncInfoProtoMessage syncInfoProtoMessage = 3;
+        InvSpecProtoMessage invSpecProtoMessage = 4;
+        RequestModifiersSpecMessageProto requestModifiersSpecMessageProto = 5;
+        ModifiersSpecMessageProto modifiersSpecMessageProto = 6;
+        GetPeersSpecMessageProto getPeersSpecMessageProto = 7;
+        PeersSpecMessageProto peersSpecMessageProto = 8;
+        HandshakeProtoMessage handshakeProtoMessage = 9;
     }
-
-    bytes magic = 8;
-    bytes checksum = 7;
 }
