@@ -82,26 +82,31 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   }
 
   override def receive: Receive = {
-    case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
-      modifierSerializers.get(modifierTypeId).foreach { companion =>
-        remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
-          case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
-          case pmod: EncryPersistentModifier@unchecked =>
-            if (settings.influxDB.isDefined && nodeView.history.isFullChainSynced) {
-              pmod match {
-                case h: Header => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - h.timestamp)
-                case b: Block => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - b.header.timestamp)
-                case _ =>
-              }
-            }
-            if (nodeView.history.contains(pmod.id) || ModifiersCache.contains(key(pmod.id)))
-              logger.warn(s"Received modifier ${pmod.encodedId} that is already in history")
-            else ModifiersCache.put(key(pmod.id), pmod, nodeView.history)
-        }
-        logger.debug(s"Cache before(${ModifiersCache.size})")
-        computeApplications()
-        logger.debug(s"Cache after(${ModifiersCache.size})")
+    case ModifiersFromRemote(modifierTypeId, modifiers) =>
+      modifierTypeId match {
+        case Payload.modifierTypeId => modifiers.map(Payload.fromProto)
+        case Header.modifierTypeId => modifiers.map(Header.fromProto)
+        case Transaction.ModifierTypeId =>
       }
+//      modifierSerializers.get(modifierTypeId).foreach { companion =>
+//        remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
+//          case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
+//          case pmod: EncryPersistentModifier@unchecked =>
+//            if (settings.influxDB.isDefined && nodeView.history.isFullChainSynced) {
+//              pmod match {
+//                case h: Header => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - h.timestamp)
+//                case b: Block => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - b.header.timestamp)
+//                case _ =>
+//              }
+//            }
+//            if (nodeView.history.contains(pmod.id) || ModifiersCache.contains(key(pmod.id)))
+//              logger.warn(s"Received modifier ${pmod.encodedId} that is already in history")
+//            else ModifiersCache.put(key(pmod.id), pmod, nodeView.history)
+//        }
+//        logger.debug(s"Cache before(${ModifiersCache.size})")
+//        computeApplications()
+//        logger.debug(s"Cache after(${ModifiersCache.size})")
+//      }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction]@unchecked => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier]@unchecked =>
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")

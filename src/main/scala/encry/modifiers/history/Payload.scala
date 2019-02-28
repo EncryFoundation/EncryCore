@@ -58,18 +58,22 @@ object Payload {
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (102: Byte)
 
   def rootHash(ids: Seq[ModifierId]): Digest32 = Algos.merkleTreeRoot(LeafData !@@ ids)
-}
-
-object PayloadSerializer extends Serializer[Payload] {
 
   def toProto(payload: Payload): PayloadProtoMessage = PayloadProtoMessage()
     .withHeaderId(ByteString.copyFrom(payload.headerId))
-    .withTxs(payload.transactions.map(x => TransactionSerializer.toProto(x)))
+    .withTxs(payload.transactions.map(x => Transaction.toProto(x)))
 
-  def fromProto(message: PayloadProtoMessage): Payload = Payload(
-    ModifierId @@ message.headerId.toByteArray,
-    message.txs.map(x => TransactionSerializer.fromProto(x))
-  )
+  def fromProto(message: Array[Byte]): Try[Payload] = Try {
+    val payloadProtoMessage: PayloadProtoMessage = PayloadProtoMessage.parseFrom(message)
+    Payload(
+      ModifierId @@ payloadProtoMessage.headerId.toByteArray,
+      Seq.empty
+//      payloadProtoMessage.txs.map(x => Transaction.fromProto(x).get)
+    )
+  }
+}
+
+object PayloadSerializer extends Serializer[Payload] {
 
   override def toBytes(obj: Payload): Array[Byte] =
     Bytes.concat(

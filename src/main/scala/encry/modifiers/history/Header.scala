@@ -231,9 +231,6 @@ object Header {
 
     Digest32 @@ result
   }
-}
-
-object HeaderSerializer extends Serializer[Header] {
 
   def toProto(header: Header): HeaderProtoMessage = HeaderProtoMessage()
     .withVersion(ByteString.copyFrom(Array(header.version)))
@@ -247,18 +244,25 @@ object HeaderSerializer extends Serializer[Header] {
     .withDifficulty(header.difficulty.toLong)
     .withEquihashSolution(EquihashSolution.toProto(header.equihashSolution))
 
-  def fromProto(headerM: HeaderProtoMessage): Header = Header(
-    headerM.version.toByteArray.head,
-    ModifierId @@ headerM.parentId.toByteArray,
-    Digest32 @@ headerM.adProofsRoot.toByteArray,
-    ADDigest @@ headerM.stateRoot.toByteArray,
-    Digest32 @@ headerM.transactionsRoot.toByteArray,
-    headerM.timestamp,
-    headerM.height,
-    headerM.nonce,
-    Difficulty @@ BigInt(headerM.difficulty),
-    headerM.equihashSolution.map(m => EquihashSolution(m.ints)).get
-  )
+  def fromProto(headerM: Array[Byte]): Try[Header] = Try {
+    val headerProtoMessage: HeaderProtoMessage = HeaderProtoMessage.parseFrom(headerM)
+    Header(
+      headerProtoMessage.version.toByteArray.head,
+      ModifierId @@ headerProtoMessage.parentId.toByteArray,
+      Digest32 @@ headerProtoMessage.adProofsRoot.toByteArray,
+      ADDigest @@ headerProtoMessage.stateRoot.toByteArray,
+      Digest32 @@ headerProtoMessage.transactionsRoot.toByteArray,
+      headerProtoMessage.timestamp,
+      headerProtoMessage.height,
+      headerProtoMessage.nonce,
+      Difficulty @@ BigInt(headerProtoMessage.difficulty),
+      headerProtoMessage.equihashSolution.map(m => EquihashSolution(m.ints)).get
+    )
+  }
+
+}
+
+object HeaderSerializer extends Serializer[Header] {
 
   def bytesWithoutPow(h: Header): Array[Byte] =
     Bytes.concat(

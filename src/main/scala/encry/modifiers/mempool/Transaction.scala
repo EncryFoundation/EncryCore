@@ -1,6 +1,6 @@
 package encry.modifiers.mempool
 
-import TransactionProto.DirectiveProtoMessage.{AssetIssuingDirectiveProtoMessage, DataDirectiveProtoMessage, ScriptedAssetDirectiveProtoMessage, TransferDirectiveProtoMessage}
+import TransactionProto.DirectiveProtoMessage.{AssetIssuingDirectiveProtoMessage, DataDirectiveProtoMessage, Directives, ScriptedAssetDirectiveProtoMessage, TransferDirectiveProtoMessage}
 import TransactionProto.TransactionProtoMessage
 import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
@@ -108,11 +108,6 @@ object Transaction {
       defaultProofOpt
     )
   }
-}
-
-object TransactionSerializer extends Serializer[Transaction] {
-
-  case object SerializationException extends Exception("Serialization failed.")
 
   def toProto(transaction: Transaction): TransactionProtoMessage = TransactionProtoMessage()
     .withFee(transaction.fee)
@@ -130,44 +125,56 @@ object TransactionSerializer extends Serializer[Transaction] {
     }.to[scala.collection.immutable.IndexedSeq])
     .withProof(transaction.defaultProofOpt.map(x => ByteString.copyFrom(x.bytes)).getOrElse(ByteString.EMPTY))
 
-  def fromProto(message: TransactionProtoMessage): Transaction = Transaction(
-    message.fee,
-    message.timestamp,
-    message.inputs.map(x => InputSerializer.parseBytes(x.toByteArray).get),
-    message.directives.map { x =>
-      if (x.directives.isAssetIssuingDirective) {
-        val a = x.directives.assetIssuingDirective.get
-        AssetIssuingDirective(
-          a.contractHash.toByteArray,
-          a.amount
-        )
+  def fromProto(message: Array[Byte]): Try[Transaction] = Try {
+    val transactionProtoMessage: TransactionProtoMessage = TransactionProtoMessage.parseFrom(message)
+    Transaction(
+      transactionProtoMessage.fee,
+      transactionProtoMessage.timestamp,
+      transactionProtoMessage.inputs.map(x => InputSerializer.parseBytes(x.toByteArray).get),
+      transactionProtoMessage.directives.map { x => x.directives match {
+//        case directive@Directives.DataDirective =>
+
       }
-      else if (x.directives.isDataDirective) {
-        val a = x.directives.dataDirective.get
-        DataDirective(
-          a.contractHash.toByteArray,
-          a.data.toByteArray
-        )
-      }
-      else if (x.directives.isScriptedAssetDirective) {
-        val a = x.directives.scriptedAssetDirective.get
-        ScriptedAssetDirective(
-          a.contractHash.toByteArray,
-          a.amount,
-          a.tokenIdOpt.map(x => ADKey @@ x.tokenIdOpt.toByteArray)
-        )
-      }
-      else {
-        val a = x.directives.transferDirective.get
-        TransferDirective(
-          a.address,
-          a.amount,
-          a.tokenIdOpt.map(x => ADKey @@ x.tokenIdOpt.toByteArray)
-        )
-      }
-    },
-    ProofSerializer.parseBytes(message.proof.toByteArray).toOption
-  )
+
+        if (x.directives.isAssetIssuingDirective) {
+          val a = x.directives.assetIssuingDirective.get
+          AssetIssuingDirective(
+            a.contractHash.toByteArray,
+            a.amount
+          )
+        }
+        else if (x.directives.isDataDirective) {
+          val a = x.directives.dataDirective.get
+          DataDirective(
+            a.contractHash.toByteArray,
+            a.data.toByteArray
+          )
+        }
+        else if (x.directives.isScriptedAssetDirective) {
+          val a = x.directives.scriptedAssetDirective.get
+          ScriptedAssetDirective(
+            a.contractHash.toByteArray,
+            a.amount,
+            a.tokenIdOpt.map(x => ADKey @@ x.tokenIdOpt.toByteArray)
+          )
+        }
+        else {
+          val a = x.directives.transferDirective.get
+          TransferDirective(
+            a.address,
+            a.amount,
+            a.tokenIdOpt.map(x => ADKey @@ x.tokenIdOpt.toByteArray)
+          )
+        }
+      },
+      ProofSerializer.parseBytes(transactionProtoMessage.proof.toByteArray).toOption
+    )
+  }
+}
+
+object TransactionSerializer extends Serializer[Transaction] {
+
+  case object SerializationException extends Exception("Serialization failed.")
 
   override def toBytes(obj: Transaction): Array[Byte] = {
     Bytes.concat(
