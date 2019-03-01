@@ -10,7 +10,7 @@ import encry.modifiers.history._
 import encry.settings._
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
-import encry.storage.iodb.versionalIODB.IODBWrapperForHistory
+import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.NetworkTimeProvider
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
@@ -205,7 +205,7 @@ object EncryHistory extends StrictLogging {
         val historyObjectsDir: File = getHistoryObjectsDir(settingsEncry)
         val indexStore: LSMStore = new LSMStore(historyIndexDir, keepVersions = 0)
         val objectsStore: LSMStore = new LSMStore(historyObjectsDir, keepVersions = 0)
-        IODBWrapperForHistory(indexStore, objectsStore)
+        IODBHistoryWrapper(indexStore, objectsStore)
       case VersionalStorage.LevelDB =>
         logger.info("Init history with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(historyIndexDir, new Options)

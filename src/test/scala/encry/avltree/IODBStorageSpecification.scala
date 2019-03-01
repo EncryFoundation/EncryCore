@@ -2,7 +2,7 @@ package encry.avltree
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.avltree.helpers.TestHelper
-import encry.storage.levelDb.versionalLevelDB.{LevelDbElem, VersionalLevelDB}
+import encry.storage.levelDb.versionalLevelDB.{LevelDbDiff, VersionalLevelDB}
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import org.encryfoundation.common.Algos
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
@@ -32,14 +32,14 @@ class IODBStorageSpecification extends PropSpec
       keys += pair
       val nextVersion = LevelDBVersion @@ Blake2b256(version).untag(Digest32)
       store.insert(
-        LevelDbElem(
+        LevelDbDiff(
           nextVersion,
           List(pair)
         )
       )
       store.rollbackTo(version)
       store.insert(
-        LevelDbElem(
+        LevelDbDiff(
           nextVersion,
           List(pair)
         )

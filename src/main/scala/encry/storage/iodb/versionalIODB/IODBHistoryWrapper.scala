@@ -10,7 +10,7 @@ import org.encryfoundation.common.Algos
   * @param store
   * @param objectStore
   */
-case class IODBWrapperForHistory(store: Store, objectStore: Store) extends VersionalStorage {
+case class IODBHistoryWrapper(store: Store, objectStore: Store) extends VersionalStorage {
 
   private val iodbWrapper = IODBWrapper(store)
 

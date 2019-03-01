@@ -16,7 +16,7 @@ object LevelDbFactory extends StrictLogging {
       factory     <- Try(loader.loadClass(factoryName).getConstructor().newInstance().asInstanceOf[DBFactory]).toOption
     } yield (factoryName, factory)
 
-    val (fName, f) = pairs.headOption.getOrElse(throw new Exception(s"Could not load any of the factory classes: $nativeFactory, $javaFactory"))
+    val (fName, f) = pairs.headOption.getOrElse(throw new RuntimeException(s"Could not load any of the factory classes: $nativeFactory, $javaFactory"))
     if (fName == javaFactory) logger.warn("Using the pure java LevelDB implementation which is still experimental")
     else logger.trace(s"Loaded $fName with $f")
     f

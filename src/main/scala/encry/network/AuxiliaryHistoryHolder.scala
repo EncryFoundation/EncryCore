@@ -9,7 +9,7 @@ import encry.modifiers.EncryPersistentModifier
 import encry.network.AuxiliaryHistoryHolder._
 import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.VersionalStorage
-import encry.storage.iodb.versionalIODB.IODBWrapperForHistory
+import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.NetworkTimeProvider
 import encry.view.history.EncryHistory
@@ -68,7 +68,7 @@ object AuxiliaryHistoryHolder {
         val historyObjectsDir: File = getHistoryObjectsDir(settingsEncry)
         val indexStore: LSMStore = new LSMStore(historyIndexDir, keepVersions = 0)
         val objectsStore: LSMStore = new LSMStore(historyObjectsDir, keepVersions = 0)
-        IODBWrapperForHistory(indexStore, objectsStore)
+        IODBHistoryWrapper(indexStore, objectsStore)
       case VersionalStorage.LevelDB =>
         val levelDBInit = LevelDbFactory.factory.open(historyIndexDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))

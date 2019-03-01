@@ -1,14 +1,16 @@
 package encry.storage.iodb.versionalIODB
 
+import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import io.iohk.iodb.{ByteArrayWrapper, Store}
+import org.encryfoundation.common.Algos
 
 /**
   * Wrapper, which extends VersionalStorage trait
   * @param store
   */
-case class IODBWrapper(store: Store) extends VersionalStorage {
+case class IODBWrapper(store: Store) extends VersionalStorage with StrictLogging {
 
   override def get(key: StorageKey): Option[StorageValue] =
     store.get(ByteArrayWrapper(key)).map(StorageValue @@ _.data)
@@ -25,6 +27,7 @@ case class IODBWrapper(store: Store) extends VersionalStorage {
   override def insert(version: StorageVersion,
                       toInsert: List[(StorageKey, StorageValue)],
                       toDelete: List[StorageKey] = List.empty): Unit = {
+    logger.info(s"Update to version: ${Algos.encode(version)}")
     store.update(
       ByteArrayWrapper(version),
       toDelete.map(ByteArrayWrapper.apply),

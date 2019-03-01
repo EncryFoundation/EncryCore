@@ -77,7 +77,7 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
       newBalances.foldLeft(Array.emptyByteArray) { case (acc, (id, balance)) =>
         acc ++ Algos.decode(id).get ++ Longs.toByteArray(balance)
        }
-    levelDb.insert(LevelDbElem(LevelDBVersion @@ modifierId.untag(ModifierId),
+    levelDb.insert(LevelDbDiff(LevelDBVersion @@ modifierId.untag(ModifierId),
       newBalanceKeyValue :: bxsToInsert.map(bx => (VersionalLevelDbKey @@ bx.id.untag(ADKey),
         VersionalLevelDbValue @@ bx.bytes)).toList,
       spentBxs.map(elem => VersionalLevelDbKey @@ elem.id.untag(ADKey)))

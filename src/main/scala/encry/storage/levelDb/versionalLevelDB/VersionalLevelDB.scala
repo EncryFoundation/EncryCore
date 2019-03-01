@@ -46,7 +46,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     * @param newElem
     */
   //todo: refactor
-  def insert(newElem: LevelDbElem): Unit = {
+  def insert(newElem: LevelDbDiff): Unit = {
     assert(newElem.version.length == settings.versionKeySize,
       s"Version length is incorrect! Should be: ${settings.versionKeySize}, but get: ${newElem.version.length}")
     val readOptions = new ReadOptions()

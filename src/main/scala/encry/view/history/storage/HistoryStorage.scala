@@ -4,7 +4,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.HistoryModifierSerializer
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
-import encry.storage.iodb.versionalIODB.IODBWrapperForHistory
+import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.VLDBWrapper
 import encry.storage.{EncryStorage, VersionalStorage}
 import encry.utils.CoreTaggedTypes.ModifierId
@@ -18,7 +18,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
 
   def modifierById(id: ModifierId): Option[EncryPersistentModifier] = {
     val possibleMod = store match {
-      case iodb: IODBWrapperForHistory =>
+      case iodb: IODBHistoryWrapper =>
         iodb.objectStore.get(ByteArrayWrapper(id)).map(_.data)
       case _: VLDBWrapper =>
         store.get(StorageKey @@ id.untag(ModifierId))
@@ -35,7 +35,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
 
   def insertObjects(objectsToInsert: Seq[EncryPersistentModifier]): Unit =
     store match {
-      case iodb: IODBWrapperForHistory =>
+      case iodb: IODBHistoryWrapper =>
         iodb.objectStore.update(Random.nextLong(), Seq.empty,
           objectsToInsert.map(obj => ByteArrayWrapper(obj.id) -> ByteArrayWrapper(HistoryModifierSerializer.toBytes(obj))))
       case _: VLDBWrapper =>
@@ -52,7 +52,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
                  indexesToInsert: Seq[(Array[Byte], Array[Byte])],
                  objectsToInsert: Seq[EncryPersistentModifier]): Unit = {
     store match {
-      case _: IODBWrapperForHistory =>
+      case _: IODBHistoryWrapper =>
         insertObjects(objectsToInsert)
         insert(
           StorageVersion @@ version,
@@ -74,7 +74,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
 
   def containsObject(id: ModifierId): Boolean =
     store match {
-      case iodb: IODBWrapperForHistory =>
+      case iodb: IODBHistoryWrapper =>
         iodb.objectStore.get(ByteArrayWrapper(id)).isDefined
       case _: VLDBWrapper =>
         store.get(StorageKey @@ id.untag(ModifierId)).isDefined
@@ -82,7 +82,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
 
   def removeObjects(ids: Seq[ModifierId]): Unit =
     store match {
-      case iodb: IODBWrapperForHistory =>
+      case iodb: IODBHistoryWrapper =>
         iodb.objectStore.update(Random.nextLong(), ids.map(ByteArrayWrapper.apply), Seq.empty)
       case _: VLDBWrapper =>
         store.insert(

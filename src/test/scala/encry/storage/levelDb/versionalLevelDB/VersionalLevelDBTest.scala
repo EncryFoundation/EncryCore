@@ -249,7 +249,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     val vldbInit = VersionalLevelDBCompanion(levelDBInit, dummyLevelDBSettings)
 
-    val levelDbElems: Seq[LevelDbElem] = generateRandomLevelDbElemsWithSameKeys(levelDbElemsQty, 2)
+    val levelDbElems: Seq[LevelDbDiff] = generateRandomLevelDbElemsWithSameKeys(levelDbElemsQty, 2)
 
     levelDbElems.foreach(vldbInit.insert)
 
@@ -271,7 +271,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     val vldbInit = VersionalLevelDBCompanion(levelDBInit, dummyLevelDBSettings)
 
-    val levelDbElems: Seq[LevelDbElem] = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, 100)
+    val levelDbElems: Seq[LevelDbDiff] = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, 100)
 
     levelDbElems.foreach(vldbInit.insert)
 

@@ -1,7 +1,7 @@
 package encry.utils.levelDBUtils
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.storage.levelDb.versionalLevelDB.LevelDbElem
+import encry.storage.levelDb.versionalLevelDB.LevelDbDiff
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import io.iohk.iodb.ByteArrayWrapper
 import scorex.utils.Random
@@ -23,10 +23,10 @@ trait LevelDbUnitsGenerator extends StrictLogging {
                            valueSize: Int = defaultValueSize): (VersionalLevelDbKey, VersionalLevelDbValue) =
     (generateRandomKey(keySize), generateRandomValue(valueSize))
 
-  def generateRandomLevelDbElemsWithoutDeletions(qty: Int, qtyOfElemsToInsert: Int): List[LevelDbElem] =
-    (0 until qty).foldLeft(List.empty[LevelDbElem]) {
+  def generateRandomLevelDbElemsWithoutDeletions(qty: Int, qtyOfElemsToInsert: Int): List[LevelDbDiff] =
+    (0 until qty).foldLeft(List.empty[LevelDbDiff]) {
       case (acc, i) =>
-        LevelDbElem(
+        LevelDbDiff(
           LevelDBVersion @@ Random.randomBytes(),
           List((0 until qtyOfElemsToInsert).map(_ => genRandomInsertValue()): _*)
         ) :: acc
@@ -38,12 +38,12 @@ trait LevelDbUnitsGenerator extends StrictLogging {
     * @param qtyOfElemsToInsert
     * @return
     */
-  def generateRandomLevelDbElemsWithRandomDeletions(qty: Int, qtyOfElemsToInsert: Int): Seq[LevelDbElem] =
-    (0 until qty).foldLeft(Seq.empty[LevelDbElem], Seq.empty[VersionalLevelDbKey]) {
+  def generateRandomLevelDbElemsWithRandomDeletions(qty: Int, qtyOfElemsToInsert: Int): Seq[LevelDbDiff] =
+    (0 until qty).foldLeft(Seq.empty[LevelDbDiff], Seq.empty[VersionalLevelDbKey]) {
       case ((acc, keys), _) =>
         val elemsToInsert = List((0 until qtyOfElemsToInsert).map(_ => genRandomInsertValue()): _*)
         val randomElemToDelete = keys(ScalaRandom.nextInt(keys.length))
-        (acc :+ LevelDbElem(
+        (acc :+ LevelDbDiff(
           LevelDBVersion @@ Random.randomBytes(),
           elemsToInsert,
           Seq(randomElemToDelete)
@@ -56,20 +56,20 @@ trait LevelDbUnitsGenerator extends StrictLogging {
     * @param qtyOfElemsToInsert
     * @return
     */
-  def generateRandomLevelDbElemsWithLinkedDeletions(qty: Int, qtyOfElemsToInsert: Int): Seq[LevelDbElem] =
-    (0 until qty).foldLeft(Seq.empty[LevelDbElem]) {
+  def generateRandomLevelDbElemsWithLinkedDeletions(qty: Int, qtyOfElemsToInsert: Int): Seq[LevelDbDiff] =
+    (0 until qty).foldLeft(Seq.empty[LevelDbDiff]) {
       case (acc, _) =>
-        acc :+ LevelDbElem(
+        acc :+ LevelDbDiff(
           LevelDBVersion @@ Random.randomBytes(),
           List((0 until qtyOfElemsToInsert).map(_ => genRandomInsertValue()): _*),
           acc.lastOption.map(_.elemsToInsert.map(_._1)).getOrElse(Seq.empty[VersionalLevelDbKey])
         )
     }
 
-  def generateRandomLevelDbElemsWithSameKeys(qty: Int, qtyOfElemsToInsert: Int): Seq[LevelDbElem] = {
-    (0 until qty).foldLeft(Seq.empty[LevelDbElem]) {
+  def generateRandomLevelDbElemsWithSameKeys(qty: Int, qtyOfElemsToInsert: Int): Seq[LevelDbDiff] = {
+    (0 until qty).foldLeft(Seq.empty[LevelDbDiff]) {
       case (acc, _) =>
-        acc :+ LevelDbElem(
+        acc :+ LevelDbDiff(
           LevelDBVersion @@ Random.randomBytes(),
           acc.lastOption
             .map(_.elemsToInsert.map(elem => (elem._1, generateRandomValue())))

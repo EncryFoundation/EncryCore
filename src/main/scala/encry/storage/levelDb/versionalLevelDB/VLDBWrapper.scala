@@ -22,7 +22,7 @@ case class VLDBWrapper(vldb: VersionalLevelDB) extends VersionalStorage {
                       toInsert: List[(StorageKey, StorageValue)],
                       toDelete: List[StorageKey] = List.empty): Unit = {
     vldb.insert(
-      LevelDbElem(
+      LevelDbDiff(
         LevelDBVersion @@ version.untag(StorageVersion),
         toInsert.map{case (key, value) =>
           VersionalLevelDbKey @@ key.untag(StorageKey) -> VersionalLevelDbValue @@ value.untag(StorageValue)
