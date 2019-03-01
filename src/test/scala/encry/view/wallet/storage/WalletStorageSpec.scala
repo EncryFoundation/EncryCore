@@ -2,17 +2,14 @@ package encry.view.wallet.storage
 
 import encry.settings.LevelDBSettings
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
-import encry.storage.levelDb.versionalLevelDB.{LevelDbElem, LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.FileHelper
 import encry.view.wallet.WalletStorage
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.iq80.leveldb.Options
 import org.scalatest.{Matchers, PropSpec}
 import scorex.utils.{Random => ScorexRandom}
-
-import scala.util.{Random, Try}
+import scala.util.Try
 
 class WalletStorageSpec extends PropSpec with Matchers {
 
