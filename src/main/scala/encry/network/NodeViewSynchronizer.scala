@@ -1,13 +1,14 @@
 package encry.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
 import encry.consensus.SyncInfo
 import encry.local.miner.Miner.{DisableMining, StartMining}
-import encry.modifiers.history.{Block, Payload}
-import encry.modifiers.mempool.Transaction
+import encry.modifiers.history._
+import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer}
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
 import encry.network.DeliveryManager.FullBlockChainSynced
@@ -120,12 +121,21 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case FullBlockChainSynced =>
       chainSynced = true
       deliveryManager ! FullBlockChainSynced
-    case ResponseFromLocal(peer, _, modifiers: Seq[NodeViewModifier]) =>
+    case ResponseFromLocal(peer, typeId, modifiers: Seq[NodeViewModifier]) =>
       if (modifiers.nonEmpty) {
         ///TODO ADD PROTO SER
-        val m: (ModifierTypeId, Map[ModifierId, Array[Byte]]) =
-          modifiers.head.modifierTypeId -> modifiers.map(m => m.id -> m.bytes).toMap
-        peer.handlerRef ! ModifiersNetworkMessage(m)
+        if (typeId == Header.modifierTypeId)
+          peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modifiers.map {
+            case h: Header => h.id -> HeaderProtoSerializer.toProto(h).toByteArray
+          }.toMap)
+        if (typeId == Payload.modifierTypeId)
+          peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modifiers.map {
+            case h: Payload => h.id -> PayloadProtoSerializer.toProto(h).toByteArray
+          }.toMap)
+        if (typeId == Transaction.ModifierTypeId)
+          peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modifiers.map {
+            case h: Transaction => h.id -> TransactionProtoSerializer.toProto(h).toByteArray
+          }.toMap)
       }
     case a: Any => logger.error(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
   }

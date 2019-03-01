@@ -1,7 +1,8 @@
 package encry.modifiers.mempool.directive
 
-import TransactionProto.DirectiveProtoMessage
-import TransactionProto.DirectiveProtoMessage.{ADKeyProto, ScriptedAssetDirectiveProtoMessage}
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage.DirectiveProto.{DataDirectiveProto, ScriptedAssetDirectiveProto}
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage.{ADKeyProto, DataDirectiveProtoMessage, DirectiveProto, ScriptedAssetDirectiveProtoMessage}
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.ModifierId
@@ -39,25 +40,7 @@ case class ScriptedAssetDirective(contractHash: ContractHash,
   override def toDbVersion(txId: ModifierId, numberInTx: Int): DirectiveDBVersion =
     DirectiveDBVersion(Base16.encode(txId), numberInTx, typeId, isValid, Base16.encode(contractHash), amount, "", tokenIdOpt.map(Base16.encode), "")
 
-  override def toProto(directive: Directive): DirectiveProtoMessage = {
-    val b: ScriptedAssetDirectiveProtoMessage = directive match {
-      case s: ScriptedAssetDirective =>
-        ScriptedAssetDirectiveProtoMessage()
-          .withContractHash(ByteString.copyFrom(s.contractHash))
-          .withAmount(s.amount)
-          .withTokenIdOpt(ADKeyProto().withTokenIdOpt(ByteString.copyFrom(s.tokenIdOpt.getOrElse(Array.emptyByteArray))))
-    }
-    DirectiveProtoMessage().withScriptedAssetDirective(b)
-  }
-
-  def fromProto(message: DirectiveProtoMessage): Directive = {
-    val a = message.getScriptedAssetDirective
-    ScriptedAssetDirective(
-      a.contractHash.toByteArray,
-      a.amount,
-      a.tokenIdOpt.map(x => ADKey @@ x.tokenIdOpt.toByteArray)
-    )
-  }
+  override def toDirectiveProto: DirectiveProtoMessage = ScriptedAssetDirectiveProtoSerializer.toProto(this)
 }
 
 object ScriptedAssetDirective {
@@ -78,6 +61,26 @@ object ScriptedAssetDirective {
   } yield Algos.decode(contractHash)
     .map(ch => ScriptedAssetDirective(ch, amount, tokenIdOpt.flatMap(id => Algos.decode(id).map(ADKey @@ _).toOption)))
     .getOrElse(throw new Exception("Decoding failed"))
+}
+
+object ScriptedAssetDirectiveProtoSerializer extends ProtoDirectiveSerializer[ScriptedAssetDirective] {
+
+  ///TODO REMOVE GET
+  override def toProto(message: ScriptedAssetDirective): DirectiveProtoMessage =
+    DirectiveProtoMessage().withScriptedAssetDirectiveProto(ScriptedAssetDirectiveProtoMessage()
+      .withContractHash(ByteString.copyFrom(message.contractHash))
+      .withAmount(message.amount)
+      .withTokenIdOpt(message.tokenIdOpt.map(element => ADKeyProto().withTokenIdOpt(ByteString.copyFrom(element))).get))
+
+  override def fromProto(message: DirectiveProtoMessage): Option[ScriptedAssetDirective] =
+    message.directiveProto.scriptedAssetDirectiveProto match {
+      case Some(value) => Some(ScriptedAssetDirective(
+        value.contractHash.toByteArray,
+        value.amount,
+        value.tokenIdOpt.map(x => ADKey @@ x.tokenIdOpt.toByteArray))
+      )
+      case None => Option.empty[ScriptedAssetDirective]
+    }
 }
 
 object ScriptedAssetDirectiveSerializer extends Serializer[ScriptedAssetDirective] {

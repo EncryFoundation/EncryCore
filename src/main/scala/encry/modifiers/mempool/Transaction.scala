@@ -1,15 +1,12 @@
 package encry.modifiers.mempool
 
-import TransactionProto.DirectiveProtoMessage.{AssetIssuingDirectiveProtoMessage, DataDirectiveProtoMessage, Directives, ScriptedAssetDirectiveProtoMessage, TransferDirectiveProtoMessage}
 import TransactionProto.TransactionProtoMessage
-import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.NodeViewModifier
 import encry.modifiers.mempool.directive._
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, DataBox}
 import encry.modifiers.state.box.EncryBaseBox
-import encry.EncryApp.timeProvider
 import io.circe.{Decoder, HCursor}
 import io.circe.syntax._
 import org.encryfoundation.common.transaction._
@@ -22,14 +19,13 @@ import org.encryfoundation.common.transaction.{Input, Proof}
 import org.encryfoundation.prismlang.core.PConvertible
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
-
 import scala.util.{Success, Try}
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
+import com.google.protobuf.ByteString
 import encry.modifiers.history.Block
 import encry.modifiers.history.Block.Timestamp
 import encry.validation.{ModifierValidator, ValidationResult}
-import encry.view.state.UtxoState
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
@@ -45,6 +41,8 @@ case class Transaction(fee: Amount,
   override type M = Transaction
 
   override def serializer: Serializer[Transaction] = TransactionSerializer
+
+  def toTransactionProto: TransactionProtoMessage = TransactionProtoSerializer.toProto(this)
 
   val messageToSign: Array[Byte] = UnsignedTransaction.bytesToSign(fee, timestamp, inputs, directives)
 
@@ -108,68 +106,31 @@ object Transaction {
       defaultProofOpt
     )
   }
+}
 
-  def toProto(transaction: Transaction): TransactionProtoMessage = TransactionProtoMessage()
-    .withFee(transaction.fee)
-    .withTimestamp(transaction.timestamp)
-    .withInputs(transaction.inputs.map(in => ByteString.copyFrom(in.bytes)).to[scala.collection.immutable.IndexedSeq])
-    .withDirectives(transaction.directives.map {
-      case assetIssuingDirective: AssetIssuingDirective =>
-        assetIssuingDirective.toProto(assetIssuingDirective)
-      case dataDirective: DataDirective =>
-        dataDirective.toProto(dataDirective)
-      case transferDirective: TransferDirective =>
-        transferDirective.toProto(transferDirective)
-      case scriptedAssetDirective: ScriptedAssetDirective =>
-        scriptedAssetDirective.toProto(scriptedAssetDirective)
-    }.to[scala.collection.immutable.IndexedSeq])
-    .withProof(transaction.defaultProofOpt.map(x => ByteString.copyFrom(x.bytes)).getOrElse(ByteString.EMPTY))
+trait ProtoTransactionSerializer[T] {
 
-  def fromProto(message: Array[Byte]): Try[Transaction] = Try {
-    val transactionProtoMessage: TransactionProtoMessage = TransactionProtoMessage.parseFrom(message)
-    Transaction(
-      transactionProtoMessage.fee,
-      transactionProtoMessage.timestamp,
-      transactionProtoMessage.inputs.map(x => InputSerializer.parseBytes(x.toByteArray).get),
-      transactionProtoMessage.directives.map { x => x.directives match {
-//        case directive@Directives.DataDirective =>
+  def toProto(message: T): TransactionProtoMessage
 
-      }
+  def fromProto(message: TransactionProtoMessage): Try[T]
+}
 
-        if (x.directives.isAssetIssuingDirective) {
-          val a = x.directives.assetIssuingDirective.get
-          AssetIssuingDirective(
-            a.contractHash.toByteArray,
-            a.amount
-          )
-        }
-        else if (x.directives.isDataDirective) {
-          val a = x.directives.dataDirective.get
-          DataDirective(
-            a.contractHash.toByteArray,
-            a.data.toByteArray
-          )
-        }
-        else if (x.directives.isScriptedAssetDirective) {
-          val a = x.directives.scriptedAssetDirective.get
-          ScriptedAssetDirective(
-            a.contractHash.toByteArray,
-            a.amount,
-            a.tokenIdOpt.map(x => ADKey @@ x.tokenIdOpt.toByteArray)
-          )
-        }
-        else {
-          val a = x.directives.transferDirective.get
-          TransferDirective(
-            a.address,
-            a.amount,
-            a.tokenIdOpt.map(x => ADKey @@ x.tokenIdOpt.toByteArray)
-          )
-        }
-      },
-      ProofSerializer.parseBytes(transactionProtoMessage.proof.toByteArray).toOption
-    )
-  }
+object TransactionProtoSerializer extends ProtoTransactionSerializer[Transaction] {
+
+  override def toProto(message: Transaction): TransactionProtoMessage = TransactionProtoMessage()
+    .withFee(message.fee)
+    .withTimestamp(message.timestamp)
+    .withInputs(message.inputs.map(input => ByteString.copyFrom(input.bytes)).to[scala.collection.immutable.IndexedSeq])
+    .withDirectives(message.directives.map(_.toDirectiveProto).to[scala.collection.immutable.IndexedSeq])
+    .withProof(message.defaultProofOpt.map(el => ByteString.copyFrom(el.bytes)).getOrElse(ByteString.EMPTY))
+
+  override def fromProto(message: TransactionProtoMessage): Try[Transaction] = Try(Transaction(
+    message.fee,
+    message.timestamp,
+    message.inputs.map(element => InputSerializer.parseBytes(element.toByteArray).get),
+    message.directives.map(directive => DirectiveProtoSerializer.fromProto(directive).get),
+    ProofSerializer.parseBytes(message.proof.toByteArray).toOption
+  ))
 }
 
 object TransactionSerializer extends Serializer[Transaction] {

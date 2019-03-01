@@ -1,13 +1,11 @@
 package encry.crypto.equihash
 
 import java.util
-
-import HeaderProto.EquihashSolutionMessage
+import HeaderProto.HeaderProtoMessage.EquihashSolutionMessage
 import com.google.common.primitives.Ints
 import encry.settings.Constants
 import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.common.serialization.{BytesSerializable, Serializer}
-
 import scala.util.Try
 
 case class EquihashSolution(ints: Seq[Int]) extends BytesSerializable {
@@ -22,6 +20,7 @@ case class EquihashSolution(ints: Seq[Int]) extends BytesSerializable {
 object EquihashSolution {
 
   val length: Int = Constants.Chain.HashLength
+
   def empty: EquihashSolution = EquihashSolution(Seq.fill(length)(0))
 
   def toProto(es: EquihashSolution): EquihashSolutionMessage = EquihashSolutionMessage().withInts(es.ints)

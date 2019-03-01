@@ -1,6 +1,6 @@
 package encry.modifiers.history
 
-import BlockProto.AdProofsProtoMessage
+import BlockProto.BlockProtoMessage.AdProofsProtoMessage
 import com.google.common.primitives.Bytes
 import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
@@ -29,6 +29,8 @@ case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
   override lazy val serializer: Serializer[ADProofs] = ADProofSerializer
 
   override def toString: String = s"ADProofs(${Algos.encode(id)},${Algos.encode(headerId)},${Algos.encode(proofBytes)})"
+
+  def toProtoADProofs: AdProofsProtoMessage = ADProofsProtoSerializer.toProto(this)
 
   /**
     * Verify a set of box(outputs) operations on authenticated UTXO set by using the proof (this class wraps).
@@ -75,9 +77,9 @@ object ADProofs {
   val KeyLength = 32
 
   implicit val jsonEncoder: Encoder[ADProofs] = (p: ADProofs) => Map(
-    "headerId"   -> Algos.encode(p.headerId).asJson,
+    "headerId" -> Algos.encode(p.headerId).asJson,
     "proofBytes" -> Algos.encode(p.proofBytes).asJson,
-    "digest"     -> Algos.encode(p.digest).asJson
+    "digest" -> Algos.encode(p.digest).asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[ADProofs] = (c: HCursor) => {
@@ -90,23 +92,11 @@ object ADProofs {
     )
   }
 
-  def toProto(adProofs: Option[ADProofs]): AdProofsProtoMessage = {
-    if (adProofs.isDefined)
-      AdProofsProtoMessage()
-        .withHeaderId(ByteString.copyFrom(adProofs.get.headerId))
-        .withProofBytes(ByteString.copyFrom(adProofs.get.proofBytes))
-    else AdProofsProtoMessage.defaultInstance
-  }
-
-  def fromProto(message: AdProofsProtoMessage) = ADProofs(
-    ModifierId @@ message.headerId.toByteArray,
-    SerializedAdProof @@ message.proofBytes.toByteArray
-  )
-
   def proofDigest(proofBytes: SerializedAdProof): Digest32 = Algos.hash(proofBytes)
 
   /**
     * Convert operation over a box into an AVL+ tree modification
+    *
     * @param op - operation over a box
     * @return AVL+ tree modification
     */
@@ -118,6 +108,19 @@ object ADProofs {
       }
       case Removal(id) => Remove(id)
     }
+}
+
+object ADProofsProtoSerializer {
+
+  def toProto(adProofs: ADProofs): AdProofsProtoMessage = AdProofsProtoMessage()
+    .withHeaderId(ByteString.copyFrom(adProofs.headerId))
+    .withProofBytes(ByteString.copyFrom(adProofs.proofBytes))
+
+
+  def fromProto(message: AdProofsProtoMessage): ADProofs = ADProofs(
+    ModifierId @@ message.headerId.toByteArray,
+    SerializedAdProof @@ message.proofBytes.toByteArray
+  )
 }
 
 object ADProofSerializer extends Serializer[ADProofs] {

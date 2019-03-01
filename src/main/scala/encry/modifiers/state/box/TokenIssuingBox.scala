@@ -1,7 +1,7 @@
 package encry.modifiers.state.box
 
 import BoxesProto.BoxProtoMessage
-import BoxesProto.BoxProtoMessage.{AssetBoxProtoMessage, DataBoxProtoMessage, TokenIssuingBoxProtoMessage}
+import BoxesProto.BoxProtoMessage.TokenIssuingBoxProtoMessage
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.google.protobuf.ByteString
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
@@ -38,28 +38,9 @@ case class TokenIssuingBox(override val proposition: EncryProposition,
       "amount" -> PValue(amount, Types.PInt)
     ), tpe)
 
-  override def toProto(box: EncryBaseBox): BoxProtoMessage = {
-    val a = box match {
-      case s: TokenIssuingBox =>
-        TokenIssuingBoxProtoMessage()
-          .withAmount(s.amount)
-          .withEncryPropositionProtoMessage(EncryPropositionSerializer.toProto(s.proposition))
-          .withNonce(s.nonce)
-          .withTokenId(ByteString.copyFrom(s.tokenId))
-    }
-    BoxProtoMessage().withTokenIssuingBox(a)
-  }
+  override def serializeToProto: BoxProtoMessage = TokenIssuingBox.toProto(this)
 
-  override def fromProto(message: BoxProtoMessage): EncryBaseBox = {
-    val a = message.getTokenIssuingBox
-    TokenIssuingBox(
-      a.encryPropositionProtoMessage.map(x => EncryPropositionSerializer.fromProto(x)).get,
-      a.nonce,
-      a.amount,
-      a.tokenId.toByteArray
-    )
-  }
-
+  override def serializeFromProto(message: BoxProtoMessage): Option[EncryBaseBox] = TokenIssuingBox.fromProto(message)
 }
 
 object TokenIssuingBox {
@@ -89,6 +70,24 @@ object TokenIssuingBox {
       amount,
       Algos.decode(tokenId).getOrElse(Array.emptyByteArray)
     )
+  }
+
+  def toProto(box: EncryBaseBox): BoxProtoMessage = box match {
+    case tokenIssuingBox: TokenIssuingBox =>
+      BoxProtoMessage().withTokenIssuingBox(TokenIssuingBoxProtoMessage()
+        .withPropositionProtoMessage(ByteString.copyFrom(box.proposition.contractHash))
+        .withNonce(box.nonce)
+        .withAmount(tokenIssuingBox.amount)
+        .withTokenId(ByteString.copyFrom(tokenIssuingBox.tokenId)))
+  }
+
+  def fromProto(message: BoxProtoMessage): Some[TokenIssuingBox] = message.box.tokenIssuingBox match {
+    case Some(value) => Some(TokenIssuingBox(
+      EncryProposition(value.propositionProtoMessage.toByteArray),
+      value.nonce,
+      value.amount,
+      value.tokenId.toByteArray
+    ))
   }
 }
 

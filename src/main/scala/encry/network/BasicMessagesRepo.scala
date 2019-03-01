@@ -35,7 +35,7 @@ object BasicMessagesRepo {
     def toInnerMessage: InnerMessage
   }
 
-  sealed trait ProtoSerializer[T] {
+  sealed trait ProtoNetworkMessagesSerializer[T] {
 
     def toProto(message: T): InnerMessage
 
@@ -124,7 +124,7 @@ object BasicMessagesRepo {
     override def toInnerMessage: InnerMessage = SyncInfoNetworkMessageSerializer.toProto(this)
   }
 
-  object SyncInfoNetworkMessageSerializer extends ProtoSerializer[SyncInfoNetworkMessage] {
+  object SyncInfoNetworkMessageSerializer extends ProtoNetworkMessagesSerializer[SyncInfoNetworkMessage] {
 
     override def toProto(message: SyncInfoNetworkMessage): InnerMessage =
       SyncInfoProtoMessage(sIPM().withLastHeaderIds(message.esi.lastHeaderIds.map(GoogleByteString.copyFrom)))
@@ -149,7 +149,7 @@ object BasicMessagesRepo {
     require(data._2.length < maxInvObjects, s"Inv message ${data._2.length} length bigger than max length $maxInvObjects!")
   }
 
-  object InvNetworkMessageSerializer extends ProtoSerializer[InvNetworkMessage] {
+  object InvNetworkMessageSerializer extends ProtoNetworkMessagesSerializer[InvNetworkMessage] {
 
     def toProto(message: InvNetworkMessage): InnerMessage = InvProtoMessage(InvPM()
       .withModifierTypeId(GoogleByteString.copyFrom(Array(message.data._1)))
@@ -177,7 +177,7 @@ object BasicMessagesRepo {
       s"Modifiers message ${data._2.length} length bigger than max length $maxInvObjects!")
   }
 
-  object RequestModifiersSerializer extends ProtoSerializer[RequestModifiersNetworkMessage] {
+  object RequestModifiersSerializer extends ProtoNetworkMessagesSerializer[RequestModifiersNetworkMessage] {
 
     override def toProto(message: RequestModifiersNetworkMessage): InnerMessage =
       RequestModifiersProtoMessage(rModsPM()
@@ -203,7 +203,7 @@ object BasicMessagesRepo {
       innerMessage.modifiersProtoMessage.map(_.toByteArray).getOrElse(Array.emptyByteArray)
   }
 
-  object ModifiersNetworkMessageSerializer extends ProtoSerializer[ModifiersNetworkMessage] {
+  object ModifiersNetworkMessageSerializer extends ProtoNetworkMessagesSerializer[ModifiersNetworkMessage] {
 
     override def toProto(message: ModifiersNetworkMessage): InnerMessage = ModifiersProtoMessage(ModifiersPM()
       .withModifierTypeId(GoogleByteString.copyFrom(Array(message.data._1)))
@@ -244,7 +244,7 @@ object BasicMessagesRepo {
       innerMessage.peersProtoMessage.map(_.toByteArray).getOrElse(Array.emptyByteArray)
   }
 
-  object PeersNetworkMessageSerializer extends ProtoSerializer[PeersNetworkMessage] {
+  object PeersNetworkMessageSerializer extends ProtoNetworkMessagesSerializer[PeersNetworkMessage] {
 
     override def toProto(message: PeersNetworkMessage): InnerMessage = PeersProtoMessage(PeersPM().withPeers(
       message.peers.map(element => InetSocketAddressProtoMessage().withHost(element.getHostName).withPort(element.getPort))
@@ -270,7 +270,7 @@ object BasicMessagesRepo {
       innerMessage.handshakeProtoMessage.map(_.toByteArray).getOrElse(Array.emptyByteArray)
   }
 
-  object HandshakeSerializer extends ProtoSerializer[Handshake] {
+  object HandshakeSerializer extends ProtoNetworkMessagesSerializer[Handshake] {
 
     override def toProto(message: Handshake): InnerMessage = HandshakeProtoMessage(hPM()
       .withProtocolVersion(GoogleByteString.copyFrom(message.protocolVersion))

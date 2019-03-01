@@ -34,11 +34,11 @@ message TransactionProtoMessage {
             bytes data = 2;
         }
 
-        oneof directivesLocal {
-            TransferDirectiveProtoMessage transferDirective = 1;
-            AssetIssuingDirectiveProtoMessage assetIssuingDirective = 2;
-            ScriptedAssetDirectiveProtoMessage scriptedAssetDirective = 3;
-            DataDirectiveProtoMessage dataDirective = 4;
+        oneof directiveProto {
+            TransferDirectiveProtoMessage transferDirectiveProto = 1;
+            AssetIssuingDirectiveProtoMessage assetIssuingDirectiveProto = 2;
+            ScriptedAssetDirectiveProtoMessage scriptedAssetDirectiveProto = 3;
+            DataDirectiveProtoMessage dataDirectiveProto = 4;
         }
     }
 

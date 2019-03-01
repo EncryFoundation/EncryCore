@@ -1,10 +1,27 @@
 package encry.modifiers.mempool.directive
 
-import TransactionProto.DirectiveProtoMessage
-import TransactionProto.DirectiveProtoMessage._
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage.{DirectiveProto, TransferDirectiveProtoMessage}
 import org.encryfoundation.common.serialization.Serializer
 
 import scala.util.{Failure, Try}
+
+trait ProtoDirectiveSerializer[T] {
+
+  def toProto(message: T): DirectiveProtoMessage
+
+  def fromProto(message: DirectiveProtoMessage): Option[T]
+}
+
+object DirectiveProtoSerializer {
+
+  def fromProto(message: DirectiveProtoMessage): Option[Directive] = message.directiveProto match {
+    case DirectiveProto.AssetIssuingDirectiveProto(_) => AssetIssuingDirectiveProtoSerializer.fromProto(message)
+    case DirectiveProto.DataDirectiveProto(_) => DataDirectiveProtoSerializer.fromProto(message)
+    case DirectiveProto.TransferDirectiveProto(_) => TransferDirectiveProtoSerializer.fromProto(message)
+    case DirectiveProto.ScriptedAssetDirectiveProto(_) => ScriptedAssetDirectiveProtoSerializer.fromProto(message)
+  }
+}
 
 object DirectiveSerializer extends Serializer[Directive] {
 
@@ -15,33 +32,6 @@ object DirectiveSerializer extends Serializer[Directive] {
     case dd: DataDirective => DataDirective.TypeId +: DataDirectiveSerializer.toBytes(dd)
     case m => throw new Exception(s"Serialization of unknown directive type: $m")
   }
-
-  def toBytes1(obj: Directive): Array[Byte] = obj match {
-    case td: TransferDirective => TransferDirective.TypeId +: td.toProto(td).toByteArray
-    case aid: AssetIssuingDirective =>
-      AssetIssuingDirective.TypeId +: aid.toProto(aid).toByteArray
-    case sad: ScriptedAssetDirective =>
-      ScriptedAssetDirective.TypeId +: sad.toProto(sad).toByteArray
-    case dd: DataDirective =>
-      DataDirective.TypeId +: dd.toProto(dd).toByteArray
-    case m => throw new Exception(s"Serialization of unknown directive type: $m")
-  }
-
-//  def parseBytes1(bytes: Array[Byte]): Try[Nothing] = Try {
-//    case a: TransferDirective if bytes.head == TransferDirective.`TypeId` =>
-//      val k = DirectiveProtoMessage().withTransferDirective(TransferDirectiveProtoMessage.parseFrom(bytes.tail))
-//      a.fromProto(k)
-//    case a: AssetIssuingDirective if bytes.head == AssetIssuingDirective.`TypeId` =>
-//      val k = DirectiveProtoMessage().withAssetIssuingDirective(AssetIssuingDirectiveProtoMessage.parseFrom(bytes.tail))
-//      a.fromProto(k)
-//    case a: ScriptedAssetDirective if bytes.head == ScriptedAssetDirective.`TypeId` =>
-//      val k = DirectiveProtoMessage().withScriptedAssetDirective(ScriptedAssetDirectiveProtoMessage.parseFrom(bytes.tail))
-//      a.fromProto(k)
-//    case a: DataDirective if bytes.head == DataDirective.`TypeId` =>
-//      val k = DirectiveProtoMessage().withDataDirective(DataDirectiveProtoMessage.parseFrom(bytes.tail))
-//      a.fromProto(k)
-//    case t => Failure(new Exception(s"Got unknown typeId: $t"))
-//  }
 
   override def parseBytes(bytes: Array[Byte]): Try[Directive] = Try(bytes.head).flatMap {
     case TransferDirective.`TypeId` => TransferDirectiveSerializer.parseBytes(bytes.tail)

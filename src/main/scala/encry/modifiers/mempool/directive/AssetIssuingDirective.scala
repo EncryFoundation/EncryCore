@@ -1,7 +1,8 @@
 package encry.modifiers.mempool.directive
 
-import TransactionProto.DirectiveProtoMessage
-import TransactionProto.DirectiveProtoMessage.AssetIssuingDirectiveProtoMessage
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage.{AssetIssuingDirectiveProtoMessage, DirectiveProto}
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage.DirectiveProto.AssetIssuingDirectiveProto
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.ModifierId
@@ -36,26 +37,10 @@ case class AssetIssuingDirective(contractHash: ContractHash, amount: Amount) ext
 
   override def serializer: Serializer[M] = AssetIssuingDirectiveSerializer
 
-  override def toProto(directive: Directive): DirectiveProtoMessage = {
-    val a: AssetIssuingDirectiveProtoMessage = directive match {
-      case s: AssetIssuingDirective =>
-        AssetIssuingDirectiveProtoMessage()
-          .withAmount(s.amount)
-          .withContractHash(ByteString.copyFrom(s.contractHash))
-    }
-    DirectiveProtoMessage().withAssetIssuingDirective(a)
-  }
-
-  override def fromProto(directive: DirectiveProtoMessage): AssetIssuingDirective = {
-    val a: AssetIssuingDirectiveProtoMessage = directive.getAssetIssuingDirective
-    AssetIssuingDirective(
-      a.contractHash.toByteArray,
-      a.amount
-    )
-  }
-
   override def toDbVersion(txId: ModifierId, numberInTx: Int): DirectiveDBVersion =
     DirectiveDBVersion(Base16.encode(txId), numberInTx, typeId, isValid, Base16.encode(contractHash), amount, "", None, "")
+
+  override def toDirectiveProto: DirectiveProtoMessage = AssetIssuingDirectiveProtoSerializer.toProto(this)
 }
 
 object AssetIssuingDirective {
@@ -76,6 +61,21 @@ object AssetIssuingDirective {
       .map(ch => AssetIssuingDirective(ch, amount))
       .getOrElse(throw new Exception("Decoding failed"))
   }
+}
+
+object AssetIssuingDirectiveProtoSerializer extends ProtoDirectiveSerializer[AssetIssuingDirective] {
+
+  override def toProto(message: AssetIssuingDirective): DirectiveProtoMessage =
+    DirectiveProtoMessage().withAssetIssuingDirectiveProto(AssetIssuingDirectiveProtoMessage()
+      .withAmount(message.amount)
+      .withContractHash(ByteString.copyFrom(message.contractHash))
+    )
+
+  override def fromProto(message: DirectiveProtoMessage): Option[AssetIssuingDirective] =
+    message.directiveProto.assetIssuingDirectiveProto match {
+      case Some(value) => Some(AssetIssuingDirective(value.contractHash.toByteArray, value.amount))
+      case None => Option.empty[AssetIssuingDirective]
+    }
 }
 
 object AssetIssuingDirectiveSerializer extends Serializer[AssetIssuingDirective] {

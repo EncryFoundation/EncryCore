@@ -15,9 +15,9 @@ trait EncryBaseBox extends Box[EncryProposition] with PConvertible {
 
   val nonce: Long
 
-  def toProto(box: EncryBaseBox): BoxProtoMessage
+  def serializeToProto: BoxProtoMessage
 
-  def fromProto(message: BoxProtoMessage): EncryBaseBox
+  def serializeFromProto(message: BoxProtoMessage): Option[EncryBaseBox]
 
   override lazy val id: ADKey = ADKey @@ Algos.hash(Longs.toByteArray(nonce)).updated(0, typeId)
 

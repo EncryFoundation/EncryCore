@@ -24,6 +24,8 @@ case class Payload(override val headerId: ModifierId, txs: Seq[Transaction])
 
   assert(txs.nonEmpty, "Block should contain at least 1 coinbase-like transaction")
 
+  def toProtoPayload: PayloadProtoMessage = PayloadProtoSerializer.toProto(this)
+
   override val modifierTypeId: ModifierTypeId = Payload.modifierTypeId
 
   override type M = Payload
@@ -41,13 +43,13 @@ case class Payload(override val headerId: ModifierId, txs: Seq[Transaction])
 object Payload {
 
   implicit val jsonEncoder: Encoder[Payload] = (bp: Payload) => Map(
-    "headerId"     -> Algos.encode(bp.headerId).asJson,
+    "headerId" -> Algos.encode(bp.headerId).asJson,
     "transactions" -> bp.txs.map(_.asJson).asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[Payload] = (c: HCursor) => {
     for {
-      headerId     <- c.downField("headerId").as[String]
+      headerId <- c.downField("headerId").as[String]
       transactions <- c.downField("transactions").as[Seq[Transaction]]
     } yield Payload(
       ModifierId @@ Algos.decode(headerId).getOrElse(Array.emptyByteArray),
@@ -59,16 +61,19 @@ object Payload {
 
   def rootHash(ids: Seq[ModifierId]): Digest32 = Algos.merkleTreeRoot(LeafData !@@ ids)
 
+}
+
+object PayloadProtoSerializer {
+
   def toProto(payload: Payload): PayloadProtoMessage = PayloadProtoMessage()
     .withHeaderId(ByteString.copyFrom(payload.headerId))
-    .withTxs(payload.transactions.map(x => Transaction.toProto(x)))
+    .withTxs(payload.transactions.map(_.toTransactionProto))
 
-  def fromProto(message: Array[Byte]): Try[Payload] = Try {
-    val payloadProtoMessage: PayloadProtoMessage = PayloadProtoMessage.parseFrom(message)
+  ///TODO remove get
+  def fromProto(payloadProtoMessage: PayloadProtoMessage): Try[Payload] = Try {
     Payload(
       ModifierId @@ payloadProtoMessage.headerId.toByteArray,
-      Seq.empty
-//      payloadProtoMessage.txs.map(x => Transaction.fromProto(x).get)
+      payloadProtoMessage.txs.map(x => TransactionProtoSerializer.fromProto(x).get)
     )
   }
 }
@@ -79,8 +84,8 @@ object PayloadSerializer extends Serializer[Payload] {
     Bytes.concat(
       obj.headerId,
       Ints.toByteArray(obj.transactions.size),
-      obj.transactions.map(tx => ArrayUtils.addAll(Ints.toByteArray(tx.bytes.length),tx.bytes))
-        .foldLeft(Array.emptyByteArray){case (acc, txBytes) => ArrayUtils.addAll(acc, txBytes)}
+      obj.transactions.map(tx => ArrayUtils.addAll(Ints.toByteArray(tx.bytes.length), tx.bytes))
+        .foldLeft(Array.emptyByteArray) { case (acc, txBytes) => ArrayUtils.addAll(acc, txBytes) }
     )
 
   override def parseBytes(bytes: Array[Byte]): Try[Payload] = Try {

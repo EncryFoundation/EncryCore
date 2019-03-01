@@ -1,6 +1,7 @@
 package encry.modifiers.history
 
 import BlockProto.BlockProtoMessage
+import BlockProto.BlockProtoMessage.AdProofsProtoMessage
 import com.google.common.primitives.{Bytes, Ints}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.mempool.directive.TransferDirective
@@ -93,17 +94,23 @@ object Block {
       None
     )
   }
+}
 
-//  def toProto(block: Block): BlockProtoMessage = BlockProtoMessage()
-//    .withHeader(Header.toProto(block.header))
-//    .withPayload(Payload.toProto(block.payload))
-//    .withAdProofsOpt(ADProofs.toProto(block.adProofsOpt))
-//
-//  def fromProto(message: BlockProtoMessage): Block = Block(
-//    message.header.map(x => Header.fromProto(x)).get.get,
-//    message.payload.map(x => Payload.fromProto(x)).get.get,
-//    message.adProofsOpt.map(x => ADProofs.fromProto(x))
-//  )
+object BlockProtoSerializer {
+
+    def toProto(block: Block): BlockProtoMessage = BlockProtoMessage()
+      .withHeader(block.header.toHeaderProto)
+      .withPayload(block.payload.toProtoPayload)
+      .withAdProofsOpt(block.adProofsOpt match {
+        case Some(value) => value.toProtoADProofs
+        case None => AdProofsProtoMessage.defaultInstance
+      })
+
+    def fromProto(message: BlockProtoMessage): Block = Block(
+      message.header.map(x => HeaderProtoSerializer.fromProto(x)).get.get,
+      message.payload.map(x => PayloadProtoSerializer.fromProto(x)).get.get,
+      message.adProofsOpt.map(x => ADProofsProtoSerializer.fromProto(x))
+    )
 }
 
 object BlockSerializer extends Serializer[Block] {

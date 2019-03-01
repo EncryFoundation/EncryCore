@@ -40,6 +40,8 @@ case class Header(version: Version,
 
   override val modifierTypeId: ModifierTypeId = Header.modifierTypeId
 
+  def toHeaderProto: HeaderProtoMessage = HeaderProtoSerializer.toProto(this)
+
   lazy val powHash: Digest32 = getPowHash(this)
 
   lazy val requiredDifficulty: Difficulty = difficulty
@@ -231,6 +233,9 @@ object Header {
 
     Digest32 @@ result
   }
+}
+
+object HeaderProtoSerializer {
 
   def toProto(header: Header): HeaderProtoMessage = HeaderProtoMessage()
     .withVersion(ByteString.copyFrom(Array(header.version)))
@@ -244,8 +249,7 @@ object Header {
     .withDifficulty(header.difficulty.toLong)
     .withEquihashSolution(EquihashSolution.toProto(header.equihashSolution))
 
-  def fromProto(headerM: Array[Byte]): Try[Header] = Try {
-    val headerProtoMessage: HeaderProtoMessage = HeaderProtoMessage.parseFrom(headerM)
+  def fromProto(headerProtoMessage: HeaderProtoMessage): Try[Header] = Try {
     Header(
       headerProtoMessage.version.toByteArray.head,
       ModifierId @@ headerProtoMessage.parentId.toByteArray,
@@ -259,7 +263,6 @@ object Header {
       headerProtoMessage.equihashSolution.map(m => EquihashSolution(m.ints)).get
     )
   }
-
 }
 
 object HeaderSerializer extends Serializer[Header] {

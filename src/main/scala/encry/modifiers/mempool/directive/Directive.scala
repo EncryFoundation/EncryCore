@@ -1,6 +1,7 @@
 package encry.modifiers.mempool.directive
 
-import TransactionProto.DirectiveProtoMessage
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage.DirectiveProto
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.EncryBaseBox
 import io.circe._
@@ -21,9 +22,7 @@ trait Directive extends BytesSerializable {
 
   def toDbVersion(txId: ModifierId, numberInTx: Int): DirectiveDBVersion
 
-  def toProto(directive: Directive): DirectiveProtoMessage
-
-  def fromProto(message: DirectiveProtoMessage): Directive
+  def toDirectiveProto: DirectiveProtoMessage
 }
 
 object Directive {

@@ -1,7 +1,7 @@
 package encry.modifiers.history
 
-import BlockProto.AdProofsProtoMessage
-import HeaderProto.HeaderProtoMessage
+//import BlockProto.AdProofsProtoMessage
+//import HeaderProto.HeaderProtoMessage
 import PayloadProto.PayloadProtoMessage
 import encry.modifiers.EncryPersistentModifier
 import org.encryfoundation.common.serialization.Serializer
@@ -17,12 +17,12 @@ object HistoryModifierSerializer extends Serializer[EncryPersistentModifier] {
     case m => throw new Exception(s"Serialization for unknown modifier: $m")
   }
 
-  def toBytes1(obj: EncryPersistentModifier): Array[Byte] = obj match {
-    case m: Header => Header.modifierTypeId +: HeaderSerializer.toProto(m).toByteArray
-    case m: ADProofs => ADProofs.modifierTypeId +: ADProofSerializer.toProto(Some(m)).toByteArray
-    case m: Payload => Payload.modifierTypeId +: PayloadSerializer.toProto(m).toByteArray
-    case m => throw new Exception(s"Serialization for unknown modifier: $m")
-  }
+//  def toBytes1(obj: EncryPersistentModifier): Array[Byte] = obj match {
+//    case m: Header => Header.modifierTypeId +: HeaderSerializer.toProto(m).toByteArray
+//    case m: ADProofs => ADProofs.modifierTypeId +: ADProofSerializer.toProto(Some(m)).toByteArray
+//    case m: Payload => Payload.modifierTypeId +: PayloadSerializer.toProto(m).toByteArray
+//    case m => throw new Exception(s"Serialization for unknown modifier: $m")
+//  }
 
 //  def parseBytes1(bytes: Array[Byte]): Try[EncryPersistentModifier] = Try {
 //    case _: Header if bytes.head == Header.`modifierTypeId` =>

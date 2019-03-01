@@ -1,7 +1,7 @@
 package encry.modifiers.state.box
 
 import BoxesProto.BoxProtoMessage
-import BoxesProto.BoxProtoMessage.AssetBoxProtoMessage
+import BoxesProto.BoxProtoMessage.{AssetBoxProtoMessage, TokenIdProto}
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.google.protobuf.ByteString
 import encry.modifiers.state.box.Box.Amount
@@ -41,29 +41,9 @@ case class AssetBox(override val proposition: EncryProposition,
       "tokenId" -> PValue(tokenIdOpt.getOrElse(Constants.IntrinsicTokenId), Types.PCollection.ofByte)
     ), tpe)
 
-  override def toProto(box: EncryBaseBox): BoxProtoMessage = {
-    val a = box match {
-      case s: AssetBox =>
-        AssetBoxProtoMessage()
-          .withAmount(s.amount)
-          .withEncryPropositionProtoMessage(EncryPropositionSerializer.toProto(s.proposition))
-          .withNonce(s.nonce)
-          .withTokenId(ByteString.copyFrom(s.tokenIdOpt.getOrElse(Array.emptyByteArray)))
-    }
-    BoxProtoMessage().withAssetBox(a)
-  }
+  override def serializeToProto: BoxProtoMessage = AssetBox.toProto(this)
 
-  override def fromProto(message: BoxProtoMessage): EncryBaseBox = {
-    val a = message.getAssetBox
-    AssetBox(
-      a.encryPropositionProtoMessage.map(x => EncryPropositionSerializer.fromProto(x)).get,
-      a.nonce,
-      a.amount,
-      a.tokenId.toByteArray match {
-        case a: Array[Byte] if a.isEmpty => Option.empty
-        case a => Some(a)
-      })
-  }
+  override def serializeFromProto(message: BoxProtoMessage): Option[EncryBaseBox] = AssetBox.fromProto(message)
 }
 
 object AssetBox {
@@ -91,6 +71,26 @@ object AssetBox {
       amount,
       tokenIdOpt.map(str => Algos.decode(str).getOrElse(Array.emptyByteArray))
     )
+  }
+
+  def toProto(box: EncryBaseBox): BoxProtoMessage = BoxProtoMessage().withAssetBox(box match {
+    case ab: AssetBox => AssetBoxProtoMessage()
+      .withAmount(ab.amount)
+      .withPropositionProtoMessage(ByteString.copyFrom(ab.proposition.contractHash))
+      .withNonce(ab.nonce)
+      .withTokenId(ab.tokenIdOpt match {
+        case Some(value) => TokenIdProto().withTokenId(ByteString.copyFrom(value))
+        case None => TokenIdProto.defaultInstance
+      })
+  })
+
+  def fromProto(message: BoxProtoMessage): Option[EncryBaseBox] = message.box.assetBox match {
+    case Some(value) => Some(AssetBox(EncryProposition(
+      value.propositionProtoMessage.toByteArray),
+      value.nonce,
+      value.amount,
+      value.tokenId.map(_.tokenId.toByteArray)
+    ))
   }
 }
 

@@ -1,7 +1,7 @@
 package encry.modifiers.mempool.directive
 
-import TransactionProto.DirectiveProtoMessage
-import TransactionProto.DirectiveProtoMessage.{ADKeyProto, TransferDirectiveProtoMessage}
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage.{ADKeyProto, DirectiveProto, ScriptedAssetDirectiveProtoMessage, TransferDirectiveProtoMessage}
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.ModifierId
@@ -42,26 +42,7 @@ case class TransferDirective(address: Address,
   override def toDbVersion(txId: ModifierId, numberInTx: Int): DirectiveDBVersion =
     DirectiveDBVersion(Base16.encode(txId), numberInTx, typeId, isValid, "", amount, address, tokenIdOpt.map(Base16.encode), "")
 
-  override def toProto(transferDirective: Directive): DirectiveProtoMessage = {
-    val a: TransferDirectiveProtoMessage = transferDirective match {
-      case s: TransferDirective =>
-        TransferDirectiveProtoMessage()
-          .withAddress(s.address)
-          .withAmount(s.amount)
-          .withTokenIdOpt(ADKeyProto()
-            .withTokenIdOpt(ByteString.copyFrom(s.tokenIdOpt.getOrElse(Array.emptyByteArray))))
-    }
-    DirectiveProtoMessage().withTransferDirective(a)
-  }
-
-  override def fromProto(message: DirectiveProtoMessage): TransferDirective = {
-    val a: TransferDirectiveProtoMessage = message.getTransferDirective
-    TransferDirective(
-      a.address,
-      a.amount,
-      a.tokenIdOpt.map(x => ADKey @@ x.tokenIdOpt.toByteArray)
-    )
-  }
+  override def toDirectiveProto: DirectiveProtoMessage = TransferDirectiveProtoSerializer.toProto(this)
 }
 
 object TransferDirective {
@@ -85,8 +66,27 @@ object TransferDirective {
       amount,
       tokenIdOpt.flatMap(id => Algos.decode(id).map(ADKey @@ _).toOption)
     )
-
   }
+}
+
+object TransferDirectiveProtoSerializer extends ProtoDirectiveSerializer[TransferDirective] {
+
+  ///TODO REMOVE GET
+  override def toProto(message: TransferDirective): DirectiveProtoMessage =
+    DirectiveProtoMessage().withTransferDirectiveProto(TransferDirectiveProtoMessage()
+      .withAddress(message.address)
+      .withAmount(message.amount)
+      .withTokenIdOpt(message.tokenIdOpt.map(element => ADKeyProto().withTokenIdOpt(ByteString.copyFrom(element))).get))
+
+  override def fromProto(message: DirectiveProtoMessage): Option[TransferDirective] =
+    message.directiveProto.transferDirectiveProto match {
+      case Some(value) => Some(TransferDirective(
+        value.address,
+        value.amount,
+        value.tokenIdOpt.map(x => ADKey @@ x.tokenIdOpt.toByteArray))
+      )
+      case None => Option.empty[TransferDirective]
+    }
 }
 
 object TransferDirectiveSerializer extends Serializer[TransferDirective] {

@@ -1,7 +1,8 @@
 package encry.modifiers.mempool.directive
 
-import TransactionProto.DirectiveProtoMessage
-import TransactionProto.DirectiveProtoMessage.DataDirectiveProtoMessage
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage.DirectiveProto.DataDirectiveProto
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage.{DataDirectiveProtoMessage, DirectiveProto}
 import com.google.common.primitives.{Bytes, Ints}
 import com.google.protobuf.ByteString
 import encry.modifiers.mempool.directive.Directive.DTypeId
@@ -32,26 +33,11 @@ case class DataDirective(contractHash: ContractHash, data: Array[Byte]) extends 
 
   override def serializer: Serializer[M] = DataDirectiveSerializer
 
-  override def toProto(directive: Directive): DirectiveProtoMessage = {
-    val a: DataDirectiveProtoMessage = directive match {
-      case s: DataDirective =>
-        DataDirectiveProtoMessage()
-          .withData(ByteString.copyFrom(s.data))
-          .withContractHash(ByteString.copyFrom(s.contractHash))
-    }
-    DirectiveProtoMessage().withDataDirective(a)
-  }
-
-  override def fromProto(directiveProtoMessage: DirectiveProtoMessage): DataDirective = {
-    val a: DataDirectiveProtoMessage = directiveProtoMessage.getDataDirective
-    DataDirective(
-      a.contractHash.toByteArray,
-      a.data.toByteArray
-    )
-  }
-
   override def toDbVersion(txId: ModifierId, numberInTx: Int): DirectiveDBVersion =
-    DirectiveDBVersion(Base16.encode(txId), numberInTx, typeId, isValid, Base16.encode(contractHash), 0L, "", None, Base16.encode(data))
+    DirectiveDBVersion(Base16.encode(txId), numberInTx, typeId, isValid, Base16.encode(contractHash), 0L, "", None, Base16
+      .encode(data))
+
+  override def toDirectiveProto: DirectiveProtoMessage = DataDirectiveProtoSerializer.toProto(this)
 }
 
 object DataDirective {
@@ -72,6 +58,20 @@ object DataDirective {
       .flatMap(ch => Algos.decode(dataEnc).map(data => DataDirective(ch, data)))
       .getOrElse(throw new Exception("Decoding failed"))
   }
+}
+
+object DataDirectiveProtoSerializer extends ProtoDirectiveSerializer[DataDirective] {
+
+  override def toProto(message: DataDirective): DirectiveProtoMessage = DirectiveProtoMessage()
+    .withDataDirectiveProto(DataDirectiveProtoMessage()
+      .withContractHash(ByteString.copyFrom(message.contractHash))
+      .withData(ByteString.copyFrom(message.data)))
+
+  override def fromProto(message: DirectiveProtoMessage): Option[DataDirective] =
+    message.directiveProto.dataDirectiveProto match {
+      case Some(value) => Some(DataDirective(value.contractHash.toByteArray, value.data.toByteArray))
+      case None => Option.empty[DataDirective]
+    }
 }
 
 object DataDirectiveSerializer extends Serializer[DataDirective] {
