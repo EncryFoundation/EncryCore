@@ -113,7 +113,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
           if (!h.isHeadersChainSynced && cancellables.isEmpty) sendSync(h.syncInfo)
           else if (h.isHeadersChainSynced && !h.isFullChainSynced && cancellables.isEmpty) self ! CheckModifiersToDownload
         }
-      case _ => println("WTF")
+      case _ => logger.info(s"DeliveryManager got invalid type of DataFromPeer message!")
     }
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: ModifierId, previousModifier: Option[ModifierId]) =>
       if (previousModifier.isDefined && isBlockChainSynced)

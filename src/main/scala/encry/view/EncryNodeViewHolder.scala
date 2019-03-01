@@ -83,11 +83,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
 
   override def receive: Receive = {
     case ModifiersFromRemote(modifierTypeId, modifiers) =>
-      modifierTypeId match {
-        case Payload.modifierTypeId => modifiers.map(Payload.fromProto)
-        case Header.modifierTypeId => modifiers.map(Header.fromProto)
-        case Transaction.ModifierTypeId =>
-      }
+//      modifierTypeId match {
+//        case Payload.modifierTypeId => modifiers.map(Payload.fromProto)
+//        case Header.modifierTypeId => modifiers.map(Header.fromProto)
+//        case Transaction.ModifierTypeId =>
+//      }
 //      modifierSerializers.get(modifierTypeId).foreach { companion =>
 //        remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
 //          case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)

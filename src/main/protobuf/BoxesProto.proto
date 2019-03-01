@@ -1,26 +1,28 @@
 syntax = "proto3";
 
+option optimize_for = SPEED;
+
 message BoxProtoMessage {
 
-    message EncryPropositionProtoMessage {
-        bytes contractHash = 1;
+    message TokenIdProto {
+        bytes tokenId = 1;
     }
 
     message AssetBoxProtoMessage {
-        EncryPropositionProtoMessage encryPropositionProtoMessage = 1;
+        bytes propositionProtoMessage = 1;
         uint64 nonce = 2;
         uint64 amount = 3;
-        bytes tokenId = 4;
+        TokenIdProto tokenId = 4;
     }
 
     message DataBoxProtoMessage {
-        EncryPropositionProtoMessage encryPropositionProtoMessage = 1;
+        bytes propositionProtoMessage = 1;
         uint64 nonce = 2;
         bytes data = 3;
     }
 
     message TokenIssuingBoxProtoMessage {
-        EncryPropositionProtoMessage encryPropositionProtoMessage = 1;
+        bytes propositionProtoMessage = 1;
         uint64 nonce = 2;
         uint64 amount = 3;
         bytes tokenId = 4;

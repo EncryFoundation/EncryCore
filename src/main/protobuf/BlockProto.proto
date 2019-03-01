@@ -2,14 +2,16 @@ syntax = "proto3";
 import "HeaderProto.proto";
 import "PayloadProto.proto";
 
+option optimize_for = SPEED;
+
 message BlockProtoMessage {
+
+    message AdProofsProtoMessage {
+        bytes headerId = 1;
+        bytes proofBytes = 2;
+    }
 
     HeaderProtoMessage header = 1;
     PayloadProtoMessage payload = 2;
     AdProofsProtoMessage adProofsOpt = 3;
-}
-
-message AdProofsProtoMessage {
-    bytes headerId = 1;
-    bytes proofBytes = 2;
 }

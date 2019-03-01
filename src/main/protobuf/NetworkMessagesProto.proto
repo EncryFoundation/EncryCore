@@ -1,50 +1,57 @@
 syntax = "proto3";
 import "SyntaxMessageProto.proto";
 
-///TODO naming!
+option optimize_for = SPEED;
 
-message SyncInfoProtoMessage {
-    repeated bytes lastHeaderIds = 1;
-}
+message GeneralizedNetworkProtoMessage {
 
-message InvSpecProtoMessage {
-    bytes modifierTypeId = 1;
-    repeated bytes modifiers = 2;
-}
+    message SyncInfoProtoMessage {
+        repeated bytes lastHeaderIds = 1;
+    }
 
-message RequestModifiersSpecMessageProto {
-    bytes modifierTypeId = 1;
-    repeated bytes modifiers = 2;
-}
+    message InvProtoMessage {
+        bytes modifierTypeId = 1;
+        repeated bytes modifiers = 2;
+    }
 
-message ModifiersSpecMessageProto {
-    bytes modifierTypeId = 1;
-    MapToProto map = 2;
-}
+    message RequestModifiersProtoMessage {
+        bytes modifierTypeId = 1;
+        repeated bytes modifiers = 2;
+    }
 
-message GetPeersSpecMessageProto { }
+    message ModifiersProtoMessage {
 
-message PeersSpecMessageProto {
-    repeated InetSocketAddressProtoMessage peers = 1;
-}
+        message MapFieldEntry {
+            bytes key = 1;
+            bytes value = 2;
+        }
 
-message HandshakeProtoMessage {
-    bytes protocolVersion = 1;
-    string nodeName = 2;
-    InetSocketAddressProtoMessage declaredAddress = 3;
-    uint64 time = 4;
-}
+        bytes modifierTypeId = 1;
+        repeated MapFieldEntry map = 2;
+    }
 
-message GeneralNetworkProtoMessage {
-    bytes MAGIC = 1;
-    bytes Checksum = 2;
+    message GetPeersProtoMessage { }
+
+    message PeersProtoMessage {
+        repeated InetSocketAddressProtoMessage peers = 1;
+    }
+
+    message HandshakeProtoMessage {
+        bytes protocolVersion = 1;
+        string nodeName = 2;
+        InetSocketAddressProtoMessage declaredAddress = 3;
+        uint64 time = 4;
+    }
+
+    bytes magic = 1;
+    bytes checksum = 2;
     oneof innerMessage {
         SyncInfoProtoMessage syncInfoProtoMessage = 3;
-        InvSpecProtoMessage invSpecProtoMessage = 4;
-        RequestModifiersSpecMessageProto requestModifiersSpecMessageProto = 5;
-        ModifiersSpecMessageProto modifiersSpecMessageProto = 6;
-        GetPeersSpecMessageProto getPeersSpecMessageProto = 7;
-        PeersSpecMessageProto peersSpecMessageProto = 8;
+        InvProtoMessage invProtoMessage = 4;
+        RequestModifiersProtoMessage requestModifiersProtoMessage = 5;
+        ModifiersProtoMessage modifiersProtoMessage = 6;
+        GetPeersProtoMessage getPeersProtoMessage = 7;
+        PeersProtoMessage peersProtoMessage = 8;
         HandshakeProtoMessage handshakeProtoMessage = 9;
     }
 }

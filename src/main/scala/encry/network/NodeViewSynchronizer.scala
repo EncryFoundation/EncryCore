@@ -62,8 +62,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         case tx: Transaction => broadcastModifierInv(tx)
         case _ => //Do nothing
       }
-    case SemanticallyFailedModification(_, _) =>
-    case ChangedState(_) =>
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       deliveryManager ! ChangedHistory(reader)
@@ -113,6 +111,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         logger.info(s"Got inv message from ${remote.socketAddress} with modifiers: ${invData._2.map(Algos.encode).mkString(",")} ")
         //todo: Ban node that send payload id?
         if (invData._1 != Payload.modifierTypeId) nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
+      case _ => logger.info(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
     }
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       deliveryManager ! RequestFromLocal(peer, modifierTypeId, modifierIds)

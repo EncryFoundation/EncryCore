@@ -1,6 +1,12 @@
 syntax = "proto3";
 
+option optimize_for = SPEED;
+
 message HeaderProtoMessage {
+
+    message EquihashSolutionMessage {
+        repeated uint32 ints = 1;
+    }
 
     bytes version = 1;
     bytes parentId = 2;
@@ -12,8 +18,4 @@ message HeaderProtoMessage {
     uint64 nonce = 8;
     uint64 difficulty = 9;
     EquihashSolutionMessage equihashSolution = 10;
-}
-
-message EquihashSolutionMessage {
-    repeated uint32 ints = 1;
 }

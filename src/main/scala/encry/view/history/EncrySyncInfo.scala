@@ -1,7 +1,5 @@
 package encry.view.history
 
-import NetworkMessagesProto.SyncInfoProtoMessage
-import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.SyncInfo
 import encry.EncryApp.settings
@@ -19,15 +17,6 @@ case class EncrySyncInfo(lastHeaderIds: Seq[ModifierId]) extends SyncInfo {
   override def startingPoints: ModifierIds = lastHeaderIds.map(id => Header.modifierTypeId -> id)
 
   override lazy val serializer: Serializer[M] = EncrySyncInfoSerializer
-}
-
-object EncrySyncInfo {
-
-  def toProto(modifiers: Seq[ModifierId]): SyncInfoProtoMessage = SyncInfoProtoMessage()
-    .withLastHeaderIds(modifiers.map(x => ByteString.copyFrom(x)))
-
-  def fromProto(message: SyncInfoProtoMessage): EncrySyncInfo =
-    EncrySyncInfo(message.lastHeaderIds.map(x => ModifierId @@ x.toByteArray))
 }
 
 object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
@@ -56,8 +45,4 @@ object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
 
     EncrySyncInfo(ids)
   }
-}
-
-object EncrySyncInfoMessageSpec {
-
 }

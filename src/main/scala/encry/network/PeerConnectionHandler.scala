@@ -8,10 +8,10 @@ import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import encry.EncryApp.settings
 import encry.EncryApp._
-import encry.network.BasicMessagesRepo.{GeneralizedNetworkMessage, MessageFromNetwork, NetworkMessage, Handshake}
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle, _}
 import PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
 import com.typesafe.scalalogging.StrictLogging
+import encry.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, MessageFromNetwork, NetworkMessage}
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
@@ -72,7 +72,8 @@ class PeerConnectionHandler(connection: ActorRef,
   }
 
   def receivedData: Receive = {
-    case Received(data) => GeneralizedNetworkMessage.fromProto(data) match {
+    case Received(data) =>
+      GeneralizedNetworkMessage.fromProto(data) match {
       case Success(value) => value match {
         case handshake: Handshake =>
           logger.info(s"Got a Handshake from $remote.")

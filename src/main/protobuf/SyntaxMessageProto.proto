@@ -1,22 +1,6 @@
 syntax = "proto3";
 
-message MapToProto {
-
-    message MapElementProto {
-        bytes key = 1;
-        bytes value = 2;
-    }
-
-    repeated MapElementProto keyValue = 1;
-}
-
-message EitherToProto {
-
-    oneof element {
-        bytes left = 1;
-        bytes right = 2;
-    }
-}
+option optimize_for = SPEED;
 
 message InetSocketAddressProtoMessage {
     string host = 1;
