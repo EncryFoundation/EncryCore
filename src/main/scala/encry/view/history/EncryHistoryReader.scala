@@ -105,6 +105,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
         .flatMap { h => headerIdsAtHeight(h + 1) }
         .flatMap { id => typedModifierById[Header](id) }
         .filter(filterCond)
+      logger.info(s"nextLevelHeaders: ${nextLevelHeaders.map(header => Algos.encode(header.id))}")
       if (nextLevelHeaders.isEmpty) acc.map(_.reverse)
       else {
         val updatedChains: Seq[Seq[Header]] = nextLevelHeaders.flatMap { h =>
@@ -115,7 +116,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
         loop(currentHeight + 1, updatedChains ++ nonUpdatedChains)
       }
     }
-
+    logger.info(s"continuationHeaderChains. ${header.height}")
     loop(header.height, Seq(Seq(header)))
   }
 
@@ -165,6 +166,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     val heightDelta: Int = Math.max(header1.height - header2.height, 0)
 
     def loop(numberBack: Int, otherChain: HeaderChain): (HeaderChain, HeaderChain) = {
+      logger.info(s"loop: ${numberBack}")
       val chains: (HeaderChain, HeaderChain) = commonBlockThenSuffixes(otherChain, header1, numberBack + heightDelta)
       if (chains._1.head == chains._2.head) chains
       else {
@@ -173,7 +175,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
         else throw new Exception(s"Common point not found for headers $header1 and $header2")
       }
     }
-
+    logger.info(s"commonBlockThenSuffixes.")
     loop(2, HeaderChain(Seq(header2)))
   }
 

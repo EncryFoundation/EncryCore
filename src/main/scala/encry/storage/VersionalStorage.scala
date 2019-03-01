@@ -27,16 +27,16 @@ trait VersionalStorage {
 
 object VersionalStorage {
 
+  sealed trait StorageType
+  case object IODB extends StorageType
+  case object LevelDB extends StorageType
+
   object StorageVersion extends TaggedType[Array[Byte]]
   object StorageKey extends TaggedType[Array[Byte]]
   object StorageValue extends TaggedType[Array[Byte]]
-  object StorageType extends TaggedType[String]
 
   type StorageVersion = StorageVersion.Type
   type StorageKey = StorageKey.Type
   type StorageValue = StorageValue.Type
-  type StorageType = StorageType.Type
 
-  val LevelDB: StorageType = StorageType @@ "LevelDb"
-  val IODB: StorageType = StorageType @@ "iodb"
 }
