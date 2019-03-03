@@ -2,7 +2,7 @@ package encry.utils
 
 import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.history.Header
-import encry.modifiers.mempool.directive.{AssetIssuingDirective, DataDirective, Directive, TransferDirective}
+import encry.modifiers.mempool.directive._
 import encry.modifiers.mempool.{Transaction, TransactionFactory, UnsignedTransaction}
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.{Block, Header}
@@ -287,6 +287,43 @@ trait EncryGenerator {
       (0 until numOfOutputs).foldLeft(IndexedSeq.empty[AssetIssuingDirective]) { case (directivesAll, _) =>
         directivesAll :+ AssetIssuingDirective(PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract.hash, amount)
       }
+
+    val pubKey: PublicKey25519 = privKey.publicImage
+
+    val uInputs: IndexedSeq[Input] = useOutputs
+      .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes))))
+      .toIndexedSeq
+
+    val change: Amount = useOutputs.map(_.amount).sum - (amount + fee)
+
+    val newDirectives: IndexedSeq[Directive] =
+      if (change > 0) TransferDirective(pubKey.address.address, amount, None) +: (0 until numOfOutputs).map(_ =>
+        TransferDirective(pubKey.address.address, change / numOfOutputs, None)) ++: directives
+      else directives
+
+    val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, newDirectives)
+
+    val signature: Signature25519 = privKey.sign(uTransaction.messageToSign)
+
+    uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
+  }
+
+  def universalTransactionScratch(privKey: PrivateKey25519,
+                                  fee: Long,
+                                  timestamp: Long,
+                                  useOutputs: IndexedSeq[MonetaryBox],
+                                  amount: Long,
+                                  numOfOutputs: Int = 5): Transaction = {
+    val directives: IndexedSeq[Directive] = IndexedSeq(
+      AssetIssuingDirective(PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract.hash, amount),
+      DataDirective(PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract.hash, Random.randomBytes()),
+      ScriptedAssetDirective(PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract.hash, 10L,
+        Option(ADKey @@ Random.randomBytes())),
+      ScriptedAssetDirective(PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract.hash, 10L,
+        Option.empty[ADKey]),
+      TransferDirective(privKey.publicImage.address.address, 10L, Option(ADKey @@ Random.randomBytes())),
+      TransferDirective(privKey.publicImage.address.address, 10L, Option.empty[ADKey])
+    )
 
     val pubKey: PublicKey25519 = privKey.publicImage
 

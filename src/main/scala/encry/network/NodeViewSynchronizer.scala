@@ -86,8 +86,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
           case _ =>
         }
-      case RequestModifiersNetworkMessage(_, invData) =>
-        logger.info(s"Get request from remote peer. chainSynced = $chainSynced")
+      case RequestModifiersNetworkMessage(invData) =>
+        //TODO CHECK SIZE
+
+      logger.info(s"Get request from remote peer. chainSynced = $chainSynced")
         if (chainSynced) {
           val inRequestCache: Map[String, NodeViewModifier] =
             invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
@@ -108,8 +110,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         }
         else logger.info(s"Peer $remote requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
           s"node is not synced, so ignore msg")
-      case InvNetworkMessage(_, invData) =>
-        logger.info(s"Got inv message from ${remote.socketAddress} with modifiers: ${invData._2.map(Algos.encode).mkString(",")} ")
+      case InvNetworkMessage(invData) =>
+        //TODO CHECK SIZE
+
+      logger.info(s"Got inv message from ${remote.socketAddress} with modifiers: ${invData._2.map(Algos.encode).mkString(",")} ")
         //todo: Ban node that send payload id?
         if (invData._1 != Payload.modifierTypeId) nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
       case _ => logger.info(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
@@ -142,8 +146,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
     if (chainSynced) {
+      //TODO CHECK SIZE
+
       networkControllerRef !
-        SendToNetwork(InvNetworkMessage(settings.network.maxInvObjects, m.modifierTypeId -> Seq(m.id)), Broadcast)
+        SendToNetwork(InvNetworkMessage( m.modifierTypeId -> Seq(m.id)), Broadcast)
     }
 
 }

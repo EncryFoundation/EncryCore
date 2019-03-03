@@ -237,6 +237,7 @@ object Header {
 
 object HeaderProtoSerializer {
 
+  //TODO check big int difficulty
   def toProto(header: Header): HeaderProtoMessage = HeaderProtoMessage()
     .withVersion(ByteString.copyFrom(Array(header.version)))
     .withParentId(ByteString.copyFrom(header.parentId))
@@ -250,6 +251,10 @@ object HeaderProtoSerializer {
     .withEquihashSolution(EquihashSolution.toProto(header.equihashSolution))
 
   def fromProto(headerProtoMessage: HeaderProtoMessage): Try[Header] = Try {
+    val eqs: EquihashSolution = headerProtoMessage.equihashSolution.map(m => EquihashSolution(m.ints)) match {
+      case Some(value) => value
+      case _ => throw new RuntimeException("No EquihashSolution in header!")
+    }
     Header(
       headerProtoMessage.version.toByteArray.head,
       ModifierId @@ headerProtoMessage.parentId.toByteArray,
@@ -260,7 +265,7 @@ object HeaderProtoSerializer {
       headerProtoMessage.height,
       headerProtoMessage.nonce,
       Difficulty @@ BigInt(headerProtoMessage.difficulty),
-      headerProtoMessage.equihashSolution.map(m => EquihashSolution(m.ints)).get
+      eqs
     )
   }
 }

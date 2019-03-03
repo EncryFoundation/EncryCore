@@ -65,12 +65,16 @@ object ScriptedAssetDirective {
 
 object ScriptedAssetDirectiveProtoSerializer extends ProtoDirectiveSerializer[ScriptedAssetDirective] {
 
-  ///TODO REMOVE GET
-  override def toProto(message: ScriptedAssetDirective): DirectiveProtoMessage =
-    DirectiveProtoMessage().withScriptedAssetDirectiveProto(ScriptedAssetDirectiveProtoMessage()
+  override def toProto(message: ScriptedAssetDirective): DirectiveProtoMessage ={
+    val initialDirective: ScriptedAssetDirectiveProtoMessage = ScriptedAssetDirectiveProtoMessage()
       .withContractHash(ByteString.copyFrom(message.contractHash))
       .withAmount(message.amount)
-      .withTokenIdOpt(message.tokenIdOpt.map(element => ADKeyProto().withTokenIdOpt(ByteString.copyFrom(element))).get))
+    val saDirective: ScriptedAssetDirectiveProtoMessage = message.tokenIdOpt match {
+      case Some(value) => initialDirective.withTokenIdOpt( ADKeyProto().withTokenIdOpt(ByteString.copyFrom(value)))
+      case None => initialDirective
+    }
+    DirectiveProtoMessage().withScriptedAssetDirectiveProto(saDirective)
+  }
 
   override def fromProto(message: DirectiveProtoMessage): Option[ScriptedAssetDirective] =
     message.directiveProto.scriptedAssetDirectiveProto match {

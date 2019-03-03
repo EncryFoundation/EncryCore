@@ -15,7 +15,7 @@ import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.LeafData
 import scorex.crypto.hash.Digest32
 
-import scala.util.Try
+import scala.util.{Success, Try}
 
 case class Payload(override val headerId: ModifierId, txs: Seq[Transaction])
   extends TransactionsCarryingPersistentNodeViewModifier[EncryProposition, Transaction]
@@ -69,12 +69,10 @@ object PayloadProtoSerializer {
     .withHeaderId(ByteString.copyFrom(payload.headerId))
     .withTxs(payload.transactions.map(_.toTransactionProto))
 
-  ///TODO remove get
   def fromProto(payloadProtoMessage: PayloadProtoMessage): Try[Payload] = Try {
-    Payload(
-      ModifierId @@ payloadProtoMessage.headerId.toByteArray,
-      payloadProtoMessage.txs.map(x => TransactionProtoSerializer.fromProto(x).get)
-    )
+    val transactions: Seq[Transaction] = payloadProtoMessage.txs.map(tx => TransactionProtoSerializer.fromProto(tx))
+        .collect { case Success(transaction) => transaction}
+    Payload(ModifierId @@ payloadProtoMessage.headerId.toByteArray, transactions)
   }
 }
 

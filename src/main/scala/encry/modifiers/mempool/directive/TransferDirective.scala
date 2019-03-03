@@ -71,12 +71,16 @@ object TransferDirective {
 
 object TransferDirectiveProtoSerializer extends ProtoDirectiveSerializer[TransferDirective] {
 
-  ///TODO REMOVE GET
-  override def toProto(message: TransferDirective): DirectiveProtoMessage =
-    DirectiveProtoMessage().withTransferDirectiveProto(TransferDirectiveProtoMessage()
+  override def toProto(message: TransferDirective): DirectiveProtoMessage = {
+    val initialDirective: TransferDirectiveProtoMessage = TransferDirectiveProtoMessage()
       .withAddress(message.address)
       .withAmount(message.amount)
-      .withTokenIdOpt(message.tokenIdOpt.map(element => ADKeyProto().withTokenIdOpt(ByteString.copyFrom(element))).get))
+    val transferDirective: TransferDirectiveProtoMessage = message.tokenIdOpt match {
+      case Some(value) => initialDirective.withTokenIdOpt(ADKeyProto().withTokenIdOpt(ByteString.copyFrom(value)))
+      case None => initialDirective
+    }
+    DirectiveProtoMessage().withTransferDirectiveProto(transferDirective)
+  }
 
   override def fromProto(message: DirectiveProtoMessage): Option[TransferDirective] =
     message.directiveProto.transferDirectiveProto match {

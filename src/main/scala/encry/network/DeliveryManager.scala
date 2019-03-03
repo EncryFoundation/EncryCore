@@ -160,7 +160,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       if (notYetRequestedIds.nonEmpty) {
         logger.info(s"Send request to ${peer.socketAddress.getAddress} for modifiers of type $mTypeId " +
           s"with ${modifierIds.size} ids.")
-        peer.handlerRef ! RequestModifiersNetworkMessage(settings.network.maxInvObjects, mTypeId -> notYetRequestedIds)
+        peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequestedIds)
         syncTracker.incrementRequest(peer)
       }
       notYetRequestedIds.foreach { id =>
@@ -193,7 +193,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
                 requestedModifiers.get(cp).exists(_.contains(key(modifierId)))) {
                 logger.debug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: " +
                   s"$mTypeId with id: ${Algos.encode(modifierId)}")
-                peerInfo._1.handlerRef ! RequestModifiersNetworkMessage(settings.network.maxInvObjects, mTypeId -> Seq(modifierId))
+                ///TODO ADD MODS CHECK
+                peerInfo._1.handlerRef ! RequestModifiersNetworkMessage( mTypeId -> Seq(modifierId))
                 syncTracker.incrementRequest(cp)
                 val cancellable: Cancellable = context.system.scheduler
                   .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(cp, mTypeId, modifierId))
@@ -232,8 +233,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
     if (isBlockChainSynced) extOpt match {
       case None => logger.info(s"extOpt is empty for: $remote. Its status is: $status.")
       case Some(ext) =>
+        //TODO CHECK SIZE
         ext.groupBy(_._1).mapValues(_.map(_._2)).foreach { case (mid, mods) =>
-          networkControllerRef ! SendToNetwork(InvNetworkMessage(settings.network.maxInvObjects, mid -> mods), SendToPeer(remote))
+          networkControllerRef ! SendToNetwork(InvNetworkMessage(mid -> mods), SendToPeer(remote))
         }
     } else logger.info(s"Peer's $remote history is younger, but node is not synced, so ignore sending extensions")
 

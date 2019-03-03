@@ -117,12 +117,17 @@ trait ProtoTransactionSerializer[T] {
 
 object TransactionProtoSerializer extends ProtoTransactionSerializer[Transaction] {
 
-  override def toProto(message: Transaction): TransactionProtoMessage = TransactionProtoMessage()
-    .withFee(message.fee)
-    .withTimestamp(message.timestamp)
-    .withInputs(message.inputs.map(input => ByteString.copyFrom(input.bytes)).to[scala.collection.immutable.IndexedSeq])
-    .withDirectives(message.directives.map(_.toDirectiveProto).to[scala.collection.immutable.IndexedSeq])
-    .withProof(message.defaultProofOpt.map(el => ByteString.copyFrom(el.bytes)).getOrElse(ByteString.EMPTY))
+  override def toProto(message: Transaction): TransactionProtoMessage = {
+    val initialTx: TransactionProtoMessage = TransactionProtoMessage()
+      .withFee(message.fee)
+      .withTimestamp(message.timestamp)
+      .withInputs(message.inputs.map(input => ByteString.copyFrom(input.bytes)).to[scala.collection.immutable.IndexedSeq])
+      .withDirectives(message.directives.map(_.toDirectiveProto).to[scala.collection.immutable.IndexedSeq])
+    message.defaultProofOpt match {
+      case Some(value) => initialTx.withProof(ByteString.copyFrom(value.bytes))
+      case None => initialTx
+    }
+  }
 
   override def fromProto(message: TransactionProtoMessage): Try[Transaction] = Try(Transaction(
     message.fee,

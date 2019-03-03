@@ -14,7 +14,7 @@ trait ProtoDirectiveSerializer[T] {
 }
 
 object DirectiveProtoSerializer {
-
+//TODO check this
   def fromProto(message: DirectiveProtoMessage): Option[Directive] = message.directiveProto match {
     case DirectiveProto.AssetIssuingDirectiveProto(_) => AssetIssuingDirectiveProtoSerializer.fromProto(message)
     case DirectiveProto.DataDirectiveProto(_) => DataDirectiveProtoSerializer.fromProto(message)

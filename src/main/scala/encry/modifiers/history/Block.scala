@@ -68,6 +68,7 @@ case class Block(header: Header,
   override def toString: String = s"<Block height=${header.height} timestamp=${header.timestamp} " +
     s"txQty=${payload.transactions.size} id=${header.encodedId}>"
 
+  def toProtoBlock: BlockProtoMessage = BlockProtoSerializer.toProto(this)
 }
 
 object Block {
@@ -79,14 +80,14 @@ object Block {
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (100: Byte)
 
   implicit val jsonEncoder: Encoder[Block] = (b: Block) => Map(
-    "header"   -> b.header.asJson,
-    "payload"  -> b.payload.asJson,
+    "header" -> b.header.asJson,
+    "payload" -> b.payload.asJson,
     "adProofs" -> b.adProofsOpt.map(_.asJson).getOrElse(Map.empty[String, String].asJson)
   ).asJson
 
   implicit val jsonDecoder: Decoder[Block] = (c: HCursor) => {
     for {
-      header  <- c.downField("header").as[Header]
+      header <- c.downField("header").as[Header]
       payload <- c.downField("payload").as[Payload]
     } yield Block(
       header,
@@ -98,19 +99,21 @@ object Block {
 
 object BlockProtoSerializer {
 
-    def toProto(block: Block): BlockProtoMessage = BlockProtoMessage()
+  def toProto(block: Block): BlockProtoMessage = {
+    val initialBlock = BlockProtoMessage()
       .withHeader(block.header.toHeaderProto)
       .withPayload(block.payload.toProtoPayload)
-      .withAdProofsOpt(block.adProofsOpt match {
-        case Some(value) => value.toProtoADProofs
-        case None => AdProofsProtoMessage.defaultInstance
-      })
+    block.adProofsOpt match {
+      case Some(value) => initialBlock.withAdProofsOpt(value.toProtoADProofs)
+      case _ => initialBlock
+    }
+  }
 
-    def fromProto(message: BlockProtoMessage): Block = Block(
-      message.header.map(x => HeaderProtoSerializer.fromProto(x)).get.get,
-      message.payload.map(x => PayloadProtoSerializer.fromProto(x)).get.get,
-      message.adProofsOpt.map(x => ADProofsProtoSerializer.fromProto(x))
-    )
+  def fromProto(message: BlockProtoMessage): Block = Block(
+    message.header.map(x => HeaderProtoSerializer.fromProto(x)).get.get,
+    message.payload.map(x => PayloadProtoSerializer.fromProto(x)).get.get,
+    message.adProofsOpt.map(x => ADProofsProtoSerializer.fromProto(x))
+  )
 }
 
 object BlockSerializer extends Serializer[Block] {
