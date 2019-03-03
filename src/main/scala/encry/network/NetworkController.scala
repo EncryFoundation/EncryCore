@@ -69,9 +69,9 @@ class NetworkController extends Actor with StrictLogging {
       message match {
         case message@SyncInfoNetworkMessage(_) =>
           findHandler(message, NetworkMessagesIds.SyncInfo, remote, messagesHandlers)
-        case message@InvNetworkMessage(_, _) =>
+        case message@InvNetworkMessage(_) =>
           findHandler(message, NetworkMessagesIds.Inv, remote, messagesHandlers)
-        case message@RequestModifiersNetworkMessage(_, _) =>
+        case message@RequestModifiersNetworkMessage(_) =>
           findHandler(message, NetworkMessagesIds.RequestModifier, remote, messagesHandlers)
         case message@ModifiersNetworkMessage(_) =>
           findHandler(message, NetworkMessagesIds.Modifier, remote, messagesHandlers)

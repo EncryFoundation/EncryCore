@@ -1,11 +1,14 @@
-import sbt._
+import sbt.Def
+import sbt.Keys.version
 
-lazy val settings = Seq(
+val settings: Seq[Def.Setting[String]] = Seq(
   name := "EncryCore",
   version := "0.9.3",
   organization := "org.encryfoundation",
   scalaVersion := "2.12.6"
 )
+
+val encry = (project in file(".")).settings(settings: _*)
 
 val akkaVersion = "2.5.13"
 val akkaHttpVersion = "10.0.9"
@@ -90,12 +93,7 @@ libraryDependencies ++= Seq(
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
   "SonaType" at "https://oss.sonatype.org/content/groups/public",
   "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/",
-  "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
-)
-
-PB.targets in Compile := Seq(
-  scalapb.gen() -> (sourceManaged in Compile).value
-)
+  "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/")
 
 evictionWarningOptions in update := EvictionWarningOptions.default
   .withWarnTransitiveEvictions(false)
@@ -157,8 +155,11 @@ sourceGenerators in Compile += Def.task {
   Seq(versionFile)
 }
 
-val encry = (project in file(".")).settings(settings: _*)
 lazy val it = project.dependsOn(encry)
 lazy val benchmarks = (project in file("benchmarks"))
   .dependsOn(encry % "compile->compile;test->test")
   .enablePlugins(JmhPlugin)
+
+PB.targets in Compile := Seq(
+  scalapb.gen() -> (sourceManaged in Compile).value / "protobuf"
+)
