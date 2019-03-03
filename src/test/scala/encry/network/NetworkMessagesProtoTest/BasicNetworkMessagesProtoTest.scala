@@ -1,12 +1,9 @@
 package encry.network.NetworkMessagesProtoTest
 
-import java.net.{InetAddress, InetSocketAddress}
-
+import java.net.InetSocketAddress
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage
-import NetworkMessagesProto.GeneralizedNetworkProtoMessage.InnerMessage.HandshakeProtoMessage
-import NetworkMessagesProto.GeneralizedNetworkProtoMessage.{InnerMessage, HandshakeProtoMessage => hPM}
+import NetworkMessagesProto.GeneralizedNetworkProtoMessage.InnerMessage,
 import akka.util.ByteString
-import encry.EncryApp.settings
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.mempool.Transaction
@@ -17,8 +14,7 @@ import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.utils.EncryGenerator
 import encry.view.history.EncrySyncInfo
 import org.scalatest.{Matchers, PropSpec}
-
-import scala.util.{Success, Try}
+import scala.util.Try
 
 class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with InstanceFactory with EncryGenerator {
 
