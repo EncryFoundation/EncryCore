@@ -124,6 +124,7 @@ class PeerConnectionHandler(connection: ActorRef,
     case Received(data) =>
       logger.info(s"Got new network message! Try to parse it!")
       val packet: (List[ByteString], ByteString) = getPacket(chunksBuffer ++ data)
+      logger.info(s"${packet._1.size}")
       chunksBuffer = packet._2
       packet._1.find { packet =>
         GeneralizedNetworkMessage.fromProto(packet) match {
