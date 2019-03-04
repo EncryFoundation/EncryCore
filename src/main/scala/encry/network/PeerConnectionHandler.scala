@@ -74,18 +74,18 @@ class PeerConnectionHandler(connection: ActorRef,
   def receivedData: Receive = {
     case Received(data) =>
       GeneralizedNetworkMessage.fromProto(data) match {
-      case Success(value) => value match {
-        case handshake: Handshake =>
-          logger.info(s"Got a Handshake from $remote.")
-          receivedHandshake = Some(handshake)
-          connection ! ResumeReading
-          if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
-        case message => logger.info(s"Have expecting handshake, but received ${message.messageName}.")
+        case Success(value) => value match {
+          case handshake: Handshake =>
+            logger.info(s"Got a Handshake from $remote.")
+            receivedHandshake = Some(handshake)
+            connection ! ResumeReading
+            if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
+          case message => logger.info(s"Have expecting handshake, but received ${message.messageName}.")
+        }
+        case Failure(exception) =>
+          logger.info(s"Error during parsing a handshake: $exception.")
+          self ! CloseConnection
       }
-      case Failure(exception) =>
-        logger.info(s"Error during parsing a handshake: $exception.")
-        self ! CloseConnection
-    }
   }
 
   def handshakeTimeout: Receive = {
@@ -125,20 +125,28 @@ class PeerConnectionHandler(connection: ActorRef,
   def workingCycleRemoteInterface: Receive = {
     case Received(data) =>
       logger.info(s"Got new network message! Try to parse it!")
-      val packet: (List[ByteString], ByteString) = getPacket(chunksBuffer ++ data)
-      logger.info(s"${packet._1.size}")
-      chunksBuffer = packet._2
-      packet._1.find { packet =>
-        GeneralizedNetworkMessage.fromProto(packet) match {
-          case Success(message) =>
-            networkController ! MessageFromNetwork(message, selfPeer)
-            logger.info("Received message " + message.messageName + " from " + remote)
-            false
-          case Failure(e) =>
-            logger.info(s"Corrupted data from: " + remote + s"$e")
-            true
-        }
+
+      GeneralizedNetworkMessage.fromProto(data) match {
+        case Success(message) =>
+          networkController ! MessageFromNetwork(message, selfPeer)
+          logger.info("Received message " + message.messageName + " from " + remote)
+        case Failure(e) => logger.info(s"Corrupted data from: " + remote + s"$e")
       }
+
+      //      val packet: (List[ByteString], ByteString) = getPacket(chunksBuffer ++ data)
+      //      logger.info(s"${packet._1.size}")
+      //      chunksBuffer = packet._2
+      //      packet._1.find { packet =>
+      //        GeneralizedNetworkMessage.fromProto(packet) match {
+      //          case Success(message) =>
+      //            networkController ! MessageFromNetwork(message, selfPeer)
+      //            logger.info("Received message " + message.messageName + " from " + remote)
+      //            false
+      //          case Failure(e) =>
+      //            logger.info(s"Corrupted data from: " + remote + s"$e")
+      //            true
+      //        }
+      //      }
       connection ! ResumeReading
   }
 
