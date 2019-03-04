@@ -82,6 +82,8 @@ object BasicMessagesRepo extends StrictLogging {
       //TODO do we need it?
       //require(checkSumBytes.length > 0, "Empty checksum bytes!")
       val calculatedCheckSum: GoogleByteString = MessageOptions.calculateCheckSum(checkSumBytes)
+      logger.info(s"calculatedCheckSum.length - ${calculatedCheckSum.size()}")
+      logger.info(s"MAGIC.length - ${MessageOptions.MAGIC.size()}")
       GeneralizedNetworkProtoMessage()
         .withMagic(MessageOptions.MAGIC)
         .withChecksum(calculatedCheckSum)
