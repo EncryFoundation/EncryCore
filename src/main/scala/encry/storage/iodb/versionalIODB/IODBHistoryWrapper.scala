@@ -16,7 +16,8 @@ case class IODBHistoryWrapper(store: Store, objectStore: Store) extends Versiona
 
   override def get(key: StorageKey): Option[StorageValue] = iodbWrapper.get(key)
 
-  override def getAll(): Iterator[(StorageKey, StorageValue)] = iodbWrapper.getAll()
+  //always return all elems
+  override def getAll(maxQty: Int): Iterator[(StorageKey, StorageValue)] = iodbWrapper.getAll()
 
   override def currentVersion: StorageVersion = iodbWrapper.currentVersion
 

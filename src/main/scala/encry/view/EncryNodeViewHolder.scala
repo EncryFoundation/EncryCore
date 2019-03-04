@@ -313,7 +313,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     stateDir.mkdir()
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
     val state: StateType = {
-      if (settings.node.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings.node)
+      if (settings.node.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings)
       else EncryState.generateGenesisUtxoState(stateDir, Some(self), settings, influxRef)
     }.asInstanceOf[StateType]
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
@@ -347,7 +347,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     {
       (version, digest) match {
         case (Some(_), Some(_)) if settings.node.stateMode.isDigest =>
-          DigestState.create(version, digest, dir, settings.node)
+          DigestState.create(version, digest, dir, settings)
         case _ => EncryState.readOrGenerate(settings, Some(self), influxRef)
       }
     }.asInstanceOf[StateType]

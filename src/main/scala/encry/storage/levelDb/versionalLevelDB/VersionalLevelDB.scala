@@ -10,6 +10,7 @@ import org.iq80.leveldb.{DB, ReadOptions}
 import supertagged.TaggedType
 
 import scala.annotation.tailrec
+import scala.collection.immutable
 
 case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLogging with AutoCloseable {
 
@@ -30,8 +31,10 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       db.get(userKey(elemKey)).headOption.contains(ACCESSIBLE_KEY_PREFIX)) {
       val lastElemVersion: LevelDBVersion =
         LevelDBVersion @@ ArrayUtils.subarray(db.get(userKey(elemKey), readOptions), 1, settings.versionKeySize + 1)
-      if (db.get(accessableElementKeyForVersion(lastElemVersion, elemKey), readOptions) != null) {
-        Some(VersionalLevelDbValue @@ db.get(accessableElementKeyForVersion(lastElemVersion, elemKey), readOptions))
+      val possibleElem: Array[Byte] =
+        db.get(accessableElementKeyForVersion(lastElemVersion, elemKey), readOptions)
+      if (possibleElem != null) {
+        Some(VersionalLevelDbValue @@ possibleElem)
       }
       else None
     } else None
@@ -55,13 +58,14 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     //Set current version to newElem.version
     batch.put(CURRENT_VERSION_KEY, newElem.version)
     //Insert new version to versions list
-    batch.put(VERSIONS_LIST, newElem.version.untag(LevelDBVersion) ++ versionsList(readOptions).flatMap(_.untag(LevelDBVersion)))
+    batch.put(VERSIONS_LIST, newElem.version.untag(LevelDBVersion) ++ versionsList(readOptions).flatten)
     //Ids of all elements, added by newElem
-    batch.put(versionKey(newElem.version), newElem.elemsToInsert.map(_._1).flatMap(_.untag(LevelDBVersion)).toArray)
+    batch.put(versionKey(newElem.version), newElem.elemsToInsert.flatMap(_._1).toArray)
     //Ids of all elements, deleted by newElem
-    batch.put(versionDeletionsKey(newElem.version), newElem.elemsToDelete.flatMap(_.untag(LevelDBVersion)).toArray)
+    batch.put(versionDeletionsKey(newElem.version), newElem.elemsToDelete.flatten.toArray)
     newElem.elemsToInsert.foreach {
       case (elemKey, elemValue) =>
+
         /**
           * Put elem by key (ACCESSIBLE_KEY_PREFIX +: "version" ++ "elemKey")
           * First check contain db this elem or not. if no: insert elem, and insert init access map
@@ -89,13 +93,13 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
 
   /**
     * Get all elems, stored in currentVersion.
-    *
+    * if maxQty = -1 return all data
     * @return
     */
-  def getAll: List[(VersionalLevelDbKey, VersionalLevelDbValue)] = {
+  def getAll(maxQty: Int = -1): List[(VersionalLevelDbKey, VersionalLevelDbValue)] = {
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
-    val result = getCurrentElementsKeys
+    val result = getCurrentElementsKeys(maxQty)
       .foldLeft(List.empty[(VersionalLevelDbKey, VersionalLevelDbValue)]) {
         case (acc, nextKey) =>
           (nextKey -> get(nextKey).get) :: acc
@@ -157,12 +161,12 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     val batch = db.createWriteBatch()
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
-    val wrappedVer: ByteArrayWrapper = new ByteArrayWrapper(versionToResolve)
-    val currentVersions: List[ByteArrayWrapper] = versionsList(readOptions).map(ByteArrayWrapper.apply)
-    val deletionsByThisVersion = getInaccessiableKeysInVersion(versionToResolve, readOptions)
+    val wrappedVer: ByteArrayWrapper = ByteArrayWrapper(versionToResolve)
+    val currentVersions: Set[ByteArrayWrapper] = versionsList(readOptions).map(ByteArrayWrapper.apply).toSet
+    val deletionsByThisVersion: Seq[VersionalLevelDbKey] =
+      getInaccessiableKeysInVersion(versionToResolve, readOptions)
     deletionsByThisVersion.foreach { key =>
       val elemMap = db.get(userKey(key), readOptions)
-      val accessFlag = elemMap.head
       val wrappedVersions = splitValue2elems(settings.versionKeySize, elemMap.tail)
         .map(ver => new ByteArrayWrapper(ver))
       val elemVersions = wrappedVersions.filter(currentVersions.contains)
@@ -171,16 +175,16 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         batch.delete(accessableElementKeyForVersion(LevelDBVersion @@ toDelWrapped.data, key))
       )
       if (elemVersions.isEmpty) batch.delete(userKey(key))
-      else batch.put(userKey(key), accessFlag +: elemVersions.foldLeft(Array.emptyByteArray) { case (acc, ver) => acc ++ ver.data })
+      else batch.put(userKey(key), elemMap.head +: elemVersions.foldLeft(Array.emptyByteArray) { case (acc, ver) => acc ++ ver.data })
     }
     val insertionsByThisVersion =
       splitValue2elems(DEFAULT_USER_KEY_SIZE, db.get(versionKey(versionToResolve))).map(VersionalLevelDbKey @@ _)
-    insertionsByThisVersion.foreach{ elemKey =>
+    insertionsByThisVersion.foreach { elemKey =>
       val elemInfo = db.get(userKey(elemKey))
       val elemFlag = elemInfo.head
       val elemMap = elemInfo.tail
       val elemVersions = splitValue2elems(settings.versionKeySize, elemMap).map(ByteArrayWrapper.apply)
-      elemVersions.dropWhile(_ != wrappedVer).tail.foreach{
+      elemVersions.dropWhile(_ != wrappedVer).tail.foreach {
         elemVerToDel => batch.delete(accessableElementKeyForVersion(LevelDBVersion @@ elemVerToDel.data, elemKey))
       }
       val newElemMap = elemVersions.takeWhile(_ != wrappedVer) :+ wrappedVer
@@ -217,13 +221,13 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     *
     * @return
     */
-  def getCurrentElementsKeys: List[VersionalLevelDbKey] = {
+  def getCurrentElementsKeys(maxQty: Int = -1): List[VersionalLevelDbKey] = {
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
     val iter = db.iterator(readOptions)
     iter.seekToFirst()
     var buffer: List[VersionalLevelDbKey] = List.empty[VersionalLevelDbKey]
-    while (iter.hasNext) {
+    while (iter.hasNext && (maxQty == -1 || buffer.length < maxQty)) {
       val nextKey = iter.next().getKey
       if (nextKey.head == USER_KEY_PREFIX && db.get(nextKey).headOption.contains(ACCESSIBLE_KEY_PREFIX)) {
         buffer ::= VersionalLevelDbKey @@ nextKey.tail
@@ -269,7 +273,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       db.write(batch)
       rollbackResolver(verToDelete.map(LevelDBVersion @@ _.data))
       batch.close()
-    } else throw new Exception(s"Impossible to rollback to ${Algos.encode(rollbackPoint)}")
+    } else throw new RuntimeException(s"Impossible to rollback to ${Algos.encode(rollbackPoint)}")
     readOptions.snapshot().close()
   }
 
@@ -295,18 +299,14 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     */
   def recoverOrInit(initValues: Map[VersionalLevelDbKey, VersionalLevelDbValue] = Map.empty,
                     keySize: Int = DEFAULT_VERSION_KEY_SIZE): Unit = {
-    val currentVersion = if (db.get(CURRENT_VERSION_KEY) == null) INIT_VERSION(keySize)
-    else db.get(CURRENT_VERSION_KEY)
+    val possibleCurVer = db.get(CURRENT_VERSION_KEY)
+    val currentVersion = if (possibleCurVer == null) INIT_VERSION(keySize)
+    else possibleCurVer
     val initValuesWithVersion = initValues.map { case (key, value) => VersionalLevelDbKey @@ (currentVersion ++ key) -> value }
     (VersionalLevelDBCompanion.INIT_MAP(keySize) ++ initValuesWithVersion).foreach { case (key, value) => recoverOrInitKey(key, value) }
   }
 
-  def printKeysMap(): Unit = {
-    getAll
-  }
-
-  // for debug only
-  def print(): String = {
+  override def toString: String = {
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
     val info = "VERSIONAL WRAPPER OF LEVEL DB Stat:\n " +

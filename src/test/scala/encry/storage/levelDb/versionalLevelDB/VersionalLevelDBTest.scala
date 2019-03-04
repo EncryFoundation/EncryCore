@@ -55,11 +55,11 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     //Check correctness of keys
 
-    reopendVLDB.getAll.forall{case (elemKey, _) => keysToInsert.contains(ByteArrayWrapper(elemKey))} shouldBe true
+    reopendVLDB.getAll().forall{case (elemKey, _) => keysToInsert.contains(ByteArrayWrapper(elemKey))} shouldBe true
 
     //Check correctness of values
 
-    reopendVLDB.getAll
+    reopendVLDB.getAll()
       .forall{case (_, elemValue) => valuesHashes.contains(new ByteArrayWrapper(Algos.hash(elemValue)))} shouldBe true
   }
 
@@ -104,23 +104,23 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     //Check correctness of keys
 
-    reopendVLDB.getAll.map(elem => ByteArrayWrapper.apply(elem._1)).
+    reopendVLDB.getAll().map(elem => ByteArrayWrapper.apply(elem._1)).
       forall{case elemKey => correctKeys.contains(elemKey)} shouldBe true
 
     //Check correctness of values
 
-    reopendVLDB.getAll
+    reopendVLDB.getAll()
       .forall{case elemValue => correctValues.contains(new ByteArrayWrapper(Algos.hash(elemValue._2)))} shouldBe true
 
     //Check that impossible to get deleted keys
 
-    val allElemsInDB = reopendVLDB.getAll.map(_._1)
+    val allElemsInDB = reopendVLDB.getAll().map(_._1)
 
     incorrectKeys.forall(key => {
       !allElemsInDB.map(elem => new ByteArrayWrapper(elem)).contains(key)
     }) shouldBe true
 
-    println(reopendVLDB.print())
+    println(reopendVLDB.toString())
   }
 
   property("Level db should always contains not more than maxVersionParam") {

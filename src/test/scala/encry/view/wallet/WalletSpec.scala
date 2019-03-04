@@ -11,6 +11,7 @@ import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLe
 import encry.utils.TestHelper.Props
 import encry.utils.{EncryGenerator, FileHelper}
 import io.iohk.iodb.LSMStore
+import org.encryfoundation.common.Algos
 import org.iq80.leveldb.{DB, Options}
 import org.scalatest.{Matchers, PropSpec}
 
@@ -22,8 +23,9 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
   property("Balance count (intrinsic coins only).") {
 
+    val dir = FileHelper.getRandomTempDir
+
     val db: DB = {
-      val dir = FileHelper.getRandomTempDir
       if (!dir.exists()) dir.mkdirs()
       LevelDbFactory.factory.open(dir, new Options)
     }
@@ -67,6 +69,8 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
     wallet.scanPersistent(secondBlock)
 
     wallet.walletStorage.getTokenBalanceById(Constants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance - useBox.amount
+
+    logger.info(s"tmp dir size: ${dir.length()}")
   }
 
   property("Balance count (intrinsic coins + tokens)") {

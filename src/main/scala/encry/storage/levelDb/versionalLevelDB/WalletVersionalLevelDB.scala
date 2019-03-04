@@ -26,7 +26,8 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
 
   val levelDb: VersionalLevelDB = VersionalLevelDB(db, settings)
 
-  def getAllBoxes: Seq[EncryBaseBox] = levelDb.getAll
+  def getAllBoxes(maxQty: Int = -1): Seq[EncryBaseBox] = levelDb.getAll(maxQty)
+      .filter(_._1 sameElements BALANCE_KEY)
       .map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
       .collect {
         case Success(box) => box
@@ -40,26 +41,6 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
   def getTokenBalanceById(id: TokenId): Option[Amount] = getBalances
     .find(_._1 sameElements Algos.encode(id))
     .map(_._2)
-
-  /**
-    * Get all elems, stored in currentVersion.
-    *
-    * @return
-    */
-  def getBoxes(qty: Int = 450): Seq[EncryBaseBox] = {
-    val readOptions = new ReadOptions()
-    readOptions.snapshot(levelDb.db.getSnapshot)
-    val result = levelDb.getCurrentElementsKeys.take(qty)
-      .foldLeft(List.empty[(VersionalLevelDbKey, VersionalLevelDbValue)]) {
-        case (acc, nextKey) =>
-          (nextKey -> levelDb.get(nextKey).get) :: acc
-      }
-    readOptions.snapshot().close()
-    result.map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
-      .collect {
-        case Success(box) => box
-      }
-  }
 
   def containsBox(id: ADKey): Boolean = getBoxById(id).isDefined
 

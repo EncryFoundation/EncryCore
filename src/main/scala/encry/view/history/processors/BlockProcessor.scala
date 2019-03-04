@@ -10,6 +10,8 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{Block, Header, HeaderChain}
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
+import io.circe.syntax._
+import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.common.Algos
 
 import scala.util.{Failure, Try}
@@ -37,7 +39,9 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     */
   protected def processBlock(fullBlock: Block,
                              modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
+    logger.info(s"Process block: ${fullBlock.asJson}")
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
+    logger.info(s"best full chain contains: ${bestFullChain.length}")
     val newBestAfterThis: Header = bestFullChain.last.header
     processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, settings.node.blocksToKeep))
   }
@@ -59,11 +63,16 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def processBetterChain: BlockProcessing = {
     case toProcess@ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
+      logger.info(s"Prev best block is: ${bestBlockOpt.get.asJson}")
       val prevBest: Block = bestBlockOpt.get
+      logger.info(s"prevBest.header: ${prevBest.header.asJson}")
+      logger.info(s"newBestHeader: ${newBestHeader.asJson}")
       val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
+      logger.info(s"prevChain(${prevChain.length}). New chain(${newChain.length})")
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
+      logger.info(s"To apply(${toApply.length})")
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
         //application of this block leads to full chain with higher score
@@ -114,8 +123,11 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   }
 
   private def calculateBestFullChain(block: Block): Seq[Block] = {
+    logger.info(s"calculateBestFullChain for block: ${block.asJson}")
     val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
+    logger.info(s"continuations: ${continuations.map(seq => s"Seq contains: ${seq.length}").mkString(",")}")
     val chains: Seq[Seq[Block]] = continuations.map(_.map(getBlock).takeWhile(_.nonEmpty).flatten)
+    logger.info(s"Chains: ${chains.map(chain => s"chain contain: ${chain.length}").mkString(",")}")
     chains.map(c => block +: c).maxBy(c => scoreOf(c.last.id).get)
   }
 

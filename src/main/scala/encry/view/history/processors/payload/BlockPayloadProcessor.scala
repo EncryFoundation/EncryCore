@@ -23,11 +23,12 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
         else Some(processBlock(block, payload))
       }.getOrElse(putToHistory(payload))
 
-  private def getBlockByPayload(payload: Payload): Option[Block] =
+  private def getBlockByPayload(payload: Payload): Option[Block] = {
     typedModifierById[Header](payload.headerId).flatMap { h =>
       if (!adState) Some(Block(h, payload, None))
       else typedModifierById[ADProofs](h.adProofsId).map(ps => Block(h, payload, Some(ps)))
     }
+  }
 
   override protected def validate(m: Payload): Try[Unit] =
     modifierValidation(m, typedModifierById[Header](m.headerId))

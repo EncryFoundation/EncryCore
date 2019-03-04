@@ -7,11 +7,13 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{ADProofs, Block, Header}
 import encry.modifiers.mempool.Transaction
-import encry.settings.{Constants, LevelDBSettings, NodeSettings}
+import encry.settings.{Constants, EncryAppSettings, LevelDBSettings, NodeSettings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB._
+import encry.view.state.UtxoState.logger
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
@@ -94,31 +96,37 @@ class DigestState protected(override val version: VersionTag,
   override def rollbackVersions: Iterable[VersionTag] = stateStore.versions.map(VersionTag @@ _.untag(LevelDBVersion))
 }
 
-object DigestState {
+object DigestState extends StrictLogging {
 
   def create(versionOpt: Option[VersionTag],
              rootHashOpt: Option[ADDigest],
              dir: File,
-             settings: NodeSettings): DigestState = Try {
-    val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
-    //todo: get leveldb settings from settings
-    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(100)))
+             settings: EncryAppSettings): DigestState = Try {
+    val vldbInit = settings.storage.state match {
+      case VersionalStorage.IODB =>
+        logger.info("Init state with iodb storage")
+        IODBWrapper(new LSMStore(dir, keepVersions = Constants.DefaultKeepVersions))
+      case VersionalStorage.LevelDB =>
+        logger.info("Init state with levelDB storage")
+        val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 33), keySize = 33))
+    }
 
     (versionOpt, rootHashOpt) match {
 
       case (Some(version), Some(rootHash)) =>
         if (vldbInit.currentVersion sameElements version) {
-          new DigestState(version, rootHash, vldbInit, settings)
+          new DigestState(version, rootHash, vldbInit, settings.node)
         } else {
           val inVersion: VersionTag = VersionTag @@ vldbInit.currentVersion.untag(LevelDBVersion)
-          new DigestState(inVersion, rootHash, vldbInit, settings).update(version, rootHash).get //sync store
+          new DigestState(inVersion, rootHash, vldbInit, settings.node).update(version, rootHash).get //sync store
         }.ensuring(vldbInit.currentVersion.sameElements(version))
 
       case (None, None) =>
         val version: VersionTag = VersionTag @@ vldbInit.currentVersion.untag(LevelDBVersion)
         val rootHash: Array[Byte] = vldbInit.get(StorageKey @@ version.untag(VersionTag)).get
 
-        new DigestState(version, ADDigest @@ rootHash, vldbInit, settings)
+        new DigestState(version, ADDigest @@ rootHash, vldbInit, settings.node)
 
       case _ => throw new Exception("Unsupported argument combination.")
     }

@@ -75,7 +75,7 @@ object EncryState extends StrictLogging {
     })
   }
 
-  def generateGenesisDigestState(stateDir: File, settings: NodeSettings): DigestState =
+  def generateGenesisDigestState(stateDir: File, settings: EncryAppSettings): DigestState =
     DigestState.create(Some(genesisStateVersion), Some(afterGenesisStateDigest), stateDir, settings)
 
   def readOrGenerate(settings: EncryAppSettings,
@@ -84,7 +84,7 @@ object EncryState extends StrictLogging {
     val stateDir: File = getStateDir(settings)
     stateDir.mkdirs()
     settings.node.stateMode match {
-      case StateMode.Digest => DigestState.create(None, None, stateDir, settings.node)
+      case StateMode.Digest => DigestState.create(None, None, stateDir, settings)
       case StateMode.Utxo if stateDir.listFiles().nonEmpty =>
         UtxoState.create(stateDir, nodeViewHolderRef, settings, statsSenderRef)
       case _ => EncryState.generateGenesisUtxoState(stateDir, nodeViewHolderRef, settings, statsSenderRef)
