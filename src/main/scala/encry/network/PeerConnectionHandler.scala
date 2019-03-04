@@ -102,6 +102,7 @@ class PeerConnectionHandler(connection: ActorRef,
       peerManager ! Handshaked(peer)
       handshakeTimeoutCancellableOpt.map(_.cancel())
       connection ! ResumeReading
+      logger.info(s"Context become workingCycle on peerHandler")
       context become workingCycle
   }
 
@@ -121,6 +122,7 @@ class PeerConnectionHandler(connection: ActorRef,
 
   def workingCycleRemoteInterface: Receive = {
     case Received(data) =>
+      logger.info(s"Got new network message! Try to parse it!")
       val packet: (List[ByteString], ByteString) = getPacket(chunksBuffer ++ data)
       chunksBuffer = packet._2
       packet._1.find { packet =>
