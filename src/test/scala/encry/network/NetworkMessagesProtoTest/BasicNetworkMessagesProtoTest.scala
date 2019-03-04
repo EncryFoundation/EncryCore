@@ -40,8 +40,6 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
   val invDataPayloadsDummy: (ModifierTypeId, Vector[ModifierId]) = Payload.modifierTypeId -> Vector.empty[ModifierId]
   val invDataTransactionsDummy: (ModifierTypeId, Seq[ModifierId]) = Transaction.ModifierTypeId -> Vector.empty[ModifierId]
 
-  def protocolToBytes(protocol: String): Array[Byte] = protocol.split("\\.").map(elem => elem.toByte)
-
   property("SyncInfoMessage should be serialized correctly") {
     val syncInfo: EncrySyncInfo = EncrySyncInfo(testedBlocks.map(_.header.id))
     val syncInfoBeforeProto: SyncInfoNetworkMessage = SyncInfoNetworkMessage(syncInfo)

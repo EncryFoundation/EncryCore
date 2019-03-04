@@ -20,7 +20,6 @@ import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
-
 import scala.util.Try
 
 case class Header(version: Version,

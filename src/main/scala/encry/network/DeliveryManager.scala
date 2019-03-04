@@ -193,7 +193,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
                 requestedModifiers.get(cp).exists(_.contains(key(modifierId)))) {
                 logger.debug(s"Re-ask ${cp.socketAddress} and handler: ${cp.handlerRef} for modifiers of type: " +
                   s"$mTypeId with id: ${Algos.encode(modifierId)}")
-                ///TODO ADD MODS CHECK
                 peerInfo._1.handlerRef ! RequestModifiersNetworkMessage( mTypeId -> Seq(modifierId))
                 syncTracker.incrementRequest(cp)
                 val cancellable: Cancellable = context.system.scheduler

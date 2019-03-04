@@ -44,6 +44,8 @@ trait EncryGenerator {
     PrivateKey25519(privateKey, publicKey)
   }
 
+  def protocolToBytes(protocol: String): Array[Byte] = protocol.split("\\.").map(elem => elem.toByte)
+
   def timestamp: Long = System.currentTimeMillis()
 
   def randomAddress: Address = Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address

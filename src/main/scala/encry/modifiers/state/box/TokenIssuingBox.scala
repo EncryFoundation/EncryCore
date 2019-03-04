@@ -38,9 +38,7 @@ case class TokenIssuingBox(override val proposition: EncryProposition,
       "amount" -> PValue(amount, Types.PInt)
     ), tpe)
 
-  override def serializeToProto: BoxProtoMessage = TokenIssuingBox.toProto(this)
-
-  override def serializeFromProto(message: BoxProtoMessage): Option[EncryBaseBox] = TokenIssuingBox.fromProto(message)
+  override def serializeToProto: BoxProtoMessage = TokenIssuingBoxProtoSerializer.toProto(this)
 }
 
 object TokenIssuingBox {
@@ -72,22 +70,25 @@ object TokenIssuingBox {
     )
   }
 
-  def toProto(box: EncryBaseBox): BoxProtoMessage = box match {
-    case tokenIssuingBox: TokenIssuingBox =>
-      BoxProtoMessage().withTokenIssuingBox(TokenIssuingBoxProtoMessage()
-        .withPropositionProtoMessage(ByteString.copyFrom(box.proposition.contractHash))
-        .withNonce(box.nonce)
-        .withAmount(tokenIssuingBox.amount)
-        .withTokenId(ByteString.copyFrom(tokenIssuingBox.tokenId)))
-  }
+}
 
-  def fromProto(message: BoxProtoMessage): Some[TokenIssuingBox] = message.box.tokenIssuingBox match {
-    case Some(value) => Some(TokenIssuingBox(
-      EncryProposition(value.propositionProtoMessage.toByteArray),
-      value.nonce,
-      value.amount,
-      value.tokenId.toByteArray
-    ))
+object TokenIssuingBoxProtoSerializer extends BaseBoxProtoSerialize[TokenIssuingBox] {
+
+  override def toProto(t: TokenIssuingBox): BoxProtoMessage = BoxProtoMessage().withTokenIssuingBox(
+    TokenIssuingBoxProtoMessage()
+      .withPropositionProtoMessage(ByteString.copyFrom(t.proposition.contractHash))
+      .withNonce(t.nonce)
+      .withAmount(t.amount)
+      .withTokenId(ByteString.copyFrom(t.tokenId)))
+
+  override def fromProto(b: Array[Byte]): Try[TokenIssuingBox] = Try {
+    val box: BoxProtoMessage = BoxProtoMessage.parseFrom(b)
+    TokenIssuingBox(EncryProposition(
+      box.getTokenIssuingBox.propositionProtoMessage.toByteArray),
+      box.getTokenIssuingBox.nonce,
+      box.getTokenIssuingBox.amount,
+      box.getTokenIssuingBox.tokenId.toByteArray
+    )
   }
 }
 

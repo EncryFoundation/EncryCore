@@ -1,7 +1,7 @@
 package encry.modifiers.state.box
 
 import BoxesProto.BoxProtoMessage
-import BoxesProto.BoxProtoMessage.DataBoxProtoMessage
+import BoxesProto.BoxProtoMessage.{AssetBoxProtoMessage, DataBoxProtoMessage, TokenIdProto}
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.google.protobuf.ByteString
 import encry.modifiers.state.box.EncryBox.BxTypeId
@@ -11,6 +11,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.prismlang.core.Types
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
+
 import scala.util.Try
 
 /** Stores arbitrary data in EncryTL binary format. */
@@ -34,9 +35,7 @@ case class DataBox(override val proposition: EncryProposition,
       "data" -> PValue(data, Types.PCollection.ofByte)
     ), tpe)
 
-  override def serializeToProto: BoxProtoMessage = DataBox.toProto(this)
-
-  override def serializeFromProto(message: BoxProtoMessage): Option[EncryBaseBox] = DataBox.fromProto(message)
+  override def serializeToProto: BoxProtoMessage = DataBoxProtoSerializer.toProto(this)
 }
 
 object DataBox {
@@ -44,38 +43,40 @@ object DataBox {
   val TypeId: BxTypeId = 4.toByte
 
   implicit val jsonEncoder: Encoder[DataBox] = (bx: DataBox) => Map(
-    "type"        -> TypeId.asJson,
-    "id"          -> Algos.encode(bx.id).asJson,
+    "type" -> TypeId.asJson,
+    "id" -> Algos.encode(bx.id).asJson,
     "proposition" -> bx.proposition.asJson,
-    "nonce"       -> bx.nonce.asJson,
-    "data"        -> Algos.encode(bx.data).asJson,
+    "nonce" -> bx.nonce.asJson,
+    "data" -> Algos.encode(bx.data).asJson,
   ).asJson
 
   implicit val jsonDecoder: Decoder[DataBox] = (c: HCursor) => {
     for {
       proposition <- c.downField("proposition").as[EncryProposition]
-      nonce       <- c.downField("nonce").as[Long]
-      data        <- c.downField("data").as[Array[Byte]]
+      nonce <- c.downField("nonce").as[Long]
+      data <- c.downField("data").as[Array[Byte]]
     } yield DataBox(
       proposition,
       nonce,
       data
     )
   }
+}
 
-  def toProto(box: EncryBaseBox): BoxProtoMessage = BoxProtoMessage().withDataBox(box match {
-    case db: DataBox => DataBoxProtoMessage()
-      .withPropositionProtoMessage(ByteString.copyFrom(db.proposition.contractHash))
-      .withNonce(db.nonce)
-      .withData(ByteString.copyFrom(db.data))
-  })
+object DataBoxProtoSerializer extends BaseBoxProtoSerialize[DataBox] {
 
-  def fromProto(message: BoxProtoMessage):  Option[EncryBaseBox] = message.box.dataBox match {
-    case Some(value) => Some(DataBox(
-      EncryProposition(value.propositionProtoMessage.toByteArray),
-      value.nonce,
-      value.data.toByteArray
-    ))
+  override def toProto(t: DataBox): BoxProtoMessage = BoxProtoMessage().withDataBox(DataBoxProtoMessage()
+    .withPropositionProtoMessage(ByteString.copyFrom(t.proposition.contractHash))
+    .withNonce(t.nonce)
+    .withData(ByteString.copyFrom(t.data)))
+
+  override def fromProto(b: Array[Byte]): Try[DataBox] = Try {
+    val box: BoxProtoMessage = BoxProtoMessage.parseFrom(b)
+    DataBox(EncryProposition(
+      box.getDataBox.propositionProtoMessage.toByteArray),
+      box.getDataBox.nonce,
+      box.getDataBox.data.toByteArray
+    )
   }
 }
 

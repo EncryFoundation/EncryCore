@@ -2,7 +2,6 @@ package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.ByteOrder
-
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import akka.io.Tcp
 import akka.io.Tcp._
@@ -14,7 +13,6 @@ import PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, MessageFromNetwork, NetworkMessage}
-
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
@@ -113,9 +111,7 @@ class PeerConnectionHandler(connection: ActorRef,
       def sendOutMessage(): Unit = {
         val messageToNetwork: Array[Byte] = GeneralizedNetworkMessage.toProto(message).toByteArray
         val bytes: ByteString = ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork)
-        logger.info(s"Send to $remote message with ${bytes.size} bytes. Length of nm is: ${Ints.toByteArray(messageToNetwork.length)}")
         connection ! Write(bytes)
-        logger.info("Send message " + message.messageName + " to " + remote)
       }
 
       settings.network.addedMaxDelay match {
@@ -127,16 +123,6 @@ class PeerConnectionHandler(connection: ActorRef,
 
   def workingCycleRemoteInterface: Receive = {
     case Received(data) =>
-      logger.info(s"Got new network message! Try to parse it! Length is: ${data.length}")
-
-//      GeneralizedNetworkMessage.fromProto(data) match {
-//        case Success(message) =>
-//          networkController ! MessageFromNetwork(message, selfPeer)
-//          logger.info("Received message " + message.messageName + " from " + remote)
-//        case Failure(e) => logger.info(s"Corrupted data from: " + remote + s"$e")
-//      }
-
-
       val packet: (List[ByteString], ByteString) = getPacket(chunksBuffer ++ data)
       logger.info(s"${packet._1.size}")
       chunksBuffer = packet._2
@@ -196,16 +182,10 @@ class PeerConnectionHandler(connection: ActorRef,
 
     @tailrec
     def multiPacket(packets: List[ByteString], current: ByteString): (List[ByteString], ByteString) =
-      if (current.length < headerSize) {
-        logger.info(s"current.length = ${current.length} expected $headerSize")
-        (packets.reverse, current)
-      }
+      if (current.length < headerSize) (packets.reverse, current)
       else {
         val len: Int = current.iterator.getInt(ByteOrder.BIG_ENDIAN)
-        if (current.length < len + headerSize) {
-          logger.info(s"current.length = ${current.length} expected ${len + headerSize}")
-          (packets.reverse, current)
-        }
+        if (current.length < len + headerSize) (packets.reverse, current)
         else {
           val rem: ByteString = current drop headerSize
           val (front: ByteString, back: ByteString) = rem.splitAt(len)

@@ -14,7 +14,6 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, SerializedAdProof}
 import scorex.crypto.hash.Digest32
-
 import scala.util.{Failure, Success, Try}
 
 case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
@@ -77,9 +76,9 @@ object ADProofs {
   val KeyLength = 32
 
   implicit val jsonEncoder: Encoder[ADProofs] = (p: ADProofs) => Map(
-    "headerId" -> Algos.encode(p.headerId).asJson,
+    "headerId"   -> Algos.encode(p.headerId).asJson,
     "proofBytes" -> Algos.encode(p.proofBytes).asJson,
-    "digest" -> Algos.encode(p.digest).asJson
+    "digest"     -> Algos.encode(p.digest).asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[ADProofs] = (c: HCursor) => {

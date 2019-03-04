@@ -14,7 +14,6 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.LeafData
 import scorex.crypto.hash.Digest32
-
 import scala.util.{Success, Try}
 
 case class Payload(override val headerId: ModifierId, txs: Seq[Transaction])
@@ -43,14 +42,14 @@ case class Payload(override val headerId: ModifierId, txs: Seq[Transaction])
 object Payload {
 
   implicit val jsonEncoder: Encoder[Payload] = (bp: Payload) => Map(
-    "headerId" -> Algos.encode(bp.headerId).asJson,
-    "transactions" -> bp.txs.map(_.asJson).asJson
+    "headerId"      -> Algos.encode(bp.headerId).asJson,
+    "transactions"  -> bp.txs.map(_.asJson).asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[Payload] = (c: HCursor) => {
     for {
-      headerId <- c.downField("headerId").as[String]
-      transactions <- c.downField("transactions").as[Seq[Transaction]]
+      headerId      <- c.downField("headerId").as[String]
+      transactions  <- c.downField("transactions").as[Seq[Transaction]]
     } yield Payload(
       ModifierId @@ Algos.decode(headerId).getOrElse(Array.emptyByteArray),
       transactions

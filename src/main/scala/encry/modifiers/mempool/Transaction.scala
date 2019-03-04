@@ -69,8 +69,8 @@ case class Transaction(fee: Amount,
   val tpe: Types.Product = Types.EncryTransaction
 
   def asVal: PValue = PValue(PObject(Map(
-    "inputs" -> PValue(inputs.map(_.boxId.toList), Types.PCollection(Types.PCollection.ofByte)),
-    "outputs" -> PValue(newBoxes.map(_.asPrism), Types.PCollection(Types.EncryBox)),
+    "inputs"        -> PValue(inputs.map(_.boxId.toList), Types.PCollection(Types.PCollection.ofByte)),
+    "outputs"       -> PValue(newBoxes.map(_.asPrism), Types.PCollection(Types.EncryBox)),
     "messageToSign" -> PValue(messageToSign, Types.PCollection.ofByte)
   ), tpe), tpe)
 }
@@ -82,21 +82,21 @@ object Transaction {
   case class TransactionValidationException(s: String) extends Exception(s)
 
   implicit val jsonEncoder: Encoder[Transaction] = (tx: Transaction) => Map(
-    "id" -> Algos.encode(tx.id).asJson,
-    "fee" -> tx.fee.asJson,
-    "timestamp" -> tx.timestamp.asJson,
-    "inputs" -> tx.inputs.map(_.asJson).asJson,
-    "directives" -> tx.directives.map(_.asJson).asJson,
-    "outputs" -> tx.newBoxes.toSeq.map(_.asJson).asJson,
+    "id"              -> Algos.encode(tx.id).asJson,
+    "fee"             -> tx.fee.asJson,
+    "timestamp"       -> tx.timestamp.asJson,
+    "inputs"          -> tx.inputs.map(_.asJson).asJson,
+    "directives"      -> tx.directives.map(_.asJson).asJson,
+    "outputs"         -> tx.newBoxes.toSeq.map(_.asJson).asJson,
     "defaultProofOpt" -> tx.defaultProofOpt.map(_.asJson).asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[Transaction] = (c: HCursor) => {
     for {
-      fee <- c.downField("fee").as[Long]
-      timestamp <- c.downField("timestamp").as[Long]
-      inputs <- c.downField("inputs").as[IndexedSeq[Input]]
-      directives <- c.downField("directives").as[IndexedSeq[Directive]]
+      fee             <- c.downField("fee").as[Long]
+      timestamp       <- c.downField("timestamp").as[Long]
+      inputs          <- c.downField("inputs").as[IndexedSeq[Input]]
+      directives      <- c.downField("directives").as[IndexedSeq[Directive]]
       defaultProofOpt <- c.downField("defaultProofOpt").as[Option[Proof]]
     } yield Transaction(
       fee,

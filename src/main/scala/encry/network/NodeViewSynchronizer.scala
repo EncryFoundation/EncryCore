@@ -89,8 +89,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             case _ =>
           }
         case RequestModifiersNetworkMessage(invData) =>
-          //TODO CHECK SIZE
-
           logger.info(s"Get request modifiers from remote peer. chainSynced = $chainSynced")
           if (chainSynced) {
             val inRequestCache: Map[String, NodeViewModifier] =
@@ -113,8 +111,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           else logger.info(s"Peer $remote requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
             s"node is not synced, so ignore msg")
         case InvNetworkMessage(invData) =>
-          //TODO CHECK SIZE
-
           logger.info(s"Got inv message from ${remote.socketAddress} with modifiers: ${invData._2.map(Algos.encode).mkString(",")} ")
           //todo: Ban node that send payload id?
           if (invData._1 != Payload.modifierTypeId) nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
@@ -128,38 +124,25 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       chainSynced = true
       deliveryManager ! FullBlockChainSynced
     case ResponseFromLocal(peer, typeId, modifiers: Seq[NodeViewModifier]) =>
-      if (modifiers.nonEmpty) {
-        ///TODO ADD PROTO SER
-        logger.info(s"NodeViewSyncronuser non empty!")
-        if (typeId == Header.modifierTypeId) {
+      if (modifiers.nonEmpty) typeId match {
+        case _ if typeId == Header.modifierTypeId =>
           val modsB: Seq[(ModifierId, Array[Byte])] =
             modifiers.map { case h: Header => h.id -> HeaderProtoSerializer.toProto(h).toByteArray }
-          logger.info(s"${modsB.size} length of headers send to the network")
           peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
-        }
-        if (typeId == Payload.modifierTypeId) {
+        case _ if typeId == Payload.modifierTypeId =>
           val modsB: Seq[(ModifierId, Array[Byte])] =
             modifiers.map { case h: Payload => h.id -> PayloadProtoSerializer.toProto(h).toByteArray }
-          logger.info(s"${modsB.size} length of payloads send to the network")
           peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
-        }
-        if (typeId == Transaction.ModifierTypeId) {
+        case _ if typeId == Transaction.ModifierTypeId =>
           peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modifiers.map {
             case h: Transaction => h.id -> TransactionProtoSerializer.toProto(h).toByteArray
           }.toMap)
-        }
       }
     case a: Any => logger.error(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
   }
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
-    if (chainSynced) {
-      //TODO CHECK SIZE
-
-      networkControllerRef !
-        SendToNetwork(InvNetworkMessage(m.modifierTypeId -> Seq(m.id)), Broadcast)
-    }
-
+    if (chainSynced) networkControllerRef ! SendToNetwork(InvNetworkMessage(m.modifierTypeId -> Seq(m.id)), Broadcast)
 }
 
 object NodeViewSynchronizer {

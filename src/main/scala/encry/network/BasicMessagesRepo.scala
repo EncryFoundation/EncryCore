@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage.InnerMessage
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage.InnerMessage.{GetPeersProtoMessage, HandshakeProtoMessage, InvProtoMessage, ModifiersProtoMessage, PeersProtoMessage, RequestModifiersProtoMessage, SyncInfoProtoMessage}
@@ -16,7 +15,6 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.view.history.EncrySyncInfo
 import scorex.crypto.hash.Blake2b256
-
 import scala.util.Try
 
 object BasicMessagesRepo extends StrictLogging {
@@ -63,27 +61,30 @@ object BasicMessagesRepo extends StrictLogging {
   }
 
   /**
+    * @param message - message, received from network
+    * @param source - sender of received message
     *
-    * @param spec
-    * @param source
+    *               This case class transfers network message from PeerConnectionHandler actor to the NetworkController.
+    *               Main duty is to transfer message from network with sender of it message to the NetworkController as an end point.
     */
 
-  case class MessageFromNetwork(spec: NetworkMessage, source: Option[ConnectedPeer])
+  case class MessageFromNetwork(message: NetworkMessage, source: Option[ConnectedPeer])
 
   /**
+    * This object contains functions, connected with protobuf serialization to the generalized network message.
     *
+    * toProto function first computes checkSum as a hash from NetworkMessageProtoSerialized bytes. Next,
+    * assembles GeneralizedMessage, which contains from first dour calculated checkSum bytes, MAGIC constant, network message.
+    *
+    * fromProto function tries to serialize raw bytes to GeneralizedMessage and compare
+    * magic bytes. Next, tries to collect networkMessage.
     */
 
   object GeneralizedNetworkMessage {
 
     def toProto(message: NetworkMessage): GeneralizedNetworkProtoMessage = {
       val innerMessage: InnerMessage = message.toInnerMessage
-      val checkSumBytes: Array[Byte] = message.checkSumBytes(innerMessage)
-      //TODO do we need it?
-      //require(checkSumBytes.length > 0, "Empty checksum bytes!")
-      val calculatedCheckSum: GoogleByteString = MessageOptions.calculateCheckSum(checkSumBytes)
-      logger.info(s"calculatedCheckSum.length - ${calculatedCheckSum.size()}")
-      logger.info(s"MAGIC.length - ${MessageOptions.MAGIC.size()}")
+      val calculatedCheckSum: GoogleByteString = MessageOptions.calculateCheckSum(message.checkSumBytes(innerMessage))
       GeneralizedNetworkProtoMessage()
         .withMagic(MessageOptions.MAGIC)
         .withChecksum(calculatedCheckSum)
@@ -91,10 +92,8 @@ object BasicMessagesRepo extends StrictLogging {
     }
 
     def fromProto(message: AkkaByteString): Try[NetworkMessage] = Try {
-      logger.info(s"GeneralizedNetworkMessage fromProto start")
       val netMessage: GeneralizedNetworkProtoMessage =
         GeneralizedNetworkProtoMessage.parseFrom(message.toArray)
-      logger.info(s"GeneralizedNetworkMessage fromProto finished")
       require(netMessage.magic.toByteArray.sameElements(MessageOptions.MAGIC.toByteArray),
         s"Wrong MAGIC! Got ${netMessage.magic.toByteArray.mkString(",")}")
       netMessage.innerMessage match {
@@ -117,12 +116,22 @@ object BasicMessagesRepo extends StrictLogging {
       }
     }.flatten
 
+    /**
+      * @param serializer - function, which takes as a parameter other function, which provides serialisation to NetworkMessage.
+      *                   As a result it gives serialized network message contained in option.
+      * @param innerMessage - type of protobuf generalized nested message.
+      * @param requiredBytes - checkSum, stored in received message.
+      * @return - serialized network message contained in option.
+      *
+      *         This function provides validation check for inner message parsing and compares checkSum bytes.
+      */
+
     def checkMessageValidity(serializer: InnerMessage => Option[NetworkMessage],
                              innerMessage: InnerMessage,
                              requiredBytes: GoogleByteString): Try[NetworkMessage] = Try {
-      val deserializedMessage: Option[NetworkMessage] = serializer(innerMessage)
-      require(deserializedMessage.isDefined, "Nested message is invalid!")
-      val networkMessage: NetworkMessage = deserializedMessage.get
+      val serializedMessage: Option[NetworkMessage] = serializer(innerMessage)
+      require(serializedMessage.isDefined, "Nested message is invalid!")
+      val networkMessage: NetworkMessage = serializedMessage.get
       val checkSumBytes: Array[Byte] = networkMessage.checkSumBytes(innerMessage)
       val calculatedCheckSumBytes = MessageOptions.calculateCheckSum(checkSumBytes)
       require(calculatedCheckSumBytes.toByteArray.sameElements(requiredBytes.toByteArray),
@@ -132,8 +141,11 @@ object BasicMessagesRepo extends StrictLogging {
   }
 
   /**
+    * @param esi - EncrySyncInfo case class which contains sequence of modifiers ids/
     *
-    * @param esi
+    *            This message is a nested type of generalized network message. It's sent with the aim to show other peer,
+    *            which last N modifiers this peer has.
+    *            Response for this message is an InvMessage which contains all modifiers older than local.
     */
 
   case class SyncInfoNetworkMessage(esi: EncrySyncInfo) extends NetworkMessage {
@@ -159,8 +171,9 @@ object BasicMessagesRepo extends StrictLogging {
   }
 
   /**
+    * @param data - modifiersIds sequence.
     *
-    * @param data
+    *             This message sends as a respons for SyncInfoMessage or to show other peers locally generated modifier.
     */
 
   case class InvNetworkMessage(data: InvData) extends NetworkMessage {
@@ -191,10 +204,9 @@ object BasicMessagesRepo extends StrictLogging {
   }
 
   /**
+    * @param data - modifiersIds sequence.
     *
-    * @param data - id's of requested modifiers. Includes modifierTypeId and Seq[ModifierId].
-    *
-    *             This message sends to the peer
+    *             This message sends to the peer to request missing in local history modifiers.
     */
 
   case class RequestModifiersNetworkMessage(data: InvData) extends NetworkMessage {
@@ -226,6 +238,12 @@ object BasicMessagesRepo extends StrictLogging {
         case None => Option.empty[RequestModifiersNetworkMessage]
       }
   }
+
+  /**
+    * @param data - map with modifierId as a key and serialized to protobuf modifiers as a value.
+    *
+    *             This message sends as a RESPONSE ONLY to RequestModifiers message.
+    */
 
   case class ModifiersNetworkMessage(data: ModifiersData) extends NetworkMessage {
 
@@ -273,8 +291,7 @@ object BasicMessagesRepo extends StrictLogging {
   }
 
   /**
-    *
-    * @param peers - sequence of known by this peer another peers.
+    * @param peers - sequence of known by this peer other peers.
     *
     *              This network message sends directly to the sender of 'GetPeers' message.
     */
@@ -307,7 +324,6 @@ object BasicMessagesRepo extends StrictLogging {
   }
 
   /**
-    *
     * @param protocolVersion - peer network communication protocol version
     * @param nodeName        - peer name
     * @param declaredAddress - peer address

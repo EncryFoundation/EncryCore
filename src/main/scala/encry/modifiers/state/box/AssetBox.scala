@@ -41,9 +41,8 @@ case class AssetBox(override val proposition: EncryProposition,
       "tokenId" -> PValue(tokenIdOpt.getOrElse(Constants.IntrinsicTokenId), Types.PCollection.ofByte)
     ), tpe)
 
-  override def serializeToProto: BoxProtoMessage = AssetBox.toProto(this)
+  override def serializeToProto: BoxProtoMessage = AssetBoxProtoSerializer.toProto(this)
 
-  override def serializeFromProto(message: BoxProtoMessage): Option[EncryBaseBox] = AssetBox.fromProto(message)
 }
 
 object AssetBox {
@@ -72,25 +71,30 @@ object AssetBox {
       tokenIdOpt.map(str => Algos.decode(str).getOrElse(Array.emptyByteArray))
     )
   }
+}
 
-  def toProto(box: EncryBaseBox): BoxProtoMessage = BoxProtoMessage().withAssetBox(box match {
-    case ab: AssetBox => AssetBoxProtoMessage()
-      .withAmount(ab.amount)
-      .withPropositionProtoMessage(ByteString.copyFrom(ab.proposition.contractHash))
-      .withNonce(ab.nonce)
-      .withTokenId(ab.tokenIdOpt match {
-        case Some(value) => TokenIdProto().withTokenId(ByteString.copyFrom(value))
-        case None => TokenIdProto.defaultInstance
-      })
-  })
+object AssetBoxProtoSerializer extends BaseBoxProtoSerialize[AssetBox] {
 
-  def fromProto(message: BoxProtoMessage): Option[EncryBaseBox] = message.box.assetBox match {
-    case Some(value) => Some(AssetBox(EncryProposition(
-      value.propositionProtoMessage.toByteArray),
-      value.nonce,
-      value.amount,
-      value.tokenId.map(_.tokenId.toByteArray)
-    ))
+  override def toProto(t: AssetBox): BoxProtoMessage = {
+    val initialBox: AssetBoxProtoMessage = AssetBoxProtoMessage()
+      .withAmount(t.amount)
+      .withPropositionProtoMessage(ByteString.copyFrom(t.proposition.contractHash))
+      .withNonce(t.nonce)
+    val resultedBox: AssetBoxProtoMessage = t.tokenIdOpt match {
+      case Some(value) => initialBox.withTokenId(TokenIdProto().withTokenId(ByteString.copyFrom(value)))
+      case _ => initialBox
+    }
+    BoxProtoMessage().withAssetBox(resultedBox)
+  }
+
+  override def fromProto(b: Array[Byte]): Try[AssetBox] = Try {
+    val box: BoxProtoMessage = BoxProtoMessage.parseFrom(b)
+    AssetBox(EncryProposition(
+      box.getAssetBox.propositionProtoMessage.toByteArray),
+      box.getAssetBox.nonce,
+      box.getAssetBox.amount,
+      box.getAssetBox.tokenId.map(_.tokenId.toByteArray)
+    )
   }
 }
 
