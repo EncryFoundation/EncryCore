@@ -27,10 +27,11 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
   def get(elemKey: VersionalLevelDbKey): Option[VersionalLevelDbValue] = {
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
-    val possibleElemInResolved = if (db.get(userKey(elemKey)) != null &&
-      db.get(userKey(elemKey)).headOption.contains(ACCESSIBLE_KEY_PREFIX)) {
+    val map: Array[Byte] = db.get(userKey(elemKey), readOptions)
+    val possibleElemInResolved = if (map != null &&
+      map.headOption.contains(ACCESSIBLE_KEY_PREFIX)) {
       val lastElemVersion: LevelDBVersion =
-        LevelDBVersion @@ ArrayUtils.subarray(db.get(userKey(elemKey), readOptions), 1, settings.versionKeySize + 1)
+        LevelDBVersion @@ ArrayUtils.subarray(map, 1, settings.versionKeySize + 1)
       val possibleElem: Array[Byte] =
         db.get(accessableElementKeyForVersion(lastElemVersion, elemKey), readOptions)
       if (possibleElem != null) {
