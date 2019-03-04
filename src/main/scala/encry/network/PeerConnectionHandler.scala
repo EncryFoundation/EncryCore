@@ -109,7 +109,9 @@ class PeerConnectionHandler(connection: ActorRef,
   def workingCycleLocalInterface: Receive = {
     case message: NetworkMessage =>
       def sendOutMessage(): Unit = {
-        connection ! Write(ByteString(GeneralizedNetworkMessage.toProto(message).toByteArray))
+        val bytes: ByteString = ByteString(GeneralizedNetworkMessage.toProto(message).toByteArray)
+        logger.info(s"Send to $remote message with ${bytes.size} bytes.")
+        connection ! Write(bytes)
         logger.info("Send message " + message.messageName + " to " + remote)
       }
 
