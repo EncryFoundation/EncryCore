@@ -2,7 +2,7 @@ package encry.network.NetworkMessagesProtoTest
 
 import java.net.InetSocketAddress
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage
-import NetworkMessagesProto.GeneralizedNetworkProtoMessage.InnerMessage,
+import NetworkMessagesProto.GeneralizedNetworkProtoMessage.InnerMessage
 import akka.util.ByteString
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.{Block, Header, Payload}
