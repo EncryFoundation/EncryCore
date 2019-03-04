@@ -60,8 +60,10 @@ class NetworkController extends Actor with StrictLogging {
                           remote: ConnectedPeer,
                           mH: Map[Seq[Byte], ActorRef]): Unit =
     mH.find(_._1.contains(messageId)).map(_._2) match {
-      case Some(handler) => handler ! DataFromPeer(message, remote)
-      case None => logger.error("No handlers found for message: " + NetworkMessagesIds.SyncInfo)
+      case Some(handler) =>
+        handler ! DataFromPeer(message, remote)
+        logger.info(s"Send message DataFromPeer with ${message.messageName} to $handler.")
+      case None => logger.error("No handlers found for message: " + message.messageName)
     }
 
   def businessLogic: Receive = {
@@ -79,7 +81,7 @@ class NetworkController extends Actor with StrictLogging {
           findHandler(message, NetworkMessagesIds.GetPeers, remote, messagesHandlers)
         case message@PeersNetworkMessage(_) =>
           findHandler(message, NetworkMessagesIds.Peers, remote, messagesHandlers)
-        case ms => logger.info(s"Invalid message type: $ms.")
+        case ms => logger.info(s"Invalid message type: ${ms.messageName}.")
       }
     case SendToNetwork(message, sendingStrategy) =>
       (peerManager ? FilterPeers(sendingStrategy)) (5 seconds)

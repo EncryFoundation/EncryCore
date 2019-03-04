@@ -70,7 +70,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       mempoolReaderOpt = Some(reader)
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
     case DisconnectedPeer(remote) => deliveryManager ! DisconnectedPeer(remote)
-    case DataFromPeer(message, remote) => message match {
+    case DataFromPeer(message, remote) =>
+      logger.info(s"Got ${message.messageName} on NodeViewSyncronizer.")
+      message match {
       case SyncInfoNetworkMessage(syncInfo) =>
         logger.info(s"Got sync message from ${remote.socketAddress} with " +
           s"${syncInfo.lastHeaderIds.size} headers. Head's headerId is: " +
@@ -89,7 +91,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       case RequestModifiersNetworkMessage(invData) =>
         //TODO CHECK SIZE
 
-      logger.info(s"Get request from remote peer. chainSynced = $chainSynced")
+      logger.info(s"Get request modifiers from remote peer. chainSynced = $chainSynced")
         if (chainSynced) {
           val inRequestCache: Map[String, NodeViewModifier] =
             invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
