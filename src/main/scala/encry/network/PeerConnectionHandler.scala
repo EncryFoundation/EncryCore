@@ -72,8 +72,7 @@ class PeerConnectionHandler(connection: ActorRef,
   }
 
   def receivedData: Receive = {
-    case Received(data) =>
-      GeneralizedNetworkMessage.fromProto(data) match {
+    case Received(data) => GeneralizedNetworkMessage.fromProto(data) match {
         case Success(value) => value match {
           case handshake: Handshake =>
             logger.info(s"Got a Handshake from $remote.")
@@ -124,14 +123,15 @@ class PeerConnectionHandler(connection: ActorRef,
 
   def workingCycleRemoteInterface: Receive = {
     case Received(data) =>
-      logger.info(s"Got new network message! Try to parse it!")
+      logger.info(s"Got new network message! Try to parse it! Length is: ${data.length}")
 
-      GeneralizedNetworkMessage.fromProto(data) match {
-        case Success(message) =>
-          networkController ! MessageFromNetwork(message, selfPeer)
-          logger.info("Received message " + message.messageName + " from " + remote)
-        case Failure(e) => logger.info(s"Corrupted data from: " + remote + s"$e")
-      }
+//      GeneralizedNetworkMessage.fromProto(data) match {
+//        case Success(message) =>
+//          networkController ! MessageFromNetwork(message, selfPeer)
+//          logger.info("Received message " + message.messageName + " from " + remote)
+//        case Failure(e) => logger.info(s"Corrupted data from: " + remote + s"$e")
+//      }
+
 
       val packet: (List[ByteString], ByteString) = getPacket(chunksBuffer ++ data)
       logger.info(s"${packet._1.size}")
@@ -192,10 +192,16 @@ class PeerConnectionHandler(connection: ActorRef,
 
     @tailrec
     def multiPacket(packets: List[ByteString], current: ByteString): (List[ByteString], ByteString) =
-      if (current.length < headerSize) (packets.reverse, current)
+      if (current.length < headerSize) {
+        logger.info(s"current.length = ${current.length} expected $headerSize")
+        (packets.reverse, current)
+      }
       else {
         val len: Int = current.iterator.getInt(ByteOrder.BIG_ENDIAN)
-        if (current.length < len + headerSize) (packets.reverse, current)
+        if (current.length < len + headerSize) {
+          logger.info(s"current.length = ${current.length} expected ${len + headerSize}")
+          (packets.reverse, current)
+        }
         else {
           val rem: ByteString = current drop headerSize
           val (front: ByteString, back: ByteString) = rem.splitAt(len)
