@@ -86,40 +86,40 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     nodeView.state.closeStorage()
   }
 
+
   override def receive: Receive = {
-    case ModifiersFromRemote(modifierTypeId, modifiers) =>
-      modifierTypeId match {
-        case Payload.modifierTypeId => modifiers.foreach { bytes =>
-          PayloadProtoSerializer.fromProto(PayloadProtoMessage.parseFrom(bytes)).foreach { payload =>
-            if (nodeView.history.contains(payload.id) || ModifiersCache.contains(key(payload.id)))
-              logger.warn(s"Received modifier ${payload.encodedId} that is already in history")
-            else ModifiersCache.put(key(payload.id), payload, nodeView.history)
-          }
-        }
-          logger.debug(s"Cache before(${ModifiersCache.size})")
-          computeApplications()
-          logger.debug(s"Cache after(${ModifiersCache.size})")
-        case Header.modifierTypeId => modifiers.foreach { bytes =>
-          HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)).foreach { header =>
-            if (nodeView.history.contains(header.id) || ModifiersCache.contains(key(header.id)))
-              logger.warn(s"Received modifier ${header.encodedId} that is already in history")
-            else ModifiersCache.put(key(header.id), header, nodeView.history)
-            if (settings.influxDB.isDefined && nodeView.history.isFullChainSynced) {
-              header match {
-                case h: Header => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - h.timestamp)
-                case b: Block => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - b.header.timestamp)
-                case _ =>
-              }
+    case ModifiersFromRemote(modifierTypeId, modifiers) => modifierTypeId match {
+      case Payload.modifierTypeId => modifiers.foreach { bytes =>
+        Try(PayloadProtoSerializer.fromProto(PayloadProtoMessage.parseFrom(bytes)).foreach { payload =>
+          if (nodeView.history.contains(payload.id) || ModifiersCache.contains(key(payload.id)))
+            logger.warn(s"Received modifier ${payload.encodedId} that is already in history")
+          else ModifiersCache.put(key(payload.id), payload, nodeView.history)
+        })
+      }
+        logger.debug(s"Cache before(${ModifiersCache.size})")
+        computeApplications()
+        logger.debug(s"Cache after(${ModifiersCache.size})")
+      case Header.modifierTypeId => modifiers.foreach { bytes =>
+        Try(HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)).foreach { header =>
+          if (nodeView.history.contains(header.id) || ModifiersCache.contains(key(header.id)))
+            logger.warn(s"Received modifier ${header.encodedId} that is already in history")
+          else ModifiersCache.put(key(header.id), header, nodeView.history)
+          if (settings.influxDB.isDefined && nodeView.history.isFullChainSynced) {
+            header match {
+              case h: Header => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - h.timestamp)
+              case b: Block => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - b.header.timestamp)
+              case _ =>
             }
           }
-        }
-          logger.debug(s"Cache before(${ModifiersCache.size})")
-          computeApplications()
-          logger.debug(s"Cache after(${ModifiersCache.size})")
-        case Transaction.ModifierTypeId => modifiers.foreach { bytes =>
-          TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes)).foreach(tx => txModify(tx))
-        }
+        })
       }
+        logger.debug(s"Cache before(${ModifiersCache.size})")
+        computeApplications()
+        logger.debug(s"Cache after(${ModifiersCache.size})")
+      case Transaction.ModifierTypeId => modifiers.foreach { bytes =>
+        Try(TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes)).foreach(tx => txModify(tx)))
+      }
+    }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction]@unchecked => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier]@unchecked =>
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
