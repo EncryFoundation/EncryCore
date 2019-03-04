@@ -133,20 +133,21 @@ class PeerConnectionHandler(connection: ActorRef,
         case Failure(e) => logger.info(s"Corrupted data from: " + remote + s"$e")
       }
 
-      //      val packet: (List[ByteString], ByteString) = getPacket(chunksBuffer ++ data)
-      //      logger.info(s"${packet._1.size}")
-      //      chunksBuffer = packet._2
-      //      packet._1.find { packet =>
-      //        GeneralizedNetworkMessage.fromProto(packet) match {
-      //          case Success(message) =>
-      //            networkController ! MessageFromNetwork(message, selfPeer)
-      //            logger.info("Received message " + message.messageName + " from " + remote)
-      //            false
-      //          case Failure(e) =>
-      //            logger.info(s"Corrupted data from: " + remote + s"$e")
-      //            true
-      //        }
-      //      }
+      val packet: (List[ByteString], ByteString) = getPacket(chunksBuffer ++ data)
+      logger.info(s"${packet._1.size}")
+      chunksBuffer = packet._2
+      packet._1.find { packet =>
+        GeneralizedNetworkMessage.fromProto(packet) match {
+          case Success(message) =>
+            networkController ! MessageFromNetwork(message, selfPeer)
+            logger.info("Received message " + message.messageName + " from " + remote)
+            false
+          case Failure(e) =>
+            logger.info(s"Corrupted data from: " + remote + s"$e")
+            true
+        }
+      }
+
       connection ! ResumeReading
   }
 
