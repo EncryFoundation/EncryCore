@@ -4,12 +4,13 @@ import java.net.InetSocketAddress
 
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage.InnerMessage
-import NetworkMessagesProto.GeneralizedNetworkProtoMessage.InnerMessage.{GetPeersProtoMessage, InvProtoMessage, ModifiersProtoMessage, PeersProtoMessage, RequestModifiersProtoMessage, SyncInfoProtoMessage, HandshakeProtoMessage}
+import NetworkMessagesProto.GeneralizedNetworkProtoMessage.InnerMessage.{GetPeersProtoMessage, HandshakeProtoMessage, InvProtoMessage, ModifiersProtoMessage, PeersProtoMessage, RequestModifiersProtoMessage, SyncInfoProtoMessage}
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage.ModifiersProtoMessage.MapFieldEntry
-import NetworkMessagesProto.GeneralizedNetworkProtoMessage.{InvProtoMessage => InvPM, ModifiersProtoMessage => ModifiersPM, PeersProtoMessage => PeersPM, RequestModifiersProtoMessage => rModsPM, SyncInfoProtoMessage => sIPM, GetPeersProtoMessage => GetPeersProto, HandshakeProtoMessage => hPM}
+import NetworkMessagesProto.GeneralizedNetworkProtoMessage.{GetPeersProtoMessage => GetPeersProto, HandshakeProtoMessage => hPM, InvProtoMessage => InvPM, ModifiersProtoMessage => ModifiersPM, PeersProtoMessage => PeersPM, RequestModifiersProtoMessage => rModsPM, SyncInfoProtoMessage => sIPM}
 import SyntaxMessageProto.InetSocketAddressProtoMessage
 import com.google.protobuf.{ByteString => GoogleByteString}
 import akka.util.{ByteString => AkkaByteString}
+import com.typesafe.scalalogging.StrictLogging
 import encry.network.BasicMessagesRepo.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
@@ -18,7 +19,7 @@ import scorex.crypto.hash.Blake2b256
 
 import scala.util.Try
 
-object BasicMessagesRepo {
+object BasicMessagesRepo extends StrictLogging {
 
   object BasicMsgDataTypes {
     type InvData = (ModifierTypeId, Seq[ModifierId])
@@ -88,8 +89,10 @@ object BasicMessagesRepo {
     }
 
     def fromProto(message: AkkaByteString): Try[NetworkMessage] = Try {
+      logger.info(s"GeneralizedNetworkMessage fromProto start")
       val netMessage: GeneralizedNetworkProtoMessage =
         GeneralizedNetworkProtoMessage.parseFrom(message.toArray)
+      logger.info(s"GeneralizedNetworkMessage fromProto finished")
       require(netMessage.magic.toByteArray.sameElements(MessageOptions.MAGIC.toByteArray),
         s"Wrong MAGIC! Got ${netMessage.magic.toByteArray.mkString(",")}")
       netMessage.innerMessage match {
