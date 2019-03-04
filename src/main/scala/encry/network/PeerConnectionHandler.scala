@@ -2,6 +2,7 @@ package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.ByteOrder
+
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import akka.io.Tcp
 import akka.io.Tcp._
@@ -10,8 +11,10 @@ import encry.EncryApp.settings
 import encry.EncryApp._
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle, _}
 import PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
+import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, MessageFromNetwork, NetworkMessage}
+
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
@@ -108,8 +111,9 @@ class PeerConnectionHandler(connection: ActorRef,
   def workingCycleLocalInterface: Receive = {
     case message: NetworkMessage =>
       def sendOutMessage(): Unit = {
-        val bytes: ByteString = ByteString(GeneralizedNetworkMessage.toProto(message).toByteArray)
-        logger.info(s"Send to $remote message with ${bytes.size} bytes.")
+        val messageToNetwork: Array[Byte] = GeneralizedNetworkMessage.toProto(message).toByteArray
+        val bytes: ByteString = ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork)
+        logger.info(s"Send to $remote message with ${bytes.size} bytes. Length of nm is: ${Ints.toByteArray(messageToNetwork.length)}")
         connection ! Write(bytes)
         logger.info("Send message " + message.messageName + " to " + remote)
       }
