@@ -72,17 +72,19 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
           * First check contain db this elem or not. if no: insert elem, and insert init access map
           * if db contains elem, just insert elem
           */
-        if (db.get(userKey(elemKey)) == null) {
+        val elemMap: Array[Byte] = db.get(userKey(elemKey), readOptions)
+        if (elemMap == null) {
           batch.put(userKey(elemKey), ACCESSIBLE_KEY_PREFIX +: newElem.version)
         } else {
-          val accessMap = db.get(userKey(elemKey), readOptions).tail
+          val accessMap = elemMap.tail
           batch.put(userKey(elemKey), (ACCESSIBLE_KEY_PREFIX +: newElem.version) ++ accessMap)
         }
         batch.put(accessableElementKeyForVersion(newElem.version, elemKey), elemValue)
     }
     newElem.elemsToDelete.foreach { elemKey =>
+      val possibleMap = db.get(userKey(elemKey), readOptions)
       val accessMap =
-        if (db.get(userKey(elemKey), readOptions) != null) db.get(userKey(elemKey), readOptions).tail
+        if (possibleMap != null) possibleMap.tail
         else Array.emptyByteArray
       batch.put(userKey(elemKey), INACCESSIBLE_KEY_PREFIX +: accessMap)
     }
