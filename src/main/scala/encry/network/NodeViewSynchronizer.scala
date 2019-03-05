@@ -124,19 +124,22 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       chainSynced = true
       deliveryManager ! FullBlockChainSynced
     case ResponseFromLocal(peer, typeId, modifiers: Seq[NodeViewModifier]) =>
-      if (modifiers.nonEmpty) typeId match {
-        case _ if typeId == Header.modifierTypeId =>
-          val modsB: Seq[(ModifierId, Array[Byte])] =
-            modifiers.map { case h: Header => h.id -> HeaderProtoSerializer.toProto(h).toByteArray }
-          peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
-        case _ if typeId == Payload.modifierTypeId =>
-          val modsB: Seq[(ModifierId, Array[Byte])] =
-            modifiers.map { case h: Payload => h.id -> PayloadProtoSerializer.toProto(h).toByteArray }
-          peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
-        case _ if typeId == Transaction.ModifierTypeId =>
-          peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modifiers.map {
-            case h: Transaction => h.id -> TransactionProtoSerializer.toProto(h).toByteArray
-          }.toMap)
+      if (modifiers.nonEmpty) {
+        logger.info(s"Sent modifiers size is: ${modifiers.length}")
+        typeId match {
+          case _ if typeId == Header.modifierTypeId =>
+            val modsB: Seq[(ModifierId, Array[Byte])] =
+              modifiers.map { case h: Header => h.id -> HeaderProtoSerializer.toProto(h).toByteArray }
+            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
+          case _ if typeId == Payload.modifierTypeId =>
+            val modsB: Seq[(ModifierId, Array[Byte])] =
+              modifiers.map { case h: Payload => h.id -> PayloadProtoSerializer.toProto(h).toByteArray }
+            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
+          case _ if typeId == Transaction.ModifierTypeId =>
+            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modifiers.map {
+              case h: Transaction => h.id -> TransactionProtoSerializer.toProto(h).toByteArray
+            }.toMap)
+        }
       }
     case a: Any => logger.error(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
   }

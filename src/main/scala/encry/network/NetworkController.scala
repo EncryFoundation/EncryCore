@@ -72,16 +72,22 @@ class NetworkController extends Actor with StrictLogging {
         case message@SyncInfoNetworkMessage(_) =>
           findHandler(message, NetworkMessagesIds.SyncInfo, remote, messagesHandlers)
         case message@InvNetworkMessage(_) =>
-          if (message.data._2.size < settings.network.maxInvObjects)
+          if (message.data._2.size <= settings.network.maxInvObjects) {
+            logger.info(s"Got ${message.data._2.size} inv modifiers!")
             findHandler(message, NetworkMessagesIds.Inv, remote, messagesHandlers)
+          }
           else logger.info(s"Received InvMessage with bigger ${message.data._2.size} mods number than expected from $remote")
         case message@RequestModifiersNetworkMessage(_) =>
-          if (message.data._2.size < settings.network.maxInvObjects)
+          if (message.data._2.size <= settings.network.maxInvObjects) {
+            logger.info(s"Got ${message.data._2.size} request modifiers!")
             findHandler(message, NetworkMessagesIds.RequestModifier, remote, messagesHandlers)
+          }
           else logger.info(s"Received RequestModifiersMessage with bigger ${message.data._2.size} mods number than expected from $remote")
         case message@ModifiersNetworkMessage(_) =>
-          if (message.data._2.size < settings.network.maxInvObjects)
+          if (message.data._2.size <= settings.network.maxInvObjects) {
+            logger.info(s"Got ${message.data._2.size} modifiers!")
             findHandler(message, NetworkMessagesIds.Modifier, remote, messagesHandlers)
+          }
           else logger.info(s"Received ModifiersMessage with bigger ${message.data._2.size} mods number than expected from $remote")
         case message@GetPeersNetworkMessage =>
           findHandler(message, NetworkMessagesIds.GetPeers, remote, messagesHandlers)
