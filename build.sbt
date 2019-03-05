@@ -84,7 +84,6 @@ libraryDependencies ++= Seq(
   "org.typelevel" % "cats-core_2.12" % "1.0.1",
   "org.typelevel" % "cats-kernel_2.12" % "1.0.1",
   "org.typelevel" % "cats-macros_2.12" % "1.0.1"
-  //"com.googlecode.concurrentlinkedhashmap" % "concurrentlinkedhashmap-lru" % "1.4.2"
 ) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
@@ -100,8 +99,8 @@ evictionWarningOptions in update := EvictionWarningOptions.default
 logLevel := Level.Info
 val opts = Seq(
   "-server",
-  "-Xms4G",
-  "-Xmx8G",
+  "-Xms2G",
+  "-Xmx4G",
   "-XX:+ExitOnOutOfMemoryError",
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
