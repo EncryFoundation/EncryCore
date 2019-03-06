@@ -63,16 +63,11 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def processBetterChain: BlockProcessing = {
     case toProcess@ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
-      logger.info(s"Prev best block is: ${bestBlockOpt.get.asJson}")
       val prevBest: Block = bestBlockOpt.get
-      logger.info(s"prevBest.header: ${prevBest.header.asJson}")
-      logger.info(s"newBestHeader: ${newBestHeader.asJson}")
       val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
-      logger.info(s"prevChain(${prevChain.length}). New chain(${newChain.length})")
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
-      logger.info(s"To apply(${toApply.length})")
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
         //application of this block leads to full chain with higher score
