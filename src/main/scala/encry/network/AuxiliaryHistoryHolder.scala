@@ -73,7 +73,7 @@ object AuxiliaryHistoryHolder {
         val levelDBInit = LevelDbFactory.factory.open(historyIndexDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
     }
-    val storage: HistoryStorage = new HistoryStorage(vldbInit)
+    val storage: HistoryStorage = HistoryStorage(vldbInit)
 
     val history: EncryHistory = (settingsEncry.node.stateMode.isDigest, settingsEncry.node.verifyTransactions) match {
       case (true, true) =>
