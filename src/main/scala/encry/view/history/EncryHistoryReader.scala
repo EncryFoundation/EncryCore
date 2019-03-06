@@ -105,7 +105,6 @@ trait EncryHistoryReader extends BlockHeaderProcessor
         .flatMap { h => headerIdsAtHeight(h + 1) }
         .flatMap { id => typedModifierById[Header](id) }
         .filter(filterCond)
-      logger.info(s"nextLevelHeaders: ${nextLevelHeaders.map(header => Algos.encode(header.id))}")
       if (nextLevelHeaders.isEmpty) acc.map(_.reverse)
       else {
         val updatedChains: Seq[Seq[Header]] = nextLevelHeaders.flatMap { h =>
@@ -116,7 +115,6 @@ trait EncryHistoryReader extends BlockHeaderProcessor
         loop(currentHeight + 1, updatedChains ++ nonUpdatedChains)
       }
     }
-    logger.info(s"continuationHeaderChains. ${header.height}")
     loop(header.height, Seq(Seq(header)))
   }
 
