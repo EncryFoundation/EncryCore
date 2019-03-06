@@ -59,7 +59,7 @@ object EncryApp extends App with StrictLogging {
     if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender], "statsSender"))
     else None
   lazy val auxHistoryHolder: ActorRef =
-    system.actorOf(Props(new AuxiliaryHistoryHolder(settings, timeProvider, nodeViewSynchronizer))
+    system.actorOf(Props(AuxiliaryHistoryHolder(settings, timeProvider, nodeViewSynchronizer))
     .withDispatcher("aux-history-dispatcher"), "auxHistoryHolder")
   lazy val nodeViewHolder: ActorRef =
     system.actorOf(EncryNodeViewHolder.props(auxHistoryHolder).withDispatcher("nvh-dispatcher"), "nodeViewHolder")
