@@ -53,9 +53,10 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
 
   def isEmpty: Boolean = version.isEmpty
 
-  //todo: get key szie from settings
-  def rollbackVersions: Iterable[ADDigest] = store.versions.map(ADDigest @@ _.untag(StorageVersion))
-    .filterNot(elem => ByteArrayWrapper(elem) == VersionalLevelDBCompanion.INIT_VERSION(33))
+  //todo: get key size from settings
+  def rollbackVersions: Iterable[ADDigest] = store.versions.collect {
+    case elem if ByteArrayWrapper(elem) != VersionalLevelDBCompanion.INIT_VERSION(33) => ADDigest @@ elem.untag(StorageVersion)
+  }
 
   def update[K <: Array[Byte], V <: Array[Byte]](prover: BatchAVLProver[D, _],
                                                  additionalData: Seq[(K, V)]): Try[Unit] = Try {
