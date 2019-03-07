@@ -1,34 +1,42 @@
 package encry.view.wallet
 
-import java.net.InetSocketAddress
-
-import encry.EncryApp.settings
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.state.box.{AssetBox, MonetaryBox}
-import encry.settings.{Constants, EncryAppSettings}
+import encry.settings.{Constants, EncryAppSettings, LevelDBSettings}
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDBCompanion}
 import encry.utils.TestHelper.Props
 import encry.utils.{EncryGenerator, FileHelper}
 import io.iohk.iodb.LSMStore
+import org.encryfoundation.common.Algos
+import org.iq80.leveldb.{DB, Options}
 import org.scalatest.{Matchers, PropSpec}
 
-import scala.collection.immutable.TreeMap
-
-class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator {
+class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator with StrictLogging {
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read
 
+  val dummyLevelDBSettings = LevelDBSettings(5)
+
   property("Balance count (intrinsic coins only).") {
 
-    val walletStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
+    val dir = FileHelper.getRandomTempDir
+
+    val db: DB = {
+      if (!dir.exists()) dir.mkdirs()
+      LevelDbFactory.factory.open(dir, new Options)
+    }
 
     val accountManagerStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0, keySize = 33)
 
     val accountManager: AccountManager = AccountManager(accountManagerStore)
 
-    val wallet: EncryWallet = EncryWallet(walletStore, accountManager)
+    val walletStorage = WalletVersionalLevelDBCompanion.apply(db, dummyLevelDBSettings)
+
+    val wallet: EncryWallet = EncryWallet(walletStorage, accountManager)
 
     val validTxs: Seq[Transaction] = genValidPaymentTxsToAddr(4, accountManager.mandatoryAccount.publicImage.address.address)
 
@@ -61,21 +69,29 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
     wallet.scanPersistent(secondBlock)
 
     wallet.walletStorage.getTokenBalanceById(Constants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance - useBox.amount
+
+    logger.info(s"tmp dir size: ${dir.length()}")
   }
 
   property("Balance count (intrinsic coins + tokens)") {
+
+    val db: DB = {
+      val dir = FileHelper.getRandomTempDir
+      if (!dir.exists()) dir.mkdirs()
+      LevelDbFactory.factory.open(dir, new Options)
+    }
 
     val txsQty: Int = 4
 
     val blockHeader: Header = genHeader
 
-    val walletStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
-
     val accountManagerStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0, keySize = 33)
 
     val keyManager: AccountManager = AccountManager(accountManagerStore)
 
-    val wallet: EncryWallet = EncryWallet(walletStore, keyManager)
+    val walletStorage = WalletVersionalLevelDBCompanion(db, dummyLevelDBSettings)
+
+    val wallet: EncryWallet = EncryWallet(walletStorage, keyManager)
 
     val validTxs: Seq[Transaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.mandatoryAccount.publicImage.address.address)
 

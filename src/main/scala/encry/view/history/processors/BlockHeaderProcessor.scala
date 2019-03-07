@@ -11,6 +11,9 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history._
 import encry.settings.Constants._
 import encry.settings.{Constants, EncryAppSettings}
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.utils.NetworkTimeProvider
 import encry.validation.{ModifierValidator, ValidationResult}
@@ -18,7 +21,9 @@ import encry.view.history.History.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
+import scorex.crypto.hash.Digest32
 import supertagged.@@
+
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.util.Try
@@ -29,8 +34,9 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   protected val timeProvider: NetworkTimeProvider
   private val difficultyController: PowLinearController.type = PowLinearController
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
-  protected val BestHeaderKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(Header.modifierTypeId))
-  protected val BestBlockKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(DigestLength)(-1))
+  protected val BestHeaderKey: StorageKey =
+    StorageKey @@ Array.fill(DigestLength)(Header.modifierTypeId.untag(ModifierTypeId))
+  protected val BestBlockKey: StorageKey = StorageKey @@ Array.fill(DigestLength)(-1: Byte)
   protected val historyStorage: HistoryStorage
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node)
   private var isHeadersChainSyncedVar: Boolean = false
@@ -90,16 +96,16 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity
 
-  private def heightIdsKey(height: Int): ByteArrayWrapper = ByteArrayWrapper(Algos.hash(Ints.toByteArray(height)))
+  private def heightIdsKey(height: Int): StorageKey = StorageKey @@ Algos.hash(Ints.toByteArray(height)).untag(Digest32)
 
-  protected def headerScoreKey(id: ModifierId): ByteArrayWrapper =
-    ByteArrayWrapper(Algos.hash("score".getBytes(Algos.charset) ++ id))
+  protected def headerScoreKey(id: ModifierId): StorageKey =
+    StorageKey @@ Algos.hash("score".getBytes(Algos.charset) ++ id).untag(Digest32)
 
-  protected def headerHeightKey(id: ModifierId): ByteArrayWrapper =
-    ByteArrayWrapper(Algos.hash("height".getBytes(Algos.charset) ++ id))
+  protected def headerHeightKey(id: ModifierId): StorageKey =
+    StorageKey @@ Algos.hash("height".getBytes(Algos.charset) ++ id).untag(Digest32)
 
-  protected def validityKey(id: Array[Byte]): ByteArrayWrapper =
-    ByteArrayWrapper(Algos.hash("validity".getBytes(Algos.charset) ++ id))
+  protected def validityKey(id: Array[Byte]): StorageKey =
+    StorageKey @@ Algos.hash("validity".getBytes(Algos.charset) ++ id).untag(Digest32)
 
   def contains(id: ModifierId): Boolean
 
@@ -113,7 +119,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   protected def process(h: Header): ProgressInfo[EncryPersistentModifier] = getHeaderInfoUpdate(h) match {
     case Some(dataToUpdate) =>
-      historyStorage.bulkInsert(ByteArrayWrapper(h.id), dataToUpdate._1, Seq(dataToUpdate._2))
+      historyStorage.bulkInsert(h.id, dataToUpdate._1, Seq(dataToUpdate._2))
       bestHeaderIdOpt match {
         case Some(bestHeaderId) =>
           val toProcess: Seq[Header] =
@@ -126,61 +132,61 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
 
-  private def getHeaderInfoUpdate(header: Header): Option[(Seq[(ByteArrayWrapper, ByteArrayWrapper)],
-    EncryPersistentModifier)] = if (header.isGenesis) {
-    logger.info(s"Initialize header chain with genesis header ${header.encodedId}")
-    Option(Seq(
-      BestHeaderKey -> ByteArrayWrapper(header.id),
-      heightIdsKey(Constants.Chain.GenesisHeight) -> ByteArrayWrapper(header.id),
-      headerHeightKey(header.id) -> ByteArrayWrapper(Ints.toByteArray(Constants.Chain.GenesisHeight)),
-      headerScoreKey(header.id) -> ByteArrayWrapper(header.difficulty.toByteArray)), header)
-  } else {
-    scoreOf(header.parentId).map { parentScore =>
-      val score: BigInt @@ ConsensusTaggedTypes.Difficulty.Tag =
-        Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
-      val bestRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-        if ((header.height > bestHeaderHeight) ||
-          (header.height == bestHeaderHeight && score > bestHeadersChainScore))
-          Seq(BestHeaderKey -> ByteArrayWrapper(header.id)) else Seq.empty
-      val scoreRow: (ByteArrayWrapper, ByteArrayWrapper) =
-        headerScoreKey(header.id) -> ByteArrayWrapper(score.toByteArray)
-      val heightRow: (ByteArrayWrapper, ByteArrayWrapper) =
-        headerHeightKey(header.id) -> ByteArrayWrapper(Ints.toByteArray(header.height))
-      val headerIdsRow: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-        if ((header.height > bestHeaderHeight) ||
-          (header.height == bestHeaderHeight && score > bestHeadersChainScore)) bestBlockHeaderIdsRow(header, score)
-        else {
-          if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(header)
-          orphanedBlockHeaderIdsRow(header, score)
-        }
-      (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
+  private def getHeaderInfoUpdate(header: Header): Option[(Seq[(StorageKey, StorageValue)], EncryPersistentModifier)] =
+    if (header.isGenesis) {
+      logger.info(s"Initialize header chain with genesis header ${header.encodedId}")
+      Option(Seq(
+        BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId),
+        heightIdsKey(Constants.Chain.GenesisHeight) -> StorageValue @@ header.id.untag(ModifierId),
+        headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(Constants.Chain.GenesisHeight),
+        headerScoreKey(header.id) -> StorageValue @@ header.difficulty.toByteArray) -> header)
+    } else {
+      scoreOf(header.parentId).map { parentScore =>
+        val score: BigInt @@ ConsensusTaggedTypes.Difficulty.Tag =
+          Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
+        val bestRow: Seq[(StorageKey, StorageValue)] =
+          if ((header.height > bestHeaderHeight) ||
+            (header.height == bestHeaderHeight && score > bestHeadersChainScore))
+            Seq(BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId)) else Seq.empty
+        val scoreRow: (StorageKey, StorageValue) =
+          headerScoreKey(header.id) -> StorageValue @@ score.toByteArray
+        val heightRow: (StorageKey, StorageValue) =
+          headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(header.height)
+        val headerIdsRow: Seq[(StorageKey, StorageValue)] =
+          if ((header.height > bestHeaderHeight) ||
+            (header.height == bestHeaderHeight && score > bestHeadersChainScore)) bestBlockHeaderIdsRow(header, score)
+          else {
+            if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(header)
+            orphanedBlockHeaderIdsRow(header, score)
+          }
+        (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
     }
   }
 
 
   /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
     * header ids at this height */
-  private def bestBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
+  private def bestBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(StorageKey, StorageValue)] = {
     val prevHeight = bestHeaderHeight
     logger.info(s"New best header ${h.encodedId} with score: $score." +
       s" New height: ${h.height}, old height: $prevHeight")
-    val self: (ByteArrayWrapper, ByteArrayWrapper) =
-      heightIdsKey(h.height) -> ByteArrayWrapper((Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray)
+    val self: (StorageKey, StorageValue) =
+      heightIdsKey(h.height) -> StorageValue @@ (Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray
     val parentHeaderOpt: Option[Header] = typedModifierById[Header](h.parentId)
     val forkHeaders: Seq[Header] = parentHeaderOpt.toSeq
       .flatMap(parent => headerChainBack(h.height, parent, h => isInBestChain(h)).headers)
       .filter(h => !isInBestChain(h))
-    val forkIds: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = forkHeaders.map { header =>
+    val forkIds: Seq[(StorageKey, StorageValue)] = forkHeaders.map { header =>
       val otherIds: Seq[ModifierId] = headerIdsAtHeight(header.height).filterNot(_ sameElements header.id)
-      heightIdsKey(header.height) -> ByteArrayWrapper((Seq(header.id) ++ otherIds).flatten.toArray)
+      heightIdsKey(header.height) -> StorageValue @@ (Seq(header.id) ++ otherIds).flatten.toArray
     }
     forkIds :+ self
   }
 
   /** Row to storage, that put this orphaned block id to the end of header ids at this height */
-  private def orphanedBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(ByteArrayWrapper, ByteArrayWrapper)] = {
+  private def orphanedBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(StorageKey, StorageValue)] = {
     logger.info(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
-    Seq(heightIdsKey(h.height) -> ByteArrayWrapper((headerIdsAtHeight(h.height) :+ h.id).flatten.toArray))
+    Seq(heightIdsKey(h.height) -> StorageValue @@ (headerIdsAtHeight(h.height) :+ h.id).flatten.toArray)
   }
 
   protected def validate(header: Header): Try[Unit] = HeaderValidator.validate(header).toTry
@@ -208,7 +214,10 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     *         First id is always from the best headers chain.
     */
   def headerIdsAtHeight(height: Int): Seq[ModifierId] =
-    ModifierId @@ historyStorage.store.get(heightIdsKey(height: Int)).map(_.data).getOrElse(Array()).grouped(32).toSeq
+    historyStorage.store
+      .get(heightIdsKey(height))
+      .map(elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq)
+      .getOrElse(Seq.empty[ModifierId])
 
   /**
     * @param limit       - maximum length of resulting HeaderChain

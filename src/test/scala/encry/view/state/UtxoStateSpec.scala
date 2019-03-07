@@ -1,13 +1,15 @@
 package encry.view.state
 
 import java.io.File
+
 import akka.actor.ActorRef
 import encry.avltree
-import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
+import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedAVLStorage}
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.modifiers.state.box.Box.Amount
-import encry.settings.{Constants, EncryAppSettings}
+import encry.settings.{Constants, EncryAppSettings, LevelDBSettings}
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
 import encry.view.history.History.Height
 import io.iohk.iodb.LSMStore
@@ -15,6 +17,7 @@ import org.encryfoundation.common.Algos.HF
 import org.encryfoundation.common.{Algos, crypto}
 import org.encryfoundation.common.transaction.Pay2PubKeyAddress
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, SerializedAdProof}
+import org.iq80.leveldb.Options
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.hash.Digest32
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
@@ -27,24 +30,21 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
   def utxoFromBoxHolder(bh: BoxHolder,
                         dir: File,
                         nodeViewHolderRef: Option[ActorRef],
-                        settings: EncryAppSettings,
-                        statsSenderRef: Option[ActorRef]): UtxoState = {
+                        settings: EncryAppSettings): UtxoState = {
     val p = new avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
-
-    val stateStore = new LSMStore(dir, keySize = 32, keepVersions = 10)
-
+    val reopenedLevelDb = LevelDbFactory.factory.open(dir, new Options)
+    val vldb = VLDBWrapper(VersionalLevelDBCompanion(reopenedLevelDb, LevelDBSettings(100, 33), keySize = 33))
     val persistentProver: avltree.PersistentBatchAVLProver[Digest32, HF] = {
       val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
-      val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(stateStore, np)(Algos.hash)
+      val storage: VersionedAVLStorage[Digest32] = new VersionedAVLStorage(vldb, np, settings)(Algos.hash)
       PersistentBatchAVLProver.create(p, storage).get
     }
-
     new UtxoState(
       persistentProver,
       EncryState.genesisStateVersion,
       Constants.Chain.GenesisHeight,
-      stateStore,
+      vldb,
       0L,
       None,
       settings,
@@ -61,7 +61,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val bh: BoxHolder = BoxHolder(initialBoxes)
 
-    val state: UtxoState = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None, settings, None)
+    val state: UtxoState = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None, settings)
 
     val regularTransactions: Seq[Transaction] = initialBoxes.map { bx =>
       TransactionFactory.defaultPaymentTransactionScratch(
@@ -92,7 +92,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val bh = BoxHolder(bxs)
 
-    val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None, settings, None)
+    val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None, settings)
 
     val factory = TestHelper
     val keys = factory.genKeys(TestHelper.Props.keysQty)
@@ -131,7 +131,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val bh = BoxHolder(bxs)
 
-    val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None, settings, None)
+    val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, None, settings)
 
     val factory = TestHelper
     val keys = factory.genKeys(TestHelper.Props.keysQty)

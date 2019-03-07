@@ -11,7 +11,7 @@ import scorex.crypto.hash.Digest32
 import scorex.utils.{Random => RandomBytes}
 import scala.util.{Failure, Random, Success, Try}
 
-class VersionedIODBAVLStorageStatefulSpecification extends PropSpec {
+class VersionedAVLStorageStatefulSpecification extends PropSpec {
   val params: Parameters = Parameters.default
     .withMinSize(10)
     .withMaxSize(50)
@@ -33,7 +33,7 @@ object WithLSM extends VersionedIODBAVLStorageStatefulCommands with TestHelper {
   override protected val LL = 32
 
   override protected def createStatefulProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF] = {
-    createPersistentProverWithLSM(keepVersions)
+    createPersistentProverWithVLDB(keepVersions)
   }
 }
 

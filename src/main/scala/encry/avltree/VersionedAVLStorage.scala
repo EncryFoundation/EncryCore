@@ -2,40 +2,61 @@ package encry.avltree
 
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.avltree.VersionedIODBAVLStorage.{InternalNodePrefix, LeafPrefix}
+import encry.avltree.VersionedAVLStorage.{InternalNodePrefix, LeafPrefix}
+import encry.settings.EncryAppSettings
+import encry.storage.VersionalStorage
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.storage.iodb.versionalIODB.IODBWrapper
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbKey
+import encry.storage.levelDb.versionalLevelDB.{VersionalLevelDB, VersionalLevelDBCompanion}
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, Balance}
 import scorex.crypto.hash
 import scorex.crypto.hash.{CryptographicHash, Digest}
-
 import scala.util.{Failure, Try}
 
 case class NodeParameters(keySize: Int, valueSize: Option[Int], labelSize: Int)
 
-class VersionedIODBAVLStorage[D <: Digest](store: Store,
-                                           nodeParameters: NodeParameters)(implicit val hf: CryptographicHash[D])
+//store keySize = 33!!
+case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
+                                            nodeParameters: NodeParameters,
+                                            settings: EncryAppSettings)(implicit val hf: CryptographicHash[D])
   extends StrictLogging {
 
   val TopNodeKey: ByteArrayWrapper = ByteArrayWrapper(Array.fill(nodeParameters.labelSize)(123: Byte))
   val TopNodeHeight: ByteArrayWrapper = ByteArrayWrapper(Array.fill(nodeParameters.labelSize)(124: Byte))
 
   def rollback(version: ADDigest): Try[(EncryProverNodes[D], Int)] = Try {
-    store.rollback(ByteArrayWrapper(version))
+    store.rollbackTo(StorageVersion @@ version.untag(ADDigest))
     val top: EncryProverNodes[D] =
-      VersionedIODBAVLStorage.fetch[D](ADKey @@ store.get(TopNodeKey).get.data)(hf, store, nodeParameters)
-    val topHeight: Int = Ints.fromByteArray(store.get(TopNodeHeight).get.data)
+      VersionedAVLStorage.fetch[D](ADKey @@ store.get(StorageKey @@ TopNodeKey.data).get.untag(StorageValue))(hf, store, nodeParameters)
+    val topHeight: Int = Ints.fromByteArray(store.get(StorageKey @@ TopNodeHeight.data).get)
     top -> topHeight
   }.recoverWith { case e =>
-    logger.info(s"Failed to recover tree for digest ${Algos.encode(version)}: $e")
+    logger.info(s"Failed to recover tree for digest ${Algos.encode(version)} : $e")
     Failure(e)
   }
 
-  def version: Option[ADDigest] = store.lastVersionID.map(d => ADDigest @@ d.data)
+  //check what kind of storage is used. IODB haven't got initial version, instead of vldb
+  def version: Option[ADDigest] = {
+    val currentStorageVersion = store.currentVersion
+    settings.storage.state match {
+      case VersionalStorage.IODB =>
+        if (currentStorageVersion sameElements IODBWrapper.initVer) None
+        else Some(ADDigest @@ currentStorageVersion.untag(StorageVersion))
+      case VersionalStorage.LevelDB =>
+        if (currentStorageVersion sameElements VersionalLevelDBCompanion.INIT_VERSION(33)) None
+        else Some(ADDigest @@ currentStorageVersion.untag(StorageVersion))
+    }
+  }
 
   def isEmpty: Boolean = version.isEmpty
 
-  def rollbackVersions: Iterable[ADDigest] = store.rollbackVersions().map(d => ADDigest @@ d.data)
+  //todo: get key size from settings
+  def rollbackVersions: Iterable[ADDigest] = store.versions.collect {
+    case elem if ByteArrayWrapper(elem) != VersionalLevelDBCompanion.INIT_VERSION(33) => ADDigest @@ elem.untag(StorageVersion)
+  }
 
   def update[K <: Array[Byte], V <: Array[Byte]](prover: BatchAVLProver[D, _],
                                                  additionalData: Seq[(K, V)]): Try[Unit] = Try {
@@ -48,9 +69,13 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store,
       additionalData.map { case (k, v) => ByteArrayWrapper(k) -> ByteArrayWrapper(v) }
     val toUpdateWithWrapped: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = toUpdate ++ toUpdateWrapped
     val toRemoveMerged: List[ByteArrayWrapper] = toRemove.filterNot(toUpdate.map(_._1).intersect(toRemove).contains)
-    logger.info(s"Update storage to version ${digestWrapper.data}: ${toUpdateWithWrapped.size} elements to insert," +
+    logger.info(s"Update storage to version ${Algos.encode(digestWrapper.data)}: ${toUpdateWithWrapped.size} elements to insert," +
       s" ${toRemove.size} elements to remove")
-    store.update(digestWrapper, toRemoveMerged, toUpdateWithWrapped)
+    store.insert(
+      StorageVersion @@ digestWrapper.data,
+      toUpdateWithWrapped.map{case (key, value) => StorageKey @@ key.data -> StorageValue @@ value.data}.toList,
+      toRemoveMerged.map(key => StorageKey @@ key.data)
+    )
   }.recoverWith { case e =>
     logger.info(s"Failed to update tree: $e")
     Failure(e)
@@ -76,15 +101,15 @@ class VersionedIODBAVLStorage[D <: Digest](store: Store,
   }
 }
 
-object VersionedIODBAVLStorage {
+object VersionedAVLStorage extends StrictLogging {
 
   val InternalNodePrefix: Byte = 0.toByte
   val LeafPrefix: Byte = 1.toByte
 
   def fetch[D <: hash.Digest](key: ADKey)(implicit hf: CryptographicHash[D],
-                                          store: Store,
+                                          store: VersionalStorage,
                                           nodeParameters: NodeParameters): EncryProverNodes[D] = {
-    val bytes: Array[Byte] = store(ByteArrayWrapper(key)).data
+    val bytes: Array[Byte] = store.get(StorageKey @@ key.untag(ADKey)).get
     val keySize: Int = nodeParameters.keySize
     val labelSize: Int = nodeParameters.labelSize
     bytes.head match {
@@ -120,16 +145,18 @@ object VersionedIODBAVLStorage {
                                                   val rkey: ADKey,
                                                   protected var pb: Balance = Balance @@ 0.toByte)
                                                  (implicit val phf: CryptographicHash[D],
-                                                  store: Store,
+                                                  store: VersionalStorage,
                                                   nodeParameters: NodeParameters)
+
     extends InternalProverEncryNode(k = pk, l = null, r = null, b = pb)(phf) {
+
     override def left: EncryProverNodes[D] = {
-      if (l == null) l = VersionedIODBAVLStorage.fetch[D](lkey)
+      if (l == null) l = VersionedAVLStorage.fetch[D](lkey)
       l
     }
 
     override def right: EncryProverNodes[D] = {
-      if (r == null) r = VersionedIODBAVLStorage.fetch[D](rkey)
+      if (r == null) r = VersionedAVLStorage.fetch[D](rkey)
       r
     }
   }

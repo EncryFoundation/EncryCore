@@ -264,10 +264,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
             case Success(newMinState) =>
               val newMemPool: Mempool =
                 updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)
-              val newVault: EncryWallet = if (progressInfo.chainSwitchingNeeded)
+              if (progressInfo.chainSwitchingNeeded)
                 nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
               else nodeView.wallet
-              blocksApplied.foreach(newVault.scanPersistent)
+              blocksApplied.foreach(nodeView.wallet.scanPersistent)
               logger.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
               if (progressInfo.chainSwitchingNeeded)
                 context.actorSelection("/user/blockListener") !
@@ -278,7 +278,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
                     BestHeaderInChain(header, System.currentTimeMillis()))
               if (newHistory.isFullChainSynced)
                 Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
-              updateNodeView(Some(newHistory), Some(newMinState), Some(newVault), Some(newMemPool))
+              updateNodeView(Some(newHistory), Some(newMinState), Some(nodeView.wallet), Some(newMemPool))
             case Failure(e) =>
               logger.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
                 s"to minimal state because of: $e")
@@ -302,8 +302,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
 
   def txModify(tx: Transaction): Unit = nodeView.mempool.put(tx) match {
     case Success(newPool) =>
-      val newVault: EncryWallet = nodeView.wallet.scanOffchain(tx)
-      updateNodeView(updatedVault = Some(newVault), updatedMempool = Some(newPool))
+      updateNodeView(updatedVault = Some(nodeView.wallet), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, Transaction](tx)
     case Failure(e) => logger.warn(s"Failed to put tx ${tx.id} to mempool" +
       s" with exception ${e.getLocalizedMessage}")
@@ -314,7 +313,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     stateDir.mkdir()
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
     val state: StateType = {
-      if (settings.node.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings.node)
+      if (settings.node.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings)
       else EncryState.generateGenesisUtxoState(stateDir, Some(self), settings, influxRef)
     }.asInstanceOf[StateType]
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
@@ -348,7 +347,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     {
       (version, digest) match {
         case (Some(_), Some(_)) if settings.node.stateMode.isDigest =>
-          DigestState.create(version, digest, dir, settings.node)
+          DigestState.create(version, digest, dir, settings)
         case _ => EncryState.readOrGenerate(settings, Some(self), influxRef)
       }
     }.asInstanceOf[StateType]

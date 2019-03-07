@@ -1,43 +1,55 @@
 package encry.avltree
 
-import com.google.common.primitives.Longs
+import com.typesafe.scalalogging.StrictLogging
 import encry.avltree.helpers.TestHelper
-import io.iohk.iodb.{ByteArrayWrapper, Store}
+import encry.storage.levelDb.versionalLevelDB.{LevelDbDiff, VersionalLevelDB}
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
+import org.encryfoundation.common.Algos
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.crypto.hash.Blake2b256
+import scorex.crypto.hash.{Blake2b256, Digest32}
+
 import scala.collection.mutable.ArrayBuffer
 
 class IODBStorageSpecification extends PropSpec
   with PropertyChecks
   with GeneratorDrivenPropertyChecks
   with Matchers
-  with TestHelper {
+  with TestHelper
+  with StrictLogging {
 
   override protected val KL = 32
   override protected val VL = 8
   override protected val LL = 32
 
-  val storeTest: Store => Unit = { store =>
-    var version = store.lastVersionID.map(v => Longs.fromByteArray(v.data))
-    val keys: ArrayBuffer[(ByteArrayWrapper, ByteArrayWrapper)] = ArrayBuffer()
-    forAll { b: Array[Byte] =>
-      val pair = (ByteArrayWrapper(Blake2b256(0.toByte +: version.getOrElse(0L).toByte +: b)),
-        ByteArrayWrapper(Blake2b256(version.getOrElse(0L).toByte +: b)))
+  val storeTest: VersionalLevelDB => Unit = { store =>
+    var version = store.currentVersion
+    logger.info(s"Current store version: ${Algos.encode(version)}")
+    val keys: ArrayBuffer[(VersionalLevelDbKey, VersionalLevelDbValue)] = ArrayBuffer()
+    forAll { input: String =>
+      val pair = (VersionalLevelDbKey @@ Blake2b256(input).untag(Digest32),
+        VersionalLevelDbValue @@ Blake2b256(input).untag(Digest32))
       keys += pair
-      val nextVersion = version.getOrElse(0L) + 1
-      store.update(nextVersion, Seq(), Seq(pair))
-
-      if (version.isDefined) {
-        store.rollback(ByteArrayWrapper.fromLong(version.get))
-        store.update(nextVersion, Seq(), Seq(pair))
-      }
-      version = Some(nextVersion)
-      keys.foreach(k => store(k._1).data shouldEqual k._2.data)
+      val nextVersion = LevelDBVersion @@ Blake2b256(version).untag(Digest32)
+      store.insert(
+        LevelDbDiff(
+          nextVersion,
+          List(pair)
+        )
+      )
+      store.rollbackTo(version)
+      store.insert(
+        LevelDbDiff(
+          nextVersion,
+          List(pair)
+        )
+      )
+      version = nextVersion
+      keys.foreach(k => {
+        store.get(k._1).get shouldEqual k._2
+      })
     }
   }
 
-  property("IODB with LSM") { storeTest(createLSMStore()) }
-
-  property("IODB with QuickStore") { quickTest(storeTest(createQuickStore())) }
+  property("VLDB") { storeTest(createVLDB(11, 32)) }
 }

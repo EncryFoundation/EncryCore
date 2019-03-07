@@ -1,10 +1,11 @@
 package benches
 
 import java.io.File
+
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.avltree
-import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedIODBAVLStorage}
+import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedAVLStorage}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.history.{ADProofs, Block, Header, Payload}
@@ -12,9 +13,14 @@ import encry.modifiers.mempool.directive.{AssetIssuingDirective, DataDirective, 
 import encry.modifiers.mempool.{Transaction, TransactionFactory, UnsignedTransaction}
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
-import encry.settings.{Constants, EncryAppSettings, NodeSettings}
+import encry.settings.{Constants, EncryAppSettings, LevelDBSettings, NodeSettings}
+import encry.storage.VersionalStorage
+import encry.storage.VersionalStorage.StorageType
+import encry.storage.iodb.versionalIODB.IODBWrapper
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
+import encry.storage.levelDb.versionalLevelDB._
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.utils.{Mnemonic, NetworkTimeProvider}
+import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
 import encry.view.history.EncryHistory
 import encry.view.history.History.Height
 import encry.view.history.processors.payload.BlockPayloadProcessor
@@ -29,9 +35,11 @@ import org.encryfoundation.common.transaction.EncryAddress.Address
 import org.encryfoundation.common.transaction.{Input, Pay2PubKeyAddress, Proof, PubKeyLockedContract}
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
+import org.iq80.leveldb.Options
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
+
 import scala.collection.immutable
 import scala.util.{Random => R}
 
@@ -39,6 +47,28 @@ object Utils extends StrictLogging {
 
   val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
   val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
+
+  val defaultKeySize: Int = 32
+  val defaultValueSize: Int = 256
+
+  def generateRandomKey(keySize: Int = defaultKeySize): VersionalLevelDbKey =
+    VersionalLevelDbKey @@ Random.randomBytes(keySize)
+
+  def generateRandomValue(valueSize: Int = defaultValueSize): VersionalLevelDbValue =
+    VersionalLevelDbValue @@ Random.randomBytes(valueSize)
+
+  def genRandomInsertValue(keySize: Int = defaultKeySize,
+                           valueSize: Int = defaultValueSize): (VersionalLevelDbKey, VersionalLevelDbValue) =
+    (generateRandomKey(keySize), generateRandomValue(valueSize))
+
+  def generateRandomLevelDbElemsWithoutDeletions(qty: Int, qtyOfElemsToInsert: Int): List[LevelDbDiff] =
+    (0 until qty).foldLeft(List.empty[LevelDbDiff]) {
+      case (acc, i) =>
+        LevelDbDiff(
+          LevelDBVersion @@ Random.randomBytes(),
+          List((0 until qtyOfElemsToInsert).map(_ => genRandomInsertValue()): _*)
+        ) :: acc
+    }
 
   def generateGenesisBlockValidForState(state: UtxoState): Block = {
     val txs = Seq(coinbaseTransaction(0))
@@ -99,11 +129,10 @@ object Utils extends StrictLogging {
   def generateNextBlockValidForHistory(history: EncryHistory,
                                        difficultyDiff: BigInt = 0,
                                        prevBlock: Option[Block],
-                                       transactionsNumber: Int): Block = {
+                                       txs: Seq[Transaction]): Block = {
     val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
     val requiredDifficulty: Difficulty = prevBlock.map(b => history.requiredDifficultyAfter(b.header))
       .getOrElse(Constants.Chain.InitialDifficulty)
-    val txs = genValidPaymentTxs(transactionsNumber) ++ Seq(coinbaseTransaction)
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.bestHeaderHeight + 1,
@@ -128,20 +157,27 @@ object Utils extends StrictLogging {
   def utxoFromBoxHolder(bh: BoxHolder,
                         dir: File,
                         nodeViewHolderRef: Option[ActorRef],
-                        settings: EncryAppSettings): UtxoState = {
+                        settings: EncryAppSettings,
+                        storageType: StorageType): UtxoState = {
     val p = new avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
-    val stateStore = new LSMStore(dir, keySize = 32, keepVersions = 10)
+    val versionalStorage = storageType match {
+      case VersionalStorage.IODB =>
+        IODBWrapper(new LSMStore(dir, keySize = 32, keepVersions = 10))
+      case VersionalStorage.LevelDB =>
+        val reopenedLevelDb = LevelDbFactory.factory.open(dir, new Options)
+        VLDBWrapper(VersionalLevelDBCompanion(reopenedLevelDb, LevelDBSettings(100, 33), keySize = 33))
+    }
     val persistentProver: avltree.PersistentBatchAVLProver[Digest32, HF] = {
       val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
-      val storage: VersionedIODBAVLStorage[Digest32] = new VersionedIODBAVLStorage(stateStore, np)(Algos.hash)
+      val storage: VersionedAVLStorage[Digest32] = new VersionedAVLStorage(versionalStorage, np, settings)(Algos.hash)
       PersistentBatchAVLProver.create(p, storage).get
     }
     new UtxoState(
       persistentProver,
       EncryState.genesisStateVersion,
       Constants.Chain.GenesisHeight,
-      stateStore,
+      versionalStorage,
       0L,
       None,
       settings,
@@ -357,9 +393,12 @@ object Utils extends StrictLogging {
 
   def generateHistory(settingsEncry: EncryAppSettings, file: File): EncryHistory = {
 
-    val indexStore: LSMStore = new LSMStore(file, keepVersions = 0)
-    val objectsStore: LSMStore = new LSMStore(file, keepVersions = 0)
-    val storage: HistoryStorage = new HistoryStorage(indexStore, objectsStore)
+    val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
+    val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
+    val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
+    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
+    val storage: HistoryStorage = new HistoryStorage(vldbInit)
+
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
     new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {

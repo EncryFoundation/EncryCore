@@ -10,6 +10,8 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{Block, Header, HeaderChain}
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
+import io.circe.syntax._
+import io.circe.{Decoder, Encoder, HCursor}
 import org.encryfoundation.common.Algos
 
 import scala.util.{Failure, Try}
@@ -37,7 +39,9 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     */
   protected def processBlock(fullBlock: Block,
                              modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
+    logger.info(s"Process block: ${fullBlock.asJson}")
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
+    logger.info(s"best full chain contains: ${bestFullChain.length}")
     val newBestAfterThis: Header = bestFullChain.last.header
     processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, settings.node.blocksToKeep))
   }
@@ -114,8 +118,11 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   }
 
   private def calculateBestFullChain(block: Block): Seq[Block] = {
+    logger.info(s"calculateBestFullChain for block: ${block.asJson}")
     val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
+    logger.info(s"continuations: ${continuations.map(seq => s"Seq contains: ${seq.length}").mkString(",")}")
     val chains: Seq[Seq[Block]] = continuations.map(_.map(getBlock).takeWhile(_.nonEmpty).flatten)
+    logger.info(s"Chains: ${chains.map(chain => s"chain contain: ${chain.length}").mkString(",")}")
     chains.map(c => block +: c).maxBy(c => scoreOf(c.last.id).get)
   }
 
@@ -130,14 +137,13 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def updateStorage(newModRow: EncryPersistentModifier,
                             bestFullHeaderId: ModifierId,
                             updateHeaderInfo: Boolean = false): Unit = {
-    val bestFullHeaderIdWrapped: ByteArrayWrapper = ByteArrayWrapper(bestFullHeaderId)
-    val indicesToInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
-      if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderIdWrapped, BestHeaderKey -> bestFullHeaderIdWrapped)
-      else Seq(BestBlockKey -> bestFullHeaderIdWrapped)
+    val indicesToInsert: Seq[(Array[Byte], Array[Byte])] =
+      if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderId, BestHeaderKey -> bestFullHeaderId)
+      else Seq(BestBlockKey -> bestFullHeaderId)
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
   }
 
-  private def storageVersion(newModRow: EncryPersistentModifier) = ByteArrayWrapper(newModRow.id)
+  private def storageVersion(newModRow: EncryPersistentModifier) = newModRow.id
 
   protected def modifierValidation(m: EncryPersistentModifier, headerOpt: Option[Header]): Try[Unit] = {
     val minimalHeight: Int = blockDownloadProcessor.minimalBlockHeight

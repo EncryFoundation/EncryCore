@@ -8,6 +8,7 @@ import org.openjdk.jmh.annotations._
 import benches.Utils._
 import encry.modifiers.state.box.AssetBox
 import encry.settings.EncryAppSettings
+import encry.storage.VersionalStorage
 import encry.view.state.{BoxHolder, UtxoState}
 import encryBenchmark.Settings
 import org.openjdk.jmh.infra.Blackhole
@@ -21,8 +22,10 @@ class StateBenches {
   def applyBlocksToTheState(stateBench: StateBenchState, bh: Blackhole): Unit = {
     bh.consume {
       val innerState: UtxoState =
-        utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings)
-      stateBench.chain.foldLeft(innerState) { case (state, block) => state.applyModifier(block).get }
+        utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings, VersionalStorage.LevelDB)
+      stateBench.chain.foldLeft(innerState) { case (state, block) =>
+        state.applyModifier(block).get
+      }
       innerState.closeStorage()
     }
   }
@@ -69,7 +72,7 @@ object StateBenches {
       genHardcodedBox(privKey.publicImage.address.address, nonce)
     )
     val boxesHolder: BoxHolder = BoxHolder(initialBoxes)
-    var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings)
+    var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
     val genesisBlock: Block = generateGenesisBlockValidForState(state)
 
     state = state.applyModifier(genesisBlock).get

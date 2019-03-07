@@ -71,12 +71,12 @@ object PayloadSerializer extends Serializer[Payload] {
     val headerId: Array[Byte] = bytes.slice(0, 32)
     val txQty: Int = Ints.fromByteArray(bytes.slice(32, 36))
     val leftBytes: Array[Byte] = bytes.drop(36)
-    val txs: Seq[Transaction] = (0 until txQty).foldLeft(Seq[Transaction](), 0) { case ((acc, shift), _) =>
+    val txs: Seq[Transaction] = (0 until txQty).foldLeft(List[Transaction](), 0) { case ((acc, shift), _) =>
       val len: Int = Ints.fromByteArray(leftBytes.slice(shift, shift + 4))
       TransactionSerializer
-        .parseBytes(ArrayUtils.subarray(leftBytes, shift + 4, shift + 4 + len)).map(d => (acc :+ d, shift + 4 + len))
+        .parseBytes(ArrayUtils.subarray(leftBytes, shift + 4, shift + 4 + len)).map(d => (d :: acc, shift + 4 + len))
         .getOrElse(throw new Exception("Serialization failed."))
-    }._1
+    }._1.reverse
     Payload(ModifierId @@ headerId, txs)
   }
 }

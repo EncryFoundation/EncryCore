@@ -54,10 +54,9 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
   "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8",
-  "org.iq80.leveldb" % "leveldb" % "0.7",
+  "org.iq80.leveldb" % "leveldb" % "0.9",
   "javax.xml.bind" % "jaxb-api" % "2.3.0",
   "com.iheart" %% "ficus" % "1.4.2",
-  "org.slf4j" % "slf4j-api" % "1.7.25",
   "com.typesafe" % "config" % "1.3.3",
   "org.bouncycastle" % "bcprov-jdk15on" % "1.58",
   "org.whispersystems" % "curve25519-java" % "0.5.0",
@@ -100,7 +99,7 @@ evictionWarningOptions in update := EvictionWarningOptions.default
 logLevel := Level.Info
 val opts = Seq(
   "-server",
-  "-Xms4G",
+  "-Xms2G",
   "-Xmx4G",
   "-XX:+ExitOnOutOfMemoryError",
   "-XX:+IgnoreUnrecognizedVMOptions",
@@ -110,7 +109,8 @@ val opts = Seq(
   "-XX:+AlwaysPreTouch",
   "-XX:+PerfDisableSharedMem",
   "-XX:+ParallelRefProcEnabled",
-  "-XX:+UseStringDeduplication")
+  "-XX:+UseStringDeduplication",
+  "-XX:MaxMetaspaceSize=512m")
 
 javaOptions in run ++= opts
 

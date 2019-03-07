@@ -1,33 +1,26 @@
 package encry.view.wallet
 
 import java.io.File
-import com.google.common.primitives.Longs
+
+import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.Block
 import encry.modifiers.mempool.Transaction
-import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box.{EncryBaseBox, EncryProposition}
-import encry.settings.EncryAppSettings
+import encry.settings.{Constants, EncryAppSettings}
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB, WalletVersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.{ModifierId, VersionTag}
-import encry.utils.{BalanceCalculator, BoxFilter}
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
+import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.crypto.PublicKey25519
+import org.iq80.leveldb.{DB, Options}
+
 import scala.util.Try
 
-case class EncryWallet(walletStore: Store, accountManager: AccountManager) {
-
-  import WalletStorage._
-
-  val walletStorage: WalletStorage = WalletStorage(walletStore, publicKeys)
+case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: AccountManager) extends StrictLogging {
 
   def publicKeys: Set[PublicKey25519] = accountManager.publicAccounts.toSet
 
   def propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes))
-
-  def scanOffchain(tx: Transaction): EncryWallet = this
-
-  def scanOffchain(txs: Seq[Transaction]): EncryWallet = this
 
   def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = modifier match {
     case block: Block =>
@@ -45,52 +38,18 @@ case class EncryWallet(walletStore: Store, accountManager: AccountManager) {
               }
             (nBxs ++ newBxsL) -> (sBxs ++ spendBxsIdsL)
         }
-
-      updateWallet(modifier.id, newBxs, spentBxs)
+      walletStorage.updateWallet(modifier.id, newBxs, spentBxs)
       this
 
     case _ => this
   }
 
-  def rollback(to: VersionTag): Try[EncryWallet] = Try(walletStore.rollback(ByteArrayWrapper(to))).map(_ => this)
+  def rollback(to: VersionTag): Try[Unit] = Try(walletStorage.rollback(ModifierId @@ to.untag(VersionTag)))
 
-  private def calculateNewBalance(bxsToInsert: Seq[EncryBaseBox], bxsToRemove: Seq[EncryBaseBox]): ByteArrayWrapper = {
-    val balancesToInsert: Map[ByteArrayWrapper, Amount] = BalanceCalculator.balanceSheet(bxsToInsert)
-      .map(elt => ByteArrayWrapper(elt._1) -> elt._2)
-    val balancesToRemove: Map[ByteArrayWrapper, Amount] = BalanceCalculator.balanceSheet(bxsToRemove)
-      .map(elt => ByteArrayWrapper(elt._1) -> elt._2)
-    val oldBalances: Map[ByteArrayWrapper, Amount] = getBalances
-      .map(elt => ByteArrayWrapper(elt._1) -> elt._2)
-      .toMap
-    val newBalances: Map[ByteArrayWrapper, Amount] = (oldBalances.toSeq ++ balancesToInsert.toSeq)
-      .groupBy(_._1)
-      .foldLeft(Map.empty[ByteArrayWrapper, Amount]) { case (balanceMap, tokenInfo) =>
-        balanceMap.updated(tokenInfo._1, tokenInfo._2.foldLeft(0L)((tokenSum, token) => tokenSum + token._2))
-      }
-      .map(tokenInfo => tokenInfo._1 -> (tokenInfo._2 - balancesToRemove.filter(_._1 == tokenInfo._1).values.sum))
-    ByteArrayWrapper(
-      newBalances.foldLeft(Array.empty[Byte]) { case (acc, (ByteArrayWrapper(id), balance)) =>
-        acc ++ id ++ Longs.toByteArray(balance)
-      }
-    )
-  }
-
-  private def updateWallet(modifierId: ModifierId, newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]): Unit = {
-    val bxsToInsert: Seq[EncryBaseBox] = newBxs.filter(bx => !spentBxs.contains(bx))
-    val newBalances: ByteArrayWrapper = calculateNewBalance(
-      BoxFilter.filterAmountCarryingBxs(bxsToInsert),
-      spentBxs.filter(bx => !newBxs.contains(bx))
-    )
-    val toRemoveSummary: Seq[ByteArrayWrapper] = spentBxs.map(bx => keyByBoxId(bx.id))
-    val toInsertSummary: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = (balancesKey, newBalances) +:
-      BoxFilter.filterAmountCarryingBxs(bxsToInsert).map(bx => keyByBoxId(bx.id) -> ByteArrayWrapper(bx.bytes))
-    walletStorage.update(ByteArrayWrapper(modifierId), toRemoveSummary, toInsertSummary)
-  }
-
-  def getBalances: Seq[(TokenId, Long)] = walletStorage.getBalances.toSeq
+  def getBalances: Seq[(String, Long)] = walletStorage.getBalances.toSeq
 }
 
-object EncryWallet {
+object EncryWallet extends StrictLogging {
 
   def getWalletDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/wallet")
 
@@ -101,8 +60,9 @@ object EncryWallet {
     walletDir.mkdirs()
     val keysDir: File = getKeysDir(settings)
     keysDir.mkdirs()
-    val walletStore: LSMStore = new LSMStore(walletDir, keepVersions = 0)
+    val db: DB = LevelDbFactory.factory.open(walletDir, new Options)
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 33)
-    EncryWallet(walletStore, AccountManager(accountManagerStore))
+    val walletStorage = WalletVersionalLevelDBCompanion(db, settings.levelDB)
+    EncryWallet(walletStorage, AccountManager(accountManagerStore))
   }
 }

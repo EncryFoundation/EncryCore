@@ -1,10 +1,12 @@
 package encry.avltree
 
+import com.typesafe.scalalogging.StrictLogging
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ADValue, Balance}
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash._
 
-sealed trait EncryNode[D <: Digest] {
+sealed trait EncryNode[D <: Digest] extends StrictLogging{
 
   var visited: Boolean = false
   protected var labelOpt: Option[D] = None

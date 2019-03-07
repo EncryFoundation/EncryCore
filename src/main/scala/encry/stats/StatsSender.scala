@@ -14,6 +14,7 @@ import encry.stats.StatsSender._
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
 import org.influxdb.{InfluxDB, InfluxDBFactory}
+
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -87,6 +88,9 @@ class StatsSender extends Actor {
             )
           )
         }
+
+    case TxsInBlock(txsNum) =>
+      influxDB.write(InfluxPort, s"txsInEachBlock,nodeName=$nodeName value=$txsNum")
 
     case StartApplyingModif(modifierId: ModifierId, modifierTypeId: ModifierTypeId, startTime: Long) =>
       modifiersToApply += Algos.encode(modifierId) -> (modifierTypeId, startTime)

@@ -1,7 +1,8 @@
 package encry.utils
 
 import encry.crypto.equihash.EquihashSolution
-import encry.modifiers.history.Header
+import encry.modifiers.InstanceFactory
+import encry.modifiers.history.{Block, Header}
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, MonetaryBox}
@@ -55,7 +56,6 @@ trait EncryGenerator {
 
   def genValidPaymentTxsToAddr(qty: Int, address: Address): Seq[Transaction] = {
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
-
     keys.map { k =>
       val useBoxes = IndexedSeq(genAssetBox(address))
       TransactionFactory.defaultPaymentTransactionScratch(k, Props.txFee,
@@ -65,7 +65,6 @@ trait EncryGenerator {
 
   def genValidPaymentTxToAddrWithSpentBoxes(boxes: IndexedSeq[AssetBox], address: Address): Transaction = {
     val key: PrivateKey25519 = genPrivKeys(1).head
-
     TransactionFactory.defaultPaymentTransactionScratch(key, Props.txFee,
       scala.util.Random.nextLong(), boxes, address, Props.boxValue)
   }
@@ -84,8 +83,7 @@ trait EncryGenerator {
     }
   }
 
-  def genChainSpendingTxs(qty: Int): Seq[Transaction] = {
-
+  def genSelfSpendingTxs(qty: Int): Seq[Transaction] = {
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
     val timestamp: Amount = System.currentTimeMillis()
     keys.foldLeft(Seq[Transaction]()) { (seq, key) =>
@@ -95,7 +93,6 @@ trait EncryGenerator {
         timestamp, useBoxes, randomAddress, Props.boxValue)
     }
   }
-
 
   def genInvalidPaymentTxs(qty: Int): Seq[Transaction] = {
     val timestamp: Amount = System.currentTimeMillis()
@@ -116,6 +113,22 @@ trait EncryGenerator {
       Digest32 @@ Random.randomBytes(),
       Math.abs(random.nextLong()),
       Math.abs(random.nextInt(10000)),
+      random.nextLong(),
+      Constants.Chain.InitialDifficulty,
+      EquihashSolution(Seq(1, 3))
+    )
+  }
+
+  def genHeaderAtHeight(height: Int = 0, transactionsRoot: Digest32 = Digest32 @@ Random.randomBytes()): Header = {
+    val random = new scala.util.Random
+    Header(
+      1.toByte,
+      ModifierId @@ Random.randomBytes(),
+      Digest32 @@ Random.randomBytes(32),
+      ADDigest @@ Random.randomBytes(33),
+      transactionsRoot,
+      Math.abs(random.nextLong()),
+      height,
       random.nextLong(),
       Constants.Chain.InitialDifficulty,
       EquihashSolution(Seq(1, 3))

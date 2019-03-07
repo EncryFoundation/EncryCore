@@ -1,35 +1,32 @@
 package encry.storage
 
 import com.typesafe.scalalogging.StrictLogging
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.utils.CoreTaggedTypes.VersionTag
-import io.iohk.iodb.{ByteArrayWrapper, Store}
+import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
+import scorex.crypto.hash.Digest32
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 trait EncryStorage extends AutoCloseable with StrictLogging {
 
-  val store: Store
+  val store: VersionalStorage
 
-  def insert(version: ByteArrayWrapper, toInsert: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit =
-    store.update(version, Seq.empty, toInsert)
+  def insert(version: StorageVersion, toInsert: List[(StorageKey, StorageValue)]): Unit =
+    store.insert(version, toInsert)
 
-  def remove(version: ByteArrayWrapper, toRemove: Seq[ByteArrayWrapper]): Unit =
-    store.update(version, toRemove, Seq.empty)
+  def remove(version: StorageVersion, toRemove: List[StorageKey]): Unit =
+    store.insert(version, List.empty, toRemove)
 
-  def update(version: ByteArrayWrapper,
-             toRemove: Seq[ByteArrayWrapper],
-             toUpdate: Seq[(ByteArrayWrapper, ByteArrayWrapper)]): Unit = {
-    remove(version, toRemove)
-    insert(ByteArrayWrapper(Algos.hash(version.data)), toUpdate)
+  def update(version: StorageVersion,
+             toUpdate: List[(StorageKey, StorageValue)]): Unit = {
+    insert(StorageVersion @@ Algos.hash(version).untag(Digest32), toUpdate)
   }
 
-  def get(key: ByteArrayWrapper): Option[Array[Byte]] = store.get(key).map(_.data)
+  def get(key: StorageKey): Option[Array[Byte]] = store.get(key)
 
-  def rollbackTo(version: VersionTag): Try[Unit] = store.get(ByteArrayWrapper(version)) match {
-      case Some(_) => Success(store.rollback(ByteArrayWrapper(version)))
-      case None => Failure(new Exception(s"Unable to get root hash at version ${Algos.encoder.encode(version)}"))
-    }
+  def rollbackTo(version: VersionTag): Try[Unit] = Try{store.rollbackTo(StorageVersion @@ version.untag(VersionTag))}
 
   override def close(): Unit = {
     logger.info("Closing storage")

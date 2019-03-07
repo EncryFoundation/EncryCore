@@ -1,13 +1,16 @@
 package encry.avltree
 
+import com.typesafe.scalalogging.StrictLogging
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, Balance}
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest
 import scorex.utils.ByteArray
+
 import scala.collection.mutable.ArrayBuffer
 import scala.util.{Failure, Success, Try}
 
-trait AuthenticatedTreeOps[D <: Digest] {
+trait AuthenticatedTreeOps[D <: Digest] extends StrictLogging {
 
   protected def arrayToString(a: Array[Byte]): String = Base16.encode(a).take(8)
 
@@ -79,6 +82,7 @@ trait AuthenticatedTreeOps[D <: Digest] {
 
   protected def returnResultOfOneOperation(operation: encry.avltree.Operation,
                                            rootNode: EncryNode[D]): Try[(EncryNode[D], Option[ADValue])] = Try {
+
     val key: ADKey = operation.key
 
     require(ByteArray.compare(key, NegativeInfinityKey) > 0, s"Key ${Base16.encode(key)} is less than -inf")
@@ -87,39 +91,40 @@ trait AuthenticatedTreeOps[D <: Digest] {
 
     var savedNode: Option[EncryLeaf[D]] = None
 
-    def modifyHelper(rNode: EncryNode[D], key: ADKey,
+    def modifyHelper(rootNode: EncryNode[D], key: ADKey,
                      operation: encry.avltree.Operation): (EncryNode[D], Boolean, Boolean, Boolean, Option[ADValue]) = {
-      rNode match {
+      rootNode match {
         case r: EncryLeaf[D] =>
-          if (keyMatchesLeaf(key, r)) operation match {
-            case m: encry.avltree.Modification => m.updateFn(Some(r.value)) match {
-              case Success(None) => // delete key
+          if (keyMatchesLeaf(key, r))
+            operation match {
+              case m: encry.avltree.Modification => m.updateFn(Some(r.value)) match {
+                case Success(None) => // delete key
+                  onNodeVisit(r, operation)
+                  (r, false, false, true, Some(r.value))
+                case Success(Some(v)) => // update value
+                  valueLengthOpt.foreach(vl => require(v.length == vl, s"Value length is fixed and should be $vl"))
+                  val oldValue: Option[ADValue] = Some(r.value)
+                  val rNew: EncryLeaf[D] = r.getNew(newValue = v)
+                  onNodeVisit(r, operation)
+                  (rNew, true, false, false, oldValue)
+                case Failure(e) => throw e // updateFunction doesn't like the value we found
+              }
+              case _: Lookup =>
                 onNodeVisit(r, operation)
-                (r, false, false, true, Some(r.value))
-              case Success(Some(v)) => // update value
-                valueLengthOpt.foreach(vl => require(v.length == vl, s"Value length is fixed and should be $vl"))
-                val oldValue: Option[ADValue] = Some(r.value)
-                val rNew: EncryLeaf[D] = r.getNew(newValue = v)
-                onNodeVisit(r, operation)
-                (rNew, true, false, false, oldValue)
-              case Failure(e) => throw e // updateFunction doesn't like the value we found
-            }
-            case _: Lookup =>
-              onNodeVisit(r, operation)
-              (r, false, false, false, Some(r.value))
+                (r, false, false, false, Some(r.value))
           } else operation match {
             case m: Modification => m.updateFn(None) match {
               case Success(None) => // don't change anything, just lookup
-                onNodeVisit(rNode, operation)
+                onNodeVisit(rootNode, operation)
                 (r, false, false, false, None)
               case Success(Some(v)) => // insert new value
                 valueLengthOpt.foreach(vl => require(v.length == vl, s"Value length is fixed and should be $vl"))
-                onNodeVisit(rNode, operation)
+                onNodeVisit(rootNode, operation)
                 (addNode(r, key, v), true, true, false, None)
               case Failure(e) => throw e // updateFunctions doesn't like that we found nothing
             }
             case _: Lookup =>
-              onNodeVisit(rNode, operation)
+              onNodeVisit(rootNode, operation)
               (r, false, false, false, None)
           }
         case r: InternalEncryNode[D] =>
@@ -256,7 +261,6 @@ trait AuthenticatedTreeOps[D <: Digest] {
         }
       }
     }
-
     val (newRootNode: EncryNode[D], _, heightIncreased: Boolean, toDelete: Boolean, oldValue: Option[ADValue]) =
       modifyHelper(rootNode, key, operation)
     if (toDelete) {

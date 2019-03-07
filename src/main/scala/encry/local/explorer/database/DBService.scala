@@ -59,7 +59,7 @@ class DBService extends StrictLogging {
   private lazy val pgTransactor: HikariTransactor[IO] = HikariTransactor[IO](dataSource)
 
   def shutdown(): Future[Unit] = {
-    logger.info("Shutting down dbService")
+    logger.info("Shutting down dbService.")
     pgTransactor.shutdown.unsafeToFuture
   }
 

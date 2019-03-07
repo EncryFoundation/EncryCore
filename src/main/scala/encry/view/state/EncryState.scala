@@ -9,6 +9,8 @@ import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
 import encry.modifiers.state.box._
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
+import encry.storage.VersionalStorage
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDB
 import io.iohk.iodb.Store
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scorex.crypto.encode.Base16
@@ -22,7 +24,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
 
   def rootHash: ADDigest
 
-  val stateStore: Store
+  val stateStore: VersionalStorage
 
   def closeStorage(): Unit = stateStore.close()
 
@@ -73,7 +75,7 @@ object EncryState extends StrictLogging {
     })
   }
 
-  def generateGenesisDigestState(stateDir: File, settings: NodeSettings): DigestState =
+  def generateGenesisDigestState(stateDir: File, settings: EncryAppSettings): DigestState =
     DigestState.create(Some(genesisStateVersion), Some(afterGenesisStateDigest), stateDir, settings)
 
   def readOrGenerate(settings: EncryAppSettings,
@@ -82,7 +84,7 @@ object EncryState extends StrictLogging {
     val stateDir: File = getStateDir(settings)
     stateDir.mkdirs()
     settings.node.stateMode match {
-      case StateMode.Digest => DigestState.create(None, None, stateDir, settings.node)
+      case StateMode.Digest => DigestState.create(None, None, stateDir, settings)
       case StateMode.Utxo if stateDir.listFiles().nonEmpty =>
         UtxoState.create(stateDir, nodeViewHolderRef, settings, statsSenderRef)
       case _ => EncryState.generateGenesisUtxoState(stateDir, nodeViewHolderRef, settings, statsSenderRef)

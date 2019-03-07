@@ -11,8 +11,11 @@ import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
 import encry.EncryApp.settings
+import encry.storage.VersionalStorage.StorageKey
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbKey
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
+
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
@@ -79,7 +82,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
       val startId: ModifierId = headerIdsAtHeight(heightFrom).head
       val startHeader: Header = typedModifierById[Header](startId).get
       val headers: HeaderChain = headerChainBack(size, startHeader, _ => false)
-        .ensuring(_.headers.exists(_.height == Constants.Chain.GenesisHeight), "Should always contain genesis header")
+        .ensuring(_.headers.exists(_.height == Constants.Chain.GenesisHeight), "Should always contain genesis header.")
       headers.headers.flatMap(h => Seq((Header.modifierTypeId, h.id)))
     } else {
       val ids: Seq[ModifierId] = info.lastHeaderIds
@@ -112,7 +115,6 @@ trait EncryHistoryReader extends BlockHeaderProcessor
         loop(currentHeight + 1, updatedChains ++ nonUpdatedChains)
       }
     }
-
     loop(header.height, Seq(Seq(header)))
   }
 
@@ -170,7 +172,6 @@ trait EncryHistoryReader extends BlockHeaderProcessor
         else throw new Exception(s"Common point not found for headers $header1 and $header2")
       }
     }
-
     loop(2, HeaderChain(Seq(header2)))
   }
 
@@ -189,8 +190,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
     historyStorage.store.get(validityKey(modifierId)) match {
-      case Some(b) if b.data.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
-      case Some(b) if b.data.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
+      case Some(b) if b.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
+      case Some(b) if b.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
       case None if contains(modifierId) => ModifierSemanticValidity.Unknown
       case None => ModifierSemanticValidity.Absent
       case m =>

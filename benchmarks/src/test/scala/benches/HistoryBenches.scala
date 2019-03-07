@@ -4,6 +4,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import benches.HistoryBenches.HistoryBenchState
 import benches.Utils.{generateHistory, generateNextBlockValidForHistory, getRandomTempDir}
+import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.history.Block
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory

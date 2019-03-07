@@ -15,6 +15,7 @@ import io.circe.syntax._
 import org.encryfoundation.common.Algos
 
 import scala.concurrent.Future
+import scala.util.Random
 
 case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
                               restApiSettings: RESTApiSettings)(implicit val context: ActorRefFactory)
@@ -32,8 +33,8 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
     getWallet
       .map { w =>
         Map(
-          "balances" -> w.getBalances.map(i => Algos.encode(i._1) -> i._2.toString).toMap.asJson,
-          "utxosQty" -> w.walletStorage.allBoxes.length.asJson
+          "balances" -> w.getBalances.map(i => i._1 -> i._2.toString).toMap.asJson,
+          "utxosQty" -> Random.shuffle(w.walletStorage.getAllBoxes(1000)).length.asJson
         ).asJson
       }
       .okJson()
@@ -41,7 +42,7 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
 
   def getUtxosR: Route = (path("utxos") & get) {
     getWallet
-      .map { _.walletStorage.allBoxes.asJson }
+      .map { w => Random.shuffle(w.walletStorage.getAllBoxes(1000)).asJson }
       .okJson()
   }
 }
