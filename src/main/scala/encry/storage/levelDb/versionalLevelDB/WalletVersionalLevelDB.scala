@@ -18,6 +18,7 @@ import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.iq80.leveldb.{DB, ReadOptions}
 import scorex.crypto.hash.Digest32
 
+import scala.collection.immutable
 import scala.util.Success
 
 case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLogging with AutoCloseable {
@@ -27,12 +28,23 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
   val levelDb: VersionalLevelDB = VersionalLevelDB(db, settings)
 
   //todo: optimize this
-  def getAllBoxes(maxQty: Int = -1): Seq[EncryBaseBox] = levelDb.getAll(maxQty)
-      .filter(_._1 sameElements BALANCE_KEY)
-      .map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
-      .collect {
-        case Success(box) => box
-      }
+  def getAllBoxes(maxQty: Int = -1): Seq[EncryBaseBox] = {
+    val a: immutable.Seq[(VersionalLevelDbKey, VersionalLevelDbValue)] = levelDb.getAll(maxQty)
+    println(a.size + " number of all boxes")
+    val b: immutable.Seq[(VersionalLevelDbKey, VersionalLevelDbValue)] = a.filter(_._1 sameElements BALANCE_KEY)
+    println(b.size + " number of filtered boxes")
+    val b1 = b.map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
+    println(b1.size + " number of maped boxes")
+    val c = b1.collect { case Success(box) => box }
+    println(c.size + " number of resulted boxes")
+    c
+//    levelDb.getAll(maxQty)
+//      .filter(_._1 sameElements BALANCE_KEY)
+//      .map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
+//      .collect {
+//        case Success(box) => box
+//      }
+  }
 
   def getBoxById(id: ADKey): Option[EncryBaseBox] = {
     levelDb.get(VersionalLevelDbKey @@ id.untag(ADKey))
