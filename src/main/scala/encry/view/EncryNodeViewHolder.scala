@@ -314,7 +314,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
           s" to history caused $e")
         nodeViewSynchronizer ! SyntacticallyFailedModification(pmod, e)
     }
-  } else logger.warn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
+  } else logger.warn(s"Trying to apply modifier ${pmod.encodedId} that's already in history.")
 
   def txModify(tx: Transaction): Unit = nodeView.mempool.put(tx) match {
     case Success(newPool) =>
