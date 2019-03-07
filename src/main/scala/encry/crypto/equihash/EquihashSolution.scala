@@ -1,7 +1,6 @@
 package encry.crypto.equihash
 
 import java.util
-import HeaderProto.HeaderProtoMessage.EquihashSolutionMessage
 import com.google.common.primitives.Ints
 import encry.settings.Constants
 import io.circe.{Decoder, Encoder, HCursor}
@@ -22,10 +21,6 @@ object EquihashSolution {
   val length: Int = Constants.Chain.HashLength
 
   def empty: EquihashSolution = EquihashSolution(Seq.fill(length)(0))
-
-  def toProto(es: EquihashSolution): EquihashSolutionMessage = EquihashSolutionMessage().withInts(es.ints)
-
-  def fromProto(esm: EquihashSolutionMessage): EquihashSolution = EquihashSolution(esm.ints)
 
   /** This is for json representation of [[EquihashSolution]] instances */
   implicit val jsonEncoder: Encoder[EquihashSolution] = Encoder.encodeSeq[Int].contramap[EquihashSolution](_.ints)

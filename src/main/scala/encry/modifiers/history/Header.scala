@@ -247,13 +247,9 @@ object HeaderProtoSerializer {
     .withHeight(header.height)
     .withNonce(header.nonce)
     .withDifficulty(header.difficulty.toLong)
-    .withEquihashSolution(EquihashSolution.toProto(header.equihashSolution))
+    .withInts(header.equihashSolution.ints)
 
-  def fromProto(headerProtoMessage: HeaderProtoMessage): Try[Header] = Try {
-    val eqs: EquihashSolution = headerProtoMessage.equihashSolution.map(m => EquihashSolution(m.ints)) match {
-      case Some(value) => value
-      case _ => throw new RuntimeException("No EquihashSolution in header!")
-    }
+  def fromProto(headerProtoMessage: HeaderProtoMessage): Try[Header] = Try(
     Header(
       headerProtoMessage.version.toByteArray.head,
       ModifierId @@ headerProtoMessage.parentId.toByteArray,
@@ -264,9 +260,9 @@ object HeaderProtoSerializer {
       headerProtoMessage.height,
       headerProtoMessage.nonce,
       Difficulty @@ BigInt(headerProtoMessage.difficulty),
-      eqs
+      EquihashSolution(headerProtoMessage.ints)
     )
-  }
+  )
 }
 
 object HeaderSerializer extends Serializer[Header] {

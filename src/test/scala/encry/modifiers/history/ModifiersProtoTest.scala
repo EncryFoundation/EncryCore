@@ -3,10 +3,8 @@ package encry.modifiers.history
 import BlockProto.BlockProtoMessage
 import BoxesProto.BoxProtoMessage
 import HeaderProto.HeaderProtoMessage
-import HeaderProto.HeaderProtoMessage.EquihashSolutionMessage
 import PayloadProto.PayloadProtoMessage
 import TransactionProto.TransactionProtoMessage
-import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.InstanceFactory
 import encry.modifiers.mempool.directive._
 import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer}
@@ -151,14 +149,6 @@ class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {
     val payloadToProto: PayloadProtoMessage = payload.toProtoPayload
     val payloadFromProto: Try[Payload] = PayloadProtoSerializer.fromProto(payloadToProto)
     payload shouldEqual payloadFromProto.get
-  }
-
-  ///TODO maybe compare all fields!?
-  property("EquihashSolution toProto and fromProto test") {
-    val ehs: EquihashSolution = genHeader.equihashSolution
-    val ehsToProto: EquihashSolutionMessage = EquihashSolution.toProto(ehs)
-    val ehsFromProto: EquihashSolution = EquihashSolution.fromProto(ehsToProto)
-    ehs shouldEqual ehsFromProto
   }
 
   ///TODO maybe compare all fields!?

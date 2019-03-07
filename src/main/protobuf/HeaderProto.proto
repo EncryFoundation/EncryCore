@@ -2,10 +2,6 @@ syntax = "proto3";
 
 message HeaderProtoMessage {
 
-    message EquihashSolutionMessage {
-        repeated uint32 ints = 1;
-    }
-
     bytes version = 1;
     bytes parentId = 2;
     bytes adProofsRoot = 3;
@@ -15,5 +11,5 @@ message HeaderProtoMessage {
     uint32 height = 7;
     uint64 nonce = 8;
     uint64 difficulty = 9;
-    EquihashSolutionMessage equihashSolution = 10;
+    repeated uint32 ints = 10;
 }
