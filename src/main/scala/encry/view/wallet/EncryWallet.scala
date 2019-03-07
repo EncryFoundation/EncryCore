@@ -39,7 +39,6 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: Ac
             (nBxs ++ newBxsL) -> (sBxs ++ spendBxsIdsL)
         }
       println(s"${newBxs.mkString(",")}  ->  ${spentBxs.mkString(",")}")
-      walletStorage.updateWallet(modifier.id, newBxs, spentBxs)
       this
 
     case _ => this

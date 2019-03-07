@@ -8,17 +8,14 @@ import encry.modifiers.state.StateModifierSerializer
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.EncryBaseBox
 import encry.modifiers.state.box.TokenIssuingBox.TokenId
-import encry.settings.{Constants, LevelDBSettings}
+import encry.settings.LevelDBSettings
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion._
 import encry.utils.{BalanceCalculator, ByteStr}
 import encry.utils.CoreTaggedTypes.ModifierId
-import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
-import org.iq80.leveldb.{DB, ReadOptions}
+import org.iq80.leveldb.DB
 import scorex.crypto.hash.Digest32
-
-import scala.collection.immutable
 import scala.util.Success
 
 case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLogging with AutoCloseable {
@@ -28,28 +25,13 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
   val levelDb: VersionalLevelDB = VersionalLevelDB(db, settings)
 
   //todo: optimize this
-  def getAllBoxes(maxQty: Int = -1): Seq[EncryBaseBox] = {
-    val a: immutable.Seq[(VersionalLevelDbKey, VersionalLevelDbValue)] = levelDb.getAll(maxQty)
-    println(a.size + " number of all boxes")
-    val b: immutable.Seq[(VersionalLevelDbKey, VersionalLevelDbValue)] = a.filterNot(_._1 sameElements BALANCE_KEY)
-    println(b.size + " number of filtered boxes")
-    val b1 = b.map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
-    println(b1.size + " number of maped boxes")
-    val c = b1.collect { case Success(box) => box }
-    println(c.size + " number of resulted boxes")
-    c
-//    levelDb.getAll(maxQty)
-//      .filter(_._1 sameElements BALANCE_KEY)
-//      .map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
-//      .collect {
-//        case Success(box) => box
-//      }
-  }
+  def getAllBoxes(maxQty: Int = -1): Seq[EncryBaseBox] = levelDb.getAll(maxQty)
+    .filterNot(_._1 sameElements BALANCE_KEY)
+    .map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
+    .collect { case Success(box) => box }
 
-  def getBoxById(id: ADKey): Option[EncryBaseBox] = {
-    levelDb.get(VersionalLevelDbKey @@ id.untag(ADKey))
-      .flatMap(wrappedBx => StateModifierSerializer.parseBytes(wrappedBx, id.head).toOption)
-  }
+  def getBoxById(id: ADKey): Option[EncryBaseBox] = levelDb.get(VersionalLevelDbKey @@ id.untag(ADKey))
+    .flatMap(wrappedBx => StateModifierSerializer.parseBytes(wrappedBx, id.head).toOption)
 
   def getTokenBalanceById(id: TokenId): Option[Amount] = getBalances
     .find(_._1 sameElements Algos.encode(id))
@@ -62,15 +44,15 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
   def updateWallet(modifierId: ModifierId, newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]): Unit = {
     val bxsToInsert: Seq[EncryBaseBox] = newBxs.filter(bx => !spentBxs.contains(bx))
     val newBalances: Map[String, Amount] = {
-      val toRemoveFromBalance = BalanceCalculator.balanceSheet(spentBxs).map{case (key, value) => ByteStr(key) -> value * -1}
-      val toAddToBalance = BalanceCalculator.balanceSheet(newBxs).map{case (key, value) => ByteStr(key) -> value}
-      val prevBalance = getBalances.map{case (id, value) => ByteStr(Algos.decode(id).get) -> value}
+      val toRemoveFromBalance = BalanceCalculator.balanceSheet(spentBxs).map { case (key, value) => ByteStr(key) -> value * -1 }
+      val toAddToBalance = BalanceCalculator.balanceSheet(newBxs).map { case (key, value) => ByteStr(key) -> value }
+      val prevBalance = getBalances.map { case (id, value) => ByteStr(Algos.decode(id).get) -> value }
       (toAddToBalance |+| toRemoveFromBalance |+| prevBalance).map { case (tokenId, value) => tokenId.toString -> value }
     }
     val newBalanceKeyValue = BALANCE_KEY -> VersionalLevelDbValue @@
       newBalances.foldLeft(Array.emptyByteArray) { case (acc, (id, balance)) =>
         acc ++ Algos.decode(id).get ++ Longs.toByteArray(balance)
-       }
+      }
     levelDb.insert(LevelDbDiff(LevelDBVersion @@ modifierId.untag(ModifierId),
       newBalanceKeyValue :: bxsToInsert.map(bx => (VersionalLevelDbKey @@ bx.id.untag(ADKey),
         VersionalLevelDbValue @@ bx.bytes)).toList,
