@@ -6,21 +6,16 @@ import HeaderProto.HeaderProtoMessage
 import HeaderProto.HeaderProtoMessage.EquihashSolutionMessage
 import PayloadProto.PayloadProtoMessage
 import TransactionProto.TransactionProtoMessage
-import encry.crypto.equihash.{EquihashSolution, EquihashSolutionsSerializer}
+import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.InstanceFactory
 import encry.modifiers.mempool.directive._
-import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer, TransactionSerializer}
+import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer}
 import encry.modifiers.state.box._
-import encry.settings.EncryAppSettings
-import encry.utils.EncryGenerator
-import encry.view.history.EncryHistory
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.{Pay2PubKeyAddress, PubKeyLockedContract}
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
-import org.scalatest.{FunSuite, Matchers, PropSpec}
+import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.signatures.PublicKey
 import scorex.utils.Random
-
 import scala.util.Try
 
 class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {
@@ -189,7 +184,7 @@ class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {
     val payload: Payload = Payload(header.id, transactions)
     val block = Block(header, payload, None)
     val blockToProto: BlockProtoMessage = block.toProtoBlock
-    val blockFromProto: Block = BlockProtoSerializer.fromProto(blockToProto)
+    val blockFromProto: Block = BlockProtoSerializer.fromProto(blockToProto).get
     block shouldEqual blockFromProto
   }
 

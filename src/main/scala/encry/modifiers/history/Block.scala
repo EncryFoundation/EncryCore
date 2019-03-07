@@ -107,11 +107,11 @@ object BlockProtoSerializer {
     }
   }
 
-  def fromProto(message: BlockProtoMessage): Block = Block(
+  def fromProto(message: BlockProtoMessage): Try[Block] = Try(Block(
     message.header.map(x => HeaderProtoSerializer.fromProto(x)).get.get,
     message.payload.map(x => PayloadProtoSerializer.fromProto(x)).get.get,
     message.adProofsOpt.map(x => ADProofsProtoSerializer.fromProto(x))
-  )
+  ))
 }
 
 object BlockSerializer extends Serializer[Block] {

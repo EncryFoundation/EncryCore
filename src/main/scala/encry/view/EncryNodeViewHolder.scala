@@ -1,7 +1,6 @@
 package encry.view
 
 import java.io.File
-
 import HeaderProto.HeaderProtoMessage
 import PayloadProto.PayloadProtoMessage
 import TransactionProto.TransactionProtoMessage
@@ -33,7 +32,6 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
-
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -99,19 +97,20 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         logger.debug(s"Cache before(${ModifiersCache.size})")
         computeApplications()
         logger.debug(s"Cache after(${ModifiersCache.size})")
-      case Header.modifierTypeId => modifiers.foreach { bytes =>
-        Try(HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)).foreach { header =>
-          if (nodeView.history.contains(header.id) || ModifiersCache.contains(key(header.id)))
-            logger.warn(s"Received modifier ${header.encodedId} that is already in history")
-          else ModifiersCache.put(key(header.id), header, nodeView.history)
-          if (settings.influxDB.isDefined && nodeView.history.isFullChainSynced) {
-            header match {
-              case h: Header => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - h.timestamp)
-              case _ =>
+      case Header.modifierTypeId =>
+        modifiers.foreach { bytes =>
+          Try(HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)).foreach { header =>
+            if (nodeView.history.contains(header.id) || ModifiersCache.contains(key(header.id)))
+              logger.warn(s"Received modifier ${header.encodedId} that is already in history")
+            else ModifiersCache.put(key(header.id), header, nodeView.history)
+            if (settings.influxDB.isDefined && nodeView.history.isFullChainSynced) {
+              header match {
+                case h: Header => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - h.timestamp)
+                case _ =>
+              }
             }
-          }
-        })
-      }
+          })
+        }
         logger.debug(s"Cache before(${ModifiersCache.size})")
         computeApplications()
         logger.debug(s"Cache after(${ModifiersCache.size})")

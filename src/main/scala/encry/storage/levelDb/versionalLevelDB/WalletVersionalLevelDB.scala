@@ -26,6 +26,7 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
 
   val levelDb: VersionalLevelDB = VersionalLevelDB(db, settings)
 
+  //todo: optimize this
   def getAllBoxes(maxQty: Int = -1): Seq[EncryBaseBox] = levelDb.getAll(maxQty)
       .filter(_._1 sameElements BALANCE_KEY)
       .map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }

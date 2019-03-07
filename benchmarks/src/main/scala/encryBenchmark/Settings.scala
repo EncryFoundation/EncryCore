@@ -9,8 +9,7 @@ case class Settings(serializedAssetBenchSettings: SerializedAssetBenchSettings,
                     serializedDataBenchSettings: SerializedDataBenchSettings,
                     benchesSettings: BenchesSettings,
                     stateBenchSettings: StateBenchSettings,
-                    historyBenchSettings: HistoryBenchSettings,
-                    serializedByProtoModifiersBenchStateSettings: SerializedByProtoModifiersBenchStateSettings)
+                    historyBenchSettings: HistoryBenchSettings)
 
 object Settings {
   val configPath = "encry.benchmark"
@@ -32,5 +31,3 @@ case class StateBenchSettings(totalBoxesNumber: Int,
                               numberOfOutputsInOneTransaction: Int)
 
 case class HistoryBenchSettings(blocksNumber: Int, transactionsNumber: Int)
-
-case class SerializedByProtoModifiersBenchStateSettings(blockNumber: Int)

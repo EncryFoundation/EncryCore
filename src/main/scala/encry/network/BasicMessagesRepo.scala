@@ -41,13 +41,13 @@ object BasicMessagesRepo extends StrictLogging {
   }
 
   object NetworkMessagesIds {
-    val GetPeers: Byte = 1: Byte
-    val Peers: Byte = 2: Byte
+    val GetPeers: Byte        = 1: Byte
+    val Peers: Byte           = 2: Byte
     val RequestModifier: Byte = 22: Byte
-    val Modifier: Byte = 33: Byte
-    val Inv: Byte = 55: Byte
-    val SyncInfo: Byte = 65: Byte
-    val HandShake: Byte = 75: Byte
+    val Modifier: Byte        = 33: Byte
+    val Inv: Byte             = 55: Byte
+    val SyncInfo: Byte        = 65: Byte
+    val HandShake: Byte       = 75: Byte
   }
 
   object MessageOptions {
@@ -381,5 +381,4 @@ object BasicMessagesRepo extends StrictLogging {
       case None => Option.empty[Handshake]
     }
   }
-
 }

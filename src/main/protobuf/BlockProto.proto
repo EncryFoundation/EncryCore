@@ -2,8 +2,6 @@ syntax = "proto3";
 import "HeaderProto.proto";
 import "PayloadProto.proto";
 
-option optimize_for = SPEED;
-
 message BlockProtoMessage {
 
     message AdProofsProtoMessage {

@@ -2,20 +2,15 @@ package encry.view.history.storage
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.HistoryModifierSerializer
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.VLDBWrapper
-import encry.storage.{EncryStorage, VersionalStorage}
+import encry.storage.VersionalStorage
 import encry.utils.CoreTaggedTypes.ModifierId
-import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.serialization.Serializer
 import scorex.utils.{Random => ScorexRandom}
-
 import encry.modifiers.history.HistoryModifiersProtoSerializer
 import encry.storage.EncryStorage
-import io.iohk.iodb.{ByteArrayWrapper, Store}
-//import org.encryfoundation.common.serialization.Serializer
+import io.iohk.iodb.ByteArrayWrapper
 import scala.util.{Failure, Random, Success}
 
 case class HistoryStorage(override val store: VersionalStorage) extends EncryStorage with StrictLogging {
@@ -28,10 +23,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
         store.get(StorageKey @@ id.untag(ModifierId))
     }
     possibleMod.flatMap { res =>
-      HistoryModifierSerializer.parseBytes(res) match {
-  def modifierById(id: ModifierId): Option[EncryPersistentModifier] =
-    objectsStore.get(ByteArrayWrapper(id)).flatMap { res =>
-      HistoryModifiersProtoSerializer.fromProto(res.data) match {
+      HistoryModifiersProtoSerializer.fromProto(res) match {
         case Success(b) => Some(b)
         case Failure(e) =>
           logger.warn(s"Failed to parse block from db: $e")
@@ -44,17 +36,15 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
     store match {
       case iodb: IODBHistoryWrapper =>
         iodb.objectStore.update(Random.nextLong(), Seq.empty,
-          objectsToInsert.map(obj => ByteArrayWrapper(obj.id) -> ByteArrayWrapper(HistoryModifierSerializer.toBytes(obj))))
+          objectsToInsert.map(obj => ByteArrayWrapper(obj.id) -> ByteArrayWrapper(HistoryModifiersProtoSerializer.toProto(obj))))
       case _: VLDBWrapper =>
         insert(
           StorageVersion @@ objectsToInsert.head.id.untag(ModifierId),
           objectsToInsert.map(obj =>
-            StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ HistoryModifierSerializer.toBytes(obj)
+            StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ HistoryModifiersProtoSerializer.toProto(obj)
           ).toList,
         )
     }
-    objectsStore.update(Random.nextLong(), Seq.empty,
-      objectsToInsert.map(obj => ByteArrayWrapper(obj.id) -> ByteArrayWrapper(HistoryModifiersProtoSerializer.toProto(obj))))
 
 
   def bulkInsert(version: Array[Byte],
@@ -75,7 +65,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
           (indexesToInsert.map{case (key, value) =>
             StorageKey @@ key -> StorageValue @@ value
           } ++ objectsToInsert.map(obj =>
-            StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ HistoryModifierSerializer.toBytes(obj)
+            StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ HistoryModifiersProtoSerializer.toProto(obj)
           )).toList
         )
     }
@@ -100,6 +90,4 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
           ids.map(elem => StorageKey @@ elem.untag(ModifierId)).toList
         )
     }
-
-//  def serializer: Serializer[EncryPersistentModifier] = HistoryModifierSerializer
 }

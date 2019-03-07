@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-option optimize_for = SPEED;
-
 message InetSocketAddressProtoMessage {
     string host = 1;
     uint32 port = 2;

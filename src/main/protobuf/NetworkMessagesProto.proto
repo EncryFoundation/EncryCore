@@ -1,8 +1,6 @@
 syntax = "proto3";
 import "SyntaxMessageProto.proto";
 
-option optimize_for = SPEED;
-
 message GeneralizedNetworkProtoMessage {
 
     message SyncInfoProtoMessage {

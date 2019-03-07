@@ -87,9 +87,6 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
   }
 
   property("InvNetworkMessage should be serialized correctly") {
-    /**
-      *
-      */
     val invNetworkMessageWithHeadersBeforeProto: InvNetworkMessage = InvNetworkMessage(invDataHeaders)
     val invNetworkMessageWithHeadersToProto: InnerMessage = invNetworkMessageWithHeadersBeforeProto.toInnerMessage
     val invNetworkMessageWithHeadersFromProto: Option[InvNetworkMessage] =
@@ -101,9 +98,6 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
     comparisonHeaders.size shouldEqual 1
     comparisonHeaders.head shouldEqual true
 
-    /**
-      *
-      */
     val generalizedNetworkMessageToProtoHeaders: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(invNetworkMessageWithHeadersBeforeProto)
     val generalizedNetworkMessageFromProtoHeaders: Try[NetworkMessage] =
       GeneralizedNetworkMessage.fromProto(ByteString(generalizedNetworkMessageToProtoHeaders.toByteArray))
@@ -119,9 +113,6 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
     comparisonReceivedMessageH.size shouldEqual 1
     comparisonReceivedMessageH.head shouldEqual true
 
-    /**
-      *
-      */
     val invNetworkMessageWithPayloadsBeforeProto: InvNetworkMessage = InvNetworkMessage(invDataPayloads)
     val invNetworkMessageWithPayloadsToProto: InnerMessage = invNetworkMessageWithPayloadsBeforeProto.toInnerMessage
     val invNetworkMessageWithPayloadsFromProto: Option[InvNetworkMessage] =
@@ -132,10 +123,6 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
       invNetworkMessageWithPayloadsFromProto.get.data._2.exists(element => id.sameElements(element))).toSet
     comparisonPayloads.size shouldEqual 1
     comparisonPayloads.head shouldEqual true
-
-    /**
-      *
-      */
 
     val generalizedNetworkMessageToProtoPayloads: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(invNetworkMessageWithPayloadsBeforeProto)
     val generalizedNetworkMessageFromProtoPayloads: Try[NetworkMessage] =
@@ -152,9 +139,6 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
     comparisonReceivedMessageP.size shouldEqual 1
     comparisonReceivedMessageP.head shouldEqual true
 
-    /**
-      *
-      */
     val invNetworkMessageWithTransactionsBeforeProto: InvNetworkMessage = InvNetworkMessage(invDataTransactions)
     val invNetworkMessageWithTransactionsToProto: InnerMessage = invNetworkMessageWithTransactionsBeforeProto.toInnerMessage
     val invNetworkMessageWithTransactionsFromProto: Option[InvNetworkMessage] =
@@ -165,10 +149,6 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
       invNetworkMessageWithTransactionsFromProto.get.data._2.exists(element => id.sameElements(element))).toSet
     comparisonTransactions.size shouldEqual 1
     comparisonTransactions.head shouldEqual true
-
-    /**
-      *
-      */
 
     val generalizedNetworkMessageToProtoTx: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(invNetworkMessageWithTransactionsBeforeProto)
     val generalizedNetworkMessageFromProtoTx: Try[NetworkMessage] =
@@ -184,9 +164,7 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
       invNetworkMessageWithTransactionsBeforeProto.data._2.exists(element => id.sameElements(element))).toSet
     comparisonReceivedMessageT.size shouldEqual 1
     comparisonReceivedMessageT.head shouldEqual true
-    /**
-      *
-      */
+
     val invNetworkMessageWithHeadersBeforeProtoDummy: InvNetworkMessage = InvNetworkMessage(invDataHeadersDummy)
     val invNetworkMessageWithHeadersToProtoDummy: InnerMessage = invNetworkMessageWithHeadersBeforeProtoDummy.toInnerMessage
     val invNetworkMessageWithHeadersFromProtoDummy: Option[InvNetworkMessage] =
@@ -194,9 +172,6 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
 
     invNetworkMessageWithHeadersFromProtoDummy shouldBe None
 
-    /**
-      *
-      */
     val invNetworkMessageWithPayloadsBeforeProtoDummy: InvNetworkMessage = InvNetworkMessage(invDataPayloadsDummy)
     val invNetworkMessageWithPayloadsToProtoDummy: InnerMessage = invNetworkMessageWithPayloadsBeforeProtoDummy.toInnerMessage
     val invNetworkMessageWithPayloadsFromProtoDummy: Option[InvNetworkMessage] =
@@ -204,9 +179,6 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
 
     invNetworkMessageWithPayloadsFromProtoDummy shouldBe None
 
-    /**
-      *
-      */
     val invNetworkMessageWithTransactionsBeforeProtoDummy: InvNetworkMessage = InvNetworkMessage(invDataTransactionsDummy)
     val invNetworkMessageWithTransactionsToProtoDummy: InnerMessage = invNetworkMessageWithTransactionsBeforeProtoDummy.toInnerMessage
     val invNetworkMessageWithTransactionsFromProtoDummy: Option[InvNetworkMessage] =

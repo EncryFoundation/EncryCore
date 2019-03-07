@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-option optimize_for = SPEED;
-
 message HeaderProtoMessage {
 
     message EquihashSolutionMessage {

@@ -1,8 +1,6 @@
 syntax = "proto3";
 import "TransactionProto.proto";
 
-option optimize_for = SPEED;
-
 message PayloadProtoMessage {
     bytes headerId = 1;
     repeated TransactionProtoMessage txs = 2;
