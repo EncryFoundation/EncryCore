@@ -62,43 +62,16 @@ class NetworkController extends Actor with StrictLogging {
     mH.find(_._1.contains(messageId)).map(_._2) match {
       case Some(handler) =>
         handler ! DataFromPeer(message, remote)
-        logger.info(s"Send message DataFromPeer with ${message.messageName} to $handler.")
+        logger.debug(s"Send message DataFromPeer with ${message.messageName} to $handler.")
       case None => logger.error("No handlers found for message: " + message.messageName)
     }
 
   def businessLogic: Receive = {
+    case MessageFromNetwork(message, Some(remote)) if message.isValid(settings) =>
+      logger.info(s"Got ${message.messageName} on the NetworkController.")
+      findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
     case MessageFromNetwork(message, Some(remote)) =>
-      message match {
-        case message@SyncInfoNetworkMessage(_) =>
-          if (message.esi.lastHeaderIds.size <= settings.network.syncPacketLength) {
-            logger.info(s"Got ${message.esi.lastHeaderIds.size} modifiersIds in sync info!")
-            findHandler(message, NetworkMessagesIds.SyncInfo, remote, messagesHandlers)
-          }
-          else logger.info(s"Received SyncInfoNetworkMessage with bigger ${message.esi.lastHeaderIds.size} mods number than expected from $remote")
-        case message@InvNetworkMessage(_) =>
-          if (message.data._2.size <= settings.network.maxInvObjects) {
-            logger.info(s"Got ${message.data._2.size} inv modifiers!")
-            findHandler(message, NetworkMessagesIds.Inv, remote, messagesHandlers)
-          }
-          else logger.info(s"Received InvMessage with bigger ${message.data._2.size} mods number than expected from $remote")
-        case message@RequestModifiersNetworkMessage(_) =>
-          if (message.data._2.size <= settings.network.syncPacketLength) {
-            logger.info(s"Got ${message.data._2.size} request modifiers!")
-            findHandler(message, NetworkMessagesIds.RequestModifier, remote, messagesHandlers)
-          }
-          else logger.info(s"Received RequestModifiersMessage with bigger ${message.data._2.size} mods number than expected from $remote")
-        case message@ModifiersNetworkMessage(_) =>
-          if (message.data._2.size <= settings.network.syncPacketLength) {
-            logger.info(s"Got ${message.data._2.size} modifiers!")
-            findHandler(message, NetworkMessagesIds.Modifier, remote, messagesHandlers)
-          }
-          else logger.info(s"Received ModifiersMessage with bigger ${message.data._2.size} mods number than expected from $remote")
-        case message@GetPeersNetworkMessage =>
-          findHandler(message, NetworkMessagesIds.GetPeers, remote, messagesHandlers)
-        case message@PeersNetworkMessage(_) =>
-          findHandler(message, NetworkMessagesIds.Peers, remote, messagesHandlers)
-        case ms => logger.info(s"Invalid message type: ${ms.messageName}.")
-      }
+      logger.info(s"Invalid message type: ${message.messageName} from remote $remote")
     case SendToNetwork(message, sendingStrategy) =>
       (peerManager ? FilterPeers(sendingStrategy)) (5 seconds)
         .map(_.asInstanceOf[Seq[ConnectedPeer]])

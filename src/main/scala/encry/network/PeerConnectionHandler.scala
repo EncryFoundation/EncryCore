@@ -102,7 +102,7 @@ class PeerConnectionHandler(connection: ActorRef,
       peerManager ! Handshaked(peer)
       handshakeTimeoutCancellableOpt.map(_.cancel())
       connection ! ResumeReading
-      logger.info(s"Context become workingCycle on peerHandler")
+      logger.debug(s"Context become workingCycle on peerHandler")
       context become workingCycle
   }
 

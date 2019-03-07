@@ -20,7 +20,8 @@ class PeerSynchronizer extends Actor with StrictLogging {
 
   override def preStart: Unit = {
     super.preStart()
-    networkController ! RegisterMessagesHandler(Seq(NetworkMessagesIds.Peers, NetworkMessagesIds.GetPeers), self)
+    networkController ! RegisterMessagesHandler(
+      Seq(PeersNetworkMessage.NetworkMessageTypeID, GetPeersNetworkMessage.NetworkMessageTypeID), self)
     context.system.scheduler.schedule(2.seconds,
       settings.network.syncInterval)(networkController ! SendToNetwork(GetPeersNetworkMessage, SendToRandom))
   }

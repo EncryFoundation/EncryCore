@@ -23,7 +23,7 @@ case class EncryAppSettings(directory: String,
 
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader with StrictLogging {
 
-  val configPath: String = "encry.core"
+  val configPath: String = "encry"
 
   val read: EncryAppSettings = ConfigFactory.load("local.conf")
     .withFallback(ConfigFactory.load()).as[EncryAppSettings](configPath)

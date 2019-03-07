@@ -12,6 +12,7 @@ import akka.util.{ByteString => AkkaByteString}
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BasicMessagesRepo.BasicMsgDataTypes.{InvData, ModifiersData}
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.view.history.EncrySyncInfo
 import scorex.crypto.hash.Blake2b256
@@ -28,9 +29,13 @@ object BasicMessagesRepo extends StrictLogging {
 
     val messageName: String
 
+    val NetworkMessageTypeID: Byte
+
     def checkSumBytes(innerMessage: InnerMessage): Array[Byte]
 
     def toInnerMessage: InnerMessage
+
+    def isValid(setting: EncryAppSettings): Boolean
   }
 
   sealed trait ProtoNetworkMessagesSerializer[T] {
@@ -38,16 +43,6 @@ object BasicMessagesRepo extends StrictLogging {
     def toProto(message: T): InnerMessage
 
     def fromProto(message: InnerMessage): Option[T]
-  }
-
-  object NetworkMessagesIds {
-    val GetPeers: Byte        = 1: Byte
-    val Peers: Byte           = 2: Byte
-    val RequestModifier: Byte = 22: Byte
-    val Modifier: Byte        = 33: Byte
-    val Inv: Byte             = 55: Byte
-    val SyncInfo: Byte        = 65: Byte
-    val HandShake: Byte       = 75: Byte
   }
 
   object MessageOptions {
@@ -156,6 +151,16 @@ object BasicMessagesRepo extends StrictLogging {
       innerMessage.syncInfoProtoMessage.map(_.toByteArray).getOrElse(Array.emptyByteArray)
 
     override def toInnerMessage: InnerMessage = SyncInfoNetworkMessageSerializer.toProto(this)
+
+    override val NetworkMessageTypeID: Byte = SyncInfoNetworkMessage.NetworkMessageTypeID
+
+    override def isValid(setting: EncryAppSettings): Boolean =
+      if (esi.lastHeaderIds.size <= setting.network.syncPacketLength) true else false
+  }
+
+  object SyncInfoNetworkMessage {
+
+    val NetworkMessageTypeID: Byte = 65: Byte
   }
 
   object SyncInfoNetworkMessageSerializer extends ProtoNetworkMessagesSerializer[SyncInfoNetworkMessage] {
@@ -184,6 +189,16 @@ object BasicMessagesRepo extends StrictLogging {
       innerMessage.invProtoMessage.map(_.toByteArray).getOrElse(Array.emptyByteArray)
 
     override def toInnerMessage: InnerMessage = InvNetworkMessageSerializer.toProto(this)
+
+    override val NetworkMessageTypeID: Byte = InvNetworkMessage.NetworkMessageTypeID
+
+    override def isValid(setting: EncryAppSettings): Boolean =
+      if (data._2.size <= setting.network.syncPacketLength) true else false
+  }
+
+  object InvNetworkMessage {
+
+    val NetworkMessageTypeID: Byte = 55: Byte
   }
 
   object InvNetworkMessageSerializer extends ProtoNetworkMessagesSerializer[InvNetworkMessage] {
@@ -217,6 +232,16 @@ object BasicMessagesRepo extends StrictLogging {
       innerMessage.requestModifiersProtoMessage.map(_.toByteArray).getOrElse(Array.emptyByteArray)
 
     override def toInnerMessage: InnerMessage = RequestModifiersSerializer.toProto(this)
+
+    override val NetworkMessageTypeID: Byte = RequestModifiersNetworkMessage.NetworkMessageTypeID
+
+    override def isValid(setting: EncryAppSettings): Boolean =
+      if (data._2.size <= setting.network.syncPacketLength) true else false
+  }
+
+  object RequestModifiersNetworkMessage {
+
+    val NetworkMessageTypeID: Byte = 22: Byte
   }
 
   object RequestModifiersSerializer extends ProtoNetworkMessagesSerializer[RequestModifiersNetworkMessage] {
@@ -253,6 +278,16 @@ object BasicMessagesRepo extends StrictLogging {
 
     override def checkSumBytes(innerMessage: InnerMessage): Array[Byte] =
       innerMessage.modifiersProtoMessage.map(_.toByteArray).getOrElse(Array.emptyByteArray)
+
+    override val NetworkMessageTypeID: Byte = ModifiersNetworkMessage.NetworkMessageTypeID
+
+    override def isValid(setting: EncryAppSettings): Boolean =
+      if (data._2.size <= setting.network.syncPacketLength) true else false
+  }
+
+  object ModifiersNetworkMessage {
+
+    val NetworkMessageTypeID: Byte = 33: Byte
   }
 
   object ModifiersNetworkMessageSerializer extends ProtoNetworkMessagesSerializer[ModifiersNetworkMessage] {
@@ -288,6 +323,10 @@ object BasicMessagesRepo extends StrictLogging {
 
     override def checkSumBytes(innerMessage: InnerMessage): Array[Byte] =
       innerMessage.getPeersProtoMessage.map(_.toByteArray).getOrElse(Array.emptyByteArray)
+
+    override val NetworkMessageTypeID: Byte = 1: Byte
+
+    override def isValid(setting: EncryAppSettings): Boolean = true
   }
 
   /**
@@ -304,6 +343,15 @@ object BasicMessagesRepo extends StrictLogging {
 
     override def checkSumBytes(innerMessage: InnerMessage): Array[Byte] =
       innerMessage.peersProtoMessage.map(_.toByteArray).getOrElse(Array.emptyByteArray)
+
+    override val NetworkMessageTypeID: Byte = PeersNetworkMessage.NetworkMessageTypeID
+
+    override def isValid(setting: EncryAppSettings): Boolean = true
+  }
+
+  object PeersNetworkMessage {
+
+    val NetworkMessageTypeID: Byte = 2: Byte
   }
 
   object PeersNetworkMessageSerializer extends ProtoNetworkMessagesSerializer[PeersNetworkMessage] {
@@ -348,6 +396,15 @@ object BasicMessagesRepo extends StrictLogging {
 
     override def checkSumBytes(innerMessage: InnerMessage): Array[Byte] =
       innerMessage.handshakeProtoMessage.map(_.toByteArray).getOrElse(Array.emptyByteArray)
+
+    override val NetworkMessageTypeID: Byte = Handshake.NetworkMessageTypeID
+
+    override def isValid(setting: EncryAppSettings): Boolean = true
+  }
+
+  object Handshake {
+
+    val NetworkMessageTypeID: Byte = 75: Byte
   }
 
   object HandshakeSerializer extends ProtoNetworkMessagesSerializer[Handshake] {

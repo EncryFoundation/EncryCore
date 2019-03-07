@@ -39,9 +39,9 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     */
   protected def processBlock(fullBlock: Block,
                              modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
-    logger.info(s"Process block: ${fullBlock.asJson}")
+    logger.debug(s"Process block: ${fullBlock.asJson}")
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
-    logger.info(s"best full chain contains: ${bestFullChain.length}")
+    logger.debug(s"best full chain contains: ${bestFullChain.length}")
     val newBestAfterThis: Header = bestFullChain.last.header
     processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, settings.node.blocksToKeep))
   }

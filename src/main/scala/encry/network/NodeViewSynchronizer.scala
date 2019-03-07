@@ -42,8 +42,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     "deliveryManager")
 
   override def preStart(): Unit = {
-    val messageIds: Seq[Byte] =
-      Seq(NetworkMessagesIds.Inv, NetworkMessagesIds.RequestModifier, NetworkMessagesIds.SyncInfo)
+    val messageIds: Seq[Byte] = Seq(
+      InvNetworkMessage.NetworkMessageTypeID,
+      RequestModifiersNetworkMessage.NetworkMessageTypeID,
+      InvNetworkMessage.NetworkMessageTypeID)
     networkControllerRef ! RegisterMessagesHandler(messageIds, self)
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
