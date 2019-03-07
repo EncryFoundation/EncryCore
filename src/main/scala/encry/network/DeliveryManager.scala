@@ -68,7 +68,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       syncTracker.updateStatus(remote, status)
       status match {
-        case Unknown => logger.info("Peer status is still unknown.")
+        case Unknown => logger.info("Peer status is still unknown")
         case Younger => sendExtension(remote, status, extOpt)
         case _ =>
       }
