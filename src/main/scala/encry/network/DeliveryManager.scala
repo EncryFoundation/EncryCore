@@ -50,8 +50,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   def key(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
   override def preStart(): Unit = {
-    val messageSpecs: Seq[Byte] = Seq(ModifiersNetworkMessage.NetworkMessageTypeID)
-    networkControllerRef ! RegisterMessagesHandler(messageSpecs, self)
+    networkControllerRef ! RegisterMessagesHandler(Seq(ModifiersNetworkMessage.NetworkMessageTypeID), self)
     syncTracker.scheduleSendSyncInfo()
     context.system.scheduler.schedule(
       settings.network.modifierDeliverTimeCheck,

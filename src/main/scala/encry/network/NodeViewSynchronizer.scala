@@ -45,7 +45,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     val messageIds: Seq[Byte] = Seq(
       InvNetworkMessage.NetworkMessageTypeID,
       RequestModifiersNetworkMessage.NetworkMessageTypeID,
-      InvNetworkMessage.NetworkMessageTypeID)
+      SyncInfoNetworkMessage.NetworkMessageTypeID)
     networkControllerRef ! RegisterMessagesHandler(messageIds, self)
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
