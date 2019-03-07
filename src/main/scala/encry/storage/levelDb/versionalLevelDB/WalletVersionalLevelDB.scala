@@ -31,7 +31,7 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
   def getAllBoxes(maxQty: Int = -1): Seq[EncryBaseBox] = {
     val a: immutable.Seq[(VersionalLevelDbKey, VersionalLevelDbValue)] = levelDb.getAll(maxQty)
     println(a.size + " number of all boxes")
-    val b: immutable.Seq[(VersionalLevelDbKey, VersionalLevelDbValue)] = a.filter(_._1 sameElements BALANCE_KEY)
+    val b: immutable.Seq[(VersionalLevelDbKey, VersionalLevelDbValue)] = a.filterNot(_._1 sameElements BALANCE_KEY)
     println(b.size + " number of filtered boxes")
     val b1 = b.map { case (key, bytes) => StateModifierSerializer.parseBytes(bytes, key.head) }
     println(b1.size + " number of maped boxes")
