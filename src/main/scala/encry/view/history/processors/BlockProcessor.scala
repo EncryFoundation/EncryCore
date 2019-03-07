@@ -118,11 +118,11 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   }
 
   private def calculateBestFullChain(block: Block): Seq[Block] = {
-    logger.info(s"calculateBestFullChain for block: ${block.asJson}")
+    logger.debug(s"calculateBestFullChain for block: ${block.asJson}")
     val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
-    logger.info(s"continuations: ${continuations.map(seq => s"Seq contains: ${seq.length}").mkString(",")}")
+    logger.debug(s"continuations: ${continuations.map(seq => s"Seq contains: ${seq.length}").mkString(",")}")
     val chains: Seq[Seq[Block]] = continuations.map(_.map(getBlock).takeWhile(_.nonEmpty).flatten)
-    logger.info(s"Chains: ${chains.map(chain => s"chain contain: ${chain.length}").mkString(",")}")
+    logger.debug(s"Chains: ${chains.map(chain => s"chain contain: ${chain.length}").mkString(",")}")
     chains.map(c => block +: c).maxBy(c => scoreOf(c.last.id).get)
   }
 

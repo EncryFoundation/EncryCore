@@ -78,10 +78,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       if (delivered.contains(key(modifierId))) delivered -= key(modifierId)
       else reexpect(peer, modifierTypeId, modifierId)
     case CheckModifiersToDownload =>
-      logger.info(s"CheckModifiersToDownload request before hitory opt")
       historyReaderOpt.foreach { h =>
-        logger.info(s"CheckModifiersToDownload request AFTER hitory opt")
-        logger.info(s"CheckModifiersToDownload requestedModifiers size ${requestedModifiers.size}")
         val currentQueue: HashSet[ModifierId] =
           requestedModifiers.flatMap { case (_, modIds) =>
             modIds.keys.map(modId => ModifierId @@ modId.toArray)
@@ -89,7 +86,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
         val newIds: Seq[(ModifierTypeId, ModifierId)] =
           h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
             .filterNot(modId => currentQueue.contains(modId._2))
-        logger.info(s"CheckModifiersToDownload newIds size ${newIds.size}")
         if (newIds.nonEmpty) newIds.groupBy(_._1).foreach {
           case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) => requestDownload(modId, ids.map(_._2))
         }
