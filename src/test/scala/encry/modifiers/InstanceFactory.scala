@@ -24,7 +24,6 @@ import org.encryfoundation.prismlang.core.Ast.Expr
 import org.encryfoundation.prismlang.core.{Ast, Types}
 import org.iq80.leveldb.Options
 import scorex.utils.Random
-
 import scala.util.{Random => Scarand}
 
 trait InstanceFactory extends Keys with EncryGenerator {

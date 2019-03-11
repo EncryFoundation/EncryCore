@@ -11,12 +11,11 @@ import encry.network.BasicMessagesRepo
 import encry.network.BasicMessagesRepo._
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.utils.EncryGenerator
 import encry.view.history.EncrySyncInfo
 import org.scalatest.{Matchers, PropSpec}
 import scala.util.Try
 
-class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with InstanceFactory with EncryGenerator {
+class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with InstanceFactory {
 
   val settings: EncryAppSettings = EncryAppSettings.read
   val testedBlocks: Vector[Block] = (0 until 10).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
@@ -46,10 +45,10 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
     val syncInfoToProto: GeneralizedNetworkProtoMessage.InnerMessage = syncInfoBeforeProto.toInnerMessage
     val syncInfoFromProto: Option[SyncInfoNetworkMessage] = SyncInfoNetworkMessageSerializer.fromProto(syncInfoToProto)
 
-    val comparison: Set[Boolean] = syncInfoFromProto.get.esi.lastHeaderIds.map(id =>
-      syncInfoBeforeProto.esi.lastHeaderIds.exists(element => id.sameElements(element))).toSet
-    comparison.size shouldEqual 1
-    comparison.head shouldEqual true
+    val comparison: Boolean = syncInfoFromProto.get.esi.lastHeaderIds.forall(id =>
+      syncInfoBeforeProto.esi.lastHeaderIds.exists(element => id.sameElements(element)))
+
+    comparison shouldEqual true
 
     val generalizedNetworkMessageToProto: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(syncInfoBeforeProto)
     val generalizedNetworkMessageFromProto: Try[NetworkMessage] =
@@ -60,10 +59,10 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
     val receivedMessage: SyncInfoNetworkMessage = generalizedNetworkMessageFromProto.get match {
       case si: SyncInfoNetworkMessage => si
     }
-    val comparisonReceivedMessage: Set[Boolean] = receivedMessage.esi.lastHeaderIds.map(id =>
-      syncInfoBeforeProto.esi.lastHeaderIds.exists(element => id.sameElements(element))).toSet
-    comparisonReceivedMessage.size shouldEqual 1
-    comparisonReceivedMessage.head shouldEqual true
+
+    val comparisonReceivedMessage: Boolean = receivedMessage.esi.lastHeaderIds.forall(id =>
+      syncInfoBeforeProto.esi.lastHeaderIds.exists(element => id.sameElements(element)))
+    comparisonReceivedMessage shouldEqual true
 
     val syncInfoWithoutModifiers: EncrySyncInfo = EncrySyncInfo(Seq.empty[ModifierId])
     val syncInfoBeforeProtoWithoutModifiers: SyncInfoNetworkMessage = SyncInfoNetworkMessage(syncInfoWithoutModifiers)
@@ -93,10 +92,9 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
       InvNetworkMessageSerializer.fromProto(invNetworkMessageWithHeadersToProto)
 
     invNetworkMessageWithHeadersBeforeProto.data._1 == invNetworkMessageWithHeadersFromProto.get.data._1
-    val comparisonHeaders: Set[Boolean] = invNetworkMessageWithHeadersBeforeProto.data._2.map(id =>
-      invNetworkMessageWithHeadersFromProto.get.data._2.exists(element => id.sameElements(element))).toSet
-    comparisonHeaders.size shouldEqual 1
-    comparisonHeaders.head shouldEqual true
+    val comparisonHeaders: Boolean = invNetworkMessageWithHeadersBeforeProto.data._2.forall(id =>
+      invNetworkMessageWithHeadersFromProto.get.data._2.exists(element => id.sameElements(element)))
+    comparisonHeaders shouldEqual true
 
     val generalizedNetworkMessageToProtoHeaders: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(invNetworkMessageWithHeadersBeforeProto)
     val generalizedNetworkMessageFromProtoHeaders: Try[NetworkMessage] =
@@ -108,10 +106,9 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
       case inv: InvNetworkMessage => inv
     }
     receivedMessageH.data._1 == invNetworkMessageWithHeadersBeforeProto.data._1
-    val comparisonReceivedMessageH: Set[Boolean] = receivedMessageH.data._2.map(id =>
-      invNetworkMessageWithHeadersBeforeProto.data._2.exists(element => id.sameElements(element))).toSet
-    comparisonReceivedMessageH.size shouldEqual 1
-    comparisonReceivedMessageH.head shouldEqual true
+    val comparisonReceivedMessageH: Boolean = receivedMessageH.data._2.forall(id =>
+      invNetworkMessageWithHeadersBeforeProto.data._2.exists(element => id.sameElements(element)))
+    comparisonReceivedMessageH shouldEqual true
 
     val invNetworkMessageWithPayloadsBeforeProto: InvNetworkMessage = InvNetworkMessage(invDataPayloads)
     val invNetworkMessageWithPayloadsToProto: InnerMessage = invNetworkMessageWithPayloadsBeforeProto.toInnerMessage
@@ -119,10 +116,9 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
       InvNetworkMessageSerializer.fromProto(invNetworkMessageWithPayloadsToProto)
 
     invNetworkMessageWithPayloadsBeforeProto.data._1 == invNetworkMessageWithPayloadsFromProto.get.data._1
-    val comparisonPayloads: Set[Boolean] = invNetworkMessageWithPayloadsBeforeProto.data._2.map(id =>
-      invNetworkMessageWithPayloadsFromProto.get.data._2.exists(element => id.sameElements(element))).toSet
-    comparisonPayloads.size shouldEqual 1
-    comparisonPayloads.head shouldEqual true
+    val comparisonPayloads: Boolean = invNetworkMessageWithPayloadsBeforeProto.data._2.forall(id =>
+      invNetworkMessageWithPayloadsFromProto.get.data._2.exists(element => id.sameElements(element)))
+    comparisonPayloads shouldEqual true
 
     val generalizedNetworkMessageToProtoPayloads: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(invNetworkMessageWithPayloadsBeforeProto)
     val generalizedNetworkMessageFromProtoPayloads: Try[NetworkMessage] =
@@ -134,10 +130,9 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
       case inv: InvNetworkMessage => inv
     }
     receivedMessageP.data._1 == invNetworkMessageWithPayloadsBeforeProto.data._1
-    val comparisonReceivedMessageP: Set[Boolean] = receivedMessageP.data._2.map(id =>
-      invNetworkMessageWithPayloadsBeforeProto.data._2.exists(element => id.sameElements(element))).toSet
-    comparisonReceivedMessageP.size shouldEqual 1
-    comparisonReceivedMessageP.head shouldEqual true
+    val comparisonReceivedMessageP: Boolean = receivedMessageP.data._2.forall(id =>
+      invNetworkMessageWithPayloadsBeforeProto.data._2.exists(element => id.sameElements(element)))
+    comparisonReceivedMessageP shouldEqual true
 
     val invNetworkMessageWithTransactionsBeforeProto: InvNetworkMessage = InvNetworkMessage(invDataTransactions)
     val invNetworkMessageWithTransactionsToProto: InnerMessage = invNetworkMessageWithTransactionsBeforeProto.toInnerMessage
@@ -145,10 +140,9 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
       InvNetworkMessageSerializer.fromProto(invNetworkMessageWithTransactionsToProto)
 
     invNetworkMessageWithTransactionsBeforeProto.data._1 == invNetworkMessageWithTransactionsFromProto.get.data._1
-    val comparisonTransactions: Set[Boolean] = invNetworkMessageWithTransactionsBeforeProto.data._2.map(id =>
-      invNetworkMessageWithTransactionsFromProto.get.data._2.exists(element => id.sameElements(element))).toSet
-    comparisonTransactions.size shouldEqual 1
-    comparisonTransactions.head shouldEqual true
+    val comparisonTransactions: Boolean = invNetworkMessageWithTransactionsBeforeProto.data._2.forall(id =>
+      invNetworkMessageWithTransactionsFromProto.get.data._2.exists(element => id.sameElements(element)))
+    comparisonTransactions shouldEqual true
 
     val generalizedNetworkMessageToProtoTx: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(invNetworkMessageWithTransactionsBeforeProto)
     val generalizedNetworkMessageFromProtoTx: Try[NetworkMessage] =
@@ -160,10 +154,9 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
       case inv: InvNetworkMessage => inv
     }
     receivedMessageT.data._1 == invNetworkMessageWithTransactionsBeforeProto.data._1
-    val comparisonReceivedMessageT: Set[Boolean] = receivedMessageT.data._2.map(id =>
-      invNetworkMessageWithTransactionsBeforeProto.data._2.exists(element => id.sameElements(element))).toSet
-    comparisonReceivedMessageT.size shouldEqual 1
-    comparisonReceivedMessageT.head shouldEqual true
+    val comparisonReceivedMessageT: Boolean = receivedMessageT.data._2.forall(id =>
+      invNetworkMessageWithTransactionsBeforeProto.data._2.exists(element => id.sameElements(element)))
+    comparisonReceivedMessageT shouldEqual true
 
     val invNetworkMessageWithHeadersBeforeProtoDummy: InvNetworkMessage = InvNetworkMessage(invDataHeadersDummy)
     val invNetworkMessageWithHeadersToProtoDummy: InnerMessage = invNetworkMessageWithHeadersBeforeProtoDummy.toInnerMessage
@@ -194,10 +187,9 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
       RequestModifiersSerializer.fromProto(requestModifiersWithHeadersToProto)
 
     requestModifiersWithHeadersBeforeProto.data._1 == requestModifiersWithHeadersFromProto.get.data._1
-    val comparisonHeaders: Set[Boolean] = requestModifiersWithHeadersBeforeProto.data._2.map(id =>
-      requestModifiersWithHeadersFromProto.get.data._2.exists(element => id.sameElements(element))).toSet
-    comparisonHeaders.size shouldEqual 1
-    comparisonHeaders.head shouldEqual true
+    val comparisonHeaders: Boolean = requestModifiersWithHeadersBeforeProto.data._2.forall(id =>
+      requestModifiersWithHeadersFromProto.get.data._2.exists(element => id.sameElements(element)))
+    comparisonHeaders shouldEqual true
 
     val generalizedNetworkMessageToProtoHeaders: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(requestModifiersWithHeadersBeforeProto)
     val generalizedNetworkMessageFromProtoHeaders: Try[NetworkMessage] =
@@ -209,10 +201,9 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
       case req: RequestModifiersNetworkMessage => req
     }
     receivedMessageH.data._1 == requestModifiersWithHeadersBeforeProto.data._1
-    val comparisonReceivedMessageH: Set[Boolean] = receivedMessageH.data._2.map(id =>
-      requestModifiersWithHeadersBeforeProto.data._2.exists(element => id.sameElements(element))).toSet
-    comparisonReceivedMessageH.size shouldEqual 1
-    comparisonReceivedMessageH.head shouldEqual true
+    val comparisonReceivedMessageH: Boolean = receivedMessageH.data._2.forall(id =>
+      requestModifiersWithHeadersBeforeProto.data._2.exists(element => id.sameElements(element)))
+    comparisonReceivedMessageH shouldEqual true
 
     val requestModifiersWithPayloadsBeforeProto: RequestModifiersNetworkMessage = RequestModifiersNetworkMessage(invDataPayloads)
     val requestModifiersWithPayloadsToProto: InnerMessage = requestModifiersWithPayloadsBeforeProto.toInnerMessage
@@ -220,10 +211,9 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
       RequestModifiersSerializer.fromProto(requestModifiersWithPayloadsToProto)
 
     requestModifiersWithPayloadsBeforeProto.data._1 == requestModifiersWithPayloadsFromProto.get.data._1
-    val comparisonPayloads: Set[Boolean] = requestModifiersWithPayloadsBeforeProto.data._2.map(id =>
-      requestModifiersWithPayloadsFromProto.get.data._2.exists(element => id.sameElements(element))).toSet
-    comparisonPayloads.size shouldEqual 1
-    comparisonPayloads.head shouldEqual true
+    val comparisonPayloads: Boolean = requestModifiersWithPayloadsBeforeProto.data._2.forall(id =>
+      requestModifiersWithPayloadsFromProto.get.data._2.exists(element => id.sameElements(element)))
+    comparisonPayloads shouldEqual true
 
     val requestModifiersWithTransactionsBeforeProto: RequestModifiersNetworkMessage = RequestModifiersNetworkMessage(invDataTransactions)
     val requestModifiersWithTransactionsToProto: InnerMessage = requestModifiersWithTransactionsBeforeProto.toInnerMessage
@@ -231,10 +221,9 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
       RequestModifiersSerializer.fromProto(requestModifiersWithTransactionsToProto)
 
     requestModifiersWithTransactionsBeforeProto.data._1 == requestModifiersWithTransactionsFromProto.get.data._1
-    val comparisonTransactions: Set[Boolean] = requestModifiersWithTransactionsBeforeProto.data._2.map(id =>
-      requestModifiersWithTransactionsFromProto.get.data._2.exists(element => id.sameElements(element))).toSet
-    comparisonTransactions.size shouldEqual 1
-    comparisonTransactions.head shouldEqual true
+    val comparisonTransactions: Boolean = requestModifiersWithTransactionsBeforeProto.data._2.forall(id =>
+      requestModifiersWithTransactionsFromProto.get.data._2.exists(element => id.sameElements(element)))
+    comparisonTransactions shouldEqual true
 
     val requestModifiersWithHeadersBeforeProtoDummy: RequestModifiersNetworkMessage = RequestModifiersNetworkMessage(invDataHeadersDummy)
     val requestModifiersWithHeadersToProtoDummy: InnerMessage = requestModifiersWithHeadersBeforeProtoDummy.toInnerMessage
@@ -285,32 +274,26 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
     val modifiersNetworkMessagePayloadsFromProto = ModifiersNetworkMessageSerializer.fromProto(modifiersNetworkMessagePayloadsToProto)
     val modifiersNetworkMessageTransactionsFromProto = ModifiersNetworkMessageSerializer.fromProto(modifiersNetworkMessageTransactionsToProto)
 
-    val compr1: Set[Boolean] = modifiersNetworkMessageHeaders.data._2.keys.map(el => modifiersNetworkMessageHeadersFromProto.get.data._2.keys
-      .exists(id => id.sameElements(el))).toSet
-    compr1.size shouldBe 1
-    compr1.head shouldBe true
-    val compr2 = modifiersNetworkMessageHeaders.data._2.values.map(el => modifiersNetworkMessageHeadersFromProto.get.data._2.values
-      .exists(id => id.sameElements(el))).toSet
-    compr2.size shouldBe 1
-    compr2.head shouldBe true
+    val compr1: Boolean = modifiersNetworkMessageHeaders.data._2.keys.forall(el => modifiersNetworkMessageHeadersFromProto.get.data._2.keys
+      .exists(id => id.sameElements(el)))
+    compr1 shouldBe true
+    val compr2: Boolean = modifiersNetworkMessageHeaders.data._2.values.forall(el => modifiersNetworkMessageHeadersFromProto.get.data._2.values
+      .exists(id => id.sameElements(el)))
+    compr2 shouldBe true
 
-    val compr3: Set[Boolean] = modifiersNetworkMessagePayloads.data._2.keys.map(el => modifiersNetworkMessagePayloadsFromProto.get.data._2.keys
-      .exists(id => id.sameElements(el))).toSet
-    compr3.size shouldBe 1
-    compr3.head shouldBe true
-    val compr4 = modifiersNetworkMessagePayloads.data._2.values.map(el => modifiersNetworkMessagePayloadsFromProto.get.data._2.values
-      .exists(id => id.sameElements(el))).toSet
-    compr4.size shouldBe 1
-    compr4.head shouldBe true
+    val compr3: Boolean = modifiersNetworkMessagePayloads.data._2.keys.forall(el => modifiersNetworkMessagePayloadsFromProto.get.data._2.keys
+      .exists(id => id.sameElements(el)))
+    compr3 shouldBe true
+    val compr4: Boolean = modifiersNetworkMessagePayloads.data._2.values.forall(el => modifiersNetworkMessagePayloadsFromProto.get.data._2.values
+      .exists(id => id.sameElements(el)))
+    compr4 shouldBe true
 
-    val compr5: Set[Boolean] = modifiersNetworkMessageTransactions.data._2.keys.map(el => modifiersNetworkMessageTransactionsFromProto.get.data._2.keys
-      .exists(id => id.sameElements(el))).toSet
-    compr5.size shouldBe 1
-    compr5.head shouldBe true
-    val compr6 = modifiersNetworkMessageTransactions.data._2.values.map(el => modifiersNetworkMessageTransactionsFromProto.get.data._2.values
-      .exists(id => id.sameElements(el))).toSet
-    compr6.size shouldBe 1
-    compr6.head shouldBe true
+    val compr5: Boolean = modifiersNetworkMessageTransactions.data._2.keys.forall(el => modifiersNetworkMessageTransactionsFromProto.get.data._2.keys
+      .exists(id => id.sameElements(el)))
+    compr5 shouldBe true
+    val compr6: Boolean = modifiersNetworkMessageTransactions.data._2.values.forall(el => modifiersNetworkMessageTransactionsFromProto.get.data._2.values
+      .exists(id => id.sameElements(el)))
+    compr6 shouldBe true
   }
 
   property("GetPeersNetworkMessage should be serialized correctly") {
