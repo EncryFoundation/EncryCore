@@ -82,8 +82,8 @@ object InfoApiRoute {
     val unconfirmedCount: Int = readers.m.map(_.size).getOrElse(0)
     Map(
       "name" -> nodeName.asJson,
-      "headersHeight" -> bestHeader.map(_.height.toString).getOrElse("still initializing history").asJson,
-      "fullHeight" -> bestFullBlock.map(_.header.height.toString).getOrElse("still initializing history").asJson,
+      "headersHeight" -> bestHeader.map(_.height.toString).getOrElse("History not ready yet").asJson,
+      "fullHeight" -> bestFullBlock.map(_.header.height.toString).getOrElse("History not ready yet").asJson,
       "bestHeaderId" -> bestHeader.map(_.encodedId).asJson,
       "bestFullHeaderId" -> bestFullBlock.map(_.header.encodedId).asJson,
       "previousFullHeaderId" -> bestFullBlock.map(_.header.parentId).map(Algos.encode).asJson,
