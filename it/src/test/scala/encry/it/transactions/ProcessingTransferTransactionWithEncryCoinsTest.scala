@@ -47,6 +47,7 @@ class ProcessingTransferTransactionWithEncryCoinsTest extends AsyncFunSuite
       case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i)
     }
 
+    Thread.sleep(1000)
     Await.result(dockerNodes().head.waitForHeadersHeight(firstHeightToWait), waitTime)
 
     val boxes: Seq[EncryBaseBox] = Await.result(dockerNodes().head.outputs, waitTime)
