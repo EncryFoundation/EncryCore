@@ -19,6 +19,7 @@ object DirectiveProtoSerializer {
     case DirectiveProto.DataDirectiveProto(_) => DataDirectiveProtoSerializer.fromProto(message)
     case DirectiveProto.TransferDirectiveProto(_) => TransferDirectiveProtoSerializer.fromProto(message)
     case DirectiveProto.ScriptedAssetDirectiveProto(_) => ScriptedAssetDirectiveProtoSerializer.fromProto(message)
+    case DirectiveProto.Empty => None
   }
 }
 
