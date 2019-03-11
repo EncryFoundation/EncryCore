@@ -11,7 +11,7 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import encry.cli.commands.AddPeer.PeerFromCli
 import PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
-import encry.network.message.{GetPeersSpec, Message, PeersSpec}
+import BasicMessagesRepo._
 
 class PeerSynchronizer extends Actor with StrictLogging {
 
@@ -20,31 +20,33 @@ class PeerSynchronizer extends Actor with StrictLogging {
 
   override def preStart: Unit = {
     super.preStart()
-    networkController ! RegisterMessagesHandler(Seq(GetPeersSpec, PeersSpec), self)
-    val msg: Message[Unit] = Message[Unit](GetPeersSpec, Right(Unit), None)
-    context.system.scheduler
-      .schedule(2.seconds, settings.network.syncInterval)(networkController ! SendToNetwork(msg, SendToRandom))
+    networkController ! RegisterMessagesHandler(
+      Seq(PeersNetworkMessage.NetworkMessageTypeID, GetPeersNetworkMessage.NetworkMessageTypeID), self)
+    context.system.scheduler.schedule(2.seconds,
+      settings.network.syncInterval)(networkController ! SendToNetwork(GetPeersNetworkMessage, SendToRandom))
   }
 
   override def receive: Receive = {
+    case DataFromPeer(message, remote) => message match {
+      case PeersNetworkMessage(peers) =>
+        peers.filter(p => CheckPeersObj.checkPossibilityToAddPeer(p, knownPeersCollection, settings)).foreach(isa =>
+          peerManager ! AddOrUpdatePeer(isa, None, Some(remote.direction)))
+        logger.debug(s"Got new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
+      case GetPeersNetworkMessage =>
+        (peerManager ? RandomPeers(3)).mapTo[Seq[InetSocketAddress]]
+          .foreach { peers =>
+            val correctPeers: Seq[InetSocketAddress] = peers.filter(address => {
+              if (remote.socketAddress.getAddress.isSiteLocalAddress) true
+              else !address.getAddress.isSiteLocalAddress && address != remote.socketAddress
+            })
+            logger.info(s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
+            networkController ! SendToNetwork(PeersNetworkMessage(correctPeers), SendToPeer(remote))
+            logger.debug(s"Send to ${remote.socketAddress} peers message which contains next peers: ${peers.mkString(",")}")
+          }
+      case _ => logger.info(s"PeerSynchronizer got invalid type of DataFromPeer message!")
+    }
     case PeerFromCli(address) =>
       knownPeersCollection = knownPeersCollection + address
-    case DataFromPeer(spec, peers: Seq[InetSocketAddress]@unchecked, remote)
-      if spec.messageCode == PeersSpec.messageCode =>
-      peers.filter(p => CheckPeersObj.checkPossibilityToAddPeer(p, knownPeersCollection, settings)).foreach(isa =>
-        peerManager ! AddOrUpdatePeer(isa, None, Some(remote.direction)))
-      logger.debug(s"Got new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
-    case DataFromPeer(spec, _, remote) if spec.messageCode == GetPeersSpec.messageCode =>
-      (peerManager ? RandomPeers(3)).mapTo[Seq[InetSocketAddress]]
-        .foreach { peers =>
-          val correctPeers: Seq[InetSocketAddress] = peers.filter(address => {
-            if (remote.socketAddress.getAddress.isSiteLocalAddress) true
-            else !address.getAddress.isSiteLocalAddress && address != remote.socketAddress
-          })
-          logger.info(s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
-          networkController ! SendToNetwork(Message(PeersSpec, Right(correctPeers), None), SendToPeer(remote))
-          logger.debug(s"Send to ${remote.socketAddress} peers message which contains next peers: ${peers.mkString(",")}")
-        }
     case nonsense: Any => logger.warn(s"PeerSynchronizer: got something strange $nonsense")
   }
 }

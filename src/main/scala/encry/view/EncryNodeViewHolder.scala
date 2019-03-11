@@ -1,6 +1,9 @@
 package encry.view
 
 import java.io.File
+import HeaderProto.HeaderProtoMessage
+import PayloadProto.PayloadProtoMessage
+import TransactionProto.TransactionProtoMessage
 import akka.actor.{Actor, ActorRef, Props}
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
@@ -10,7 +13,7 @@ import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
 import encry.modifiers._
 import encry.modifiers.history._
-import encry.modifiers.mempool.{Transaction, TransactionSerializer}
+import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer, TransactionSerializer}
 import encry.modifiers.state.box.EncryProposition
 import encry.network.AuxiliaryHistoryHolder.{Append, ReportModifierInvalid, ReportModifierValid}
 import encry.network.DeliveryManager.FullBlockChainSynced
@@ -81,27 +84,40 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     nodeView.state.closeStorage()
   }
 
+
   override def receive: Receive = {
-    case ModifiersFromRemote(modifierTypeId, remoteObjects) =>
-      modifierSerializers.get(modifierTypeId).foreach { companion =>
-        remoteObjects.flatMap(r => companion.parseBytes(r).toOption).foreach {
-          case tx: Transaction@unchecked if tx.modifierTypeId == Transaction.ModifierTypeId => txModify(tx)
-          case pmod: EncryPersistentModifier@unchecked =>
+    case ModifiersFromRemote(modifierTypeId, modifiers) => modifierTypeId match {
+      case Payload.modifierTypeId => modifiers.foreach { bytes =>
+        Try(PayloadProtoSerializer.fromProto(PayloadProtoMessage.parseFrom(bytes)).foreach { payload =>
+          if (nodeView.history.contains(payload.id) || ModifiersCache.contains(key(payload.id)))
+            logger.warn(s"Received modifier ${payload.encodedId} that is already in history")
+          else ModifiersCache.put(key(payload.id), payload, nodeView.history)
+        })
+      }
+        logger.debug(s"Cache before(${ModifiersCache.size})")
+        computeApplications()
+        logger.debug(s"Cache after(${ModifiersCache.size})")
+      case Header.modifierTypeId =>
+        modifiers.foreach { bytes =>
+          Try(HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)).foreach { header =>
+            if (nodeView.history.contains(header.id) || ModifiersCache.contains(key(header.id)))
+              logger.warn(s"Received modifier ${header.encodedId} that is already in history")
+            else ModifiersCache.put(key(header.id), header, nodeView.history)
             if (settings.influxDB.isDefined && nodeView.history.isFullChainSynced) {
-              pmod match {
+              header match {
                 case h: Header => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - h.timestamp)
-                case b: Block => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - b.header.timestamp)
                 case _ =>
               }
             }
-            if (nodeView.history.contains(pmod.id) || ModifiersCache.contains(key(pmod.id)))
-              logger.warn(s"Received modifier ${pmod.encodedId} that is already in history")
-            else ModifiersCache.put(key(pmod.id), pmod, nodeView.history)
+          })
         }
         logger.debug(s"Cache before(${ModifiersCache.size})")
         computeApplications()
         logger.debug(s"Cache after(${ModifiersCache.size})")
+      case Transaction.ModifierTypeId => modifiers.foreach { bytes =>
+        Try(TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes)).foreach(tx => txModify(tx)))
       }
+    }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction]@unchecked => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier]@unchecked =>
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
@@ -298,7 +314,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
           s" to history caused $e")
         nodeViewSynchronizer ! SyntacticallyFailedModification(pmod, e)
     }
-  } else logger.warn(s"Trying to apply modifier ${pmod.encodedId} that's already in history")
+  } else logger.warn(s"Trying to apply modifier ${pmod.encodedId} that's already in history.")
 
   def txModify(tx: Transaction): Unit = nodeView.mempool.put(tx) match {
     case Success(newPool) =>

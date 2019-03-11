@@ -4,8 +4,8 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import benches.HistoryBenches.HistoryBenchState
 import benches.Utils.{generateHistory, generateNextBlockValidForHistory, getRandomTempDir}
-import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.history.Block
+import encry.modifiers.mempool.Transaction
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
 import encryBenchmark.Settings
@@ -72,7 +72,7 @@ object HistoryBenches {
           case ((prevHistory, prevBlock, vector), _) =>
             val block: Block =
               generateNextBlockValidForHistory(
-                prevHistory, 0, prevBlock, benchSettings.historyBenchSettings.transactionsNumber
+                prevHistory, 0, prevBlock,  Seq.empty[Transaction]
               )
             (prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block),
               Some(block), vector :+ block)

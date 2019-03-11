@@ -1,6 +1,8 @@
 package encry.modifiers.history
 
+import PayloadProto.PayloadProtoMessage
 import com.google.common.primitives.{Bytes, Ints}
+import com.google.protobuf.ByteString
 import encry.modifiers.mempool._
 import encry.modifiers.state.box.EncryProposition
 import encry.modifiers.{EncryPersistentModifier, ModifierWithDigest, TransactionsCarryingPersistentNodeViewModifier}
@@ -12,7 +14,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.LeafData
 import scorex.crypto.hash.Digest32
-import scala.util.Try
+import scala.util.{Success, Try}
 
 case class Payload(override val headerId: ModifierId, txs: Seq[Transaction])
   extends TransactionsCarryingPersistentNodeViewModifier[EncryProposition, Transaction]
@@ -20,6 +22,8 @@ case class Payload(override val headerId: ModifierId, txs: Seq[Transaction])
     with ModifierWithDigest {
 
   assert(txs.nonEmpty, "Block should contain at least 1 coinbase-like transaction")
+
+  def toProtoPayload: PayloadProtoMessage = PayloadProtoSerializer.toProto(this)
 
   override val modifierTypeId: ModifierTypeId = Payload.modifierTypeId
 
@@ -38,14 +42,14 @@ case class Payload(override val headerId: ModifierId, txs: Seq[Transaction])
 object Payload {
 
   implicit val jsonEncoder: Encoder[Payload] = (bp: Payload) => Map(
-    "headerId"     -> Algos.encode(bp.headerId).asJson,
-    "transactions" -> bp.txs.map(_.asJson).asJson
+    "headerId"      -> Algos.encode(bp.headerId).asJson,
+    "transactions"  -> bp.txs.map(_.asJson).asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[Payload] = (c: HCursor) => {
     for {
-      headerId     <- c.downField("headerId").as[String]
-      transactions <- c.downField("transactions").as[Seq[Transaction]]
+      headerId      <- c.downField("headerId").as[String]
+      transactions  <- c.downField("transactions").as[Seq[Transaction]]
     } yield Payload(
       ModifierId @@ Algos.decode(headerId).getOrElse(Array.emptyByteArray),
       transactions
@@ -55,6 +59,20 @@ object Payload {
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (102: Byte)
 
   def rootHash(ids: Seq[ModifierId]): Digest32 = Algos.merkleTreeRoot(LeafData !@@ ids)
+
+}
+
+object PayloadProtoSerializer {
+
+  def toProto(payload: Payload): PayloadProtoMessage = PayloadProtoMessage()
+    .withHeaderId(ByteString.copyFrom(payload.headerId))
+    .withTxs(payload.transactions.map(_.toTransactionProto))
+
+  def fromProto(payloadProtoMessage: PayloadProtoMessage): Try[Payload] = Try {
+    val transactions: Seq[Transaction] = payloadProtoMessage.txs.map(tx => TransactionProtoSerializer.fromProto(tx))
+        .collect { case Success(transaction) => transaction}
+    Payload(ModifierId @@ payloadProtoMessage.headerId.toByteArray, transactions)
+  }
 }
 
 object PayloadSerializer extends Serializer[Payload] {
@@ -63,8 +81,8 @@ object PayloadSerializer extends Serializer[Payload] {
     Bytes.concat(
       obj.headerId,
       Ints.toByteArray(obj.transactions.size),
-      obj.transactions.map(tx => ArrayUtils.addAll(Ints.toByteArray(tx.bytes.length),tx.bytes))
-        .foldLeft(Array.emptyByteArray){case (acc, txBytes) => ArrayUtils.addAll(acc, txBytes)}
+      obj.transactions.map(tx => ArrayUtils.addAll(Ints.toByteArray(tx.bytes.length), tx.bytes))
+        .foldLeft(Array.emptyByteArray) { case (acc, txBytes) => ArrayUtils.addAll(acc, txBytes) }
     )
 
   override def parseBytes(bytes: Array[Byte]): Try[Payload] = Try {

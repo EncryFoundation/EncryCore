@@ -1,0 +1,48 @@
+syntax = "proto3";
+import "scalapb/scalapb.proto";
+
+message TransactionProtoMessage {
+
+    message DirectiveProtoMessage {
+
+        message ADKeyProto {
+            bytes tokenIdOpt = 1;
+        }
+
+        message TransferDirectiveProtoMessage {
+            string address = 1;
+            uint64 amount = 2;
+            ADKeyProto tokenIdOpt = 3;
+        }
+
+        message AssetIssuingDirectiveProtoMessage {
+            bytes contractHash = 1;
+            uint64 amount = 2;
+        }
+
+        message ScriptedAssetDirectiveProtoMessage {
+
+            bytes contractHash = 1;
+            uint64 amount = 2;
+            ADKeyProto tokenIdOpt = 3;
+        }
+
+        message DataDirectiveProtoMessage {
+            bytes contractHash = 1;
+            bytes data = 2;
+        }
+
+        oneof directiveProto {
+            TransferDirectiveProtoMessage transferDirectiveProto = 1;
+            AssetIssuingDirectiveProtoMessage assetIssuingDirectiveProto = 2;
+            ScriptedAssetDirectiveProtoMessage scriptedAssetDirectiveProto = 3;
+            DataDirectiveProtoMessage dataDirectiveProto = 4;
+        }
+    }
+
+    uint64 fee = 1;
+    uint64 timestamp = 2;
+    repeated bytes inputs = 3 [(scalapb.field).collection_type = "scala.collection.immutable.IndexedSeq"];
+    repeated DirectiveProtoMessage directives = 4 [(scalapb.field).collection_type = "scala.collection.immutable.IndexedSeq"];
+    bytes proof = 5;
+}

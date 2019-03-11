@@ -1,6 +1,9 @@
 package encry.modifiers.mempool.directive
 
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage.{ADKeyProto, DirectiveProto, ScriptedAssetDirectiveProtoMessage, TransferDirectiveProtoMessage}
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.Box.Amount
@@ -17,6 +20,7 @@ import scorex.crypto.encode.Base16
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scorex.crypto.hash.Digest32
 import supertagged.@@
+
 import scala.util.Try
 
 case class TransferDirective(address: Address,
@@ -37,6 +41,8 @@ case class TransferDirective(address: Address,
 
   override def toDbVersion(txId: ModifierId, numberInTx: Int): DirectiveDBVersion =
     DirectiveDBVersion(Base16.encode(txId), numberInTx, typeId, isValid, "", amount, address, tokenIdOpt.map(Base16.encode), "")
+
+  override def toDirectiveProto: DirectiveProtoMessage = TransferDirectiveProtoSerializer.toProto(this)
 }
 
 object TransferDirective {
@@ -44,24 +50,47 @@ object TransferDirective {
   val TypeId: DTypeId = 1.toByte
 
   implicit val jsonEncoder: Encoder[TransferDirective] = (d: TransferDirective) => Map(
-    "typeId"  -> d.typeId.asJson,
+    "typeId" -> d.typeId.asJson,
     "address" -> d.address.toString.asJson,
-    "amount"  -> d.amount.asJson,
+    "amount" -> d.amount.asJson,
     "tokenId" -> d.tokenIdOpt.map(id => Algos.encode(id)).getOrElse("null").asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[TransferDirective] = (c: HCursor) => {
     for {
-      address    <- c.downField("address").as[String]
-      amount     <- c.downField("amount").as[Long]
+      address <- c.downField("address").as[String]
+      amount <- c.downField("amount").as[Long]
       tokenIdOpt <- c.downField("tokenId").as[Option[String]]
     } yield TransferDirective(
       address,
       amount,
       tokenIdOpt.flatMap(id => Algos.decode(id).map(ADKey @@ _).toOption)
     )
-
   }
+}
+
+object TransferDirectiveProtoSerializer extends ProtoDirectiveSerializer[TransferDirective] {
+
+  override def toProto(message: TransferDirective): DirectiveProtoMessage = {
+    val initialDirective: TransferDirectiveProtoMessage = TransferDirectiveProtoMessage()
+      .withAddress(message.address)
+      .withAmount(message.amount)
+    val transferDirective: TransferDirectiveProtoMessage = message.tokenIdOpt match {
+      case Some(value) => initialDirective.withTokenIdOpt(ADKeyProto().withTokenIdOpt(ByteString.copyFrom(value)))
+      case None => initialDirective
+    }
+    DirectiveProtoMessage().withTransferDirectiveProto(transferDirective)
+  }
+
+  override def fromProto(message: DirectiveProtoMessage): Option[TransferDirective] =
+    message.directiveProto.transferDirectiveProto match {
+      case Some(value) => Some(TransferDirective(
+        value.address,
+        value.amount,
+        value.tokenIdOpt.map(x => ADKey @@ x.tokenIdOpt.toByteArray))
+      )
+      case None => Option.empty[TransferDirective]
+    }
 }
 
 object TransferDirectiveSerializer extends Serializer[TransferDirective] {

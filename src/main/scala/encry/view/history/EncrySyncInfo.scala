@@ -6,7 +6,6 @@ import encry.EncryApp.settings
 import encry.consensus.History.ModifierIds
 import encry.modifiers.NodeViewModifier
 import encry.modifiers.history.Header
-import encry.network.message.SyncInfoMessageSpec
 import org.encryfoundation.common.serialization.Serializer
 
 import scala.util.Try
@@ -25,7 +24,7 @@ object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
   override def toBytes(obj: EncrySyncInfo): Array[Byte] = concatFixLengthBytes(obj.lastHeaderIds)
 
   def concatFixLengthBytes(seq: Traversable[Array[Byte]]): Array[Byte] = seq.headOption match {
-    case None       => Array[Byte]()
+    case None => Array[Byte]()
     case Some(head) => concatFixLengthBytes(seq, head.length)
   }
 
@@ -47,5 +46,3 @@ object EncrySyncInfoSerializer extends Serializer[EncrySyncInfo] {
     EncrySyncInfo(ids)
   }
 }
-
-object EncrySyncInfoMessageSpec extends SyncInfoMessageSpec[EncrySyncInfo](EncrySyncInfoSerializer.parseBytes)

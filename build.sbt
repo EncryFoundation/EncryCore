@@ -1,11 +1,14 @@
-import sbt._
+import sbt.Def
+import sbt.Keys.version
 
-lazy val settings = Seq(
+val settings: Seq[Def.Setting[String]] = Seq(
   name := "EncryCore",
   version := "0.9.3",
   organization := "org.encryfoundation",
   scalaVersion := "2.12.6"
 )
+
+val encry = (project in file(".")).settings(settings: _*)
 
 val akkaVersion = "2.5.13"
 val akkaHttpVersion = "10.0.9"
@@ -73,7 +76,7 @@ libraryDependencies ++= Seq(
   "commons-net" % "commons-net" % "3.6",
   "com.spotify" % "docker-client" % "8.11.0" % "test" classifier "shaded",
   "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.9.6",
-  "com.fasterxml.jackson.core"% "jackson-databind" % "2.9.6",
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.6",
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.6",
   "org.asynchttpclient" % "async-http-client" % "2.4.7",
   "com.spotify" % "docker-client" % "8.11.3",
@@ -83,7 +86,8 @@ libraryDependencies ++= Seq(
   "org.aspectj" % "aspectjweaver" % "1.9.2",
   "org.typelevel" % "cats-core_2.12" % "1.0.1",
   "org.typelevel" % "cats-kernel_2.12" % "1.0.1",
-  "org.typelevel" % "cats-macros_2.12" % "1.0.1"
+  "org.typelevel" % "cats-macros_2.12" % "1.0.1",
+  "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf"
 ) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
@@ -124,7 +128,7 @@ assemblyJarName in assembly := "EncryCore.jar"
 
 mainClass in assembly := Some("encry.EncryApp")
 
-test in assembly := { }
+test in assembly := {}
 
 assemblyMergeStrategy in assembly := {
   case "logback.xml" => MergeStrategy.first
@@ -151,8 +155,11 @@ sourceGenerators in Compile += Def.task {
   Seq(versionFile)
 }
 
-val encry = (project in file(".")).settings(settings: _*)
 lazy val it = project.dependsOn(encry)
 lazy val benchmarks = (project in file("benchmarks"))
   .dependsOn(encry % "compile->compile;test->test")
   .enablePlugins(JmhPlugin)
+
+PB.targets in Compile := Seq(
+  scalapb.gen() -> (sourceManaged in Compile).value / "protobuf"
+)

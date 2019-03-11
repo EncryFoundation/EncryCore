@@ -1,12 +1,12 @@
 package encry.modifiers.mempool
 
+import TransactionProto.TransactionProtoMessage
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.modifiers.NodeViewModifier
-import encry.modifiers.mempool.directive.{Directive, DirectiveSerializer}
+import encry.modifiers.mempool.directive._
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, DataBox}
 import encry.modifiers.state.box.EncryBaseBox
-import encry.EncryApp.timeProvider
 import io.circe.{Decoder, HCursor}
 import io.circe.syntax._
 import org.encryfoundation.common.transaction._
@@ -19,14 +19,13 @@ import org.encryfoundation.common.transaction.{Input, Proof}
 import org.encryfoundation.prismlang.core.PConvertible
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
-
 import scala.util.{Success, Try}
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
+import com.google.protobuf.ByteString
 import encry.modifiers.history.Block
 import encry.modifiers.history.Block.Timestamp
 import encry.validation.{ModifierValidator, ValidationResult}
-import encry.view.state.UtxoState
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
@@ -42,6 +41,8 @@ case class Transaction(fee: Amount,
   override type M = Transaction
 
   override def serializer: Serializer[Transaction] = TransactionSerializer
+
+  def toTransactionProto: TransactionProtoMessage = TransactionProtoSerializer.toProto(this)
 
   val messageToSign: Array[Byte] = UnsignedTransaction.bytesToSign(fee, timestamp, inputs, directives)
 
@@ -68,8 +69,8 @@ case class Transaction(fee: Amount,
   val tpe: Types.Product = Types.EncryTransaction
 
   def asVal: PValue = PValue(PObject(Map(
-    "inputs" -> PValue(inputs.map(_.boxId.toList), Types.PCollection(Types.PCollection.ofByte)),
-    "outputs" -> PValue(newBoxes.map(_.asPrism), Types.PCollection(Types.EncryBox)),
+    "inputs"        -> PValue(inputs.map(_.boxId.toList), Types.PCollection(Types.PCollection.ofByte)),
+    "outputs"       -> PValue(newBoxes.map(_.asPrism), Types.PCollection(Types.EncryBox)),
     "messageToSign" -> PValue(messageToSign, Types.PCollection.ofByte)
   ), tpe), tpe)
 }
@@ -105,6 +106,36 @@ object Transaction {
       defaultProofOpt
     )
   }
+}
+
+trait ProtoTransactionSerializer[T] {
+
+  def toProto(message: T): TransactionProtoMessage
+
+  def fromProto(message: TransactionProtoMessage): Try[T]
+}
+
+object TransactionProtoSerializer extends ProtoTransactionSerializer[Transaction] {
+
+  override def toProto(message: Transaction): TransactionProtoMessage = {
+    val initialTx: TransactionProtoMessage = TransactionProtoMessage()
+      .withFee(message.fee)
+      .withTimestamp(message.timestamp)
+      .withInputs(message.inputs.map(input => ByteString.copyFrom(input.bytes)).to[scala.collection.immutable.IndexedSeq])
+      .withDirectives(message.directives.map(_.toDirectiveProto).to[scala.collection.immutable.IndexedSeq])
+    message.defaultProofOpt match {
+      case Some(value) => initialTx.withProof(ByteString.copyFrom(value.bytes))
+      case None => initialTx
+    }
+  }
+
+  override def fromProto(message: TransactionProtoMessage): Try[Transaction] = Try(Transaction(
+    message.fee,
+    message.timestamp,
+    message.inputs.map(element => InputSerializer.parseBytes(element.toByteArray).get),
+    message.directives.map(directive => DirectiveProtoSerializer.fromProto(directive).get),
+    ProofSerializer.parseBytes(message.proof.toByteArray).toOption
+  ))
 }
 
 object TransactionSerializer extends Serializer[Transaction] {
@@ -214,10 +245,10 @@ case class InputDBVersion(id: String, txId: String, contractByteVersion: String,
     for {
       decodedId <- Base16.decode(id)
       decodedContractBytes <- Base16.decode(contractByteVersion)
-      decodedContract      <- InputSerializer.decodeEitherCompiledOrRegular(decodedContractBytes)
-      decodedBase16Proofs  <- if (proofs.length != 0) proofs.split(",").toList.traverse(Base16.decode)
-                              else Success(List.empty)
-      decodedProofs        <- decodedBase16Proofs.traverse(ProofSerializer.parseBytes)
+      decodedContract <- InputSerializer.decodeEitherCompiledOrRegular(decodedContractBytes)
+      decodedBase16Proofs <- if (proofs.length != 0) proofs.split(",").toList.traverse(Base16.decode)
+      else Success(List.empty)
+      decodedProofs <- decodedBase16Proofs.traverse(ProofSerializer.parseBytes)
     } yield {
       Input(ADKey @@ decodedId, decodedContract, decodedProofs)
     }

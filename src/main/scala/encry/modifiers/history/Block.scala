@@ -1,5 +1,6 @@
 package encry.modifiers.history
 
+import BlockProto.BlockProtoMessage
 import com.google.common.primitives.{Bytes, Ints}
 import encry.modifiers.mempool.Transaction
 import encry.modifiers.mempool.directive.TransferDirective
@@ -41,16 +42,16 @@ case class Block(header: Header,
   override def serializer: Serializer[Block] = BlockSerializer
 
   def dataString: String = {
-    val encodedId: String = Base16.encode(id)
-    val encodedParentId: String = Base16.encode(parentId)
-    val proofsRoot: String = Base16.encode(header.adProofsRoot)
-    val stateRoot: String = Base16.encode(header.stateRoot)
+    val encodedId: String        = Base16.encode(id)
+    val encodedParentId: String  = Base16.encode(parentId)
+    val proofsRoot: String       = Base16.encode(header.adProofsRoot)
+    val stateRoot: String        = Base16.encode(header.stateRoot)
     val transactionsRoot: String = Base16.encode(header.transactionsRoot)
-    val proofs: String = adProofsOpt.map(p => Base16.encode(p.bytes)).getOrElse("")
-    val solution: String = header.equihashSolution.ints.mkString("{", ", ", "}")
+    val proofs: String           = adProofsOpt.map(p => Base16.encode(p.bytes)).getOrElse("")
+    val solution: String         = header.equihashSolution.ints.mkString("{", ", ", "}")
     val (minerAddress: String, minerReward: Long) = minerInfo(payload.transactions.last)
-    val feesTotal: Long = payload.transactions.map(_.fee).sum
-    val txsSize: Int = payload.transactions.map(_.bytes.length).sum
+    val feesTotal: Long          = payload.transactions.map(_.fee).sum
+    val txsSize: Int             = payload.transactions.map(_.bytes.length).sum
 
     s"('$encodedId', '$encodedParentId', '${header.version}', '${header.height}', '$proofsRoot', '$stateRoot', " +
       s"'$transactionsRoot', '${header.timestamp}', '${header.difficulty}', '${bytes.length}', '$solution', '$proofs', " +
@@ -65,20 +66,21 @@ case class Block(header: Header,
   override def toString: String = s"<Block height=${header.height} timestamp=${header.timestamp} " +
     s"txQty=${payload.transactions.size} id=${header.encodedId}>"
 
+  def toProtoBlock: BlockProtoMessage = BlockProtoSerializer.toProto(this)
 }
 
 object Block {
 
   type Timestamp = Long
-  type Version = Byte
-  type Height = Int
+  type Version   = Byte
+  type Height    = Int
 
   val modifierTypeId: ModifierTypeId = ModifierTypeId @@ (100: Byte)
 
   implicit val jsonEncoder: Encoder[Block] = (b: Block) => Map(
-    "header"   -> b.header.asJson,
-    "payload"  -> b.payload.asJson,
-    "adProofs" -> b.adProofsOpt.map(_.asJson).getOrElse(Map.empty[String, String].asJson)
+    "header"    -> b.header.asJson,
+    "payload"   -> b.payload.asJson,
+    "adProofs"  -> b.adProofsOpt.map(_.asJson).getOrElse(Map.empty[String, String].asJson)
   ).asJson
 
   implicit val jsonDecoder: Decoder[Block] = (c: HCursor) => {
@@ -91,6 +93,25 @@ object Block {
       None
     )
   }
+}
+
+object BlockProtoSerializer {
+
+  def toProto(block: Block): BlockProtoMessage = {
+    val initialBlock = BlockProtoMessage()
+      .withHeader(block.header.toHeaderProto)
+      .withPayload(block.payload.toProtoPayload)
+    block.adProofsOpt match {
+      case Some(value) => initialBlock.withAdProofsOpt(value.toProtoADProofs)
+      case _ => initialBlock
+    }
+  }
+
+  def fromProto(message: BlockProtoMessage): Try[Block] = Try(Block(
+    message.header.map(x => HeaderProtoSerializer.fromProto(x)).get.get,
+    message.payload.map(x => PayloadProtoSerializer.fromProto(x)).get.get,
+    message.adProofsOpt.map(x => ADProofsProtoSerializer.fromProto(x))
+  ))
 }
 
 object BlockSerializer extends Serializer[Block] {

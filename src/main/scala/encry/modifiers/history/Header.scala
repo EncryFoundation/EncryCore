@@ -1,7 +1,9 @@
 package encry.modifiers.history
 
+import HeaderProto.HeaderProtoMessage
 import cats.implicits._
 import com.google.common.primitives.{Ints, _}
+import com.google.protobuf.ByteString
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.crypto.equihash.{Equihash, EquihashSolution, EquihashSolutionsSerializer}
 import encry.modifiers.history.Block.{Height, Timestamp, Version}
@@ -37,6 +39,8 @@ case class Header(version: Version,
 
   override val modifierTypeId: ModifierTypeId = Header.modifierTypeId
 
+  def toHeaderProto: HeaderProtoMessage = HeaderProtoSerializer.toProto(this)
+
   lazy val powHash: Digest32 = getPowHash(this)
 
   lazy val requiredDifficulty: Difficulty = difficulty
@@ -60,7 +64,10 @@ case class Header(version: Version,
 
   override def serializer: Serializer[M] = HeaderSerializer
 
-  override def toString: String = s"Header(id=$encodedId, height=$height, parent=${Algos.encode(parentId)})"
+  override def toString: String = s"Header(id=$encodedId, height=$height, parent=${Algos.encode(parentId)}, " +
+    s"version = $version, adProofsRoot = ${Algos.encode(adProofsRoot)}, stateRoot = ${Algos.encode(stateRoot)}, " +
+    s" transactionsRoot = ${Algos.encode(transactionsRoot)}, timestamp = $timestamp, nonce = $nonce, " +
+    s"difficulty = $difficulty)"
 }
 
 case class HeaderDBVersion(id: String,
@@ -225,6 +232,37 @@ object Header {
 
     Digest32 @@ result
   }
+}
+
+object HeaderProtoSerializer {
+
+  //TODO check big int difficulty
+  def toProto(header: Header): HeaderProtoMessage = HeaderProtoMessage()
+    .withVersion(ByteString.copyFrom(Array(header.version)))
+    .withParentId(ByteString.copyFrom(header.parentId))
+    .withAdProofsRoot(ByteString.copyFrom(header.adProofsRoot))
+    .withStateRoot(ByteString.copyFrom(header.stateRoot))
+    .withTransactionsRoot(ByteString.copyFrom(header.transactionsRoot))
+    .withTimestamp(header.timestamp)
+    .withHeight(header.height)
+    .withNonce(header.nonce)
+    .withDifficulty(header.difficulty.toLong)
+    .withInts(header.equihashSolution.ints)
+
+  def fromProto(headerProtoMessage: HeaderProtoMessage): Try[Header] = Try(
+    Header(
+      headerProtoMessage.version.toByteArray.head,
+      ModifierId @@ headerProtoMessage.parentId.toByteArray,
+      Digest32 @@ headerProtoMessage.adProofsRoot.toByteArray,
+      ADDigest @@ headerProtoMessage.stateRoot.toByteArray,
+      Digest32 @@ headerProtoMessage.transactionsRoot.toByteArray,
+      headerProtoMessage.timestamp,
+      headerProtoMessage.height,
+      headerProtoMessage.nonce,
+      Difficulty @@ BigInt(headerProtoMessage.difficulty),
+      EquihashSolution(headerProtoMessage.ints)
+    )
+  )
 }
 
 object HeaderSerializer extends Serializer[Header] {

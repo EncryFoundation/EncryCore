@@ -9,6 +9,7 @@ import benches.Utils._
 import encry.modifiers.state.box.AssetBox
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
+import encry.storage.VersionalStorage.IODB
 import encry.view.state.{BoxHolder, UtxoState}
 import encryBenchmark.Settings
 import org.openjdk.jmh.infra.Blackhole
@@ -34,7 +35,7 @@ class StateBenches {
   def readStateFileBench(stateBench: StateBenchState, bh: Blackhole): Unit = {
     bh.consume {
       val localState: UtxoState =
-        utxoFromBoxHolder(stateBench.boxesHolder, stateBench.tmpDir, None, stateBench.settings)
+        utxoFromBoxHolder(stateBench.boxesHolder, stateBench.tmpDir, None, stateBench.settings, IODB)
       localState.closeStorage()
     }
   }

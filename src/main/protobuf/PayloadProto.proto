@@ -1,0 +1,7 @@
+syntax = "proto3";
+import "TransactionProto.proto";
+
+message PayloadProtoMessage {
+    bytes headerId = 1;
+    repeated TransactionProtoMessage txs = 2;
+}

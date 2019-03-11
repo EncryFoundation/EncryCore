@@ -1,6 +1,7 @@
 package encry.network.PriorityTests
 
 import java.net.InetSocketAddress
+
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.pattern.ask
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
@@ -9,13 +10,13 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.HistoryComparisonResult
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.Block
+import encry.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage}
 import encry.network.DeliveryManager.GetStatusTrackerPeer
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.HandshakedPeer
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
-import encry.network.message.ModifiersSpec
-import encry.network.{DeliveryManager, Handshake, Version}
+import encry.network.DeliveryManager
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.utils.{CoreTaggedTypes, EncryGenerator}
@@ -23,6 +24,7 @@ import encry.view.EncryNodeViewHolder.DownloadRequest
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import supertagged.@@
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
@@ -66,9 +68,7 @@ class LowPriorityTest extends TestKit(ActorSystem("MySpecN"))
 
     val cP: ConnectedPeer =
       ConnectedPeer(newPeer, dm, Incoming,
-        Handshake(Version(1.toByte, 2.toByte, 3.toByte),
-          "peer", Some(newPeer), System.currentTimeMillis())
-      )
+        Handshake(protocolToBytes(settings.network.appVersion), "peer3", Some(newPeer), System.currentTimeMillis()))
 
     dm ! HandshakedPeer(cP)
 
@@ -81,7 +81,7 @@ class LowPriorityTest extends TestKit(ActorSystem("MySpecN"))
       Some(currBlock.header.id)
     }
 
-    dm ! DataFromPeer(ModifiersSpec, message, cP)
+    dm ! DataFromPeer(ModifiersNetworkMessage(message), cP)
 
     Thread.sleep(10000)
 

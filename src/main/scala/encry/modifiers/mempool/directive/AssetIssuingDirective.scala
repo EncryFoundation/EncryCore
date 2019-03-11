@@ -1,6 +1,10 @@
 package encry.modifiers.mempool.directive
 
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage.{AssetIssuingDirectiveProtoMessage, DirectiveProto}
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage.DirectiveProto.AssetIssuingDirectiveProto
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.Box.Amount
@@ -14,6 +18,7 @@ import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
+
 import scala.util.Try
 
 case class AssetIssuingDirective(contractHash: ContractHash, amount: Amount) extends Directive {
@@ -34,6 +39,8 @@ case class AssetIssuingDirective(contractHash: ContractHash, amount: Amount) ext
 
   override def toDbVersion(txId: ModifierId, numberInTx: Int): DirectiveDBVersion =
     DirectiveDBVersion(Base16.encode(txId), numberInTx, typeId, isValid, Base16.encode(contractHash), amount, "", None, "")
+
+  override def toDirectiveProto: DirectiveProtoMessage = AssetIssuingDirectiveProtoSerializer.toProto(this)
 }
 
 object AssetIssuingDirective {
@@ -41,19 +48,34 @@ object AssetIssuingDirective {
   val TypeId: DTypeId = 2.toByte
 
   implicit val jsonEncoder: Encoder[AssetIssuingDirective] = (d: AssetIssuingDirective) => Map(
-    "typeId"       -> d.typeId.asJson,
+    "typeId" -> d.typeId.asJson,
     "contractHash" -> Algos.encode(d.contractHash).asJson,
-    "amount"       -> d.amount.asJson
+    "amount" -> d.amount.asJson
   ).asJson
 
   implicit val jsonDecoder: Decoder[AssetIssuingDirective] = (c: HCursor) => {
     for {
       contractHash <- c.downField("contractHash").as[String]
-      amount       <- c.downField("amount").as[Long]
+      amount <- c.downField("amount").as[Long]
     } yield Algos.decode(contractHash)
       .map(ch => AssetIssuingDirective(ch, amount))
       .getOrElse(throw new Exception("Decoding failed"))
   }
+}
+
+object AssetIssuingDirectiveProtoSerializer extends ProtoDirectiveSerializer[AssetIssuingDirective] {
+
+  override def toProto(message: AssetIssuingDirective): DirectiveProtoMessage =
+    DirectiveProtoMessage().withAssetIssuingDirectiveProto(AssetIssuingDirectiveProtoMessage()
+      .withAmount(message.amount)
+      .withContractHash(ByteString.copyFrom(message.contractHash))
+    )
+
+  override def fromProto(message: DirectiveProtoMessage): Option[AssetIssuingDirective] =
+    message.directiveProto.assetIssuingDirectiveProto match {
+      case Some(value) => Some(AssetIssuingDirective(value.contractHash.toByteArray, value.amount))
+      case None => Option.empty[AssetIssuingDirective]
+    }
 }
 
 object AssetIssuingDirectiveSerializer extends Serializer[AssetIssuingDirective] {

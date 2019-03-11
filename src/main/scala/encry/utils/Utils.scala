@@ -2,7 +2,7 @@ package encry.utils
 
 import com.google.common.primitives.Longs
 import CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.network.message.BasicMsgDataTypes.InvData
+import encry.network.BasicMessagesRepo.BasicMsgDataTypes.InvData
 import org.encryfoundation.common.Algos
 
 object Utils {

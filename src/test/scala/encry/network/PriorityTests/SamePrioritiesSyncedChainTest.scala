@@ -1,6 +1,7 @@
 package encry.network.PriorityTests
 
 import java.net.InetSocketAddress
+
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.pattern.ask
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
@@ -9,13 +10,13 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.HistoryComparisonResult
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.Block
+import encry.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage}
 import encry.network.DeliveryManager.{FullBlockChainSynced, GetStatusTrackerPeer}
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.HandshakedPeer
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
-import encry.network.message.ModifiersSpec
-import encry.network.{DeliveryManager, Handshake, Version}
+import encry.network.DeliveryManager
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.utils.{CoreTaggedTypes, EncryGenerator}
@@ -23,6 +24,7 @@ import encry.view.EncryNodeViewHolder.DownloadRequest
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import supertagged.@@
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
@@ -70,21 +72,15 @@ class SamePrioritiesSyncedChainTest extends TestKit(ActorSystem("MySpecN"))
 
     val cP1: ConnectedPeer =
       ConnectedPeer(newPeer1, dm, Incoming,
-        Handshake(Version(1.toByte, 2.toByte, 3.toByte),
-          "peer1", Some(newPeer1), System.currentTimeMillis())
-      )
+        Handshake(protocolToBytes(settings.network.appVersion), "peer1", Some(newPeer1), System.currentTimeMillis()))
 
     val cP2: ConnectedPeer =
       ConnectedPeer(newPeer2, dm, Incoming,
-        Handshake(Version(1.toByte, 2.toByte, 3.toByte),
-          "peer2", Some(newPeer2), System.currentTimeMillis())
-      )
+        Handshake(protocolToBytes(settings.network.appVersion), "peer2", Some(newPeer2), System.currentTimeMillis()))
 
     val cP3: ConnectedPeer =
       ConnectedPeer(newPeer3, dm, Incoming,
-        Handshake(Version(1.toByte, 2.toByte, 3.toByte),
-          "peer3", Some(newPeer3), System.currentTimeMillis())
-      )
+        Handshake(protocolToBytes(settings.network.appVersion), "peer3", Some(newPeer3), System.currentTimeMillis()))
 
     dm ! HandshakedPeer(cP1)
     dm ! HandshakedPeer(cP2)
@@ -97,9 +93,9 @@ class SamePrioritiesSyncedChainTest extends TestKit(ActorSystem("MySpecN"))
     val message: (Byte @@ CoreTaggedTypes.ModifierTypeId.Tag, Map[ModifierId, Array[Byte]]) =
       ModifierTypeId @@ (101: Byte) -> coll
 
-    dm ! DataFromPeer(ModifiersSpec, message, cP1)
-    dm ! DataFromPeer(ModifiersSpec, message, cP2)
-    dm ! DataFromPeer(ModifiersSpec, message, cP3)
+    dm ! DataFromPeer(ModifiersNetworkMessage(message), cP1)
+    dm ! DataFromPeer(ModifiersNetworkMessage(message), cP2)
+    dm ! DataFromPeer(ModifiersNetworkMessage(message), cP3)
 
     Thread.sleep(15000)
 

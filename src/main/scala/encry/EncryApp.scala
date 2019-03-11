@@ -16,7 +16,6 @@ import encry.local.explorer.BlockListener
 import encry.local.explorer.database.DBService
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
-import encry.network.message._
 import encry.network.{PeerManager, _}
 import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, StatsSender, Zombie}
@@ -44,17 +43,6 @@ object EncryApp extends App with StrictLogging {
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
   val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName
     .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)).take(5)
-  lazy val basicSpecs = {
-    val invSpec = new InvSpec(settings.network.maxInvObjects)
-    val requestModifierSpec = new RequestModifierSpec(settings.network.maxInvObjects)
-    Seq(
-      GetPeersSpec,
-      PeersSpec,
-      invSpec,
-      requestModifierSpec,
-      ModifiersSpec
-    )
-  }
   val influxRef: Option[ActorRef] =
     if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender], "statsSender"))
     else None

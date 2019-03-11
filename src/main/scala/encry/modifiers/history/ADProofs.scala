@@ -1,6 +1,8 @@
 package encry.modifiers.history
 
+import BlockProto.BlockProtoMessage.AdProofsProtoMessage
 import com.google.common.primitives.Bytes
+import com.google.protobuf.ByteString
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.avltree.{BatchAVLVerifier, Insert, Modification, Remove}
 import encry.modifiers.state.box._
@@ -26,6 +28,8 @@ case class ADProofs(headerId: ModifierId, proofBytes: SerializedAdProof)
   override lazy val serializer: Serializer[ADProofs] = ADProofSerializer
 
   override def toString: String = s"ADProofs(${Algos.encode(id)},${Algos.encode(headerId)},${Algos.encode(proofBytes)})"
+
+  def toProtoADProofs: AdProofsProtoMessage = ADProofsProtoSerializer.toProto(this)
 
   /**
     * Verify a set of box(outputs) operations on authenticated UTXO set by using the proof (this class wraps).
@@ -91,6 +95,7 @@ object ADProofs {
 
   /**
     * Convert operation over a box into an AVL+ tree modification
+    *
     * @param op - operation over a box
     * @return AVL+ tree modification
     */
@@ -102,6 +107,19 @@ object ADProofs {
       }
       case Removal(id) => Remove(id)
     }
+}
+
+object ADProofsProtoSerializer {
+
+  def toProto(adProofs: ADProofs): AdProofsProtoMessage = AdProofsProtoMessage()
+    .withHeaderId(ByteString.copyFrom(adProofs.headerId))
+    .withProofBytes(ByteString.copyFrom(adProofs.proofBytes))
+
+
+  def fromProto(message: AdProofsProtoMessage): ADProofs = ADProofs(
+    ModifierId @@ message.headerId.toByteArray,
+    SerializedAdProof @@ message.proofBytes.toByteArray
+  )
 }
 
 object ADProofSerializer extends Serializer[ADProofs] {

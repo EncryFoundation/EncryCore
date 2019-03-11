@@ -9,9 +9,6 @@ import org.encryfoundation.common.Algos
 import org.iq80.leveldb.{DB, ReadOptions}
 import supertagged.TaggedType
 
-import scala.annotation.tailrec
-import scala.collection.immutable
-
 case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLogging with AutoCloseable {
 
   def versionsList(readOptions: ReadOptions = new ReadOptions()): List[LevelDBVersion] =

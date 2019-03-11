@@ -9,25 +9,22 @@ import akka.pattern.ask
 import encry.EncryApp._
 import encry.network.NetworkController.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
-import encry.network.message.Message.MessageCode
-import encry.network.message.{Message, MessageHandler}
 import PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import com.typesafe.scalalogging.StrictLogging
 import encry.cli.commands.AddPeer.PeerFromCli
+import BasicMessagesRepo._
 import encry.settings.NetworkSettings
-import encry.view.history.EncrySyncInfoMessageSpec
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 class NetworkController extends Actor with StrictLogging {
 
   val networkSettings: NetworkSettings = settings.network
   val peerSynchronizer: ActorRef =
     context.actorOf(Props[PeerSynchronizer].withDispatcher("network-dispatcher"), "peerSynchronizer")
-  val messagesHandler: MessageHandler = MessageHandler(basicSpecs ++ Seq(EncrySyncInfoMessageSpec))
-  var messageHandlers: Map[Seq[MessageCode], ActorRef] = Map.empty
+  var messagesHandlers: Map[Seq[Byte], ActorRef] = Map.empty
   var outgoing: Set[InetSocketAddress] = Set.empty
   lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse None
   var knownPeersCollection: Set[InetSocketAddress] = settings.network.knownPeers.toSet
@@ -58,16 +55,23 @@ class NetworkController extends Actor with StrictLogging {
       context stop self
   }
 
+  private def findHandler(message: NetworkMessage,
+                          messageId: Byte,
+                          remote: ConnectedPeer,
+                          mH: Map[Seq[Byte], ActorRef]): Unit =
+    mH.find(_._1.contains(messageId)).map(_._2) match {
+      case Some(handler) =>
+        handler ! DataFromPeer(message, remote)
+        logger.debug(s"Send message DataFromPeer with ${message.messageName} to $handler.")
+      case None => logger.error("No handlers found for message: " + message.messageName)
+    }
+
   def businessLogic: Receive = {
-    case Message(spec, Left(msgBytes), Some(remote)) =>
-      spec.parseBytes(msgBytes) match {
-        case Success(content) =>
-          messageHandlers.find(_._1.contains(spec.messageCode)).map(_._2) match {
-            case Some(handler) => handler ! DataFromPeer(spec, content, remote)
-            case None => logger.error("No handlers found for message: " + spec.messageCode)
-          }
-        case Failure(e) => logger.error(s"Failed to deserialize data: $e")
-      }
+    case MessageFromNetwork(message, Some(remote)) if message.isValid(settings) =>
+      logger.info(s"Got ${message.messageName} on the NetworkController.")
+      findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
+    case MessageFromNetwork(message, Some(remote)) =>
+      logger.info(s"Invalid message type: ${message.messageName} from remote $remote")
     case SendToNetwork(message, sendingStrategy) =>
       (peerManager ? FilterPeers(sendingStrategy)) (5 seconds)
         .map(_.asInstanceOf[Seq[ConnectedPeer]])
@@ -95,7 +99,7 @@ class NetworkController extends Actor with StrictLogging {
         case Outgoing => s"New outgoing connection to $remote established (bound to local $local)"
       }
       logger.info(logMsg)
-      context.actorOf(PeerConnectionHandler.props(messagesHandler, sender(), direction, externalSocketAddress, remote)
+      context.actorOf(PeerConnectionHandler.props(sender(), direction, externalSocketAddress, remote)
         .withDispatcher("network-dispatcher"))
       outgoing -= remote
     case Connected(remote, _) =>
@@ -108,9 +112,9 @@ class NetworkController extends Actor with StrictLogging {
   }
 
   override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse {
-    case RegisterMessagesHandler(specs, handler) =>
-      logger.info(s"Registering handlers for ${specs.map(s => s.messageCode -> s.messageName)}")
-      messageHandlers += specs.map(_.messageCode) -> handler
+    case RegisterMessagesHandler(ids, handler) =>
+      logger.info(s"Registering handlers for ${ids.mkString(",")}.")
+      messagesHandlers += (ids -> handler)
     case CommandFailed(cmd: Tcp.Command) =>
       context.actorSelection("/user/statsSender") ! "Failed to execute command : " + cmd
     case nonsense: Any => logger.warn(s"NetworkController: got something strange $nonsense")
@@ -121,15 +125,14 @@ object NetworkController {
 
   object ReceivableMessages {
 
-    import encry.network.message.MessageSpec
-    import scala.reflect.runtime.universe.TypeTag
+    case class DataFromPeer(message: NetworkMessage, source: ConnectedPeer)
 
-    case class DataFromPeer[DT: TypeTag](spec: MessageSpec[DT], data: DT, source: ConnectedPeer)
+    case class RegisterMessagesHandler(ids: Seq[Byte], handler: ActorRef)
 
-    case class RegisterMessagesHandler(specs: Seq[MessageSpec[_]], handler: ActorRef)
-
-    case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)
+    case class SendToNetwork(message: NetworkMessage, sendingStrategy: SendingStrategy)
 
     case class ConnectTo(address: InetSocketAddress)
+
   }
+
 }

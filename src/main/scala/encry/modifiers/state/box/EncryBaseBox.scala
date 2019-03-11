@@ -1,5 +1,6 @@
 package encry.modifiers.state.box
 
+import BoxesProto.BoxProtoMessage
 import com.google.common.primitives.Longs
 import encry.modifiers.state.box.EncryBox.BxTypeId
 import io.circe.{Decoder, DecodingFailure, Encoder}
@@ -8,11 +9,15 @@ import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.encryfoundation.prismlang.core.wrapped.{PObject, PValue}
 import org.encryfoundation.prismlang.core.{PConvertible, Types}
 
+import scala.util.Try
+
 trait EncryBaseBox extends Box[EncryProposition] with PConvertible {
 
   val typeId: BxTypeId
 
   val nonce: Long
+
+  def serializeToProto: BoxProtoMessage
 
   override lazy val id: ADKey = ADKey @@ Algos.hash(Longs.toByteArray(nonce)).updated(0, typeId)
 
@@ -29,6 +34,13 @@ trait EncryBaseBox extends Box[EncryProposition] with PConvertible {
   )
 
   def asPrism: PObject = PObject(baseFields, tpe)
+}
+
+trait BaseBoxProtoSerialize[T] {
+
+  def toProto(t: T): BoxProtoMessage
+
+  def fromProto(b: Array[Byte]): Try[T]
 }
 
 object EncryBaseBox {

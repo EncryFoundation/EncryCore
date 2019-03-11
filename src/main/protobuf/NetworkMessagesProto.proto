@@ -1,0 +1,55 @@
+syntax = "proto3";
+import "SyntaxMessageProto.proto";
+
+message GeneralizedNetworkProtoMessage {
+
+    message SyncInfoProtoMessage {
+        repeated bytes lastHeaderIds = 1;
+    }
+
+    message InvProtoMessage {
+        bytes modifierTypeId = 1;
+        repeated bytes modifiers = 2;
+    }
+
+    message RequestModifiersProtoMessage {
+        bytes modifierTypeId = 1;
+        repeated bytes modifiers = 2;
+    }
+
+    message ModifiersProtoMessage {
+
+        message MapFieldEntry {
+            bytes key = 1;
+            bytes value = 2;
+        }
+
+        bytes modifierTypeId = 1;
+        repeated MapFieldEntry map = 2;
+    }
+
+    message GetPeersProtoMessage { }
+
+    message PeersProtoMessage {
+        repeated InetSocketAddressProtoMessage peers = 1;
+    }
+
+    message HandshakeProtoMessage {
+        bytes protocolVersion = 1;
+        string nodeName = 2;
+        InetSocketAddressProtoMessage declaredAddress = 3;
+        uint64 time = 4;
+    }
+
+    bytes magic = 1;
+    bytes checksum = 2;
+    oneof innerMessage {
+        SyncInfoProtoMessage syncInfoProtoMessage = 3;
+        InvProtoMessage invProtoMessage = 4;
+        RequestModifiersProtoMessage requestModifiersProtoMessage = 5;
+        ModifiersProtoMessage modifiersProtoMessage = 6;
+        GetPeersProtoMessage getPeersProtoMessage = 7;
+        PeersProtoMessage peersProtoMessage = 8;
+        HandshakeProtoMessage handshakeProtoMessage = 9;
+    }
+}
