@@ -2,7 +2,6 @@ package encry.it.api
 
 import java.io.IOException
 import java.util.concurrent.TimeoutException
-
 import encry.it.util.GlobalTimer._
 import encry.modifiers.history.{Block, Header}
 import encry.modifiers.mempool.Transaction
@@ -15,19 +14,6 @@ import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import org.slf4j.{Logger, LoggerFactory}
-
-import scala.compat.java8.FutureConverters._
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.concurrent.duration.{FiniteDuration, _}
-import io.circe.parser.parse
-import io.circe.syntax._
-import io.circe.{Decoder, Encoder, Json}
-import org.asynchttpclient.Dsl.{get => _get, post => _post}
-import org.asynchttpclient._
-import org.asynchttpclient.util.HttpConstants
-import org.slf4j.{Logger, LoggerFactory}
-
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
