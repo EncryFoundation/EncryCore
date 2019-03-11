@@ -2,6 +2,7 @@ package encry.it.api
 
 import java.io.IOException
 import java.util.concurrent.TimeoutException
+
 import encry.it.util.GlobalTimer._
 import encry.modifiers.history.{Block, Header}
 import encry.modifiers.mempool.Transaction
@@ -14,6 +15,7 @@ import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import org.slf4j.{Logger, LoggerFactory}
+
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -25,10 +27,12 @@ import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import org.slf4j.{Logger, LoggerFactory}
+
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{FiniteDuration, _}
+import scala.util.{Failure, Success, Try}
 
 trait HttpApi { // scalastyle:ignore
 
@@ -88,8 +92,10 @@ trait HttpApi { // scalastyle:ignore
     val eitherHeight = response.hcursor.downField("fullHeight").as[Option[String]]
     eitherHeight.fold[Future[Int]](
       e => Future.failed(new Exception(s"Error getting `fullHeight` from /info response: $e\n$response", e)),
-      maybeHeight => Future.successful(maybeHeight.map(_.toInt).getOrElse(0))
-    )
+      maybeHeight => Future.successful(Try(maybeHeight.map(_.toInt)) match {
+        case Success(value) => value.getOrElse(0)
+        case Failure(_) => 0
+      }))
   }
 
   def headersHeight: Future[Int] = get("/info") flatMap { r =>
@@ -97,7 +103,10 @@ trait HttpApi { // scalastyle:ignore
     val eitherHeight = response.hcursor.downField("headersHeight").as[Option[String]]
     eitherHeight.fold[Future[Int]](
       e => Future.failed(new Exception(s"Error getting `headersHeight` from /info response: $e\n$response", e)),
-      maybeHeight => Future.successful(maybeHeight.map(_.toInt).getOrElse(0))
+      maybeHeight => Future.successful(Try(maybeHeight.map(_.toInt)) match {
+        case Success(value) => value.getOrElse(0)
+        case Failure(_) => 0
+      })
     )
   }
 
@@ -106,7 +115,7 @@ trait HttpApi { // scalastyle:ignore
     val eitherBalance = response.hcursor.downField("balances").as[Map[String, String]]
     eitherBalance.fold[Future[Map[String, Long]]](
       e => Future.failed(new Exception(s"Error getting `balances` from /info response: $e\n$response", e)),
-      maybeBalance => Future.successful(maybeBalance.map{case (token, balance) => token -> balance.toLong})
+      maybeBalance => Future.successful(maybeBalance.map { case (token, balance) => token -> balance.toLong })
     )
   }
 

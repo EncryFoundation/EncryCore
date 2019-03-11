@@ -36,7 +36,6 @@ class DataTransactionTest extends AsyncFunSuite
     val waitTime: FiniteDuration = 30.minutes
     val fee: Long = scala.util.Random.nextInt(500)
 
-    Thread.sleep(60000)
     Await.result(dockerNodes().head.waitForHeadersHeight(firstHeightToWait), waitTime)
 
     val boxes: Seq[EncryBaseBox] = Await.result(dockerNodes().head.outputs, waitTime)
