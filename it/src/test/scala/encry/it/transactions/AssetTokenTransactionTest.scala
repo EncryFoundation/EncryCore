@@ -49,7 +49,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite
     val tokenAmount: Int = scala.util.Random.nextInt(500)
     val recipientAddress: Address = PublicKey25519(Curve25519.createKeyPair(Random.randomBytes())._2).address.address
 
-    Thread.sleep(1000)
+    Thread.sleep(10000)
     Await.result(dockerNodes().head.waitForHeadersHeight(firstHeightToWait), waitTime)
 
     val getBoxes: Seq[EncryBaseBox] = Await.result(dockerNodes().head.outputs, waitTime)
