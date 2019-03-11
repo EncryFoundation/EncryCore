@@ -24,7 +24,7 @@ class MinerWalletBalanceTest extends AsyncFunSuite with Matchers with NodesFromD
       case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i)
     }
 
-    Thread.sleep(10000)
+    Thread.sleep(60000)
     val height = dockerNodes().head.waitForHeadersHeight(heightToCheck)
     Await.result(height, 30.minutes)
     height map { _ =>
