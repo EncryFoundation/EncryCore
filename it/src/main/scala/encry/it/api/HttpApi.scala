@@ -85,19 +85,19 @@ trait HttpApi { // scalastyle:ignore
 
   def fullHeight: Future[Int] = get("/info") flatMap { r =>
     val response = jsonAnswerAs[Json](r.getResponseBody)
-    val eitherHeight = response.hcursor.downField("fullHeight").as[Option[Int]]
+    val eitherHeight = response.hcursor.downField("fullHeight").as[Option[String]]
     eitherHeight.fold[Future[Int]](
       e => Future.failed(new Exception(s"Error getting `fullHeight` from /info response: $e\n$response", e)),
-      maybeHeight => Future.successful(maybeHeight.getOrElse(0))
+      maybeHeight => Future.successful(maybeHeight.map(_.toInt).getOrElse(0))
     )
   }
 
   def headersHeight: Future[Int] = get("/info") flatMap { r =>
     val response = jsonAnswerAs[Json](r.getResponseBody)
-    val eitherHeight = response.hcursor.downField("headersHeight").as[Option[Int]]
+    val eitherHeight = response.hcursor.downField("headersHeight").as[Option[String]]
     eitherHeight.fold[Future[Int]](
       e => Future.failed(new Exception(s"Error getting `headersHeight` from /info response: $e\n$response", e)),
-      maybeHeight => Future.successful(maybeHeight.getOrElse(0))
+      maybeHeight => Future.successful(maybeHeight.map(_.toInt).getOrElse(0))
     )
   }
 
