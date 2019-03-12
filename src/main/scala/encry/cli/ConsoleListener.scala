@@ -10,6 +10,8 @@ class ConsoleListener extends Actor {
 
   import ConsoleListener._
 
+  override def preStart(): Unit = self ! StartListening
+
   override def receive: Receive = {
     case StartListening =>
       Iterator.continually(scala.io.StdIn.readLine(prompt)).foreach { input =>

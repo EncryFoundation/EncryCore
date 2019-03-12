@@ -11,7 +11,6 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.ChangedHistory
 import encry.settings.EncryAppSettings
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetNodeViewChanges
 import encry.view.history.EncryHistoryReader
-
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global

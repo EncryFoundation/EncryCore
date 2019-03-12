@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
@@ -13,6 +12,7 @@ import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
 import encry.network.DeliveryManager.FullBlockChainSynced
 import BasicMessagesRepo._
+import encry.Starter.MessageWithNodeViewSyncActorRef
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -30,6 +30,7 @@ import org.encryfoundation.common.transaction.Proposition
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
                            networkControllerRef: ActorRef,
+                           auxHistoryRef: ActorRef,
                            system: ActorSystem,
                            settings: EncryAppSettings) extends Actor with StrictLogging {
 
@@ -37,11 +38,12 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   var mempoolReaderOpt: Option[Mempool] = None
   var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   var chainSynced: Boolean = false
-  val deliveryManager: ActorRef = context.actorOf(
-    Props(classOf[DeliveryManager], influxRef, nodeViewHolderRef, networkControllerRef, system, settings),
-    "deliveryManager")
+  val deliveryManager: ActorRef = context.actorOf(Props(classOf[DeliveryManager],
+    influxRef, nodeViewHolderRef, networkControllerRef, system, settings), "deliveryManager")
 
   override def preStart(): Unit = {
+    nodeViewHolderRef ! MessageWithNodeViewSyncActorRef
+    auxHistoryRef ! MessageWithNodeViewSyncActorRef
     val messageIds: Seq[Byte] = Seq(
       InvNetworkMessage.NetworkMessageTypeID,
       RequestModifiersNetworkMessage.NetworkMessageTypeID,

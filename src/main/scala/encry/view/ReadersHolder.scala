@@ -1,7 +1,8 @@
 package encry.view
 
 import akka.actor.Actor
-import encry.EncryApp._
+import com.typesafe.scalalogging.StrictLogging
+import encry.Starter.NVHActorIsReady
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, NodeViewChange}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetNodeViewChanges
 import encry.view.ReadersHolder.{GetDataFromHistory, GetReaders, Readers}
@@ -9,18 +10,18 @@ import encry.view.history.EncryHistoryReader
 import encry.view.mempool.MempoolReader
 import encry.view.state.UtxoStateReader
 
-class ReadersHolder extends Actor {
+class ReadersHolder extends Actor with StrictLogging {
 
-  override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[NodeViewChange])
-    nodeViewHolder ! GetNodeViewChanges(history = true, state = true, vault = true, mempool = true)
-  }
+  override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[NodeViewChange])
 
   var historyReaderOpt: Option[EncryHistoryReader] = None
   var stateReaderOpt: Option[UtxoStateReader] = None
   var mempoolReaderOpt: Option[MempoolReader] = None
 
   override def receive: Receive = {
+    case NVHActorIsReady =>
+      logger.info(s"Got NVHActorIsReady from $sender. Sending request for nodeViewChanges.")
+      sender() ! GetNodeViewChanges(history = true, state = true, vault = true, mempool = true)
     case ChangedHistory(reader: EncryHistoryReader@unchecked) if reader.isInstanceOf[EncryHistoryReader] =>
       historyReaderOpt = Some(reader)
     case ChangedState(reader: UtxoStateReader@unchecked) if reader.isInstanceOf[UtxoStateReader] =>
@@ -34,11 +35,7 @@ class ReadersHolder extends Actor {
 }
 
 object ReadersHolder {
-
   case object GetDataFromHistory
-
   case object GetReaders
-
-  case class Readers(h: Option[EncryHistoryReader], s: Option[UtxoStateReader], m: Option[MempoolReader])
-
+  case class  Readers(h: Option[EncryHistoryReader], s: Option[UtxoStateReader], m: Option[MempoolReader])
 }

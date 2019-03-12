@@ -32,7 +32,7 @@ class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with StrictLogging 
         .fold(self ! MineBlock(candidate, nonce + 1)) { block =>
           logger.info(s"New block is found: $block on worker $self at " +
             s"${sdf.format(new Date(System.currentTimeMillis()))}. Iter qty: ${nonce - initialNonce + 1}")
-          miner ! MinedBlock(block, myIdx)
+          context.parent ! MinedBlock(block, myIdx)
         }
     case NextChallenge(candidate: CandidateBlock) =>
       challengeStartTime = new Date(System.currentTimeMillis())

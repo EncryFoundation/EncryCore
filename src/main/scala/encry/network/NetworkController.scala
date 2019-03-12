@@ -13,6 +13,7 @@ import PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import com.typesafe.scalalogging.StrictLogging
 import encry.cli.commands.AddPeer.PeerFromCli
 import BasicMessagesRepo._
+import encry.Starter.MessageWithPeerHandlerRef
 import encry.settings.NetworkSettings
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -22,8 +23,6 @@ import scala.util.Try
 class NetworkController extends Actor with StrictLogging {
 
   val networkSettings: NetworkSettings = settings.network
-  val peerSynchronizer: ActorRef =
-    context.actorOf(Props[PeerSynchronizer].withDispatcher("network-dispatcher"), "peerSynchronizer")
   var messagesHandlers: Map[Seq[Byte], ActorRef] = Map.empty
   var outgoing: Set[InetSocketAddress] = Set.empty
   lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse None
@@ -46,10 +45,10 @@ class NetworkController extends Actor with StrictLogging {
 
   override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
 
-  def bindingLogic: Receive = {
+  def bindingLogic(peerManagerRef: ActorRef): Receive = {
     case Bound(_) =>
       logger.info("Successfully bound to the port " + networkSettings.bindAddress.getPort)
-      context.system.scheduler.schedule(600.millis, 5.seconds)(peerManager ! CheckPeers)
+      context.system.scheduler.schedule(600.millis, 5.seconds)(peerManagerRef ! CheckPeers)
     case CommandFailed(_: Bind) =>
       logger.info("Network port " + networkSettings.bindAddress.getPort + " already in use!")
       context stop self
@@ -66,19 +65,19 @@ class NetworkController extends Actor with StrictLogging {
       case None => logger.error("No handlers found for message: " + message.messageName)
     }
 
-  def businessLogic: Receive = {
+  def businessLogic(peerManagerRef: ActorRef): Receive = {
     case MessageFromNetwork(message, Some(remote)) if message.isValid(settings) =>
       logger.info(s"Got ${message.messageName} on the NetworkController.")
       findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
     case MessageFromNetwork(message, Some(remote)) =>
       logger.info(s"Invalid message type: ${message.messageName} from remote $remote")
     case SendToNetwork(message, sendingStrategy) =>
-      (peerManager ? FilterPeers(sendingStrategy)) (5 seconds)
+      (peerManagerRef ? FilterPeers(sendingStrategy)) (5 seconds)
         .map(_.asInstanceOf[Seq[ConnectedPeer]])
         .foreach(_.foreach(_.handlerRef ! message))
   }
 
-  def peerLogic: Receive = {
+  def peerLogic(peerManagerRef: ActorRef, peerSyncRef: ActorRef): Receive = {
     ///TODO: Duplicate `checkPossibilityToAddPeer` logic
     case ConnectTo(remote) if CheckPeersObj.checkPossibilityToAddPeer(remote, knownPeersCollection, settings) =>
       outgoing += remote
@@ -89,8 +88,8 @@ class NetworkController extends Actor with StrictLogging {
         pullMode = true)
     case PeerFromCli(address) =>
       knownPeersCollection = knownPeersCollection + address
-      peerManager ! PeerFromCli(address)
-      peerSynchronizer ! PeerFromCli(address)
+      peerManagerRef ! PeerFromCli(address)
+      peerSyncRef ! PeerFromCli(address)
       self ! ConnectTo(address)
     case Connected(remote, local) if CheckPeersObj.checkPossibilityToAddPeer(remote, knownPeersCollection, settings) =>
       val direction: ConnectionType = if (outgoing.contains(remote)) Outgoing else Incoming
@@ -99,8 +98,9 @@ class NetworkController extends Actor with StrictLogging {
         case Outgoing => s"New outgoing connection to $remote established (bound to local $local)"
       }
       logger.info(logMsg)
-      context.actorOf(PeerConnectionHandler.props(sender(), direction, externalSocketAddress, remote)
-        .withDispatcher("network-dispatcher"))
+      context.actorOf(PeerConnectionHandler.props(
+        sender(), direction, externalSocketAddress, remote, peerManagerRef, self
+      ).withDispatcher("network-dispatcher"))
       outgoing -= remote
     case Connected(remote, _) =>
       logger.info(s"Peer $remote trying to connect, but checkPossibilityToAddPeer(remote):" +
@@ -108,31 +108,38 @@ class NetworkController extends Actor with StrictLogging {
     case CommandFailed(c: Connect) =>
       outgoing -= c.remoteAddress
       logger.info("Failed to connect to : " + c.remoteAddress)
-      peerManager ! Disconnected(c.remoteAddress)
+      peerManagerRef ! Disconnected(c.remoteAddress)
   }
 
-  override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse {
+  override def receive: Receive = {
+    case MessageWithPeerHandlerRef =>
+      val peerSynchronizer: ActorRef = context.actorOf(Props(classOf[PeerSynchronizer], sender())
+        .withDispatcher("network-dispatcher"), "peerSynchronizer")
+      context.become(mainLogic(sender(), peerSynchronizer))
     case RegisterMessagesHandler(ids, handler) =>
       logger.info(s"Registering handlers for ${ids.mkString(",")}.")
       messagesHandlers += (ids -> handler)
-    case CommandFailed(cmd: Tcp.Command) =>
-      context.actorSelection("/user/statsSender") ! "Failed to execute command : " + cmd
     case nonsense: Any => logger.warn(s"NetworkController: got something strange $nonsense")
   }
+
+  def mainLogic(peerManagerRef: ActorRef, peerSyncRef: ActorRef): Receive =
+    bindingLogic(peerManagerRef) orElse
+      businessLogic(peerManagerRef) orElse
+      peerLogic(peerManagerRef, peerSyncRef) orElse {
+      case RegisterMessagesHandler(ids, handler) =>
+        logger.info(s"Registering handlers for ${ids.mkString(",")}.")
+        messagesHandlers += (ids -> handler)
+      case CommandFailed(cmd: Tcp.Command) =>
+        context.actorSelection("/user/statsSender") ! "Failed to execute command : " + cmd
+      case nonsense: Any => logger.warn(s"NetworkController: got something strange $nonsense")
+    }
 }
 
 object NetworkController {
-
   object ReceivableMessages {
-
     case class DataFromPeer(message: NetworkMessage, source: ConnectedPeer)
-
     case class RegisterMessagesHandler(ids: Seq[Byte], handler: ActorRef)
-
     case class SendToNetwork(message: NetworkMessage, sendingStrategy: SendingStrategy)
-
     case class ConnectTo(address: InetSocketAddress)
-
   }
-
 }

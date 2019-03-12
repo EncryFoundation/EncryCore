@@ -2,10 +2,10 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
-
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
+import encry.Starter.MessageWithMinerRef
 import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.local.miner.Worker.NextChallenge
@@ -30,11 +30,9 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
-
 import scala.collection._
-import scala.util.{Failure, Success, Try}
 
-class Miner extends Actor with StrictLogging {
+class Miner(nodeViewHolderRef: ActorRef) extends Actor with StrictLogging {
 
   import Miner._
 
@@ -46,8 +44,10 @@ class Miner extends Actor with StrictLogging {
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
 
-  override def preStart(): Unit =
+  override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
+    nodeViewHolderRef ! MessageWithMinerRef
+  }
 
   override def postStop(): Unit = killAllWorkers()
 
@@ -83,18 +83,18 @@ class Miner extends Actor with StrictLogging {
         s" with nonce: ${block.header.nonce}")
       logger.info(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
       killAllWorkers()
-        nodeViewHolder ! LocallyGeneratedModifier(block.header)
-        nodeViewHolder ! LocallyGeneratedModifier(block.payload)
+      nodeViewHolderRef ! LocallyGeneratedModifier(block.header)
+      nodeViewHolderRef ! LocallyGeneratedModifier(block.payload)
       if (settings.influxDB.isDefined) {
         context.actorSelection("/user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
         context.actorSelection("/user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
       }
       if (settings.node.stateMode == StateMode.Digest)
-        block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
+        block.adProofsOpt.foreach(adp => nodeViewHolderRef ! LocallyGeneratedModifier(adp))
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
-    case msg => logger.info(s"Miner dead letter: $FullBlockChainSynced")
+    case _ => logger.info(s"Miner dead letter: $FullBlockChainSynced")
   }
 
   def miningEnabled: Receive =
@@ -190,7 +190,7 @@ class Miner extends Actor with StrictLogging {
   }
 
   def produceCandidate(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Mempool, CandidateEnvelope] {
+    nodeViewHolderRef ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Mempool, CandidateEnvelope] {
       nodeView =>
         val producingStartTime: Time = System.currentTimeMillis()
         startTime = producingStartTime

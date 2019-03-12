@@ -1,9 +1,10 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
+import encry.Starter.MessageWithPeerHandlerRef
 import encry.cli.commands.AddPeer.PeerFromCli
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
@@ -15,12 +16,14 @@ import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.util.Random
 
-class PeerManager extends Actor with StrictLogging {
+class PeerManager(nodeViewSync: ActorRef, networkController: ActorRef) extends Actor with StrictLogging {
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
   var connectingPeers: Set[InetSocketAddress] = Set.empty
   var nodes: Map[InetSocketAddress, PeerInfo] = Map.empty
   var knownPeersCollection: Set[InetSocketAddress] = settings.network.knownPeers.toSet
+
+  override def preStart(): Unit = networkController ! MessageWithPeerHandlerRef
 
   addKnownPeersToPeersDatabase()
 
@@ -53,12 +56,12 @@ class PeerManager extends Actor with StrictLogging {
         && !connectedPeers.contains(peer.socketAddress)) {
         self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
         connectedPeers += (peer.socketAddress -> peer)
-        nodeViewSynchronizer ! HandshakedPeer(peer)
+        nodeViewSync ! HandshakedPeer(peer)
       }
     case Disconnected(remote) =>
       connectedPeers -= remote
       connectingPeers -= remote
-      nodeViewSynchronizer ! DisconnectedPeer(remote)
+      nodeViewSync ! DisconnectedPeer(remote)
     case CheckPeers =>
       def randomPeer: Option[InetSocketAddress] = {
         val peers: Seq[InetSocketAddress] = knownPeers().keys.toSeq

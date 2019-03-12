@@ -20,7 +20,9 @@ import scala.util.{Failure, Random, Success}
 class PeerConnectionHandler(connection: ActorRef,
                             direction: ConnectionType,
                             ownSocketAddress: Option[InetSocketAddress],
-                            remote: InetSocketAddress) extends Actor with StrictLogging {
+                            remote: InetSocketAddress,
+                            peerManagerRef: ActorRef,
+                            networkControllerRef: ActorRef) extends Actor with StrictLogging {
 
   import PeerConnectionHandler.ReceivableMessages._
 
@@ -47,7 +49,7 @@ class PeerConnectionHandler(connection: ActorRef,
       connection ! ResumeWriting
     case cc: ConnectionClosed =>
       logger.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
-      peerManager ! Disconnected(remote)
+      peerManagerRef ! Disconnected(remote)
       context stop self
     case CloseConnection =>
       logger.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")
@@ -99,7 +101,7 @@ class PeerConnectionHandler(connection: ActorRef,
       require(receivedHandshake.isDefined)
       val peer: ConnectedPeer = ConnectedPeer(remote, self, direction, receivedHandshake.get)
       selfPeer = Some(peer)
-      peerManager ! Handshaked(peer)
+      peerManagerRef ! Handshaked(peer)
       handshakeTimeoutCancellableOpt.map(_.cancel())
       connection ! ResumeReading
       logger.debug(s"Context become workingCycle on peerHandler")
@@ -128,7 +130,7 @@ class PeerConnectionHandler(connection: ActorRef,
       packet._1.find { packet =>
         GeneralizedNetworkMessage.fromProto(packet) match {
           case Success(message) =>
-            networkController ! MessageFromNetwork(message, selfPeer)
+            networkControllerRef ! MessageFromNetwork(message, selfPeer)
             logger.info("Received message " + message.messageName + " from " + remote)
             false
           case Failure(e) =>
@@ -151,7 +153,7 @@ class PeerConnectionHandler(connection: ActorRef,
       reportStrangeInput orElse dead
 
   override def preStart: Unit = {
-    peerManager ! DoConnecting(remote, direction)
+    peerManagerRef ! DoConnecting(remote, direction)
     handshakeTimeoutCancellableOpt = Some(context.system.scheduler.scheduleOnce(settings.network.handshakeTimeout)
     (self ! HandshakeTimeout))
     connection ! Register(self, keepOpenOnPeerClosed = false, useResumeWriting = true)
@@ -241,7 +243,11 @@ object PeerConnectionHandler {
 
   }
 
-  def props(connection: ActorRef, direction: ConnectionType,
-            ownSocketAddress: Option[InetSocketAddress], remote: InetSocketAddress): Props =
-    Props(new PeerConnectionHandler(connection, direction, ownSocketAddress, remote))
+  def props(connection: ActorRef,
+            direction: ConnectionType,
+            ownSocketAddress: Option[InetSocketAddress],
+            remote: InetSocketAddress,
+            peerManagerRef: ActorRef,
+            networkControllerRef: ActorRef): Props =
+    Props(new PeerConnectionHandler(connection, direction, ownSocketAddress, remote, peerManagerRef, networkControllerRef))
 }

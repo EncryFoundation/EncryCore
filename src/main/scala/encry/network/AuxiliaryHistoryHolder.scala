@@ -4,6 +4,7 @@ import java.io.File
 
 import akka.actor.{Actor, ActorRef}
 import com.typesafe.scalalogging.StrictLogging
+import encry.Starter.{AuxHistoryIsReady, MessageWithNodeViewSyncActorRef}
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
 import encry.network.AuxiliaryHistoryHolder._
@@ -13,30 +14,36 @@ import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.NetworkTimeProvider
 import encry.view.history.EncryHistory
-import encry.view.history.EncryHistory.{getHistoryIndexDir, getHistoryObjectsDir, logger}
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
 import org.iq80.leveldb.Options
 
-case class AuxiliaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvider, syncronizer: ActorRef)
-  extends Actor with StrictLogging {
+case class AuxiliaryHistoryHolder(settings: EncryAppSettings,
+                                  ntp: NetworkTimeProvider,
+                                  starterRef: ActorRef) extends Actor with StrictLogging {
 
   val history: EncryHistory = AuxiliaryHistoryHolder.readOrGenerate(settings, ntp)
-
-  override def preStart(): Unit = syncronizer ! AuxHistoryChanged(history)
+  starterRef ! AuxHistoryIsReady
 
   override def receive: Receive = {
+    case MessageWithNodeViewSyncActorRef =>
+      sender() ! AuxHistoryChanged(history)
+      context.become(mainLogic(sender()))
+    case message => logger.info(s"Got $message on AuxHistoryActor during initializing iodbs.")
+  }
+
+  def mainLogic(nodeViewSyncActorRef: ActorRef): Receive = {
     case Append(mod) =>
       history.append(mod)
-      syncronizer ! AuxHistoryChanged(history)
+      nodeViewSyncActorRef ! AuxHistoryChanged(history)
     case ReportModifierValid(mod) =>
       history.reportModifierIsValid(mod)
-      syncronizer ! AuxHistoryChanged(history)
+      nodeViewSyncActorRef ! AuxHistoryChanged(history)
     case ReportModifierInvalid(mod, progressInfo) =>
       history.reportModifierIsInvalid(mod, progressInfo)
-      syncronizer ! AuxHistoryChanged(history)
+      nodeViewSyncActorRef ! AuxHistoryChanged(history)
   }
 
   override def postStop(): Unit = {

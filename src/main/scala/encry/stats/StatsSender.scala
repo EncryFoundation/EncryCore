@@ -4,7 +4,6 @@ import java.io.File
 import java.net.InetAddress
 import java.util
 import java.text.SimpleDateFormat
-import java.util.Date
 import akka.actor.Actor
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{settings, timeProvider}
@@ -14,14 +13,12 @@ import encry.stats.StatsSender._
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
 import org.influxdb.{InfluxDB, InfluxDBFactory}
-
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class StatsSender extends Actor {
 
   var modifiersToDownload: Map[String, (ModifierTypeId, Long)] = Map()
-
 
   val nodeName: String = settings.network.nodeName match {
     case Some(value) => value
@@ -133,6 +130,7 @@ class StatsSender extends Actor {
       )
     case NewBlockAppended(isHeader, success) if nodeName.exists(_.isDigit) =>
       val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
+      //println(s"isHeader - $isHeader --> success - $success.")
       influxDB.write(InfluxPort,s"""newBlockAppended,success=$success,isHeader=$isHeader,nodeName=$nodeName value=$nodeNumber""")
     case NewBlockAppended(_, _) =>
     case TimestampDifference(diff) => influxDB.write(InfluxPort,s"""tsDiff,nodeName=$nodeName value=$diff""")

@@ -4,7 +4,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import java.net.InetSocketAddress
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef}
 import akka.pattern.ask
 import encry.EncryApp._
 import akka.util.Timeout
@@ -13,34 +13,34 @@ import encry.cli.commands.AddPeer.PeerFromCli
 import PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
 import BasicMessagesRepo._
 
-class PeerSynchronizer extends Actor with StrictLogging {
+class PeerSynchronizer(peerManagerRef: ActorRef) extends Actor with StrictLogging {
 
   implicit val timeout: Timeout = Timeout(settings.network.syncTimeout.getOrElse(5 seconds))
   var knownPeersCollection: Set[InetSocketAddress] = settings.network.knownPeers.toSet
 
   override def preStart: Unit = {
     super.preStart()
-    networkController ! RegisterMessagesHandler(
+    context.parent ! RegisterMessagesHandler(
       Seq(PeersNetworkMessage.NetworkMessageTypeID, GetPeersNetworkMessage.NetworkMessageTypeID), self)
     context.system.scheduler.schedule(2.seconds,
-      settings.network.syncInterval)(networkController ! SendToNetwork(GetPeersNetworkMessage, SendToRandom))
+      settings.network.syncInterval)(context.parent ! SendToNetwork(GetPeersNetworkMessage, SendToRandom))
   }
 
   override def receive: Receive = {
     case DataFromPeer(message, remote) => message match {
       case PeersNetworkMessage(peers) =>
         peers.filter(p => CheckPeersObj.checkPossibilityToAddPeer(p, knownPeersCollection, settings)).foreach(isa =>
-          peerManager ! AddOrUpdatePeer(isa, None, Some(remote.direction)))
+          peerManagerRef ! AddOrUpdatePeer(isa, None, Some(remote.direction)))
         logger.debug(s"Got new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
       case GetPeersNetworkMessage =>
-        (peerManager ? RandomPeers(3)).mapTo[Seq[InetSocketAddress]]
+        (peerManagerRef ? RandomPeers(3)).mapTo[Seq[InetSocketAddress]]
           .foreach { peers =>
             val correctPeers: Seq[InetSocketAddress] = peers.filter(address => {
               if (remote.socketAddress.getAddress.isSiteLocalAddress) true
               else !address.getAddress.isSiteLocalAddress && address != remote.socketAddress
             })
             logger.info(s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
-            networkController ! SendToNetwork(PeersNetworkMessage(correctPeers), SendToPeer(remote))
+            context.parent ! SendToNetwork(PeersNetworkMessage(correctPeers), SendToPeer(remote))
             logger.debug(s"Send to ${remote.socketAddress} peers message which contains next peers: ${peers.mkString(",")}")
           }
       case _ => logger.info(s"PeerSynchronizer got invalid type of DataFromPeer message!")
