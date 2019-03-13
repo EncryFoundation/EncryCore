@@ -113,7 +113,7 @@ class Starter(actorSystem: ActorSystem,
         StateInfoApiRoute(readersHolder, nodeViewHolder, appSettings.restApi, appSettings.node.stateMode),
         WalletInfoApiRoute(nodeViewHolder, appSettings.restApi)
       )
-      Starter.setupHttpService(appSettings, actorSystem, apiRoutes, swaggerConfig)
+      setupHttpService(appSettings, actorSystem, apiRoutes, swaggerConfig)
     }
 
     if (appSettings.monitoringSettings.exists(_.kamonEnabled)) {
@@ -125,6 +125,15 @@ class Starter(actorSystem: ActorSystem,
     if (appSettings.kafka.exists(_.sendToKafka))
       actorSystem.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
   }
+
+  def setupHttpService(appSettings: EncryAppSettings,
+                       actorSystem: ActorSystem,
+                       apiRoutes: Seq[ApiRoute],
+                       swaggerConfig: String): Future[Http.ServerBinding] = Http(actorSystem).bindAndHandle(
+    CompositeHttpService(actorSystem, apiRoutes, appSettings.restApi, swaggerConfig).compositeRoute,
+    appSettings.restApi.bindAddress.getAddress.getHostAddress,
+    appSettings.restApi.bindAddress.getPort
+  )
 }
 
 object Starter {
@@ -140,15 +149,4 @@ object Starter {
   case object MessageWithPeerHandlerRef
 
   case object NVHActorIsReady
-
-  import encry.EncryApp.system
-
-  def setupHttpService(appSettings: EncryAppSettings,
-                       actorSystem: ActorSystem,
-                       apiRoutes: Seq[ApiRoute],
-                       swaggerConfig: String): Future[Http.ServerBinding] = Http().bindAndHandle(
-    CompositeHttpService(actorSystem, apiRoutes, appSettings.restApi, swaggerConfig).compositeRoute,
-    appSettings.restApi.bindAddress.getAddress.getHostAddress,
-    appSettings.restApi.bindAddress.getPort
-  )
 }
