@@ -35,11 +35,8 @@ trait MempoolReader extends NodeViewComponent {
         val (promise: Promise[MemPoolResponse], allIds: Seq[ModifierId]) = p._2
         promise.complete(Success(allIds.map(id => getById(id).get)))
         None
-      } else {
-        Some(newKey -> p._2)
-      }
+      } else Some(newKey -> p._2)
     })
     waitedForAssembly = newMap
   }
-
 }
