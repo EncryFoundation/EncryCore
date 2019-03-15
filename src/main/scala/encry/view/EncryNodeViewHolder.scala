@@ -73,6 +73,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     }
   }
 
+  context.system.scheduler.schedule(5.seconds, 3600.seconds, self, CleanBloomFilterInMempool)
+
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     reason.printStackTrace()
     System.exit(100)
@@ -134,10 +136,23 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       if (mempool) sender() ! ChangedMempool(nodeView.mempool)
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] = modifierTypeId match {
-        case Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
+        case Transaction.ModifierTypeId =>
+          logger.info(s"Got new transactions: ${modifierIds.map(Algos.encode).mkString(",")}. Size is: ${modifierIds.size}.")
+          val filteredTxs: Seq[ModifierId] = nodeView.mempool.checkIfContains(modifierIds)
+          logger.info(s"Filtered transactions are: ${filteredTxs.map(Algos.encode).mkString(",")}. Size is: ${filteredTxs.size}.")
+          filteredTxs
+          //nodeView.mempool.notIn(modifierIds)
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
-      sender() ! RequestFromLocal(peer, modifierTypeId, ids)
+      if (ids.nonEmpty) {
+        sender() ! RequestFromLocal(peer, modifierTypeId, ids)
+      }
+    case CleanBloomFilterInMempool =>
+      logger.info(s"\n\n\n\n\n\n\nBloomFilter BEFORE update!!!!! Current filter is: " +
+        s"${nodeView.mempool.bloomFilterForMemoryPool.approximateElementCount()}\n\n\n\n\n\n\n")
+      nodeView.mempool.updateBloomFilter()
+      logger.info(s"\n\n\n\n\n\n\nBloomFilter has been updated!!!!! Current filter is: " +
+        s"${nodeView.mempool.bloomFilterForMemoryPool.approximateElementCount()}\n\n\n\n\n\n\n")
     case a: Any =>
       logger.error(s"Strange input: $a")
   }
@@ -318,8 +333,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
 
   def txModify(tx: Transaction): Unit = nodeView.mempool.put(tx) match {
     case Success(newPool) =>
+      //TODO for what we update wallet?
       updateNodeView(updatedVault = Some(nodeView.wallet), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, Transaction](tx)
+      logger.info(s"Successfully put tx into bloomFilter")
+      nodeView.mempool.putElementToBloomFilter(tx.id)
     case Failure(e) => logger.warn(s"Failed to put tx ${tx.id} to mempool" +
       s" with exception ${e.getLocalizedMessage}")
   }
@@ -409,6 +427,8 @@ object EncryNodeViewHolder {
   case class DownloadRequest(modifierTypeId: ModifierTypeId,
                              modifierId: ModifierId,
                              previousModifier: Option[ModifierId] = None) extends NodeViewHolderEvent
+
+  case object CleanBloomFilterInMempool
 
   case class CurrentView[HIS, MS, VL, MP](history: HIS, state: MS, vault: VL, pool: MP)
 

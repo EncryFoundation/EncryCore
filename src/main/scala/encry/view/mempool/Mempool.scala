@@ -3,11 +3,14 @@ package encry.view.mempool
 import akka.actor.ActorSystem
 import com.google.common.base.Charsets
 import com.google.common.hash.{BloomFilter, Funnel, PrimitiveSink}
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.Transaction
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.mempool.Mempool._
+import org.encryfoundation.common.Algos
+
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -16,13 +19,9 @@ import scala.util.{Failure, Success, Try}
 class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
               settings: EncryAppSettings,
               timeProvider: NetworkTimeProvider,
-              system: ActorSystem) extends MempoolReader with AutoCloseable {
+              system: ActorSystem) extends MempoolReader with AutoCloseable with StrictLogging {
 
-  val bloomFilterForMemoryPool: BloomFilter[String] = BloomFilter.create(
-    new Funnel[String] {
-      override def funnel(from: String, into: PrimitiveSink): Unit = into.putString(from, Charsets.UTF_8)
-    }, 100000, 0.001
-  )
+  var bloomFilterForMemoryPool: BloomFilter[String] = createBloomFilter
 
   private def removeExpired(): Mempool =
     filter(tx => (timeProvider.estimatedTime - tx.timestamp) > settings.node.utxMaxAge.toMillis)
@@ -33,8 +32,8 @@ class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
   def put(tx: Transaction): Try[Mempool] = put(Seq(tx))
 
   def put(txs: Iterable[Transaction]): Try[Mempool] = {
-    val validTxs: Iterable[Transaction] = txs
-      .filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
+    val validTxs: Iterable[Transaction] =
+      txs.filter(tx => tx.semanticValidity.isSuccess && !unconfirmed.contains(key(tx.id)))
     if (validTxs.nonEmpty) {
       if ((size + validTxs.size) <= settings.node.mempoolMaxCapacity) Success(putWithoutCheck(validTxs))
       else {
@@ -42,7 +41,8 @@ class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
         val overflow: Int = (size + validTxs.size) - settings.node.mempoolMaxCapacity
         Success(putWithoutCheck(validTxs.take(validTxs.size - overflow)))
       }
-    } else Failure(new Exception("Failed to put transaction into pool cause it's already in it."))
+    } else Failure(new Exception(s"Failed to put transaction ${txs.map(tx => Algos.encode(tx.id)).mkString(",")} " +
+      s"into pool cause it's already there."))
   }
 
   def putWithoutCheck(txs: Iterable[Transaction]): Mempool = {
@@ -67,7 +67,27 @@ class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
     this
   }
 
-  def notIn(ids: Seq[ModifierId]): Seq[ModifierId] = ids.filter(id => !contains(id))
+  def checkIfContains(ids: Seq[ModifierId]): Seq[ModifierId] =
+    ids.filterNot { id =>
+      val a = bloomFilterForMemoryPool.mightContain(Algos.encode(id))
+      logger.info(s"\nTransaction ${Algos.encode(id)} ---->>>>  $a\n")
+      a
+    }
+
+  def putElementToBloomFilter(id: ModifierId): Unit = {
+    val a = bloomFilterForMemoryPool.put(Algos.encode(id))
+    logger.info(s"\n\nUpdated bloom filter is: ${bloomFilterForMemoryPool.approximateElementCount()}. $a ${Algos.encode(id)}\n\n")
+  }
+
+  def updateBloomFilter(): Unit = bloomFilterForMemoryPool = createBloomFilter
+
+  def createBloomFilter: BloomFilter[String] = BloomFilter.create(
+    new Funnel[String] {
+      override def funnel(from: String, into: PrimitiveSink): Unit = into.putString(from, Charsets.UTF_8)
+    }, 36000L, 0.001D
+  )
+
+  def notIn(ids: Seq[ModifierId]): Seq[ModifierId] = ids.filterNot(id => contains(id))
 }
 
 object Mempool {
