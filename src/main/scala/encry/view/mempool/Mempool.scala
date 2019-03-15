@@ -84,7 +84,7 @@ class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
   def createBloomFilter: BloomFilter[String] = BloomFilter.create(
     new Funnel[String] {
       override def funnel(from: String, into: PrimitiveSink): Unit = into.putString(from, Charsets.UTF_8)
-    }, 36000L, 0.001D
+    }, 18000L, 0.1D
   )
 
   def notIn(ids: Seq[ModifierId]): Seq[ModifierId] = ids.filterNot(id => contains(id))
