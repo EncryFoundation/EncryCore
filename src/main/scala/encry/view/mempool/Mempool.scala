@@ -2,7 +2,7 @@ package encry.view.mempool
 
 import akka.actor.ActorSystem
 import com.google.common.base.Charsets
-import com.google.common.hash.{BloomFilter, Funnel, PrimitiveSink}
+import com.google.common.hash.{BloomFilter, Funnels}
 import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.Transaction
@@ -10,7 +10,6 @@ import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.mempool.Mempool._
 import org.encryfoundation.common.Algos
-
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -68,24 +67,14 @@ class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
   }
 
   def checkIfContains(ids: Seq[ModifierId]): Seq[ModifierId] =
-    ids.filterNot { id =>
-      val a = bloomFilterForMemoryPool.mightContain(Algos.encode(id))
-      logger.info(s"\nTransaction ${Algos.encode(id)} ---->>>>  $a\n")
-      a
-    }
+    ids.filterNot(id => bloomFilterForMemoryPool.mightContain(Algos.encode(id)))
 
-  def putElementToBloomFilter(id: ModifierId): Unit = {
-    val a = bloomFilterForMemoryPool.put(Algos.encode(id))
-    logger.info(s"\n\nUpdated bloom filter is: ${bloomFilterForMemoryPool.approximateElementCount()}. $a ${Algos.encode(id)}\n\n")
-  }
+  def putElementToBloomFilter(id: ModifierId): Unit = bloomFilterForMemoryPool.put(Algos.encode(id))
 
   def updateBloomFilter(): Unit = bloomFilterForMemoryPool = createBloomFilter
 
   def createBloomFilter: BloomFilter[String] = BloomFilter.create(
-    new Funnel[String] {
-      override def funnel(from: String, into: PrimitiveSink): Unit = into.putString(from, Charsets.UTF_8)
-    }, 18000L, 0.1D
-  )
+    Funnels.stringFunnel(Charsets.UTF_8), settings.node.bloomFilterCapacity, settings.node.bloomFilterFPP)
 
   def notIn(ids: Seq[ModifierId]): Seq[ModifierId] = ids.filterNot(id => contains(id))
 }

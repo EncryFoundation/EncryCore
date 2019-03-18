@@ -17,6 +17,9 @@ case class NodeSettings(stateMode: StateMode,
                         utxMaxAge: FiniteDuration,
                         mempoolCleanupInterval: FiniteDuration,
                         mempoolMaxCapacity: Int,
+                        bloomFilterCleanupInterval: FiniteDuration,
+                        bloomFilterCapacity: Long,
+                        bloomFilterFPP: Double,
                         useCli: Boolean)
 
 trait NodeSettingsReader {
@@ -35,6 +38,9 @@ trait NodeSettingsReader {
       cfg.as[FiniteDuration](s"$path.utxMaxAge"),
       cfg.as[FiniteDuration](s"$path.mempoolCleanupInterval"),
       cfg.as[Int](s"$path.mempoolMaxCapacity"),
+      cfg.as[FiniteDuration](s"$path.bloomFilterCleanupInterval"),
+      cfg.as[Long](s"$path.bloomFilterCapacity"),
+      cfg.as[Double](s"$path.bloomFilterFPP"),
       cfg.as[Boolean](s"$path.useCli"),
     )
   }

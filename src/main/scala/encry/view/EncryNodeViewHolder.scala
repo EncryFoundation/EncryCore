@@ -73,7 +73,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     }
   }
 
-  context.system.scheduler.schedule(5.seconds, 3600.seconds, self, CleanBloomFilterInMempool)
+  context.system.scheduler.schedule(5.seconds, settings.node.bloomFilterCleanupInterval, self, CleanBloomFilterInMempool)
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     reason.printStackTrace()
@@ -85,7 +85,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     nodeView.history.closeStorage()
     nodeView.state.closeStorage()
   }
-
 
   override def receive: Receive = {
     case ModifiersFromRemote(modifierTypeId, modifiers) => modifierTypeId match {
@@ -136,25 +135,12 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       if (mempool) sender() ! ChangedMempool(nodeView.mempool)
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] = modifierTypeId match {
-        case Transaction.ModifierTypeId =>
-          logger.info(s"Got new transactions: ${modifierIds.map(Algos.encode).mkString(",")}. Size is: ${modifierIds.size}.")
-          val filteredTxs: Seq[ModifierId] = nodeView.mempool.checkIfContains(modifierIds)
-          logger.info(s"Filtered transactions are: ${filteredTxs.map(Algos.encode).mkString(",")}. Size is: ${filteredTxs.size}.")
-          filteredTxs
-          //nodeView.mempool.notIn(modifierIds)
+        case Transaction.ModifierTypeId => nodeView.mempool.checkIfContains(modifierIds)
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
-      if (ids.nonEmpty) {
-        sender() ! RequestFromLocal(peer, modifierTypeId, ids)
-      }
-    case CleanBloomFilterInMempool =>
-      logger.info(s"\n\n\n\n\n\n\nBloomFilter BEFORE update!!!!! Current filter is: " +
-        s"${nodeView.mempool.bloomFilterForMemoryPool.approximateElementCount()}\n\n\n\n\n\n\n")
-      nodeView.mempool.updateBloomFilter()
-      logger.info(s"\n\n\n\n\n\n\nBloomFilter has been updated!!!!! Current filter is: " +
-        s"${nodeView.mempool.bloomFilterForMemoryPool.approximateElementCount()}\n\n\n\n\n\n\n")
-    case a: Any =>
-      logger.error(s"Strange input: $a")
+      if (ids.nonEmpty) sender() ! RequestFromLocal(peer, modifierTypeId, ids)
+    case CleanBloomFilterInMempool => nodeView.mempool.updateBloomFilter()
+    case a: Any => logger.error(s"Strange input: $a")
   }
 
   //todo refactor loop
