@@ -322,7 +322,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       //TODO for what we update wallet?
       updateNodeView(updatedVault = Some(nodeView.wallet), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, Transaction](tx)
-      logger.info(s"Successfully put tx into bloomFilter")
       nodeView.mempool.putElementToBloomFilter(tx.id)
     case Failure(e) => logger.warn(s"Failed to put tx ${tx.id} to mempool" +
       s" with exception ${e.getLocalizedMessage}")
