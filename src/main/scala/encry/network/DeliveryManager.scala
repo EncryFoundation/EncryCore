@@ -32,6 +32,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       settings: EncryAppSettings) extends Actor with StrictLogging with Stash {
 
   //TODO try to implement local dispatcher and create implicit val executionContext = context.dispatcher
+  //TODO try to implement mailbox with priorities ( the best priority wil be with UpdateHistory message )
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
