@@ -148,7 +148,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     )
   }
 
-  def refactoredExpect(peer: ConnectedPeer, mTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
+  def refactoredRequestModifies(peer: ConnectedPeer, mTypeId: ModifierTypeId, modifierIds: Seq[ModifierId]): Unit = {
 
     val firstCondition: Boolean = mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining
     val secondCondition: Boolean = mTypeId != Transaction.ModifierTypeId
@@ -172,6 +172,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
             .scheduler.scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(peer, mTypeId, id)) -> 1)
         }
         expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, requestedModIds)
+        //TODO pay attention to 'requestedModifiers' collection
       }
     }
   }
@@ -207,8 +208,31 @@ class DeliveryManager(influxRef: Option[ActorRef],
       }
     }
 
-  def refactoredReExpect(peer: ConnectedPeer, mTypeId: ModifierTypeId, modifierId: ModifierId) = {
-
+  def refactoredReRequestModifier(peer: ConnectedPeer, mTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
+    val peerCollection: Map[ModifierIdAsKey, (Cancellable, PeerPriorityStatus)] =
+      expectedModifiers.getOrElse(peer.socketAddress.getAddress, Map.empty)
+    peerCollection.get(key(modifierId)) match {
+      case Some((timer, attempts)) =>
+        syncTracker.statuses.find { case (innerPeer, (cResult, _)) =>
+          innerPeer.socketAddress == peer.socketAddress && cResult != Younger
+        }.foreach {
+          case (localPeer, _) if attempts < settings.network.maxDeliveryChecks =>
+            /* && requestedModifiers.get(cp).exists(_.contains(key(modifierId))) */
+            localPeer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modifierId))
+            syncTracker.incrementRequest(peer)
+            timer.cancel()
+            expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress,
+              peerCollection.updated(
+                key(modifierId),
+                context.system.scheduler
+                  .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(peer, mTypeId, modifierId)) -> (attempts + 1)
+              ))
+          case _ =>
+            expectedModifiers =
+              expectedModifiers.updated(peer.socketAddress.getAddress, peerCollection - key(modifierId))
+        }
+      case None =>
+    }
   }
 
   //todo: refactor
