@@ -38,7 +38,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   var chainSynced: Boolean = false
   val deliveryManager: ActorRef = context.actorOf(
-    Props(classOf[DeliveryManager], influxRef, nodeViewHolderRef, networkControllerRef, system, settings),
+    Props(classOf[DeliveryManager], influxRef, nodeViewHolderRef, networkControllerRef, settings),
     "deliveryManager")
 
   override def preStart(): Unit = {
@@ -67,7 +67,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       }
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
-      deliveryManager ! ChangedHistory(reader)
+      deliveryManager ! HistoryChanges(reader)
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] =>
       mempoolReaderOpt = Some(reader)
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
@@ -180,6 +180,8 @@ object NodeViewSynchronizer {
     trait NodeViewChange extends NodeViewHolderEvent
 
     case class ChangedHistory[HR <: EncryHistoryReader](reader: HR) extends NodeViewChange
+
+    case class HistoryChanges(history: EncryHistory)
 
     case class ChangedMempool[MR <: MempoolReader](mempool: MR) extends NodeViewChange
 
