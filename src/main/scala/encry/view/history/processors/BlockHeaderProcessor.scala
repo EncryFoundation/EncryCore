@@ -51,8 +51,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[Header](id)) match {
           case Some(bestHeaderAtThisHeight) =>
             val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
-              .filter(m => !excluding.exists(_ sameElements m._2))
-              .filter(m => !contains(m._2))
+              .filter(m => !excluding.exists(_ sameElements m._2) && !contains(m._2))
             continuation(Height @@ (height + 1), acc ++ toDownload)
           case None => acc
         }

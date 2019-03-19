@@ -67,7 +67,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       }
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
-      deliveryManager ! HistoryChanges(reader)
+      //deliveryManager ! HistoryChanges(reader)
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] =>
       mempoolReaderOpt = Some(reader)
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
