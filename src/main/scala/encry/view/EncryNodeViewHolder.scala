@@ -160,7 +160,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       updatedState.getOrElse(nodeView.state),
       updatedVault.getOrElse(nodeView.wallet),
       updatedMempool.getOrElse(nodeView.mempool))
-    if (updatedHistory.nonEmpty) context.system.eventStream.publish(ChangedHistory(newNodeView.history))
+    if (updatedHistory.nonEmpty) {
+      context.system.eventStream.publish(ChangedHistory(newNodeView.history))
+      context.system.eventStream.publish(HistoryChanges(newNodeView.history))
+    }
     if (updatedState.nonEmpty) context.system.eventStream.publish(ChangedState(newNodeView.state))
     if (updatedMempool.nonEmpty) context.system.eventStream.publish(ChangedMempool(newNodeView.mempool))
     nodeView = newNodeView
