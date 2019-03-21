@@ -38,8 +38,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   var chainSynced: Boolean = false
   val deliveryManager: ActorRef = context.actorOf(
-    Props(classOf[DeliveryManager], influxRef, nodeViewHolderRef, networkControllerRef, settings),
-    "deliveryManager")
+    Props(classOf[DeliveryManager], influxRef, nodeViewHolderRef, networkControllerRef, settings)
+      .withDispatcher("deliveryManagerPriorityMailbox-dispatcher"), "deliveryManager")
 
   override def preStart(): Unit = {
     val messageIds: Seq[Byte] = Seq(
