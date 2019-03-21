@@ -40,7 +40,7 @@ case class AuxiliaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimePr
   }
 
   override def postStop(): Unit = {
-    logger.warn(s"Stopping AuxiliaryHistoryHolder")
+    logger.warn(s"Stopping AuxiliaryHistoryHolder.")
     history.closeStorage()
   }
 
