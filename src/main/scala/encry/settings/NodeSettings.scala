@@ -40,7 +40,7 @@ trait NodeSettingsReader {
       cfg.as[Int](s"$path.mempoolMaxCapacity"),
       cfg.as[FiniteDuration](s"$path.bloomFilterCleanupInterval"),
       cfg.as[Long](s"$path.bloomFilterCapacity"),
-      cfg.as[Double](s"$path.bloomFilterFPP"),
+      cfg.as[Double](s"$path.bloomFilterFailureProbability"),
       cfg.as[Boolean](s"$path.useCli"),
     )
   }
