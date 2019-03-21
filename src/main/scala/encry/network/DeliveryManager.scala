@@ -1,7 +1,8 @@
 package encry.network
 
 import java.net.InetAddress
-import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, PoisonPill, Stash}
+
+import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, PoisonPill, Props, Stash}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
@@ -18,12 +19,14 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo}
 import org.encryfoundation.common.Algos
 import encry.settings.EncryAppSettings
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.mutable
-import scala.util.Random
+import scala.util.{Random, Try}
 import BasicMessagesRepo._
+import akka.dispatch.DequeBasedMessageQueueSemantics
 import encry.modifiers.history.Header
 
 class DeliveryManager(influxRef: Option[ActorRef],
@@ -120,6 +123,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case HistoryChanges(historyReader) => context.become(basicMessageHandler(historyReader, isBlockChainSynced, isMining))
     case message => logger.info(s"Got strange message $message on DeliveryManager.")
   }
+
   /**
     * If node is not synced, send sync info to random peer, otherwise to all known peers
     *
@@ -128,6 +132,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   def sendSync(syncInfo: EncrySyncInfo, isBlockChainSynced: Boolean): Unit =
     if (isBlockChainSynced) syncTracker.peersToSyncWith.foreach(peer => peer.handlerRef ! SyncInfoNetworkMessage(syncInfo))
     else Random.shuffle(syncTracker.peersToSyncWith).headOption.foreach(peer => peer.handlerRef ! SyncInfoNetworkMessage(syncInfo))
+
   /**
     *
     * @param history
@@ -143,7 +148,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       modifierIds: Seq[ModifierId],
                       isBlockChainSynced: Boolean,
                       isMining: Boolean): Unit = {
-
     val firstCondition: Boolean = mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining
     val secondCondition: Boolean = mTypeId != Transaction.ModifierTypeId
     val thirdCondition: Boolean = syncTracker.statuses.get(peer).exists(_._1 != Younger)
@@ -154,9 +158,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
       val receivedModifiersByPeer: Set[ModifierIdAsKey] = receivedModifiers.getOrElse(peer.socketAddress.getAddress, Set.empty)
 
-      val notYetRequested: Seq[ModifierId] = modifierIds.filter(id =>
-        !history.contains(id) && !receivedModifiersByPeer.contains(toKey(id))
-          && !requestedModifiersFromPeer.contains(toKey(id)))
+      val notYetRequested: Seq[ModifierId] = modifierIds.filter(id => !history.contains(id)
+        && !receivedModifiersByPeer.contains(toKey(id)) && !requestedModifiersFromPeer.contains(toKey(id))
+      )
 
       if (notYetRequested.nonEmpty) {
         logger.info(s"Send request to ${peer.socketAddress.getAddress} for modifiers of type $mTypeId " +
@@ -166,12 +170,12 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
         val requestedModIds = notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
           rYet.updated(toKey(id), context.system
-            .scheduler.scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(peer, mTypeId, id)) -> 1)
-        }
+            .scheduler.scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(peer, mTypeId, id)) -> 1) }
         expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, requestedModIds)
       }
     }
   }
+
   /**
     *
     * @param peer
@@ -201,21 +205,24 @@ class DeliveryManager(influxRef: Option[ActorRef],
       case None => logger.info(s"Tried to re-ask modifier ${Algos.encode(modId)}, but this id not needed from this peer")
     }
   }
+
   /**
     * Check 'expectedModifiers' for awaiting modifier with id 'mId' from 'peer'
     *
-    * @param mId - id of checkable modifier
+    * @param mId  - id of checkable modifier
     * @param peer - peer from which we possibly expecting modifier
     * @return 'true' if we are expecting this modifier from this peer otherwise 'false'
     */
   def isExpecting(mId: ModifierId, peer: ConnectedPeer): Boolean =
     expectedModifiers.get(peer.socketAddress.getAddress).exists(_.contains(toKey(mId)))
+
   /**
     * Clear the 'receivedSpamModifiers' collection
     *
     * @param mIds - sequence of modifiers ids which will be deleted from spam collection
     */
   def deleteSpam(mIds: Seq[ModifierId]): Unit = for (id <- mIds) receivedSpamModifiers -= toKey(id)
+
   /**
     * Check receivedSpamModifiers for contains received modifier
     *
@@ -223,6 +230,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * @return 'true' if received modifier is in spam collection otherwise 'false'
     */
   def isSpam(mId: ModifierId): Boolean = receivedSpamModifiers.contains(toKey(mId))
+
   /**
     *
     * @param remote
@@ -235,11 +243,12 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case Some(ext) =>
       ext.groupBy(_._1).mapValues(_.map(_._2)).foreach {
         case (mTid, mods) if mods.size <= settings.network.maxInvObjects =>
-         networkControllerRef ! SendToNetwork(InvNetworkMessage(mTid -> mods), SendToPeer(remote))
+          networkControllerRef ! SendToNetwork(InvNetworkMessage(mTid -> mods), SendToPeer(remote))
         case (_, mods) => logger.info(s"Tried to send inv message with size ${mods.size}. Current size is redundant.")
       }
     case None => logger.info(s"extOpt is empty for: $remote. Its status is: $status.")
   }
+
   /**
     *
     * @param modifierTypeId
@@ -264,6 +273,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       }
     case _ => requestDownload(modifierTypeId, modifierIds, history, isBlockChainSynced, isMining)
   }
+
   /**
     * If node is not synced, `requestDownload` sends request for the one peer which will be find by 2 criteria:
     * 1) HistoryComparisonResult != Younger.
@@ -272,11 +282,11 @@ class DeliveryManager(influxRef: Option[ActorRef],
     *
     * If there are no any peers, request won't be sent.
     *
-    * @param modifierTypeId - modifier type id
-    * @param modifierIds - modifier id
-    * @param history - current history state
+    * @param modifierTypeId     - modifier type id
+    * @param modifierIds        - modifier id
+    * @param history            - current history state
     * @param isBlockChainSynced - current blockchain state
-    * @param isMining - current mining state
+    * @param isMining           - current mining state
     */
   def requestDownload(modifierTypeId: ModifierTypeId,
                       modifierIds: Seq[ModifierId],
@@ -298,12 +308,13 @@ class DeliveryManager(influxRef: Option[ActorRef],
         }
       case _ => logger.info(s"BlockChain is synced. There is no nodes, which we can connect with.")
     }
+
   /**
     * Handle received modifier
     *
-    * @param mTid - modifier type id
-    * @param mId - modifier id
-    * @param peer - peer who sent modifier
+    * @param mTid               - modifier type id
+    * @param mId                - modifier id
+    * @param peer               - peer who sent modifier
     * @param isBlockChainSynced - current chain state
     */
   def receive(mTid: ModifierTypeId,
@@ -323,6 +334,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         headersForPriorityRequest = headersForPriorityRequest
           .updated(toKey(mId), headersForPriorityRequest.getOrElse(toKey(mId), Seq.empty) :+ peer.socketAddress.getAddress)
     } else receivedSpamModifiers = receivedSpamModifiers - toKey(mId) + (toKey(mId) -> peer)
+
   /**
     * Transform modifier id to WrappedArray of bytes
     *
@@ -341,11 +353,10 @@ object DeliveryManager {
   import akka.dispatch.PriorityGenerator
   import akka.dispatch.UnboundedStablePriorityMailbox
   import com.typesafe.config.Config
-  class DeliveryManagerPriorityMailbox(settings: ActorSystem.Settings, config: Config)
-    extends UnboundedStablePriorityMailbox(
-      PriorityGenerator {
-        case HistoryChanges(_) => 0
-        case PoisonPill        => 2
-        case _                 => 1
-      })
+
+  def props(influxRef: Option[ActorRef],
+            nodeViewHolderRef: ActorRef,
+            networkControllerRef: ActorRef,
+            settings: EncryAppSettings): Props =
+    Props(new DeliveryManager(influxRef, nodeViewHolderRef, networkControllerRef, settings))
 }
