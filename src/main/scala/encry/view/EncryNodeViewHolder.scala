@@ -139,7 +139,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
       if (ids.nonEmpty) sender() ! RequestFromLocal(peer, modifierTypeId, ids)
-    case CleanBloomFilterInMempool => nodeView.mempool.updateBloomFilter()
+    case CleanBloomFilterInMempool => nodeView.mempool.reInitBloomFilter()
     case a: Any => logger.error(s"Strange input: $a")
   }
 

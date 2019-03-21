@@ -71,10 +71,10 @@ class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
 
   def putElementToBloomFilter(id: ModifierId): Unit = bloomFilterForMemoryPool.put(Algos.encode(id))
 
-  def updateBloomFilter(): Unit = bloomFilterForMemoryPool = createBloomFilter
+  def reInitBloomFilter(): Unit = bloomFilterForMemoryPool = createBloomFilter
 
   def createBloomFilter: BloomFilter[String] = BloomFilter.create(
-    Funnels.stringFunnel(Charsets.UTF_8), settings.node.bloomFilterCapacity, settings.node.bloomFilterFPP)
+    Funnels.stringFunnel(Charsets.UTF_8), settings.node.bloomFilterCapacity, settings.node.bloomFilterFailureProbability)
 
   def notIn(ids: Seq[ModifierId]): Seq[ModifierId] = ids.filterNot(id => contains(id))
 }

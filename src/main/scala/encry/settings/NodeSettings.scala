@@ -19,7 +19,7 @@ case class NodeSettings(stateMode: StateMode,
                         mempoolMaxCapacity: Int,
                         bloomFilterCleanupInterval: FiniteDuration,
                         bloomFilterCapacity: Long,
-                        bloomFilterFPP: Double,
+                        bloomFilterFailureProbability: Double,
                         useCli: Boolean)
 
 trait NodeSettingsReader {

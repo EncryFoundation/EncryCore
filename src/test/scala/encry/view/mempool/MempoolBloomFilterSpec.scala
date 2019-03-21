@@ -7,7 +7,7 @@ import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.{EncryGenerator, NetworkTimeProvider}
 import org.scalatest.{Matchers, WordSpecLike}
 
-class MempoolBloomFilter extends WordSpecLike with EncryGenerator with Matchers {
+class MempoolBloomFilterSpec extends WordSpecLike with EncryGenerator with Matchers {
 
   val settings: EncryAppSettings = EncryAppSettings.read
   val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
