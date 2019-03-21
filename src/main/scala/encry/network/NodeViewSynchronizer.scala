@@ -38,8 +38,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   var chainSynced: Boolean = false
   val deliveryManager: ActorRef = context.actorOf(
-    Props(classOf[DeliveryManager], influxRef, nodeViewHolderRef, networkControllerRef, settings)
-      .withDispatcher("deliveryManagerPriorityMailbox-dispatcher"), "deliveryManager")
+    DeliveryManager.props(influxRef, nodeViewHolderRef, networkControllerRef, settings)
+     , "deliveryManager")
 
   override def preStart(): Unit = {
     val messageIds: Seq[Byte] = Seq(
@@ -67,7 +67,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       }
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
-      //deliveryManager ! HistoryChanges(reader)
+      deliveryManager ! HistoryChanges(reader)
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] =>
       mempoolReaderOpt = Some(reader)
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
