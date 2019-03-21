@@ -44,7 +44,7 @@ case class SyncTracker(deliveryManager: ActorRef,
           val priority: PeerPriorityStatus = PeerPriorityStatus.definePriorityStatus(requested, received)
           logger.debug(s"Peer ${peer.socketAddress} has new priority: ${PeerPriorityStatus.toString(priority)}.")
           statuses = statuses.updated(peer, (hcr, priority))
-        case None => logger.info(s"Can't update peer ${peer.socketAddress} priority. No such peer in status tracker.")
+        case None => logger.info(s"Can't update peer ${peer.socketAddress} priority. No such peer in status tracker")
       }
     }
     peersNetworkCommunication = Map.empty[ConnectedPeer, (Requested, Received)]
