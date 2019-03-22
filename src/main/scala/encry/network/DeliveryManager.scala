@@ -259,7 +259,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   }
   /**
     * This function provides request with priority status. This means, that in priority we will ask peer who sent us
-    * a header to send us payload. If we can't connect to this peer we will call 'requestDownload' function.
+    * a header to send us payload. If we can't connect to this peer we will call 'requestDownload' function
     *
     * @param modifierTypeId     - modifier type id
     * @param modifierIds        - requesting payload id
