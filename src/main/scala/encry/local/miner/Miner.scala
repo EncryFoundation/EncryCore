@@ -12,7 +12,7 @@ import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.history.{Block, Header}
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
-import encry.network.DeliveryManager.FullBlockChainSynced
+import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
 import encry.stats.StatsSender.{CandidateProducingTime, MiningEnd, MiningTime, SleepTime}
@@ -94,7 +94,7 @@ class Miner extends Actor with StrictLogging {
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
-    case msg => logger.info(s"Miner dead letter: $FullBlockChainSynced")
+    case msg => logger.info(s"Miner dead letter: $FullBlockChainIsSynced")
   }
 
   def miningEnabled: Receive =
@@ -109,7 +109,7 @@ class Miner extends Actor with StrictLogging {
       context.become(miningEnabled)
       self ! StartMining
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty, candidateOpt)
-    case FullBlockChainSynced =>
+    case FullBlockChainIsSynced =>
       syncingDone = true
       if (settings.node.mining) self ! EnableMining
     case DisableMining | SemanticallySuccessfulModifier(_) =>
@@ -136,7 +136,7 @@ class Miner extends Actor with StrictLogging {
   }
 
   def chainEvents: Receive = {
-    case FullBlockChainSynced => syncingDone = true
+    case FullBlockChainIsSynced => syncingDone = true
   }
 
   def procCandidateBlock(c: CandidateBlock): Unit = {
