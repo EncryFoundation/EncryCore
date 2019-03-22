@@ -140,7 +140,7 @@ class PrioritySeveralNodesCommunicationTest extends TestKit(ActorSystem("MySpecN
 
     dm ! DataFromPeer(ModifiersNetworkMessage(message2), cP2)
 
-    Thread.sleep(15000)
+    Thread.sleep(10000)
 
     val result3 = Await.result(
       (dm ? GetSyncTrackerPeer).mapTo[Map[ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus)]],
