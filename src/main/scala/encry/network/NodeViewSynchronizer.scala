@@ -11,7 +11,7 @@ import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer}
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
-import encry.network.DeliveryManager.FullBlockChainSynced
+import encry.network.DeliveryManager.FullBlockChainIsSynced
 import BasicMessagesRepo._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -38,8 +38,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   var chainSynced: Boolean = false
   val deliveryManager: ActorRef = context.actorOf(
-    DeliveryManager.props(influxRef, nodeViewHolderRef, networkControllerRef, settings)
-     , "deliveryManager")
+    DeliveryManager.props(influxRef, nodeViewHolderRef, networkControllerRef, settings), "deliveryManager")
 
   override def preStart(): Unit = {
     val messageIds: Seq[Byte] = Seq(
@@ -120,9 +119,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       deliveryManager ! RequestFromLocal(peer, modifierTypeId, modifierIds)
     case StartMining => deliveryManager ! StartMining
     case DisableMining => deliveryManager ! DisableMining
-    case FullBlockChainSynced =>
+    case FullBlockChainIsSynced =>
       chainSynced = true
-      deliveryManager ! FullBlockChainSynced
+      deliveryManager ! FullBlockChainIsSynced
     case ResponseFromLocal(peer, typeId, modifiers: Seq[NodeViewModifier]) =>
       if (modifiers.nonEmpty) {
         logger.debug(s"Sent modifiers size is: ${modifiers.length}")

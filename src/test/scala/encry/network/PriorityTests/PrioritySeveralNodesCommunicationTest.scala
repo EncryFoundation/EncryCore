@@ -1,8 +1,7 @@
 package encry.network.PriorityTests
 
 import java.net.InetSocketAddress
-
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import akka.util.Timeout
@@ -11,9 +10,9 @@ import encry.consensus.History.HistoryComparisonResult
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.Block
 import encry.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage}
-import encry.network.DeliveryManager.GetStatusTrackerPeer
+import encry.network.DeliveryManager.GetSyncTrackerPeer
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.network.NodeViewSynchronizer.ReceivableMessages.HandshakedPeer
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, HistoryChanges}
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
 import encry.network.DeliveryManager
@@ -24,9 +23,9 @@ import encry.view.EncryNodeViewHolder.DownloadRequest
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import supertagged.@@
-
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import encry.view.history.EncryHistory
 
 /**
   * This test simulates DeliveryManager behaviour connected with the logic of choosing nodes relative to priority.
@@ -65,9 +64,12 @@ class PrioritySeveralNodesCommunicationTest extends TestKit(ActorSystem("MySpecN
   implicit val timeout: Timeout = Timeout(1.minutes)
   val settings: EncryAppSettings = EncryAppSettings.read
   val dm: ActorRef = system
-    .actorOf(Props(classOf[DeliveryManager], None, TestProbe().ref, TestProbe().ref, system, settings))
+    .actorOf(DeliveryManager.props(None, TestProbe().ref, TestProbe().ref, settings))
 
   "Several nodes test" should "show right behavior" in {
+
+    val history: EncryHistory = generateDummyHistory(settings)
+    dm ! HistoryChanges(history)
 
     val blocksV: Vector[Block] = (0 until 20).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
       case ((prevHistory, blocks), _) =>
@@ -104,7 +106,7 @@ class PrioritySeveralNodesCommunicationTest extends TestKit(ActorSystem("MySpecN
     Thread.sleep(10000)
 
     val result1 = Await.result(
-      (dm ? GetStatusTrackerPeer).mapTo[Map[ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus)]],
+      (dm ? GetSyncTrackerPeer).mapTo[Map[ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus)]],
       1.minutes
     )
 
@@ -120,7 +122,7 @@ class PrioritySeveralNodesCommunicationTest extends TestKit(ActorSystem("MySpecN
     Thread.sleep(10000)
 
     val result2 = Await.result(
-      (dm ? GetStatusTrackerPeer).mapTo[Map[ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus)]],
+      (dm ? GetSyncTrackerPeer).mapTo[Map[ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus)]],
       1.minutes
     )
 
@@ -141,7 +143,7 @@ class PrioritySeveralNodesCommunicationTest extends TestKit(ActorSystem("MySpecN
     Thread.sleep(15000)
 
     val result3 = Await.result(
-      (dm ? GetStatusTrackerPeer).mapTo[Map[ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus)]],
+      (dm ? GetSyncTrackerPeer).mapTo[Map[ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus)]],
       1.minutes
     )
 

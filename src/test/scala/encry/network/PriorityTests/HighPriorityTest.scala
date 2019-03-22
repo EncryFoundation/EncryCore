@@ -2,7 +2,7 @@ package encry.network.PriorityTests
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import akka.util.Timeout
@@ -11,9 +11,9 @@ import encry.consensus.History.HistoryComparisonResult
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.Block
 import encry.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage}
-import encry.network.DeliveryManager.GetStatusTrackerPeer
+import encry.network.DeliveryManager.GetSyncTrackerPeer
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.network.NodeViewSynchronizer.ReceivableMessages.HandshakedPeer
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, HistoryChanges}
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
 import encry.network.DeliveryManager
@@ -21,6 +21,7 @@ import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.utils.{CoreTaggedTypes, EncryGenerator}
 import encry.view.EncryNodeViewHolder.DownloadRequest
+import encry.view.history.EncryHistory
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import supertagged.@@
@@ -53,9 +54,12 @@ class HighPriorityTest extends TestKit(ActorSystem("MySpecN"))
   implicit val timeout: Timeout = Timeout(1.minutes)
   val settings: EncryAppSettings = EncryAppSettings.read
   val dm: ActorRef = system
-    .actorOf(Props(classOf[DeliveryManager], None, TestProbe().ref, TestProbe().ref, system, settings))
+    .actorOf(DeliveryManager.props(None, TestProbe().ref, TestProbe().ref, settings))
 
   "High priority test" should "show HighPriority ( 4 )" in {
+
+    val history: EncryHistory = generateDummyHistory(settings)
+    dm ! HistoryChanges(history)
 
     val blocksV: Vector[Block] = (0 until 10).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
       case ((prevHistory, blocks), _) =>
@@ -87,7 +91,7 @@ class HighPriorityTest extends TestKit(ActorSystem("MySpecN"))
     Thread.sleep(10000)
 
     val result = Await.result(
-      (dm ? GetStatusTrackerPeer).mapTo[Map[ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus)]],
+      (dm ? GetSyncTrackerPeer).mapTo[Map[ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus)]],
       1.minutes
     )
 

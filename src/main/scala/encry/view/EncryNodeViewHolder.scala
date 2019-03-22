@@ -16,7 +16,7 @@ import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer, TransactionSerializer}
 import encry.modifiers.state.box.EncryProposition
 import encry.network.AuxiliaryHistoryHolder.{Append, ReportModifierInvalid, ReportModifierValid}
-import encry.network.DeliveryManager.FullBlockChainSynced
+import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
@@ -160,10 +160,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       updatedState.getOrElse(nodeView.state),
       updatedVault.getOrElse(nodeView.wallet),
       updatedMempool.getOrElse(nodeView.mempool))
-    if (updatedHistory.nonEmpty) {
-      context.system.eventStream.publish(ChangedHistory(newNodeView.history))
-      context.system.eventStream.publish(HistoryChanges(newNodeView.history))
-    }
+    if (updatedHistory.nonEmpty) context.system.eventStream.publish(ChangedHistory(newNodeView.history))
     if (updatedState.nonEmpty) context.system.eventStream.publish(ChangedState(newNodeView.state))
     if (updatedMempool.nonEmpty) context.system.eventStream.publish(ChangedMempool(newNodeView.mempool))
     nodeView = newNodeView
@@ -294,7 +291,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
                   context.actorSelection("/user/statsSender") !
                     BestHeaderInChain(header, System.currentTimeMillis()))
               if (newHistory.isFullChainSynced)
-                Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
+                Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
               updateNodeView(Some(newHistory), Some(newMinState), Some(nodeView.wallet), Some(newMemPool))
             case Failure(e) =>
               logger.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
