@@ -90,7 +90,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
 
     case block: Block =>
       logger.info(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
-        s"root hash ${Algos.encode(rootHash)} at height $height")
+        s"root hash ${Algos.encode(rootHash)} at height $height.")
       statsSenderRef.foreach(_ ! TxsInBlock(block.payload.transactions.size))
       applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] = metadata(
