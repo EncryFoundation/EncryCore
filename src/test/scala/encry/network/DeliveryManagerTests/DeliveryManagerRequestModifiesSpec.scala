@@ -77,5 +77,11 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
         .size == blocks._2.size)
       assert(deliveryManager.underlyingActor.headersForPriorityRequest.isEmpty)
     }
+    "choose correct peer in priority request" in {
+      val blocks: List[Block] = generateBlocks(10, generateDummyHistory(settings))._2
+      val newPeer1 = new InetSocketAddress("172.16.13.15", 9001)
+      val peer1: ConnectedPeer = ConnectedPeer(newPeer1, deliveryManager, Incoming,
+        Handshake(protocolToBytes(settings.network.appVersion), "peer1", Some(newPeer), System.currentTimeMillis()))
+    }
   }
 }

@@ -104,7 +104,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         for ((id, _) <- modifiers) receive(typeId, id, remote, isBlockChainSynced)
         if (spam.nonEmpty) {
           logger.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
-            s": ${spam.keys.map(Algos.encode)}")
+            s": ${spam.keys.map(Algos.encode)}.")
           deleteSpam(spam.keys.toSeq)
         }
         val filteredModifiers: Seq[Array[Byte]] = fm.filterNot { case (modId, _) => history.contains(modId) }.values.toSeq
@@ -132,7 +132,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * If node is not synced, send sync info to random peer, otherwise to all known peers.
     *
     * @param syncInfo           - sync info
-    * @param isBlockChainSynced - current blockchain status
+    * @param isBlockChainSynced - current block chain status
     */
   def sendSync(syncInfo: EncrySyncInfo, isBlockChainSynced: Boolean): Unit =
     if (isBlockChainSynced) syncTracker.peersToSyncWith.foreach(peer => peer.handlerRef ! SyncInfoNetworkMessage(syncInfo))
