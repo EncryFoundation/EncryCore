@@ -55,7 +55,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     networkControllerRef ! RegisterMessagesHandler(Seq(ModifiersNetworkMessage.NetworkMessageTypeID), self)
 
   override def receive: Receive = {
-    case HistoryChanges(historyReader) =>
+    case UpdatedHistory(historyReader) =>
       unstashAll()
       logger.info(s"Got message with history. All messages will be unstashed. Starting all schedulers.")
       context.system.scheduler.schedule(5.second, settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
@@ -125,7 +125,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case FullBlockChainIsSynced => context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining))
     case StartMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = true))
     case DisableMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = false))
-    case HistoryChanges(historyReader) => context.become(basicMessageHandler(historyReader, isBlockChainSynced, isMining))
+    case UpdatedHistory(historyReader) => context.become(basicMessageHandler(historyReader, isBlockChainSynced, isMining))
     case message => logger.info(s"Got strange message $message on DeliveryManager.")
   }
   /**

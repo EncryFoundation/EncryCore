@@ -13,7 +13,7 @@ import encry.modifiers.history.Block
 import encry.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage}
 import encry.network.DeliveryManager.GetSyncTrackerPeer
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, HistoryChanges}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, UpdatedHistory}
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
 import encry.network.DeliveryManager
@@ -59,7 +59,7 @@ class HighPriorityTest extends TestKit(ActorSystem("MySpecN"))
   "High priority test" should "show HighPriority ( 4 )" in {
 
     val history: EncryHistory = generateDummyHistory(settings)
-    dm ! HistoryChanges(history)
+    dm ! UpdatedHistory(history)
 
     val blocksV: Vector[Block] = (0 until 10).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
       case ((prevHistory, blocks), _) =>

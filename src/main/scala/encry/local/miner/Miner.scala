@@ -94,7 +94,7 @@ class Miner extends Actor with StrictLogging {
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
-    case msg => logger.info(s"Miner dead letter: $FullBlockChainIsSynced")
+    case msg => logger.info(s"Miner received strange message: $msg.")
   }
 
   def miningEnabled: Receive =

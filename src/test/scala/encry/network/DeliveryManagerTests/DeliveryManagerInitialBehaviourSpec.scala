@@ -6,7 +6,7 @@ import akka.testkit.{TestActorRef, TestProbe}
 import encry.modifiers.InstanceFactory
 import encry.network.BasicMessagesRepo.Handshake
 import encry.network.DeliveryManager
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, HistoryChanges}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, UpdatedHistory}
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
@@ -36,7 +36,7 @@ class DeliveryManagerInitialBehaviourSpec extends WordSpecLike with BeforeAndAft
 
       deliveryManager ! HandshakedPeer(peer)
       assert(deliveryManager.underlyingActor.syncTracker.statuses.isEmpty)
-      deliveryManager ! HistoryChanges(history)
+      deliveryManager ! UpdatedHistory(history)
       deliveryManager ! HandshakedPeer(peer2)
       assert(deliveryManager.underlyingActor.syncTracker.statuses.size == 2)
       deliveryManager.stop()

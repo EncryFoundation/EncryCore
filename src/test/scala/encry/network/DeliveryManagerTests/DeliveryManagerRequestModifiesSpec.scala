@@ -26,7 +26,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
   override def afterAll(): Unit = system.terminate()
 
   "RequestModifies" should {
-    val initialState = initialiseDeliveryManager(isBlockChainSynced = true, isMining = true, settings, system)
+    val initialState = initialiseDeliveryManager(isBlockChainSynced = true, isMining = true, settings)
     val deliveryManager = initialState._1
     val newPeer = new InetSocketAddress("172.16.13.10", 9001)
     val peer: ConnectedPeer = ConnectedPeer(newPeer, deliveryManager, Incoming,

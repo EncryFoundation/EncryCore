@@ -11,7 +11,7 @@ import encry.modifiers.InstanceFactory
 import encry.modifiers.history.Block
 import encry.network.BasicMessagesRepo.Handshake
 import encry.network.DeliveryManager.GetSyncTrackerPeer
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, HistoryChanges}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, UpdatedHistory}
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
 import encry.network.DeliveryManager
@@ -54,7 +54,7 @@ class BadPriorityTest extends TestKit(ActorSystem("MySpecN"))
   "Bad priority test" should "show BadPriority ( 1 )" in {
 
     val history: EncryHistory = generateDummyHistory(settings)
-    dm ! HistoryChanges(history)
+    dm ! UpdatedHistory(history)
 
     val blocks1V: Vector[Block] = (0 until 10).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
       case ((prevHistory, blocks), _) =>

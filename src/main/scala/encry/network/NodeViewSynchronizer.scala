@@ -66,7 +66,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       }
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
-      deliveryManager ! HistoryChanges(reader)
+      deliveryManager ! UpdatedHistory(reader)
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] =>
       mempoolReaderOpt = Some(reader)
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
@@ -180,7 +180,7 @@ object NodeViewSynchronizer {
 
     case class ChangedHistory[HR <: EncryHistoryReader](reader: HR) extends NodeViewChange
 
-    case class HistoryChanges(history: EncryHistory)
+    case class UpdatedHistory(history: EncryHistory)
 
     case class ChangedMempool[MR <: MempoolReader](mempool: MR) extends NodeViewChange
 
