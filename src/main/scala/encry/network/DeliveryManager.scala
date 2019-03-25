@@ -132,7 +132,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   }
 
   /**
-    * If node is not synced, send sync info to random peer, otherwise to all known peers
+    * If node is not synced, send sync info to random peer, otherwise to all known peers.
     *
     * @param syncInfo
     */

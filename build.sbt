@@ -87,7 +87,8 @@ libraryDependencies ++= Seq(
   "org.typelevel" % "cats-core_2.12" % "1.0.1",
   "org.typelevel" % "cats-kernel_2.12" % "1.0.1",
   "org.typelevel" % "cats-macros_2.12" % "1.0.1",
-  "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf"
+  "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf",
+  "com.google.guava" % "guava" % "27.1-jre"
 ) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
@@ -103,8 +104,8 @@ evictionWarningOptions in update := EvictionWarningOptions.default
 logLevel := Level.Info
 val opts = Seq(
   "-server",
-  "-Xms2G",
-  "-Xmx4G",
+  "-Xms1G",
+  "-Xmx2G",
   "-XX:+ExitOnOutOfMemoryError",
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
