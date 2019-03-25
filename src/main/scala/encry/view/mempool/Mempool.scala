@@ -44,7 +44,7 @@ class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
         Success(putWithoutCheck(validTxs.take(validTxs.size - overflow)))
       }
     } else Failure(new Exception(s"Failed to put transaction ${txs.map(tx => Algos.encode(tx.id)).mkString(",")} " +
-      s"into pool cause it's already there."))
+      s"into pool cause it's already there"))
   }
 
   def putWithoutCheck(txs: Iterable[Transaction]): Mempool = {
