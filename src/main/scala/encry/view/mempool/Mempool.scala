@@ -41,7 +41,6 @@ class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
       else {
         removeExpired()
         val overflow: Int = (size + validTxs.size) - settings.node.mempoolMaxCapacity
-        validTxs.foreach(tx => bloomFilterForMemoryPool.put(Algos.encode(tx.id)))
         Success(putWithoutCheck(validTxs.take(validTxs.size - overflow)))
       }
     } else Failure(new Exception(s"Failed to put transaction ${txs.map(tx => Algos.encode(tx.id)).mkString(",")} " +
@@ -70,8 +69,12 @@ class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
     this
   }
 
-  def notIn(ids: Seq[ModifierId]): Seq[ModifierId] =
-    ids.filterNot(id => bloomFilterForMemoryPool.mightContain(Algos.encode(id)))
+  def notRequested(ids: Seq[ModifierId]): Seq[ModifierId] =
+    ids.flatMap(id => if (bloomFilterForMemoryPool.mightContain(Algos.encode(id))) None
+     else {
+      bloomFilterForMemoryPool.put(Algos.encode(id))
+      Some(id)
+    })
 
   def putElementToBloomFilter(id: ModifierId): Unit = bloomFilterForMemoryPool.put(Algos.encode(id))
 

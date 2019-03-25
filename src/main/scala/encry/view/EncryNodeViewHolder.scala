@@ -133,7 +133,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       if (mempool) sender() ! ChangedMempool(nodeView.mempool)
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] = modifierTypeId match {
-        case Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
+        case Transaction.ModifierTypeId => nodeView.mempool.notRequested(modifierIds)
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
       if (ids.nonEmpty) sender() ! RequestFromLocal(peer, modifierTypeId, ids)
