@@ -1,7 +1,7 @@
 package encry.network
 
 import java.net.InetAddress
-import akka.actor.{Actor, ActorRef, Cancellable, Props, Stash}
+import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
