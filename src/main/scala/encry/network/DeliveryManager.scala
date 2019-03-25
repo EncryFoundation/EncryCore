@@ -29,7 +29,7 @@ import encry.modifiers.history.Header
 class DeliveryManager(influxRef: Option[ActorRef],
                       nodeViewHolderRef: ActorRef,
                       networkControllerRef: ActorRef,
-                      settings: EncryAppSettings) extends Actor with StrictLogging with Stash {
+                      settings: EncryAppSettings) extends Actor with StrictLogging {
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
@@ -56,15 +56,13 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
   override def receive: Receive = {
     case UpdatedHistory(historyReader) =>
-      unstashAll()
-      logger.info(s"Got message with history. All messages will be unstashed. Starting all schedulers.")
+      logger.info(s"Got message with history. Starting normal actor's work.")
       context.system.scheduler.schedule(5.second, settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
       context.system.scheduler.schedule(5.second, settings.network.updatePriorityTime.seconds)(syncTracker.updatePeersPriorityStatus())
       syncTracker.scheduleSendSyncInfo()
       context.become(basicMessageHandler(historyReader, isBlockChainSynced = false, isMining = false))
     case message =>
-      logger.info(s"Got new message $message while awaiting history. This message will be stashed.")
-      stash()
+      logger.info(s"Got new message $message while awaiting history.")
   }
 
   def basicMessageHandler(history: EncryHistory, isBlockChainSynced: Boolean, isMining: Boolean): Receive = {

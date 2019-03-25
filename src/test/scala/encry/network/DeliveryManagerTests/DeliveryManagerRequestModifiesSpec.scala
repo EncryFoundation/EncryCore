@@ -1,7 +1,6 @@
 package encry.network.DeliveryManagerTests
 
 import java.net.InetSocketAddress
-
 import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 import encry.consensus.History.Older
