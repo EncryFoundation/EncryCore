@@ -71,7 +71,7 @@ class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
 
   def notRequested(ids: Seq[ModifierId]): Seq[ModifierId] =
     ids.collect {
-      case id: Array[Byte] if !bloomFilterForMemoryPool.mightContain(Algos.encode(id)) =>
+      case id: ModifierId if !bloomFilterForMemoryPool.mightContain(Algos.encode(id)) =>
         bloomFilterForMemoryPool.put(Algos.encode(id))
         id
     }
