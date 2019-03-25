@@ -129,6 +129,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         logger.info("Trying to send sync info too often")
       else historyReaderOpt.foreach(r => sendSync(r.syncInfo))
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
+      logger.info("Get history on delmanager")
       historyReaderOpt = Some(reader)
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] => mempoolReaderOpt = Some(reader)
     case GetStatusTrackerPeer => sender() ! syncTracker.statuses

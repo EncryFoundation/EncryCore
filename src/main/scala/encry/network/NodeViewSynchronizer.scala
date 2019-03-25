@@ -65,8 +65,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         case tx: Transaction => broadcastModifierInv(tx)
         case _ => //Do nothing
       }
-    case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
+    case AuxHistoryChanged(history) =>
+      historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
+      logger.info("Get history on nvs send to delivery manager")
       deliveryManager ! ChangedHistory(reader)
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] =>
       mempoolReaderOpt = Some(reader)
