@@ -19,7 +19,7 @@ class MempoolBloomFilterSpec extends WordSpecLike with EncryGenerator with Match
   val transactions: Seq[Transaction] = genValidPaymentTxs(transactionsNumber)
 
   transactions.foreach { tx =>
-    val checkTx: Seq[ModifierId] = mempool.notIn(Seq(tx.id))
+    val checkTx: Seq[ModifierId] = mempool.notRequested(Seq(tx.id))
     if (checkTx.nonEmpty) {
       mempool.put(tx)
     }
@@ -33,7 +33,7 @@ class MempoolBloomFilterSpec extends WordSpecLike with EncryGenerator with Match
 
     "not allow to put repeating transactions" in {
       transactions.foreach { tx =>
-        val checkTx: Seq[ModifierId] = mempool.notIn(Seq(tx.id))
+        val checkTx: Seq[ModifierId] = mempool.notRequested(Seq(tx.id))
         if (checkTx.nonEmpty) {
           mempool.put(tx)
         }
@@ -44,7 +44,7 @@ class MempoolBloomFilterSpec extends WordSpecLike with EncryGenerator with Match
     "allow to put new uniq transactions into mempool with nonEmpty bloom filter" in {
       val uniqTransactions: Seq[Transaction] = genValidPaymentTxs(transactionsNumber)
       uniqTransactions.foreach { tx =>
-        val checkTx: Seq[ModifierId] = mempool.notIn(Seq(tx.id))
+        val checkTx: Seq[ModifierId] = mempool.notRequested(Seq(tx.id))
         if (checkTx.nonEmpty) {
           mempool.put(tx)
         }
