@@ -23,7 +23,7 @@ class NetworkController extends Actor with StrictLogging {
 
   val networkSettings: NetworkSettings = settings.network
   val peerSynchronizer: ActorRef =
-    context.actorOf(Props[PeerSynchronizer].withDispatcher("network-dispatcher"), "peerSynchronizer")
+    context.actorOf(Props[PeerSynchronizer], "peerSynchronizer")
   var messagesHandlers: Map[Seq[Byte], ActorRef] = Map.empty
   var outgoing: Set[InetSocketAddress] = Set.empty
   lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse None
@@ -68,7 +68,7 @@ class NetworkController extends Actor with StrictLogging {
 
   def businessLogic: Receive = {
     case MessageFromNetwork(message, Some(remote)) if message.isValid(settings) =>
-      logger.info(s"Got ${message.messageName} on the NetworkController.")
+      logger.debug(s"Got ${message.messageName} on the NetworkController.")
       findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
     case MessageFromNetwork(message, Some(remote)) =>
       logger.info(s"Invalid message type: ${message.messageName} from remote $remote")
@@ -99,8 +99,7 @@ class NetworkController extends Actor with StrictLogging {
         case Outgoing => s"New outgoing connection to $remote established (bound to local $local)"
       }
       logger.info(logMsg)
-      context.actorOf(PeerConnectionHandler.props(sender(), direction, externalSocketAddress, remote)
-        .withDispatcher("network-dispatcher"))
+      context.actorOf(PeerConnectionHandler.props(sender(), direction, externalSocketAddress, remote))
       outgoing -= remote
     case Connected(remote, _) =>
       logger.info(s"Peer $remote trying to connect, but checkPossibilityToAddPeer(remote):" +
