@@ -79,6 +79,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case CheckModifiersToDownload =>
       logger.info(s"received checkModifiersToDownload! historyReaderOpt: ${historyReaderOpt}")
       historyReaderOpt.foreach { h =>
+        logger.info(s"Best height: ${h.bestHeaderHeight}")
+        logger.info(s"Best header id: ${h.bestHeaderOpt.map(header => Algos.encode(header.id))}")
         val currentQueue: HashSet[ModifierId] =
           requestedModifiers.flatMap { case (_, modIds) =>
             modIds.keys.map(modId => ModifierId @@ modId.toArray)
