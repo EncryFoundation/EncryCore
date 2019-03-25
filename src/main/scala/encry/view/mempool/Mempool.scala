@@ -10,6 +10,7 @@ import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.mempool.Mempool._
 import org.encryfoundation.common.Algos
+import scala.concurrent.duration._
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -21,6 +22,8 @@ class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
               system: ActorSystem) extends MempoolReader with AutoCloseable with StrictLogging {
 
   var bloomFilterForMemoryPool: BloomFilter[String] = createBloomFilter
+
+  system.scheduler.schedule(5.seconds, settings.node.bloomFilterCleanupInterval)(reInitBloomFilter())
 
   private def removeExpired(): Mempool =
     filter(tx => (timeProvider.estimatedTime - tx.timestamp) > settings.node.utxMaxAge.toMillis)
@@ -38,6 +41,7 @@ class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
       else {
         removeExpired()
         val overflow: Int = (size + validTxs.size) - settings.node.mempoolMaxCapacity
+        validTxs.foreach(tx => bloomFilterForMemoryPool.put(Algos.encode(tx.id)))
         Success(putWithoutCheck(validTxs.take(validTxs.size - overflow)))
       }
     } else Failure(new Exception(s"Failed to put transaction ${txs.map(tx => Algos.encode(tx.id)).mkString(",")} " +
@@ -66,7 +70,7 @@ class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
     this
   }
 
-  def checkIfContains(ids: Seq[ModifierId]): Seq[ModifierId] =
+  def notIn(ids: Seq[ModifierId]): Seq[ModifierId] =
     ids.filterNot(id => bloomFilterForMemoryPool.mightContain(Algos.encode(id)))
 
   def putElementToBloomFilter(id: ModifierId): Unit = bloomFilterForMemoryPool.put(Algos.encode(id))
@@ -75,8 +79,6 @@ class Mempool(val unconfirmed: TrieMap[TxKey, Transaction],
 
   def createBloomFilter: BloomFilter[String] = BloomFilter.create(
     Funnels.stringFunnel(Charsets.UTF_8), settings.node.bloomFilterCapacity, settings.node.bloomFilterFailureProbability)
-
-  def notIn(ids: Seq[ModifierId]): Seq[ModifierId] = ids.filterNot(id => contains(id))
 }
 
 object Mempool {

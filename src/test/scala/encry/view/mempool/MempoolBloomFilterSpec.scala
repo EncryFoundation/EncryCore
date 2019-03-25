@@ -19,24 +19,22 @@ class MempoolBloomFilterSpec extends WordSpecLike with EncryGenerator with Match
   val transactions: Seq[Transaction] = genValidPaymentTxs(transactionsNumber)
 
   transactions.foreach { tx =>
-    val checkTx: Seq[ModifierId] = mempool.checkIfContains(Seq(tx.id))
+    val checkTx: Seq[ModifierId] = mempool.notIn(Seq(tx.id))
     if (checkTx.nonEmpty) {
-      mempool.putElementToBloomFilter(tx.id)
       mempool.put(tx)
     }
   }
 
   "Bloom filter" should {
 
-    "allow to put new uniq transaction" in {
+    "allow to put new unique transaction" in {
       mempool.unconfirmed.values.size shouldBe transactions.size
     }
 
     "not allow to put repeating transactions" in {
       transactions.foreach { tx =>
-        val checkTx: Seq[ModifierId] = mempool.checkIfContains(Seq(tx.id))
+        val checkTx: Seq[ModifierId] = mempool.notIn(Seq(tx.id))
         if (checkTx.nonEmpty) {
-          mempool.putElementToBloomFilter(tx.id)
           mempool.put(tx)
         }
       }
@@ -46,9 +44,8 @@ class MempoolBloomFilterSpec extends WordSpecLike with EncryGenerator with Match
     "allow to put new uniq transactions into mempool with nonEmpty bloom filter" in {
       val uniqTransactions: Seq[Transaction] = genValidPaymentTxs(transactionsNumber)
       uniqTransactions.foreach { tx =>
-        val checkTx: Seq[ModifierId] = mempool.checkIfContains(Seq(tx.id))
+        val checkTx: Seq[ModifierId] = mempool.notIn(Seq(tx.id))
         if (checkTx.nonEmpty) {
-          mempool.putElementToBloomFilter(tx.id)
           mempool.put(tx)
         }
       }

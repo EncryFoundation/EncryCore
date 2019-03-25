@@ -76,12 +76,9 @@ object BloomFilterBenchmark {
     val transactions3: Seq[Transaction] = genValidPaymentTxs(100000)
 
     def getUniqTransactions(mempool: Mempool, transactions: Seq[Transaction]): Unit = transactions.foreach { tx =>
-      val filteredTxs: Seq[ModifierId] = mempool.checkIfContains(Seq(tx.id))
+      val filteredTxs: Seq[ModifierId] = mempool.notIn(Seq(tx.id))
       if (filteredTxs.nonEmpty) {
-        mempool.putElementToBloomFilter(tx.id)
-//        println(mempool.bloomFilterForMemoryPool.approximateElementCount())
         mempool.put(tx)
-//        println(mempool.unconfirmed.size)
       }
     }
   }
