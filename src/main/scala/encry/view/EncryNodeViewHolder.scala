@@ -290,8 +290,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
                 newHistory.bestHeaderOpt.foreach(header =>
                   context.actorSelection("/user/statsSender") !
                     BestHeaderInChain(header, System.currentTimeMillis()))
-              if (newHistory.isFullChainSynced)
+              if (newHistory.isFullChainSynced) {
+                logger.info(s"blockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
                 Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
+              }
               updateNodeView(Some(newHistory), Some(newMinState), Some(nodeView.wallet), Some(newMemPool))
             case Failure(e) =>
               logger.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +

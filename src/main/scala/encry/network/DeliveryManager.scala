@@ -120,7 +120,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
         logger.info("Trying to send sync info too often")
       else sendSync(history.syncInfo, isBlockChainSynced)
     case GetSyncTrackerPeer => sender() ! syncTracker.statuses
-    case FullBlockChainIsSynced => context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining))
+    case FullBlockChainIsSynced =>
+      logger.info("FullBlockChainIsSynced on delivery manager!")
+      context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining))
     case StartMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = true))
     case DisableMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = false))
     case UpdatedHistory(historyReader) => context.become(basicMessageHandler(historyReader, isBlockChainSynced, isMining))
