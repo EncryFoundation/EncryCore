@@ -159,7 +159,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       isMining: Boolean): Unit = {
     val firstCondition: Boolean = mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining
     val secondCondition: Boolean = mTypeId != Transaction.ModifierTypeId
-    val thirdCondition: Boolean = syncTracker.statuses.get(peer).exists(_._1 != Younger)
+    val thirdCondition: Boolean = syncTracker.statuses.get(peer.socketAddress.getAddress).exists(_._1 != Younger)
 
     if ((firstCondition || secondCondition) && thirdCondition) {
       val requestedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, PeerPriorityStatus)] = expectedModifiers
@@ -199,11 +199,11 @@ class DeliveryManager(influxRef: Option[ActorRef],
       expectedModifiers.getOrElse(peer.socketAddress.getAddress, Map.empty)
     peerRequests.get(toKey(modId)) match {
       case Some((timer, attempts)) =>
-        syncTracker.statuses.find { case (innerPeer, (cResult, _)) =>
-          innerPeer.socketAddress == peer.socketAddress && cResult != Younger
+        syncTracker.statuses.find { case (innerPeerAddr, (cResult, _, cP)) =>
+          innerPeerAddr == peer.socketAddress.getAddress && cResult != Younger
         }.foreach {
-          case (localPeer, _) if attempts < settings.network.maxDeliveryChecks && peerRequests.contains(toKey(modId)) =>
-            localPeer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
+          case (_, (_, _, cP)) if attempts < settings.network.maxDeliveryChecks && peerRequests.contains(toKey(modId)) =>
+            cP.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
             logger.debug(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
               s"$mTypeId with id: ${Algos.encode(modId)}")
             syncTracker.incrementRequest(peer)
@@ -275,10 +275,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       isBlockChainSynced: Boolean,
                       isMining: Boolean): Unit = headersForPriorityRequest.get(toKey(headerId)) match {
     case Some(addresses) if addresses.nonEmpty =>
-      syncTracker.statuses.find(_._1.socketAddress.getAddress == addresses.head) match {
-        case Some((peer, _)) =>
+      syncTracker.statuses.find(_._1 == addresses.head) match {
+        case Some((_, (_, _, cP))) =>
           headersForPriorityRequest = headersForPriorityRequest - toKey(headerId)
-          requestModifies(history, peer, modifierTypeId, Seq(modifierIds), isBlockChainSynced, isMining)
+          requestModifies(history, cP, modifierTypeId, Seq(modifierIds), isBlockChainSynced, isMining)
         case None => requestDownload(modifierTypeId, Seq(modifierIds), history, isBlockChainSynced, isMining)
       }
     case _ => requestDownload(modifierTypeId, Seq(modifierIds), history, isBlockChainSynced, isMining)
@@ -303,17 +303,17 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       isBlockChainSynced: Boolean,
                       isMining: Boolean): Unit =
     if (!isBlockChainSynced) syncTracker.getPeersForConnection.lastOption match {
-      case Some((peer, _)) =>
+      case Some((_, (_, _, cP))) =>
         influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
-        requestModifies(history, peer, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
+        requestModifies(history, cP, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
       case None => logger.info(s"BlockChain is not synced. There is no nodes, which we can connect with.")
     }
     else syncTracker.getPeersForConnection match {
       case coll: Vector[_] if coll.nonEmpty =>
         influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
-        coll.foreach { case (peer, _) =>
-          logger.debug(s"Sent download request to the ${peer.socketAddress}.")
-          requestModifies(history, peer, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
+        coll.foreach { case (_, (_, _, cP)) =>
+          logger.debug(s"Sent download request to the ${cP.socketAddress}.")
+          requestModifies(history, cP, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
         }
       case _ => logger.info(s"BlockChain is synced. There is no nodes, which we can connect with.")
     }
