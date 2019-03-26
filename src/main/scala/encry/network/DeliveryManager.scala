@@ -115,7 +115,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
           deleteSpam(spam.keys.toSeq)
         }
         val filteredModifiers: Seq[Array[Byte]] = fm.filterNot { case (modId, _) =>
-          historyReaderOpt.map(_.contains(modId)).getOrElse(false)
+          historyReaderOpt.exists(_.contains(modId))
         }.values.toSeq
         if (filteredModifiers.nonEmpty) nodeViewHolderRef ! ModifiersFromRemote(typeId, filteredModifiers)
         historyReaderOpt.foreach { h =>
