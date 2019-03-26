@@ -82,12 +82,17 @@ class DeliveryManager(influxRef: Option[ActorRef],
         logger.info(s"Best height: ${h.bestHeaderHeight}")
         logger.info(s"Best header id: ${h.bestHeaderOpt.map(header => Algos.encode(header.id))}")
         val currentQueue: HashSet[ModifierId] =
-          requestedModifiers.flatMap { case (_, modIds) =>
+          requestedModifiers.flatMap { case (cp, modIds) =>
+            logger.info(s"Expecting from peer ${cp.socketAddress} mods: " +
+              s"${modIds.keys.map(modIdAsKey => Algos.encode(modIdAsKey.toArray).mkString(","))}")
             modIds.keys.map(modId => ModifierId @@ modId.toArray)
           }.to[HashSet]
         logger.info(s"currentQueue(${currentQueue.size}): ${currentQueue.map(Algos.encode).mkString(",")}")
-        val newIds: Seq[(ModifierTypeId, ModifierId)] =
+        val modsToDownload =
           h.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
+        logger.info(s"Mods to download: ${modsToDownload.map(elem => Algos.encode(elem._2)).mkString(",")}")
+        val newIds: Seq[(ModifierTypeId, ModifierId)] =
+          modsToDownload
             .filterNot(modId => currentQueue.contains(modId._2))
         logger.info(s"New ids(${newIds.length}): ${newIds.map(elem => Algos.encode(elem._2)).mkString(",")}")
         if (newIds.nonEmpty) newIds.groupBy(_._1).foreach {
@@ -110,7 +115,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
           deleteSpam(spam.keys.toSeq)
         }
         val filteredModifiers: Seq[Array[Byte]] = fm.filterNot { case (modId, _) =>
-          historyReaderOpt.contains(modId)
+          historyReaderOpt.map(_.contains(modId)).getOrElse(false)
         }.values.toSeq
         if (filteredModifiers.nonEmpty) nodeViewHolderRef ! ModifiersFromRemote(typeId, filteredModifiers)
         historyReaderOpt.foreach { h =>
