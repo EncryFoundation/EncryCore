@@ -304,7 +304,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         } else {
           if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.modifierTypeId) context.system
             .actorSelection("user/statsSender") ! NewBlockAppended(true, true)
-          if (isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
+          if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Failure(e) =>
