@@ -60,7 +60,12 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case SyntacticallyFailedModification(_, _) =>
     case SemanticallySuccessfulModifier(mod) =>
       mod match {
-        case block: Block => broadcastModifierInv(block.header)
+        case block: Block =>
+          broadcastModifierInv(block.header)
+          modifiersRequestCache = Map(
+            Algos.encode(block.id) -> block.header,
+            Algos.encode(block.payload.id) -> block.payload
+          )
         case tx: Transaction => broadcastModifierInv(tx)
         case _ => //Do nothing
       }
