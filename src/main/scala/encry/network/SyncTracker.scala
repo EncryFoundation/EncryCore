@@ -92,7 +92,7 @@ case class SyncTracker(deliveryManager: ActorRef,
   }
 
   def clearStatus(remote: InetSocketAddress): Unit = {
-    statuses.keys.find(_.socketAddress == remote) match {
+    statuses.keys.find(_.socketAddress.getAddress == remote.getAddress) match {
       case Some(peer) => statuses -= peer
       case None => logger.warn(s"Trying to clear status for $remote, but it is not found")
     }
