@@ -1,6 +1,7 @@
 package encry.network
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{ActorContext, ActorRef, Cancellable}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
@@ -10,6 +11,7 @@ import encry.network.SyncTracker.PeerPriorityStatus
 import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
 import encry.settings.NetworkSettings
 import encry.utils.NetworkTime.Time
+
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -18,7 +20,7 @@ case class SyncTracker(deliveryManager: ActorRef,
                        context: ActorContext,
                        networkSettings: NetworkSettings) extends StrictLogging {
 
-  var statuses: Map[ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus)] = Map.empty
+  var statuses: Map[InetAddress, (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer)] = Map.empty
 
   private var schedule: Option[Cancellable] = None
   private val lastSyncSentTime: mutable.Map[ConnectedPeer, Time] = mutable.Map[ConnectedPeer, Time]()
@@ -35,43 +37,43 @@ case class SyncTracker(deliveryManager: ActorRef,
 
   private type Requested = Int
   private type Received = Int
-  private var peersNetworkCommunication: Map[ConnectedPeer, (Requested, Received)] = Map.empty
+  private var peersNetworkCommunication: Map[InetAddress, (Requested, Received)] = Map.empty
 
   def updatePeersPriorityStatus(): Unit = {
     peersNetworkCommunication.foreach { case (peer, (requested, received)) =>
       statuses.get(peer) match {
-        case Some((hcr, _)) =>
+        case Some((hcr, _, cp)) =>
           val priority: PeerPriorityStatus = PeerPriorityStatus.definePriorityStatus(requested, received)
-          logger.debug(s"Peer ${peer.socketAddress} has new priority: ${PeerPriorityStatus.toString(priority)}.")
-          statuses = statuses.updated(peer, (hcr, priority))
-        case None => logger.info(s"Can't update peer ${peer.socketAddress} priority. No such peer in status tracker")
+          logger.debug(s"Peer ${peer} has new priority: ${PeerPriorityStatus.toString(priority)}.")
+          statuses = statuses.updated(peer, (hcr, priority, cp))
+        case None => logger.info(s"Can't update peer ${peer} priority. No such peer in status tracker")
       }
     }
-    peersNetworkCommunication = Map.empty[ConnectedPeer, (Requested, Received)]
+    peersNetworkCommunication = Map.empty[InetAddress, (Requested, Received)]
   }
 
   def incrementRequest(peer: ConnectedPeer): Unit = {
-    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer, (0, 0))
+    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
     logger.debug(s"Updating request parameter from ${peer.socketAddress}. New one is: ${
       requestReceiveStat._1 + 1
     }")
     peersNetworkCommunication =
-      peersNetworkCommunication.updated(peer, (requestReceiveStat._1 + 1, requestReceiveStat._2))
+      peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1 + 1, requestReceiveStat._2))
   }
 
   def incrementReceive(peer: ConnectedPeer): Unit = {
-    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer, (0, 0))
+    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
     logger.debug(s"Updating received parameter from ${peer.socketAddress}. New one is: ${
       requestReceiveStat._2 + 1
     }")
     peersNetworkCommunication =
-      peersNetworkCommunication.updated(peer, (requestReceiveStat._1, requestReceiveStat._2 + 1))
+      peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1, requestReceiveStat._2 + 1))
   }
 
-  def getPeersForConnection: Vector[(ConnectedPeer, (HistoryComparisonResult, PeerPriorityStatus))] =
+  def getPeersForConnection: Vector[(InetAddress, (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer))] =
     statuses
-      .filter { case (_, (hcr, _)) => hcr != Younger }
-      .toVector.sortBy { case (_, (_, pps)) => pps }
+      .filter { case (_, (hcr, _, _)) => hcr != Younger }
+      .toVector.sortBy { case (_, (_, pps, _)) => pps }
 
   def scheduleSendSyncInfo(): Unit = {
     schedule.foreach(_.cancel())
@@ -81,9 +83,10 @@ case class SyncTracker(deliveryManager: ActorRef,
   }
 
   def updateStatus(peer: ConnectedPeer, status: HistoryComparisonResult): Unit = {
-    val priority: PeerPriorityStatus = statuses.getOrElse(peer, (Unknown, PeerPriorityStatus.InitialPriority))._2
+    val priority: PeerPriorityStatus =
+      statuses.getOrElse(peer.socketAddress.getAddress, (Unknown, PeerPriorityStatus.InitialPriority, peer))._2
     val seniorsBefore: Int = numberOfOlderNodes
-    statuses = statuses.updated(peer, (status, priority))
+    statuses = statuses.updated(peer.socketAddress.getAddress, (status, priority, peer))
     val olderAfter: Int = numberOfOlderNodes
     if (seniorsBefore > 0 && olderAfter == 0) {
       logger.info("Syncing is done, switching to stable regime")
@@ -92,7 +95,7 @@ case class SyncTracker(deliveryManager: ActorRef,
   }
 
   def clearStatus(remote: InetSocketAddress): Unit = {
-    statuses.keys.find(_.socketAddress.getAddress == remote.getAddress) match {
+    statuses.keys.find(_ == remote.getAddress) match {
       case Some(peer) => statuses -= peer
       case None => logger.warn(s"Trying to clear status for $remote, but it is not found")
     }
@@ -122,8 +125,12 @@ case class SyncTracker(deliveryManager: ActorRef,
     */
   def peersToSyncWith: Seq[ConnectedPeer] = {
     val outdated: Seq[ConnectedPeer] = outdatedPeers
-    lazy val unknowns: IndexedSeq[ConnectedPeer] = statuses.filter(_._2._1 == Unknown).keys.toIndexedSeq
-    lazy val olderNodes: IndexedSeq[ConnectedPeer] = statuses.filter(_._2._1 == Older).keys.toIndexedSeq
+    lazy val unknowns: IndexedSeq[ConnectedPeer] = statuses.collect{
+      case (_, (historyComparisonResult, _, cP)) if historyComparisonResult == Unknown => cP
+    }.toIndexedSeq
+    lazy val olderNodes: IndexedSeq[ConnectedPeer] = statuses.collect{
+      case (_, (historyComparisonResult, _, cP)) if historyComparisonResult == Older => cP
+    }.toIndexedSeq
     lazy val nonOutdated: IndexedSeq[ConnectedPeer] =
       if (olderNodes.nonEmpty) olderNodes(scala.util.Random.nextInt(olderNodes.size)) +: unknowns else unknowns
     val peers: Seq[ConnectedPeer] = if (outdated.nonEmpty) outdated
