@@ -8,12 +8,14 @@ import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import encry.EncryApp.settings
 import encry.EncryApp._
-import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, WorkingCycle, _}
+import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, _}
 import PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, MessageFromNetwork, NetworkMessage}
+import encry.network.BasicMessagesRepo._
+import PeerConnectionHandler.ReceivableMessages._
 import scala.annotation.tailrec
+import scala.collection.immutable.HashMap
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
 
@@ -22,40 +24,38 @@ class PeerConnectionHandler(connection: ActorRef,
                             ownSocketAddress: Option[InetSocketAddress],
                             remote: InetSocketAddress) extends Actor with StrictLogging {
 
-  import PeerConnectionHandler.ReceivableMessages._
-
   context watch connection
 
   var receivedHandshake: Option[Handshake] = None
   var selfPeer: Option[ConnectedPeer] = None
   var handshakeSent = false
   var handshakeTimeoutCancellableOpt: Option[Cancellable] = None
-  var chunksBuffer: ByteString = CompactByteString()
+  var chunksBuffer: ByteString = CompactByteString.empty
+  var outMessagesBuffer: HashMap[Long, ByteString] = HashMap.empty
+  var outMessagesCounter: Long = 0
+
+  override def preStart: Unit = {
+    peerManager ! DoConnecting(remote, direction)
+    handshakeTimeoutCancellableOpt = Some(context.system.scheduler.scheduleOnce(settings.network.handshakeTimeout)
+    (self ! HandshakeTimeout))
+    connection ! Register(self, keepOpenOnPeerClosed = false, useResumeWriting = true)
+    connection ! ResumeReading
+  }
+
+  override def postStop(): Unit = {
+    logger.info(s"Peer handler $self to $remote is destroyed.")
+    connection ! Close
+  }
+
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit =
+    logger.info(s"Reason of restarting actor $self: ${reason.toString}.")
 
   override def receive: Receive =
     startInteraction orElse
       receivedData orElse
       handshakeTimeout orElse
       handshakeDone orElse
-      processErrors(AwaitingHandshake) orElse deadNotIn
-
-  def processErrors(stateName: CommunicationState): Receive = {
-    case CommandFailed(w: Write) =>
-      logger.warn(s"Write failed :$w " + remote + s" in state $stateName")
-      connection ! Close
-      connection ! ResumeReading
-      connection ! ResumeWriting
-    case cc: ConnectionClosed =>
-      logger.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
-      peerManager ! Disconnected(remote)
-      context stop self
-    case CloseConnection =>
-      logger.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")
-      connection ! Close
-    case CommandFailed(cmd: Tcp.Command) =>
-      logger.info("Failed to execute command : " + cmd + s" in state $stateName")
-      connection ! ResumeReading
-  }
+      processErrors(AwaitingHandshake)
 
   def startInteraction: Receive = {
     case StartInteraction =>
@@ -74,18 +74,18 @@ class PeerConnectionHandler(connection: ActorRef,
 
   def receivedData: Receive = {
     case Received(data) => GeneralizedNetworkMessage.fromProto(data) match {
-        case Success(value) => value match {
-          case handshake: Handshake =>
-            logger.info(s"Got a Handshake from $remote.")
-            receivedHandshake = Some(handshake)
-            connection ! ResumeReading
-            if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
-          case message => logger.info(s"Have expecting handshake, but received ${message.messageName}.")
-        }
-        case Failure(exception) =>
-          logger.info(s"Error during parsing a handshake: $exception.")
-          self ! CloseConnection
+      case Success(value) => value match {
+        case handshake: Handshake =>
+          logger.info(s"Got a Handshake from $remote.")
+          receivedHandshake = Some(handshake)
+          connection ! ResumeReading
+          if (receivedHandshake.isDefined && handshakeSent) self ! HandshakeDone
+        case message => logger.info(s"Have expecting handshake, but received ${message.messageName}.")
       }
+      case Failure(exception) =>
+        logger.info(s"Error during parsing a handshake: $exception.")
+        self ! CloseConnection
+    }
   }
 
   def handshakeTimeout: Receive = {
@@ -102,24 +102,105 @@ class PeerConnectionHandler(connection: ActorRef,
       peerManager ! Handshaked(peer)
       handshakeTimeoutCancellableOpt.map(_.cancel())
       connection ! ResumeReading
-      logger.debug(s"Context become workingCycle on peerHandler")
-      context become workingCycle
+      logger.debug(s"Starting workingCycleWriting on peerHandler for $remote.")
+      context become workingCycleWriting
   }
 
-  def workingCycleLocalInterface: Receive = {
+  def processErrors(stateName: CommunicationState): Receive = {
+    case cc: ConnectionClosed =>
+      logger.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
+      peerManager ! Disconnected(remote)
+      context stop self
+    case CloseConnection =>
+      logger.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")
+      connection ! Close
+    case fail@CommandFailed(cmd: Tcp.Command) =>
+      logger.debug("Failed to execute command : " + cmd + s" in state $stateName cause ${fail.cause}")
+      connection ! ResumeReading
+    case message => logger.debug(s"Peer connection handler for $remote Got something strange: $message")
+  }
+
+  def workingCycleWriting: Receive =
+    workingCycleLocalInterfaceWritingMode orElse
+      workingCycleRemoteInterface orElse
+      processErrors(WorkingCycleWriting)
+
+  def workingCycleBuffering: Receive =
+    workingCycleLocalInterfaceBufferingMode orElse
+      workingCycleRemoteInterface orElse
+      processErrors(WorkingCycleBuffering)
+
+  def workingCycleLocalInterfaceWritingMode: Receive = {
     case message: NetworkMessage =>
-      def sendOutMessage(): Unit = {
+      def sendMessage(): Unit = {
+        outMessagesCounter += 1
         val messageToNetwork: Array[Byte] = GeneralizedNetworkMessage.toProto(message).toByteArray
         val bytes: ByteString = ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork)
-        connection ! Write(bytes)
+        connection ! Write(bytes, Ack(outMessagesCounter))
       }
-
       settings.network.addedMaxDelay match {
         case Some(delay) =>
-          context.system.scheduler.scheduleOnce(Random.nextInt(delay.toMillis.toInt).millis)(sendOutMessage())
-        case None => sendOutMessage()
+          context.system.scheduler.scheduleOnce(Random.nextInt(delay.toMillis.toInt).millis)(sendMessage())
+        case None => sendMessage()
       }
+    case fail@CommandFailed(Write(msg, Ack(id))) =>
+      logger.debug(s"Failed to write ${msg.length} bytes to $remote cause ${fail.cause}, switching to buffering mode")
+      connection ! ResumeReading
+      toBuffer(id, msg)
+      context.become(workingCycleBuffering)
+    case CloseConnection =>
+      logger.info(s"Enforced to abort communication with: " + remote + ", switching to closing mode")
+      if (outMessagesBuffer.isEmpty) connection ! Close else context.become(workingCycleClosingWithNonEmptyBuffer)
+    case Ack(_) => // ignore ACKs in stable mode
+    case WritingResumed => // ignore in stable mode
   }
+
+  // operate in ACK mode until all buffered messages are transmitted
+  def workingCycleLocalInterfaceBufferingMode: Receive = {
+    case message: NetworkMessage =>
+      outMessagesCounter += 1
+      val messageToNetwork: Array[Byte] = GeneralizedNetworkMessage.toProto(message).toByteArray
+      val bytes: ByteString = ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork)
+      toBuffer(outMessagesCounter, bytes)
+    case fail@CommandFailed(Write(msg, Ack(id))) =>
+      logger.debug(s"Failed to buffer ${msg.length} bytes to $remote cause ${fail.cause}")
+      connection ! ResumeWriting
+      toBuffer(id, msg)
+    case CommandFailed(ResumeWriting) => // ignore in ACK mode
+    case WritingResumed => writeFirst()
+    case Ack(id) =>
+      outMessagesBuffer -= id
+      if (outMessagesBuffer.nonEmpty) writeFirst()
+      else {
+        logger.info("Buffered messages processed, exiting buffering mode")
+        context become workingCycleWriting
+      }
+    case CloseConnection =>
+      logger.info(s"Enforced to abort communication with: " + remote + s", switching to closing mode")
+      writeAll()
+      context become workingCycleClosingWithNonEmptyBuffer
+  }
+
+  def workingCycleClosingWithNonEmptyBuffer: Receive = {
+    case CommandFailed(_: Write) =>
+      connection ! ResumeWriting
+      context.become({
+        case WritingResumed =>
+          writeAll()
+          context.unbecome()
+        case Ack(id) => outMessagesBuffer -= id
+      }, discardOld = false)
+    case Ack(id) =>
+      outMessagesBuffer -= id
+      if (outMessagesBuffer.isEmpty) connection ! Close
+    case message => logger.debug(s"Got strange message $message during closing phase")
+  }
+
+  def writeFirst(): Unit = outMessagesBuffer.headOption.foreach { case (id, msg) => connection ! Write(msg, Ack(id)) }
+
+  def writeAll(): Unit = outMessagesBuffer.foreach { case (id, msg) => connection ! Write(msg, Ack(id)) }
+
+  def toBuffer(id: Long, message: ByteString): Unit = outMessagesBuffer += id -> message
 
   def workingCycleRemoteInterface: Receive = {
     case Received(data) =>
@@ -136,43 +217,7 @@ class PeerConnectionHandler(connection: ActorRef,
             true
         }
       }
-
       connection ! ResumeReading
-  }
-
-  def reportStrangeInput: Receive = {
-    case nonsense: Any => logger.warn(s"Strange input for PeerConnectionHandler: $nonsense")
-  }
-
-  def workingCycle: Receive =
-    workingCycleLocalInterface orElse
-      workingCycleRemoteInterface orElse
-      processErrors(WorkingCycle) orElse
-      reportStrangeInput orElse dead
-
-  override def preStart: Unit = {
-    peerManager ! DoConnecting(remote, direction)
-    handshakeTimeoutCancellableOpt = Some(context.system.scheduler.scheduleOnce(settings.network.handshakeTimeout)
-    (self ! HandshakeTimeout))
-    connection ! Register(self, keepOpenOnPeerClosed = false, useResumeWriting = true)
-    connection ! ResumeReading
-  }
-
-  def dead: Receive = {
-    case message => logger.debug(s"Got smth strange: $message")
-  }
-
-  def deadNotIn: Receive = {
-    case message => logger.debug(s"Got smth node strange: $message")
-  }
-
-  override def postStop(): Unit = {
-    logger.info(s"Peer handler $self to $remote is destroyed.")
-    connection ! Close
-  }
-
-  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    logger.info(s"Reason of restarting actor $self: ${reason.toString}.")
   }
 
   def getPacket(data: ByteString): (List[ByteString], ByteString) = {
@@ -201,9 +246,7 @@ class PeerConnectionHandler(connection: ActorRef,
 object PeerConnectionHandler {
 
   sealed trait ConnectionType
-
   case object Incoming extends ConnectionType
-
   case object Outgoing extends ConnectionType
 
   case class ConnectedPeer(socketAddress: InetSocketAddress,
@@ -224,21 +267,16 @@ object PeerConnectionHandler {
   }
 
   sealed trait CommunicationState
-
-  case object AwaitingHandshake extends CommunicationState
-
-  case object WorkingCycle extends CommunicationState
+  case object AwaitingHandshake     extends CommunicationState
+  case object WorkingCycleWriting   extends CommunicationState
+  case object WorkingCycleBuffering extends CommunicationState
 
   object ReceivableMessages {
-
     case object HandshakeDone
-
     case object StartInteraction
-
     case object HandshakeTimeout
-
     case object CloseConnection
-
+    final case class Ack(offset: Long) extends Tcp.Event
   }
 
   def props(connection: ActorRef, direction: ConnectionType,
