@@ -2,7 +2,6 @@ package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.ByteOrder
-
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import akka.io.Tcp
 import akka.io.Tcp._
@@ -15,10 +14,6 @@ import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BasicMessagesRepo._
 import PeerConnectionHandler.ReceivableMessages._
-import encry.modifiers.history.Header
-import encry.utils.CoreTaggedTypes.ModifierId
-import scorex.utils.{Random => R}
-
 import scala.annotation.tailrec
 import scala.collection.immutable.HashMap
 import scala.concurrent.duration._
@@ -108,11 +103,8 @@ class PeerConnectionHandler(connection: ActorRef,
       handshakeTimeoutCancellableOpt.map(_.cancel())
       connection ! ResumeReading
       logger.debug(s"Starting workingCycleWriting on peerHandler for $remote.")
-      //context.system.scheduler.scheduleOnce(5.seconds)(spam)
       context become workingCycleWriting
   }
-
-  //def spam: Unit = while (true) self ! InvNetworkMessage(Header.modifierTypeId -> Seq(ModifierId @@ R.randomBytes()))
 
   def processErrors(stateName: CommunicationState): Receive = {
     case cc: ConnectionClosed =>
@@ -123,7 +115,7 @@ class PeerConnectionHandler(connection: ActorRef,
       logger.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")
       connection ! Close
     case fail@CommandFailed(cmd: Tcp.Command) =>
-      logger.info("Failed to execute command : " + cmd + s" in state $stateName cause ${fail.cause}")
+      logger.debug("Failed to execute command : " + cmd + s" in state $stateName cause ${fail.cause}")
       connection ! ResumeReading
     case message => logger.debug(s"Peer connection handler for $remote Got something strange: $message")
   }
@@ -152,7 +144,7 @@ class PeerConnectionHandler(connection: ActorRef,
         case None => sendMessage()
       }
     case fail@CommandFailed(Write(msg, Ack(id))) =>
-      logger.info(s"Failed to write ${msg.length} bytes to $remote cause ${fail.cause}, switching to buffering mode")
+      logger.debug(s"Failed to write ${msg.length} bytes to $remote cause ${fail.cause}, switching to buffering mode")
       connection ! ResumeReading
       toBuffer(id, msg)
       context.become(workingCycleBuffering)
@@ -171,7 +163,7 @@ class PeerConnectionHandler(connection: ActorRef,
       val bytes: ByteString = ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork)
       toBuffer(outMessagesCounter, bytes)
     case fail@CommandFailed(Write(msg, Ack(id))) =>
-      logger.info(s"Failed to buffer ${msg.length} bytes to $remote cause ${fail.cause}")
+      logger.debug(s"Failed to buffer ${msg.length} bytes to $remote cause ${fail.cause}")
       connection ! ResumeWriting
       toBuffer(id, msg)
     case CommandFailed(ResumeWriting) => // ignore in ACK mode
