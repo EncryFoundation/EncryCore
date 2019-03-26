@@ -6,7 +6,7 @@ import akka.testkit.{TestActorRef, TestProbe}
 import encry.modifiers.InstanceFactory
 import encry.network.BasicMessagesRepo.Handshake
 import encry.network.DeliveryManager
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, HistoryChanges}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, UpdatedHistory}
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
@@ -23,7 +23,7 @@ class DeliveryManagerInitialBehaviourSpec extends WordSpecLike with BeforeAndAft
   override def afterAll(): Unit = system.terminate()
 
   "DeliveryManager" should {
-    "handle only HistoryChange message and stash all other messages before history's initialisation" in {
+    "handle only HistoryChange message and don't handle other messages before history's initialisation" in {
       val history: EncryHistory = generateDummyHistory(settings)
       val deliveryManager: TestActorRef[DeliveryManager] =
         TestActorRef[DeliveryManager](DeliveryManager.props(None, TestProbe().ref, TestProbe().ref, settings))
@@ -36,9 +36,9 @@ class DeliveryManagerInitialBehaviourSpec extends WordSpecLike with BeforeAndAft
 
       deliveryManager ! HandshakedPeer(peer)
       assert(deliveryManager.underlyingActor.syncTracker.statuses.isEmpty)
-      deliveryManager ! HistoryChanges(history)
+      deliveryManager ! UpdatedHistory(history)
       deliveryManager ! HandshakedPeer(peer2)
-      assert(deliveryManager.underlyingActor.syncTracker.statuses.size == 2)
+      assert(deliveryManager.underlyingActor.syncTracker.statuses.size == 1)
       deliveryManager.stop()
     }
   }

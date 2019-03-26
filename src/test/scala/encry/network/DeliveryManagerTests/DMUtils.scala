@@ -7,7 +7,7 @@ import encry.modifiers.InstanceFactory
 import encry.modifiers.history.Block
 import encry.network.DeliveryManager
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.NodeViewSynchronizer.ReceivableMessages.HistoryChanges
+import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.view.history.EncryHistory
@@ -17,13 +17,12 @@ object DMUtils extends InstanceFactory {
 
   def initialiseDeliveryManager(isBlockChainSynced: Boolean,
                                 isMining: Boolean,
-                                settings: EncryAppSettings,
-                                system: ActorSystem): (TestActorRef[DeliveryManager], EncryHistory) = {
-    implicit val actorSystem: ActorSystem = system
+                                settings: EncryAppSettings)
+                               (implicit actorSystem: ActorSystem): (TestActorRef[DeliveryManager], EncryHistory) = {
     val history: EncryHistory = generateDummyHistory(settings)
     val deliveryManager: TestActorRef[DeliveryManager] =
       TestActorRef[DeliveryManager](DeliveryManager.props(None, TestProbe().ref, TestProbe().ref, settings))
-    deliveryManager ! HistoryChanges(history)
+    deliveryManager ! UpdatedHistory(history)
     if (isMining) deliveryManager ! StartMining
     if (isBlockChainSynced) deliveryManager ! FullBlockChainIsSynced
     (deliveryManager, history)

@@ -84,7 +84,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     nodeView.state.closeStorage()
   }
 
-
   override def receive: Receive = {
     case ModifiersFromRemote(modifierTypeId, modifiers) => modifierTypeId match {
       case Payload.modifierTypeId => modifiers.foreach { bytes =>
@@ -134,12 +133,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       if (mempool) sender() ! ChangedMempool(nodeView.mempool)
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] = modifierTypeId match {
-        case Transaction.ModifierTypeId => nodeView.mempool.notIn(modifierIds)
+        case Transaction.ModifierTypeId => nodeView.mempool.notRequested(modifierIds)
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
-      sender() ! RequestFromLocal(peer, modifierTypeId, ids)
-    case a: Any =>
-      logger.error(s"Strange input: $a")
+      if (ids.nonEmpty) sender() ! RequestFromLocal(peer, modifierTypeId, ids)
+    case a: Any => logger.error(s"Strange input: $a")
   }
 
   //todo refactor loop
@@ -318,6 +316,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
 
   def txModify(tx: Transaction): Unit = nodeView.mempool.put(tx) match {
     case Success(newPool) =>
+      //TODO for what we update wallet?
       updateNodeView(updatedVault = Some(nodeView.wallet), updatedMempool = Some(newPool))
       nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, Transaction](tx)
     case Failure(e) => logger.warn(s"Failed to put tx ${tx.id} to mempool" +

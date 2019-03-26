@@ -12,7 +12,7 @@ import encry.modifiers.history.Block
 import encry.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage}
 import encry.network.DeliveryManager.GetSyncTrackerPeer
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, HistoryChanges}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, UpdatedHistory}
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
 import encry.network.DeliveryManager
@@ -69,7 +69,7 @@ class PrioritySeveralNodesCommunicationTest extends TestKit(ActorSystem("MySpecN
   "Several nodes test" should "show right behavior" in {
 
     val history: EncryHistory = generateDummyHistory(settings)
-    dm ! HistoryChanges(history)
+    dm ! UpdatedHistory(history)
 
     val blocksV: Vector[Block] = (0 until 20).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
       case ((prevHistory, blocks), _) =>

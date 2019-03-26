@@ -1,7 +1,7 @@
 package encry.network
 
 import java.net.InetAddress
-import akka.actor.{Actor, ActorRef, Cancellable, Props, Stash}
+import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
@@ -29,7 +29,7 @@ import encry.modifiers.history.Header
 class DeliveryManager(influxRef: Option[ActorRef],
                       nodeViewHolderRef: ActorRef,
                       networkControllerRef: ActorRef,
-                      settings: EncryAppSettings) extends Actor with StrictLogging with Stash {
+                      settings: EncryAppSettings) extends Actor with StrictLogging {
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
@@ -55,16 +55,14 @@ class DeliveryManager(influxRef: Option[ActorRef],
     networkControllerRef ! RegisterMessagesHandler(Seq(ModifiersNetworkMessage.NetworkMessageTypeID), self)
 
   override def receive: Receive = {
-    case HistoryChanges(historyReader) =>
-      unstashAll()
-      logger.info(s"Got message with history. All messages will be unstashed. Starting all schedulers.")
+    case UpdatedHistory(historyReader) =>
+      logger.info(s"Got message with history. Starting normal actor's work.")
       context.system.scheduler.schedule(5.second, settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
       context.system.scheduler.schedule(5.second, settings.network.updatePriorityTime.seconds)(syncTracker.updatePeersPriorityStatus())
       syncTracker.scheduleSendSyncInfo()
       context.become(basicMessageHandler(historyReader, isBlockChainSynced = false, isMining = false))
     case message =>
-      logger.info(s"Got new message $message while awaiting history. This message will be stashed.")
-      stash()
+      logger.info(s"Got new message $message while awaiting history.")
   }
 
   def basicMessageHandler(history: EncryHistory, isBlockChainSynced: Boolean, isMining: Boolean): Receive = {
@@ -104,7 +102,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         for ((id, _) <- modifiers) receive(typeId, id, remote, isBlockChainSynced)
         if (spam.nonEmpty) {
           logger.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
-            s": ${spam.keys.map(Algos.encode)}")
+            s": ${spam.keys.map(Algos.encode)}.")
           deleteSpam(spam.keys.toSeq)
         }
         val filteredModifiers: Seq[Array[Byte]] = fm.filterNot { case (modId, _) => history.contains(modId) }.values.toSeq
@@ -125,14 +123,14 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case FullBlockChainIsSynced => context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining))
     case StartMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = true))
     case DisableMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = false))
-    case HistoryChanges(historyReader) => context.become(basicMessageHandler(historyReader, isBlockChainSynced, isMining))
+    case UpdatedHistory(historyReader) => context.become(basicMessageHandler(historyReader, isBlockChainSynced, isMining))
     case message => logger.info(s"Got strange message $message on DeliveryManager.")
   }
   /**
-    * If node is not synced, send sync info to random peer, otherwise to all known peers
+    * If node is not synced, send sync info to random peer, otherwise to all known peers.
     *
     * @param syncInfo           - sync info
-    * @param isBlockChainSynced - current blockchain status
+    * @param isBlockChainSynced - current block chain status
     */
   def sendSync(syncInfo: EncrySyncInfo, isBlockChainSynced: Boolean): Unit =
     if (isBlockChainSynced) syncTracker.peersToSyncWith.foreach(peer => peer.handlerRef ! SyncInfoNetworkMessage(syncInfo))
