@@ -140,6 +140,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       historyReaderOpt = Some(reader)
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] => mempoolReaderOpt = Some(reader)
     case GetStatusTrackerPeer => sender() ! syncTracker.statuses
+    case msg => logger.info(s"Received $msg from ${sender()}")
   }
 
   /**

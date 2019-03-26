@@ -62,7 +62,7 @@ class NetworkController extends Actor with StrictLogging {
     mH.find(_._1.contains(messageId)).map(_._2) match {
       case Some(handler) =>
         handler ! DataFromPeer(message, remote)
-        logger.debug(s"Send message DataFromPeer with ${message.messageName} to $handler.")
+        logger.debug(s"Send message DataFromPeer with ${message.messageName} to $handler(${handler.path}).")
       case None => logger.error("No handlers found for message: " + message.messageName)
     }
 
