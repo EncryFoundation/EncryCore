@@ -3,7 +3,7 @@ package encry.network
 import java.net.InetAddress
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.History.{HistoryComparisonResult, Unknown, Younger}
+import encry.consensus.History.{Fork, HistoryComparisonResult, Unknown, Younger}
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.mempool.Transaction
 import encry.network.DeliveryManager._
@@ -18,6 +18,7 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo}
 import org.encryfoundation.common.Algos
 import encry.settings.EncryAppSettings
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
@@ -159,7 +160,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       isMining: Boolean): Unit = {
     val firstCondition: Boolean = mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining
     val secondCondition: Boolean = mTypeId != Transaction.ModifierTypeId
-    val thirdCondition: Boolean = syncTracker.statuses.get(peer.socketAddress.getAddress).exists(_._1 != Younger)
+    val thirdCondition: Boolean = syncTracker.statuses.get(peer.socketAddress.getAddress)
+      .exists{case (comrResult, _, _) => comrResult != Younger && comrResult != Fork}
 
     if ((firstCondition || secondCondition) && thirdCondition) {
       val requestedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, PeerPriorityStatus)] = expectedModifiers
@@ -199,8 +201,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
       expectedModifiers.getOrElse(peer.socketAddress.getAddress, Map.empty)
     peerRequests.get(toKey(modId)) match {
       case Some((timer, attempts)) =>
-        syncTracker.statuses.find { case (innerPeerAddr, (cResult, _, cP)) =>
-          innerPeerAddr == peer.socketAddress.getAddress && cResult != Younger
+        syncTracker.statuses.find { case (innerPeerAddr, (cResult, _, _)) =>
+          innerPeerAddr == peer.socketAddress.getAddress && cResult != Younger && cResult != Fork
         }.foreach {
           case (_, (_, _, cP)) if attempts < settings.network.maxDeliveryChecks && peerRequests.contains(toKey(modId)) =>
             cP.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
