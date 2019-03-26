@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.InetAddress
+
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.{Fork, HistoryComparisonResult, Unknown, Younger}
@@ -277,8 +278,11 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       isBlockChainSynced: Boolean,
                       isMining: Boolean): Unit = headersForPriorityRequest.get(toKey(headerId)) match {
     case Some(addresses) if addresses.nonEmpty =>
+      logger.info(s"Trying to make priority request to payload for header(${Algos.encode(headerId)}). " +
+        s"Addresses: ${addresses}")
       syncTracker.statuses.find(_._1 == addresses.head) match {
         case Some((_, (_, _, cP))) =>
+          logger.info(s"Find handler for address: ${addresses.head}")
           headersForPriorityRequest = headersForPriorityRequest - toKey(headerId)
           requestModifies(history, cP, modifierTypeId, Seq(modifierIds), isBlockChainSynced, isMining)
         case None => requestDownload(modifierTypeId, Seq(modifierIds), history, isBlockChainSynced, isMining)
@@ -340,9 +344,12 @@ class DeliveryManager(influxRef: Option[ActorRef],
       val peerReceivedModifiers: Set[ModifierIdAsKey] = receivedModifiers.getOrElse(peer.socketAddress.getAddress, Set.empty)
       receivedModifiers = receivedModifiers.updated(peer.socketAddress.getAddress, peerReceivedModifiers + toKey(mId))
       expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, peerExpectedModifiers - toKey(mId))
-      if (isBlockChainSynced && mTid == Header.modifierTypeId)
+      if (isBlockChainSynced && mTid == Header.modifierTypeId) {
+        logger.info(s"Received header with id: ${Algos.encode(mId)} from peer: ${peer.socketAddress.getAddress}")
         headersForPriorityRequest = headersForPriorityRequest
           .updated(toKey(mId), headersForPriorityRequest.getOrElse(toKey(mId), Seq.empty) :+ peer.socketAddress.getAddress)
+        logger.info(s"After updating headersForPriorityRequest contains ${headersForPriorityRequest.get(toKey(mId))}")
+      }
     } else receivedSpamModifiers = receivedSpamModifiers - toKey(mId) + (toKey(mId) -> peer)
   /**
     * Transform modifier id to WrappedArray of bytes
