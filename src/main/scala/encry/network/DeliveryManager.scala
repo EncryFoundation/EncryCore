@@ -46,7 +46,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   /**
     * This collection used to keep received modifiers ids.
     */
-  var receivedModifiers: Map[InetAddress, Set[ModifierIdAsKey]] = Map.empty
+  //var receivedModifiers: Map[InetAddress, Set[ModifierIdAsKey]] = Map.empty
   /**
     * This collection used to keep expecting modifiers ids.
     */
@@ -78,13 +78,13 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case HandshakedPeer(remote) => syncTracker.updateStatus(remote, Unknown)
     case DisconnectedPeer(remote) => syncTracker.clearStatus(remote)
     case CheckDelivery(peer, modifierTypeId, modifierId) =>
-      val modIdsFromPeer: Set[ModifierIdAsKey] = receivedModifiers.getOrElse(peer.socketAddress.getAddress, Set.empty)
-      modIdsFromPeer.find(id => id == toKey(modifierId)) match {
-        case Some(_) if modIdsFromPeer.size <= 1 => receivedModifiers = receivedModifiers - peer.socketAddress.getAddress
-        case Some(_) => receivedModifiers =
-          receivedModifiers.updated(peer.socketAddress.getAddress, modIdsFromPeer - toKey(modifierId))
-        case None => reRequestModifier(peer, modifierTypeId, modifierId)
-      }
+//      val modIdsFromPeer: Set[ModifierIdAsKey] = receivedModifiers.getOrElse(peer.socketAddress.getAddress, Set.empty)
+//      modIdsFromPeer.find(id => id == toKey(modifierId)) match {
+//        case Some(_) if modIdsFromPeer.size <= 1 => receivedModifiers = receivedModifiers - peer.socketAddress.getAddress
+//        case Some(_) => receivedModifiers =
+//          receivedModifiers.updated(peer.socketAddress.getAddress, modIdsFromPeer - toKey(modifierId))
+//        case None => reRequestModifier(peer, modifierTypeId, modifierId)
+//      }
     case CheckModifiersToDownload =>
       val requestedMods: HashSet[ModifierId] = expectedModifiers.flatMap { case (_, modIds) =>
         modIds.keys.map(modId => ModifierId @@ modId.toArray)
@@ -162,16 +162,16 @@ class DeliveryManager(influxRef: Option[ActorRef],
     val firstCondition: Boolean = mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining
     val secondCondition: Boolean = mTypeId != Transaction.ModifierTypeId
     val thirdCondition: Boolean = syncTracker.statuses.get(peer.socketAddress.getAddress)
-      .exists{case (comrResult, _, _) => comrResult != Younger && comrResult != Fork}
+      .exists { case (comrResult, _, _) => comrResult != Younger && comrResult != Fork }
 
     if ((firstCondition || secondCondition) && thirdCondition) {
       val requestedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, PeerPriorityStatus)] = expectedModifiers
         .getOrElse(peer.socketAddress.getAddress, Map.empty)
 
-      val receivedModifiersByPeer: Set[ModifierIdAsKey] = receivedModifiers.getOrElse(peer.socketAddress.getAddress, Set.empty)
+      //val receivedModifiersByPeer: Set[ModifierIdAsKey] = receivedModifiers.getOrElse(peer.socketAddress.getAddress, Set.empty)
 
       val notYetRequested: Seq[ModifierId] = modifierIds.filter(id => !history.contains(id)
-        && !receivedModifiersByPeer.contains(toKey(id)) && !requestedModifiersFromPeer.contains(toKey(id)))
+        && /*!receivedModifiersByPeer.contains(toKey(id))*/ !requestedModifiersFromPeer.contains(toKey(id)))
 
       if (notYetRequested.nonEmpty) {
         logger.info(s"Send request to ${peer.socketAddress.getAddress} for modifiers of type $mTypeId " +
@@ -181,8 +181,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
         val requestedModIds = notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
           rYet.updated(toKey(id), context.system
-            .scheduler.scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(peer, mTypeId, id)) -> 1)
-        }
+            .scheduler.scheduleOnce(settings.network.deliveryTimeout)(reRequestModifier(peer, mTypeId, id)) -> 1) }
 
         expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, requestedModIds)
       }
@@ -213,7 +212,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
             timer.cancel()
             expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, peerRequests.updated(toKey(modId),
               context.system.scheduler
-                .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(peer, mTypeId, modId)) -> (attempts + 1)
+                .scheduleOnce(settings.network.deliveryTimeout)(reRequestModifier(peer, mTypeId, modId)) -> (attempts + 1)
             ))
           case _ => expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, peerRequests - toKey(modId))
         }
@@ -341,8 +340,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
       val peerExpectedModifiers: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress.getAddress, Map.empty)
       peerExpectedModifiers.get(toKey(mId)).foreach(_._1.cancel())
-      val peerReceivedModifiers: Set[ModifierIdAsKey] = receivedModifiers.getOrElse(peer.socketAddress.getAddress, Set.empty)
-      receivedModifiers = receivedModifiers.updated(peer.socketAddress.getAddress, peerReceivedModifiers + toKey(mId))
+      //val peerReceivedModifiers: Set[ModifierIdAsKey] = receivedModifiers.getOrElse(peer.socketAddress.getAddress, Set.empty)
+      //receivedModifiers = receivedModifiers.updated(peer.socketAddress.getAddress, peerReceivedModifiers + toKey(mId))
       expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, peerExpectedModifiers - toKey(mId))
       if (isBlockChainSynced && mTid == Header.modifierTypeId) {
         logger.info(s"Received header with id: ${Algos.encode(mId)} from peer: ${peer.socketAddress.getAddress}")
