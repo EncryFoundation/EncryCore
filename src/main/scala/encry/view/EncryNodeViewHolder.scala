@@ -149,7 +149,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     case CheckModifiersToDownload=>
       println(s"GOT CheckModifiersToDownload on NVH")
       val mods: Seq[(ModifierTypeId, ModifierId)] =
-        nodeView.history.modifiersToDownloadForNVH(settings.network.networkChunkSize)
+        nodeView.history.modifiersToDownload(settings.network.networkChunkSize,
+          ModifiersCache.cache.map(x => ModifierId @@ x._1.toArray))
       println(mods.size + " MODIFIERS ON NVH")
       logger.info(mods.size + " MODIFIERS ON NVH")
       val fm: Seq[(ModifierTypeId, ModifierId)] = mods.filterNot {  case (_, id) =>

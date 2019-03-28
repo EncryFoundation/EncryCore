@@ -59,6 +59,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
       s"expectedModifiers -> ${expectedModifiers.map(x => x._1 -> x._2.size)}")
   )
 
+  var tmpVar: Long = System.currentTimeMillis()
+
   override def preStart(): Unit =
     networkControllerRef ! RegisterMessagesHandler(Seq(ModifiersNetworkMessage.NetworkMessageTypeID), self)
 
@@ -106,7 +108,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 //        modIds.keys.map(modId => ModifierId @@ modId.toArray)
 //      }.to[HashSet]
       //nodeViewHolderRef ! CheckModifiersWithQueueSize(requestedMods.size)
-    case ModifiersFromNVH(mods) =>
+    case ModifiersFromNVH(mods) if System.currentTimeMillis() - tmpVar > 10000 =>
       val requestedMods: HashSet[ModifierId] = expectedModifiers.flatMap { case (_, modIds) =>
         modIds.keys.map(modId => ModifierId @@ modId.toArray)
       }.to[HashSet]
@@ -117,6 +119,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
         a.groupBy(_._1).foreach { case (modId, ids) =>
           requestDownload(modId, ids.map(_._2), history, isBlockChainSynced, isMining)
         }
+      tmpVar = System.currentTimeMillis()
+    case ModifiersFromNVH(mods) =>
+      println(s"Got ModifiersFromNVH with ${mods.size} during if System.currentTimeMillis() - tmpVar > 10000 ")
 //      history.modifiersToDownload(settings.network.networkChunkSize - requestedMods.size, requestedMods)
 //        .groupBy(_._1)
 //        .foreach { case (modId, ids) =>
