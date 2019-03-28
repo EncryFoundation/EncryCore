@@ -11,7 +11,7 @@ import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer}
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
-import encry.network.DeliveryManager.FullBlockChainIsSynced
+import encry.network.DeliveryManager.{FullBlockChainIsSynced, ModifiersFromNVH}
 import BasicMessagesRepo._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -58,6 +58,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case SemanticallyFailedModification(_, _) =>
     case ChangedState(_) =>
     case SyntacticallyFailedModification(_, _) =>
+    case ModifiersFromNVH(fm) => deliveryManager ! ModifiersFromNVH(fm)
     case SemanticallySuccessfulModifier(mod) =>
       mod match {
         case block: Block =>

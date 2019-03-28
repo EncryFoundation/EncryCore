@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import HeaderProto.HeaderProtoMessage
 import PayloadProto.PayloadProtoMessage
 import TransactionProto.TransactionProtoMessage
@@ -16,7 +17,7 @@ import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer, TransactionSerializer}
 import encry.modifiers.state.box.EncryProposition
 import encry.network.AuxiliaryHistoryHolder.{Append, ReportModifierInvalid, ReportModifierValid}
-import encry.network.DeliveryManager.FullBlockChainIsSynced
+import encry.network.DeliveryManager.{CheckModifiersWithQueueSize, FullBlockChainIsSynced, ModifiersFromNVH}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
@@ -32,6 +33,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -71,6 +73,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
 
       context.system.actorSelection("user/statsSender") ! DiffBtwMempoolAndLastBlockTxs(diffBtw)
     }
+  }
+
+  context.system.scheduler.schedule(5.second, settings.network.modifierDeliverTimeCheck){
+    println(s"Trigger CheckModifiersToDownload from context.system.scheduler.schedule ON NVH")
+    self ! CheckModifiersToDownload
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -136,7 +143,23 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         case Transaction.ModifierTypeId => nodeView.mempool.notRequested(modifierIds)
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
+      logger.info(s"\n\n\nNVH GOT CompareViews. Current cache is ${ModifiersCache.size}. Requested mods -> ${modifierIds.size}. Filtered mpds -> ${ids.size}\n\n\n")
+
       if (ids.nonEmpty) sender() ! RequestFromLocal(peer, modifierTypeId, ids)
+    case CheckModifiersToDownload=>
+      println(s"GOT CheckModifiersToDownload on NVH")
+      val mods: Seq[(ModifierTypeId, ModifierId)] =
+        nodeView.history.modifiersToDownloadForNVH(settings.network.networkChunkSize)
+      println(mods.size + " MODIFIERS ON NVH")
+      logger.info(mods.size + " MODIFIERS ON NVH")
+      val fm: Seq[(ModifierTypeId, ModifierId)] = mods.filterNot {  case (_, id) =>
+        val a = ModifiersCache.contains(key(id))
+        //logger.info(s"$a")
+        a
+      }
+      println(fm.size + " FILTERED MODIFIERS ON NVH")
+      logger.info(fm.size + " FILTERED MODIFIERS ON NVH")
+      nodeViewSynchronizer ! ModifiersFromNVH(fm)
     case a: Any => logger.error(s"Strange input: $a")
   }
 
