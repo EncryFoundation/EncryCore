@@ -85,6 +85,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     System.exit(100)
   }
 
+  system.scheduler.schedule(5.seconds, 10.seconds)(println(s"Modifiers cache from NVH: ${ModifiersCache.size}"))
+
   override def postStop(): Unit = {
     logger.warn(s"Stopping EncryNodeViewHolder")
     nodeView.history.closeStorage()

@@ -73,7 +73,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 //      }
       context.system.scheduler.schedule(5.second, settings.network.updatePriorityTime.seconds)(syncTracker.updatePeersPriorityStatus())
       syncTracker.scheduleSendSyncInfo()
-      context.become(basicMessageHandler(historyReader, isBlockChainSynced = false, isMining = false))
+      context.become(basicMessageHandler(historyReader, isBlockChainSynced = false, isMining = settings.node.mining))
     case message =>
       logger.info(s"Got new message $message while awaiting history.")
   }
@@ -109,13 +109,11 @@ class DeliveryManager(influxRef: Option[ActorRef],
 //      }.to[HashSet]
       //nodeViewHolderRef ! CheckModifiersWithQueueSize(requestedMods.size)
     case ModifiersFromNVH(mods) if System.currentTimeMillis() - tmpVar > 10000 =>
-      val requestedMods: HashSet[ModifierId] = expectedModifiers.flatMap { case (_, modIds) =>
-        modIds.keys.map(modId => ModifierId @@ modId.toArray)
-      }.to[HashSet]
-      println(s"ModifiersFromNVH received mods: ${mods.size}")
+      val requestedMods: HashSet[ModifierIdAsKey] = expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
+      println(s"\nModifiersFromNVH received mods: ${mods.size}\n")
       val a = mods
-        .filterNot(mod => requestedMods.contains(mod._2))
-      println(s"ModifiersFromNVH filtered ${a.size}")
+        .filterNot(mod => requestedMods.contains(toKey(mod._2)))
+      println(s"\nModifiersFromNVH filtered ${a.size}\n")
         a.groupBy(_._1).foreach { case (modId, ids) =>
           requestDownload(modId, ids.map(_._2), history, isBlockChainSynced, isMining)
         }
