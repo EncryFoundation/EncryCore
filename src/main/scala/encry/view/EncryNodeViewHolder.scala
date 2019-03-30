@@ -75,10 +75,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     }
   }
 
-  context.system.scheduler.schedule(5.second, settings.network.modifierDeliverTimeCheck){
-    println(s"Trigger CheckModifiersToDownload from context.system.scheduler.schedule ON NVH")
-    self ! CheckModifiersToDownload
-  }
+//  context.system.scheduler.schedule(5.second, settings.network.modifierDeliverTimeCheck){
+//    println(s"Trigger CheckModifiersToDownload from context.system.scheduler.schedule ON NVH")
+//    self ! CheckModifiersToDownload
+//  }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     reason.printStackTrace()
@@ -104,6 +104,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       }
         logger.debug(s"Cache before(${ModifiersCache.size})")
         computeApplications()
+        self ! CheckModifiersToDownload
         logger.debug(s"Cache after(${ModifiersCache.size})")
       case Header.modifierTypeId =>
         modifiers.foreach { bytes =>
@@ -121,6 +122,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         }
         logger.debug(s"Cache before(${ModifiersCache.size})")
         computeApplications()
+        self ! CheckModifiersToDownload
         logger.debug(s"Cache after(${ModifiersCache.size})")
       case Transaction.ModifierTypeId => modifiers.foreach { bytes =>
         Try(TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes)).foreach(tx => txModify(tx)))
