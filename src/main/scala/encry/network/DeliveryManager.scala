@@ -113,7 +113,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     //        modIds.keys.map(modId => ModifierId @@ modId.toArray)
     //      }.to[HashSet]
     //nodeViewHolderRef ! CheckModifiersWithQueueSize(requestedMods.size)
-    case ModifiersFromNVH(mods) if System.currentTimeMillis() - tmpVar > 10000 =>
+    case ModifiersFromNVH(mods) =>
       val requestedMods: HashSet[ModifierIdAsKey] = expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
       println(s"\nModifiersFromNVH received mods: ${mods.size}\n")
       val a = mods
@@ -123,14 +123,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
         requestDownload(modId, ids.map(_._2), history, isBlockChainSynced, isMining)
       }
       tmpVar = System.currentTimeMillis()
-    case ModifiersFromNVH(mods) =>
-      println(s"Got ModifiersFromNVH with ${mods.size} during if System.currentTimeMillis() - tmpVar > 10000 ")
-    //      history.modifiersToDownload(settings.network.networkChunkSize - requestedMods.size, requestedMods)
-    //        .groupBy(_._1)
-    //        .foreach { case (modId, ids) =>
-    //          println(s"CheckModifiersToDownload requestDownload")
-    //          requestDownload(modId, ids.map(_._2), history, isBlockChainSynced, isMining)
-    //        }
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       if (modifierIds.nonEmpty) requestModifies(history, peer, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
     case DataFromPeer(message, remote) => message match {
@@ -209,7 +201,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
     val secondCondition: Boolean = mTypeId != Transaction.ModifierTypeId
     val thirdCondition: Boolean = syncTracker.statuses.get(peer.socketAddress.getAddress)
       .exists { case (comrResult, _, _) => comrResult != Younger && comrResult != Fork }
-
+    logger.info("===============requestModifies============\n " +
+      s"firstCondition: $firstCondition\n " +
+      s"secondCondition: $secondCondition\n " +
+      s"thirdCondition: $thirdCondition ")
     if ((firstCondition || secondCondition) && thirdCondition) {
       val requestedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress.getAddress, Map.empty)
@@ -370,11 +365,13 @@ class DeliveryManager(influxRef: Option[ActorRef],
     if (!isBlockChainSynced) {
       val random = new Random()
       val acceptedPeers = syncTracker.getPeersForConnection.filter(nodeInfo =>
-        nodeInfo._2._2 != SyncTracker.PeerPriorityStatus.BadNode && (nodeInfo._2._1 == Equal || nodeInfo._2._1 == Older))
+        nodeInfo._2._2 != SyncTracker.PeerPriorityStatus.BadNode)
+      logger.info(s"Blockchain is not synced. acceptedPeers: $acceptedPeers")
       if (acceptedPeers.nonEmpty) {
         val cP = acceptedPeers(random.nextInt(acceptedPeers.length))._2._3
         logger.info(s"Peers map: ${syncTracker.getPeersForConnection}")
         influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
+        logger.info(s"requestModifies for peer ${cP.socketAddress.getAddress} for mods: ${modifierIds.map(Algos.encode).mkString(",")}")
         requestModifies(history, cP, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
       } else logger.info(s"BlockChain is not synced. There is no nodes, which we can connect with.")
     }
