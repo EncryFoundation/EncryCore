@@ -122,7 +122,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
         case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) =>
           requestDownload(modId, ids.map(_._2), history, isBlockChainSynced, isMining)
       }
-    case SemanticallySuccessfulModifier(mod) => receivedModifiers -= toKey(mod.id)
+    case SemanticallySuccessfulModifier(mod) =>
+      receivedModifiers -= toKey(mod.id)
+      logger.info(s"receivedModifiers size: ${receivedModifiers.size}")
     case SemanticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
     case SemanticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>

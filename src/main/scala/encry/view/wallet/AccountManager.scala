@@ -71,16 +71,18 @@ case class AccountManager(store: Store) extends StrictLogging {
       EncryApp.forceStopApplication(500)
     }, r => r)
 
-  private def saveAccount(privateKey: PrivateKey, publicKey: PublicKey): Unit =
+  private def saveAccount(privateKey: PrivateKey, publicKey: PublicKey): Unit = {
+    logger.info(s"Set private key to: ${Algos.encode(privateKey)} and public key: ${Algos.encode(publicKey)}")
     store.update(
       scala.util.Random.nextLong(),
       Seq.empty,
 
       Seq((ByteArrayWrapper(AccountManager.AccountPrefix +: publicKey),
         ByteArrayWrapper(AES.encrypt(privateKey, settings.wallet.map(_.password)
-        .getOrElse(throw new RuntimeException("password not specified"))))))
+          .getOrElse(throw new RuntimeException("password not specified"))))))
 
     )
+  }
 }
 
 object AccountManager {

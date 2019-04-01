@@ -24,6 +24,7 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: Ac
 
   def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = modifier match {
     case block: Block =>
+      logger.info(s"Keys during sync: ${publicKeys}")
       val (newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]) =
         block.transactions.foldLeft(Seq[EncryBaseBox](), Seq[EncryBaseBox]()) {
           case ((nBxs, sBxs), tx: Transaction) =>
