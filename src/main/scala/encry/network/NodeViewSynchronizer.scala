@@ -104,14 +104,17 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           val nonInRequestCache = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
           if (nonInRequestCache.nonEmpty)
             historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
-              val objs: Seq[NodeViewModifier] = invData._1 match {
-                case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(nonInRequestCache)
-                case _: ModifierTypeId => nonInRequestCache.flatMap(id => readers._1.modifierById(id))
+              invData._1 match {
+                case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId =>
+                  self ! ResponseFromLocal(remote, invData._1, readers._2.getAll(nonInRequestCache))
+                case _: ModifierTypeId => nonInRequestCache.foreach(id =>
+                  readers._1.modifierById(id).foreach(mod => self ! ResponseFromLocal(remote, invData._1, Seq(mod)))
+                )
               }
-              logger.debug(s"nonInRequestCache(${objs.size}): ${objs.map(mod => Algos.encode(mod.id)).mkString(",")}")
-              logger.debug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
-                s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
-              self ! ResponseFromLocal(remote, invData._1, objs)
+//              logger.debug(s"nonInRequestCache(${objs.size}): ${objs.map(mod => Algos.encode(mod.id)).mkString(",")}")
+//              logger.debug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
+//                s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
+              //self ! ResponseFromLocal(remote, invData._1, objs)
             }
         }
         else logger.info(s"Peer $remote requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
