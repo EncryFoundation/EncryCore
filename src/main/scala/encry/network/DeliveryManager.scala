@@ -209,6 +209,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
       val requestedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress.getAddress, Map.empty)
 
+      logger.info(s"Awaiting for: ${requestedModifiersFromPeer.keys.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
+      logger.info(s"Trying to make request for: ${modifierIds.map(Algos.encode).mkString(",")}")
+
       //val receivedModifiersByPeer: Set[ModifierIdAsKey] = receivedModifiers.getOrElse(peer.socketAddress.getAddress, Set.empty)
 
       val notYetRequested: Seq[ModifierId] = modifierIds.filter(id => !history.contains(id)
@@ -216,6 +219,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
       //      val notYetRequested: Seq[ModifierId] = modifierIds.filterNot(id => (history.contains(id)
       //        || /*!receivedModifiersByPeer.contains(toKey(id))*/ requestedModifiersFromPeer.contains(toKey(id))))
+
+      logger.info(s"After filter: ${notYetRequested.map(Algos.encode).mkString(",")}")
 
       if (notYetRequested.nonEmpty) {
         logger.info(s"Send request to ${peer.socketAddress.getAddress} for modifiers of type $mTypeId " +

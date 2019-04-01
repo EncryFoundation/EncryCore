@@ -155,7 +155,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   def sendResponse(peer: ConnectedPeer, typeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit =
     if (modifiers.nonEmpty) {
-      logger.debug(s"Sent modifiers size is: ${modifiers.length}")
+      logger.info(s"Sent modifiers size is: ${modifiers.length}|${modifiers.map(mod => Algos.encode(mod.id)).mkString(",")}")
       typeId match {
         case Header.modifierTypeId =>
           val modsB: Seq[(ModifierId, Array[Byte])] =
