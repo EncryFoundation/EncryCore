@@ -100,15 +100,15 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           val inRequestCache: Map[String, NodeViewModifier] =
             invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
           logger.debug(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
-          self ! ResponseFromLocal(remote, invData._1, inRequestCache.values.toSeq)
+          sendResponse(remote, invData._1, inRequestCache.values.toSeq)
           val nonInRequestCache = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
           if (nonInRequestCache.nonEmpty)
             historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
               invData._1 match {
                 case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId =>
-                  self ! ResponseFromLocal(remote, invData._1, readers._2.getAll(nonInRequestCache))
+                  sendResponse(remote, invData._1, readers._2.getAll(nonInRequestCache))
                 case _: ModifierTypeId => nonInRequestCache.foreach(id =>
-                  readers._1.modifierById(id).foreach(mod => self ! ResponseFromLocal(remote, invData._1, Seq(mod)))
+                  readers._1.modifierById(id).foreach(mod => sendResponse(remote, invData._1, Seq(mod)))
                 )
               }
 //              logger.debug(s"nonInRequestCache(${objs.size}): ${objs.map(mod => Algos.encode(mod.id)).mkString(",")}")
@@ -132,26 +132,45 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case FullBlockChainIsSynced =>
       chainSynced = true
       deliveryManager ! FullBlockChainIsSynced
-    case ResponseFromLocal(peer, typeId, modifiers: Seq[NodeViewModifier]) =>
-      if (modifiers.nonEmpty) {
-        logger.debug(s"Sent modifiers size is: ${modifiers.length}")
-        typeId match {
-          case Header.modifierTypeId =>
-            val modsB: Seq[(ModifierId, Array[Byte])] =
-              modifiers.map { case h: Header => h.id -> HeaderProtoSerializer.toProto(h).toByteArray }
-            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
-          case Payload.modifierTypeId =>
-            val modsB: Seq[(ModifierId, Array[Byte])] =
-              modifiers.map { case h: Payload => h.id -> PayloadProtoSerializer.toProto(h).toByteArray }
-            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
-          case Transaction.ModifierTypeId =>
-            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modifiers.map {
-              case h: Transaction => h.id -> TransactionProtoSerializer.toProto(h).toByteArray
-            }.toMap)
-        }
-      }
+//    case ResponseFromLocal(peer, typeId, modifiers: Seq[NodeViewModifier]) =>
+//      if (modifiers.nonEmpty) {
+//        logger.debug(s"Sent modifiers size is: ${modifiers.length}")
+//        typeId match {
+//          case Header.modifierTypeId =>
+//            val modsB: Seq[(ModifierId, Array[Byte])] =
+//              modifiers.map { case h: Header => h.id -> HeaderProtoSerializer.toProto(h).toByteArray }
+//            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
+//          case Payload.modifierTypeId =>
+//            val modsB: Seq[(ModifierId, Array[Byte])] =
+//              modifiers.map { case h: Payload => h.id -> PayloadProtoSerializer.toProto(h).toByteArray }
+//            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
+//          case Transaction.ModifierTypeId =>
+//            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modifiers.map {
+//              case h: Transaction => h.id -> TransactionProtoSerializer.toProto(h).toByteArray
+//            }.toMap)
+//        }
+//      }
     case a: Any => logger.error(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
   }
+
+  def sendResponse(peer: ConnectedPeer, typeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit =
+    if (modifiers.nonEmpty) {
+      logger.debug(s"Sent modifiers size is: ${modifiers.length}")
+      typeId match {
+        case Header.modifierTypeId =>
+          val modsB: Seq[(ModifierId, Array[Byte])] =
+            modifiers.map { case h: Header => h.id -> HeaderProtoSerializer.toProto(h).toByteArray }
+          peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
+        case Payload.modifierTypeId =>
+          val modsB: Seq[(ModifierId, Array[Byte])] =
+            modifiers.map { case h: Payload => h.id -> PayloadProtoSerializer.toProto(h).toByteArray }
+          peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
+        case Transaction.ModifierTypeId =>
+          peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modifiers.map {
+            case h: Transaction => h.id -> TransactionProtoSerializer.toProto(h).toByteArray
+          }.toMap)
+      }
+    }
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
     if (chainSynced) networkControllerRef ! SendToNetwork(InvNetworkMessage(m.modifierTypeId -> Seq(m.id)), Broadcast)

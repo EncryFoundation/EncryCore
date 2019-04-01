@@ -25,7 +25,7 @@ import scala.collection.immutable.HashSet
 import scala.collection.mutable
 import scala.util.Random
 import BasicMessagesRepo._
-import encry.modifiers.history.Header
+import encry.modifiers.history.{Header, Payload}
 
 class DeliveryManager(influxRef: Option[ActorRef],
                       nodeViewHolderRef: ActorRef,
@@ -219,7 +219,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
       if (notYetRequested.nonEmpty) {
         logger.info(s"Send request to ${peer.socketAddress.getAddress} for modifiers of type $mTypeId " +
-          s"with ${modifierIds.size} ids.")
+          s"with ${modifierIds.size}|${modifierIds.map(Algos.encode).mkString(",")} ids.")
         peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequested)
         syncTracker.incrementRequest(peer)
 
@@ -248,8 +248,11 @@ class DeliveryManager(influxRef: Option[ActorRef],
                         peerRequests: Map[ModifierIdAsKey, (Cancellable, Int)]): Unit =
     peerRequests.get(toKey(modId)) match {
       case Some((timer, attempts)) =>
-        syncTracker.statuses.find { case (innerPeerAddr, (cResult, _, _)) =>
-          innerPeerAddr == peer.socketAddress.getAddress && cResult != Younger && cResult != Fork
+        syncTracker.statuses.find { case (innerPeerAddr, (cResult, peerStatus, _)) =>
+          innerPeerAddr == peer.socketAddress.getAddress &&
+            cResult != Younger &&
+            cResult != Fork &&
+            peerStatus != SyncTracker.PeerPriorityStatus.BadNode
         }.foreach {
           case (_, (_, _, cP)) =>
             cP.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
@@ -372,7 +375,12 @@ class DeliveryManager(influxRef: Option[ActorRef],
         logger.info(s"Peers map: ${syncTracker.getPeersForConnection}")
         influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
         logger.info(s"requestModifies for peer ${cP.socketAddress.getAddress} for mods: ${modifierIds.map(Algos.encode).mkString(",")}")
-        requestModifies(history, cP, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
+//        if (modifierTypeId == Payload.modifierTypeId)
+//          modifierIds.foreach(modId =>
+//            requestModifies(history, cP, modifierTypeId, Seq(modId), isBlockChainSynced, isMining)
+//          )
+//        else
+          requestModifies(history, cP, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
       } else logger.info(s"BlockChain is not synced. There is no nodes, which we can connect with.")
     }
     else syncTracker.getPeersForConnection match {
