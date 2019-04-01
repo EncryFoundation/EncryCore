@@ -4,7 +4,7 @@ import java.net.InetAddress
 
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.History.{Fork, HistoryComparisonResult, Unknown, Younger}
+import encry.consensus.History._
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.mempool.Transaction
 import encry.network.DeliveryManager._
@@ -70,7 +70,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       //        println(s"Trigger CheckModifiersToDownload from context.system.scheduler.schedule")
       //        self ! CheckModifiersToDownload
       //      }
-      context.system.scheduler.schedule(5.second, settings.network.updatePriorityTime.seconds)(syncTracker.updatePeersPriorityStatus())
+      context.system.scheduler.schedule(5.second, settings.network.deliveryTimeout)(syncTracker.updatePeersPriorityStatus())
       syncTracker.scheduleSendSyncInfo()
       context.become(basicMessageHandler(historyReader, isBlockChainSynced = false, isMining = settings.node.mining))
     case message =>
@@ -351,7 +351,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   /**
     * If node is not synced, `requestDownload` sends request for the one peer which will be find by 2 criteria:
     * 1) HistoryComparisonResult != Younger.
-    * 2) Choose peer with highest priority.
+    * 2) Choose random peer with non bad priority.
     * Otherwise this function sends requests for all known peers selected by 1-st criterion as above.
     *
     * If there are no any peers, request won't be sent.
@@ -367,11 +367,16 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       history: EncryHistory,
                       isBlockChainSynced: Boolean,
                       isMining: Boolean): Unit =
-    if (!isBlockChainSynced) syncTracker.getPeersForConnection.lastOption match {
-      case Some((_, (_, _, cP))) =>
+    if (!isBlockChainSynced) {
+      val random = new Random()
+      val acceptedPeers = syncTracker.getPeersForConnection.filter(nodeInfo =>
+        nodeInfo._2._2 != SyncTracker.PeerPriorityStatus.BadNode && (nodeInfo._2._1 == Equal || nodeInfo._2._1 == Older))
+      if (acceptedPeers.nonEmpty) {
+        val cP = acceptedPeers(random.nextInt(acceptedPeers.length))._2._3
+        logger.info(s"Peers map: ${syncTracker.getPeersForConnection}")
         influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
         requestModifies(history, cP, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
-      case None => logger.info(s"BlockChain is not synced. There is no nodes, which we can connect with.")
+      } else logger.info(s"BlockChain is not synced. There is no nodes, which we can connect with.")
     }
     else syncTracker.getPeersForConnection match {
       case coll: Vector[_] if coll.nonEmpty =>

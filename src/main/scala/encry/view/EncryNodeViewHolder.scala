@@ -103,8 +103,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         })
       }
         logger.debug(s"Cache before(${ModifiersCache.size})")
-        computeApplications()
-        self ! CheckModifiersToDownload
+        val appliedMods = computeApplications()
+        logger.info(s"appliedModsqty: $appliedMods")
+        if (appliedMods > 0) self ! CheckModifiersToDownload
         logger.debug(s"Cache after(${ModifiersCache.size})")
       case Header.modifierTypeId =>
         modifiers.foreach { bytes =>
@@ -121,8 +122,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
           })
         }
         logger.debug(s"Cache before(${ModifiersCache.size})")
-        computeApplications()
-        self ! CheckModifiersToDownload
+        val appliedMods = computeApplications()
+        logger.info(s"appliedModsqty: $appliedMods")
+        if (appliedMods > 0) self ! CheckModifiersToDownload
         logger.debug(s"Cache after(${ModifiersCache.size})")
       case Transaction.ModifierTypeId => modifiers.foreach { bytes =>
         Try(TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes)).foreach(tx => txModify(tx)))
@@ -131,7 +133,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction]@unchecked => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier]@unchecked =>
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
-      pmodModify(lm.pmod, true)
+      pmodModify(lm.pmod, isLocallyGenerated = true)
     case GetDataFromCurrentView(f) =>
       val result = f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool))
       result match {
@@ -169,13 +171,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   }
 
   //todo refactor loop
-  def computeApplications(): Unit = {
+  def computeApplications(lastAppliedModsQty: Int = 0): Int = {
     val mods = ModifiersCache.popCandidate(nodeView.history)
     if (mods.nonEmpty) {
       mods.foreach(mod => pmodModify(mod))
-      computeApplications()
+      computeApplications(lastAppliedModsQty + mods.length)
     }
-    else Unit
+    else lastAppliedModsQty
   }
 
   def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)

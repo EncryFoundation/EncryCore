@@ -44,7 +44,7 @@ case class SyncTracker(deliveryManager: ActorRef,
       statuses.get(peer) match {
         case Some((hcr, _, cp)) =>
           val priority: PeerPriorityStatus = PeerPriorityStatus.definePriorityStatus(requested, received)
-          logger.debug(s"Peer ${peer} has new priority: ${PeerPriorityStatus.toString(priority)}.")
+          logger.info(s"Peer $peer has new priority: ${PeerPriorityStatus.toString(priority)}.")
           statuses = statuses.updated(peer, (hcr, priority, cp))
         case None => logger.info(s"Can't update peer ${peer} priority. No such peer in status tracker")
       }
@@ -54,7 +54,7 @@ case class SyncTracker(deliveryManager: ActorRef,
 
   def incrementRequest(peer: ConnectedPeer): Unit = {
     val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
-    logger.debug(s"Updating request parameter from ${peer.socketAddress}. New one is: ${
+    logger.info(s"Updating request parameter from ${peer.socketAddress}. New one is: ${
       requestReceiveStat._1 + 1
     }")
     peersNetworkCommunication =
@@ -63,7 +63,7 @@ case class SyncTracker(deliveryManager: ActorRef,
 
   def incrementReceive(peer: ConnectedPeer): Unit = {
     val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
-    logger.debug(s"Updating received parameter from ${peer.socketAddress}. New one is: ${
+    logger.info(s"Updating received parameter from ${peer.socketAddress}. New one is: ${
       requestReceiveStat._2 + 1
     }")
     peersNetworkCommunication =
