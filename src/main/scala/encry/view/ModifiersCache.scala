@@ -26,7 +26,7 @@ object ModifiersCache extends StrictLogging {
 
   def isEmpty: Boolean = size == 0
 
-  def contains(key: Key): Boolean = cache.contains(key) || ConcurrentHashMap.newKeySet[Key]().contains(key)
+  def contains(key: Key): Boolean = cache.contains(key)
 
   def put(key: Key, value: EncryPersistentModifier, history: EncryHistory): Unit = if (!contains(key)) {
     cache.put(key, value)

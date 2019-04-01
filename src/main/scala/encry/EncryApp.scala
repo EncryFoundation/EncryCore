@@ -56,8 +56,7 @@ object EncryApp extends App with StrictLogging {
     .withDispatcher("network-dispatcher"), "networkController")
   lazy val peerManager: ActorRef = system.actorOf(Props(classOf[PeerManager]), "peerManager")
   lazy val nodeViewSynchronizer: ActorRef = system.actorOf(
-    Props(classOf[NodeViewSynchronizer], influxRef, nodeViewHolder, networkController, system, settings)
-    .withMailbox(""),
+    Props(classOf[NodeViewSynchronizer], influxRef, nodeViewHolder, networkController, system, settings),
     "nodeViewSynchronizer")
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
   if (settings.monitoringSettings.exists(_.kamonEnabled)) {
