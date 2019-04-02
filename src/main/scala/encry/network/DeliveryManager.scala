@@ -352,7 +352,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
       }
     case _ => requestDownload(modifierTypeId, Seq(modifierIds), history, isBlockChainSynced, isMining)
   }
-
   /**
     * If node is not synced, `requestDownload` sends request for the one peer which will be find by 2 criteria:
     * 1) HistoryComparisonResult != Younger.
