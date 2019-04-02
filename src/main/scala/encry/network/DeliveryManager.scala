@@ -287,10 +287,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * @param peer - peer from which we possibly expecting modifier
     * @return 'true' if we are expecting this modifier from this peer otherwise 'false'
     */
-  def isExpecting(mId: ModifierId, peer: ConnectedPeer): Boolean = {
-    println(expectedModifiers.getOrElse(peer.socketAddress.getAddress, Map.empty).contains(toKey(mId)) + peer.toString)
+  def isExpecting(mId: ModifierId, peer: ConnectedPeer): Boolean =
     expectedModifiers.getOrElse(peer.socketAddress.getAddress, Map.empty).contains(toKey(mId))
-  }
 
   /**
     * Clear the 'receivedSpamModifiers' collection

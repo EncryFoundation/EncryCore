@@ -1,6 +1,7 @@
 package encry.network.DeliveryManagerTests
 
 import java.net.InetSocketAddress
+
 import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 import encry.consensus.History.Older
@@ -14,12 +15,13 @@ import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.history.EncryHistory
-import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
+import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import encry.network.DeliveryManagerTests.DMUtils._
 
 class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfterAll
   with Matchers
-  with InstanceFactory {
+  with InstanceFactory
+  with OneInstancePerTest {
 
   implicit val system: ActorSystem = ActorSystem("SynchronousTestingSpec")
   val settings: EncryAppSettings = EncryAppSettings.read
@@ -47,30 +49,34 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
     }
     "not handle repeating modifiers from RequestFromLocal message" in {
       deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, headerIds)
+      deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, headerIds)
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(peer.socketAddress.getAddress, Map.empty)
         .keys.size == headerIds.size)
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(peer.socketAddress.getAddress, Map.empty)
         .keys.forall(elem => wrappedIds.contains(elem)))
     }
     "Delivery manager should handle received requested modifier correctly" in {
+      deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, headerIds)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
         Header.modifierTypeId -> blocks._2.map(k => k.header.id -> Array.emptyByteArray).toMap), peer)
-//      assert(deliveryManager.underlyingActor.receivedModifiers.getOrElse(peer.socketAddress.getAddress, Set.empty)
-//        .size == headerIds.size)
-//      assert(deliveryManager.underlyingActor.receivedModifiers.getOrElse(peer.socketAddress.getAddress, Set.empty)
-//        .forall(elem => wrappedIds.contains(elem)))
+      assert(deliveryManager.underlyingActor.receivedModifiers.size == blocks._2.size)
+      assert(deliveryManager.underlyingActor.receivedModifiers.forall(elem => wrappedIds.contains(elem)))
       assert(deliveryManager.underlyingActor.headersForPriorityRequest.forall(x => wrappedIds.contains(x._1)))
     }
     "Delivery manager should not handle received repeating modifiers" in {
+      deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, headerIds)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
         Header.modifierTypeId -> blocks._2.map(k => k.header.id -> Array.emptyByteArray).toMap), peer)
-//      assert(deliveryManager.underlyingActor.receivedModifiers.getOrElse(peer.socketAddress.getAddress, Set.empty)
-//        .size == headerIds.size)
-//      assert(deliveryManager.underlyingActor.receivedModifiers.getOrElse(peer.socketAddress.getAddress, Set.empty)
-//        .forall(elem => wrappedIds.contains(elem)))
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
+        Header.modifierTypeId -> blocks._2.map(k => k.header.id -> Array.emptyByteArray).toMap), peer)
+      assert(deliveryManager.underlyingActor.receivedModifiers.size == headerIds.size)
+      assert(deliveryManager.underlyingActor.receivedModifiers.forall(elem => wrappedIds.contains(elem)))
       assert(deliveryManager.underlyingActor.headersForPriorityRequest.forall(x => wrappedIds.contains(x._1)))
     }
     "handle priority request for payload correctly" in {
+      deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, headerIds)
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
+        Header.modifierTypeId -> blocks._2.map(k => k.header.id -> Array.emptyByteArray).toMap), peer)
       headerIds.foreach(id =>
         deliveryManager ! DownloadRequest(Payload.modifierTypeId, blocks._2
           .find(block => block.id.sameElements(id)).get.payload.id, Some(id)))
