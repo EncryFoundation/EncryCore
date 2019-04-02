@@ -72,7 +72,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         println(s"Trigger CheckModifiersToDownload from context.system.scheduler.schedule")
         self ! CheckModifiersToDownload
       }
-      context.system.scheduler.schedule(5.second, settings.network.deliveryTimeout)(syncTracker.updatePeersPriorityStatus())
+      context.system.scheduler.schedule(5.second, settings.network.deliveryTimeout*settings.network.maxDeliveryChecks)(syncTracker.updatePeersPriorityStatus())
       syncTracker.scheduleSendSyncInfo()
       context.become(basicMessageHandler(historyReader, isBlockChainSynced = false, isMining = settings.node.mining))
     case message =>
