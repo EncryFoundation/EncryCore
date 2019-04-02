@@ -255,11 +255,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
                         peerRequests: Map[ModifierIdAsKey, (Cancellable, Int)]): Unit =
     peerRequests.get(toKey(modId)) match {
       case Some((timer, attempts)) =>
-        syncTracker.statuses.find { case (innerPeerAddr, (cResult, peerStatus, _)) =>
+        syncTracker.statuses.find { case (innerPeerAddr, (cResult, _, _)) =>
           innerPeerAddr == peer.socketAddress.getAddress &&
             cResult != Younger &&
-            cResult != Fork &&
-            peerStatus != SyncTracker.PeerPriorityStatus.BadNode
+            cResult != Fork
         }.foreach {
           case (_, (_, _, cP)) =>
             cP.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
