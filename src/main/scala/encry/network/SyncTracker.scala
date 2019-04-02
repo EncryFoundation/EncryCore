@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
-
 import akka.actor.{ActorContext, ActorRef, Cancellable}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
@@ -11,7 +10,6 @@ import encry.network.SyncTracker.PeerPriorityStatus
 import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
 import encry.settings.NetworkSettings
 import encry.utils.NetworkTime.Time
-
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -46,7 +44,7 @@ case class SyncTracker(deliveryManager: ActorRef,
           val priority: PeerPriorityStatus = PeerPriorityStatus.definePriorityStatus(requested, received)
           logger.info(s"Peer $peer has new priority: ${PeerPriorityStatus.toString(priority)}.")
           statuses = statuses.updated(peer, (hcr, priority, cp))
-        case None => logger.info(s"Can't update peer ${peer} priority. No such peer in status tracker")
+        case None => logger.info(s"Can't update peer $peer priority. No such peer in status tracker")
       }
     }
     peersNetworkCommunication = Map.empty[InetAddress, (Requested, Received)]
@@ -54,20 +52,34 @@ case class SyncTracker(deliveryManager: ActorRef,
 
   def incrementRequest(peer: ConnectedPeer): Unit = {
     val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
-    logger.info(s"Updating request parameter from ${peer.socketAddress}. New one is: ${
-      requestReceiveStat._1 + 1
-    }")
+    logger.info(s"Updating request parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
+      s" New one is: (${requestReceiveStat._1 + 1}, ${requestReceiveStat._2})")
     peersNetworkCommunication =
       peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1 + 1, requestReceiveStat._2))
   }
 
+  def incrementRequestForNModifiers(peer: ConnectedPeer, modifiersQty: Int): Unit = {
+    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
+    logger.info(s"Updating request parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
+      s" New one is: (${requestReceiveStat._1 + 1}, ${requestReceiveStat._2})")
+    peersNetworkCommunication =
+      peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1 + modifiersQty, requestReceiveStat._2))
+  }
+
   def incrementReceive(peer: ConnectedPeer): Unit = {
     val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
-    logger.info(s"Updating received parameter from ${peer.socketAddress}. New one is: ${
-      requestReceiveStat._2 + 1
-    }")
+    logger.info(s"Updating received parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
+      s" New one is: (${requestReceiveStat._1}, ${requestReceiveStat._2 + 1})")
     peersNetworkCommunication =
       peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1, requestReceiveStat._2 + 1))
+  }
+
+  def decrementRequest(peer: ConnectedPeer): Unit = {
+    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
+    logger.info(s"Decrement request parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
+      s" New one is: (${requestReceiveStat._1}, ${requestReceiveStat._2 - 1})")
+    peersNetworkCommunication =
+      peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1, requestReceiveStat._2 - 1))
   }
 
   def getPeersForConnection: Vector[(InetAddress, (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer))] =
@@ -147,19 +159,19 @@ object SyncTracker {
 
     type PeerPriorityStatus = Int
 
-    val HighPriority: PeerPriorityStatus = 4
-    val LowPriority: PeerPriorityStatus = 3
+    val HighPriority: PeerPriorityStatus    = 4
+    val LowPriority: PeerPriorityStatus     = 3
     val InitialPriority: PeerPriorityStatus = 2
-    val BadNode: PeerPriorityStatus = 1
+    val BadNode: PeerPriorityStatus         = 1
 
     private val criterionForHighP: Double = 0.75
-    private val criterionForLowP: Double = 0.50
+    private val criterionForLowP: Double  = 0.50
 
     def definePriorityStatus(requested: Int, received: Int): PeerPriorityStatus =
       received.toDouble / requested match {
         case t if t >= criterionForHighP => HighPriority
-        case t if t >= criterionForLowP => LowPriority
-        case _ => BadNode
+        case t if t >= criterionForLowP  => LowPriority
+        case _                           => BadNode
       }
 
     def toString(priority: PeerPriorityStatus): String = priority match {

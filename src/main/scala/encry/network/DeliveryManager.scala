@@ -230,7 +230,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         logger.info(s"Send request to ${peer.socketAddress.getAddress} for modifiers of type $mTypeId " +
           s"with ${notYetRequested.size}|${notYetRequested.map(Algos.encode).mkString(",")} ids.")
         peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequested)
-        syncTracker.incrementRequest(peer)
+        syncTracker.incrementRequestForNModifiers(peer, notYetRequested.size)
 
         val requestedModIds = notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
           rYet.updated(toKey(id), context.system
@@ -287,8 +287,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * @param peer - peer from which we possibly expecting modifier
     * @return 'true' if we are expecting this modifier from this peer otherwise 'false'
     */
-  def isExpecting(mId: ModifierId, peer: ConnectedPeer): Boolean =
+  def isExpecting(mId: ModifierId, peer: ConnectedPeer): Boolean = {
+    println(expectedModifiers.getOrElse(peer.socketAddress.getAddress, Map.empty).contains(toKey(mId)) + peer.toString)
     expectedModifiers.getOrElse(peer.socketAddress.getAddress, Map.empty).contains(toKey(mId))
+  }
 
   /**
     * Clear the 'receivedSpamModifiers' collection
@@ -427,7 +429,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
           .updated(toKey(mId), headersForPriorityRequest.getOrElse(toKey(mId), Seq.empty) :+ peer.socketAddress.getAddress)
         logger.info(s"After updating headersForPriorityRequest contains ${headersForPriorityRequest.get(toKey(mId))}")
       }
-    } else receivedSpamModifiers = receivedSpamModifiers - toKey(mId) + (toKey(mId) -> peer)
+    } else {
+      receivedSpamModifiers = receivedSpamModifiers - toKey(mId) + (toKey(mId) -> peer)
+      syncTracker.decrementRequest(peer)
+    }
 
   /**
     * Transform modifier id to WrappedArray of bytes
