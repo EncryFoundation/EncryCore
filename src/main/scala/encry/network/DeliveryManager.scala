@@ -161,7 +161,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
       if (syncTracker.elapsedTimeSinceLastSync < settings.network.syncInterval.toMillis / 2)
         logger.info("Trying to send sync info too often")
       else sendSync(history.syncInfo, isBlockChainSynced)
-    case GetSyncTrackerPeer => sender() ! syncTracker.statuses
     case FullBlockChainIsSynced =>
       logger.info("FullBlockChainIsSynced on delivery manager!")
       context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining))
@@ -353,7 +352,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
       }
     case _ => requestDownload(modifierTypeId, Seq(modifierIds), history, isBlockChainSynced, isMining)
   }
-
   /**
     * If node is not synced, `requestDownload` sends request for the one peer which will be find by 2 criteria:
     * 1) HistoryComparisonResult != Younger.
@@ -395,7 +393,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
         }
       case _ => logger.info(s"BlockChain is synced. There is no nodes, which we can connect with.")
     }
-
   /**
     * Handle received modifier. We will process received modifier only if we are expecting this on.
     *
@@ -414,13 +411,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
       val peerExpectedModifiers: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress.getAddress, Map.empty)
       peerExpectedModifiers.get(toKey(mId)).foreach(_._1.cancel())
-      //val peerReceivedModifiers: Set[ModifierIdAsKey] = receivedModifiers.getOrElse(peer.socketAddress.getAddress, Set.empty)
-      //receivedModifiers = receivedModifiers.updated(peer.socketAddress.getAddress, peerReceivedModifiers + toKey(mId))
-      logger.info(s"expectedModifiers -> ${expectedModifiers.map(x => x._1 -> x._2.size)} BEFORE")
       if (mTid != Transaction.ModifierTypeId) receivedModifiers += toKey(mId)
       expectedModifiers = clearExpectedModifiersCollection(peerExpectedModifiers, toKey(mId), peer.socketAddress.getAddress)
-      //expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, peerExpectedModifiers - toKey(mId))
-      logger.info(s"expectedModifiers -> ${expectedModifiers.map(x => x._1 -> x._2.size)} AFTRE")
       if (isBlockChainSynced && mTid == Header.modifierTypeId) {
         logger.info(s"Received header with id: ${Algos.encode(mId)} from peer: ${peer.socketAddress.getAddress}")
         headersForPriorityRequest = headersForPriorityRequest
@@ -431,26 +423,29 @@ class DeliveryManager(influxRef: Option[ActorRef],
       receivedSpamModifiers = receivedSpamModifiers - toKey(mId) + (toKey(mId) -> peer)
       syncTracker.decrementRequest(peer)
     }
-
   /**
-    * Transform modifier id to WrappedArray of bytes
+    * Transform modifier id to WrappedArray.ofBytes
     *
     * @param id - modifier id which will be transform to WrappedArray of bytes
     * @return transformed modifier id
     */
   def toKey(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
-
   /**
+    * This function gets collection of current expected modifiers from 'peer' and modifier, which
+    * will be removed from received collection as a parameters.
+    * If expected modifiers collection will contain other modifiers even after removing,
+    * this function will return collection of expectedModifiers with updated 'peer' expected collection
+    * otherwise it will return expectedModifiers collection without 'peer'.
     *
-    * @param peerCollection
-    * @param modifierId
-    * @param peer
-    * @return
+    * @param expectedModifiersFromPeer - collection of expected modifiers from 'peer'
+    * @param modifierId - modifier id, which will be removed from 'expectedModifiersFromPeer'
+    * @param peer - 'peer' from which expected modifiers collection we remove received modifier
+    * @return - expectedModifiers collection without 'peer' or expectedModifiers with updated 'peer' expected collection.
     */
-  def clearExpectedModifiersCollection(peerCollection: Map[ModifierIdAsKey, (Cancellable, Int)],
+  def clearExpectedModifiersCollection(expectedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, Int)],
                                        modifierId: ModifierIdAsKey,
                                        peer: InetAddress): Map[InetAddress, Map[ModifierIdAsKey, (Cancellable, Int)]] = {
-    val collectionWithoutModId: Map[ModifierIdAsKey, (Cancellable, Int)] = peerCollection - modifierId
+    val collectionWithoutModId: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiersFromPeer - modifierId
     collectionWithoutModId match {
       case coll: Map[_, _] if coll.nonEmpty => expectedModifiers.updated(peer, coll)
       case _ => expectedModifiers - peer
@@ -461,8 +456,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
 object DeliveryManager {
 
   case object FullBlockChainIsSynced
-
-  case object GetSyncTrackerPeer
 
   case class CheckModifiersWithQueueSize(size: Int)
 
