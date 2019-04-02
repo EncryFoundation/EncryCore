@@ -68,7 +68,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   override def receive: Receive = {
     case UpdatedHistory(historyReader) =>
       logger.info(s"Got message with history. Starting normal actor's work.")
-      context.system.scheduler.schedule(5.second, settings.network.modifierDeliverTimeCheck){
+      context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck){
         println(s"Trigger CheckModifiersToDownload from context.system.scheduler.schedule")
         self ! CheckModifiersToDownload
       }
@@ -103,30 +103,30 @@ class DeliveryManager(influxRef: Option[ActorRef],
           expectedModifiers = clearExpectedModifiersCollection(expectedModifiersByPeer, modId, peer.socketAddress.getAddress)
         case _ => logger.info(s"This modifiers ${Algos.encode(modifierId)} has been already delivered. We don't need reRequest it.")
       }
-    //      val modIdsFromPeer: Set[ModifierIdAsKey] = receivedModifiers.getOrElse(peer.socketAddress.getAddress, Set.empty)
-    //      modIdsFromPeer.find(id => id == toKey(modifierId)) match {
-    //        case Some(_) if modIdsFromPeer.size <= 1 => receivedModifiers = receivedModifiers - peer.socketAddress.getAddress
-    //        case Some(_) => receivedModifiers =
-    //          receivedModifiers.updated(peer.socketAddress.getAddress, modIdsFromPeer - toKey(modifierId))
-    //        case None => reRequestModifier(peer, modifierTypeId, modifierId)
-    //      }
     case CheckModifiersToDownload =>
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys}.to[HashSet]
+      logger.info(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
       val newIds: Seq[(ModifierTypeId, ModifierId)] =
         history.modifiersToDownload(
           settings.network.networkChunkSize - currentQueue.size,
           currentQueue.map(elem => ModifierId @@ elem.toArray)
         ).filterNot(modId => currentQueue.contains(toKey(modId._2)))
+      logger.info(s"newIds: ${newIds.map(elem => Algos.encode(elem._2)).mkString(",")}")
       if (newIds.nonEmpty) newIds.groupBy(_._1).foreach {
         case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) =>
           requestDownload(modId, ids.map(_._2), history, isBlockChainSynced, isMining)
+      }
+      context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck){
+        println(s"Trigger CheckModifiersToDownload from context.system.scheduler.schedule")
+        self ! CheckModifiersToDownload
       }
     case SemanticallySuccessfulModifier(mod) =>
       receivedModifiers -= toKey(mod.id)
       logger.info(s"receivedModifiers size: ${receivedModifiers.size}")
     case SemanticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
-    case SemanticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
+    case SyntacticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
+    case SuccessfulTransaction(_) => //do nothing
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       if (modifierIds.nonEmpty) requestModifies(history, peer, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
     case DataFromPeer(message, remote) => message match {
@@ -146,7 +146,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         if (!history.isHeadersChainSynced && expectedModifiers.isEmpty) sendSync(history.syncInfo, isBlockChainSynced)
         else if (history.isHeadersChainSynced && !history.isFullChainSynced && expectedModifiers.isEmpty) {
           println(s"Trigger CheckModifiersToDownload from DataFromPeer ${expectedModifiers.size}")
-          //self ! CheckModifiersToDownload
+          self ! CheckModifiersToDownload
         }
       case _ => logger.info(s"DeliveryManager got invalid type of DataFromPeer message!")
     }
@@ -264,7 +264,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         }.foreach {
           case (_, (_, _, cP)) =>
             cP.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
-            logger.debug(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
+            logger.info(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
               s"$mTypeId with id: ${Algos.encode(modId)}")
             syncTracker.incrementRequest(peer)
             timer.cancel()

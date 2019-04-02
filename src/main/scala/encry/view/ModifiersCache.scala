@@ -29,6 +29,7 @@ object ModifiersCache extends StrictLogging {
   def contains(key: Key): Boolean = cache.contains(key)
 
   def put(key: Key, value: EncryPersistentModifier, history: EncryHistory): Unit = if (!contains(key)) {
+    logger.info(s"put ${Algos.encode(key.toArray)} to cache")
     cache.put(key, value)
     value match {
       case header: Header =>
