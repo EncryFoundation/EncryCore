@@ -26,6 +26,7 @@ import supertagged.@@
 
 import scala.annotation.tailrec
 import scala.collection.immutable
+import scala.collection.immutable.HashSet
 import scala.util.Try
 
 trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
@@ -43,7 +44,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
 
-  def modifiersToDownload(howMany: Int, excluding: Iterable[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
+  def modifiersToDownload(howMany: Int, excluding: HashSet[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
     @tailrec
     def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] =
       if (acc.lengthCompare(howMany) >= 0) acc

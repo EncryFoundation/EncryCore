@@ -111,13 +111,13 @@ class DeliveryManager(influxRef: Option[ActorRef],
     //        case None => reRequestModifier(peer, modifierTypeId, modifierId)
     //      }
     case CheckModifiersToDownload =>
-      val currentQueue: HashSet[ModifierId] =
-        expectedModifiers.flatMap { case (_, modIds) =>
-          modIds.keys.map(modId => ModifierId @@ modId.toArray)
-        }.to[HashSet]
+      val currentQueue: HashSet[ModifierIdAsKey] =
+        expectedModifiers.flatMap { case (_, modIds) => modIds.keys}.to[HashSet]
       val newIds: Seq[(ModifierTypeId, ModifierId)] =
-        history.modifiersToDownload(settings.network.networkChunkSize - currentQueue.size, currentQueue)
-          .filterNot(modId => currentQueue.contains(modId._2))
+        history.modifiersToDownload(
+          settings.network.networkChunkSize - currentQueue.size,
+          currentQueue.map(elem => ModifierId @@ elem.toArray)
+        ).filterNot(modId => currentQueue.contains(toKey(modId._2)))
       if (newIds.nonEmpty) newIds.groupBy(_._1).foreach {
         case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) =>
           requestDownload(modId, ids.map(_._2), history, isBlockChainSynced, isMining)
