@@ -146,7 +146,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         if (!history.isHeadersChainSynced && expectedModifiers.isEmpty) sendSync(history.syncInfo, isBlockChainSynced)
         else if (history.isHeadersChainSynced && !history.isFullChainSynced && expectedModifiers.isEmpty) {
           println(s"Trigger CheckModifiersToDownload from DataFromPeer ${expectedModifiers.size}")
-          self ! CheckModifiersToDownload
+          //self ! CheckModifiersToDownload
         }
       case _ => logger.info(s"DeliveryManager got invalid type of DataFromPeer message!")
     }
