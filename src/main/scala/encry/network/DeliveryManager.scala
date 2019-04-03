@@ -57,7 +57,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     println(s"headersForPriorityRequest -> ${headersForPriorityRequest.size} " +
       s"receivedSpamModifiers -> ${receivedSpamModifiers.size} " +
       s"expectedModifiers -> ${expectedModifiers.map(x => x._1 -> x._2.size)}" +
-      s" receivedModifiers -> ${receivedModifiers.size} -> ${receivedModifiers.mkString(",")}")
+      s" receivedModifiers -> ${receivedModifiers.size}")
   )
 
   var tmpVar: Long = System.currentTimeMillis()
@@ -96,6 +96,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case CheckModifiersToDownload =>
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
+      logger.info(s"${expectedModifiers.map(x => x._1 -> x._2.map(k => Algos.encode(k._1.toArray))).mkString(",")}")
       logger.info(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
       val newIds: Seq[(ModifierTypeId, ModifierId)] =
         history.modifiersToDownload(
@@ -122,14 +123,14 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case DataFromPeer(message, remote) => message match {
       case ModifiersNetworkMessage((typeId, modifiers)) =>
         logger.info(s"Got ${modifiers.size} modifiers on the DM from $remote with id: ${modifiers.keys.map(Algos.encode).mkString(",")}")
-        val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
-          modifiers.partition { case (id, _) => isSpam(id) }
         influxRef.foreach(_ ! GetModifiers(typeId, modifiers.keys.toSeq))
         for ((id, _) <- modifiers) receive(typeId, id, remote, isBlockChainSynced)
+        val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
+          modifiers.partition { case (id, _) => isSpam(id) }
         if (spam.nonEmpty) {
           logger.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
             s": ${spam.keys.map(Algos.encode)}.")
-          deleteSpam(spam.keys.toSeq)
+          receivedSpamModifiers = Map.empty
         }
         val filteredModifiers: Seq[Array[Byte]] = fm.filterNot { case (modId, _) => history.contains(modId) }.values.toSeq
         if (filteredModifiers.nonEmpty) nodeViewHolderRef ! ModifiersFromRemote(typeId, filteredModifiers)
@@ -163,16 +164,19 @@ class DeliveryManager(influxRef: Option[ActorRef],
   def checkDelivery(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
     val expectedModifiersByPeer: Map[ModifierIdAsKey, (Cancellable, Int)] =
       expectedModifiers.getOrElse(peer.socketAddress.getAddress, Map.empty)
+    logger.info(s"PEER -> $peer")
+    logger.info(s"${expectedModifiersByPeer.map(x => Algos.encode(x._1.toArray)).mkString(",")}")
     if (modifierTypeId == Transaction.ModifierTypeId)
       expectedModifiers = clearExpectedModifiersCollection(expectedModifiersByPeer, toKey(modifierId), peer.socketAddress.getAddress)
     else expectedModifiersByPeer.find { case (id, (_, _)) => id == toKey(modifierId) } match {
       case Some((_, (_, attempts))) if attempts <= settings.network.maxDeliveryChecks =>
-        logger.info(s"Modifier ${Algos.encode(modifierId)} needed to be requested!")
+        logger.info(s"Modifier ${Algos.encode(modifierId)} needed to be requested from $peer!")
         reRequestModifier(peer, modifierTypeId, modifierId, expectedModifiersByPeer)
       case Some((modId, (_, _))) =>
-        logger.info(s"Maximum number of attempts has expired. Remove modifier ${Algos.encode(modifierId)}.")
+        logger.info(s"Maximum number of attempts has expired. Remove modifier ${Algos.encode(modifierId)} from $peer.")
         expectedModifiers = clearExpectedModifiersCollection(expectedModifiersByPeer, modId, peer.socketAddress.getAddress)
-      case _ => logger.info(s"This modifiers ${Algos.encode(modifierId)} is not contained in expectedModifiers collection.")
+      case _ =>
+        logger.info(s"This modifiers ${Algos.encode(modifierId)} is not contained in expectedModifiers collection from $peer.")
     }
   }
 
@@ -239,11 +243,16 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
         val requestedModIds = notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
           rYet.updated(toKey(id), context.system
-            .scheduler.scheduleOnce(settings.network.deliveryTimeout, self, checkDelivery(peer, mTypeId, id)) -> 1)
+            .scheduler.scheduleOnce(settings.network.deliveryTimeout, self, schedulerChecker(peer, mTypeId, id)) -> 1)
         }
         expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, requestedModIds)
       }
     }
+  }
+
+  def schedulerChecker(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
+    logger.info(s"\n\n TRIGGERED SCHEDULER FOR ${Algos.encode(modifierId)} \n\n")
+    checkDelivery(peer, modifierTypeId, modifierId)
   }
 
   /**
@@ -274,7 +283,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
             expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, peerRequests.updated(
               toKey(modId),
               context.system.scheduler
-                .scheduleOnce(settings.network.deliveryTimeout, self, checkDelivery(peer, mTypeId, modId)) -> (attempts + 1)
+                .scheduleOnce(settings.network.deliveryTimeout, self, schedulerChecker(peer, mTypeId, modId)) -> (attempts + 1)
             ))
           case _ => logger.info(s"Tried to re-ask modifier ${Algos.encode(modId)}, but this id not needed from this peer")
           //expectedModifiers = clearExpectedModifiersCollection(peerRequests, toKey(modId), peer.socketAddress.getAddress)
