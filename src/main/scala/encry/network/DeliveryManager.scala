@@ -56,7 +56,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
   context.system.scheduler.schedule(1.seconds, 10.seconds)(
     println(s"headersForPriorityRequest -> ${headersForPriorityRequest.size} " +
       s"receivedSpamModifiers -> ${receivedSpamModifiers.size} " +
-      s"expectedModifiers -> ${expectedModifiers.map(x => x._1 -> x._2.size)}")
+      s"expectedModifiers -> ${expectedModifiers.map(x => x._1 -> x._2.size)}" +
+      s" receivedModifiers -> ${receivedModifiers.size} -> ${receivedModifiers.mkString(",")}")
   )
 
   var tmpVar: Long = System.currentTimeMillis()
@@ -92,20 +93,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
       }
     case HandshakedPeer(remote) => syncTracker.updateStatus(remote, Unknown)
     case DisconnectedPeer(remote) => syncTracker.clearStatus(remote)
-    case CheckDelivery(peer, modifierTypeId, modifierId) =>
-      val expectedModifiersByPeer: Map[ModifierIdAsKey, (Cancellable, Int)] =
-        expectedModifiers.getOrElse(peer.socketAddress.getAddress, Map.empty)
-      if (modifierTypeId == Transaction.ModifierTypeId)
-        expectedModifiers = clearExpectedModifiersCollection(expectedModifiersByPeer, toKey(modifierId), peer.socketAddress.getAddress)
-      else expectedModifiersByPeer.find { case (id, (_, _)) => id == toKey(modifierId) } match {
-        case Some((_, (_, attempts))) if attempts <= settings.network.maxDeliveryChecks =>
-          logger.info(s"Modifier ${Algos.encode(modifierId)} needed to be requested!")
-          reRequestModifier(peer, modifierTypeId, modifierId, expectedModifiersByPeer)
-        case Some((modId, (_, _))) =>
-          logger.info(s"Maximum number of attempts has expired. Remove modifier ${Algos.encode(modifierId)}.")
-          expectedModifiers = clearExpectedModifiersCollection(expectedModifiersByPeer, modId, peer.socketAddress.getAddress)
-        case _ => logger.info(s"This modifiers ${Algos.encode(modifierId)} is not contained in expectedModifiers collection.")
-      }
     case CheckModifiersToDownload =>
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
@@ -173,6 +160,22 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case message => logger.info(s"Got strange message $message on DeliveryManager.")
   }
 
+  def checkDelivery(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
+    val expectedModifiersByPeer: Map[ModifierIdAsKey, (Cancellable, Int)] =
+      expectedModifiers.getOrElse(peer.socketAddress.getAddress, Map.empty)
+    if (modifierTypeId == Transaction.ModifierTypeId)
+      expectedModifiers = clearExpectedModifiersCollection(expectedModifiersByPeer, toKey(modifierId), peer.socketAddress.getAddress)
+    else expectedModifiersByPeer.find { case (id, (_, _)) => id == toKey(modifierId) } match {
+      case Some((_, (_, attempts))) if attempts <= settings.network.maxDeliveryChecks =>
+        logger.info(s"Modifier ${Algos.encode(modifierId)} needed to be requested!")
+        reRequestModifier(peer, modifierTypeId, modifierId, expectedModifiersByPeer)
+      case Some((modId, (_, _))) =>
+        logger.info(s"Maximum number of attempts has expired. Remove modifier ${Algos.encode(modifierId)}.")
+        expectedModifiers = clearExpectedModifiersCollection(expectedModifiersByPeer, modId, peer.socketAddress.getAddress)
+      case _ => logger.info(s"This modifiers ${Algos.encode(modifierId)} is not contained in expectedModifiers collection.")
+    }
+  }
+
   /**
     * If node is not synced, send sync info to random peer, otherwise to all known peers.
     *
@@ -236,7 +239,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
         val requestedModIds = notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
           rYet.updated(toKey(id), context.system
-            .scheduler.scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(peer, mTypeId, id)) -> 1)
+            .scheduler.scheduleOnce(settings.network.deliveryTimeout, self, checkDelivery(peer, mTypeId, id)) -> 1)
         }
         expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, requestedModIds)
       }
@@ -268,11 +271,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
             logger.info(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
               s"$mTypeId with id: ${Algos.encode(modId)}")
             syncTracker.incrementRequest(peer)
-            timer.cancel()
             expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, peerRequests.updated(
               toKey(modId),
               context.system.scheduler
-                .scheduleOnce(settings.network.deliveryTimeout, self, CheckDelivery(peer, mTypeId, modId)) -> (attempts + 1)
+                .scheduleOnce(settings.network.deliveryTimeout, self, checkDelivery(peer, mTypeId, modId)) -> (attempts + 1)
             ))
           case _ => logger.info(s"Tried to re-ask modifier ${Algos.encode(modId)}, but this id not needed from this peer")
           //expectedModifiers = clearExpectedModifiersCollection(peerRequests, toKey(modId), peer.socketAddress.getAddress)

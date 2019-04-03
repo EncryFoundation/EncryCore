@@ -193,9 +193,9 @@ object NodeViewSynchronizer {
 
     case class RequestFromLocal(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    case class CheckDelivery(source: ConnectedPeer,
-                             modifierTypeId: ModifierTypeId,
-                             modifierId: ModifierId)
+//    case class CheckDelivery(source: ConnectedPeer,
+//                             modifierTypeId: ModifierTypeId,
+//                             modifierId: ModifierId)
 
     trait PeerManagerEvent
 
