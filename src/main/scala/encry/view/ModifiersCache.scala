@@ -1,14 +1,17 @@
 package encry.view
 
 import java.util.concurrent.ConcurrentHashMap
+
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.settings
 import encry.modifiers.EncryPersistentModifier
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.history.Header
+import encry.settings.Constants
 import encry.validation.{MalformedModifierError, RecoverableModifierError}
 import encry.view.history.EncryHistory
 import org.encryfoundation.common.Algos
+
 import scala.collection.immutable.SortedMap
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
@@ -18,9 +21,10 @@ object ModifiersCache extends StrictLogging {
 
   private type Key = mutable.WrappedArray[Byte]
 
-//  private val cache1 =
- val cache: TrieMap[Key, EncryPersistentModifier] = TrieMap[Key, EncryPersistentModifier]()
+  //  private val cache1 =
+  val cache: TrieMap[Key, EncryPersistentModifier] = TrieMap[Key, EncryPersistentModifier]()
   private var headersCollection: SortedMap[Int, List[ModifierId]] = SortedMap[Int, List[ModifierId]]()
+
 
   def size: Int = cache.size
 
@@ -79,32 +83,42 @@ object ModifiersCache extends StrictLogging {
       }
     }).collect { case Some(v) => v._1 }
 
-    val bestHeadersIds: List[Key] = headersCollection.get(history.bestHeaderHeight + 1) match {
-      case Some(value) =>
-        headersCollection = headersCollection - (history.bestHeaderHeight + 1)
-        logger.info(s"HeadersCollection size is: ${headersCollection.size}")
-        value.map(cache.get(_)).collect {
-          case Some(v: Header)
-            if (v.parentId sameElements history.bestHeaderOpt.map(_.id).getOrElse(Array.emptyByteArray))
-              && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
-            logger.info(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
-            new mutable.WrappedArray.ofByte(v.id)
-        }
+    val bestHeadersIds: List[Key] = {
+      headersCollection.get(history.bestHeaderHeight + 1) match {
+        case Some(value) =>
+          headersCollection = headersCollection - (history.bestHeaderHeight + 1)
+          logger.info(s"HeadersCollection size is: ${headersCollection.size}")
+          value.map(cache.get(_)).collect {
+            case Some(v: Header)
+              if (
+                (v.parentId sameElements history.bestHeaderOpt.map(_.id).getOrElse(Array.emptyByteArray)) ||
+                  (history.bestHeaderHeight == Constants.Chain.PreGenesisHeight &&
+                    (v.parentId sameElements Header.GenesisParentId)
+                    )
+                )
+                && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
+              logger.info(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
+              new mutable.WrappedArray.ofByte(v.id)
+          }
 
-      case None =>
-        logger.debug(s"No best header in cache")
-        List[Key]()
+        case None =>
+          logger.info(s"No best header in cache")
+          List[Key]()
+      }
     }
     if (bestHeadersIds.nonEmpty) bestHeadersIds
     else history.headerIdsAtHeight(history.bestBlockHeight + 1).headOption match {
       case Some(id) => history.modifierById(id) match {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           List(new mutable.WrappedArray.ofByte(header.payloadId))
+        case _ if !history.isFullChainSynced => List.empty[Key]
         case _ => exhaustiveSearch
       }
-      case None =>
+      case None if history.isFullChainSynced =>
         logger.debug(s"No payloads for current history")
         exhaustiveSearch
+      case None => logger.info(s"No payloads for current history")
+        List.empty[Key]
     }
   }
 }
