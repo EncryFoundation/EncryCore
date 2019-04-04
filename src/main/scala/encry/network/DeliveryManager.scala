@@ -283,10 +283,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
       case Some((timer, attempts)) =>
         syncTracker.statuses.find { case (innerPeerAddr, (cResult, _, _)) =>
           innerPeerAddr == peer.socketAddress.getAddress &&
-            cResult != Younger &&
-            cResult != Fork
-        }.foreach {
-          case (_, (_, _, cP)) =>
+            cResult != Younger && cResult != Fork
+        } match {
+          case Some((_, (_, _, cP))) =>
             cP.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
             logger.info(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
               s"$mTypeId with id: ${Algos.encode(modId)}. Attempts: $attempts")
@@ -296,7 +295,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
               context.system.scheduler
                 .scheduleOnce(settings.network.deliveryTimeout)(schedulerChecker(peer, mTypeId, modId)) -> (attempts + 1)
             ))
-          case _ => logger.info(s"Tried to re-ask modifier ${Algos.encode(modId)}, but this id not needed from this peer")
+          case None =>
+            expectedModifiers = clearExpectedModifiersCollection(peerRequests, toKey(modId), peer.socketAddress.getAddress)
+            logger.info(s"Tried to re-ask modifier ${Algos.encode(modId)}, but this id not needed from this peer")
           //expectedModifiers = clearExpectedModifiersCollection(peerRequests, toKey(modId), peer.socketAddress.getAddress)
           //expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, peerRequests - toKey(modId))
         }
