@@ -232,7 +232,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       s"thirdCondition: $thirdCondition ")
 
     logger.info(s"PEEEER -> $peer")
-    logger.info(s"${syncTracker.statuses.map(x => x._1).mkString(",")}")
+    logger.info(s"${syncTracker.statuses.map(x => x._1 -> x._2._1).mkString(",")}")
     if ((firstCondition || secondCondition) && thirdCondition) {
       val requestedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress.getAddress, Map.empty)
