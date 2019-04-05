@@ -54,10 +54,14 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
             logger.info(s"requiredModifiersForHeader($bestHeaderAtThisHeight) ->" +
               s"${requiredModifiersForHeader(bestHeaderAtThisHeight).map(x => Algos.encode(x._2))}")
             val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
-              .filter(m => !excluding.exists(_ sameElements m._2))
-              .filter(m => !contains(m._2)) //todo can we combine this 2 filter?
+            val b = toDownload.filter(m => !excluding.exists(_ sameElements m._2))
+            logger.info(s"b() ->" + s"${b.map(x => Algos.encode(x._2))}")
+
+            val c = b.filter(m => !contains(m._2)) //todo can we combine this 2 filter?
+            logger.info(s"c() ->" + s"${c.map(x => Algos.encode(x._2))}")
+
             logger.info(s"acc ->>> ${acc.map(x => Algos.encode(x._2))} -->>>  ${height + 1}")
-            continuation(Height @@ (height + 1), acc ++ toDownload)
+            continuation(Height @@ (height + 1), acc ++ c)
           case None => acc
         }
       }
@@ -192,8 +196,8 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
             orphanedBlockHeaderIdsRow(header, score)
           }
         (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
+      }
     }
-  }
 
 
   /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
