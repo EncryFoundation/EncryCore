@@ -218,8 +218,14 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       isMining: Boolean): Unit = {
     val firstCondition: Boolean = mTypeId == Transaction.ModifierTypeId && isBlockChainSynced && isMining
     val secondCondition: Boolean = mTypeId != Transaction.ModifierTypeId
-    val thirdCondition: Boolean = syncTracker.statuses.get(peer.socketAddress.getAddress)
-      .exists { case (comrResult, _, _) => comrResult != Younger && comrResult != Fork }
+    val thirdCondition =
+      if (!isBlockChainSynced) syncTracker.statuses.get(peer.socketAddress.getAddress)
+        .exists { case (comrResult, _, _) => comrResult != Younger && comrResult != Fork }
+      else syncTracker.statuses.contains(peer.socketAddress.getAddress)
+
+        //.exists { case (comrResult, _, _) => comrResult != Fork }
+    //    val thirdCondition: Boolean = syncTracker.statuses.get(peer.socketAddress.getAddress)
+    //      .exists { case (comrResult, _, _) => comrResult != Younger && comrResult != Fork }
     logger.info("===============requestModifies============\n " +
       s"firstCondition: $firstCondition\n " +
       s"secondCondition: $secondCondition\n " +
