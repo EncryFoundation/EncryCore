@@ -51,18 +51,28 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       else {
         headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[Header](id)) match {
           case Some(bestHeaderAtThisHeight) =>
+            logger.info(s"requiredModifiersForHeader($bestHeaderAtThisHeight) ->" +
+              s"${requiredModifiersForHeader(bestHeaderAtThisHeight).map(x => Algos.encode(x._2))}")
             val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
               .filter(m => !excluding.exists(_ sameElements m._2))
               .filter(m => !contains(m._2)) //todo can we combine this 2 filter?
+            logger.info(s"acc ->>> ${acc.map(x => Algos.encode(x._2))} -->>>  ${height + 1}")
             continuation(Height @@ (height + 1), acc ++ toDownload)
           case None => acc
         }
       }
 
+    logger.info(s"BEST BLOCK OPT ${bestBlockOpt.map(x => Algos.encode(x.id))}")
     bestBlockOpt match {
-      case _ if !isHeadersChainSynced => Seq.empty
-      case Some(fb) => continuation(Height @@ (fb.header.height + 1), Seq.empty)
-      case None => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
+      case _ if !isHeadersChainSynced =>
+        logger.info(s"case 1!")
+        Seq.empty
+      case Some(fb) =>
+        logger.info(s"case 2")
+        continuation(Height @@ (fb.header.height + 1), Seq.empty)
+      case None =>
+        logger.info(s"case 3")
+        continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
 
