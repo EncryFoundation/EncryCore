@@ -135,5 +135,15 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
         RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id))
       )
     }
+
+    "" in {
+      deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, headerIds)
+      blocks._2.take(9).foreach { h =>
+        deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId, Map(h.header.id -> h.header.bytes)), peer)
+      }
+
+      //assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(peer.a))
+
+    }
   }
 }

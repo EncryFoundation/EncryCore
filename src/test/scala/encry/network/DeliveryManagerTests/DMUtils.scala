@@ -11,7 +11,9 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.view.history.EncryHistory
+
 import scala.collection.mutable
+import scala.collection.mutable.WrappedArray
 
 object DMUtils extends InstanceFactory {
 
@@ -21,7 +23,7 @@ object DMUtils extends InstanceFactory {
                                (implicit actorSystem: ActorSystem): (TestActorRef[DeliveryManager], EncryHistory) = {
     val history: EncryHistory = generateDummyHistory(settings)
     val deliveryManager: TestActorRef[DeliveryManager] =
-      TestActorRef[DeliveryManager](DeliveryManager.props(None, TestProbe().ref, TestProbe().ref, settings))
+      TestActorRef[DeliveryManager](DeliveryManager.props(None, TestProbe().ref, TestProbe().ref, settings).withDispatcher("delivery-manager-dispatcher"))
     deliveryManager ! UpdatedHistory(history)
     if (isMining) deliveryManager ! StartMining
     if (isBlockChainSynced) deliveryManager ! FullBlockChainIsSynced
@@ -35,6 +37,6 @@ object DMUtils extends InstanceFactory {
         (prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block), blocks :+ block)
     }
 
-  def toKey(id: ModifierId) = new mutable.WrappedArray.ofByte(id)
+  def toKey(id: ModifierId): WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
 }

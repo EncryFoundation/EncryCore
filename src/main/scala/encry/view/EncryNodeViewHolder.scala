@@ -146,7 +146,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
       logger.info(s"\n\n\nNVH GOT CompareViews. Current cache is ${ModifiersCache.size}. Requested mods -> ${modifierIds.size}. Filtered mpds -> ${ids.size}\n\n\n")
-
+      logger.info(s"\n ${ModifiersCache.cache.map(x => Algos.encode(x._1.toArray))}")
       if (ids.nonEmpty) sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case a: Any => logger.error(s"Strange input: $a")
   }
