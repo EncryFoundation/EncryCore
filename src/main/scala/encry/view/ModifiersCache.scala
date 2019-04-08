@@ -23,6 +23,9 @@ object ModifiersCache extends StrictLogging {
   //  private val cache1 =
   val cache: TrieMap[Key, EncryPersistentModifier] = TrieMap[Key, EncryPersistentModifier]()
   private var headersCollection: SortedMap[Int, List[ModifierId]] = SortedMap[Int, List[ModifierId]]()
+  private var isChainSynced = false
+
+  def setChainSynced(): Unit = isChainSynced = true
 
   def size: Int = cache.size
 
@@ -109,11 +112,16 @@ object ModifiersCache extends StrictLogging {
       case Some(id) => history.modifierById(id) match {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           List(new mutable.WrappedArray.ofByte(header.payloadId))
+        case _ if !isChainSynced =>
+          logger.info(s"ModsCache no applicable payload")
+          List.empty[Key]
         case _ => exhaustiveSearch
       }
-      case None =>
+      case None if isChainSynced =>
         logger.info(s"No payloads for current history")
         exhaustiveSearch
+      case None => logger.info(s"No payloads for current history")
+        List.empty[Key]
     }
   }
 }

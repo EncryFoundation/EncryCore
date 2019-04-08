@@ -307,6 +307,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
                     BestHeaderInChain(header, System.currentTimeMillis()))
               if (newHistory.isFullChainSynced) {
                 logger.info(s"blockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
+                ModifiersCache.setChainSynced()
                 Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
               }
               updateNodeView(Some(newHistory), Some(newMinState), Some(nodeView.wallet), Some(newMemPool))
