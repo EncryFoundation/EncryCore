@@ -172,6 +172,10 @@ class Miner extends Actor with StrictLogging {
     val coinbase: Transaction = TransactionFactory
       .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, view.state.height)
 
+    println("<----  Coinbase tx Start ---->")
+    println(s"Coinbase box ->>> ${coinbase.newBoxes.map(x => Algos.encode(x.id))}")
+    println("<----  Coinbase tx End   ---->")
+
     val txs: Seq[Transaction] = txsToPut.sortBy(_.timestamp) :+ coinbase
 
     val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
