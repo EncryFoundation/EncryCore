@@ -107,7 +107,7 @@ object EncryApp extends App with StrictLogging {
 
   def forceStopApplication(code: Int = 0): Nothing = {
     system.registerOnTermination {
-      println("Actor system is terminated.")
+      println("Actor system is terminated")
     }
     Await.ready(system.terminate(), 1 minute)
     sys.exit(code)
