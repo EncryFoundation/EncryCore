@@ -57,7 +57,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   val syncTracker: SyncTracker = SyncTracker(self, context, settings.network)
 
   context.system.scheduler.schedule(1.seconds, 10.seconds)(
-    println(s"headersForPriorityRequest -> ${headersForPriorityRequest.size} " +
+    logger.info(s"headersForPriorityRequest -> ${headersForPriorityRequest.size} " +
       s"receivedSpamModifiers -> ${receivedSpamModifiers.size} " +
       s"expectedModifiers -> ${expectedModifiers.map(x => x._1 -> x._2.size)}" +
       s" receivedModifiers -> ${receivedModifiers.size}")
@@ -74,7 +74,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case UpdatedHistory(historyReader) =>
       logger.info(s"Got message with history. Starting normal actor's work.")
       context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck) {
-        println(s"Trigger CheckModifiersToDownload from context.system.scheduler.schedule")
+        logger.info(s"Trigger CheckModifiersToDownload from context.system.scheduler.schedule")
         self ! CheckModifiersToDownload
       }
       context.system.scheduler.schedule(0.second, (settings.network.deliveryTimeout._1 * settings.network.maxDeliveryChecks).seconds) {
@@ -114,7 +114,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
           requestDownload(modId, ids.map(_._2), history, isBlockChainSynced, isMining)
       }
       context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck) {
-        println(s"Trigger CheckModifiersToDownload from context.system.scheduler.schedule")
+        logger.info(s"Trigger CheckModifiersToDownload from context.system.scheduler.schedule")
         self ! CheckModifiersToDownload
       }
     case SemanticallySuccessfulModifier(mod) =>
@@ -141,7 +141,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         if (filteredModifiers.nonEmpty) nodeViewHolderRef ! ModifiersFromRemote(typeId, filteredModifiers)
         if (!history.isHeadersChainSynced && expectedModifiers.isEmpty) sendSync(history.syncInfo, isBlockChainSynced)
         else if (history.isHeadersChainSynced && !history.isFullChainSynced && expectedModifiers.isEmpty) {
-          println(s"Trigger CheckModifiersToDownload from DataFromPeer ${expectedModifiers.size}")
+          logger.info(s"Trigger CheckModifiersToDownload from DataFromPeer ${expectedModifiers.size}")
           //self ! CheckModifiersToDownload
         }
       case _ => logger.info(s"DeliveryManager got invalid type of DataFromPeer message!")
@@ -150,7 +150,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       if (previousModifier.isDefined && isBlockChainSynced)
         priorityRequest(modifierTypeId, modifiersId, previousModifier.get, history, isBlockChainSynced, isMining)
       else {
-        println(s"DownloadRequest requestDownload")
+        logger.info(s"DownloadRequest requestDownload")
         requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
       }
     case SendLocalSyncInfo =>
