@@ -26,6 +26,7 @@ import supertagged.@@
 
 import scala.annotation.tailrec
 import scala.collection.immutable
+import scala.collection.immutable.HashSet
 import scala.util.Try
 
 trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
@@ -43,7 +44,43 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
 
-  def modifiersToDownload(howMany: Int, excluding: Iterable[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
+  def modifiersToDownload(howMany: Int, excluding: HashSet[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
+    @tailrec
+    def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] =
+      if (acc.lengthCompare(howMany) >= 0) acc
+      else {
+        headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[Header](id)) match {
+          case Some(bestHeaderAtThisHeight) =>
+            logger.info(s"requiredModifiersForHeader($bestHeaderAtThisHeight) ->" +
+              s"${requiredModifiersForHeader(bestHeaderAtThisHeight).map(x => Algos.encode(x._2))}")
+            val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
+            val b = toDownload.filter(m => !excluding.exists(_ sameElements m._2))
+            logger.info(s"b() ->" + s"${b.map(x => Algos.encode(x._2))}")
+
+            val c = b.filter(m => !contains(m._2)) //todo can we combine this 2 filter?
+            logger.info(s"c() ->" + s"${c.map(x => Algos.encode(x._2))}")
+
+            logger.info(s"acc ->>> ${acc.map(x => Algos.encode(x._2))} -->>>  ${height + 1}")
+            continuation(Height @@ (height + 1), acc ++ c)
+          case None => acc
+        }
+      }
+
+    logger.info(s"BEST BLOCK OPT ${bestBlockOpt.map(x => Algos.encode(x.id))}")
+    bestBlockOpt match {
+      case _ if !isHeadersChainSynced =>
+        logger.info(s"case 1!")
+        Seq.empty
+      case Some(fb) =>
+        logger.info(s"case 2")
+        continuation(Height @@ (fb.header.height + 1), Seq.empty)
+      case None =>
+        logger.info(s"case 3")
+        continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
+    }
+  }
+
+  def modifiersToDownloadForNVH(howMany: Int): Seq[(ModifierTypeId, ModifierId)] = {
     @tailrec
     def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] =
       if (acc.lengthCompare(howMany) >= 0) acc
@@ -51,7 +88,6 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[Header](id)) match {
           case Some(bestHeaderAtThisHeight) =>
             val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
-              .filter(m => !excluding.exists(_ sameElements m._2))
               .filter(m => !contains(m._2))
             continuation(Height @@ (height + 1), acc ++ toDownload)
           case None => acc
@@ -160,8 +196,8 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
             orphanedBlockHeaderIdsRow(header, score)
           }
         (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
+      }
     }
-  }
 
 
   /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of

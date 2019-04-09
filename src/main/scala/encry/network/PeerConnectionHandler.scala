@@ -210,7 +210,7 @@ class PeerConnectionHandler(connection: ActorRef,
         GeneralizedNetworkMessage.fromProto(packet) match {
           case Success(message) =>
             networkController ! MessageFromNetwork(message, selfPeer)
-            logger.info("Received message " + message.messageName + " from " + remote)
+            logger.debug("Received message " + message.messageName + " from " + remote)
             false
           case Failure(e) =>
             logger.info(s"Corrupted data from: " + remote + s"$e")

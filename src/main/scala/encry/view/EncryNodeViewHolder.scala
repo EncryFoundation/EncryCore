@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import HeaderProto.HeaderProtoMessage
 import PayloadProto.PayloadProtoMessage
 import TransactionProto.TransactionProtoMessage
@@ -16,7 +17,7 @@ import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer, TransactionSerializer}
 import encry.modifiers.state.box.EncryProposition
 import encry.network.AuxiliaryHistoryHolder.{Append, ReportModifierInvalid, ReportModifierValid}
-import encry.network.DeliveryManager.FullBlockChainSynced
+import encry.network.DeliveryManager.{CheckModifiersWithQueueSize, FullBlockChainIsSynced, ModifiersFromNVH}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
@@ -32,6 +33,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -78,6 +80,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     System.exit(100)
   }
 
+  system.scheduler.schedule(5.seconds, 10.seconds)(logger.info(s"Modifiers cache from NVH: ${ModifiersCache.size}"))
+
   override def postStop(): Unit = {
     logger.warn(s"Stopping EncryNodeViewHolder")
     nodeView.history.closeStorage()
@@ -88,8 +92,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     case ModifiersFromRemote(modifierTypeId, modifiers) => modifierTypeId match {
       case Payload.modifierTypeId => modifiers.foreach { bytes =>
         Try(PayloadProtoSerializer.fromProto(PayloadProtoMessage.parseFrom(bytes)).foreach { payload =>
+          logger.info(s"after ser: ${Algos.encode(payload.id)}")
           if (nodeView.history.contains(payload.id) || ModifiersCache.contains(key(payload.id)))
-            logger.warn(s"Received modifier ${payload.encodedId} that is already in history")
+            logger.warn(s"Received modifier ${payload.encodedId} that is already in history(" +
+              s"history: ${nodeView.history.contains(payload.id)}. Cache: ${ModifiersCache.contains(key(payload.id))})")
           else ModifiersCache.put(key(payload.id), payload, nodeView.history)
         })
       }
@@ -97,10 +103,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         computeApplications()
         logger.debug(s"Cache after(${ModifiersCache.size})")
       case Header.modifierTypeId =>
+        logger.info(s"Headers on receive: ${modifiers.size}")
         modifiers.foreach { bytes =>
           Try(HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)).foreach { header =>
+            logger.info(s"after ser: ${Algos.encode(header.id)}")
             if (nodeView.history.contains(header.id) || ModifiersCache.contains(key(header.id)))
-              logger.warn(s"Received modifier ${header.encodedId} that is already in history")
+              logger.warn(s"Received modifier ${header.encodedId} that is already in history(" +
+                s"history: ${nodeView.history.contains(header.id)}. Cache: ${ModifiersCache.contains(key(header.id))})")
             else ModifiersCache.put(key(header.id), header, nodeView.history)
             if (settings.influxDB.isDefined && nodeView.history.isFullChainSynced) {
               header match {
@@ -120,7 +129,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction]@unchecked => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier]@unchecked =>
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
-      pmodModify(lm.pmod)
+      pmodModify(lm.pmod, isLocallyGenerated = true)
     case GetDataFromCurrentView(f) =>
       val result = f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet, nodeView.mempool))
       result match {
@@ -136,6 +145,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         case Transaction.ModifierTypeId => nodeView.mempool.notRequested(modifierIds)
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
+      logger.info(s"\n\n\nNVH GOT CompareViews. Current cache is ${ModifiersCache.size}. Requested mods -> ${modifierIds.size}. Filtered mpds -> ${ids.size}\n\n\n")
+      logger.info(s"\n ${ModifiersCache.cache.map(x => Algos.encode(x._1.toArray))}")
       if (ids.nonEmpty) sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case a: Any => logger.error(s"Strange input: $a")
   }
@@ -228,6 +239,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
               modToApply match {
                 case block: Block if settings.influxDB.isDefined =>
                   context.system.actorSelection("user/statsSender") ! TxsInBlock(block.transactions.size)
+                  context.system.eventStream.publish(SemanticallySuccessfulModifier(block.payload))
+                case block: Block =>
+                  context.system.eventStream.publish(SemanticallySuccessfulModifier(block.payload))
                 case mod =>
               }
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
@@ -242,7 +256,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
               auxHistoryHolder ! ReportModifierInvalid(modToApply, progressInfo)
               if (settings.influxDB.isDefined) context.system
                 .actorSelection("user/statsSender") ! NewBlockAppended(false, false)
-              nodeViewSynchronizer ! SemanticallyFailedModification(modToApply, e)
+              context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           } else u
         }
@@ -257,7 +271,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     }
   }
 
-  def pmodModify(pmod: EncryPersistentModifier): Unit = if (!nodeView.history.contains(pmod.id)) {
+  def pmodModify(pmod: EncryPersistentModifier, isLocallyGenerated: Boolean = false): Unit = if (!nodeView.history.contains(pmod.id)) {
     logger.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
     if (settings.influxDB.isDefined) context.system
       .actorSelection("user/statsSender") !
@@ -265,6 +279,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     auxHistoryHolder ! Append(pmod)
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
+        //ModifiersCache.remove(key(pmod.id))
         if (settings.influxDB.isDefined)
           context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
         logger.info(s"Going to apply modifications to the state: $progressInfo")
@@ -290,19 +305,23 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
                 newHistory.bestHeaderOpt.foreach(header =>
                   context.actorSelection("/user/statsSender") !
                     BestHeaderInChain(header, System.currentTimeMillis()))
-              if (newHistory.isFullChainSynced)
-                Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainSynced)
+              if (newHistory.isFullChainSynced) {
+                logger.info(s"blockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
+                ModifiersCache.setChainSynced()
+                Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
+              }
               updateNodeView(Some(newHistory), Some(newMinState), Some(nodeView.wallet), Some(newMemPool))
             case Failure(e) =>
               logger.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
                 s"to minimal state because of: $e")
               updateNodeView(updatedHistory = Some(newHistory))
-              nodeViewSynchronizer ! SemanticallyFailedModification(pmod, e)
+              context.system.eventStream.publish(SemanticallyFailedModification(pmod, e))
           }
         } else {
           if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.modifierTypeId) context.system
             .actorSelection("user/statsSender") ! NewBlockAppended(true, true)
-          requestDownloads(progressInfo, Some(pmod.id))
+          if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
+          context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Failure(e) =>
@@ -310,7 +329,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
           .actorSelection("user/statsSender") ! NewBlockAppended(true, false)
         logger.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
           s" to history caused $e")
-        nodeViewSynchronizer ! SyntacticallyFailedModification(pmod, e)
+        context.system.eventStream.publish(SyntacticallyFailedModification(pmod, e))
     }
   } else logger.warn(s"Trying to apply modifier ${pmod.encodedId} that's already in history.")
 
@@ -318,7 +337,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     case Success(newPool) =>
       //TODO for what we update wallet?
       updateNodeView(updatedVault = Some(nodeView.wallet), updatedMempool = Some(newPool))
-      nodeViewSynchronizer ! SuccessfulTransaction[EncryProposition, Transaction](tx)
+      context.system.eventStream.publish(SuccessfulTransaction[EncryProposition, Transaction](tx))
     case Failure(e) => logger.warn(s"Failed to put tx ${tx.id} to mempool" +
       s" with exception ${e.getLocalizedMessage}")
   }

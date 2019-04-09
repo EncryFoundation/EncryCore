@@ -11,7 +11,7 @@ import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer}
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
-import encry.network.DeliveryManager.FullBlockChainSynced
+import encry.network.DeliveryManager.{FullBlockChainIsSynced, ModifiersFromNVH}
 import BasicMessagesRepo._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -38,8 +38,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   var chainSynced: Boolean = false
   val deliveryManager: ActorRef = context.actorOf(
-    Props(classOf[DeliveryManager], influxRef, nodeViewHolderRef, networkControllerRef, system, settings),
-    "deliveryManager")
+    DeliveryManager.props(influxRef, nodeViewHolderRef, networkControllerRef, settings)
+      .withDispatcher("delivery-manager-dispatcher"), "deliveryManager")
 
   override def preStart(): Unit = {
     val messageIds: Seq[Byte] = Seq(
@@ -59,15 +59,21 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case SemanticallyFailedModification(_, _) =>
     case ChangedState(_) =>
     case SyntacticallyFailedModification(_, _) =>
+    case ModifiersFromNVH(fm) => deliveryManager ! ModifiersFromNVH(fm)
     case SemanticallySuccessfulModifier(mod) =>
       mod match {
-        case block: Block => broadcastModifierInv(block.header)
+        case block: Block =>
+          broadcastModifierInv(block.header)
+          modifiersRequestCache = Map(
+            Algos.encode(block.id) -> block.header,
+            Algos.encode(block.payload.id) -> block.payload
+          )
         case tx: Transaction => broadcastModifierInv(tx)
         case _ => //Do nothing
       }
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
-      deliveryManager ! ChangedHistory(reader)
+      deliveryManager ! UpdatedHistory(reader)
     case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] =>
       mempoolReaderOpt = Some(reader)
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
@@ -89,23 +95,26 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           case _ =>
         }
       case RequestModifiersNetworkMessage(invData) =>
-        logger.info(s"Get request modifiers from remote peer. chainSynced = $chainSynced")
+        logger.info(s"Get request modifiers from $remote. chainSynced = $chainSynced")
         if (chainSynced) {
           val inRequestCache: Map[String, NodeViewModifier] =
             invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
-          logger.debug(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
-          self ! ResponseFromLocal(remote, invData._1, inRequestCache.values.toSeq)
+          logger.info(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
+          sendResponse(remote, invData._1, inRequestCache.values.toSeq)
           val nonInRequestCache = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
           if (nonInRequestCache.nonEmpty)
             historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
-              val objs: Seq[NodeViewModifier] = invData._1 match {
-                case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId => readers._2.getAll(nonInRequestCache)
-                case _: ModifierTypeId => nonInRequestCache.flatMap(id => readers._1.modifierById(id))
+              invData._1 match {
+                case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId =>
+                  sendResponse(remote, invData._1, readers._2.getAll(nonInRequestCache))
+                case _: ModifierTypeId => nonInRequestCache.foreach(id =>
+                  readers._1.modifierById(id).foreach(mod => sendResponse(remote, invData._1, Seq(mod)))
+                )
               }
-              logger.debug(s"nonInRequestCache(${objs.size}): ${objs.map(mod => Algos.encode(mod.id)).mkString(",")}")
-              logger.debug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
-                s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
-              self ! ResponseFromLocal(remote, invData._1, objs)
+//              logger.debug(s"nonInRequestCache(${objs.size}): ${objs.map(mod => Algos.encode(mod.id)).mkString(",")}")
+//              logger.debug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
+//                s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
+              //self ! ResponseFromLocal(remote, invData._1, objs)
             }
         }
         else logger.info(s"Peer $remote requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
@@ -120,29 +129,48 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       deliveryManager ! RequestFromLocal(peer, modifierTypeId, modifierIds)
     case StartMining => deliveryManager ! StartMining
     case DisableMining => deliveryManager ! DisableMining
-    case FullBlockChainSynced =>
+    case FullBlockChainIsSynced =>
       chainSynced = true
-      deliveryManager ! FullBlockChainSynced
-    case ResponseFromLocal(peer, typeId, modifiers: Seq[NodeViewModifier]) =>
-      if (modifiers.nonEmpty) {
-        logger.debug(s"Sent modifiers size is: ${modifiers.length}")
-        typeId match {
-          case Header.modifierTypeId =>
-            val modsB: Seq[(ModifierId, Array[Byte])] =
-              modifiers.map { case h: Header => h.id -> HeaderProtoSerializer.toProto(h).toByteArray }
-            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
-          case Payload.modifierTypeId =>
-            val modsB: Seq[(ModifierId, Array[Byte])] =
-              modifiers.map { case h: Payload => h.id -> PayloadProtoSerializer.toProto(h).toByteArray }
-            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
-          case Transaction.ModifierTypeId =>
-            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modifiers.map {
-              case h: Transaction => h.id -> TransactionProtoSerializer.toProto(h).toByteArray
-            }.toMap)
-        }
-      }
+      deliveryManager ! FullBlockChainIsSynced
+//    case ResponseFromLocal(peer, typeId, modifiers: Seq[NodeViewModifier]) =>
+//      if (modifiers.nonEmpty) {
+//        logger.debug(s"Sent modifiers size is: ${modifiers.length}")
+//        typeId match {
+//          case Header.modifierTypeId =>
+//            val modsB: Seq[(ModifierId, Array[Byte])] =
+//              modifiers.map { case h: Header => h.id -> HeaderProtoSerializer.toProto(h).toByteArray }
+//            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
+//          case Payload.modifierTypeId =>
+//            val modsB: Seq[(ModifierId, Array[Byte])] =
+//              modifiers.map { case h: Payload => h.id -> PayloadProtoSerializer.toProto(h).toByteArray }
+//            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
+//          case Transaction.ModifierTypeId =>
+//            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modifiers.map {
+//              case h: Transaction => h.id -> TransactionProtoSerializer.toProto(h).toByteArray
+//            }.toMap)
+//        }
+//      }
     case a: Any => logger.error(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
   }
+
+  def sendResponse(peer: ConnectedPeer, typeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit =
+    if (modifiers.nonEmpty) {
+      logger.info(s"Sent modifiers size is: ${modifiers.length}|${modifiers.map(mod => Algos.encode(mod.id)).mkString(",")}")
+      typeId match {
+        case Header.modifierTypeId =>
+          val modsB: Seq[(ModifierId, Array[Byte])] =
+            modifiers.map { case h: Header => h.id -> HeaderProtoSerializer.toProto(h).toByteArray }
+          peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
+        case Payload.modifierTypeId =>
+          val modsB: Seq[(ModifierId, Array[Byte])] =
+            modifiers.map { case h: Payload => h.id -> PayloadProtoSerializer.toProto(h).toByteArray }
+          peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
+        case Transaction.ModifierTypeId =>
+          peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modifiers.map {
+            case h: Transaction => h.id -> TransactionProtoSerializer.toProto(h).toByteArray
+          }.toMap)
+      }
+    }
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
     if (chainSynced) networkControllerRef ! SendToNetwork(InvNetworkMessage(m.modifierTypeId -> Seq(m.id)), Broadcast)
@@ -165,9 +193,9 @@ object NodeViewSynchronizer {
 
     case class RequestFromLocal(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    case class CheckDelivery(source: ConnectedPeer,
-                             modifierTypeId: ModifierTypeId,
-                             modifierId: ModifierId)
+//    case class CheckDelivery(source: ConnectedPeer,
+//                             modifierTypeId: ModifierTypeId,
+//                             modifierId: ModifierId)
 
     trait PeerManagerEvent
 
@@ -180,6 +208,8 @@ object NodeViewSynchronizer {
     trait NodeViewChange extends NodeViewHolderEvent
 
     case class ChangedHistory[HR <: EncryHistoryReader](reader: HR) extends NodeViewChange
+
+    case class UpdatedHistory(history: EncryHistory)
 
     case class ChangedMempool[MR <: MempoolReader](mempool: MR) extends NodeViewChange
 
