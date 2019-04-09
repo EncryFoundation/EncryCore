@@ -209,29 +209,22 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           }
         }
 
-      println("=====VALIDATE BALANCE START =====")
-
       val validBalance: Boolean = {
         val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(bxs).map {
           case (key, value) => Algos.encode(key) -> value
         }
-        println(s"transaction id: ${Algos.encode(tx.id)}")
-        println(s"<<-->> ${tx.inputs.map(x => Algos.encode(x.boxId))} <<-->>")
-        println(s"DEBIT --->>>  ${debitB.mkString(",")}")
         val creditB: Map[String, Amount] = {
           val balanceSheet: Map[TokenId, Amount] =
             BalanceCalculator.balanceSheet(tx.newBoxes, excludeTokenIssuance = true)
           val intrinsicBalance: Amount = balanceSheet.getOrElse(Constants.IntrinsicTokenId, 0L)
           balanceSheet.updated(Constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
         }.map { case (tokenId, amount) => Algos.encode(tokenId) -> amount }
-        println(s"CREDIT --->>>  ${creditB.mkString(",")}")
         creditB.forall { case (tokenId, amount) =>
           if (tokenId == Algos.encode(Constants.IntrinsicTokenId))
             debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
           else debitB.getOrElse(tokenId, 0L) >= amount
         }
       }
-      println("=====VALIDATE BALANCE END =====")
 
       if (!validBalance) {
         logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Non-positive balance in $tx")
