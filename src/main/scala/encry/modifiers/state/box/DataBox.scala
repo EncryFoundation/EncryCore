@@ -30,7 +30,7 @@ case class DataBox(override val proposition: EncryProposition,
 
   override def asVal: PValue = PValue(asPrism, Types.DataBox)
 
-  override def asPrism: PObject =
+  override val asPrism: PObject =
     PObject(baseFields ++ Map(
       "data" -> PValue(data, Types.PCollection.ofByte)
     ), tpe)

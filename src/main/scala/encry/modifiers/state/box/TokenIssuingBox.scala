@@ -33,7 +33,7 @@ case class TokenIssuingBox(override val proposition: EncryProposition,
 
   override def asVal: PValue = PValue(asPrism, Types.DataBox)
 
-  override def asPrism: PObject =
+  override val asPrism: PObject =
     PObject(baseFields ++ Map(
       "amount" -> PValue(amount, Types.PInt)
     ), tpe)

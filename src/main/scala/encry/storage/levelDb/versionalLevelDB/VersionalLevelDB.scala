@@ -422,5 +422,11 @@ object VersionalLevelDBCompanion {
   def userKey(key: VersionalLevelDbKey): VersionalLevelDbKey =
     VersionalLevelDbKey @@ (USER_KEY_PREFIX +: key)
 
-  def splitValue2elems(elemSize: Int, value: Array[Byte]): List[Array[Byte]] = value.sliding(elemSize, elemSize).toList
+  def splitValue2elems(elemSize: Int, value: Array[Byte]): List[Array[Byte]] =
+    (0 until (value.length / elemSize)).foldLeft(List.empty[Array[Byte]]) {
+      case (acc, startI) =>
+        val bufferArray = new Array[Byte](elemSize)
+        System.arraycopy(value, startI * elemSize, bufferArray, 0, elemSize)
+        acc :+ bufferArray
+    }
 }

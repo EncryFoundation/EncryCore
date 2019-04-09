@@ -35,7 +35,7 @@ case class AssetBox(override val proposition: EncryProposition,
 
   override def asVal: PValue = PValue(asPrism, Types.AssetBox)
 
-  override def asPrism: PObject =
+  override val asPrism: PObject =
     PObject(baseFields ++ Map(
       "amount" -> PValue(amount, Types.PInt),
       "tokenId" -> PValue(tokenIdOpt.getOrElse(Constants.IntrinsicTokenId), Types.PCollection.ofByte)
