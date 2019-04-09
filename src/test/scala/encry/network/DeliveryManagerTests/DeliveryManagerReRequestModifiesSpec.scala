@@ -17,7 +17,7 @@ import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.view.history.EncryHistory
-import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike, FixedThreadPoolParallelExecution}
+import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import scala.concurrent.duration._
 import scala.collection.mutable.WrappedArray
 
@@ -25,8 +25,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
   with BeforeAndAfterAll
   with Matchers
   with InstanceFactory
-  with OneInstancePerTest
-  with FixedThreadPoolParallelExecution{
+  with OneInstancePerTest {
 
   implicit val system: ActorSystem = ActorSystem("SynchronousTestingSpec")
   val settings: EncryAppSettings = DummyEncryAppSettingsReader.read
@@ -65,63 +64,63 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
 ////          .getOrElse(peer.socketAddress.getAddress, Map.empty).isEmpty)
 ////      }
 //    }
-    "remove expired modifier from expectedModifiers collection" in {
-
-      val testProbeActor: TestProbe = TestProbe()
-      val initialState = initialiseDeliveryManager(isBlockChainSynced = false, isMining = true, settings)
-      val deliveryManager: TestActorRef[DeliveryManager] = initialState._1
-      val newPeer = new InetSocketAddress("172.16.13.10", 9001)
-      val peer: ConnectedPeer = ConnectedPeer(newPeer, testProbeActor.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion), "peer", Some(newPeer), System.currentTimeMillis()))
-      val blocks: (EncryHistory, List[Block]) = generateBlocks(10, generateDummyHistory(settings))
-      val headerIds: List[ModifierId] = blocks._2.map(_.header.id)
-      val payloadIds: List[ModifierId] = blocks._2.map(_.header.payloadId)
-      deliveryManager ! HandshakedPeer(peer)
-      deliveryManager ! OtherNodeSyncingStatus(peer, Older, None)
-
-      val newPeer1 = new InetSocketAddress("172.16.13.20", 9001)
-      val peer1: ConnectedPeer = ConnectedPeer(newPeer1, testProbeActor.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion), "peer1", Some(newPeer1), System.currentTimeMillis()))
-      deliveryManager ! HandshakedPeer(peer1)
-      deliveryManager ! OtherNodeSyncingStatus(peer1, Older, None)
-
-      val newPeer2 = new InetSocketAddress("172.16.13.30", 9001)
-      val peer2: ConnectedPeer = ConnectedPeer(newPeer2, testProbeActor.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion), "peer2", Some(newPeer2), System.currentTimeMillis()))
-
-      deliveryManager ! HandshakedPeer(peer2)
-      deliveryManager ! OtherNodeSyncingStatus(peer2, Equal, None)
-
-      deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, headerIds.take(3))
-      //deliveryManager ! RequestFromLocal(peer1, Header.modifierTypeId, headerIds.takeRight(3))
-
-      blocks._2.take(3).foreach{block =>
-
-        deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-          Header.modifierTypeId -> Map(block.header.id -> block.header.bytes)), peer)
+//    "remove expired modifier from expectedModifiers collection" in {
+//
+//      val testProbeActor: TestProbe = TestProbe()
+//      val initialState = initialiseDeliveryManager(isBlockChainSynced = false, isMining = true, settings)
+//      val deliveryManager: TestActorRef[DeliveryManager] = initialState._1
+//      val newPeer = new InetSocketAddress("172.16.13.10", 9001)
+//      val peer: ConnectedPeer = ConnectedPeer(newPeer, testProbeActor.ref, Incoming,
+//        Handshake(protocolToBytes(settings.network.appVersion), "peer", Some(newPeer), System.currentTimeMillis()))
+//      val blocks: (EncryHistory, List[Block]) = generateBlocks(10, generateDummyHistory(settings))
+//      val headerIds: List[ModifierId] = blocks._2.map(_.header.id)
+//      val payloadIds: List[ModifierId] = blocks._2.map(_.header.payloadId)
+//      deliveryManager ! HandshakedPeer(peer)
+//      deliveryManager ! OtherNodeSyncingStatus(peer, Older, None)
+//
+//      val newPeer1 = new InetSocketAddress("172.16.13.20", 9001)
+//      val peer1: ConnectedPeer = ConnectedPeer(newPeer1, testProbeActor.ref, Incoming,
+//        Handshake(protocolToBytes(settings.network.appVersion), "peer1", Some(newPeer1), System.currentTimeMillis()))
+//      deliveryManager ! HandshakedPeer(peer1)
+//      deliveryManager ! OtherNodeSyncingStatus(peer1, Older, None)
+//
+//      val newPeer2 = new InetSocketAddress("172.16.13.30", 9001)
+//      val peer2: ConnectedPeer = ConnectedPeer(newPeer2, testProbeActor.ref, Incoming,
+//        Handshake(protocolToBytes(settings.network.appVersion), "peer2", Some(newPeer2), System.currentTimeMillis()))
+//
+//      deliveryManager ! HandshakedPeer(peer2)
+//      deliveryManager ! OtherNodeSyncingStatus(peer2, Equal, None)
+//
+//      deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, headerIds.take(3))
+//      //deliveryManager ! RequestFromLocal(peer1, Header.modifierTypeId, headerIds.takeRight(3))
+//
+//      blocks._2.take(3).foreach{block =>
 //
 //        deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-//          Header.modifierTypeId -> Map(block.header.id -> block.header.bytes)), peer1)
-      }
-
-      val updatedHistory: EncryHistory = blocks._2.take(3).foldLeft(initialState._2) { case (history, block) =>
-        history.append(block.header).get._1.reportModifierIsValid(block.header)
-      }
-
-      deliveryManager ! UpdatedHistory(updatedHistory)
-
-      Thread.sleep(100000)
-
-//      deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, Seq(headerIds.head))
-//      deliveryManager ! RequestFromLocal(peer1, Header.modifierTypeId, Seq(headerIds.head))
-//      deliveryManager ! RequestFromLocal(peer2, Header.modifierTypeId, Seq(headerIds.head))
-
-//      Thread.sleep(20000)
-//      (0 to settings.network.maxDeliveryChecks).foreach(_ =>
-//        deliveryManager ! CheckDelivery(peer, Header.modifierTypeId, headerIds.head))
-//      assert(deliveryManager.underlyingActor.expectedModifiers
-//        .getOrElse(peer.socketAddress.getAddress, Map.empty).isEmpty)
-    }
+//          Header.modifierTypeId -> Map(block.header.id -> block.header.bytes)), peer)
+////
+////        deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
+////          Header.modifierTypeId -> Map(block.header.id -> block.header.bytes)), peer1)
+//      }
+//
+//      val updatedHistory: EncryHistory = blocks._2.take(3).foldLeft(initialState._2) { case (history, block) =>
+//        history.append(block.header).get._1.reportModifierIsValid(block.header)
+//      }
+//
+//      deliveryManager ! UpdatedHistory(updatedHistory)
+//
+//      Thread.sleep(100000)
+//
+////      deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, Seq(headerIds.head))
+////      deliveryManager ! RequestFromLocal(peer1, Header.modifierTypeId, Seq(headerIds.head))
+////      deliveryManager ! RequestFromLocal(peer2, Header.modifierTypeId, Seq(headerIds.head))
+//
+////      Thread.sleep(20000)
+////      (0 to settings.network.maxDeliveryChecks).foreach(_ =>
+////        deliveryManager ! CheckDelivery(peer, Header.modifierTypeId, headerIds.head))
+////      assert(deliveryManager.underlyingActor.expectedModifiers
+////        .getOrElse(peer.socketAddress.getAddress, Map.empty).isEmpty)
+//    }
 //    "correctly handle reRequest for modifier which number of tries has expired" in {
 //
 //      val newPeer1 = new InetSocketAddress("172.16.13.20", 9001)
