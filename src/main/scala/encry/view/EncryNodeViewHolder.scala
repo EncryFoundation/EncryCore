@@ -42,7 +42,7 @@ import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: ActorRef) extends Actor with StrictLogging {
 
-  case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet, mempool: Mempool)
+  case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet)//, mempool: Mempool)
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
@@ -353,17 +353,17 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
     val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
-    NodeView(history, state, wallet, memPool)
+    NodeView(history, state, wallet)//, memPool)
   }
 
   def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryObjectsDir(settings).listFiles.isEmpty)
     try {
       val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
-      val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
+      //val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
       val state: StateType =
         restoreConsistentState(EncryState.readOrGenerate(settings, Some(self), influxRef).asInstanceOf[StateType], history)
-      Some(NodeView(history, state, wallet, memPool))
+      Some(NodeView(history, state, wallet))//, memPool))
     } catch {
       case ex: Throwable =>
         logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
