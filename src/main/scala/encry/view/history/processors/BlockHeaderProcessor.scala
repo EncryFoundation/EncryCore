@@ -35,9 +35,9 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   protected val timeProvider: NetworkTimeProvider
   private val difficultyController: PowLinearController.type = PowLinearController
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
-  protected val BestHeaderKey: StorageKey =
+  protected val BestHeaderIdKey: StorageKey =
     StorageKey @@ Array.fill(DigestLength)(Header.modifierTypeId.untag(ModifierTypeId))
-  protected val BestBlockKey: StorageKey = StorageKey @@ Array.fill(DigestLength)(-1: Byte)
+  protected val BestBlockIdKey: StorageKey = StorageKey @@ Array.fill(DigestLength)(-1: Byte)
   protected val historyStorage: HistoryStorage
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node)
   private var isHeadersChainSyncedVar: Boolean = false
@@ -123,7 +123,14 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   def realDifficulty(h: Header): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
 
-  protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
+  protected def bestHeaderIdOpt: Option[ModifierId] =
+    bestHeaderIdOptCache.orElse{
+      val header = historyStorage.get(BestHeaderIdKey).map(ModifierId @@ _)
+      bestHeaderIdOptCache = header
+      header
+    }
+
+  var bestHeaderIdOptCache: Option[ModifierId] = None
 
   def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity
 
@@ -142,9 +149,16 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   def bestBlockOpt: Option[Block]
 
+  var bestBlockOptCache: Option[Block] = None
+
   def bestBlockIdOpt: Option[ModifierId]
 
-  def bestHeaderHeight: Int = bestHeaderIdOpt.flatMap(id => heightOf(id)).getOrElse(Constants.Chain.PreGenesisHeight)
+  var bestBlockIdOptCache: Option[ModifierId] = None
+
+  def bestHeaderHeight: Int = {
+    logger.info(s"bestHeaderIdOpt: ${bestHeaderIdOpt.map(Algos.encode)}")
+    bestHeaderIdOpt.flatMap(id => heightOf(id)).getOrElse(Constants.Chain.PreGenesisHeight)
+  }
 
   def bestBlockHeight: Int = bestBlockIdOpt.flatMap(id => heightOf(id)).getOrElse(Constants.Chain.PreGenesisHeight)
 
@@ -166,8 +180,9 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   private def getHeaderInfoUpdate(header: Header): Option[(Seq[(StorageKey, StorageValue)], EncryPersistentModifier)] =
     if (header.isGenesis) {
       logger.info(s"Initialize header chain with genesis header ${header.encodedId}")
+      bestHeaderIdOptCache = Some(header.id)
       Option(Seq(
-        BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId),
+        BestHeaderIdKey -> StorageValue @@ header.id.untag(ModifierId),
         heightIdsKey(Constants.Chain.GenesisHeight) -> StorageValue @@ header.id.untag(ModifierId),
         headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(Constants.Chain.GenesisHeight),
         headerScoreKey(header.id) -> StorageValue @@ header.difficulty.toByteArray) -> header)
@@ -177,15 +192,20 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
           Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
         val bestRow: Seq[(StorageKey, StorageValue)] =
           if ((header.height > bestHeaderHeight) ||
-            (header.height == bestHeaderHeight && score > bestHeadersChainScore))
-            Seq(BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId)) else Seq.empty
+            (header.height == bestHeaderHeight && score > bestHeadersChainScore)) {
+            Seq(BestHeaderIdKey -> StorageValue @@ header.id.untag(ModifierId))
+          } else Seq.empty
         val scoreRow: (StorageKey, StorageValue) =
           headerScoreKey(header.id) -> StorageValue @@ score.toByteArray
         val heightRow: (StorageKey, StorageValue) =
           headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(header.height)
         val headerIdsRow: Seq[(StorageKey, StorageValue)] =
           if ((header.height > bestHeaderHeight) ||
-            (header.height == bestHeaderHeight && score > bestHeadersChainScore)) bestBlockHeaderIdsRow(header, score)
+            (header.height == bestHeaderHeight && score > bestHeadersChainScore)) {
+            val row = bestBlockHeaderIdsRow(header, score)
+            bestHeaderIdOptCache = Some(header.id)
+            row
+          }
           else {
             if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(header)
             orphanedBlockHeaderIdsRow(header, score)

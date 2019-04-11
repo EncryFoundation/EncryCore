@@ -7,7 +7,7 @@ import encry.consensus.History.ProgressInfo
 import encry.consensus.ModifierSemanticValidity.Invalid
 import encry.local.explorer.BlockListener.NewBestBlock
 import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.{Block, Header, HeaderChain}
+import encry.modifiers.history.{Block, Header, HeaderChain, Payload}
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import io.iohk.iodb.ByteArrayWrapper
 import io.circe.syntax._
@@ -23,7 +23,12 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   protected val auxHistory: Boolean = false
 
   /** Id of header that contains transactions and proofs */
-  override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
+  override def bestBlockIdOpt: Option[ModifierId] =
+    bestBlockIdOptCache.orElse{
+      val possibleBlock = historyStorage.get(BestBlockIdKey).map(ModifierId @@ _)
+      bestBlockIdOptCache = possibleBlock
+      possibleBlock
+    }
 
   protected def getBlock(h: Header): Option[Block]
 
@@ -39,7 +44,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     */
   protected def processBlock(fullBlock: Block,
                              modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
-    //logger.debug(s"Process block: ${fullBlock.asJson}")
+    logger.info(s"Process block: ${fullBlock.asJson}")
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
     //logger.debug(s"best full chain contains: ${bestFullChain.length}")
     val newBestAfterThis: Header = bestFullChain.last.header
@@ -55,6 +60,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     case ToProcess(fullBlock, newModRow, newBestHeader, newBestChain, _)
       if isValidFirstBlock(fullBlock.header) =>
       logger.info(s"Appending ${fullBlock.encodedId} as a valid first block")
+      bestBlockOptCache = Some(fullBlock)
       logStatus(Seq(), newBestChain, fullBlock, None)
       updateStorage(newModRow, newBestHeader.id)
       ProgressInfo(None, Seq.empty, newBestChain, Seq.empty)
@@ -72,6 +78,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
       else {
         //application of this block leads to full chain with higher score
         logger.info(s"Appending ${fullBlock.encodedId}|${fullBlock.header.height} as a better chain")
+        bestBlockOptCache = Some(fullBlock)
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
         val updateBestHeader: Boolean =
@@ -138,8 +145,15 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
                             bestFullHeaderId: ModifierId,
                             updateHeaderInfo: Boolean = false): Unit = {
     val indicesToInsert: Seq[(Array[Byte], Array[Byte])] =
-      if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderId, BestHeaderKey -> bestFullHeaderId)
-      else Seq(BestBlockKey -> bestFullHeaderId)
+      if (updateHeaderInfo) {
+        bestBlockIdOptCache = Some(bestFullHeaderId)
+        bestHeaderIdOptCache = Some(bestFullHeaderId)
+        Seq(BestBlockIdKey -> bestFullHeaderId, BestHeaderIdKey -> bestFullHeaderId)
+      }
+      else {
+        bestBlockIdOptCache = Some(bestFullHeaderId)
+        Seq(BestBlockIdKey -> bestFullHeaderId)
+      }
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
   }
 
@@ -170,7 +184,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   object PayloadValidator extends ModifierValidator {
 
     def validate(m: EncryPersistentModifier, header: Header, minimalHeight: Int): ValidationResult = {
-      failFast
+      val res = failFast
         .validate(!historyStorage.containsObject(m.id)) {
           fatal(s"Modifier ${m.encodedId} is already in history")
         }
@@ -184,6 +198,8 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
           fatal(s"Header ${header.encodedId} for modifier ${m.encodedId} is semantically invalid")
         }
         .result
+      logger.info(s"Res: $res")
+      res
     }
   }
 

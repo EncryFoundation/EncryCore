@@ -36,13 +36,21 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     * Transactions and ADProofs for this Header may be missed, to get block from best full chain (in mode that support
     * it) call bestFullBlockOpt.
     */
-  def bestHeaderOpt: Option[Header] = bestHeaderIdOpt.flatMap(typedModifierById[Header])
+  def bestHeaderOpt: Option[Header] =
+    bestHeaderOptCache.orElse(bestHeaderIdOpt.flatMap(typedModifierById[Header]))
+
+  private var bestHeaderOptCache: Option[Header] = None
 
   /**
     * Complete block of the best chain with transactions.
     * Always None for an SPV mode, Some(fullBLock) for fullnode regime after initial bootstrap.
     */
-  def bestBlockOpt: Option[Block] = bestBlockIdOpt.flatMap(id => typedModifierById[Header](id)).flatMap(getBlock)
+  def bestBlockOpt: Option[Block] =
+    bestBlockOptCache.orElse{
+      val possibleBlock = bestBlockIdOpt.flatMap(id => typedModifierById[Header](id)).flatMap(getBlock)
+      bestBlockOptCache = possibleBlock
+      possibleBlock
+    }
 
   /** @return ids of count headers starting from offset */
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
