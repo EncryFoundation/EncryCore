@@ -13,7 +13,7 @@ case class VLDBWrapper(vldb: VersionalLevelDB) extends VersionalStorage {
     StorageVersion @@ vldb.currentVersion.untag(LevelDBVersion)
 
   override def versions: List[StorageVersion] =
-    vldb.versionsList().map(StorageVersion @@ _.untag(LevelDBVersion))
+    vldb.versionsList.map(StorageVersion @@ _.untag(LevelDBVersion))
 
   override def rollbackTo(to: StorageVersion): Unit =
     vldb.rollbackTo(LevelDBVersion @@ to.untag(StorageVersion))

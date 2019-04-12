@@ -192,7 +192,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
           if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
             case Success(stateAfterApply) =>
               modToApply match {
-                case block: Block if settings.influxDB.isDefined =>
+                case block: Block if settings.influxDB.isDefined & history.isFullChainSynced =>
                   context.system.actorSelection("user/statsSender") ! TxsInBlock(block.transactions.size)
                 case _ =>
               }
@@ -256,6 +256,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
               if (newHistory.isFullChainSynced) {
                 logger.info(s"blockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
                 ModifiersCache.setChainSynced()
+
                 Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
               }
               updateNodeView(Some(newHistory), Some(newMinState), Some(nodeView.wallet))

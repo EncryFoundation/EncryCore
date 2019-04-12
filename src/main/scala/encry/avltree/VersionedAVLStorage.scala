@@ -60,6 +60,7 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
 
   def update[K <: Array[Byte], V <: Array[Byte]](prover: BatchAVLProver[D, _],
                                                  additionalData: Seq[(K, V)]): Try[Unit] = Try {
+    val startTime = System.currentTimeMillis()
     val digestWrapper: Store.K = ByteArrayWrapper(prover.digest)
     val indexes: Seq[(Store.K, Store.K)] = Seq(TopNodeKey -> nodeKey(prover.topNode),
       TopNodeHeight -> ByteArrayWrapper(Ints.toByteArray(prover.rootNodeHeight)))
@@ -71,6 +72,7 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
     val toRemoveMerged: List[ByteArrayWrapper] = toRemove.filterNot(toUpdate.map(_._1).intersect(toRemove).contains)
     logger.info(s"Update storage to version ${Algos.encode(digestWrapper.data)}: ${toUpdateWithWrapped.size} elements to insert," +
       s" ${toRemove.size} elements to remove")
+    logger.info(s"Pre update: ${System.currentTimeMillis() - startTime} ms")
     store.insert(
       StorageVersion @@ digestWrapper.data,
       toUpdateWithWrapped.map{case (key, value) => StorageKey @@ key.data -> StorageValue @@ value.data}.toList,

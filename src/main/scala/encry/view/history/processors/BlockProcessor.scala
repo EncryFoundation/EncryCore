@@ -44,7 +44,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     */
   protected def processBlock(fullBlock: Block,
                              modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
-    logger.info(s"Process block: ${fullBlock.asJson}")
+    //logger.info(s"Process block: ${fullBlock.asJson}")
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
     //logger.debug(s"best full chain contains: ${bestFullChain.length}")
     val newBestAfterThis: Header = bestFullChain.last.header
@@ -69,6 +69,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def processBetterChain: BlockProcessing = {
     case toProcess@ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
+      val startTime = System.nanoTime()
       val prevBest: Block = bestBlockOpt.get
       val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
@@ -98,6 +99,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
           val diff: Int = bestHeight - prevBest.header.height
           clipBlockDataAt(((lastKept - diff) until lastKept).filter(_ >= 0))
         }
+        logger.info(s"processBetterChain for block ${Algos.encode(fullBlock.id)} is: ${(System.nanoTime() - startTime)/1000000} ms")
         ProgressInfo(branchPoint, toRemove, toApply, Seq.empty)
       }
   }

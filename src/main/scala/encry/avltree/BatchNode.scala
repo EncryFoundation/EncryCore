@@ -141,7 +141,7 @@ class VerifierLeaf[D <: Digest](protected var k: ADKey, protected var v: ADValue
   }
 }
 
-class ProverLeaf[D <: Digest](protected var k: ADKey, protected var v: ADValue, protected var nk: ADKey)
+class ProverLeaf[D <: Digest](var k: ADKey, var v: ADValue, var nk: ADKey)
                              (implicit val hf: CryptographicHash[D]) extends EncryLeaf[D] with EncryProverNodes[D] {
   def getNew(newKey: ADKey = k, newValue: ADValue = v, newNextLeafKey: ADKey = nk): ProverLeaf[D] = if (isNew) {
     k = newKey

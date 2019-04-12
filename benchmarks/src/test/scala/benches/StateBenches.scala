@@ -23,7 +23,7 @@ class StateBenches {
   def applyBlocksToTheState(stateBench: StateBenchState, bh: Blackhole): Unit = {
     bh.consume {
       val innerState: UtxoState =
-        utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings, VersionalStorage.LevelDB)
+        utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings, VersionalStorage.IODB)
       stateBench.chain.foldLeft(innerState) { case (state, block) =>
         state.applyModifier(block).get
       }
@@ -31,14 +31,14 @@ class StateBenches {
     }
   }
 
-  @Benchmark
-  def readStateFileBench(stateBench: StateBenchState, bh: Blackhole): Unit = {
-    bh.consume {
-      val localState: UtxoState =
-        utxoFromBoxHolder(stateBench.boxesHolder, stateBench.tmpDir, None, stateBench.settings, IODB)
-      localState.closeStorage()
-    }
-  }
+//  @Benchmark
+//  def readStateFileBench(stateBench: StateBenchState, bh: Blackhole): Unit = {
+//    bh.consume {
+//      val localState: UtxoState =
+//        utxoFromBoxHolder(stateBench.boxesHolder, stateBench.tmpDir, None, stateBench.settings, IODB)
+//      localState.closeStorage()
+//    }
+//  }
 }
 
 object StateBenches {
@@ -73,7 +73,7 @@ object StateBenches {
       genHardcodedBox(privKey.publicImage.address.address, nonce)
     )
     val boxesHolder: BoxHolder = BoxHolder(initialBoxes)
-    var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
+    var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.IODB)
     val genesisBlock: Block = generateGenesisBlockValidForState(state)
 
     state = state.applyModifier(genesisBlock).get

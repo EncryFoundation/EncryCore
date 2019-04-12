@@ -2,13 +2,14 @@ package encry.avltree
 
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
+import org.apache.commons.lang.ArrayUtils
+import org.bouncycastle.util.Arrays
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes._
 import scorex.crypto.hash.{Blake2b256, CryptographicHash, Digest}
 import scorex.utils.ByteArray
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.util.{Failure, Random, Success, Try}
 
 class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int,
@@ -31,7 +32,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
 
   private var oldTopNode = topNode
 
-  private var directions = new mutable.ArrayBuffer[Byte]
+  private var directions = Array.emptyByteArray
   private var directionsBitLength: Int = 0
 
   private var replayIndex = 0
@@ -50,7 +51,8 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
         case _ => false // going right
       }
     }
-    if ((directionsBitLength & 7) == 0) directions += (if (ret) 1: Byte else 0: Byte)
+    if ((directionsBitLength & 7) == 0)
+      directions = ArrayUtils.add(directions, if (ret) 1: Byte else 0: Byte)
     else if (ret) {
       val i = directionsBitLength >> 3
       directions(i) = (directions(i) | (1 << (directionsBitLength & 7))).toByte // change last byte
@@ -82,6 +84,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
   def digest: ADDigest = digest(topNode)
 
   def performOneOperation(operation: encry.avltree.Operation): Try[Option[ADValue]] = Try {
+    //logger.info(s"Perform operation: ${operation}")
     replayIndex = directionsBitLength
     returnResultOfOneOperation(operation, topNode) match {
       case Success(n) =>
@@ -89,7 +92,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
         n._2
       case Failure(e) =>
         val oldDirectionsByteLength: Int = (replayIndex + 7) / 8
-        directions.trimEnd(directions.length - oldDirectionsByteLength)
+        directions = ArrayUtils.subarray(directions, 0,oldDirectionsByteLength)
         directionsBitLength = replayIndex
         if ((directionsBitLength & 7) > 0) {
           val mask: Int = (1 << (directionsBitLength & 7)) - 1
@@ -135,31 +138,33 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
   }
 
   def generateProof(): SerializedAdProof = {
+    //logger.info("================Generating proof================")
     changedNodesBuffer.clear()
     changedNodesBufferToCheck.clear()
-    val packagedTree = new mutable.ArrayBuffer[Byte]
+    var packagedTree = Array.emptyByteArray
     var previousLeafAvailable: Boolean = false
 
     def packTree(rNode: EncryProverNodes[D]): Unit = {
       if (!rNode.visited) {
-        packagedTree += LabelInPackagedProof
-        packagedTree ++= rNode.label
+        packagedTree = ArrayUtils.add(packagedTree, LabelInPackagedProof)
+        packagedTree = ArrayUtils.addAll(packagedTree, rNode.label)
         assert(rNode.label.length == labelLength)
         previousLeafAvailable = false
       } else {
         rNode.visited = false
         rNode match {
           case r: ProverLeaf[D] =>
-            packagedTree += LeafInPackagedProof
-            if (!previousLeafAvailable) packagedTree ++= r.key
-            packagedTree ++= r.nextLeafKey
-            if (valueLengthOpt.isEmpty) packagedTree ++= Ints.toByteArray(r.value.length)
-            packagedTree ++= r.value
+            //logger.info(s"Node: ${Algos.encode(r.k)}")
+            packagedTree = ArrayUtils.add(packagedTree, LeafInPackagedProof)
+            if (!previousLeafAvailable) packagedTree = ArrayUtils.addAll(packagedTree, r.key)
+            packagedTree = ArrayUtils.addAll(packagedTree, r.nextLeafKey)
+            if (valueLengthOpt.isEmpty) packagedTree = ArrayUtils.addAll(packagedTree, Ints.toByteArray(r.value.length))
+            packagedTree = ArrayUtils.addAll(packagedTree, r.value)
             previousLeafAvailable = true
           case r: InternalProverEncryNode[D] =>
             packTree(r.left)
             packTree(r.right)
-            packagedTree += r.balance
+            packagedTree = ArrayUtils.add(packagedTree, r.balance)
         }
       }
     }
@@ -176,15 +181,15 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
     }
 
     packTree(oldTopNode)
-    packagedTree += EndOfTreeInPackagedProof
-    packagedTree ++= directions
+    packagedTree = ArrayUtils.add(packagedTree, EndOfTreeInPackagedProof)
+    packagedTree = ArrayUtils.addAll(packagedTree, directions)
 
     resetNew(topNode)
-    directions = new mutable.ArrayBuffer[Byte]
+    directions = Array.emptyByteArray
     directionsBitLength = 0
     oldTopNode = topNode
-
-    SerializedAdProof @@ packagedTree.toArray
+    logger.info("****************Generating proof*****************")
+    SerializedAdProof @@ packagedTree
   }
 
   def treeWalk[IR, LR](internalNodeFn: (InternalProverEncryNode[D], IR) => (EncryProverNodes[D], IR),
@@ -215,7 +220,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
   def unauthenticatedLookup(key: ADKey): Option[ADValue] = {
     def internalNodeFn(r: InternalProverEncryNode[D], found: Boolean): (EncryProverNodes[D], Boolean) =
       if (found) (r.left, true)
-      else ByteArray.compare(key, r.key) match {
+      else Arrays.compareUnsigned(key, r.key) match {
         case 0 => (r.right, true) // found in the tree -- go one step right, then left to the leaf
         case o if o < 0 => (r.left, false) // going left, not yet found
         case _ => (r.right, false) // going right, not yet found

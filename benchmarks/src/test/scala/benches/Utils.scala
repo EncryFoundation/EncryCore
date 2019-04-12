@@ -129,10 +129,11 @@ object Utils extends StrictLogging {
   def generateNextBlockValidForHistory(history: EncryHistory,
                                        difficultyDiff: BigInt = 0,
                                        prevBlock: Option[Block],
-                                       txs: Seq[Transaction]): Block = {
+                                       transactionsNumber: Int): Block = {
     val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
     val requiredDifficulty: Difficulty = prevBlock.map(b => history.requiredDifficultyAfter(b.header))
       .getOrElse(Constants.Chain.InitialDifficulty)
+    val txs = genValidPaymentTxs(transactionsNumber) ++ Seq(coinbaseTransaction)
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.bestHeaderHeight + 1,

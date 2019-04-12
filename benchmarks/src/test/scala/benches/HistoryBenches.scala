@@ -28,13 +28,13 @@ class HistoryBenches {
     }
   }
 
-  @Benchmark
-  def readHistoryFileBench(benchStateHistory: HistoryBenchState, bh: Blackhole): Unit = {
-    bh.consume {
-      val history: EncryHistory = generateHistory(benchStateHistory.settings, benchStateHistory.tmpDir)
-      history.closeStorage()
-    }
-  }
+//  @Benchmark
+//  def readHistoryFileBench(benchStateHistory: HistoryBenchState, bh: Blackhole): Unit = {
+//    bh.consume {
+//      val history: EncryHistory = generateHistory(benchStateHistory.settings, benchStateHistory.tmpDir)
+//      history.closeStorage()
+//    }
+//  }
 }
 
 object HistoryBenches {
@@ -72,7 +72,7 @@ object HistoryBenches {
           case ((prevHistory, prevBlock, vector), _) =>
             val block: Block =
               generateNextBlockValidForHistory(
-                prevHistory, 0, prevBlock,  Seq.empty[Transaction]
+                prevHistory, 0, prevBlock,  benchSettings.historyBenchSettings.transactionsNumber
               )
             (prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block),
               Some(block), vector :+ block)

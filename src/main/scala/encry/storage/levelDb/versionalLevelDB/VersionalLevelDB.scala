@@ -1,5 +1,7 @@
 package encry.storage.levelDb.versionalLevelDB
 
+import java.util
+
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.LevelDBSettings
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, _}
@@ -9,10 +11,17 @@ import org.encryfoundation.common.Algos
 import org.iq80.leveldb.{DB, ReadOptions}
 import supertagged.TaggedType
 
+import scala.collection.mutable.ListBuffer
+
 case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLogging with AutoCloseable {
 
-  def versionsList(readOptions: ReadOptions = new ReadOptions()): List[LevelDBVersion] =
-    splitValue2elems(settings.versionKeySize, db.get(VERSIONS_LIST, readOptions)).map(elem => LevelDBVersion @@ elem)
+  var versionsList: List[LevelDBVersion] = versionsListInDB()
+
+  def versionsListInDB(readOptions: ReadOptions = new ReadOptions()): List[LevelDBVersion] = {
+    if (db.get(VERSIONS_LIST, readOptions) != null)
+      splitValue2elems(settings.versionKeySize, db.get(VERSIONS_LIST, readOptions)).map(elem => LevelDBVersion @@ elem)
+    else List.empty
+  }
 
   def currentVersion: LevelDBVersion = LevelDBVersion @@ db.get(CURRENT_VERSION_KEY)
 
@@ -50,21 +59,25 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
   def insert(newElem: LevelDbDiff): Unit = {
     assert(newElem.version.length == settings.versionKeySize,
       s"Version length is incorrect! Should be: ${settings.versionKeySize}, but get: ${newElem.version.length}")
+    val startTime = System.currentTimeMillis()
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
     val batch = db.createWriteBatch()
     try {
       //Set current version to newElem.version
+      val batchPutting = System.currentTimeMillis()
       batch.put(CURRENT_VERSION_KEY, newElem.version)
       //Insert new version to versions list
-      batch.put(VERSIONS_LIST, newElem.version.untag(LevelDBVersion) ++ versionsList(readOptions).flatten)
+      batch.put(VERSIONS_LIST, newElem.version.untag(LevelDBVersion) ++ versionsList.flatten)
       //Ids of all elements, added by newElem
+      versionsList = newElem.version +: versionsList
       batch.put(versionKey(newElem.version), newElem.elemsToInsert.flatMap(_._1).toArray)
       //Ids of all elements, deleted by newElem
       batch.put(versionDeletionsKey(newElem.version), newElem.elemsToDelete.flatten.toArray)
+      logger.info(s"batchPutting: ${System.currentTimeMillis() - batchPutting} ms")
+      val foreachInsert = System.currentTimeMillis()
       newElem.elemsToInsert.foreach {
         case (elemKey, elemValue) =>
-
           /**
             * Put elem by key (ACCESSIBLE_KEY_PREFIX +: "version" ++ "elemKey")
             * First check contain db this elem or not. if no: insert elem, and insert init access map
@@ -74,24 +87,28 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
           if (elemMap == null) {
             batch.put(userKey(elemKey), ACCESSIBLE_KEY_PREFIX +: newElem.version)
           } else {
-            val accessMap = elemMap.tail
-            batch.put(userKey(elemKey), (ACCESSIBLE_KEY_PREFIX +: newElem.version) ++ accessMap)
+            val accessMap = util.Arrays.copyOfRange(elemMap, 1, elemMap.length)
+            batch.put(userKey(elemKey), ArrayUtils.addAll(ACCESSIBLE_KEY_PREFIX +: newElem.version, accessMap))
           }
           batch.put(accessableElementKeyForVersion(newElem.version, elemKey), elemValue)
       }
+      logger.info(s"foreachInsert: ${System.currentTimeMillis() - foreachInsert} ms")
       newElem.elemsToDelete.foreach { elemKey =>
         val possibleMap = db.get(userKey(elemKey), readOptions)
         val accessMap =
-          if (possibleMap != null) possibleMap.tail
+          if (possibleMap != null) util.Arrays.copyOfRange(possibleMap, 1, possibleMap.length)
           else Array.emptyByteArray
         batch.put(userKey(elemKey), INACCESSIBLE_KEY_PREFIX +: accessMap)
       }
+      val startBatch = System.currentTimeMillis()
       db.write(batch)
+      logger.info(s"End of batch writing: ${System.currentTimeMillis() - startBatch} ms")
       clean()
     } finally {
       batch.close()
       readOptions.snapshot().close()
     }
+    logger.info(s"Insertion time: ${System.currentTimeMillis() - startTime} ms")
   }
 
   /**
@@ -168,7 +185,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     readOptions.snapshot(db.getSnapshot)
     try {
       val wrappedVer: ByteArrayWrapper = ByteArrayWrapper(versionToResolve)
-      val currentVersions: Set[ByteArrayWrapper] = versionsList(readOptions).map(ByteArrayWrapper.apply).toSet
+      val currentVersions: Set[ByteArrayWrapper] = versionsList.map(ByteArrayWrapper.apply).toSet
       val deletionsByThisVersion: Seq[VersionalLevelDbKey] =
         getInaccessiableKeysInVersion(versionToResolve, readOptions)
       deletionsByThisVersion.foreach { key =>
@@ -213,11 +230,12 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
     try {
-      val versions = versionsList(readOptions).map(ver => new ByteArrayWrapper(ver))
+      val versions = versionsList.map(ver => new ByteArrayWrapper(ver))
       if (versions.length > settings.maxVersions) {
         val versionToDelete = versions.last
         batch.put(VERSIONS_LIST, versions.init
           .foldLeft(Array.emptyByteArray) { case (acc, key) => acc ++ key.data })
+        versionsList = versionsList.init
         db.write(batch)
         deleteResolver(LevelDBVersion @@ versionToDelete.data)
       }
@@ -253,7 +271,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
   }
 
   def inaccessibleKeys(readOptions: ReadOptions = new ReadOptions()): List[VersionalLevelDbKey] = {
-    val currentVersions = versionsList(readOptions)
+    val currentVersions = versionsList
     currentVersions.flatMap(version => getInaccessiableKeysInVersion(version, readOptions))
   }
 
@@ -273,11 +291,11 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
   def rollbackTo(rollbackPoint: LevelDBVersion): Unit = {
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
-    if (versionsList(readOptions).map(ver => new ByteArrayWrapper(ver)).contains(new ByteArrayWrapper(rollbackPoint))) {
+    if (versionsList.map(ver => new ByteArrayWrapper(ver)).contains(new ByteArrayWrapper(rollbackPoint))) {
       val batch = db.createWriteBatch()
       try {
         batch.put(CURRENT_VERSION_KEY, rollbackPoint)
-        val allVerWrapped = versionsList(readOptions).map(ver => new ByteArrayWrapper(ver))
+        val allVerWrapped = versionsList.map(ver => new ByteArrayWrapper(ver))
         val versionsBeforeRollback = allVerWrapped
           .dropWhile(_ != new ByteArrayWrapper(rollbackPoint))
           .foldLeft(Array.emptyByteArray) {
@@ -331,8 +349,8 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     val info = "VERSIONAL WRAPPER OF LEVEL DB Stat:\n " +
       s"Max versions qty: ${settings.maxVersions}\n " +
       s"Current version: ${Algos.encode(currentVersion)}\n " +
-      s"Versions qty: ${versionsList(readOptions).length}\n " +
-      s"Versions: [${versionsList(readOptions).map(Algos.encode).mkString(",")}]"
+      s"Versions qty: ${versionsList.length}\n " +
+      s"Versions: [${versionsList.map(Algos.encode).mkString(",")}]"
     info
   }
 
@@ -422,11 +440,15 @@ object VersionalLevelDBCompanion {
   def userKey(key: VersionalLevelDbKey): VersionalLevelDbKey =
     VersionalLevelDbKey @@ (USER_KEY_PREFIX +: key)
 
-  def splitValue2elems(elemSize: Int, value: Array[Byte]): List[Array[Byte]] =
-    (0 until (value.length / elemSize)).foldLeft(List.empty[Array[Byte]]) {
-      case (acc, startI) =>
+
+  def splitValue2elems(elemSize: Int, value: Array[Byte] = Array.emptyByteArray): List[Array[Byte]] = {
+    val resultArray = new Array[Array[Byte]](value.length / elemSize)
+    (0 until (value.length / elemSize)).foreach {
+      i =>
         val bufferArray = new Array[Byte](elemSize)
-        System.arraycopy(value, startI * elemSize, bufferArray, 0, elemSize)
-        acc :+ bufferArray
+        System.arraycopy(value, i * elemSize, bufferArray, 0, elemSize)
+        resultArray(i) = bufferArray
     }
+    resultArray.toList
+  }
 }

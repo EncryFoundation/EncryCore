@@ -141,7 +141,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     levelDbElems.foreach(vldbInit.insert)
 
-    vldbInit.versionsList().length shouldEqual maxVersions
+    vldbInit.versionsList.length shouldEqual maxVersions
   }
 
   property("Level db should return previous value of elem after rollback. Add elem by same key, several times") {
