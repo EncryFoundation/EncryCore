@@ -21,6 +21,7 @@ import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.utils.Utils._
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
+import encry.view.MemoryPool.CompareTransactionsWithUnconfirmed
 import encry.view.history.{EncryHistory, EncryHistoryReader}
 import encry.view.mempool.{Mempool, MempoolReader}
 import encry.view.state.StateReader
@@ -31,14 +32,15 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
                            networkControllerRef: ActorRef,
                            system: ActorSystem,
-                           settings: EncryAppSettings) extends Actor with StrictLogging {
+                           settings: EncryAppSettings,
+                           memoryPoolRef: ActorRef) extends Actor with StrictLogging {
 
   var historyReaderOpt: Option[EncryHistory] = None
   var mempoolReaderOpt: Option[Mempool] = None
   var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   var chainSynced: Boolean = false
   val deliveryManager: ActorRef = context.actorOf(
-    DeliveryManager.props(influxRef, nodeViewHolderRef, networkControllerRef, settings)
+    DeliveryManager.props(influxRef, nodeViewHolderRef, networkControllerRef, settings, memoryPoolRef)
       .withDispatcher("delivery-manager-dispatcher"), "deliveryManager")
 
   override def preStart(): Unit = {
@@ -121,8 +123,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           s"node is not synced, so ignore msg")
       case InvNetworkMessage(invData) =>
         logger.info(s"Got inv message from ${remote.socketAddress} with modifiers: ${invData._2.map(Algos.encode).mkString(",")} ")
-        //todo: Ban node that send payload id?
-        if (invData._1 != Payload.modifierTypeId) nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
+        if (invData._1 == Transaction.ModifierTypeId)
+          memoryPoolRef ! CompareTransactionsWithUnconfirmed(remote, invData._2.toIndexedSeq)
+        else if (invData._1 != Payload.modifierTypeId) nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2) //todo: Ban node that send payload id?
       case _ => logger.info(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
     }
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>

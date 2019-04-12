@@ -24,6 +24,7 @@ import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
+import encry.view.MemoryPool.UpdatedState
 import encry.view.history.EncryHistory
 import encry.view.mempool.Mempool
 import encry.view.state._
@@ -42,10 +43,13 @@ import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: ActorRef) extends Actor with StrictLogging {
 
-  case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet)//, mempool: Mempool)
+  case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet)
+
+  //, mempool: Mempool)
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
+  memoryPoolRef ! UpdatedState(nodeView.state)
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
     Header.modifierTypeId -> HeaderSerializer,
     Payload.modifierTypeId -> PayloadSerializer,
@@ -122,9 +126,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         logger.debug(s"Cache before(${ModifiersCache.size})")
         computeApplications()
         logger.debug(s"Cache after(${ModifiersCache.size})")
-      case Transaction.ModifierTypeId => modifiers.foreach { bytes =>
-        Try(TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes)).foreach(tx => txModify(tx)))
-      }
+      case id => logger.info(s"NodeViewHolder got modifier of wrong type: $id!")
     }
     case lt: LocallyGeneratedTransaction[EncryProposition, Transaction]@unchecked => txModify(lt.tx)
     case lm: LocallyGeneratedModifier[EncryPersistentModifier]@unchecked =>
@@ -142,7 +144,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       if (mempool) sender() ! ChangedMempool(nodeView.mempool)
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] = modifierTypeId match {
-        case Transaction.ModifierTypeId => nodeView.mempool.notRequested(modifierIds)
+        //case Transaction.ModifierTypeId => nodeView.mempool.notRequested(modifierIds)
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
       logger.info(s"\n\n\nNVH GOT CompareViews. Current cache is ${ModifiersCache.size}. Requested mods -> ${modifierIds.size}. Filtered mpds -> ${ids.size}\n\n\n")
@@ -186,14 +188,18 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
                     memPool: Mempool, state: StateType): Mempool = {
     val rolledBackTxs: Seq[Transaction] = blocksRemoved.flatMap(extractTransactions)
     val appliedTxs: Seq[Transaction] = blocksApplied.flatMap(extractTransactions)
-    memPool.putWithoutCheck(rolledBackTxs).filter { tx =>
-      !appliedTxs.exists(t => t.id sameElements tx.id) && {
-        state match {
-          case v: TransactionValidation[EncryProposition, Transaction] => v.validate(tx).isSuccess
-          case _ => true
-        }
-      }
+    val filteredTransactions: Seq[Transaction] = rolledBackTxs.filter { tx =>
+      !appliedTxs.exists(t => t.id sameElements tx.id)
     }
+    memoryPoolRef !
+    //    memPool.putWithoutCheck(rolledBackTxs).filter { tx =>
+    //      !appliedTxs.exists(t => t.id sameElements tx.id) && {
+    //        state match {
+    //          case v: TransactionValidation[EncryProposition, Transaction] => v.validate(tx).isSuccess
+    //          case _ => true
+    //        }
+    //      }
+    //    }
   }
 
   def requestDownloads(pi: ProgressInfo[EncryPersistentModifier], previousModifier: Option[ModifierId] = None): Unit =
@@ -291,6 +297,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
             context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
           newStateTry match {
             case Success(newMinState) =>
+              memoryPoolRef ! UpdatedState(newMinState)
               val newMemPool: Mempool =
                 updateMemPool(progressInfo.toRemove, blocksApplied, nodeView.mempool, newMinState)
               if (progressInfo.chainSwitchingNeeded)
@@ -301,10 +308,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
               if (progressInfo.chainSwitchingNeeded)
                 context.actorSelection("/user/blockListener") !
                   ChainSwitching(progressInfo.toRemove.map(_.id))
-              if (settings.influxDB.isDefined)
-                newHistory.bestHeaderOpt.foreach(header =>
-                  context.actorSelection("/user/statsSender") !
-                    BestHeaderInChain(header, System.currentTimeMillis()))
+              if (settings.influxDB.isDefined) newHistory.bestHeaderOpt.foreach(header =>
+                context.actorSelection("/user/statsSender") ! BestHeaderInChain(header, System.currentTimeMillis()))
               if (newHistory.isFullChainSynced) {
                 logger.info(s"blockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
                 ModifiersCache.setChainSynced()
@@ -353,7 +358,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
     val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
-    NodeView(history, state, wallet)//, memPool)
+    NodeView(history, state, wallet) //, memPool)
   }
 
   def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryObjectsDir(settings).listFiles.isEmpty)
@@ -363,7 +368,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       //val memPool: Mempool = Mempool.empty(settings, timeProvider, system)
       val state: StateType =
         restoreConsistentState(EncryState.readOrGenerate(settings, Some(self), influxRef).asInstanceOf[StateType], history)
-      Some(NodeView(history, state, wallet))//, memPool))
+      Some(NodeView(history, state, wallet)) //, memPool))
     } catch {
       case ex: Throwable =>
         logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")

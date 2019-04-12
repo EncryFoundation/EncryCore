@@ -32,7 +32,8 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class DeliveryManager(influxRef: Option[ActorRef],
                       nodeViewHolderRef: ActorRef,
                       networkControllerRef: ActorRef,
-                      settings: EncryAppSettings) extends Actor with StrictLogging {
+                      settings: EncryAppSettings,
+                      memoryPoolRef: ActorRef) extends Actor with StrictLogging {
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
@@ -138,7 +139,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
           receivedSpamModifiers = Map.empty
         }
         val filteredModifiers: Seq[Array[Byte]] = fm.filterNot { case (modId, _) => history.contains(modId) }.values.toSeq
-        if (filteredModifiers.nonEmpty) nodeViewHolderRef ! ModifiersFromRemote(typeId, filteredModifiers)
+        if (filteredModifiers.nonEmpty && typeId == Transaction.ModifierTypeId)
+          memoryPoolRef ! ModifiersFromRemote(typeId, filteredModifiers)
+        else if (filteredModifiers.nonEmpty) nodeViewHolderRef ! ModifiersFromRemote(typeId, filteredModifiers)
         if (!history.isHeadersChainSynced && expectedModifiers.isEmpty) sendSync(history.syncInfo, isBlockChainSynced)
         else if (history.isHeadersChainSynced && !history.isFullChainSynced && expectedModifiers.isEmpty) {
           logger.info(s"Trigger CheckModifiersToDownload from DataFromPeer ${expectedModifiers.size}")
@@ -223,7 +226,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         .exists { case (comrResult, _, _) => comrResult != Younger && comrResult != Fork }
       else syncTracker.statuses.contains(peer.socketAddress.getAddress)
 
-        //.exists { case (comrResult, _, _) => comrResult != Fork }
+    //.exists { case (comrResult, _, _) => comrResult != Fork }
     //    val thirdCondition: Boolean = syncTracker.statuses.get(peer.socketAddress.getAddress)
     //      .exists { case (comrResult, _, _) => comrResult != Younger && comrResult != Fork }
     logger.info("===============requestModifies============\n " +
@@ -524,6 +527,7 @@ object DeliveryManager {
   def props(influxRef: Option[ActorRef],
             nodeViewHolderRef: ActorRef,
             networkControllerRef: ActorRef,
-            settings: EncryAppSettings): Props =
-    Props(new DeliveryManager(influxRef, nodeViewHolderRef, networkControllerRef, settings))
+            settings: EncryAppSettings,
+            memoryPoolRef: ActorRef): Props =
+    Props(new DeliveryManager(influxRef, nodeViewHolderRef, networkControllerRef, settings, memoryPoolRef))
 }
