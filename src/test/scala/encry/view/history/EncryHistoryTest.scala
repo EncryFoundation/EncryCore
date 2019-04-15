@@ -3,7 +3,7 @@ package encry.view.history
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.{Block, Header}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
-import encry.settings.Constants
+import encry.settings.{Constants, EncryAppSettings}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.EncryGenerator
 import org.encryfoundation.common.Algos
@@ -18,17 +18,27 @@ class EncryHistoryTest extends PropSpec with Matchers with InstanceFactory with 
 //    history.bestHeaderHeight shouldEqual Constants.Chain.PreGenesisHeight
   }
 //
-//  property("Applying 10 blocks to history") {
-//
-//    val historyWith10Blocks: EncryHistory = (0 until 10).foldLeft(generateDummyHistory) {
-//      case (prevHistory, _) =>
-//        val block: Block = generateNextBlock(prevHistory)
-//        prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
-//    }
-//
-//    historyWith10Blocks.bestHeaderHeight shouldEqual 9
-//    historyWith10Blocks.bestBlockHeight shouldEqual 9
-//  }
+  property("Applying 10 blocks to history") {
+
+    val settings = EncryAppSettings.read
+
+    val historyWith10Blocks: EncryHistory = (0 until 150).foldLeft(generateDummyHistory(settings)) {
+      case (prevHistory, _) =>
+        val block: Block = generateNextBlock(prevHistory)
+        prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
+    }
+
+    val blocks = (0 until 10).foldLeft(generateDummyHistory(settings), List.empty[Block]) {
+      case ((prevHistory, blocks), _) =>
+        val block: Block = generateNextBlock(prevHistory)
+        prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block) -> (blocks :+ block)
+    }._2
+
+    historyWith10Blocks.append(blocks.head.header).get._1.append(blocks.head.payload).get._1.reportModifierIsValid(blocks.head)
+
+    historyWith10Blocks.bestHeaderHeight shouldEqual 9
+    historyWith10Blocks.bestBlockHeight shouldEqual 9
+  }
 //
 //  property("Fork with different difficult in fork block"){
 //

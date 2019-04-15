@@ -26,6 +26,8 @@ trait PersistentBatchAVLProver[D <: Digest, HF <: CryptographicHash[D]] extends 
 
   def generateProof: SerializedAdProof = avlProver.generateProof()
 
+  def updateInfo(): Unit = avlProver.updateInfo()
+
   def generateProofAndUpdateStorage[K <: Array[Byte], V <: Array[Byte]](additionalData: Seq[(K, V)]): SerializedAdProof = {
     storage.update(avlProver, additionalData).get
     avlProver.generateProof()

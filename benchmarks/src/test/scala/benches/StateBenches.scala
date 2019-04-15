@@ -23,7 +23,7 @@ class StateBenches {
   def applyBlocksToTheState(stateBench: StateBenchState, bh: Blackhole): Unit = {
     bh.consume {
       val innerState: UtxoState =
-        utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings, VersionalStorage.IODB)
+        utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings, VersionalStorage.IODB, false)
       stateBench.chain.foldLeft(innerState) { case (state, block) =>
         state.applyModifier(block).get
       }

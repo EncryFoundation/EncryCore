@@ -159,7 +159,8 @@ object Utils extends StrictLogging {
                         dir: File,
                         nodeViewHolderRef: Option[ActorRef],
                         settings: EncryAppSettings,
-                        storageType: StorageType): UtxoState = {
+                        storageType: StorageType,
+                        isChainSynced: Boolean = true): UtxoState = {
     val p = new avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
     bh.sortedBoxes.foreach(b => p.performOneOperation(avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
     val versionalStorage = storageType match {
@@ -182,7 +183,8 @@ object Utils extends StrictLogging {
       0L,
       None,
       settings,
-      None
+      None,
+      isChainSynced
     )
   }
 

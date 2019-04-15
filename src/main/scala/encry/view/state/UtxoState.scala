@@ -43,7 +43,8 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
                 val lastBlockTimestamp: Long,
                 nodeViewHolderRef: Option[ActorRef],
                 override val settings: EncryAppSettings,
-                statsSenderRef: Option[ActorRef])
+                statsSenderRef: Option[ActorRef],
+                isChainSynced: Boolean = false)
   extends EncryState[UtxoState] with UtxoStateReader with StrictLogging {
 
   import UtxoState.metadata
@@ -59,6 +60,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
 
   def applyBlockTransactions(blockTransactions: Seq[Transaction],
                              expectedDigest: ADDigest): Try[Unit] = {
+    val startTime = System.currentTimeMillis()
     def applyTry(txs: Seq[Transaction], allowedOutputDelta: Amount = 0L): Try[Unit] =
       txs.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, tx) =>
         t.flatMap { _ =>
@@ -99,11 +101,20 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           Height @@ block.header.height,
           block.header.timestamp
         )
-        val proofBytes: SerializedAdProof = persistentProver.generateProofAndUpdateStorage(meta)
-        val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
 
-        if (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest)
-          onAdProofGenerated(ADProofs(block.header.id, proofBytes))
+        persistentProver.updateStorage(meta)
+        logger.info(s"isChainSynced: ${isChainSynced}| settings.node.stateMode.isDigest: ${settings.node.stateMode.isDigest}")
+        if (isChainSynced || (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest)) {
+          val proofBytes: SerializedAdProof = persistentProver.generateProof
+          val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
+
+          if (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest)
+            onAdProofGenerated(ADProofs(block.header.id, proofBytes))
+
+          if (!(block.header.adProofsRoot sameElements proofHash))
+            throw new Exception("Calculated proofHash is not equal to the declared one.")
+        } else persistentProver.updateInfo()
+
         logger.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with" +
           s" root hash ${Algos.encode(rootHash)}")
 
@@ -111,8 +122,6 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           throw new Exception("Storage kept roothash is not equal to the declared one.")
         else if (!stateStore.versions.exists(_ sameElements block.header.stateRoot))
           throw new Exception("Unable to apply modification properly.")
-        else if (!(block.header.adProofsRoot sameElements proofHash))
-          throw new Exception("Calculated proofHash is not equal to the declared one.")
         else if (!(block.header.stateRoot sameElements persistentProver.digest))
           throw new Exception("Calculated stateRoot is not equal to the declared one.")
 
@@ -124,7 +133,8 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           lastBlockTimestamp,
           nodeViewHolderRef,
           settings,
-          statsSenderRef
+          statsSenderRef,
+          isChainSynced
         )
       }.recoverWith[UtxoState] { case e =>
         logger.info(s"Failed to apply block with header ${block.header.encodedId} to UTXOState with root" +
@@ -141,7 +151,8 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         lastBlockTimestamp,
         nodeViewHolderRef,
         settings,
-        statsSenderRef
+        statsSenderRef,
+        isChainSynced
       ))
 
     case _ => Failure(new Exception("Got Modifier of unknown type."))
@@ -174,7 +185,8 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
             lastBlockTimestamp,
             nodeViewHolderRef,
             settings,
-            statsSenderRef
+            statsSenderRef,
+            isChainSynced
           )
         }
         rollbackResult

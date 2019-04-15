@@ -138,7 +138,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
   }
 
   def generateProof(): SerializedAdProof = {
-    //logger.info("================Generating proof================")
+    logger.info("================Generating proof================")
     changedNodesBuffer.clear()
     changedNodesBufferToCheck.clear()
     var packagedTree = Array.emptyByteArray
@@ -190,6 +190,25 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
     oldTopNode = topNode
     logger.info("****************Generating proof*****************")
     SerializedAdProof @@ packagedTree
+  }
+
+  def updateInfo(): Unit = {
+    def resetNew(r: EncryProverNodes[D]): Unit = if (r.isNew) {
+      r match {
+        case rn: InternalProverEncryNode[D] =>
+          resetNew(rn.left)
+          resetNew(rn.right)
+        case _ =>
+      }
+      r.isNew = false
+      r.visited = false
+    }
+    changedNodesBuffer.clear()
+    changedNodesBufferToCheck.clear()
+    resetNew(topNode)
+    directions = Array.emptyByteArray
+    directionsBitLength = 0
+    oldTopNode = topNode
   }
 
   def treeWalk[IR, LR](internalNodeFn: (InternalProverEncryNode[D], IR) => (EncryProverNodes[D], IR),

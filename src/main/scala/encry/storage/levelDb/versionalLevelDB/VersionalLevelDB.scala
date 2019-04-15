@@ -9,6 +9,7 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.lang.ArrayUtils
 import org.encryfoundation.common.Algos
 import org.iq80.leveldb.{DB, ReadOptions}
+import scorex.crypto.encode.Base16
 import supertagged.TaggedType
 
 import scala.collection.mutable.ListBuffer
@@ -76,13 +77,15 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       batch.put(versionDeletionsKey(newElem.version), newElem.elemsToDelete.flatten.toArray)
       logger.info(s"batchPutting: ${System.currentTimeMillis() - batchPutting} ms")
       val foreachInsert = System.currentTimeMillis()
+      logger.info(s"Elems: ${newElem.elemsToInsert.length}")
       newElem.elemsToInsert.foreach {
         case (elemKey, elemValue) =>
-          /**
+          /**deleteResolver
             * Put elem by key (ACCESSIBLE_KEY_PREFIX +: "version" ++ "elemKey")
             * First check contain db this elem or not. if no: insert elem, and insert init access map
             * if db contains elem, just insert elem
             */
+          val startInsTime = System.nanoTime()
           val elemMap: Array[Byte] = db.get(userKey(elemKey), readOptions)
           if (elemMap == null) {
             batch.put(userKey(elemKey), ACCESSIBLE_KEY_PREFIX +: newElem.version)
@@ -91,8 +94,10 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
             batch.put(userKey(elemKey), ArrayUtils.addAll(ACCESSIBLE_KEY_PREFIX +: newElem.version, accessMap))
           }
           batch.put(accessableElementKeyForVersion(newElem.version, elemKey), elemValue)
+          //logger.info(s"Time of ins: ${System.nanoTime() - startInsTime} nanosec")
       }
       logger.info(s"foreachInsert: ${System.currentTimeMillis() - foreachInsert} ms")
+      val deletionTime = System.currentTimeMillis()
       newElem.elemsToDelete.foreach { elemKey =>
         val possibleMap = db.get(userKey(elemKey), readOptions)
         val accessMap =
@@ -100,6 +105,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
           else Array.emptyByteArray
         batch.put(userKey(elemKey), INACCESSIBLE_KEY_PREFIX +: accessMap)
       }
+      logger.info(s"Deletions: ${System.currentTimeMillis() - deletionTime}")
       val startBatch = System.currentTimeMillis()
       db.write(batch)
       logger.info(s"End of batch writing: ${System.currentTimeMillis() - startBatch} ms")
@@ -190,6 +196,9 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         getInaccessiableKeysInVersion(versionToResolve, readOptions)
       deletionsByThisVersion.foreach { key =>
         val elemMap = db.get(userKey(key), readOptions)
+//        logger.info(s"Elem map for: ${Algos.encode(userKey(key))} ")
+//        logger.info(s"is ${Algos.encode(Algos.hash(elemMap))} ")
+//        logger.info(s"and size: ${elemMap.length}")
         val wrappedVersions = splitValue2elems(settings.versionKeySize, elemMap.tail)
           .map(ver => new ByteArrayWrapper(ver))
         val elemVersions = wrappedVersions.filter(currentVersions.contains)

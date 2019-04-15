@@ -83,23 +83,24 @@ trait EncryHistoryReader extends BlockHeaderProcessor
 
   def continuationIds(info: EncrySyncInfo, size: Int): Option[ModifierIds] = Try {
     if (isEmpty) info.startingPoints
-    else if (info.lastHeaderIds.isEmpty) {
+    else {
       val heightFrom: Int = Math.min(bestHeaderHeight, size - 1)
       val startId: ModifierId = headerIdsAtHeight(heightFrom).head
       val startHeader: Header = typedModifierById[Header](startId).get
       val headers: HeaderChain = headerChainBack(size, startHeader, _ => false)
         .ensuring(_.headers.exists(_.height == Constants.Chain.GenesisHeight), "Should always contain genesis header.")
       headers.headers.flatMap(h => Seq((Header.modifierTypeId, h.id)))
-    } else {
-      val ids: Seq[ModifierId] = info.lastHeaderIds
-      val lastHeaderInOurBestChain: ModifierId = ids.view.reverse.find(m => isInBestChain(m)).get
-      val theirHeight: Height = heightOf(lastHeaderInOurBestChain).get
-      val heightFrom: Int = Math.min(bestHeaderHeight, theirHeight + size)
-      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
-      val startHeader: Header = typedModifierById[Header](startId).get
-      headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
-        .headers.map(h => Header.modifierTypeId -> h.id)
     }
+//    else {
+//      val ids: Seq[ModifierId] = info.lastHeaderIds
+//      val lastHeaderInOurBestChain: ModifierId = ids.view.reverse.find(m => isInBestChain(m)).get
+//      val theirHeight: Height = heightOf(lastHeaderInOurBestChain).get
+//      val heightFrom: Int = Math.min(bestHeaderHeight, theirHeight + size)
+//      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
+//      val startHeader: Header = typedModifierById[Header](startId).get
+//      headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
+//        .headers.map(h => Header.modifierTypeId -> h.id)
+//    }
   }.toOption
 
   /** @return all possible forks, that contains specified header */
