@@ -170,7 +170,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
           writeBatch.put(userKey(VersionalLevelDbKey @@ elemKey), ACCESSIBLE_KEY_PREFIX +: accessMap.tail)
         }
         db.write(writeBatch)
-        rollbackResolver(versionsToResolve.tail)
+        if (versionsToResolve.nonEmpty) rollbackResolver(versionsToResolve.tail)
       } finally {
         writeBatch.close()
         readOptions.snapshot().close()
