@@ -2,7 +2,8 @@ package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.ByteOrder
-import akka.actor.{Actor, ActorRef, Cancellable, Props}
+
+import akka.actor.{Actor, ActorRef, Cancellable, PoisonPill, Props}
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
@@ -14,6 +15,7 @@ import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BasicMessagesRepo._
 import PeerConnectionHandler.ReceivableMessages._
+
 import scala.annotation.tailrec
 import scala.collection.immutable.HashMap
 import scala.concurrent.duration._
@@ -110,6 +112,7 @@ class PeerConnectionHandler(connection: ActorRef,
     case cc: ConnectionClosed =>
       logger.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
       peerManager ! Disconnected(remote)
+      self ! PoisonPill
       context stop self
     case CloseConnection =>
       logger.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")

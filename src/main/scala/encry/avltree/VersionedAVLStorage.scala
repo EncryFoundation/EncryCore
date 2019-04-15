@@ -73,11 +73,13 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
     logger.info(s"Update storage to version ${Algos.encode(digestWrapper.data)}: ${toUpdateWithWrapped.size} elements to insert," +
       s" ${toRemove.size} elements to remove")
     logger.info(s"Pre update: ${System.currentTimeMillis() - startTime} ms")
+    val startInsert = System.currentTimeMillis()
     store.insert(
       StorageVersion @@ digestWrapper.data,
       toUpdateWithWrapped.map{case (key, value) => StorageKey @@ key.data -> StorageValue @@ value.data}.toList,
       toRemoveMerged.map(key => StorageKey @@ key.data)
     )
+    logger.info(s"Insert time: ${System.currentTimeMillis() - startInsert}")
   }.recoverWith { case e =>
     logger.info(s"Failed to update tree: $e")
     Failure(e)

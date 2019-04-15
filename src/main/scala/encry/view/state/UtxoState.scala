@@ -65,10 +65,13 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
       txs.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, tx) =>
         t.flatMap { _ =>
           if (validate(tx, allowedOutputDelta).isSuccess) {
-            extractStateChanges(tx).operations.map(ADProofs.toModification)
+            val startTime = System.currentTimeMillis()
+            val res = extractStateChanges(tx).operations.map(ADProofs.toModification)
               .foldLeft[Try[Option[ADValue]]](Success(None)) { case (tIn, m) =>
               tIn.flatMap(_ => persistentProver.performOneOperation(m))
             }
+            logger.info(s"extractStateChanges: ${System.currentTimeMillis() - startTime} ms")
+            res
           } else util.Failure(validate(tx, allowedOutputDelta).errors.head.toThrowable)
         }
       }.map(_ => Unit)
@@ -91,6 +94,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
 
     case block: Block =>
+      val startTime = System.currentTimeMillis()
       logger.info(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height.")
       statsSenderRef.foreach(_ ! TxsInBlock(block.payload.transactions.size))
@@ -101,11 +105,14 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           Height @@ block.header.height,
           block.header.timestamp
         )
-
+        val updateStorage = System.currentTimeMillis()
         persistentProver.updateStorage(meta)
+        logger.info(s"Update storage: ${System.currentTimeMillis() - updateStorage} ms")
         logger.info(s"isChainSynced: ${isChainSynced}| settings.node.stateMode.isDigest: ${settings.node.stateMode.isDigest}")
         if (isChainSynced || (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest)) {
+          val proofGenTime = System.currentTimeMillis()
           val proofBytes: SerializedAdProof = persistentProver.generateProof
+          logger.info(s"proofGenTime: ${System.currentTimeMillis() - proofGenTime} ms")
           val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
 
           if (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest)
@@ -124,6 +131,8 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           throw new Exception("Unable to apply modification properly.")
         else if (!(block.header.stateRoot sameElements persistentProver.digest))
           throw new Exception("Calculated stateRoot is not equal to the declared one.")
+
+        logger.info(s"Apply block time: ${System.currentTimeMillis() - startTime} ms")
 
         new UtxoState(
           persistentProver,
@@ -201,6 +210,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
 
   def validate(tx: Transaction, allowedOutputDelta: Amount = 0L): ValidationResult =
     if (tx.semanticValidity.isSuccess) {
+      val startTime = System.currentTimeMillis()
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, rootHash)
       val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => persistentProver.unauthenticatedLookup(input.boxId)
         .map(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head))
@@ -238,6 +248,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         }
       }
 
+      logger.info(s"Validation time: ${System.currentTimeMillis() - startTime} ms")
       if (!validBalance) {
         logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Non-positive balance in $tx")
         Invalid(Seq(MalformedModifierError(s"Non-positive balance in $tx")))

@@ -2,8 +2,10 @@ package benches
 
 import java.io.File
 import java.util.concurrent.TimeUnit
+
 import benches.HistoryBenches.HistoryBenchState
 import benches.Utils.{generateHistory, generateNextBlockValidForHistory, getRandomTempDir}
+import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.history.Block
 import encry.modifiers.mempool.Transaction
 import encry.settings.EncryAppSettings
@@ -15,14 +17,17 @@ import org.openjdk.jmh.profile.GCProfiler
 import org.openjdk.jmh.runner.{Runner, RunnerException}
 import org.openjdk.jmh.runner.options.{OptionsBuilder, TimeValue, VerboseMode}
 
-class HistoryBenches {
+class HistoryBenches extends StrictLogging{
 
   @Benchmark
   def appendBlocksToHistoryBench(benchStateHistory: HistoryBenchState, bh: Blackhole): Unit = {
     bh.consume {
       val history: EncryHistory = generateHistory(benchStateHistory.settings, getRandomTempDir)
       benchStateHistory.blocks.foldLeft(history) { case (historyL, block) =>
-        historyL.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
+        val startTime = System.currentTimeMillis()
+        val res = historyL.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
+        logger.info(s"Time of block applying: ${System.currentTimeMillis() - startTime} ms")
+        res
       }
       history.closeStorage()
     }

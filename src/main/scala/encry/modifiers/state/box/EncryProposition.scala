@@ -1,5 +1,6 @@
 package encry.modifiers.state.box
 
+import com.typesafe.scalalogging.StrictLogging
 import encry.settings.Constants
 import encry.view.history.History.Height
 import io.circe.syntax._
@@ -14,16 +15,18 @@ import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import org.encryfoundation.prismlang.core.wrapped.PValue
 import org.encryfoundation.prismlang.evaluator.Evaluator
 import scorex.crypto.signatures.PublicKey
+
 import scala.util.{Failure, Success, Try}
 
-case class EncryProposition(contractHash: ContractHash) extends Proposition {
+case class EncryProposition(contractHash: ContractHash) extends Proposition with StrictLogging {
 
   override type M = EncryProposition
 
   override def serializer: Serializer[EncryProposition] = EncryPropositionSerializer
 
-  def canUnlock(ctx: Context, contract: CompiledContract, proofs: Seq[Proof]): Boolean =
+  def canUnlock(ctx: Context, contract: CompiledContract, proofs: Seq[Proof]): Boolean = {
     if (sameHash(contractHash, contract.hash)) {
+      val startTime = System.currentTimeMillis()
       val env: List[(Option[String], PValue)] =
         if (contract.args.isEmpty) List.empty
         else List((None, ctx.transaction.asVal), (None, ctx.state.asVal), (None, ctx.box.asVal)) ++
@@ -32,9 +35,13 @@ case class EncryProposition(contractHash: ContractHash) extends Proposition {
         env.find(_._1.contains(name))
           .orElse(env.find(e => e._2.tpe == tpe || tpe.isSubtypeOf(e._2.tpe)))
           .map(elt => name -> elt._2)
-          .getOrElse(throw new Exception("Not enough arguments for contact")) }
-      Evaluator.initializedWith(args).eval[Boolean](contract.script)
+          .getOrElse(throw new Exception("Not enough arguments for contact"))
+      }
+      val res = Evaluator.initializedWith(args).eval[Boolean](contract.script)
+      logger.info(s"Eval time: ${System.currentTimeMillis() - startTime}")
+      res
     } else false
+  }
 
   def sameHash(h1: Array[Byte], h2: Array[Byte]): Boolean = ByteArrayWrapper(h1) == ByteArrayWrapper(h2)
 }
