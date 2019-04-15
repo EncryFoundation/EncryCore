@@ -38,7 +38,7 @@ case class EncryProposition(contractHash: ContractHash) extends Proposition with
           .getOrElse(throw new Exception("Not enough arguments for contact"))
       }
       val res = Evaluator.initializedWith(args).eval[Boolean](contract.script)
-      logger.info(s"Eval time: ${System.currentTimeMillis() - startTime}")
+      logger.debug(s"Eval time: ${System.currentTimeMillis() - startTime}")
       res
     } else false
   }

@@ -70,7 +70,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
               .foldLeft[Try[Option[ADValue]]](Success(None)) { case (tIn, m) =>
               tIn.flatMap(_ => persistentProver.performOneOperation(m))
             }
-            logger.info(s"extractStateChanges: ${System.currentTimeMillis() - startTime} ms")
+            logger.debug(s"extractStateChanges: ${System.currentTimeMillis() - startTime} ms")
             res
           } else util.Failure(validate(tx, allowedOutputDelta).errors.head.toThrowable)
         }
@@ -248,7 +248,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         }
       }
 
-      logger.info(s"Validation time: ${System.currentTimeMillis() - startTime} ms")
+      logger.debug(s"Validation time: ${System.currentTimeMillis() - startTime} ms")
       if (!validBalance) {
         logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Non-positive balance in $tx")
         Invalid(Seq(MalformedModifierError(s"Non-positive balance in $tx")))
