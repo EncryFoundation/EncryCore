@@ -10,7 +10,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.{RequestFromLocal, 
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.MempoolStat
-import encry.utils.CoreTaggedTypes.ModifierId
+import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.utils.NetworkTimeProvider
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{LocallyGeneratedTransaction, ModifiersFromRemote}
 import encry.view.MemoryPool._
@@ -74,7 +74,7 @@ class MemoryPool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef:
       bloomFilterForBoxesIds = initBloomFilter
     case CompareTransactionsWithUnconfirmed(peer, transactions) =>
       val unrequestedModifiers: IndexedSeq[ModifierId] = notRequested(transactions)
-      if (unrequestedModifiers.nonEmpty) sender ! RequestFromLocal(peer, Transaction.ModifierTypeId, unrequestedModifiers)
+      if (unrequestedModifiers.nonEmpty) sender ! RequestForTransactions(peer, Transaction.ModifierTypeId, unrequestedModifiers)
     case RolledBackTransactions(txs) => memoryPool = validateAndPutTransactions(txs, memoryPool, state, fromNetwork = false)
     case TransactionsForRemove(txs) => memoryPool = removeOldTransactions(txs, memoryPool)
     case LocallyGeneratedTransaction(tx) =>
@@ -175,6 +175,8 @@ object MemoryPool {
   case object AskTransactionsFromMemoryPoolFromMiner
 
   case class AskTransactionsFromNVS(txsIds: Seq[ModifierId])
+
+  case class RequestForTransactions(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
   def props(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: ActorRef): Props =
     Props(new MemoryPool(settings, ntp, minerRef))

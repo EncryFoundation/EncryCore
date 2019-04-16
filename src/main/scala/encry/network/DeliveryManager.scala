@@ -2,7 +2,7 @@ package encry.network
 
 import java.net.InetAddress
 
-import akka.actor.{Actor, ActorRef, Cancellable, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, PoisonPill, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
 import encry.local.miner.Miner.{DisableMining, StartMining}
@@ -24,8 +24,11 @@ import scala.collection.immutable.HashSet
 import scala.collection.mutable
 import scala.util.Random
 import BasicMessagesRepo._
+import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
+import com.typesafe.config.Config
 import encry.modifiers.history.{Header, Payload}
 import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
+import encry.view.MemoryPool.RequestForTransactions
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -125,6 +128,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case SyntacticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
     case SuccessfulTransaction(_) => //do nothing
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
+      if (modifierIds.nonEmpty) requestModifies(history, peer, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
+    case RequestForTransactions(peer, modifierTypeId, modifierIds) =>
       if (modifierIds.nonEmpty) requestModifies(history, peer, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
     case DataFromPeer(message, remote) => message match {
       case ModifiersNetworkMessage((typeId, modifiers)) =>
@@ -530,4 +535,21 @@ object DeliveryManager {
             settings: EncryAppSettings,
             memoryPoolRef: ActorRef): Props =
     Props(new DeliveryManager(influxRef, nodeViewHolderRef, networkControllerRef, settings, memoryPoolRef))
+
+  class DeliveryManagerPriorityQueue(settings: ActorSystem.Settings, config: Config)
+    extends UnboundedStablePriorityMailbox(
+      // Create a new PriorityGenerator, lower prio means more important
+      PriorityGenerator {
+        // 'highpriority messages should be treated first if possible
+        case RequestFromLocal(_, _, _) => 0
+
+        // 'lowpriority messages should be treated last if possible
+        case RequestForTransactions(_, _, _) => 2
+
+        // PoisonPill when no other left
+        case PoisonPill => 3
+
+        // We default to 1, which is in between high and low
+        case otherwise => 1
+      })
 }
