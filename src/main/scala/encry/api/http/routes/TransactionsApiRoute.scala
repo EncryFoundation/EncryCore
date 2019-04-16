@@ -16,33 +16,34 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedTransac
 import encry.settings.RESTApiSettings
 import scala.concurrent.Future
 
-case class TransactionsApiRoute(readersHolder: ActorRef, nodeViewActorRef: ActorRef,
+case class TransactionsApiRoute(readersHolder: ActorRef, memoryPoolRef: ActorRef,
                                 restApiSettings: RESTApiSettings, stateMode: StateMode)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
   override val route: Route = pathPrefix("transactions") {
-    getUnconfirmedTransactionsR ~ defaultTransferTransactionR
+    //getUnconfirmedTransactionsR ~
+      defaultTransferTransactionR
   }
 
   override val settings: RESTApiSettings = restApiSettings
 
-  private def getMempool: Future[MempoolReader] = (readersHolder ? GetReaders).mapTo[Readers].map(_.m.get)
+ // private def getMempool: Future[MempoolReader] = (readersHolder ? GetReaders).mapTo[Readers].map(_.m.get)
 
-  private def getUnconfirmedTransactions(limit: Int, offset: Int = 0): Future[Json] = getMempool.map {
-    _.unconfirmed.values.slice(offset, offset + limit)
-  }.map(_.map(_.asJson).asJson)
+//  private def getUnconfirmedTransactions(limit: Int, offset: Int = 0): Future[Json] = getMempool.map {
+//    _.unconfirmed.values.slice(offset, offset + limit)
+//  }.map(_.map(_.asJson).asJson)
 
   def defaultTransferTransactionR: Route = path("send") {
     post(entity(as[Transaction]) {
       tx =>
         complete {
-          nodeViewActorRef ! LocallyGeneratedTransaction[EncryProposition, Transaction](tx)
+          memoryPoolRef ! LocallyGeneratedTransaction(tx)
           StatusCodes.OK
         }
     })
   }
 
-  def getUnconfirmedTransactionsR: Route = (path("unconfirmed") & get & paging) { (offset, limit) =>
-    getUnconfirmedTransactions(limit, offset).okJson()
-  }
+//  def getUnconfirmedTransactionsR: Route = (path("unconfirmed") & get & paging) { (offset, limit) =>
+//    getUnconfirmedTransactions(limit, offset).okJson()
+//  }
 }

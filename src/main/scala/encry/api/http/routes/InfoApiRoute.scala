@@ -79,7 +79,7 @@ object InfoApiRoute {
     val stateVersion: Option[String] = readers.s.map(_.version).map(Algos.encode)
     val bestHeader: Option[Header] = readers.h.flatMap(_.bestHeaderOpt)
     val bestFullBlock: Option[Block] = readers.h.flatMap(_.bestBlockOpt)
-    val unconfirmedCount: Int = readers.m.map(_.size).getOrElse(0)
+    //val unconfirmedCount: Int = readers.m.map(_.size).getOrElse(0)
     Map(
       "name" -> nodeName.asJson,
       "headersHeight" -> bestHeader.map(_.height).getOrElse(0).asJson,
@@ -89,7 +89,7 @@ object InfoApiRoute {
       "previousFullHeaderId" -> bestFullBlock.map(_.header.parentId).map(Algos.encode).asJson,
       "difficulty" -> bestFullBlock.map(block => block.header.difficulty.toString)
         .getOrElse(Constants.Chain.InitialDifficulty.toString).asJson,
-      "unconfirmedCount" -> unconfirmedCount.asJson,
+     // "unconfirmedCount" -> unconfirmedCount.asJson,
       "stateType" -> stateType.asJson,
       "stateVersion" -> stateVersion.asJson,
       "isMining" -> minerInfo.isMining.asJson,

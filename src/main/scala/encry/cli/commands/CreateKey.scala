@@ -18,7 +18,7 @@ object CreateKey extends Command {
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = Try {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     nodeViewHolder ?
-      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Mempool, Unit] { view =>
+      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Unit] { view =>
         if (view.vault.accountManager.accounts.isEmpty) view.vault.accountManager.mandatoryAccount
         else view.vault.accountManager.createAccount(None)
       }

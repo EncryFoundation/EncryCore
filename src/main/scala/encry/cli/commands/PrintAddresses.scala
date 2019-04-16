@@ -17,7 +17,7 @@ object PrintAddresses extends Command {
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (nodeViewHolder ?
-      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Mempool, Option[Response]] { view =>
+      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Option[Response]] { view =>
         Some(Response(view.vault.publicKeys.foldLeft("") { (str, k) =>
           str + s"Pay2PubKeyAddress : ${k.address.address} , Pay2ContractHashAddress : ${k.address.p2ch.address}" + "\n"
         }))

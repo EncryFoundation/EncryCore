@@ -26,7 +26,7 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
   override val settings: RESTApiSettings = restApiSettings
 
   private def getWallet: Future[EncryWallet] = (nodeViewActorRef ?
-    GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Mempool, EncryWallet](_.vault))
+    GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryWallet](_.vault))
     .mapTo[EncryWallet]
 
   def infoR: Route = (path("info") & get) {

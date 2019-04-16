@@ -21,20 +21,30 @@ import encry.view.EncryNodeViewHolder.CurrentView
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.EncryHistory
 import encry.view.history.History.Height
-import encry.view.mempool.Mempool
 import encry.view.state.{StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
-import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
+import akka.util.Timeout
+import encry.utils.CoreTaggedTypes.ModifierId
+import encry.view.MemoryPool.{AskTransactionsFromMemoryPoolFromMiner, TransactionsFromMemoryPool}
+import akka.pattern.ask
 
+import scala.concurrent.duration._
 import scala.collection._
-import scala.util.{Failure, Success, Try}
+import scala.collection.immutable.HashMap
+import scala.concurrent.{Await, Future}
 
 class Miner extends Actor with StrictLogging {
+
+  implicit val timeout: Timeout = Timeout(5.seconds)
+
+  type TransactionIdAsKey = scala.collection.mutable.WrappedArray.ofByte
+
+  def toKey(id: ModifierId): TransactionIdAsKey = new mutable.WrappedArray.ofByte(id)
 
   import Miner._
 
@@ -83,8 +93,8 @@ class Miner extends Actor with StrictLogging {
         s" with nonce: ${block.header.nonce}")
       logger.info(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
       killAllWorkers()
-        nodeViewHolder ! LocallyGeneratedModifier(block.header)
-        nodeViewHolder ! LocallyGeneratedModifier(block.payload)
+      nodeViewHolder ! LocallyGeneratedModifier(block.header)
+      nodeViewHolder ! LocallyGeneratedModifier(block.payload)
       if (settings.influxDB.isDefined) {
         context.actorSelection("/user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
         context.actorSelection("/user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
@@ -94,15 +104,14 @@ class Miner extends Actor with StrictLogging {
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
-    case msg => logger.info(s"Miner received strange message: $msg.")
   }
 
   def miningEnabled: Receive =
-    receiveSemanticallySuccessfulModifier orElse
-      receiverCandidateBlock orElse
-      mining orElse
-      chainEvents orElse
-      unknownMessage
+    receiveSemanticallySuccessfulModifier
+      .orElse(receiverCandidateBlock)
+      .orElse(mining)
+      .orElse(chainEvents)
+      .orElse(unknownMessage)
 
   def miningDisabled: Receive = {
     case EnableMining =>
@@ -145,52 +154,38 @@ class Miner extends Actor with StrictLogging {
     self ! StartMining
   }
 
-  def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet, Mempool],
-                      bestHeaderOpt: Option[Header]): CandidateBlock = {
-    val timestamp: Time = timeProvider.estimatedTime
-    val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
+  def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet],
+                      bestHeaderOpt: Option[Header]): CandidateBlock =
+    Await.result(
+      (memoryPool ? AskTransactionsFromMemoryPoolFromMiner).mapTo[IndexedSeq[Transaction]].map { validatedTxs =>
+        val timestamp: Time = timeProvider.estimatedTime
+        val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
+        val feesTotal: Amount = validatedTxs.map(_.fee).sum
+        val supplyTotal: Amount = EncrySupplyController.supplyAt(view.state.height)
 
-    // `txsToPut` - valid, non-conflicting txs with respect to their fee amount.
-    // `txsToDrop` - invalidated txs to be dropped from mempool.
-    val (txsToPut: Seq[Transaction], txsToDrop: Seq[Transaction], _) = view.pool.takeAll.toSeq.sortBy(_.fee).reverse
-      .foldLeft((Seq[Transaction](), Seq[Transaction](), Set[ByteArrayWrapper]())) {
-        case ((validTxs, invalidTxs, bxsAcc), tx) =>
-          val bxsRaw: IndexedSeq[ByteArrayWrapper] = tx.inputs.map(u => ByteArrayWrapper(u.boxId))
-          if ((validTxs.map(_.size).sum + tx.size) <= Constants.PayloadMaxSize) {
-            if (view.state.validate(tx).isSuccess && bxsRaw.forall(k =>
-              !bxsAcc.contains(k)) && bxsRaw.size == bxsRaw.toSet.size)
-              (validTxs :+ tx, invalidTxs, bxsAcc ++ bxsRaw)
-            else (validTxs, invalidTxs :+ tx, bxsAcc)
-          } else (validTxs, invalidTxs, bxsAcc)
-      }
-    // Remove stateful-invalid txs from mempool.
-    view.pool.removeAsync(txsToDrop)
+        val minerSecret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
+        val coinbase: Transaction = TransactionFactory
+          .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, view.state.height)
 
-    val minerSecret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
-    val feesTotal: Amount = txsToPut.map(_.fee).sum
-    val supplyTotal: Amount = EncrySupplyController.supplyAt(view.state.height)
-    val coinbase: Transaction = TransactionFactory
-      .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, view.state.height)
+        val txs: Seq[Transaction] = validatedTxs.sortBy(_.timestamp) :+ coinbase
 
-    val txs: Seq[Transaction] = txsToPut.sortBy(_.timestamp) :+ coinbase
+        val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
+          .getOrElse(throw new Exception("ADProof generation failed"))
 
-    val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
-      .getOrElse(throw new Exception("ADProof generation failed"))
+        val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
+          .getOrElse(Constants.Chain.InitialDifficulty)
 
-    val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
-      .getOrElse(Constants.Chain.InitialDifficulty)
+        val candidate: CandidateBlock =
+          CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
 
-    val candidate: CandidateBlock =
-      CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
+        logger.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
+          s"and 1 coinbase for height $height")
 
-    logger.info( s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
-      s"and 1 coinbase for height $height")
-
-    candidate
-  }
+        candidate
+      }, 20.seconds)
 
   def produceCandidate(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Mempool, CandidateEnvelope] {
+    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, CandidateEnvelope] {
       nodeView =>
         val producingStartTime: Time = System.currentTimeMillis()
         startTime = producingStartTime
@@ -202,18 +197,18 @@ class Miner extends Actor with StrictLogging {
         val candidate: CandidateEnvelope =
           if ((bestHeaderOpt.isDefined &&
             (syncingDone || nodeView.history.isFullChainSynced)) || settings.node.offlineGeneration) {
-              logger.info(s"Starting candidate generation at " +
-                s"${dateFormat.format(new Date(System.currentTimeMillis()))}")
-              if (settings.influxDB.isDefined)
-                context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
-              logger.info("Going to calculate last block:")
-              val envelope: CandidateEnvelope =
-                CandidateEnvelope
-                  .fromCandidate(createCandidate(nodeView, bestHeaderOpt))
-              if (settings.influxDB.isDefined)
-                context.actorSelection("user/statsSender") !
-                  CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
-              envelope
+            logger.info(s"Starting candidate generation at " +
+              s"${dateFormat.format(new Date(System.currentTimeMillis()))}")
+            if (settings.influxDB.isDefined)
+              context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
+            logger.info("Going to calculate last block:")
+            val envelope: CandidateEnvelope =
+              CandidateEnvelope
+                .fromCandidate(createCandidate(nodeView, bestHeaderOpt))
+            if (settings.influxDB.isDefined)
+              context.actorSelection("user/statsSender") !
+                CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
+            envelope
           } else CandidateEnvelope.empty
         candidate
     }
@@ -221,22 +216,15 @@ class Miner extends Actor with StrictLogging {
 
 object Miner {
 
+  case object GetMinerStatus
+
   case object DisableMining
 
   case object EnableMining
 
   case object StartMining
 
-  case object GetMinerStatus
-
   case class MinedBlock(block: Block, workerIdx: Int)
-
-  case class MinerStatus(isMining: Boolean, candidateBlock: Option[CandidateBlock]) {
-    lazy val json: Json = Map(
-      "isMining" -> isMining.asJson,
-      "candidateBlock" -> candidateBlock.map(_.asJson).getOrElse("None".asJson)
-    ).asJson
-  }
 
   case class CandidateEnvelope(c: Option[CandidateBlock])
 
@@ -247,7 +235,15 @@ object Miner {
     def fromCandidate(c: CandidateBlock): CandidateEnvelope = CandidateEnvelope(Some(c))
   }
 
-  implicit val jsonEncoder: Encoder[MinerStatus] = (r: MinerStatus) =>
-    Map("isMining" -> r.isMining.asJson,
-      "candidateBlock" -> r.candidateBlock.map(_.asJson).getOrElse("None".asJson)).asJson
+  case class MinerStatus(isMining: Boolean, candidateBlock: Option[CandidateBlock]) {
+    lazy val json: Json = Map(
+      "isMining" -> isMining.asJson,
+      "candidateBlock" -> candidateBlock.map(_.asJson).getOrElse("None".asJson)
+    ).asJson
+  }
+
+  implicit val jsonEncoder: Encoder[MinerStatus] = (r: MinerStatus) => Map(
+    "isMining" -> r.isMining.asJson,
+    "candidateBlock" -> r.candidateBlock.map(_.asJson).getOrElse("None".asJson)
+  ).asJson
 }
