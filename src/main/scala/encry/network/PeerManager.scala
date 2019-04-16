@@ -1,9 +1,8 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef}
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp._
 import encry.cli.commands.AddPeer.PeerFromCli
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
@@ -11,11 +10,16 @@ import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, 
 import encry.network.PeerConnectionHandler._
 import encry.network.PeerManager.ReceivableMessages._
 import encry.settings.EncryAppSettings
-import scala.concurrent.Future
+import encry.utils.NetworkTimeProvider
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.language.postfixOps
 import scala.util.Random
 
-class PeerManager extends Actor with StrictLogging {
+class PeerManager(nodeViewSynchronizer: ActorRef,
+                  settings: EncryAppSettings,
+                  timeProvider: NetworkTimeProvider) extends Actor with StrictLogging {
+
+  implicit val exCon: ExecutionContextExecutor = context.dispatcher
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
   var connectingPeers: Set[InetSocketAddress] = Set.empty
