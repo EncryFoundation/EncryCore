@@ -51,10 +51,14 @@ class PeerManager extends Actor with StrictLogging {
         peer.handlerRef ! CloseConnection
       else if (CheckPeersObj.checkPossibilityToAddPeer(peer.socketAddress, knownPeersCollection, settings)
         && !connectedPeers.contains(peer.socketAddress)) {
-        self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
+        self ! AddOrUpdatePeer(
+          peer.handshake.declaredAddress.getOrElse(peer.socketAddress),
+          Some(peer.handshake.nodeName),
+          Some(peer.direction)
+        )
         connectedPeers += (peer.handshake.declaredAddress.getOrElse(peer.socketAddress) -> peer)
         nodeViewSynchronizer ! HandshakedPeer(peer)
-      }
+      } else peer.handlerRef ! CloseConnection
     case Disconnected(remote) =>
       connectedPeers -= remote
       connectingPeers -= remote
