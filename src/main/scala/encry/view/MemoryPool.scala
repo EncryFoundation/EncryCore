@@ -88,7 +88,7 @@ class MemoryPool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef:
               (boxes ++: txInputsIds.toIndexedSeq, txs :+ tx)
             else (boxes, txs)
         }
-      sender() ! validatedTxs._1
+      sender() ! validatedTxs._2
     case AskTransactionsFromNVS(ids) =>
       val idsToWrapped: Seq[WrappedIdAsKey] = ids.map(toKey)
       val txsForNVS: Seq[Transaction] = idsToWrapped.flatMap(id => memoryPool.get(id))
