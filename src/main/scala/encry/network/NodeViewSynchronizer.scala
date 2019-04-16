@@ -23,12 +23,13 @@ import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.utils.Utils._
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
-import encry.view.MemoryPool.{AskTransactionsFromNVS, CompareTransactionsWithUnconfirmed}
+import encry.view.MemoryPool.{AskTransactionsFromNVS, CompareTransactionsWithUnconfirmed, RequestForTransactions}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
 import encry.view.mempool.{Mempool, MempoolReader}
 import encry.view.state.StateReader
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.transaction.Proposition
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
@@ -139,6 +140,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case FullBlockChainIsSynced =>
       chainSynced = true
       deliveryManager ! FullBlockChainIsSynced
+    case a@RequestForTransactions(peer, Transaction.ModifierTypeId, unrequestedModifiers) => deliveryManager ! a
     case a: Any => logger.error(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
   }
 
