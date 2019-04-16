@@ -30,7 +30,7 @@ class PeerSynchronizer extends Actor with StrictLogging {
     case DataFromPeer(message, remote) => message match {
       case PeersNetworkMessage(peers) =>
         peers.filter(p => CheckPeersObj.checkPossibilityToAddPeer(p, knownPeersCollection, settings)).foreach(isa =>
-          peerManager ! AddOrUpdatePeer(isa, None, Some(remote.direction)))
+          peerManager ! AddOrUpdatePeer(isa, None, None))
         logger.debug(s"Got new peers: [${peers.mkString(",")}] from ${remote.socketAddress}")
       case GetPeersNetworkMessage =>
         (peerManager ? RandomPeers(3)).mapTo[Seq[InetSocketAddress]]
