@@ -138,7 +138,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case FullBlockChainIsSynced =>
       chainSynced = true
       deliveryManager ! FullBlockChainIsSynced
-    case a@RequestForTransactions(peer, Transaction.ModifierTypeId, unrequestedModifiers) => deliveryManager ! a
+    case a@RequestForTransactions(_, _, _) => deliveryManager ! a
     case a: Any => logger.error(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
   }
 
