@@ -543,13 +543,18 @@ object DeliveryManager {
         // 'highpriority messages should be treated first if possible
         case RequestFromLocal(_, _, _) => 0
 
+        case DataFromPeer(msg: ModifiersNetworkMessage, _) =>
+          msg match {
+            case ModifiersNetworkMessage((typeId, _)) if typeId != Transaction.ModifierTypeId => 1
+            case _ => 2
+          }
         // 'lowpriority messages should be treated last if possible
-        case RequestForTransactions(_, _, _) => 2
+        case RequestForTransactions(_, _, _) => 3
 
         // PoisonPill when no other left
-        case PoisonPill => 3
+        case PoisonPill => 4
 
         // We default to 1, which is in between high and low
-        case otherwise => 1
+        case otherwise => 2
       })
 }
