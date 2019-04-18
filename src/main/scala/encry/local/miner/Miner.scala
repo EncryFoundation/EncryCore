@@ -159,7 +159,7 @@ class Miner extends Actor with StrictLogging {
     Await.result(
       (memoryPool ? AskTransactionsFromMemoryPoolFromMiner).mapTo[IndexedSeq[Transaction]].map { validatedTxsT =>
         val txsU: IndexedSeq[Transaction] = validatedTxsT.filter(x => view.state.validate(x).isSuccess)
-        memoryPool ! TransactionsForRemove(validatedTxsT.diff(txsU))
+        memoryPool ! TransactionsForRemove(validatedTxsT.filterNot(x => view.state.validate(x).isSuccess))
         val timestamp: Time = timeProvider.estimatedTime
         val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
         val feesTotal: Amount = txsU.map(_.fee).sum

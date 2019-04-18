@@ -84,21 +84,13 @@ class MemoryPool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef:
       if (unrequestedModifiers.nonEmpty) sender ! RequestForTransactions(peer, Transaction.ModifierTypeId, unrequestedModifiers)
     case RolledBackTransactions(txs) => memoryPool = validateAndPutTransactions(txs, memoryPool, state, fromNetwork = false)
     case TransactionsForRemove(txs) =>
-      logger.info(s"Should remove: ${txs.map(tx => Algos.encode(tx.id)).mkString(",")}")
       memoryPool = removeOldTransactions(txs, memoryPool)
-      logger.info(s"After remove: ${memoryPool.keys.map(key => Algos.encode(key.toArray)).mkString(",")}")
     case LocallyGeneratedTransaction(tx) =>
       memoryPool = validateAndPutTransactions(IndexedSeq(tx), memoryPool, state, fromNetwork = true)
     case AskTransactionsFromMemoryPoolFromMiner =>
-      val validatedTxs: (IndexedSeq[WrappedIdAsKey], IndexedSeq[Transaction]) =
-        memoryPool.values.toIndexedSeq.sortBy(_.fee).reverse
-        .foldLeft(IndexedSeq.empty[WrappedIdAsKey], IndexedSeq.empty[Transaction]) { case ((boxes, txs), tx) =>
-          val txInputsIds: Set[WrappedIdAsKey] = tx.inputs.map(input => toKey(ModifierId @@ input.boxId.untag(ADKey))).toSet
-            if (txInputsIds.forall(id => !boxes.contains(id)) && txInputsIds.size == tx.inputs.size)
-              (boxes ++: txInputsIds.toIndexedSeq, txs :+ tx)
-            else (boxes, txs)
-        }
-      sender() ! validatedTxs._2
+      val validatedTxs: IndexedSeq[Transaction] =
+        memoryPool.values.toIndexedSeq.sortBy(_.fee)
+      sender() ! validatedTxs
     case AskTransactionsFromNVS(ids) =>
       val idsToWrapped: Seq[WrappedIdAsKey] = ids.map(toKey)
       val txsForNVS: Seq[Transaction] = idsToWrapped.flatMap(id => memoryPool.get(id))
