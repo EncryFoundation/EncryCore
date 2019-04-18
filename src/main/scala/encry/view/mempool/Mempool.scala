@@ -19,7 +19,6 @@ import encry.view.mempool.Mempool._
 import encry.view.state.{DigestState, EncryState, UtxoState}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
-
 import scala.collection.immutable.HashMap
 import scala.collection.mutable
 import scala.concurrent.ExecutionContextExecutor
@@ -142,7 +141,7 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
   }
 
   def cleanMemoryPoolFromExpired(pool: HashMap[WrappedIdAsKey, Transaction]): HashMap[WrappedIdAsKey, Transaction] =
-    pool.filter { case (_, tx) => (ntp.estimatedTime - tx.timestamp) > settings.node.utxMaxAge.toMillis }
+    pool.filter { case (_, tx) => (ntp.estimatedTime - tx.timestamp) < settings.node.utxMaxAge.toMillis }
 
   def initBloomFilter: BloomFilter[String] = BloomFilter.create(
     Funnels.stringFunnel(Charsets.UTF_8), settings.node.bloomFilterCapacity, settings.node.bloomFilterFailureProbability)
