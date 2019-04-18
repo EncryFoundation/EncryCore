@@ -18,6 +18,8 @@ import encry.view.EncryNodeViewHolder.ReceivableMessages.{LocallyGeneratedTransa
 import encry.view.mempool.Mempool._
 import encry.view.state.{DigestState, EncryState, UtxoState}
 import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
+
 import scala.collection.immutable.HashMap
 import scala.collection.mutable
 import scala.concurrent.ExecutionContextExecutor
@@ -85,9 +87,15 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
     case LocallyGeneratedTransaction(tx) =>
       memoryPool = validateAndPutTransactions(IndexedSeq(tx), memoryPool, state, fromNetwork = true)
     case AskTransactionsFromMemoryPoolFromMiner =>
-      val validatedTxs: IndexedSeq[Transaction] =
-        memoryPool.values.toIndexedSeq.sortBy(_.fee)
-      sender() ! validatedTxs
+      val validatedTxs: (IndexedSeq[WrappedIdAsKey], IndexedSeq[Transaction]) =
+        memoryPool.values.toIndexedSeq.sortBy(_.fee).reverse
+          .foldLeft(IndexedSeq.empty[WrappedIdAsKey], IndexedSeq.empty[Transaction]) { case ((boxes, txs), tx) =>
+            val txInputsIds: Set[WrappedIdAsKey] = tx.inputs.map(input => toKey(ModifierId @@ input.boxId.untag(ADKey))).toSet
+            if (txInputsIds.forall(id => !boxes.contains(id)) && txInputsIds.size == tx.inputs.size)
+              (boxes ++: txInputsIds.toIndexedSeq, txs :+ tx)
+            else (boxes, txs)
+          }
+      sender() ! validatedTxs._2
     case AskTransactionsFromNVS(ids) =>
       val idsToWrapped: Seq[WrappedIdAsKey] = ids.map(toKey)
       val txsForNVS: Seq[Transaction] = idsToWrapped.flatMap(id => memoryPool.get(id))
