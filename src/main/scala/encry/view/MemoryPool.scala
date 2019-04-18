@@ -43,19 +43,21 @@ class MemoryPool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef:
   var bloomFilterForBoxesIds: BloomFilter[String] = initBloomFilter
 
   override def receive: Receive = {
-    case updatedState: UpdatedState[UtxoState] =>
-      logger.info(s"Received state instance on MemoryPool actor. Starting mainLogic on this actor.")
-      context.system.scheduler.schedule(
-        settings.node.bloomFilterCleanupInterval,
-        settings.node.bloomFilterCleanupInterval, self, TickForCleanupBloomFilter)
-      context.system.scheduler.schedule(
-        settings.node.mempoolCleanupInterval,
-        settings.node.mempoolCleanupInterval, self, TickForRemoveExpired)
-      context.system.scheduler.schedule(
-        5.seconds,
-        5.seconds)(context.system.actorSelection("user/statsSender") ! MempoolStat(memoryPool.size))
-      context.become(messagesHandler(updatedState.state))
-    case _: UpdatedState[DigestState] => logger.info(s"Got digest state on MemoryPool actor.")
+    case _@UpdatedState(updatedState) =>
+      updatedState match {
+        case utxoState: UtxoState => logger.info(s"Received state instance on MemoryPool actor. Starting mainLogic on this actor.")
+          context.system.scheduler.schedule(
+            settings.node.bloomFilterCleanupInterval,
+            settings.node.bloomFilterCleanupInterval, self, TickForCleanupBloomFilter)
+          context.system.scheduler.schedule(
+            settings.node.mempoolCleanupInterval,
+            settings.node.mempoolCleanupInterval, self, TickForRemoveExpired)
+          context.system.scheduler.schedule(
+            5.seconds,
+            5.seconds)(context.system.actorSelection("user/statsSender") ! MempoolStat(memoryPool.size))
+          context.become(messagesHandler(utxoState))
+        case digestState: DigestState => logger.info(s"Got digest state on MemoryPool actor.")
+      }
     case GetMempoolSize => sender() ! memoryPool.size
     case msg => logger.info(s"Got strange message on MemoryPool actor $msg.")
   }
@@ -81,7 +83,10 @@ class MemoryPool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef:
       val unrequestedModifiers: IndexedSeq[ModifierId] = notRequested(transactions)
       if (unrequestedModifiers.nonEmpty) sender ! RequestForTransactions(peer, Transaction.ModifierTypeId, unrequestedModifiers)
     case RolledBackTransactions(txs) => memoryPool = validateAndPutTransactions(txs, memoryPool, state, fromNetwork = false)
-    case TransactionsForRemove(txs) => memoryPool = removeOldTransactions(txs, memoryPool)
+    case TransactionsForRemove(txs) =>
+      logger.info(s"Should remove: ${txs.map(tx => Algos.encode(tx.id)).mkString(",")}")
+      memoryPool = removeOldTransactions(txs, memoryPool)
+      logger.info(s"After remove: ${memoryPool.keys.map(key => Algos.encode(key.toArray)).mkString(",")}")
     case LocallyGeneratedTransaction(tx) =>
       memoryPool = validateAndPutTransactions(IndexedSeq(tx), memoryPool, state, fromNetwork = true)
     case AskTransactionsFromMemoryPoolFromMiner =>
@@ -98,18 +103,21 @@ class MemoryPool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef:
       val idsToWrapped: Seq[WrappedIdAsKey] = ids.map(toKey)
       val txsForNVS: Seq[Transaction] = idsToWrapped.flatMap(id => memoryPool.get(id))
       sender() ! txsForNVS
-    case msg => logger.info(s"Got strange message on MemoryPool actor $msg.")
   }
 
   def handleStates: Receive = {
-    case updatedState: UpdatedState[UtxoState] => context.become(messagesHandler(updatedState.state))
-    case _: UpdatedState[DigestState] => logger.info(s"Got digest state on MemoryPool actor.")
+    case _@UpdatedState(updatedState) =>
+      updatedState match {
+        case utxoState: UtxoState => context.become(messagesHandler(utxoState))
+        case digestState: DigestState => logger.info(s"Got digest state on MemoryPool actor.")
+      }
+    case msg => logger.info(s"Got strange message on MemoryPool actor $msg.")
   }
 
   def removeOldTransactions(txs: IndexedSeq[Transaction],
                             pool: HashMap[WrappedIdAsKey, Transaction]): HashMap[WrappedIdAsKey, Transaction] = {
     val transactionsIds: IndexedSeq[WrappedIdAsKey] = txs.map(tx => toKey(tx.id))
-    transactionsIds.foldLeft(pool) { case (memPool, id) => memPool - id }
+    pool -- transactionsIds
   }
 
   def validateAndPutTransactions(inputTransactions: IndexedSeq[Transaction],
@@ -195,7 +203,8 @@ object MemoryPool {
         // 'highpriority messages should be treated first if possible
         case UpdatedState(_) => 0
 
+        case AskTransactionsFromMemoryPoolFromMiner | TransactionsForRemove => 1
         // We default to 1, which is in between high and low
-        case otherwise => 1
+        case otherwise => 2
       })
 }
