@@ -28,7 +28,7 @@ import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import encry.modifiers.history.{Header, Payload}
 import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
-import encry.view.MemoryPool.RequestForTransactions
+import encry.view.mempool.Mempool.RequestForTransactions
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 

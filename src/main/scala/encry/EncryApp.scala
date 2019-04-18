@@ -1,6 +1,7 @@
 package encry
 
 import java.net.InetAddress
+
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
@@ -20,11 +21,13 @@ import encry.network.{PeerManager, _}
 import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, StatsSender, Zombie}
 import encry.utils.NetworkTimeProvider
-import encry.view.{EncryNodeViewHolder, MemoryPool, ReadersHolder}
+import encry.view.mempool.Mempool
+import encry.view.{EncryNodeViewHolder, ReadersHolder}
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
 import org.encryfoundation.common.Algos
+
 import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
 import scala.io.Source
@@ -47,7 +50,7 @@ object EncryApp extends App with StrictLogging {
     if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender], "statsSender"))
     else None
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
-  lazy val memoryPool: ActorRef = system.actorOf(MemoryPool.props(settings, timeProvider, miner).withDispatcher("mempool-dispatcher"))
+  lazy val memoryPool: ActorRef = system.actorOf(Mempool.props(settings, timeProvider, miner).withDispatcher("mempool-dispatcher"))
   lazy val auxHistoryHolder: ActorRef =
     system.actorOf(Props(AuxiliaryHistoryHolder(settings, timeProvider, nodeViewSynchronizer))
     .withDispatcher("aux-history-dispatcher"), "auxHistoryHolder")

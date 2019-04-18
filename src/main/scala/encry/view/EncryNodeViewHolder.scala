@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import HeaderProto.HeaderProtoMessage
 import PayloadProto.PayloadProtoMessage
 import akka.actor.{Actor, ActorRef, Props}
@@ -22,8 +23,8 @@ import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
-import encry.view.MemoryPool.{RolledBackTransactions, TransactionsForRemove, UpdatedState}
 import encry.view.history.EncryHistory
+import encry.view.mempool.Mempool._
 import encry.view.state._
 import encry.view.wallet.EncryWallet
 import org.apache.commons.io.FileUtils
@@ -31,6 +32,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.Proposition
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future

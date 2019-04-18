@@ -2,8 +2,9 @@ package encry.network
 
 import java.net.InetSocketAddress
 
+import akka.actor.{Actor, ActorRef, ActorSystem}
 import akka.pattern.ask
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
 import encry.consensus.SyncInfo
@@ -12,9 +13,8 @@ import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer}
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
+import encry.network.BasicMessagesRepo._
 import encry.network.DeliveryManager.{FullBlockChainIsSynced, ModifiersFromNVH}
-import BasicMessagesRepo._
-import akka.util.Timeout
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -23,12 +23,10 @@ import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.utils.Utils._
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
-import encry.view.MemoryPool.{AskTransactionsFromNVS, CompareTransactionsWithUnconfirmed, RequestForTransactions}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
-import encry.view.mempool.{Mempool, MempoolReader}
+import encry.view.mempool.Mempool._
 import encry.view.state.StateReader
 import org.encryfoundation.common.Algos
-import org.encryfoundation.common.transaction.Proposition
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -201,8 +199,6 @@ object NodeViewSynchronizer {
     case class ChangedHistory[HR <: EncryHistoryReader](reader: HR) extends NodeViewChange
 
     case class UpdatedHistory(history: EncryHistory)
-
-    case class ChangedMempool[MR <: MempoolReader](mempool: MR) extends NodeViewChange
 
     case class ChangedState[SR <: StateReader](reader: SR) extends NodeViewChange
 

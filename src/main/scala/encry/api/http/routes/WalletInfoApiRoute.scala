@@ -8,12 +8,9 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.settings.RESTApiSettings
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.EncryHistory
-import encry.view.mempool.Mempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
-import org.encryfoundation.common.Algos
-
 import scala.concurrent.Future
 import scala.util.Random
 

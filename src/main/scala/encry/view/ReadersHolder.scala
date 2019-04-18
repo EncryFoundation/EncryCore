@@ -2,11 +2,10 @@ package encry.view
 
 import akka.actor.Actor
 import encry.EncryApp._
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedMempool, ChangedState, NodeViewChange}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetNodeViewChanges
 import encry.view.ReadersHolder.{GetDataFromHistory, GetReaders, Readers}
 import encry.view.history.EncryHistoryReader
-import encry.view.mempool.MempoolReader
 import encry.view.state.UtxoStateReader
 
 class ReadersHolder extends Actor {

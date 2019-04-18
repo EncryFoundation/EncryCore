@@ -30,12 +30,10 @@ import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 import akka.util.Timeout
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.view.MemoryPool.{AskTransactionsFromMemoryPoolFromMiner, TransactionsForRemove, TransactionsFromMemoryPool}
 import akka.pattern.ask
-
+import encry.view.mempool.Mempool._
 import scala.concurrent.duration._
 import scala.collection._
-import scala.collection.immutable.HashMap
 import scala.concurrent.{Await, Future}
 
 class Miner extends Actor with StrictLogging {

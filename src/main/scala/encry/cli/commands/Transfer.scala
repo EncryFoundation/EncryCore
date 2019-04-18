@@ -9,7 +9,6 @@ import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.settings.EncryAppSettings
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.history.EncryHistory
-import encry.view.mempool.Mempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519

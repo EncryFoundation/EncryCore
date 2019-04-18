@@ -5,7 +5,6 @@ import akka.util.Timeout
 import encry.cli.{Ast, Response}
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
-import encry.view.mempool.Mempool
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import encry.EncryApp._
