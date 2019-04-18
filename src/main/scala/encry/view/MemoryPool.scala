@@ -1,9 +1,12 @@
 package encry.view
 
 import TransactionProto.TransactionProtoMessage
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
+import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.google.common.base.Charsets
 import com.google.common.hash.{BloomFilter, Funnels}
+import com.sun.java.swing.plaf.gtk.GTKConstants.StateType
+import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{RequestFromLocal, SuccessfulTransaction}
@@ -53,13 +56,14 @@ class MemoryPool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef:
         5.seconds)(context.system.actorSelection("user/statsSender") ! MempoolStat(memoryPool.size))
       context.become(messagesHandler(updatedState.state))
     case _: UpdatedState[DigestState] => logger.info(s"Got digest state on MemoryPool actor.")
+    case GetMempoolSize => sender() ! memoryPool.size
     case msg => logger.info(s"Got strange message on MemoryPool actor $msg.")
   }
 
   def messagesHandler(state: UtxoState): Receive = mainLogic(state).orElse(handleStates)
 
   def mainLogic(state: UtxoState): Receive = {
-    case ModifiersFromRemote(_, filteredModifiers) =>
+    case ModifiersFromRemote(modTypeId, filteredModifiers) if modTypeId == Transaction.ModifierTypeId =>
       val parsedModifiers: IndexedSeq[Transaction] = filteredModifiers.foldLeft(IndexedSeq.empty[Transaction]) {
         case (transactions, bytes) =>
           TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes)) match {
@@ -69,6 +73,7 @@ class MemoryPool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef:
       }
       memoryPool = validateAndPutTransactions(parsedModifiers, memoryPool, state, fromNetwork = true)
     case TickForRemoveExpired => memoryPool = cleanMemoryPoolFromExpired(memoryPool)
+    case GetMempoolSize => sender() ! memoryPool.size
     case TickForCleanupBloomFilter =>
       bloomFilterForTransactionsIds = initBloomFilter
       bloomFilterForBoxesIds = initBloomFilter
@@ -107,15 +112,14 @@ class MemoryPool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef:
     transactionsIds.foldLeft(pool) { case (memPool, id) => memPool - id }
   }
 
-  //todo add validation for same boxes
   def validateAndPutTransactions(inputTransactions: IndexedSeq[Transaction],
                                  currentMemoryPool: HashMap[WrappedIdAsKey, Transaction],
                                  currentState: UtxoState,
                                  fromNetwork: Boolean): HashMap[WrappedIdAsKey, Transaction] = {
     val validatedTransactions: IndexedSeq[Transaction] = inputTransactions.filter(tx =>
       tx.semanticValidity.isSuccess && !currentMemoryPool.contains(toKey(tx.id))
-        //&& containsValidBoxes(tx)
-        && currentState.validate(tx).isSuccess)
+        //&& currentState.validate(tx).isSuccess
+    )
     if (memoryPool.size + validatedTransactions.size <= settings.node.mempoolMaxCapacity)
       validatedTransactions.foldLeft(memoryPool) { case (pool, tx) =>
         if (fromNetwork) context.system.eventStream.publish(SuccessfulTransaction(tx))
@@ -144,6 +148,7 @@ class MemoryPool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef:
       id
   }
 
+  //should check only after get block
   def containsValidBoxes(tx: Transaction): Boolean =
     if (tx.inputs.forall(input => !bloomFilterForBoxesIds.mightContain(Algos.encode(input.boxId)))) {
       tx.inputs.foreach(input => bloomFilterForBoxesIds.put(Algos.encode(input.boxId)))
@@ -172,6 +177,8 @@ object MemoryPool {
 
   case object TickForCleanupBloomFilter
 
+  case object GetMempoolSize
+
   case object AskTransactionsFromMemoryPoolFromMiner
 
   case class AskTransactionsFromNVS(txsIds: Seq[ModifierId])
@@ -180,4 +187,15 @@ object MemoryPool {
 
   def props(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: ActorRef): Props =
     Props(new MemoryPool(settings, ntp, minerRef))
+
+  class MempoolPriorityQueue(settings: ActorSystem.Settings, config: Config)
+    extends UnboundedStablePriorityMailbox(
+      // Create a new PriorityGenerator, lower priority means more important
+      PriorityGenerator {
+        // 'highpriority messages should be treated first if possible
+        case UpdatedState(_) => 0
+
+        // We default to 1, which is in between high and low
+        case otherwise => 1
+      })
 }

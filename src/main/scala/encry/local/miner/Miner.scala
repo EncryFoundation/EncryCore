@@ -30,7 +30,7 @@ import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 import akka.util.Timeout
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.view.MemoryPool.{AskTransactionsFromMemoryPoolFromMiner, TransactionsFromMemoryPool}
+import encry.view.MemoryPool.{AskTransactionsFromMemoryPoolFromMiner, TransactionsForRemove, TransactionsFromMemoryPool}
 import akka.pattern.ask
 
 import scala.concurrent.duration._
@@ -159,11 +159,11 @@ class Miner extends Actor with StrictLogging {
     Await.result(
       (memoryPool ? AskTransactionsFromMemoryPoolFromMiner).mapTo[IndexedSeq[Transaction]].map { validatedTxsT =>
         val txsU: IndexedSeq[Transaction] = validatedTxsT.filter(x => view.state.validate(x).isSuccess)
+        memoryPool ! TransactionsForRemove(validatedTxsT.diff(txsU))
         val timestamp: Time = timeProvider.estimatedTime
         val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
         val feesTotal: Amount = txsU.map(_.fee).sum
         val supplyTotal: Amount = EncrySupplyController.supplyAt(view.state.height)
-
         val minerSecret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
         val coinbase: Transaction = TransactionFactory
           .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, view.state.height)

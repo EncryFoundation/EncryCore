@@ -47,7 +47,7 @@ object EncryApp extends App with StrictLogging {
     if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender], "statsSender"))
     else None
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
-  lazy val memoryPool: ActorRef = system.actorOf(MemoryPool.props(settings, timeProvider, miner))
+  lazy val memoryPool: ActorRef = system.actorOf(MemoryPool.props(settings, timeProvider, miner).withDispatcher("mempool-dispatcher"))
   lazy val auxHistoryHolder: ActorRef =
     system.actorOf(Props(AuxiliaryHistoryHolder(settings, timeProvider, nodeViewSynchronizer))
     .withDispatcher("aux-history-dispatcher"), "auxHistoryHolder")
@@ -95,7 +95,7 @@ object EncryApp extends App with StrictLogging {
     val apiRoutes: Seq[ApiRoute] = Seq(
       UtilsApiRoute(settings.restApi),
       PeersApiRoute(peerManager, networkController, settings.restApi),
-      InfoApiRoute(readersHolder, miner, peerManager, settings, nodeId, timeProvider),
+      InfoApiRoute(readersHolder, miner, peerManager, settings, nodeId, memoryPool, timeProvider),
       HistoryApiRoute(readersHolder, miner, settings, nodeId, settings.node.stateMode),
       TransactionsApiRoute(readersHolder, memoryPool, settings.restApi, settings.node.stateMode),
       StateInfoApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),

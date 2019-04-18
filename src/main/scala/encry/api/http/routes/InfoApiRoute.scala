@@ -1,6 +1,7 @@
 package encry.api.http.routes
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
@@ -11,10 +12,12 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeerManager.ReceivableMessages.{GetConnectedPeers, GetRecoveryStatus}
 import encry.settings._
 import encry.utils.{NetworkTime, NetworkTimeProvider}
+import encry.view.MemoryPool.GetMempoolSize
 import encry.view.ReadersHolder.{GetReaders, Readers}
 import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
+
 import scala.concurrent.Future
 
 case class InfoApiRoute(readersHolder: ActorRef,
@@ -22,6 +25,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
                         peerManager: ActorRef,
                         appSettings: EncryAppSettings,
                         nodeId: Array[Byte],
+                        mempool: ActorRef,
                         timeProvider: NetworkTimeProvider)
                        (implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
 
@@ -33,16 +37,18 @@ case class InfoApiRoute(readersHolder: ActorRef,
     val minerInfoF: Future[MinerStatus] = getMinerInfo
     val connectedPeersF: Future[Int] = getConnectedPeers
     val readersF: Future[Readers] = (readersHolder ? GetReaders).mapTo[Readers]
+    val mempoolSize: Future[Int] = (mempool ? GetMempoolSize).mapTo[Int]
     (for {
       minerInfo <- minerInfoF
       connectedPeers <- connectedPeersF
       readers <- readersF
       currentTime <- timeProvider.time()
       launchTime <- launchTimeFuture
+      memSize <- mempoolSize
       storage = storageInfo
       nodeUptime = currentTime - launchTime
     } yield InfoApiRoute.makeInfoJson(nodeId, minerInfo, connectedPeers, readers, getStateType, getNodeName,
-      getAddress, storage, nodeUptime, getConnectionWithPeers)
+      getAddress, storage, nodeUptime, memSize, getConnectionWithPeers)
       ).okJson()
   }
 
@@ -75,6 +81,7 @@ object InfoApiRoute {
                    knownPeers: Seq[InetSocketAddress],
                    storage: String,
                    nodeUptime: Long,
+                   mempoolSize: Int,
                    connectWithOnlyKnownPeer: Boolean): Json = {
     val stateVersion: Option[String] = readers.s.map(_.version).map(Algos.encode)
     val bestHeader: Option[Header] = readers.h.flatMap(_.bestHeaderOpt)
@@ -89,7 +96,7 @@ object InfoApiRoute {
       "previousFullHeaderId" -> bestFullBlock.map(_.header.parentId).map(Algos.encode).asJson,
       "difficulty" -> bestFullBlock.map(block => block.header.difficulty.toString)
         .getOrElse(Constants.Chain.InitialDifficulty.toString).asJson,
-     // "unconfirmedCount" -> unconfirmedCount.asJson,
+      "unconfirmedCount" -> mempoolSize.asJson,
       "stateType" -> stateType.asJson,
       "stateVersion" -> stateVersion.asJson,
       "isMining" -> minerInfo.isMining.asJson,
