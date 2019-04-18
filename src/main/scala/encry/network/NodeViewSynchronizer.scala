@@ -2,7 +2,9 @@ package encry.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem}
+import akka.pattern.ask
+import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
 import encry.consensus.SyncInfo
@@ -11,8 +13,8 @@ import encry.modifiers.history._
 import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer}
 import encry.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
+import encry.network.BasicMessagesRepo._
 import encry.network.DeliveryManager.{FullBlockChainIsSynced, ModifiersFromNVH}
-import BasicMessagesRepo._
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -22,23 +24,28 @@ import encry.utils.Utils._
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
-import encry.view.mempool.{Mempool, MempoolReader}
+import encry.view.mempool.Mempool._
 import encry.view.state.StateReader
 import org.encryfoundation.common.Algos
-import org.encryfoundation.common.transaction.Proposition
+
+import scala.concurrent.Await
+import scala.concurrent.duration._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
                            networkControllerRef: ActorRef,
                            system: ActorSystem,
-                           settings: EncryAppSettings) extends Actor with StrictLogging {
+                           settings: EncryAppSettings,
+                           memoryPoolRef: ActorRef) extends Actor with StrictLogging {
+
+  implicit val timeout: Timeout = Timeout(5.seconds)
 
   var historyReaderOpt: Option[EncryHistory] = None
-  var mempoolReaderOpt: Option[Mempool] = None
+  //var mempoolReaderOpt: Option[Mempool] = None
   var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   var chainSynced: Boolean = false
   val deliveryManager: ActorRef = context.actorOf(
-    DeliveryManager.props(influxRef, nodeViewHolderRef, networkControllerRef, settings)
+    DeliveryManager.props(influxRef, nodeViewHolderRef, networkControllerRef, settings, memoryPoolRef)
       .withDispatcher("delivery-manager-dispatcher"), "deliveryManager")
 
   override def preStart(): Unit = {
@@ -49,7 +56,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     networkControllerRef ! RegisterMessagesHandler(messageIds, self)
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
-    nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = true)
+    nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false)
   }
 
   override def receive: Receive = {
@@ -74,8 +81,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       deliveryManager ! UpdatedHistory(reader)
-    case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] =>
-      mempoolReaderOpt = Some(reader)
+    //    case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] =>
+    //      mempoolReaderOpt = Some(reader)
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
     case DisconnectedPeer(remote) => deliveryManager ! DisconnectedPeer(remote)
     case DataFromPeer(message, remote) => message match {
@@ -101,28 +108,27 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
           logger.info(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
           sendResponse(remote, invData._1, inRequestCache.values.toSeq)
-          val nonInRequestCache = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
-          if (nonInRequestCache.nonEmpty)
-            historyReaderOpt.flatMap(h => mempoolReaderOpt.map(mp => (h, mp))).foreach { readers =>
+          val nonInRequestCache: Seq[ModifierId] = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
+          if (nonInRequestCache.nonEmpty) {
+            if (invData._1 == Transaction.ModifierTypeId)
+              sendResponse(remote, invData._1,
+                Await.result((memoryPoolRef ? AskTransactionsFromNVS(nonInRequestCache)).mapTo[Seq[Transaction]], 10.seconds))
+            else historyReaderOpt.foreach { reader =>
               invData._1 match {
-                case typeId: ModifierTypeId if typeId == Transaction.ModifierTypeId =>
-                  sendResponse(remote, invData._1, readers._2.getAll(nonInRequestCache))
                 case _: ModifierTypeId => nonInRequestCache.foreach(id =>
-                  readers._1.modifierById(id).foreach(mod => sendResponse(remote, invData._1, Seq(mod)))
+                  reader.modifierById(id).foreach(mod => sendResponse(remote, invData._1, Seq(mod)))
                 )
               }
-//              logger.debug(s"nonInRequestCache(${objs.size}): ${objs.map(mod => Algos.encode(mod.id)).mkString(",")}")
-//              logger.debug(s"Requested ${invData._2.length} modifiers ${idsToString(invData)}, " +
-//                s"sending ${objs.length} modifiers ${idsToString(invData._1, objs.map(_.id))} ")
-              //self ! ResponseFromLocal(remote, invData._1, objs)
             }
+          }
         }
         else logger.info(s"Peer $remote requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
           s"node is not synced, so ignore msg")
       case InvNetworkMessage(invData) =>
         logger.info(s"Got inv message from ${remote.socketAddress} with modifiers: ${invData._2.map(Algos.encode).mkString(",")} ")
-        //todo: Ban node that send payload id?
-        if (invData._1 != Payload.modifierTypeId) nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
+        if (invData._1 == Transaction.ModifierTypeId && chainSynced)
+          memoryPoolRef ! CompareTransactionsWithUnconfirmed(remote, invData._2.toIndexedSeq)
+        else if (invData._1 != Payload.modifierTypeId) nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2) //todo: Ban node that send payload id?
       case _ => logger.info(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
     }
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
@@ -132,24 +138,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case FullBlockChainIsSynced =>
       chainSynced = true
       deliveryManager ! FullBlockChainIsSynced
-//    case ResponseFromLocal(peer, typeId, modifiers: Seq[NodeViewModifier]) =>
-//      if (modifiers.nonEmpty) {
-//        logger.debug(s"Sent modifiers size is: ${modifiers.length}")
-//        typeId match {
-//          case Header.modifierTypeId =>
-//            val modsB: Seq[(ModifierId, Array[Byte])] =
-//              modifiers.map { case h: Header => h.id -> HeaderProtoSerializer.toProto(h).toByteArray }
-//            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
-//          case Payload.modifierTypeId =>
-//            val modsB: Seq[(ModifierId, Array[Byte])] =
-//              modifiers.map { case h: Payload => h.id -> PayloadProtoSerializer.toProto(h).toByteArray }
-//            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
-//          case Transaction.ModifierTypeId =>
-//            peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modifiers.map {
-//              case h: Transaction => h.id -> TransactionProtoSerializer.toProto(h).toByteArray
-//            }.toMap)
-//        }
-//      }
+    case a@RequestForTransactions(_, _, _) => deliveryManager ! a
     case a: Any => logger.error(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
   }
 
@@ -193,9 +182,9 @@ object NodeViewSynchronizer {
 
     case class RequestFromLocal(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-//    case class CheckDelivery(source: ConnectedPeer,
-//                             modifierTypeId: ModifierTypeId,
-//                             modifierId: ModifierId)
+    //    case class CheckDelivery(source: ConnectedPeer,
+    //                             modifierTypeId: ModifierTypeId,
+    //                             modifierId: ModifierId)
 
     trait PeerManagerEvent
 
@@ -211,8 +200,6 @@ object NodeViewSynchronizer {
 
     case class UpdatedHistory(history: EncryHistory)
 
-    case class ChangedMempool[MR <: MempoolReader](mempool: MR) extends NodeViewChange
-
     case class ChangedState[SR <: StateReader](reader: SR) extends NodeViewChange
 
     case class RollbackFailed(branchPointOpt: Option[VersionTag]) extends NodeViewHolderEvent
@@ -227,7 +214,7 @@ object NodeViewSynchronizer {
     case class SemanticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable)
       extends ModificationOutcome
 
-    case class SuccessfulTransaction[P <: Proposition, TX <: Transaction](transaction: TX) extends ModificationOutcome
+    case class SuccessfulTransaction(transaction: Transaction) extends ModificationOutcome
 
     case class SemanticallySuccessfulModifier[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends ModificationOutcome
 

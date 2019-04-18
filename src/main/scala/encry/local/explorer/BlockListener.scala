@@ -32,7 +32,7 @@ class BlockListener(dbService: DBService, nodeViewHolder: ActorRef) extends Acto
     case Success(height) =>
       if (height == 0) logger.info("Going to begin writing to empty database")
       else logger.info(s"Going to begin writing to table with $height blocks")
-      nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
+      nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false)
     case Failure(th) =>
       logger.warn(s"Failed to connect to database with exception $th")
       context.stop(self)
@@ -57,7 +57,7 @@ class BlockListener(dbService: DBService, nodeViewHolder: ActorRef) extends Acto
   def operating(history: EncryHistoryReader, pending: mutable.LinkedHashSet[Int] = mutable.LinkedHashSet(), lastUploaded: Int): Receive =
     orphanedAndChainSwitching.orElse {
       case NewBestBlock(newHeight) =>
-        nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
+        nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false)
 
         val newPending: mutable.LinkedHashSet[Height] =
           if (newHeight != 0 && newHeight - writingGap - lastUploaded > 1) mutable.LinkedHashSet(lastUploaded + 1 until (newHeight - writingGap):_*)
@@ -93,7 +93,7 @@ class BlockListener(dbService: DBService, nodeViewHolder: ActorRef) extends Acto
               self ! UploadToDbOnHeight(height)
           }
         }
-      case UploadToDbOnHeight(_) => nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false, mempool = false)
+      case UploadToDbOnHeight(_) => nodeViewHolder ! GetNodeViewChanges(history = true, state = false, vault = false)
       case ChangedHistory(newHistory) =>
         context.become(operating(newHistory, mutable.LinkedHashSet(pending:_*), newHistory.bestBlockOpt.map(_.header.height).getOrElse(0)))
       case NewBestBlock(height) => context.become(uploadGap(history, currentHeight, pending :+ height))

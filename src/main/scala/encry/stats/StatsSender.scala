@@ -5,7 +5,9 @@ import java.net.InetAddress
 import java.util
 import java.text.SimpleDateFormat
 import java.util.Date
+
 import akka.actor.Actor
+import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
@@ -18,7 +20,7 @@ import org.influxdb.{InfluxDB, InfluxDBFactory}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class StatsSender extends Actor {
+class StatsSender extends Actor with StrictLogging {
 
   var modifiersToDownload: Map[String, (ModifierTypeId, Long)] = Map()
 
@@ -61,7 +63,7 @@ class StatsSender extends Actor {
     case HeightStatistics(bestHeaderHeight, bestBlockHeight) =>
       influxDB.write(InfluxPort,
         s"chainStat,nodeName=$nodeName value=$bestHeaderHeight,bestBlockHeight=$bestBlockHeight")
-    case BestHeaderInChain(fb: Header, applyTime: Long) =>
+    case BestHeaderInChain(fb: Header, applyTime: Long) => {
       influxDB.write(InfluxPort, util.Arrays.asList(
         s"difficulty,nodeName=$nodeName diff=${fb.difficulty.toString},height=${fb.height}",
         s"""height,nodeName=$nodeName header="${Algos.encode(fb.id)}",height=${fb.height}""",
@@ -73,6 +75,7 @@ class StatsSender extends Actor {
           s"value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[Height])}"
       )
       )
+    }
 
     case MiningEnd(blockHeader: Header, workerIdx: Int, workersQty: Int) =>
       timeProvider
