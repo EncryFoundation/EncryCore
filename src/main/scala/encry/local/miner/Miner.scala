@@ -156,7 +156,7 @@ class Miner extends Actor with StrictLogging {
   def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet],
                       bestHeaderOpt: Option[Header]): CandidateBlock = {
     val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x).isSuccess)
-    memoryPool ! TransactionsForRemove(transactionsPool.filterNot(x => view.state.validate(x).isSuccess))
+    transactionsPool = IndexedSeq.empty[Transaction]
     val timestamp: Time = timeProvider.estimatedTime
     val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
     val feesTotal: Amount = txsU.map(_.fee).sum
