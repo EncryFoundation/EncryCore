@@ -53,6 +53,7 @@ class Miner extends Actor with StrictLogging {
   var syncingDone: Boolean = settings.node.offlineGeneration
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
+  var transactionsPool: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
 
   override def preStart(): Unit =
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
@@ -153,35 +154,33 @@ class Miner extends Actor with StrictLogging {
   }
 
   def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet],
-                      bestHeaderOpt: Option[Header]): CandidateBlock =
-    Await.result(
-      (memoryPool ? AskTransactionsFromMemoryPoolFromMiner).mapTo[IndexedSeq[Transaction]].map { validatedTxsT =>
-        val txsU: IndexedSeq[Transaction] = validatedTxsT.filter(x => view.state.validate(x).isSuccess)
-        memoryPool ! TransactionsForRemove(validatedTxsT.filterNot(x => view.state.validate(x).isSuccess))
-        val timestamp: Time = timeProvider.estimatedTime
-        val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
-        val feesTotal: Amount = txsU.map(_.fee).sum
-        val supplyTotal: Amount = EncrySupplyController.supplyAt(view.state.height)
-        val minerSecret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
-        val coinbase: Transaction = TransactionFactory
-          .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, view.state.height)
+                      bestHeaderOpt: Option[Header]): CandidateBlock = {
+    val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x).isSuccess)
+    memoryPool ! TransactionsForRemove(transactionsPool.filterNot(x => view.state.validate(x).isSuccess))
+    val timestamp: Time = timeProvider.estimatedTime
+    val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
+    val feesTotal: Amount = txsU.map(_.fee).sum
+    val supplyTotal: Amount = EncrySupplyController.supplyAt(view.state.height)
+    val minerSecret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
+    val coinbase: Transaction = TransactionFactory
+      .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, view.state.height)
 
-        val txs: Seq[Transaction] = txsU.sortBy(_.timestamp) :+ coinbase
+    val txs: Seq[Transaction] = txsU.sortBy(_.timestamp) :+ coinbase
 
-        val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
-          .getOrElse(throw new Exception("ADProof generation failed"))
+    val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
+      .getOrElse(throw new Exception("ADProof generation failed"))
 
-        val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
-          .getOrElse(Constants.Chain.InitialDifficulty)
+    val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
+      .getOrElse(Constants.Chain.InitialDifficulty)
 
-        val candidate: CandidateBlock =
-          CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
+    val candidate: CandidateBlock =
+      CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
 
-        logger.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
-          s"and 1 coinbase for height $height")
+    logger.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
+      s"and 1 coinbase for height $height")
 
-        candidate
-      }, 20.seconds)
+    candidate
+  }
 
   def produceCandidate(): Unit =
     nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, CandidateEnvelope] {
