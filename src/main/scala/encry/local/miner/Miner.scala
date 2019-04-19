@@ -82,6 +82,7 @@ class Miner extends Actor with StrictLogging {
           logger.info("Candidate is empty! Producing new candidate!")
           produceCandidate()
       }
+    case TxsForMiner(txs) => transactionsPool = transactionsPool ++ txs
     case StartMining => logger.info("Can't start mining because of chain is not synced!")
     case DisableMining if context.children.nonEmpty =>
       killAllWorkers()
