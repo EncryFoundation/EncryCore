@@ -157,7 +157,6 @@ class Miner extends Actor with StrictLogging {
   def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet],
                       bestHeaderOpt: Option[Header]): CandidateBlock = {
     val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x).isSuccess)
-    transactionsPool = IndexedSeq.empty[Transaction]
     val timestamp: Time = timeProvider.estimatedTime
     val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
     val feesTotal: Amount = txsU.map(_.fee).sum
@@ -168,19 +167,20 @@ class Miner extends Actor with StrictLogging {
 
     val txs: Seq[Transaction] = txsU.sortBy(_.timestamp) :+ coinbase
 
-    val (adProof: SerializedAdProof, adDigest: ADDigest) = view.state.generateProofs(txs)
-      .getOrElse(throw new Exception("ADProof generation failed"))
+    view.state.generateProofs(txs).map {
+      case (adProof: SerializedAdProof, adDigest: ADDigest) =>
+        val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
+          .getOrElse(Constants.Chain.InitialDifficulty)
 
-    val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
-      .getOrElse(Constants.Chain.InitialDifficulty)
+        val candidate: CandidateBlock =
+          CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
 
-    val candidate: CandidateBlock =
-      CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
+        logger.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
+          s"and 1 coinbase for height $height")
 
-    logger.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
-      s"and 1 coinbase for height $height")
-
-    candidate
+        transactionsPool = IndexedSeq.empty[Transaction]
+        candidate
+    }.getOrElse(createCandidate(view, bestHeaderOpt))
   }
 
   def produceCandidate(): Unit =
