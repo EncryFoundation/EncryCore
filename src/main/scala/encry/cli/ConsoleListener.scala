@@ -39,8 +39,8 @@ object ConsoleListener {
   def getCommand(cat: String, cmd: String): Option[Command] = cmdDictionary.get(cat).flatMap(_.get(cmd))
 
   private val nodeCmds = Map("node" -> Map(
-    "shutdown" -> NodeShutdown,
-    "stopMining" -> StopMine,
+    "shutdown"    -> NodeShutdown,
+    "stopMining"  -> StopMine,
     "startMining" -> StartMine,
   ))
 
@@ -53,12 +53,12 @@ object ConsoleListener {
   ))
 
   private val walletCmds = Map("wallet" -> Map(
-    "addrs" -> PrintAddresses,
+    "addrs"     -> PrintAddresses,
     "createKey" -> CreateKey,
-    "pubKeys" -> PrintPubKeys,
-    "balance" -> GetBalance,
-    "transfer" -> Transfer,
-    "privKey" -> PrintPrivKeys //Todo delete
+    "pubKeys"   -> PrintPubKeys,
+    "balance"   -> GetBalance,
+    "transfer"  -> Transfer,
+    "privKeys"  -> PrintPrivKeys //Todo delete
   ))
 
   val cmdDictionary: Map[String, Map[String, Command]] =
