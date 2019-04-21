@@ -34,7 +34,7 @@ object ModifiersCache extends StrictLogging {
   def contains(key: Key): Boolean = cache.contains(key)
 
   def put(key: Key, value: EncryPersistentModifier, history: EncryHistory): Unit = if (!contains(key)) {
-    logger.info(s"put ${Algos.encode(key.toArray)} to cache")
+    logger.debug(s"put ${Algos.encode(key.toArray)} to cache")
     cache.put(key, value)
     value match {
       case header: Header =>
@@ -103,7 +103,7 @@ object ModifiersCache extends StrictLogging {
           }
 
         case None =>
-          logger.info(s"No best header in cache")
+          logger.debug(s"No best header in cache")
           List[Key]()
       }
     }
@@ -113,14 +113,14 @@ object ModifiersCache extends StrictLogging {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           List(new mutable.WrappedArray.ofByte(header.payloadId))
         case _ if !isChainSynced =>
-          logger.info(s"ModsCache no applicable payload")
+          logger.debug(s"ModsCache no applicable payload")
           List.empty[Key]
         case _ => exhaustiveSearch
       }
       case None if isChainSynced =>
-        logger.info(s"No payloads for current history")
+        logger.debug(s"No payloads for current history")
         exhaustiveSearch
-      case None => logger.info(s"No payloads for current history")
+      case None => logger.debug(s"No payloads for current history")
         List.empty[Key]
     }
   }

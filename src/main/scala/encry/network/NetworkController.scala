@@ -68,7 +68,7 @@ class NetworkController extends Actor with StrictLogging {
 
   def businessLogic: Receive = {
     case MessageFromNetwork(message, Some(remote)) if message.isValid(settings) =>
-      logger.info(s"Got ${message.messageName} on the NetworkController.")
+      logger.debug(s"Got ${message.messageName} on the NetworkController.")
       findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
     case MessageFromNetwork(message, Some(remote)) =>
       logger.info(s"Invalid message type: ${message.messageName} from remote $remote")
