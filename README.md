@@ -24,14 +24,7 @@ List of default configs you can find in:
 
 `EncryCore/srs/main/resources/configs/`
 
-#### 2) From container.Docker Container
-Make sure you have docker installed for documentation and guide check [this page](https://docs.docker.com/install/). Once docker is installed, run in terminal following commands:
-
-`$ docker pull encryfoundation/encry-core`
-
-`$ docker run -i --log-driver=none -a stdin -a stdout -a stderr -p 9001:9001 encry-core`
-
-#### 3) Compiling from source
+#### 2) Compiling from source
 To run EncryCore node you need JRE 1.8 or later (64-bit version, you can find official [guide here](https://docs.oracle.com/javase/8/docs/technotes/guides/install/install_overview.html)) and sbt(Simple build tool for scala and java applications, [official guide](https://www.scala-sbt.org/1.0/docs/Setup.html)) to be installed. If you running a Windows machine, please make sure, that you have git client installed.
 
 Configuration file is `src/main/resources/application.conf`.
