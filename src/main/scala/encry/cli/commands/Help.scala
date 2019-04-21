@@ -17,9 +17,11 @@ object Help extends Command {
         |node          shutdown         None           Shutdown the node
         |node          stopMining       None           Node stops mining
         |node          startMining      None           Node starts mining
+        |settings      addPeer          host, port     Add peer to 'knownPeers'
         |wallet        pubKeys          None           Print available public keys
+        |wallet        privKeys         None           Print available private keys
         |wallet        addrs            None           Print available addresses
-        |wallet        createKey           None           Add key to storage
+        |wallet        createKey        None           Add key to storage
         |wallet        balance          None           Show balance of current wallet
         |wallet        transfer         addr, amount   Transfer `amount` to `addr`ess
         |app           help             None           Show all supported commands

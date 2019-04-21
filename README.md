@@ -16,14 +16,15 @@ At first, you should download latest release from [this page](https://github.com
 
 `$ java -jar EncryCore.jar`
 
-#### 2) From container.Docker Container
-Make sure you have docker installed for documentation and guide check [this page](https://docs.docker.com/install/). Once docker is installed, run in terminal following commands:
+To run this app with additional configurations you should execute the following command:
 
-`$ docker pull encryfoundation/encry-core`
+`$ java -jar EncryCore.jar file_with_your_configurations.conf`
 
-`$ docker run -i --log-driver=none -a stdin -a stdout -a stderr -p 9001:9001 encry-core`
+List of default configs you can find in:
 
-#### 3) Compiling from source
+`EncryCore/srs/main/resources/configs/`
+
+#### 2) Compiling from source
 To run EncryCore node you need JRE 1.8 or later (64-bit version, you can find official [guide here](https://docs.oracle.com/javase/8/docs/technotes/guides/install/install_overview.html)) and sbt(Simple build tool for scala and java applications, [official guide](https://www.scala-sbt.org/1.0/docs/Setup.html)) to be installed. If you running a Windows machine, please make sure, that you have git client installed.
 
 Configuration file is `src/main/resources/application.conf`.
@@ -53,17 +54,21 @@ If you just have installed node, to check that everything is fine you can run :
 
 Here is list of the other valid commands:
 
-Group name | Command | Argument | Description
---- | ---| --- | --- |
-node|          shutdown|       None|          Shutdown the node
-node|          stopMining|       None|           Node stops mining
-node|          startMining|      None|           Node starts mining
-wallet|       pubKeys|          None|           Print available public keys
-wallet|        addrs|            None|           Print available addresses
-wallet|        createKey|           None|           Add key to storage
-wallet|        balance|          None|           Show balance of current wallet
-wallet|        transfer|         addr, amount|   Transfer `amount` to `addr`ess
-app|           help|             None|           Show all supported commands
+    | Group name |   Command       |   Argument      |  Meaning
+    |------------|-----------------|-----------------|--------------------------------
+    | node       |   shutdown      |   None          |  Shutdown the node
+    | node       |   stopMining    |   None          |  Node stops mining
+    | node       |   startMining   |   None          |  Node starts mining
+    | settings   |   addPeer       |   host, port    |  Add peer to 'knownPeers'
+    | wallet     |   pubKeys       |   None          |  Print available public keys
+    | wallet     |   privKeys      |   None          |  Print available private keys
+    | wallet     |   addrs         |   None          |  Print available addresses
+    | wallet     |   createKey     |   None          |  Add key to storage
+    | wallet     |   balance       |   None          |  Show balance of current wallet
+    | wallet     |   transfer      |   addr, amount  |  Transfer `amount` to `addr`ess
+    | app        |   help          |   None          |  Show all supported commands
+
+
 
 ## Running tests
 
