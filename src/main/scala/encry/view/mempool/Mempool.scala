@@ -51,6 +51,9 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
             settings.node.mempoolCleanupInterval,
             settings.node.mempoolCleanupInterval, self, TickForRemoveExpired)
           context.system.scheduler.schedule(
+            settings.node.mempoolTxSendingInterval,
+            settings.node.mempoolTxSendingInterval, self, TickForSendTransactionsToMiner)
+          context.system.scheduler.schedule(
             5.seconds,
             5.seconds)(context.system.actorSelection("user/statsSender") ! MempoolStat(memoryPool.size))
           context.become(messagesHandler(utxoState))
@@ -85,7 +88,7 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
       memoryPool = removeOldTransactions(txs, memoryPool)
     case LocallyGeneratedTransaction(tx) =>
       memoryPool = validateAndPutTransactions(IndexedSeq(tx), memoryPool, state, fromNetwork = true)
-    case AskTransactionsFromMemoryPoolFromMiner =>
+    case TickForSendTransactionsToMiner =>
       val validatedTxs: (IndexedSeq[WrappedIdAsKey], IndexedSeq[Transaction]) =
         memoryPool.values.toIndexedSeq.sortBy(_.fee).reverse
           .foldLeft(IndexedSeq.empty[WrappedIdAsKey], IndexedSeq.empty[Transaction]) { case ((boxes, txs), tx) =>
@@ -94,7 +97,8 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
               (boxes ++: txInputsIds.toIndexedSeq, txs :+ tx)
             else (boxes, txs)
           }
-      sender() ! validatedTxs._2
+      memoryPool = memoryPool -- validatedTxs._2.map(tx => toKey(tx.id))
+      minerRef ! TxsForMiner(validatedTxs._2)
     case AskTransactionsFromNVS(ids) =>
       val idsToWrapped: Seq[WrappedIdAsKey] = ids.map(toKey)
       val txsForNVS: Seq[Transaction] = idsToWrapped.flatMap(id => memoryPool.get(id))
@@ -186,6 +190,8 @@ object Mempool {
   case object AskTransactionsFromMemoryPoolFromMiner
 
   case class AskTransactionsFromNVS(txsIds: Seq[ModifierId])
+
+  case class TxsForMiner(txs: IndexedSeq[Transaction])
 
   case class RequestForTransactions(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
