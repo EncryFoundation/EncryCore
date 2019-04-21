@@ -2,7 +2,6 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
-
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
@@ -30,11 +29,9 @@ import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
 import akka.util.Timeout
 import encry.utils.CoreTaggedTypes.ModifierId
-import akka.pattern.ask
 import encry.view.mempool.Mempool._
 import scala.concurrent.duration._
 import scala.collection._
-import scala.concurrent.{Await, Future}
 
 class Miner extends Actor with StrictLogging {
 
@@ -91,7 +88,7 @@ class Miner extends Actor with StrictLogging {
     case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
       logger.info(s"Going to propagate new block $block from worker $workerIdx" +
         s" with nonce: ${block.header.nonce}")
-      logger.info(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
+      logger.debug(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
       killAllWorkers()
       nodeViewHolder ! LocallyGeneratedModifier(block.header)
       nodeViewHolder ! LocallyGeneratedModifier(block.payload)
@@ -141,7 +138,7 @@ class Miner extends Actor with StrictLogging {
   }
 
   def unknownMessage: Receive = {
-    case m => logger.warn(s"Unexpected message $m")
+    case m => logger.debug(s"Unexpected message $m")
   }
 
   def chainEvents: Receive = {

@@ -304,10 +304,10 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       if (db.get(key) == null) {
         batch.put(key, initValue)
         db.write(batch)
-        logger.info(s"${Algos.encode(key)} is null. Set ${Algos.encode(key)} to ${Algos.encode(initValue)}")
+        logger.debug(s"${Algos.encode(key)} is null. Set ${Algos.encode(key)} to ${Algos.encode(initValue)}")
         initValue
       } else {
-        logger.info(s"${Algos.encode(key)} exists!")
+        logger.debug(s"${Algos.encode(key)} exists!")
         VersionalLevelDbValue @@ db.get(key)
       }
     } finally batch.close()

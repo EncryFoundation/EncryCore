@@ -106,7 +106,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         if (chainSynced) {
           val inRequestCache: Map[String, NodeViewModifier] =
             invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
-          logger.info(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
+          logger.debug(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
           sendResponse(remote, invData._1, inRequestCache.values.toSeq)
           val nonInRequestCache: Seq[ModifierId] = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
           if (nonInRequestCache.nonEmpty) {

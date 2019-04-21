@@ -72,7 +72,6 @@ case class AccountManager(store: Store) extends StrictLogging {
     }, r => r)
 
   private def saveAccount(privateKey: PrivateKey, publicKey: PublicKey): Unit = {
-    logger.info(s"Set private key to: ${Algos.encode(privateKey)} and public key: ${Algos.encode(publicKey)}")
     store.update(
       scala.util.Random.nextLong(),
       Seq.empty,

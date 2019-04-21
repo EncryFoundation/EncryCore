@@ -68,7 +68,7 @@ case class SyncTracker(deliveryManager: ActorRef,
 
   def incrementReceive(peer: ConnectedPeer): Unit = {
     val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
-    logger.info(s"Updating received parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
+    logger.debug(s"Updating received parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
       s" New one is: (${requestReceiveStat._1}, ${requestReceiveStat._2 + 1})")
     peersNetworkCommunication =
       peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1, requestReceiveStat._2 + 1))
@@ -76,7 +76,7 @@ case class SyncTracker(deliveryManager: ActorRef,
 
   def decrementRequest(peer: ConnectedPeer): Unit = {
     val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
-    logger.info(s"Decrement request parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
+    logger.debug(s"Decrement request parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
       s" New one is: (${requestReceiveStat._1}, ${requestReceiveStat._2 - 1})")
     peersNetworkCommunication =
       peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1, requestReceiveStat._2 - 1))

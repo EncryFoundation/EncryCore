@@ -43,7 +43,7 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
   override def receive: Receive = {
     case _@UpdatedState(updatedState) =>
       updatedState match {
-        case utxoState: UtxoState => logger.info(s"Received state instance on MemoryPool actor. Starting mainLogic on this actor.")
+        case utxoState: UtxoState => logger.debug(s"Received state instance on MemoryPool actor. Starting mainLogic on this actor.")
           context.system.scheduler.schedule(
             settings.node.bloomFilterCleanupInterval,
             settings.node.bloomFilterCleanupInterval, self, TickForCleanupBloomFilter)
