@@ -176,7 +176,7 @@ class Miner extends Actor with StrictLogging {
           CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
 
         logger.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
-          s"and 1 coinbase for height $height")
+          s"and 1 coinbase for height $height.")
 
         transactionsPool = IndexedSeq.empty[Transaction]
         candidate
