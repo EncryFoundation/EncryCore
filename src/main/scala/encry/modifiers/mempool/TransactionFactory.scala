@@ -73,7 +73,7 @@ object TransactionFactory extends StrictLogging {
 
     if (change < 0) {
       logger.warn(s"Transaction impossible: required amount is bigger than available. Change is: $change.")
-      throw new RuntimeException("Transaction impossible: required amount is bigger than available")
+      throw new RuntimeException("Transaction impossible: required amount is bigger than available.")
     }
 
     val directives: IndexedSeq[Directive] =
