@@ -88,7 +88,7 @@ object ModifiersCache extends StrictLogging {
       headersCollection.get(history.bestHeaderHeight + 1) match {
         case Some(value) =>
           headersCollection = headersCollection - (history.bestHeaderHeight + 1)
-          logger.info(s"HeadersCollection size is: ${headersCollection.size}")
+          logger.debug(s"HeadersCollection size is: ${headersCollection.size}")
           value.map(cache.get(_)).collect {
             case Some(v: Header)
               if (
@@ -98,7 +98,7 @@ object ModifiersCache extends StrictLogging {
                     )
                 )
                 && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
-              logger.info(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
+              logger.debug(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
               new mutable.WrappedArray.ofByte(v.id)
           }
 
