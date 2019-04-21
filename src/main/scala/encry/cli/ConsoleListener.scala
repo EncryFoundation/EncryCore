@@ -57,7 +57,7 @@ object ConsoleListener {
     "createKey" -> CreateKey,
     "pubKeys" -> PrintPubKeys,
     "balance" -> GetBalance,
-    //"transfer" -> Transfer, //TODO: after transfer fix - add
+    "transfer" -> Transfer,
     "privKey" -> PrintPrivKeys //Todo delete
   ))
 

@@ -1,14 +1,14 @@
 package encry.modifiers.mempool.directive
 
 import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage
-import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage.{ADKeyProto, DirectiveProto, ScriptedAssetDirectiveProtoMessage, TransferDirectiveProtoMessage}
+import TransactionProto.TransactionProtoMessage.DirectiveProtoMessage.{ADKeyProto, TransferDirectiveProtoMessage}
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.ByteString
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.mempool.directive.Directive.DTypeId
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import encry.settings.Constants
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.Utils
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
@@ -16,11 +16,10 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.transaction.EncryAddress
 import org.encryfoundation.common.transaction.EncryAddress.Address
-import scorex.crypto.encode.Base16
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
+import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
 import supertagged.@@
-
 import scala.util.Try
 
 case class TransferDirective(address: Address,
