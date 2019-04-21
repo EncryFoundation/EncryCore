@@ -16,6 +16,14 @@ At first, you should download latest release from [this page](https://github.com
 
 `$ java -jar EncryCore.jar`
 
+To run this app with additional configurations you should execute the following command:
+
+`$ java -jar EncryCore.jar file_with_your_configurations.conf`
+
+List of default configs you can find in:
+
+`EncryCore/srs/main/resources/configs/`
+
 #### 2) From container.Docker Container
 Make sure you have docker installed for documentation and guide check [this page](https://docs.docker.com/install/). Once docker is installed, run in terminal following commands:
 
@@ -53,17 +61,21 @@ If you just have installed node, to check that everything is fine you can run :
 
 Here is list of the other valid commands:
 
-Group name | Command | Argument | Description
---- | ---| --- | --- |
-node|          shutdown|       None|          Shutdown the node
-node|          stopMining|       None|           Node stops mining
-node|          startMining|      None|           Node starts mining
-wallet|       pubKeys|          None|           Print available public keys
-wallet|        addrs|            None|           Print available addresses
-wallet|        createKey|           None|           Add key to storage
-wallet|        balance|          None|           Show balance of current wallet
-wallet|        transfer|         addr, amount|   Transfer `amount` to `addr`ess
-app|           help|             None|           Show all supported commands
+    | Group name |   Command       |   Argument      |  Meaning
+    |------------|-----------------|-----------------|--------------------------------
+    | node       |   shutdown      |   None          |  Shutdown the node
+    | node       |   stopMining    |   None          |  Node stops mining
+    | node       |   startMining   |   None          |  Node starts mining
+    | settings   |   addPeer       |   host, port    |  Add peer to 'knownPeers'
+    | wallet     |   pubKeys       |   None          |  Print available public keys
+    | wallet     |   privKeys      |   None          |  Print available private keys
+    | wallet     |   addrs         |   None          |  Print available addresses
+    | wallet     |   createKey     |   None          |  Add key to storage
+    | wallet     |   balance       |   None          |  Show balance of current wallet
+    | wallet     |   transfer      |   addr, amount  |  Transfer `amount` to `addr`ess
+    | app        |   help          |   None          |  Show all supported commands
+
+
 
 ## Running tests
 
