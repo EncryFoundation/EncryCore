@@ -2,8 +2,8 @@ package encry.modifiers.state.box
 
 import encry.settings.Constants
 import encry.view.history.History.Height
-import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
+import io.circe.{Decoder, Encoder, HCursor}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
