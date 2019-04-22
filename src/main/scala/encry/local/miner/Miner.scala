@@ -3,10 +3,11 @@ package encry.local.miner
 import java.text.SimpleDateFormat
 import java.util.Date
 import akka.actor.{Actor, Props}
+import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
-import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme}
 import encry.consensus.ConsensusTaggedTypes.Difficulty
+import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme}
 import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.history.{Block, Header}
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
@@ -15,23 +16,21 @@ import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
 import encry.stats.StatsSender.{CandidateProducingTime, MiningEnd, MiningTime, SleepTime}
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.CurrentView
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.EncryHistory
 import encry.view.history.History.Height
+import encry.view.mempool.Mempool._
 import encry.view.state.{StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
-import akka.util.Timeout
-import encry.utils.CoreTaggedTypes.ModifierId
-import encry.view.mempool.Mempool._
-import scala.concurrent.duration._
 import scala.collection._
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 class Miner extends Actor with StrictLogging {
@@ -154,16 +153,22 @@ class Miner extends Actor with StrictLogging {
 
   def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet],
                       bestHeaderOpt: Option[Header]): CandidateBlock = {
-    val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x).isSuccess)
+    val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x).isSuccess).distinct
+    val filteredTxsWithoutDuplicateInputs = txsU.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
+      case ((usedInputsIds, acc), tx) =>
+        if (tx.inputs.forall(input => !usedInputsIds.contains(Algos.encode(input.boxId)))) {
+          (usedInputsIds ++ tx.inputs.map(input => Algos.encode(input.boxId))) -> (acc :+ tx)
+        } else usedInputsIds -> acc
+    }._2
     val timestamp: Time = timeProvider.estimatedTime
     val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
-    val feesTotal: Amount = txsU.map(_.fee).sum
+    val feesTotal: Amount = filteredTxsWithoutDuplicateInputs.map(_.fee).sum
     val supplyTotal: Amount = EncrySupplyController.supplyAt(view.state.height)
     val minerSecret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
     val coinbase: Transaction = TransactionFactory
       .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, view.state.height)
 
-    val txs: Seq[Transaction] = txsU.sortBy(_.timestamp) :+ coinbase
+    val txs: Seq[Transaction] = filteredTxsWithoutDuplicateInputs.sortBy(_.timestamp) :+ coinbase
 
     view.state.generateProofs(txs) match {
       case Success((adProof, adDigest)) =>
