@@ -32,6 +32,7 @@ import encry.utils.CoreTaggedTypes.ModifierId
 import encry.view.mempool.Mempool._
 import scala.concurrent.duration._
 import scala.collection._
+import scala.util.{Failure, Success}
 
 class Miner extends Actor with StrictLogging {
 
@@ -164,8 +165,8 @@ class Miner extends Actor with StrictLogging {
 
     val txs: Seq[Transaction] = txsU.sortBy(_.timestamp) :+ coinbase
 
-    view.state.generateProofs(txs).map {
-      case (adProof: SerializedAdProof, adDigest: ADDigest) =>
+    view.state.generateProofs(txs) match {
+      case Success((adProof, adDigest)) =>
         val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
           .getOrElse(Constants.Chain.InitialDifficulty)
 
@@ -177,7 +178,10 @@ class Miner extends Actor with StrictLogging {
 
         transactionsPool = IndexedSeq.empty[Transaction]
         candidate
-    }.getOrElse(createCandidate(view, bestHeaderOpt))
+      case Failure(ex) =>
+        logger.info(s"Failed to gen candidate: ${ex.getMessage}")
+        createCandidate(view, bestHeaderOpt)
+    }
   }
 
   def produceCandidate(): Unit =
