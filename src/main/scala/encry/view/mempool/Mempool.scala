@@ -99,10 +99,10 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
           }
       memoryPool = memoryPool -- validatedTxs._2.map(tx => toKey(tx.id))
       minerRef ! TxsForMiner(validatedTxs._2)
-    case AskTransactionsFromNVS(ids) =>
+    case AskTransactionsFromNVS(remote, ids) =>
       val idsToWrapped: Seq[WrappedIdAsKey] = ids.map(toKey)
       val txsForNVS: Seq[Transaction] = idsToWrapped.flatMap(id => memoryPool.get(id))
-      sender() ! txsForNVS
+      sender() ! TxsForNVSH(remote, txsForNVS)
   }
 
   def handleStates: Receive = {
@@ -189,9 +189,11 @@ object Mempool {
 
   case object AskTransactionsFromMemoryPoolFromMiner
 
-  case class AskTransactionsFromNVS(txsIds: Seq[ModifierId])
+  case class AskTransactionsFromNVS(peer: ConnectedPeer, txsIds: Seq[ModifierId])
 
   case class TxsForMiner(txs: IndexedSeq[Transaction])
+
+  case class TxsForNVSH(peer: ConnectedPeer, txs: Seq[Transaction])
 
   case class RequestForTransactions(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 

@@ -1,10 +1,8 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
-import akka.pattern.ask
 import akka.util.Timeout
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
@@ -29,8 +27,6 @@ import encry.view.history.{EncryHistory, EncryHistoryReader}
 import encry.view.mempool.Mempool._
 import encry.view.state.StateReader
 import org.encryfoundation.common.Algos
-
-import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
@@ -43,7 +39,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   implicit val timeout: Timeout = Timeout(5.seconds)
 
   var historyReaderOpt: Option[EncryHistory] = None
-  //var mempoolReaderOpt: Option[Mempool] = None
   var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   var chainSynced: Boolean = false
   val deliveryManager: ActorRef = context.actorOf(
@@ -110,9 +105,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           sendResponse(remote, invData._1, inRequestCache.values.toSeq)
           val nonInRequestCache: Seq[ModifierId] = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
           if (nonInRequestCache.nonEmpty) {
-            if (invData._1 == Transaction.ModifierTypeId)
-              sendResponse(remote, invData._1,
-                Await.result((memoryPoolRef ? AskTransactionsFromNVS(nonInRequestCache)).mapTo[Seq[Transaction]], 10.seconds))
+            if (invData._1 == Transaction.ModifierTypeId) memoryPoolRef ! AskTransactionsFromNVS(remote ,nonInRequestCache)
             else historyReaderOpt.foreach { reader =>
               invData._1 match {
                 case _: ModifierTypeId => nonInRequestCache.foreach(id =>
@@ -131,6 +124,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         else if (invData._1 != Payload.modifierTypeId) nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2) //todo: Ban node that send payload id?
       case _ => logger.info(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
     }
+    case TxsForNVSH(remote, txs) => sendResponse(remote, Transaction.ModifierTypeId, txs)
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       deliveryManager ! RequestFromLocal(peer, modifierTypeId, modifierIds)
     case StartMining => deliveryManager ! StartMining
@@ -234,7 +228,7 @@ object NodeViewSynchronizer {
 
         case SemanticallySuccessfulModifier(mod) => mod match {
           case tx: Transaction => 3
-          case _ => 2
+          case _ => 1
         }
 
         case SuccessfulTransaction(_) => 3
