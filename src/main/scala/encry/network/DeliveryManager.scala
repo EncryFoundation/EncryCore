@@ -546,7 +546,7 @@ object DeliveryManager {
         case DataFromPeer(msg: ModifiersNetworkMessage, _) =>
           msg match {
             case ModifiersNetworkMessage((typeId, _)) if typeId != Transaction.ModifierTypeId => 1
-            case _ => 2
+            case _ => 3
           }
         // 'lowpriority messages should be treated last if possible
         case RequestForTransactions(_, _, _) => 3

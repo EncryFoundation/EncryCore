@@ -2,9 +2,11 @@ package encry.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Actor, ActorRef, ActorSystem}
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill}
+import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern.ask
 import akka.util.Timeout
+import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
 import encry.consensus.SyncInfo
@@ -81,8 +83,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       deliveryManager ! UpdatedHistory(reader)
-    //    case ChangedMempool(reader: Mempool) if reader.isInstanceOf[Mempool] =>
-    //      mempoolReaderOpt = Some(reader)
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
     case DisconnectedPeer(remote) => deliveryManager ! DisconnectedPeer(remote)
     case DataFromPeer(message, remote) => message match {
@@ -138,7 +138,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case FullBlockChainIsSynced =>
       chainSynced = true
       deliveryManager ! FullBlockChainIsSynced
-    case a@RequestForTransactions(_, _, _) => deliveryManager ! a
+    case r@RequestForTransactions(_, _, _) => deliveryManager ! r
     case a: Any => logger.error(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
   }
 
@@ -220,4 +220,27 @@ object NodeViewSynchronizer {
 
   }
 
+  class NodeViewSynchronizerPriorityQueue(settings: ActorSystem.Settings, config: Config)
+    extends UnboundedStablePriorityMailbox(
+      PriorityGenerator {
+        case RequestFromLocal(_, _, _) => 0
+
+        case DataFromPeer(msg, _) => msg match {
+          case SyncInfoNetworkMessage(_) => 1
+          case InvNetworkMessage(data) if data._1 != Transaction.ModifierTypeId => 1
+          case RequestModifiersNetworkMessage(data) if data._1 != Transaction.ModifierTypeId => 1
+          case _ => 3
+        }
+
+        case SemanticallySuccessfulModifier(mod) => mod match {
+          case tx: Transaction => 3
+          case _ => 2
+        }
+
+        case SuccessfulTransaction(_) => 3
+
+        case PoisonPill => 4
+
+        case otherwise => 2
+      })
 }

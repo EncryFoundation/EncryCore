@@ -191,10 +191,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
               modToApply match {
                 case block: Block if settings.influxDB.isDefined =>
                   context.system.actorSelection("user/statsSender") ! TxsInBlock(block.transactions.size)
-                  context.system.eventStream.publish(SemanticallySuccessfulModifier(block.payload))
-                case block: Block =>
-                  context.system.eventStream.publish(SemanticallySuccessfulModifier(block.payload))
-                case mod =>
+                case _ =>
               }
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
               auxHistoryHolder ! ReportModifierValid(modToApply)
