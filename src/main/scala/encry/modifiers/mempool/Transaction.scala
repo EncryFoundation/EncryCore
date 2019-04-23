@@ -21,7 +21,7 @@ import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
 import scala.util.{Success, Try}
 import cats.implicits._
-import com.google.common.primitives.{Bytes, Longs, Shorts}
+import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.google.protobuf.ByteString
 import encry.modifiers.history.Block
 import encry.modifiers.history.Block.Timestamp
@@ -67,6 +67,8 @@ case class Transaction(fee: Amount,
     .result
 
   val tpe: Types.Product = Types.EncryTransaction
+
+  override def hashCode(): Int = Ints.fromByteArray(messageToSign.take(4))
 
   def asVal: PValue = PValue(PObject(Map(
     "inputs"        -> PValue(inputs.map(_.boxId.toList), Types.PCollection(Types.PCollection.ofByte)),
