@@ -1,17 +1,16 @@
 package encry.network.DeliveryManagerTests
 
 import java.net.InetSocketAddress
-
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.modifiers.InstanceFactory
-import encry.network.BasicMessagesRepo.Handshake
 import encry.network.DeliveryManager
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{CheckModifiersToDownload, DisconnectedPeer, HandshakedPeer, UpdatedHistory}
-import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
+import encry.network.NodeViewSynchronizer.ReceivableMessages._
+import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
+import encry.network.DeliveryManagerTests.DMUtils._
 
 class DeliveryManagerInitialBehaviourSpec extends WordSpecLike with BeforeAndAfterAll
   with Matchers
@@ -29,25 +28,25 @@ class DeliveryManagerInitialBehaviourSpec extends WordSpecLike with BeforeAndAft
       val history: EncryHistory = generateDummyHistory(settings)
       val deliveryManager: TestActorRef[DeliveryManager] =
         TestActorRef[DeliveryManager](DeliveryManager.props(None, TestProbe().ref, TestProbe().ref, settings, TestProbe().ref))
-      val newPeer = new InetSocketAddress("172.16.13.10", 9001)
-      val newPeer2 = new InetSocketAddress("172.16.13.11", 9001)
-      val peer: ConnectedPeer = ConnectedPeer(newPeer, deliveryManager, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion), "peer", Some(newPeer), System.currentTimeMillis()))
-      val peer2: ConnectedPeer = ConnectedPeer(newPeer2, deliveryManager, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion), "peer", Some(newPeer2), System.currentTimeMillis()))
 
-      deliveryManager ! HandshakedPeer(peer)
-      assert(deliveryManager.underlyingActor.syncTracker.statuses.contains(peer.socketAddress.getAddress))
+      val (_: InetSocketAddress, cp1: ConnectedPeer) = createPeer(9001, "172.16.13.10", settings)
+      val (_: InetSocketAddress, cp2: ConnectedPeer) = createPeer(9001, "172.16.13.11", settings)
+
+      deliveryManager ! HandshakedPeer(cp1)
+      assert(deliveryManager.underlyingActor.syncTracker.statuses.contains(cp1.socketAddress.getAddress))
       assert(deliveryManager.underlyingActor.syncTracker.statuses.size == 1)
-      deliveryManager ! HandshakedPeer(peer2)
-      assert(deliveryManager.underlyingActor.syncTracker.statuses.contains(peer2.socketAddress.getAddress))
+
+      deliveryManager ! HandshakedPeer(cp2)
+      assert(deliveryManager.underlyingActor.syncTracker.statuses.contains(cp2.socketAddress.getAddress))
       assert(deliveryManager.underlyingActor.syncTracker.statuses.size == 2)
-      deliveryManager ! DisconnectedPeer(peer.socketAddress)
-      assert(deliveryManager.underlyingActor.syncTracker.statuses.contains(peer2.socketAddress.getAddress))
+
+      deliveryManager ! DisconnectedPeer(cp1.socketAddress)
+      assert(deliveryManager.underlyingActor.syncTracker.statuses.contains(cp2.socketAddress.getAddress))
       assert(deliveryManager.underlyingActor.syncTracker.statuses.size == 1)
+
       deliveryManager ! CheckModifiersToDownload
+
       deliveryManager ! UpdatedHistory(history)
-      deliveryManager.stop()
     }
   }
 }

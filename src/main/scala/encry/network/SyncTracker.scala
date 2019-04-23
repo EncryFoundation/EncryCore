@@ -34,7 +34,7 @@ case class SyncTracker(deliveryManager: ActorRef,
     */
 
   private type Requested = Int
-  private type Received = Int
+  private type Received  = Int
   private var peersNetworkCommunication: Map[InetAddress, (Requested, Received)] = Map.empty
 
   def updatePeersPriorityStatus(): Unit = {
@@ -52,7 +52,7 @@ case class SyncTracker(deliveryManager: ActorRef,
 
   def incrementRequest(peer: ConnectedPeer): Unit = {
     val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
-    logger.info(s"Updating request parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
+    logger.debug(s"Updating request parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
       s" New one is: (${requestReceiveStat._1 + 1}, ${requestReceiveStat._2})")
     peersNetworkCommunication =
       peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1 + 1, requestReceiveStat._2))
@@ -60,8 +60,8 @@ case class SyncTracker(deliveryManager: ActorRef,
 
   def incrementRequestForNModifiers(peer: ConnectedPeer, modifiersQty: Int): Unit = {
     val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
-    logger.info(s"Updating request parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
-      s" New one is: (${requestReceiveStat._1 + 1}, ${requestReceiveStat._2})")
+    logger.debug(s"Updating request parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
+      s" New one is: (${requestReceiveStat._1 + modifiersQty}, ${requestReceiveStat._2})")
     peersNetworkCommunication =
       peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1 + modifiersQty, requestReceiveStat._2))
   }
@@ -176,9 +176,9 @@ object SyncTracker {
 
     def toString(priority: PeerPriorityStatus): String = priority match {
       case 1 => "BadNode"
-      case 2 => "InitialPriority"
-      case 3 => "LowPriority"
-      case 4 => "HighPriority"
+      case 2 => "InitialPriorityNode"
+      case 3 => "LowPriorityNode"
+      case 4 => "HighPriorityNode"
     }
   }
 

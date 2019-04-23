@@ -1,19 +1,20 @@
 package encry.network.DeliveryManagerTests
 
 import java.net.InetSocketAddress
+import encry.network.DeliveryManagerTests.DMUtils.{createPeer, generateBlocks, initialiseDeliveryManager}
 import akka.actor.ActorSystem
-import akka.testkit.{TestActorRef, TestKit}
+import akka.testkit.TestKit
 import encry.consensus.History.{HistoryComparisonResult, Older}
 import encry.modifiers.InstanceFactory
-import encry.modifiers.history.{Block, Header, Payload}
-import encry.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage}
-import encry.network.DeliveryManager
-import encry.network.DeliveryManagerTests.DMUtils.{generateBlocks, initialiseDeliveryManager}
+import encry.modifiers.history.{Block, Header}
+import encry.network.BasicMessagesRepo.ModifiersNetworkMessage
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, OtherNodeSyncingStatus, RequestFromLocal}
-import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
+import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
 import encry.settings.EncryAppSettings
+import encry.utils.CoreTaggedTypes.ModifierId
+import scala.concurrent.duration._
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 
 class DeliveryManagerPriorityTests extends WordSpecLike with BeforeAndAfterAll
@@ -27,324 +28,195 @@ class DeliveryManagerPriorityTests extends WordSpecLike with BeforeAndAfterAll
   override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 
   "Delivery Manager" should {
-    val initialState = initialiseDeliveryManager(isBlockChainSynced = true, isMining = true, settings)
-    val deliveryManager: TestActorRef[DeliveryManager] = initialState._1
-    val newPeer: InetSocketAddress = new InetSocketAddress("172.16.13.10", 9001)
-    val peer: ConnectedPeer = ConnectedPeer(newPeer, deliveryManager, Incoming,
-      Handshake(protocolToBytes(settings.network.appVersion), "peer", Some(newPeer), System.currentTimeMillis()))
+    val (deliveryManager, _) = initialiseDeliveryManager(isBlockChainSynced = true, isMining = true, settings)
+    val (_: InetSocketAddress, cp1: ConnectedPeer) = createPeer(9001, "172.16.13.10", settings)
+    val (_: InetSocketAddress, cp2: ConnectedPeer) = createPeer(9002, "172.16.13.11", settings)
+    val (_: InetSocketAddress, cp3: ConnectedPeer) = createPeer(9003, "172.16.13.12", settings)
+    val (_: InetSocketAddress, cp4: ConnectedPeer) = createPeer(9004, "172.16.13.13", settings)
+    val (_: InetSocketAddress, cp5: ConnectedPeer) = createPeer(9005, "172.16.13.14", settings)
+    val (_: InetSocketAddress, cp6: ConnectedPeer) = createPeer(9006, "172.16.13.15", settings)
     val blocks: List[Block] = generateBlocks(10, generateDummyHistory(settings))._2
-    deliveryManager ! HandshakedPeer(peer)
-    deliveryManager ! OtherNodeSyncingStatus(peer, Older, None)
+    val headersIds: List[ModifierId] = blocks.map(_.header.id)
 
     /**
-      * This test simulates DeliveryManager behaviour connected with updating nodes priority while blockChain is not synced.
+      * This test simulates DeliveryManager behaviour connected with updating nodes priority.
       *
-      * Send handshake to the Delivery Manager from peer1.
-      * Send downloadRequest for N modifiers to the Delivery manager.
-      * Delivery manager must send requestModifier message for N modifiers to peer1.
-      * Do not send any modifiers to the Delivery manager from peer1.
-      * Check on Delivery manager that peer1 priority is BadNode(1).
+      * Test expected behavior is:
+      * Send handshake to the Delivery Manager from cp1 for cp1.
+      * Send RequestFromLocal for N modifiers to the Delivery Manager.
+      * Delivery manager have to use requestModifier, send request to N modifiers to cp1 and put this N modifiers in expectedModifiersCollection.
+      * Receive less than 1/2 of this modifiers during 1 attempt.
+      * When period of updating priorities will expire, delivery manager will mark cp1 as BadNode.
+      *
       */
-
     "mark peer as BadNode with BadPriority (1)" in {
-//      deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, blocks.map(_.header.id))
-//      Thread.sleep(6000)
-//      val priorityResult: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer.getAddress)
-//      assert(priorityResult._3 == peer)
-//      assert(priorityResult._1 == Older)
-//      assert(priorityResult._2 == 1)
+      deliveryManager ! HandshakedPeer(cp1)
+      deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
+      Thread.sleep(500)
+      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
+      Thread.sleep((settings.network.deliveryTimeout._1 * settings.network.maxDeliveryChecks) * 1000)
+      val priorityResult: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
+        deliveryManager.underlyingActor.syncTracker.statuses(cp1.socketAddress.getAddress)
+      assert(priorityResult._3 == cp1)
+      assert(priorityResult._1 == Older)
+      assert(priorityResult._2 == 1)
     }
 
     /**
-      * This test simulates DeliveryManager behaviour connected with updating nodes priority while blockChain is not synced.
+      * This test simulates DeliveryManager behaviour connected with updating nodes priority
       *
-      * Send handshake to the Delivery Manager from peer1.
-      * Send downloadRequest for N modifiers to the Delivery manager.
-      * Delivery manager must send requestModifier message for N modifiers to peer1.
-      * Send N valid requested modifiers to the Delivery manager from peer1.
-      * Check on Delivery manager that peer1 priority is HighPriority(4).
+      * Test expected behavior is:
+      * Send handshake to the Delivery Manager from cp1.
+      * Send RequestFromLocal for N modifiers to the Delivery Manager for cp1.
+      * Delivery manager have to use requestModifier, send request to N modifiers to cp1 and put this N modifiers in expectedModifiersCollection.
+      * Receive more than 3\4 of this modifiers during 1 attempt.
+      * When period of updating priorities will expire, delivery manager will mark cp1 as BestNode.
       */
-
-    "mark peer as BestNode with HighPriority (4)" in {
-//      deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, blocks.map(_.header.id))
-//      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-//        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), peer)
-//      Thread.sleep(6000)
-//      val priorityResult: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer.getAddress)
-//      assert(priorityResult._3 == peer)
-//      assert(priorityResult._1 == Older)
-//      assert(priorityResult._2 == 4)
+    "mark peer as HighPriorityNode with HighPriority (4)" in {
+      deliveryManager ! HandshakedPeer(cp1)
+      deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
+      Thread.sleep(500)
+      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
+        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp1)
+      Thread.sleep((settings.network.deliveryTimeout._1 * settings.network.maxDeliveryChecks) * 1000)
+      val priorityResult: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
+        deliveryManager.underlyingActor.syncTracker.statuses(cp1.socketAddress.getAddress)
+      assert(priorityResult._3 == cp1)
+      assert(priorityResult._1 == Older)
+      assert(priorityResult._2 == 4)
     }
 
     /**
-      * This test simulates DeliveryManager behaviour connected with updating nodes priority while blockChain is not synced.
+      * This test simulates DeliveryManager behaviour connected with updating nodes priority
       *
-      * Send handshake to the Delivery Manager from peer1.
-      * Send downloadRequest for N modifiers to the Delivery manager.
-      * Delivery manager must send requestModifier message for N modifiers to peer1.
-      * Send N / 2 valid requested modifiers to the Delivery manager from peer1.
-      * Check on Delivery manager that peer1 priority is LowPriority(3).
+      * Test expected behavior is:
+      * Send handshake to the Delivery Manager from cp1.
+      * Send RequestFromLocal for N modifiers to the Delivery Manager for cp1.
+      * Delivery manager have to use requestModifier, send request to N modifiers to cp1 and put this N modifiers in expectedModifiersCollection.
+      * Receive more than 1\2 and less than 3\4 of this modifiers during 1 attempt.
+      * When period of updating priorities will expire, delivery manager will mark cp1 as LowPriorityNode.
       */
-
     "mark peer as LowPriorityNode with LowPriority (3)" in {
-//      deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, blocks.map(_.header.id))
-//      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-//        Header.modifierTypeId, blocks.take(5).map(block => block.header.id -> block.header.bytes).toMap), peer)
-//      Thread.sleep(6000)
-//      val priorityResult: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer.getAddress)
-//      assert(priorityResult._3 == peer)
-//      assert(priorityResult._1 == Older)
-//      assert(priorityResult._2 == 3)
+      deliveryManager ! HandshakedPeer(cp1)
+      deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
+      Thread.sleep(500)
+      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
+      Thread.sleep(500)
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
+        Header.modifierTypeId, blocks.take(6).map(block => block.header.id -> block.header.bytes).toMap), cp1)
+      Thread.sleep((settings.network.deliveryTimeout._1 * settings.network.maxDeliveryChecks) * 1000)
+      val priorityResult: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
+        deliveryManager.underlyingActor.syncTracker.statuses(cp1.socketAddress.getAddress)
+      assert(priorityResult._3 == cp1)
+      assert(priorityResult._1 == Older)
+      assert(priorityResult._2 == 3)
     }
 
     /**
-      * This test simulates DeliveryManager behaviour connected with updating nodes priority while blockChain synced.
+      * This test simulates DeliveryManager behavior connected with updating several nodes priority active in one time
       *
-      * Send handshake to the Delivery Manager from peer1, peer2, peer3.
-      * Send downloadRequest for N modifiers to the Delivery manager.
-      * Delivery manager must send requestModifier message for N modifiers to all peers.
-      * Send N valid requested modifiers to the Delivery manager from peer1.
-      * Send N / 2 valid requested modifiers to the Delivery manager from peer2.
-      * Send 0 valid requested modifiers to the Delivery manager from peer3.
-      * Check on Delivery manager that peer1 priorities is HighPriority(4).
-      * Check on Delivery manager that peer2 priorities is LowPriority(3).
-      * Check on Delivery manager that peer3 priorities is BadNode(1).
+      * Test expected behavior is:
+      * Send handshake to the Delivery Manager from cp1, cp2, cp3, cp4, cp5, cp6.
+      * Send RequestFromLocal for N modifiers to the Delivery Manager for cp1, cp2, cp3, cp4, cp5, cp6.
+      * Delivery manager have to use requestModifier, send request to N modifiers to cp1 and put this N modifiers in expectedModifiersCollection.
+      * Receive more than 3\4 requested modifiers from cp1 and cp4.
+      * Receive less than 3\4 but more than 1\2 requested modifiers from cp2 and cp5.
+      * Receive less than 1\2 requested modifiers from cp3 and cp6.
+      * When period of updating priorities will expire, delivery manager will mark cp1 and cp4 as HighPriorityNode.
+      * When period of updating priorities will expire, delivery manager will mark cp2 and cp5 as LowPriorityNode.
+      * When period of updating priorities will expire, delivery manager will mark cp3 and cp6 as BadNode.
       */
-
     "correctly choose peer priority while several peers are available" in {
+      deliveryManager ! HandshakedPeer(cp1)
+      deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
+      deliveryManager ! HandshakedPeer(cp2)
+      deliveryManager ! OtherNodeSyncingStatus(cp2, Older, None)
+      deliveryManager ! HandshakedPeer(cp3)
+      deliveryManager ! OtherNodeSyncingStatus(cp3, Older, None)
+      deliveryManager ! HandshakedPeer(cp4)
+      deliveryManager ! OtherNodeSyncingStatus(cp4, Older, None)
+      deliveryManager ! HandshakedPeer(cp5)
+      deliveryManager ! OtherNodeSyncingStatus(cp5, Older, None)
+      deliveryManager ! HandshakedPeer(cp6)
+      deliveryManager ! OtherNodeSyncingStatus(cp6, Older, None)
+      Thread.sleep(500)
+      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp2, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp3, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp4, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp5, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp6, Header.modifierTypeId, headersIds)
+      Thread.sleep(500)
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
+        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp1)
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
+        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp4)
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
+        Header.modifierTypeId, blocks.take(5).map(block => block.header.id -> block.header.bytes).toMap), cp2)
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
+        Header.modifierTypeId, blocks.take(5).map(block => block.header.id -> block.header.bytes).toMap), cp5)
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
+        Header.modifierTypeId, blocks.take(2).map(block => block.header.id -> block.header.bytes).toMap), cp3)
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
+        Header.modifierTypeId, blocks.take(2).map(block => block.header.id -> block.header.bytes).toMap), cp6)
+      Thread.sleep((settings.network.deliveryTimeout._1 * settings.network.maxDeliveryChecks) * 1000)
+      val priorityResult1: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
+        deliveryManager.underlyingActor.syncTracker.statuses(cp1.socketAddress.getAddress)
+      val priorityResult2: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
+        deliveryManager.underlyingActor.syncTracker.statuses(cp2.socketAddress.getAddress)
+      val priorityResult3: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
+        deliveryManager.underlyingActor.syncTracker.statuses(cp3.socketAddress.getAddress)
+      val priorityResult4: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
+        deliveryManager.underlyingActor.syncTracker.statuses(cp4.socketAddress.getAddress)
+      val priorityResult5: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
+        deliveryManager.underlyingActor.syncTracker.statuses(cp5.socketAddress.getAddress)
+      val priorityResult6: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
+        deliveryManager.underlyingActor.syncTracker.statuses(cp6.socketAddress.getAddress)
 
-//      val newPeer1: InetSocketAddress = new InetSocketAddress("172.16.13.11", 9001)
-//      val peer1: ConnectedPeer = ConnectedPeer(newPeer1, deliveryManager, Incoming,
-//        Handshake(protocolToBytes(settings.network.appVersion), "peer1", Some(newPeer1), System.currentTimeMillis()))
-//
-//      deliveryManager ! HandshakedPeer(peer1)
-//      deliveryManager ! OtherNodeSyncingStatus(peer1, Older, None)
-//
-//      val newPeer2: InetSocketAddress = new InetSocketAddress("172.16.13.12", 9001)
-//      val peer2: ConnectedPeer = ConnectedPeer(newPeer2, deliveryManager, Incoming,
-//        Handshake(protocolToBytes(settings.network.appVersion), "peer2", Some(newPeer2), System.currentTimeMillis()))
-//
-//      deliveryManager ! HandshakedPeer(peer2)
-//      deliveryManager ! OtherNodeSyncingStatus(peer2, Older, None)
-//
-//      deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, blocks.map(_.header.id))
-//      deliveryManager ! RequestFromLocal(peer1, Header.modifierTypeId, blocks.map(_.header.id))
-//      deliveryManager ! RequestFromLocal(peer2, Header.modifierTypeId, blocks.map(_.header.id))
-//
-//      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-//        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), peer)
-//
-//      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-//        Header.modifierTypeId, blocks.take(5).map(block => block.header.id -> block.header.bytes).toMap), peer1)
-//
-//      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-//        Header.modifierTypeId, blocks.take(2).map(block => block.header.id -> block.header.bytes).toMap), peer2)
-//
-//      Thread.sleep(5000)
-//
-//      val priorityResultByPeer: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer.getAddress)
-//
-//      val priorityResultByPeer1: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer1.getAddress)
-//
-//      val priorityResultByPeer2: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer2.getAddress)
-//
-//      assert(priorityResultByPeer._3 == peer)
-//      assert(priorityResultByPeer._1 == Older)
-//      assert(priorityResultByPeer._2 == 4)
-//
-//      assert(priorityResultByPeer1._3 == peer1)
-//      assert(priorityResultByPeer1._1 == Older)
-//      assert(priorityResultByPeer1._2 == 3)
-//
-//      assert(priorityResultByPeer2._3 == peer2)
-//      assert(priorityResultByPeer2._1 == Older)
-//      assert(priorityResultByPeer2._2 == 1)
+      assert(priorityResult1._3 == cp1)
+      assert(priorityResult1._1 == Older)
+      assert(priorityResult1._2 == 4)
+      assert(priorityResult4._3 == cp4)
+      assert(priorityResult4._1 == Older)
+      assert(priorityResult4._2 == 4)
+
+      assert(priorityResult2._3 == cp2)
+      assert(priorityResult2._1 == Older)
+      assert(priorityResult2._2 == 3)
+      assert(priorityResult5._3 == cp5)
+      assert(priorityResult5._1 == Older)
+      assert(priorityResult5._2 == 3)
+
+      assert(priorityResult3._3 == cp3)
+      assert(priorityResult3._1 == Older)
+      assert(priorityResult3._2 == 1)
+      assert(priorityResult6._3 == cp6)
+      assert(priorityResult6._1 == Older)
+      assert(priorityResult6._2 == 1)
     }
 
     /**
-      * This test simulates DeliveryManager behaviour connected with the logic of choosing nodes relative to priority.
+      * This test simulates DeliveryManager behavior connected with updating node priority while receiving spam modifiers
       *
-      * First - send handshake message from peer1.
-      * Send downloadRequest for N modifiers to the Delivery manager.
-      * Delivery manager must send requestModifier message for N modifiers to peer1.
-      * Send N valid requested modifiers to the Delivery manager from peer1.
-      * Check on Delivery manager that peer1 priority is HighPriority(4).
-      *
-      * Second - send handshake message from peer2.
-      * Send downloadRequest for N modifiers to the Delivery manager.
-      * Delivery manager must send requestModifier message for M modifiers to peer1.
-      * Send M - K where ((M - K) / M) < LowPriority valid requested modifiers to the Delivery manager from peer1.
-      * Check on Delivery manager that peer1 priority is BadNode(1).
-      *
-      * Third - send downloadRequest for N modifiers to the delivery manager.
-      * Delivery manager must send requestModifier message for M modifiers to peer2.
-      * Send M valid requested modifiers to the Delivery manager from peer2.
-      * Check peer1 priority on this node - must be BadNode(1).
-      * Check peer2 priority on this node - must be HighPriority(4).
+      * Test expected behavior is:
+      * Send handshake to the Delivery Manager from cp1.
+      * Receive unexpected modifiers from cp1.
+      * cp1 priority must stay as InitialPriority.
       */
+    "not increment modifiers which will be putted in spam collection" in {
+      deliveryManager ! HandshakedPeer(cp1)
+      deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
+      Thread.sleep(500)
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
+        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp1)
+      Thread.sleep((settings.network.deliveryTimeout._1 * settings.network.maxDeliveryChecks) * 1000)
+      val priorityResultByPeer: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
+        deliveryManager.underlyingActor.syncTracker.statuses(cp1.socketAddress.getAddress)
 
-//    "shows right behaviour while several nodes are available" in {
-//      val newPeer1: InetSocketAddress = new InetSocketAddress("172.16.13.11", 9001)
-//      val peer1: ConnectedPeer = ConnectedPeer(newPeer1, deliveryManager, Incoming,
-//        Handshake(protocolToBytes(settings.network.appVersion), "peer1", Some(newPeer1), System.currentTimeMillis()))
-//
-//      deliveryManager ! HandshakedPeer(peer1)
-//      deliveryManager ! OtherNodeSyncingStatus(peer1, Older, None)
-//
-//      deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, blocks.map(_.header.id))
-//
-//      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-//        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), peer)
-//
-//      Thread.sleep(6000)
-//
-//      val priorityResultByPeer: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer.getAddress)
-//
-//      val priorityResultByPeer1: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer1.getAddress)
-//
-//      assert(priorityResultByPeer._3 == peer)
-//      assert(priorityResultByPeer._1 == Older)
-//      assert(priorityResultByPeer._2 == 4)
-//
-//      assert(priorityResultByPeer1._3 == peer1)
-//      assert(priorityResultByPeer1._1 == Older)
-//      assert(priorityResultByPeer1._2 == 2)
-//
-//      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-//        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), peer1)
-//
-//      Thread.sleep(6000)
-//
-//      val priorityResultByPeerNew: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer.getAddress)
-//
-//      val priorityResultByPeer1New: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer1.getAddress)
-//
-//      assert(priorityResultByPeerNew._3 == peer)
-//      assert(priorityResultByPeerNew._1 == Older)
-//      assert(priorityResultByPeerNew._2 == 4)
-//
-//      assert(priorityResultByPeer1New._3 == peer1)
-//      assert(priorityResultByPeer1New._1 == Older)
-//      assert(priorityResultByPeer1New._2 == 1)
-//
-//      val newPeer2: InetSocketAddress = new InetSocketAddress("172.16.13.15", 9001)
-//      val peer2: ConnectedPeer = ConnectedPeer(newPeer2, deliveryManager, Incoming,
-//        Handshake(protocolToBytes(settings.network.appVersion), "peer15", Some(newPeer2), System.currentTimeMillis()))
-//
-//      deliveryManager ! HandshakedPeer(peer2)
-//      deliveryManager ! OtherNodeSyncingStatus(peer2, Older, None)
-//
-//      deliveryManager ! RequestFromLocal(peer2, Payload.modifierTypeId, blocks.map(_.payload.id))
-//
-//      deliveryManager ! RequestFromLocal(peer, Payload.modifierTypeId, blocks.map(_.payload.id))
-//
-//      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-//        Header.modifierTypeId, blocks.take(2).map(block => block.payload.id -> block.payload.bytes).toMap), peer2)
-//
-//      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-//        Header.modifierTypeId, blocks.map(block => block.payload.id -> block.payload.bytes).toMap), peer)
-//
-//      Thread.sleep(6000)
-//
-//      val priorityResultByPeerNew1: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer.getAddress)
-//
-//      val priorityResultByPeer1New2: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer2.getAddress)
-//
-//      assert(priorityResultByPeerNew1._3 == peer)
-//      assert(priorityResultByPeerNew1._1 == Older)
-//      assert(priorityResultByPeerNew1._2 == 4)
-//
-//      assert(priorityResultByPeer1New2._3 == peer2)
-//      assert(priorityResultByPeer1New2._1 == Older)
-//      assert(priorityResultByPeer1New2._2 == 1)
-//    }
-
-    /**
-      * This test simulates DeliveryManager behaviour connected with updating nodes priority while blockChain synced.
-      *
-      * Send handshake to the Delivery Manager from peer1, peer2, peer3.
-      * Send downloadRequest for N modifiers to the Delivery manager.
-      * Delivery manager must send requestModifier message for N modifiers to all peers.
-      * Send N valid requested modifiers to the Delivery manager from all peers.
-      * Check on Delivery manager that peer1, peer2, peer3 priorities is HighPriority(4).
-      */
-
-//    "shows define same priorities correctly" in {
-//      val newPeer1: InetSocketAddress = new InetSocketAddress("172.16.13.11", 9001)
-//      val peer1: ConnectedPeer = ConnectedPeer(newPeer1, deliveryManager, Incoming,
-//        Handshake(protocolToBytes(settings.network.appVersion), "peer1", Some(newPeer1), System.currentTimeMillis()))
-//
-//      deliveryManager ! HandshakedPeer(peer1)
-//      deliveryManager ! OtherNodeSyncingStatus(peer1, Older, None)
-//
-//      val newPeer2: InetSocketAddress = new InetSocketAddress("172.16.13.12", 9001)
-//      val peer2: ConnectedPeer = ConnectedPeer(newPeer2, deliveryManager, Incoming,
-//        Handshake(protocolToBytes(settings.network.appVersion), "peer2", Some(newPeer2), System.currentTimeMillis()))
-//
-//      deliveryManager ! HandshakedPeer(peer2)
-//      deliveryManager ! OtherNodeSyncingStatus(peer2, Older, None)
-//
-//      deliveryManager ! RequestFromLocal(peer, Header.modifierTypeId, blocks.map(_.header.id))
-//      deliveryManager ! RequestFromLocal(peer1, Header.modifierTypeId, blocks.map(_.header.id))
-//      deliveryManager ! RequestFromLocal(peer2, Header.modifierTypeId, blocks.map(_.header.id))
-//
-//      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-//        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), peer)
-//
-//      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-//        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), peer1)
-//
-//      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-//        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), peer2)
-//
-//      Thread.sleep(6000)
-//
-//      val priorityResultByPeer: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer.getAddress)
-//
-//      val priorityResultByPeer1: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer1.getAddress)
-//
-//      val priorityResultByPeer2: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer2.getAddress)
-//
-//      assert(priorityResultByPeer._3 == peer)
-//      assert(priorityResultByPeer._1 == Older)
-//      assert(priorityResultByPeer._2 == 4)
-//
-//      assert(priorityResultByPeer1._3 == peer1)
-//      assert(priorityResultByPeer1._1 == Older)
-//      assert(priorityResultByPeer1._2 == 4)
-//
-//      assert(priorityResultByPeer2._3 == peer2)
-//      assert(priorityResultByPeer2._1 == Older)
-//      assert(priorityResultByPeer2._2 == 4)
-//    }
-
-//    "not increment modifiers which will be putted in spam collection" in {
-//      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-//        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), peer)
-//
-//      Thread.sleep(6000)
-//
-//      val priorityResultByPeer: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
-//        deliveryManager.underlyingActor.syncTracker.statuses(newPeer.getAddress)
-//
-//      assert(priorityResultByPeer._3 == peer)
-//      assert(priorityResultByPeer._1 == Older)
-//      assert(priorityResultByPeer._2 == 1)
-//    }
+      assert(priorityResultByPeer._3 == cp1)
+      assert(priorityResultByPeer._1 == Older)
+      assert(priorityResultByPeer._2 == 1)
+    }
   }
 }

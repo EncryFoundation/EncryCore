@@ -219,7 +219,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         && !requestedModifiersFromPeer.contains(toKey(id)) && !receivedModifiers.contains(toKey(id)))
 
       if (notYetRequested.nonEmpty) {
-        logger.info(s"Send request to ${peer.socketAddress.getAddress} for modifiers of type $mTypeId ")
+        logger.info(s"Send request to ${peer.socketAddress.getAddress} for ${notYetRequested.size} modifiers of type $mTypeId ")
         peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequested)
         syncTracker.incrementRequestForNModifiers(peer, notYetRequested.size)
         val requestedModIds: Map[ModifierIdAsKey, (Cancellable, PeerPriorityStatus)] =
@@ -255,7 +255,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
                         modId: ModifierId,
                         peerRequests: Map[ModifierIdAsKey, (Cancellable, Int)]): Unit =
     peerRequests.get(toKey(modId)) match {
-      case Some((timer, attempts)) =>
+      case Some((_, attempts)) =>
         syncTracker.statuses.find { case (innerPeerAddr, (cResult, _, _)) =>
           innerPeerAddr == peer.socketAddress.getAddress &&
             cResult != Younger && cResult != Fork
@@ -472,6 +472,6 @@ object DeliveryManager {
           }
         case RequestForTransactions(_, _, _) => 3
         case PoisonPill => 4
-        case otherwise => 2
+        case _ => 2
       })
 }
