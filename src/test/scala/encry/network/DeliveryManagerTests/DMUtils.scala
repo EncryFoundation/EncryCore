@@ -28,7 +28,7 @@ object DMUtils extends InstanceFactory {
     val history: EncryHistory = generateDummyHistory(settings)
     val deliveryManager: TestActorRef[DeliveryManager] =
       TestActorRef[DeliveryManager](DeliveryManager
-        .props(None, TestProbe().ref, TestProbe().ref, settings, TestProbe().ref).withDispatcher("delivery-manager-dispatcher"))
+        .props(None, TestProbe().ref, TestProbe().ref, settings, TestProbe().ref))
     deliveryManager ! UpdatedHistory(history)
     if (isMining) deliveryManager ! StartMining
     if (isBlockChainSynced) deliveryManager ! FullBlockChainIsSynced
