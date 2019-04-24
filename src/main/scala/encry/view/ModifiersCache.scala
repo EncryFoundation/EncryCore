@@ -112,6 +112,9 @@ object ModifiersCache extends StrictLogging {
       case Some(id) => history.modifierById(id) match {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           List(new mutable.WrappedArray.ofByte(header.payloadId))
+        case _ if !isChainSynced =>
+          logger.debug(s"ModsCache no applicable payload")
+          List.empty[Key]
         case _ => exhaustiveSearch
       }
       case None if isChainSynced =>
