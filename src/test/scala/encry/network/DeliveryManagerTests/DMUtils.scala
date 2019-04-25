@@ -1,10 +1,9 @@
 package encry.network.DeliveryManagerTests
 
 import java.net.InetSocketAddress
-
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
-import encry.local.miner.Miner.StartMining
+import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.Block
 import encry.network.BasicMessagesRepo.Handshake
@@ -15,7 +14,6 @@ import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.view.history.EncryHistory
-
 import scala.collection.mutable
 import scala.collection.mutable.WrappedArray
 
@@ -31,6 +29,7 @@ object DMUtils extends InstanceFactory {
         .props(None, TestProbe().ref, TestProbe().ref, settings, TestProbe().ref))
     deliveryManager ! UpdatedHistory(history)
     if (isMining) deliveryManager ! StartMining
+    else deliveryManager ! DisableMining
     if (isBlockChainSynced) deliveryManager ! FullBlockChainIsSynced
     (deliveryManager, history)
   }
