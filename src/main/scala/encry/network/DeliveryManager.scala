@@ -424,7 +424,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   /**
     * Transform modifier id to WrappedArray.ofBytes
     *
-    * @param id - modifier id which will be transform to WrappedArray of bytes
+    * @param id - modifier id which will be transform to WrappedArray of bytes.
     * @return transformed modifier id
     */
   def toKey(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
