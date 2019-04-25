@@ -134,6 +134,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
       case _ => logger.debug(s"DeliveryManager got invalid type of DataFromPeer message!")
     }
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: ModifierId, previousModifier: Option[ModifierId]) =>
+      logger.debug(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: ${modifierTypeId} prev mod: " +
+        s"${previousModifier.map(Algos.encode)}")
       if (previousModifier.isDefined && isBlockChainSynced)
         priorityRequest(modifierTypeId, modifiersId, previousModifier.get, history, isBlockChainSynced, isMining)
       else requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
@@ -436,7 +438,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * @param expectedModifiersFromPeer - collection of expected modifiers from 'peer'
     * @param modifierId                - modifier id, which will be removed from 'expectedModifiersFromPeer'
     * @param peer                      - 'peer' from which expected modifiers collection we remove received modifier
-    * @return - expectedModifiers collection without 'peer' or expectedModifiers with updated 'peer' expected collection.
+    * @return - expectedModifiers collection without 'peer' or expectedModifiers with updated 'peer' expected collection
     */
   def clearExpectedModifiersCollection(expectedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, Int)],
                                        modifierId: ModifierIdAsKey,
