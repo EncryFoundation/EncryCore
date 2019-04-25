@@ -146,19 +146,13 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
 
       handler1.expectMsgAllOf(
         RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)),
-        RequestModifiersNetworkMessage(Payload.modifierTypeId -> Seq(header.payloadId)),
+        RequestModifiersNetworkMessage(Payload.modifierTypeId -> Seq(header.payloadId))
       )
       handler2.expectMsgAllOf(RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)))
       handler3.expectMsgAllOf(RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)))
     }
     "not ask modifiers while block chain is not synced from Younger and Fork nodes" in {
       val (deliveryManager, _, _, _, blocks, _, _) = initialiseState(isChainSynced = false)
-
-      val address1 = new InetSocketAddress("123.123.123.123", 9001)
-      val handler1: TestProbe = TestProbe()
-      val cp1: ConnectedPeer = ConnectedPeer(address1, handler1.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion),
-          "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
       val address2 = new InetSocketAddress("123.123.123.124", 9001)
       val handler2: TestProbe = TestProbe()
@@ -172,8 +166,6 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.125", Some(address3), System.currentTimeMillis()))
 
-      deliveryManager ! HandshakedPeer(cp1)
-      deliveryManager ! OtherNodeSyncingStatus(cp1, Younger, None)
       deliveryManager ! HandshakedPeer(cp2)
       deliveryManager ! OtherNodeSyncingStatus(cp2, Fork, None)
       deliveryManager ! HandshakedPeer(cp3)
@@ -181,11 +173,9 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
 
       val header: Header = blocks.head.header
 
-      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(header.id))
       deliveryManager ! RequestFromLocal(cp2, Header.modifierTypeId, Seq(header.id))
       deliveryManager ! RequestFromLocal(cp3, Header.modifierTypeId, Seq(header.id))
 
-      handler1.expectNoMsg()
       handler2.expectNoMsg()
       handler3.expectMsgAllOf(RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)))
     }

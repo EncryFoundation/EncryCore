@@ -46,10 +46,11 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       .withDispatcher("delivery-manager-dispatcher"), "deliveryManager")
 
   override def preStart(): Unit = {
-    val messageIds: Seq[Byte] = Seq(
-      InvNetworkMessage.NetworkMessageTypeID,
-      RequestModifiersNetworkMessage.NetworkMessageTypeID,
-      SyncInfoNetworkMessage.NetworkMessageTypeID)
+    val messageIds: Seq[(Byte, String)] = Seq(
+      InvNetworkMessage.NetworkMessageTypeID              -> "InvNetworkMessage",
+      RequestModifiersNetworkMessage.NetworkMessageTypeID -> "RequestModifiersNetworkMessage",
+      SyncInfoNetworkMessage.NetworkMessageTypeID         -> "SyncInfoNetworkMessage"
+    )
     networkControllerRef ! RegisterMessagesHandler(messageIds, self)
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
@@ -175,10 +176,6 @@ object NodeViewSynchronizer {
     (source: ConnectedPeer, modifierTypeId: ModifierTypeId, localObjects: Seq[M])
 
     case class RequestFromLocal(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
-
-    //    case class CheckDelivery(source: ConnectedPeer,
-    //                             modifierTypeId: ModifierTypeId,
-    //                             modifierId: ModifierId)
 
     trait PeerManagerEvent
 

@@ -62,7 +62,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
   val syncTracker: SyncTracker = SyncTracker(self, context, settings.network)
 
   override def preStart(): Unit = {
-    networkControllerRef ! RegisterMessagesHandler(Seq(ModifiersNetworkMessage.NetworkMessageTypeID), self)
+    networkControllerRef ! RegisterMessagesHandler(
+      Seq(ModifiersNetworkMessage.NetworkMessageTypeID -> "ModifiersNetworkMessage"), self)
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
   }
 
@@ -242,7 +243,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   def schedulerChecker(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId): Unit =
     checkDelivery(peer, modifierTypeId, modifierId)
   /**
-    * Re-ask 'modifierId' from 'peer' if needed. We will do this only if we are expecting this modifier from 'peer'
+    * Re-ask 'modifierId' from 'peer' if needed. We will do this only if we are expecting these modifier from 'peer'
     * and if number of attempts doesn't expired yet.
     * This activity will update timer on re-asked modifier.
     *
