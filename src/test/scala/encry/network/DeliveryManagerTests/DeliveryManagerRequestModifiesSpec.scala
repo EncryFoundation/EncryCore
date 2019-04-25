@@ -3,7 +3,7 @@ package encry.network.DeliveryManagerTests
 import java.net.InetSocketAddress
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestKit, TestProbe}
-import encry.consensus.History.{Fork, Older, Younger}
+import encry.consensus.History.{Fork, Older}
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.mempool.Transaction
@@ -151,7 +151,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       handler2.expectMsgAllOf(RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)))
       handler3.expectMsgAllOf(RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)))
     }
-    "not ask modifiers while block chain is not synced from Younger and Fork nodes" in {
+    "not ask modifiers while block chain is not synced from Fork nodes" in {
       val (deliveryManager, _, _, _, blocks, _, _) = initialiseState(isChainSynced = false)
 
       val address2 = new InetSocketAddress("123.123.123.124", 9001)
