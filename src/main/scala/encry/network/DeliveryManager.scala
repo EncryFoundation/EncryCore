@@ -312,7 +312,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case Some(data) =>
       data.groupBy(_._1).mapValues(_.map(_._2)).foreach {
         case (mTid, mods) if mods.size <= settings.network.maxInvObjects =>
-          networkControllerRef ! SendToNetwork(InvNetworkMessage(mTid -> mods), SendToPeer(peer))
+          peer.handlerRef ! InvNetworkMessage(mTid -> mods)
         case (_, mods) => logger.info(s"Tried to send inv message with size ${mods.size}. Current size is redundant.")
       }
     case None => logger.info(s"dataForInvMessage is empty for: $peer. Peer's status is: $status.")
@@ -466,6 +466,9 @@ object DeliveryManager {
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
         case RequestFromLocal(_, _, _) => 0
+
+        case OtherNodeSyncingStatus(_, _, _) => 1
+
         case DataFromPeer(msg: ModifiersNetworkMessage, _) =>
           msg match {
             case ModifiersNetworkMessage((typeId, _)) if typeId != Transaction.ModifierTypeId => 1
