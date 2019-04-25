@@ -402,7 +402,7 @@ object EncryNodeViewHolder {
   class EncryNodeViewHolderPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
-        case CompareViews(_, _, _) | LocallyGeneratedModifier(_) => 0
+        case CompareViews(_, _, _) => 0
 
         case PoisonPill => 2
 
