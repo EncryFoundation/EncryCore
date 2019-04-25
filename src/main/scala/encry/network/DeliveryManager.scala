@@ -242,7 +242,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   def schedulerChecker(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId): Unit =
     checkDelivery(peer, modifierTypeId, modifierId)
   /**
-    * Re-ask 'modifierId' from 'peer' if needed. We will do this only if awaiting this modifier from 'peer'
+    * Re-ask 'modifierId' from 'peer' if needed. We will do this only if we are expecting this modifier from 'peer'
     * and if number of attempts doesn't expired yet.
     * This activity will update timer on re-asked modifier.
     *

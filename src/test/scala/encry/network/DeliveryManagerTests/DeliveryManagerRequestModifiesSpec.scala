@@ -7,7 +7,7 @@ import encry.consensus.History.{Fork, Older, Younger}
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.mempool.Transaction
-import encry.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
+import encry.network.BasicMessagesRepo._
 import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, OtherNodeSyncingStatus, RequestFromLocal}
@@ -249,7 +249,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
 
       handler1.expectNoMsg()
     }
-    "not ask modifiers which already have been received" in {
+    "not re-ask modifiers which already have been received" in {
       val (deliveryManager, _, _, _, blocks, _, _) = initialiseState(isChainSynced = false)
 
       val address1 = new InetSocketAddress("123.123.123.123", 9001)
