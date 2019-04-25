@@ -223,7 +223,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   }
 
   def pmodModify(pmod: EncryPersistentModifier, isLocallyGenerated: Boolean = false): Unit = if (!nodeView.history.contains(pmod.id)) {
-    logger.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
+    logger.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder.")
     if (settings.influxDB.isDefined) context.system
       .actorSelection("user/statsSender") !
       StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
