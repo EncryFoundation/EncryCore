@@ -301,7 +301,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   def genesisState: NodeView = {
     val stateDir: File = EncryState.getStateDir(settings)
     stateDir.mkdir()
-    assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
+    assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty.")
     val state: StateType = {
       if (settings.node.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings)
       else EncryState.generateGenesisUtxoState(stateDir, Some(self), settings, influxRef)
