@@ -112,8 +112,9 @@ class NetworkController extends Actor with StrictLogging {
   }
 
   override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse {
-    case RegisterMessagesHandler(ids, handler) =>
-      logger.info(s"Registering handlers for ${ids.mkString(",")}.")
+    case RegisterMessagesHandler(types, handler) =>
+      logger.info(s"Registering handlers for ${types.mkString(",")}.")
+      val ids = types.map(_._1)
       messagesHandlers += (ids -> handler)
     case CommandFailed(cmd: Tcp.Command) =>
       context.actorSelection("/user/statsSender") ! "Failed to execute command : " + cmd
@@ -127,7 +128,7 @@ object NetworkController {
 
     case class DataFromPeer(message: NetworkMessage, source: ConnectedPeer)
 
-    case class RegisterMessagesHandler(ids: Seq[Byte], handler: ActorRef)
+    case class RegisterMessagesHandler(types: Seq[(Byte, String)], handler: ActorRef)
 
     case class SendToNetwork(message: NetworkMessage, sendingStrategy: SendingStrategy)
 
