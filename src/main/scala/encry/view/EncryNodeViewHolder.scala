@@ -4,8 +4,10 @@ import java.io.File
 
 import HeaderProto.HeaderProtoMessage
 import PayloadProto.PayloadProtoMessage
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
+import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
+import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp._
@@ -396,6 +398,16 @@ object EncryNodeViewHolder {
     (pmod: EncryPersistentModifier)
 
   }
+
+  class EncryNodeViewHolderPriorityQueue(settings: ActorSystem.Settings, config: Config)
+    extends UnboundedStablePriorityMailbox(
+      PriorityGenerator {
+        case CompareViews(_, _, _) => 0
+
+        case PoisonPill => 2
+
+        case otherwise => 1
+      })
 
   def props(auxHistoryHolder: ActorRef, memoryPoolRef: ActorRef): Props = settings.node.stateMode match {
     case StateMode.Digest => Props(new EncryNodeViewHolder[DigestState](auxHistoryHolder, memoryPoolRef))
