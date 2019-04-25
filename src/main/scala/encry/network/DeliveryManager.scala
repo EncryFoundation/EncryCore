@@ -228,7 +228,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     val secondCondition: Boolean = mTypeId != Transaction.ModifierTypeId
     val thirdCondition =
       if (!isBlockChainSynced) syncTracker.statuses.get(peer.socketAddress.getAddress)
-        .exists { case (comrResult, _, _) => comrResult != Younger && comrResult != Fork }
+        .exists { case (comrResult, _, _) => comrResult != Fork }
       else syncTracker.statuses.contains(peer.socketAddress.getAddress)
 
     //.exists { case (comrResult, _, _) => comrResult != Fork }
