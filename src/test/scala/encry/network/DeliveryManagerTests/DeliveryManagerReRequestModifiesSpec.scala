@@ -69,6 +69,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       )
       //this thread sleep is using for expecting modifier removal
       Thread.sleep(6000)
+
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress.getAddress, Map.empty).isEmpty)
     }
     "not re-ask unnecessary modifiers" in {
