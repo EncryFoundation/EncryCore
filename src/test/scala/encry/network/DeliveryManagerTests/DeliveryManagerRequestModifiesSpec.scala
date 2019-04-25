@@ -144,10 +144,12 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
 
       deliveryManager ! DownloadRequest(Payload.modifierTypeId, header.payloadId, Some(header.id))
 
-      handler1.expectMsgAllOf(
+      handler1.expectMsgAnyOf(
         RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)),
-        RequestModifiersNetworkMessage(Payload.modifierTypeId -> Seq(header.payloadId))
+        RequestModifiersNetworkMessage(Payload.modifierTypeId -> Seq(header.payloadId)),
+        SyncInfoNetworkMessage(EncrySyncInfo(List()))
       )
+
       handler2.expectMsgAllOf(RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)))
       handler3.expectMsgAllOf(RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)))
     }
