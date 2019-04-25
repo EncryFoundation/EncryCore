@@ -9,7 +9,7 @@ import encry.modifiers.history.{Block, Header}
 import encry.modifiers.mempool.Transaction
 import encry.network.BasicMessagesRepo._
 import encry.network.DeliveryManager
-import encry.network.DeliveryManagerTests.DMUtils.{createPeer, generateBlocks, initialiseDeliveryManager, toKey}
+import encry.network.DeliveryManagerTests.DMUtils._
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
