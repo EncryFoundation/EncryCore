@@ -91,7 +91,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             val ext: ModifierIds = extensionOpt.getOrElse(Seq())
             val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
             logger.info(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
-              s"Comparison result is $comparison. Sending extension of length ${ext.length}")
+              s"Comparison result is $comparison. Sending extension of length ${ext.length}.")
             if (!(extensionOpt.nonEmpty || comparison != Younger)) logger.warn("Extension is empty while comparison is younger")
             deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
           case _ =>
