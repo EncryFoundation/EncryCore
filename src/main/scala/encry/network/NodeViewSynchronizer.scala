@@ -92,7 +92,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             val ext: ModifierIds = extensionOpt.getOrElse(Seq())
             val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
             logger.info(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
-              s"Comparison result is $comparison. Sending extension of length ${ext.length}")
+              s"Comparison result is $comparison. Sending extension of length ${ext.length}.")
             if (!(extensionOpt.nonEmpty || comparison != Younger)) logger.warn("Extension is empty while comparison is younger")
             deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
           case _ =>
@@ -219,19 +219,19 @@ object NodeViewSynchronizer {
         case DataFromPeer(msg, _) => msg match {
           case SyncInfoNetworkMessage(_) => 1
           case InvNetworkMessage(data) if data._1 != Transaction.ModifierTypeId => 1
-          case RequestModifiersNetworkMessage(data) if data._1 != Transaction.ModifierTypeId => 1
-          case _ => 3
+          case RequestModifiersNetworkMessage(data) if data._1 != Transaction.ModifierTypeId => 2
+          case _ => 4
         }
 
         case SemanticallySuccessfulModifier(mod) => mod match {
-          case tx: Transaction => 3
+          case tx: Transaction => 4
           case _ => 1
         }
 
-        case SuccessfulTransaction(_) => 3
+        case SuccessfulTransaction(_) => 4
 
-        case PoisonPill => 4
+        case PoisonPill => 5
 
-        case otherwise => 2
+        case otherwise => 3
       })
 }

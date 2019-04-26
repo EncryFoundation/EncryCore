@@ -4,8 +4,10 @@ import java.io.File
 
 import HeaderProto.HeaderProtoMessage
 import PayloadProto.PayloadProtoMessage
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
+import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
+import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp._
@@ -221,7 +223,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   }
 
   def pmodModify(pmod: EncryPersistentModifier, isLocallyGenerated: Boolean = false): Unit = if (!nodeView.history.contains(pmod.id)) {
-    logger.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder")
+    logger.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder.")
     if (settings.influxDB.isDefined) context.system
       .actorSelection("user/statsSender") !
       StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
@@ -299,7 +301,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   def genesisState: NodeView = {
     val stateDir: File = EncryState.getStateDir(settings)
     stateDir.mkdir()
-    assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty")
+    assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty.")
     val state: StateType = {
       if (settings.node.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings)
       else EncryState.generateGenesisUtxoState(stateDir, Some(self), settings, influxRef)
@@ -396,6 +398,16 @@ object EncryNodeViewHolder {
     (pmod: EncryPersistentModifier)
 
   }
+
+  class EncryNodeViewHolderPriorityQueue(settings: ActorSystem.Settings, config: Config)
+    extends UnboundedStablePriorityMailbox(
+      PriorityGenerator {
+        case CompareViews(_, _, _) => 0
+
+        case PoisonPill => 2
+
+        case otherwise => 1
+      })
 
   def props(auxHistoryHolder: ActorRef, memoryPoolRef: ActorRef): Props = settings.node.stateMode match {
     case StateMode.Digest => Props(new EncryNodeViewHolder[DigestState](auxHistoryHolder, memoryPoolRef))

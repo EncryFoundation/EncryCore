@@ -195,7 +195,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     } shouldBe true
   }
 
-  property("Check that after rollback, it is impossible to get last generated version") {
+  property("Check that after rollback, it is impossible to get last generated version.") {
 
     val maxVersions = Random.nextInt(1000) + 15
 
