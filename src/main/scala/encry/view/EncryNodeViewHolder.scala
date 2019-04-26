@@ -84,7 +84,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
           Try(PayloadProtoSerializer.fromProto(PayloadProtoMessage.parseFrom(bytes)).foreach { payload =>
             logger.info(s"after ser: ${Algos.encode(payload.id)}")
             if (nodeView.history.contains(payload.id) || ModifiersCache.contains(key(payload.id)))
-              logger.warn(s"Received modifier ${payload.encodedId} that is already in history(" +
+              logger.info(s"Received modifier ${payload.encodedId} that is already in history(" +
                 s"history: ${nodeView.history.contains(payload.id)}. Cache: ${ModifiersCache.contains(key(payload.id))})")
             else ModifiersCache.put(key(payload.id), payload, nodeView.history)
           })
@@ -94,7 +94,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         modifiers.foreach { bytes =>
           Try(HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)).foreach { header =>
             if (nodeView.history.contains(header.id) || ModifiersCache.contains(key(header.id)))
-              logger.warn(s"Received modifier ${header.encodedId} that is already in history(" +
+              logger.info(s"Received modifier ${header.encodedId} that is already in history(" +
                 s"history: ${nodeView.history.contains(header.id)}. Cache: ${ModifiersCache.contains(key(header.id))})")
             else ModifiersCache.put(key(header.id), header, nodeView.history)
             if (settings.influxDB.isDefined && nodeView.history.isFullChainSynced) {
@@ -124,6 +124,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       val ids: Seq[ModifierId] = modifierTypeId match {
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
+      if (modifierTypeId != Transaction.ModifierTypeId) logger.info(s"Got compare view message on NVH from ${peer.socketAddress}." +
+        s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
+        s" Sending RequestFromLocal with ids to $sender." +
+        s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
       if (ids.nonEmpty) sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case a: Any => logger.error(s"Strange input: $a")
   }
@@ -152,7 +156,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   }
 
   def requestDownloads(pi: ProgressInfo[EncryPersistentModifier], previousModifier: Option[ModifierId] = None): Unit =
-    pi.toDownload.foreach { case (tid, id) => nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier) }
+    pi.toDownload.foreach { case (tid, id) =>
+      if (tid != Transaction.ModifierTypeId) logger.info(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
+        s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
+      nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
+    }
 
   def trimChainSuffix(suffix: IndexedSeq[EncryPersistentModifier], rollbackPoint: ModifierId):
   IndexedSeq[EncryPersistentModifier] = {
@@ -259,7 +267,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
               }
               updateNodeView(Some(newHistory), Some(newMinState), Some(nodeView.wallet))
             case Failure(e) =>
-              logger.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
+              logger.info(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
                 s"to minimal state because of: $e")
               updateNodeView(updatedHistory = Some(newHistory))
               context.system.eventStream.publish(SemanticallyFailedModification(pmod, e))

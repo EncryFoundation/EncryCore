@@ -34,7 +34,7 @@ object ModifiersCache extends StrictLogging {
   def contains(key: Key): Boolean = cache.contains(key)
 
   def put(key: Key, value: EncryPersistentModifier, history: EncryHistory): Unit = if (!contains(key)) {
-    logger.debug(s"put ${Algos.encode(key.toArray)} to cache")
+    logger.info(s"put ${Algos.encode(key.toArray)} to cache")
     cache.put(key, value)
     value match {
       case header: Header =>
@@ -88,7 +88,7 @@ object ModifiersCache extends StrictLogging {
       headersCollection.get(history.bestHeaderHeight + 1) match {
         case Some(value) =>
           headersCollection = headersCollection - (history.bestHeaderHeight + 1)
-          logger.debug(s"HeadersCollection size is: ${headersCollection.size}")
+          logger.info(s"HeadersCollection size is: ${headersCollection.size}")
           value.map(cache.get(_)).collect {
             case Some(v: Header)
               if (
@@ -98,12 +98,12 @@ object ModifiersCache extends StrictLogging {
                     )
                 )
                 && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
-              logger.debug(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
+              logger.info(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
               new mutable.WrappedArray.ofByte(v.id)
           }
 
         case None =>
-          logger.debug(s"No best header in cache")
+          logger.info(s"No best header in cache")
           List[Key]()
       }
     }
@@ -113,14 +113,14 @@ object ModifiersCache extends StrictLogging {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           List(new mutable.WrappedArray.ofByte(header.payloadId))
         case _ if !isChainSynced =>
-          logger.debug(s"ModsCache no applicable payload")
+          logger.info(s"ModsCache no applicable payload")
           List.empty[Key]
         case _ => exhaustiveSearch
       }
       case None if isChainSynced =>
-        logger.debug(s"No payloads for current history")
+        logger.info(s"No payloads for current history")
         exhaustiveSearch
-      case None => logger.debug(s"No payloads for current history")
+      case None => logger.info(s"No payloads for current history")
         List.empty[Key]
     }
   }
