@@ -6,6 +6,7 @@ import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
 import encry.modifiers.state.box.Box.Amount
 import encry.modifiers.state.box.{AssetBox, EncryProposition}
+import encry.network.DeliveryManagerTests.DMUtils.{generateDummyHistory, generateNextBlock}
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.ModifierId
@@ -24,6 +25,7 @@ import org.encryfoundation.prismlang.core.Ast.Expr
 import org.encryfoundation.prismlang.core.{Ast, Types}
 import org.iq80.leveldb.Options
 import scorex.utils.Random
+
 import scala.util.{Random => Scarand}
 
 trait InstanceFactory extends Keys with EncryGenerator {
@@ -136,20 +138,86 @@ trait InstanceFactory extends Keys with EncryGenerator {
           Block(header, payload, None)
         }
         val newUtxo = block.payload.transactions.flatMap(_.newBoxes)
-        (fakeBlockchain :+ block) -> newUtxo.collect{case ab: AssetBox => ab}
+        (fakeBlockchain :+ block) -> newUtxo.collect { case ab: AssetBox => ab }
     }
   }._1
 
+  def genForkOn(qty: Int,
+                addDifficulty: BigInt = 0,
+                from: Int,
+                to: Int,
+                settings: EncryAppSettings): (List[Block], List[Block]) = {
+    val history: EncryHistory = generateDummyHistory(settings)
+    val forkInterval = (from until to).toList
+    (0 until qty).foldLeft((List(history), List.empty[Block] -> List.empty[Block])) {
+      case ((histories, blocks), blockHeight) =>
+        if (forkInterval.contains(blockHeight)) {
+          if (histories.length == 1) {
+            val secondHistory = generateDummyHistory(settings)
+            blocks._1.foldLeft(secondHistory) {
+              case (prevHistory, blockToApply) =>
+                prevHistory.append(blockToApply.header).get._1.append(blockToApply.payload).get._1.reportModifierIsValid(blockToApply)
+            }
+            val nextBlockInFirstChain = generateNextBlock(histories.head)
+            val nextBlockInSecondChain = generateNextBlock(secondHistory, additionalDifficulty = addDifficulty)
+            (
+              List(
+                histories.head.append(nextBlockInFirstChain.header).get._1.append(nextBlockInFirstChain.payload).get._1.reportModifierIsValid(nextBlockInFirstChain),
+                secondHistory.append(nextBlockInSecondChain.header).get._1.append(nextBlockInSecondChain.payload).get._1.reportModifierIsValid(nextBlockInSecondChain)
+              ),
+              (blocks._1 :+ nextBlockInFirstChain) -> List(nextBlockInSecondChain)
+            )
+          } else {
+            val nextBlockInFirstChain = generateNextBlock(histories.head)
+            val nextBlockInSecondChain = generateNextBlock(histories.last, additionalDifficulty = addDifficulty)
+            (
+              List(
+                histories.head.append(nextBlockInFirstChain.header).get._1.append(nextBlockInFirstChain.payload).get._1.reportModifierIsValid(nextBlockInFirstChain),
+                histories.last.append(nextBlockInSecondChain.header).get._1.append(nextBlockInSecondChain.payload).get._1.reportModifierIsValid(nextBlockInSecondChain)
+              ),
+              (blocks._1 :+ nextBlockInFirstChain) -> (blocks._2 :+ nextBlockInSecondChain)
+            )
+          }
+        } else {
+          val block: Block = generateNextBlock(histories.head)
+          (
+            List(
+              histories.head.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
+            ),
+            (blocks._1 :+ block) -> blocks._2
+          )
+        }
+    }._2
+  }
+
   def generateNextBlock(history: EncryHistory,
-                        difficultyDiff: BigInt = 0,
+                        difficultyDiff: BigInt = 1,
                         prevId: Option[ModifierId] = None,
-                        txsQty: Int = 100): Block = {
+                        txsQty: Int = 100,
+                        additionalDifficulty: BigInt = 0): Block = {
     val previousHeaderId: ModifierId =
       prevId.getOrElse(history.bestHeaderOpt.map(_.id).getOrElse(Header.GenesisParentId))
     val requiredDifficulty: Difficulty = history.bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
       .getOrElse(Constants.Chain.InitialDifficulty)
     val txs = (if (txsQty != 0) genValidPaymentTxs(Scarand.nextInt(txsQty)) else Seq.empty) ++
       Seq(coinbaseTransaction)
+    val header = genHeader.copy(
+      parentId = previousHeaderId,
+      height = history.bestHeaderHeight + 1,
+      difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff + additionalDifficulty),
+      transactionsRoot = Payload.rootHash(txs.map(_.id))
+    )
+    Block(header, Payload(header.id, txs), None)
+  }
+
+  def generateNextBlockValidForHistory(history: EncryHistory,
+                                       difficultyDiff: BigInt = 0,
+                                       score: BigInt = 1,
+                                       prevBlock: Option[Block],
+                                       txs: Seq[Transaction]): Block = {
+    val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
+    val requiredDifficulty: Difficulty = prevBlock.map(b => history.requiredDifficultyAfter(b.header))
+      .getOrElse(Constants.Chain.InitialDifficulty)
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.bestHeaderHeight + 1,

@@ -12,18 +12,15 @@ import encry.modifiers.history._
 import encry.settings.Constants._
 import encry.settings.{Constants, EncryAppSettings}
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{VersionalLevelDbKey, VersionalLevelDbValue}
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbValue
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.utils.NetworkTimeProvider
 import encry.validation.{ModifierValidator, ValidationResult}
 import encry.view.history.History.Height
 import encry.view.history.storage.HistoryStorage
-import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import scorex.crypto.hash.Digest32
 import supertagged.@@
-
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.collection.immutable.HashSet
@@ -33,13 +30,12 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   protected val settings: EncryAppSettings
   protected val timeProvider: NetworkTimeProvider
-  private val difficultyController: PowLinearController.type = PowLinearController
-  val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
-  protected val BestHeaderKey: StorageKey =
-    StorageKey @@ Array.fill(DigestLength)(Header.modifierTypeId.untag(ModifierTypeId))
+  protected val difficultyController: PowLinearController.type = PowLinearController
+  protected val BestHeaderKey: StorageKey = StorageKey @@ Array.fill(DigestLength)(Header.modifierTypeId.untag(ModifierTypeId))
   protected val BestBlockKey: StorageKey = StorageKey @@ Array.fill(DigestLength)(-1: Byte)
   protected val historyStorage: HistoryStorage
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node)
+  val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
   private var isHeadersChainSyncedVar: Boolean = false
 
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
@@ -51,27 +47,17 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       else {
         headerIdsAtHeight(height).headOption.flatMap(id => typedModifierById[Header](id)) match {
           case Some(bestHeaderAtThisHeight) =>
-            logger.debug(s"requiredModifiersForHeader($bestHeaderAtThisHeight) ->" +
-              s"${requiredModifiersForHeader(bestHeaderAtThisHeight).map(x => Algos.encode(x._2))}")
-            val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
-
-            val b = toDownload.filter(m => !excluding.exists(_ sameElements m._2))
-
-            val c = b.filter(m => !contains(m._2)) //todo can we combine this 2 filter?
-
-            continuation(Height @@ (height + 1), acc ++ c)
+            val mods: Seq[(ModifierTypeId, ModifierId)] = requiredModifiersForHeader(bestHeaderAtThisHeight)
+              .filter(m => !excluding.exists(_ sameElements m._2) && !contains(m._2))
+            continuation(Height @@ (height + 1), acc ++ mods)
           case None => acc
         }
       }
 
-    logger.debug(s"BEST BLOCK OPT ${bestBlockOpt.map(x => Algos.encode(x.id))}")
     bestBlockOpt match {
-      case _ if !isHeadersChainSynced =>
-        Seq.empty
-      case Some(fb) =>
-        continuation(Height @@ (fb.header.height + 1), Seq.empty)
-      case None =>
-        continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
+      case _ if !isHeadersChainSynced => Seq.empty
+      case Some(fb) => continuation(Height @@ (fb.header.height + 1), Seq.empty)
+      case None     => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
 
@@ -92,7 +78,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     bestBlockOpt match {
       case _ if !isHeadersChainSynced => Seq.empty
       case Some(fb) => continuation(Height @@ (fb.header.height + 1), Seq.empty)
-      case None => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
+      case None     => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
 
@@ -176,16 +162,16 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         val score: BigInt @@ ConsensusTaggedTypes.Difficulty.Tag =
           Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
         val bestRow: Seq[(StorageKey, StorageValue)] =
-          if ((header.height > bestHeaderHeight) ||
-            (header.height == bestHeaderHeight && score > bestHeadersChainScore))
-            Seq(BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId)) else Seq.empty
+          if ((header.height > bestHeaderHeight) || (header.height == bestHeaderHeight && score > bestHeadersChainScore))
+            Seq(BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId))
+          else Seq.empty
         val scoreRow: (StorageKey, StorageValue) =
           headerScoreKey(header.id) -> StorageValue @@ score.toByteArray
         val heightRow: (StorageKey, StorageValue) =
           headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(header.height)
         val headerIdsRow: Seq[(StorageKey, StorageValue)] =
-          if ((header.height > bestHeaderHeight) ||
-            (header.height == bestHeaderHeight && score > bestHeadersChainScore)) bestBlockHeaderIdsRow(header, score)
+          if ((header.height > bestHeaderHeight) || (header.height == bestHeaderHeight && score > bestHeadersChainScore))
+            bestBlockHeaderIdsRow(header, score)
           else {
             if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(header)
             orphanedBlockHeaderIdsRow(header, score)

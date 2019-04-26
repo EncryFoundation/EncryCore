@@ -10,8 +10,10 @@ import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.validation.{ModifierValidator, ValidationResult}
 import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.syntax._
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import scorex.crypto.encode.Base16
+
 import scala.util.Try
 
 case class Block(header: Header,
@@ -64,7 +66,8 @@ case class Block(header: Header,
   }
 
   override def toString: String = s"<Block height=${header.height} timestamp=${header.timestamp} " +
-    s"txQty=${payload.transactions.size} id=${header.encodedId}>"
+    s"txQty=${payload.transactions.size} id=${header.encodedId}, parentId=${Algos.encode(header.parentId)} " +
+    s"difficulty=${header.difficulty}>"
 
   def toProtoBlock: BlockProtoMessage = BlockProtoSerializer.toProto(this)
 }

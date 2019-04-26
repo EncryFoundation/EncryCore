@@ -34,10 +34,10 @@ object DMUtils extends InstanceFactory {
     (deliveryManager, history)
   }
 
-  def generateBlocks(qty: Int, history: EncryHistory): (EncryHistory, List[Block]) =
+  def generateBlocks(qty: Int, history: EncryHistory, addDifficulty: BigInt = 0): (EncryHistory, List[Block]) =
     (0 until qty).foldLeft(history, List.empty[Block]) {
       case ((prevHistory, blocks), _) =>
-        val block: Block = generateNextBlock(prevHistory)
+        val block: Block = generateNextBlock(prevHistory, additionalDifficulty = addDifficulty)
         (prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block), blocks :+ block)
     }
 
