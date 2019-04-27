@@ -134,6 +134,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
       case _ => logger.debug(s"DeliveryManager got invalid type of DataFromPeer message!")
     }
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: ModifierId, previousModifier: Option[ModifierId]) =>
+      logger.debug(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: ${modifierTypeId} prev mod: " +
+        s"${previousModifier.map(Algos.encode)}")
       if (previousModifier.isDefined && isBlockChainSynced)
         priorityRequest(modifierTypeId, modifiersId, previousModifier.get, history, isBlockChainSynced, isMining)
       else requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
@@ -312,7 +314,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case Some(data) =>
       data.groupBy(_._1).mapValues(_.map(_._2)).foreach {
         case (mTid, mods) if mods.size <= settings.network.maxInvObjects =>
-          networkControllerRef ! SendToNetwork(InvNetworkMessage(mTid -> mods), SendToPeer(peer))
+          peer.handlerRef ! InvNetworkMessage(mTid -> mods)
         case (_, mods) => logger.info(s"Tried to send inv message with size ${mods.size}. Current size is redundant.")
       }
     case None => logger.info(s"dataForInvMessage is empty for: $peer. Peer's status is: $status.")
@@ -422,7 +424,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   /**
     * Transform modifier id to WrappedArray.ofBytes
     *
-    * @param id - modifier id which will be transform to WrappedArray of bytes
+    * @param id - modifier id which will be transform to WrappedArray of bytes.
     * @return transformed modifier id
     */
   def toKey(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
@@ -436,7 +438,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * @param expectedModifiersFromPeer - collection of expected modifiers from 'peer'
     * @param modifierId                - modifier id, which will be removed from 'expectedModifiersFromPeer'
     * @param peer                      - 'peer' from which expected modifiers collection we remove received modifier
-    * @return - expectedModifiers collection without 'peer' or expectedModifiers with updated 'peer' expected collection.
+    * @return - expectedModifiers collection without 'peer' or expectedModifiers with updated 'peer' expected collection
     */
   def clearExpectedModifiersCollection(expectedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, Int)],
                                        modifierId: ModifierIdAsKey,
@@ -466,6 +468,9 @@ object DeliveryManager {
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
         case RequestFromLocal(_, _, _) => 0
+
+        case OtherNodeSyncingStatus(_, _, _) => 1
+
         case DataFromPeer(msg: ModifiersNetworkMessage, _) =>
           msg match {
             case ModifiersNetworkMessage((typeId, _)) if typeId != Transaction.ModifierTypeId => 1

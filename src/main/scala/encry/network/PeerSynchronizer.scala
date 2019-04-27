@@ -42,7 +42,7 @@ class PeerSynchronizer extends Actor with StrictLogging {
               else !address.getAddress.isSiteLocalAddress && address != remote.socketAddress
             })
             logger.info(s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
-            networkController ! SendToNetwork(PeersNetworkMessage(correctPeers), SendToPeer(remote))
+            remote.handlerRef ! PeersNetworkMessage(correctPeers)
             logger.debug(s"Send to ${remote.socketAddress} peers message which contains next peers: ${peers.mkString(",")}")
           }
       case _ => logger.info(s"PeerSynchronizer got invalid type of DataFromPeer message!")
