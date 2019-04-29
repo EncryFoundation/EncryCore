@@ -68,13 +68,16 @@ class HistoryComparisionResultTest extends WordSpecLike
       assert(comparisonResult == Younger)
     }
 
-    "mark history as Fork where our history doesn't contain all ids from other history and they are out of range our last ids" in {
+    "mark history as Fork when we have same point in histories" in {
       val history: EncryHistory = generateDummyHistory(settings)
-      val blocks: List[Block] = generateBlocks(100, generateDummyHistory(settings))._2
-      val syncInfo: EncrySyncInfo = EncrySyncInfo(
-        generateBlocks(30, generateDummyHistory(settings))._2.map(_.header.id))
 
-      val updatedHistory: EncryHistory = blocks.foldLeft(history) { case (hst, block) =>
+      val fork = genForkOn(100, 1000, 25, 30, settings)
+
+      val syncInfo: EncrySyncInfo = EncrySyncInfo(
+        fork._1.take(25).map(_.header.id) ++: fork._2.map(_.header.id)
+      )
+
+      val updatedHistory: EncryHistory = fork._1.take(30).foldLeft(history) { case (hst, block) =>
         hst.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
       }
 

@@ -65,11 +65,11 @@ trait EncryHistoryReader extends BlockHeaderProcessor
          our history contains all ids from other history, but they are out of range our best header */
     case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.forall(contains) => Younger
 
-    //Our history doesn't contain all ids from other history and they are out of range our last ids
-    case Some(_) if !si.lastHeaderIds.forall(contains) => Fork
-
-    //Strange comparison result
-    case Some(_) => Unknown
+    case Some(_) =>
+      //Our history contains some ids from other history
+      if (si.lastHeaderIds.exists(contains)) Fork
+      //Unknown comparison result
+      else Unknown
 
     //Both nodes do not keep any blocks
     case None if si.lastHeaderIds.isEmpty => Equal
