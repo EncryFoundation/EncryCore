@@ -90,7 +90,7 @@ class HistoryComparisionResultTest extends WordSpecLike
       assert(comparisonResult == Equal)
     }
 
-    "mark history as Older" in {
+    "mark history as Older " in {
       val history: EncryHistory = generateDummyHistory(settings)
       val syncInfo: EncrySyncInfo = EncrySyncInfo(
         generateBlocks(30, generateDummyHistory(settings))._2.map(_.header.id))
