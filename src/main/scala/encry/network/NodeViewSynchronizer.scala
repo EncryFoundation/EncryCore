@@ -129,8 +129,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           s"node is not synced, so ignore msg")
       case InvNetworkMessage(invData) =>
         //logger.info(s"Got inv message from ${remote.socketAddress} with modifiers: ${invData._2.map(Algos.encode).mkString(",")} ")
-        if (invData._1 == Transaction.ModifierTypeId && chainSynced)
-          memoryPoolRef ! CompareTransactionsWithUnconfirmed(remote, invData._2.toIndexedSeq)
+        if (invData._1 == Transaction.ModifierTypeId) {
+          if (chainSynced) memoryPoolRef ! CompareTransactionsWithUnconfirmed(remote, invData._2.toIndexedSeq)
+          else logger.info(s"Get inv with tx: ${invData._2.map(Algos.encode).mkString(",")}")// do nothing
+        }
         else if (invData._1 != Payload.modifierTypeId) {
           logger.info(s"Got inv message on NodeViewSynchronizer from ${remote.socketAddress} with modifiers of type:" +
             s" ${invData._1}. Size of inv is: ${invData._2.size}. Sending CompareViews to NVH. " +
