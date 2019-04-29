@@ -54,23 +54,28 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     * @param si other's node sync info
     * @return Equal if nodes have the same history, Younger if another node is behind, Older if a new node is ahead
     */
-  def compare(si: EncrySyncInfo): HistoryComparisonResult = {
-    bestHeaderIdOpt match {
-      case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) =>
-        Equal //Our best header is the same as other node best header
-      case Some(id) if si.lastHeaderIds.exists(_ sameElements id) =>
-        Older //Our best header is in other node best chain, but not at the last position
-      case Some(_) if si.lastHeaderIds.isEmpty =>
-        Younger //Other history is empty, our contain some headers
-      case Some(_) =>
-        //We are on different forks now.
-        //Return Younger, because we can send blocks from our fork that other node can download.
-        if (si.lastHeaderIds.view.exists(contains)) Younger
-        else Unknown //We don't have any of id's from other's node sync info in history.
-      //We don't know whether we can sync with it and what blocks to send in Inv message.
-      case None if si.lastHeaderIds.isEmpty => Equal //Both nodes do not keep any blocks
-      case None => Older //Our history is empty, other contain some headers
-    }
+  def compare(si: EncrySyncInfo): HistoryComparisonResult = bestHeaderIdOpt match {
+    //Our best header is the same as other history best header
+    case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) => Equal
+
+    //Our best header is in other history best chain, but not at the last position
+    case Some(id) if si.lastHeaderIds.exists(_ sameElements id) => Older
+
+    /* Other history is empty, or
+         our history contains all ids from other history, but they are out of range our best header */
+    case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.forall(contains) => Younger
+
+    //Our history doesn't contain all ids from other history and they are out of range our last ids
+    case Some(_) if !si.lastHeaderIds.forall(contains) => Fork
+
+    //Strange comparison result
+    case Some(_) => Unknown
+
+    //Both nodes do not keep any blocks
+    case None if si.lastHeaderIds.isEmpty => Equal
+
+    //Our history is empty, other contain some headers
+    case None => Older
   }
 
   def continuationIds(info: EncrySyncInfo, size: Int): Option[ModifierIds] = Try {
@@ -113,6 +118,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
         loop(currentHeight + 1, updatedChains ++ nonUpdatedChains)
       }
     }
+
     loop(header.height, Seq(Seq(header)))
   }
 
@@ -170,6 +176,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
         else throw new Exception(s"Common point not found for headers $header1 and $header2")
       }
     }
+
     loop(2, HeaderChain(Seq(header2)))
   }
 

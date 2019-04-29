@@ -1,7 +1,7 @@
 package encry.network
 
 import java.net.InetSocketAddress
-import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill}
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.util.Timeout
 import com.typesafe.config.Config
@@ -32,7 +32,6 @@ import scala.concurrent.duration._
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
                            networkControllerRef: ActorRef,
-                           system: ActorSystem,
                            settings: EncryAppSettings,
                            memoryPoolRef: ActorRef) extends Actor with StrictLogging {
 
@@ -235,6 +234,13 @@ object NodeViewSynchronizer {
     case class SemanticallySuccessfulModifier[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends ModificationOutcome
 
   }
+
+  def props(influxRef: Option[ActorRef],
+            nodeViewHolderRef: ActorRef,
+            networkControllerRef: ActorRef,
+            settings: EncryAppSettings,
+            memoryPoolRef: ActorRef): Props =
+    Props(new NodeViewSynchronizer(influxRef, nodeViewHolderRef, networkControllerRef, settings, memoryPoolRef))
 
   class NodeViewSynchronizerPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
