@@ -290,6 +290,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
             case Failure(e) =>
               logger.info(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
                 s"to minimal state because of: $e")
+
               logger.info(s"\nTime of applying to state FAILURE is: ${System.currentTimeMillis() - startAppState}. modId is: ${pmod.encodedId}")
               updateNodeView(updatedHistory = Some(newHistory))
               context.system.eventStream.publish(SemanticallyFailedModification(pmod, e))
