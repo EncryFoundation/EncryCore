@@ -10,7 +10,7 @@ import scorex.crypto.hash._
 
 import scala.util.Try
 
-trait PersistentBatchAVLProver[D <: Digest, HF <: CryptographicHash[D]] extends StrictLogging{
+trait PersistentBatchAVLProver[D <: Digest, HF <: CryptographicHash[D]] extends StrictLogging {
 
   var avlProver: BatchAVLProver[D, HF]
   val storage: VersionedAVLStorage[D]
@@ -22,8 +22,16 @@ trait PersistentBatchAVLProver[D <: Digest, HF <: CryptographicHash[D]] extends 
   def performOneOperation(operation: Operation): Try[Option[ADValue]] = avlProver.performOneOperation(operation)
 
   def generateProofAndUpdateStorage[K <: Array[Byte], V <: Array[Byte]](additionalData: Seq[(K, V)]): SerializedAdProof = {
+    logger.info(s"\nStarting generateProofAndUpdateStorage!!!\n")
+    val startTime1 = System.currentTimeMillis()
+    logger.info(s"Starting storage.update!")
     storage.update(avlProver, additionalData).get
-    avlProver.generateProof()
+    logger.info(s"Finished storage.update! Process time is: ${System.currentTimeMillis() - startTime1}")
+    logger.info(s"Starting generateProof!")
+    val startTime2 = System.currentTimeMillis()
+    val a = avlProver.generateProof()
+    logger.info(s"Finished generateProof! Process time is: ${System.currentTimeMillis() - startTime2}")
+    a
   }
 
   def generateProofAndUpdateStorage(): SerializedAdProof = generateProofAndUpdateStorage(Seq())
@@ -47,7 +55,7 @@ object PersistentBatchAVLProver {
                      paranoidChecks: Boolean
                    ): Try[PersistentBatchAVLProver[D, HF]] = Try {
 
-    new PersistentBatchAVLProver[D, HF] with StrictLogging{
+    new PersistentBatchAVLProver[D, HF] with StrictLogging {
 
       override var avlProver: BatchAVLProver[D, HF] = avlBatchProver
       override val storage: VersionedAVLStorage[D] = versionedStorage

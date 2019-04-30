@@ -81,6 +81,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   override def receive: Receive = {
     case ModifiersFromRemote(modifierTypeId, modifiers) =>
       val startTime = System.currentTimeMillis()
+      logger.info(s"Start processing ModifiersFromRemote message on NVH.")
       modifierTypeId match {
         case Payload.modifierTypeId =>
           modifiers.foreach { bytes =>
@@ -113,12 +114,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       }
       logger.info(s"Time processing of msg ModifiersFromRemote with mod of type: $modifierTypeId: ${System.currentTimeMillis() - startTime}")
     case lm: LocallyGeneratedModifier[EncryPersistentModifier]@unchecked =>
+      logger.info(s"Start processing LocallyGeneratedModifier message on NVH.")
       val startTime = System.currentTimeMillis()
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod, isLocallyGenerated = true)
       logger.info(s"Time processing of msg LocallyGeneratedModifier with mod of type ${lm.pmod.modifierTypeId}:" +
         s" with id: ${Algos.encode(lm.pmod.id)} -> ${System.currentTimeMillis() - startTime}")
     case GetDataFromCurrentView(f) =>
+      logger.info(s"Start processing GetDataFromCurrentView message on NVH.")
       val startTime = System.currentTimeMillis()
       val result = f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet))
       result match {
@@ -127,11 +130,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       }
       logger.info(s"Time processing of msg GetDataFromCurrentView from $sender(): ${System.currentTimeMillis() - startTime}")
     case GetNodeViewChanges(history, state, _) =>
+      logger.info(s"Start processing GetNodeViewChanges message on NVH.")
       val startTime = System.currentTimeMillis()
       if (history) sender() ! ChangedHistory(nodeView.history)
       if (state) sender() ! ChangedState(nodeView.state)
       logger.info(s"Time processing of msg GetNodeViewChanges from $sender(): ${System.currentTimeMillis() - startTime}")
     case CompareViews(peer, modifierTypeId, modifierIds) =>
+      logger.info(s"Start processing CompareViews message on NVH.")
       val startTime = System.currentTimeMillis()
       val ids: Seq[ModifierId] = modifierTypeId match {
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
@@ -192,7 +197,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
                                  failedMod: Option[EncryPersistentModifier],
                                  alternativeProgressInfo: Option[ProgressInfo[EncryPersistentModifier]],
                                  suffix: IndexedSeq[EncryPersistentModifier])
-
+    logger.info(s"\nStarting updating state in updateState function!")
+    val startTime = System.currentTimeMillis()
     requestDownloads(progressInfo, None)
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
     val (stateToApplyTry: Try[StateType], suffixTrimmed: IndexedSeq[EncryPersistentModifier]@unchecked) =
@@ -203,12 +209,15 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
           else Success(state) -> IndexedSeq()
         }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty.")))
       } else Success(state) -> suffixApplied
-
     stateToApplyTry match {
       case Success(stateToApply) =>
+        logger.info(s"\nApplied to state successfully! Time of it is: ${System.currentTimeMillis() - startTime}.")
+        logger.info(s"\nStarting to update UpdateInformation!")
+        val startTime1 = System.currentTimeMillis()
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
+          //here
           if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
             case Success(stateAfterApply) =>
               modToApply match {
@@ -232,6 +241,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           } else u
         }
+        logger.info(s"\n\nFinished UpdateInformation! Time is: ${System.currentTimeMillis() - startTime1}")
         uf.failedMod match {
           case Some(_) => updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
           case None => (uf.history, Success(uf.state), uf.suffix)
