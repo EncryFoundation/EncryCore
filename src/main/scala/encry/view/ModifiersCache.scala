@@ -74,6 +74,18 @@ object ModifiersCache extends StrictLogging {
       case m => m.isSuccess
     })
 
+    def getHeadersKeysAtHeight(height: Int): List[Key] = {
+      headersCollection.get(height) match {
+        case Some(headersIds) =>
+          headersIds.map(new mutable.WrappedArray.ofByte(_)).collect {
+            case headerKey if isApplicable(headerKey) => headerKey
+          }
+        case None =>
+          logger.info(s"Can't find headers at height $height in cache")
+          List.empty[Key]
+      }
+    }
+
     def exhaustiveSearch: List[Key] = List(cache.find { case (k, v) =>
       v match {
         case _: Header if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) => true
@@ -103,8 +115,11 @@ object ModifiersCache extends StrictLogging {
           }
 
         case None =>
-          logger.info(s"No best header in cache")
-          List[Key]()
+          logger.info(s"No header in cache at height ${history.bestHeaderHeight + 1}. " +
+            s"Trying to find in range [${history.bestHeaderHeight - Constants.Chain.MaxRollbackDepth}, ${history.bestHeaderHeight}]")
+          (history.bestHeaderHeight - Constants.Chain.MaxRollbackDepth to history.bestHeaderHeight).flatMap(height =>
+            getHeadersKeysAtHeight(height)
+          ).toList
       }
     }
     if (bestHeadersIds.nonEmpty) bestHeadersIds
