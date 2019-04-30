@@ -116,7 +116,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       val startTime = System.currentTimeMillis()
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       pmodModify(lm.pmod, isLocallyGenerated = true)
-      logger.info(s"Time processing of msg LocallyGeneratedModifier with mod of type ${lm.pmod.modifierTypeId}: ${System.currentTimeMillis() - startTime}")
+      logger.info(s"Time processing of msg LocallyGeneratedModifier with mod of type ${lm.pmod.modifierTypeId}:" +
+        s" with id: ${Algos.encode(lm.pmod.id)} -> ${System.currentTimeMillis() - startTime}")
     case GetDataFromCurrentView(f) =>
       val startTime = System.currentTimeMillis()
       val result = f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet))
@@ -243,18 +244,22 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   }
 
   def pmodModify(pmod: EncryPersistentModifier, isLocallyGenerated: Boolean = false): Unit = if (!nodeView.history.contains(pmod.id)) {
-    logger.info(s"Apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} to nodeViewHolder.")
+    logger.info(s"\nStarting to apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
+    val startAppHistory = System.currentTimeMillis()
     if (settings.influxDB.isDefined) context.system
       .actorSelection("user/statsSender") !
       StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
     auxHistoryHolder ! Append(pmod)
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
-        //ModifiersCache.remove(key(pmod.id))
+        logger.info(s"\nSuccessfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
+        logger.info(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
         if (settings.influxDB.isDefined)
           context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
-        logger.info(s"Going to apply modifications to the state: $progressInfo")
+        logger.info(s"\nGoing to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
+        val startAppState = System.currentTimeMillis()
         if (progressInfo.toApply.nonEmpty) {
+          logger.info(s"\n progress info non empty")
           val startPoint: Long = System.currentTimeMillis()
           val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
@@ -262,25 +267,31 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
             context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
           newStateTry match {
             case Success(newMinState) =>
+              logger.info(s"\nTime of applying to state SUCCESS is: ${System.currentTimeMillis() - startAppState}. modId is: ${pmod.encodedId}")
+              logger.info(s"\nStarting inner updating after succeeded state applying!")
+              val startInnerStateApp = System.currentTimeMillis()
               sendUpdatedInfoToMemoryPool(newMinState, progressInfo.toRemove, blocksApplied)
               if (progressInfo.chainSwitchingNeeded)
                 nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
               blocksApplied.foreach(nodeView.wallet.scanPersistent)
-              logger.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
+              logger.info(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
               if (progressInfo.chainSwitchingNeeded)
                 context.actorSelection("/user/blockListener") !
                   ChainSwitching(progressInfo.toRemove.map(_.id))
               if (settings.influxDB.isDefined) newHistory.bestHeaderOpt.foreach(header =>
                 context.actorSelection("/user/statsSender") ! BestHeaderInChain(header, System.currentTimeMillis()))
               if (newHistory.isFullChainSynced) {
-                logger.info(s"blockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
+                logger.info(s"\nblockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
                 ModifiersCache.setChainSynced()
                 Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
               }
               updateNodeView(Some(newHistory), Some(newMinState), Some(nodeView.wallet))
+              logger.info(s"\nTime of applying in inner state is: ${System.currentTimeMillis() - startInnerStateApp}")
             case Failure(e) =>
-              logger.info(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
+              logger.info(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
                 s"to minimal state because of: $e")
+
+              logger.info(s"\nTime of applying to state FAILURE is: ${System.currentTimeMillis() - startAppState}. modId is: ${pmod.encodedId}")
               updateNodeView(updatedHistory = Some(newHistory))
               context.system.eventStream.publish(SemanticallyFailedModification(pmod, e))
           }
@@ -289,16 +300,18 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
             .actorSelection("user/statsSender") ! NewBlockAppended(true, true)
           if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
           context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
+          logger.info(s"\nProgres info is empty")
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Failure(e) =>
+        logger.info(s"\nTime of applying to history FAILURE is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
         if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.modifierTypeId) context.system
           .actorSelection("user/statsSender") ! NewBlockAppended(true, false)
-        logger.warn(s"Can`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
+        logger.info(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
           s" to history caused $e")
         context.system.eventStream.publish(SyntacticallyFailedModification(pmod, e))
     }
-  } else logger.warn(s"Trying to apply modifier ${pmod.encodedId} that's already in history.")
+  } else logger.info(s"\nTrying to apply modifier ${pmod.encodedId} that's already in history.")
 
   def sendUpdatedInfoToMemoryPool(state: StateType,
                                   toRemove: Seq[EncryPersistentModifier],
