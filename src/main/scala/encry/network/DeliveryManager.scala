@@ -382,6 +382,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       isBlockChainSynced: Boolean,
                       isMining: Boolean): Unit =
     if (!isBlockChainSynced) {
+      logger.info(s"Function - request modifiers. syncTracker's peerCollection is: ${syncTracker.statuses}")
+      logger.info(s"Function - request modifiers. syncTracker's getPeersForConnection is: ${syncTracker.getPeersForConnection}")
       val (withBadNodes, withoutBadNodes) = syncTracker.getPeersForConnection.partition {
         case (_, (_, priority, _)) => priority == SyncTracker.PeerPriorityStatus.BadNode
       }
