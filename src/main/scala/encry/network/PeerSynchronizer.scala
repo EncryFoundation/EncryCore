@@ -6,7 +6,7 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, Registe
 import java.net.InetSocketAddress
 import akka.actor.Actor
 import akka.pattern.ask
-import encry.EncryApp._
+//import encry.EncryApp._
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import encry.cli.commands.AddPeer.PeerFromCli

@@ -7,7 +7,7 @@ import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import encry.EncryApp.settings
-import encry.EncryApp._
+//import encry.EncryApp._
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, _}
 import PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
 import com.google.common.primitives.Ints

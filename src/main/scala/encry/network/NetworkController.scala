@@ -6,7 +6,7 @@ import akka.io.Tcp.SO.KeepAlive
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
 import akka.pattern.ask
-import encry.EncryApp._
+//import encry.EncryApp._
 import encry.network.NetworkController.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
 import PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}

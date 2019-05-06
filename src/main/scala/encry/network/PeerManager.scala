@@ -3,7 +3,7 @@ package encry.network
 import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.Actor
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp._
+//import encry.EncryApp._
 import encry.cli.commands.AddPeer.PeerFromCli
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
 import encry.network.NetworkController.ReceivableMessages.ConnectTo

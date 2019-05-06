@@ -5,7 +5,7 @@ import java.util.Date
 import akka.actor.{Actor, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp._
+//import encry.EncryApp._
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme}
 import encry.local.miner.Worker.NextChallenge

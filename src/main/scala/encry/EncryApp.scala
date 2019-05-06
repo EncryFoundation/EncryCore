@@ -39,9 +39,11 @@ object EncryApp extends App with StrictLogging {
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
 
-  lazy val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
-  lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
-  lazy val dbService: DBService = DBService()
+  val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
+  val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
+  //lazy val dbService: DBService = DBService()
+
+  val initializerActor: ActorRef = system.actorOf(Initializer.props(settings, timeProvider))
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
   val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName
@@ -69,11 +71,11 @@ object EncryApp extends App with StrictLogging {
     Kamon.addReporter(new InfluxDBReporter())
     SystemMetrics.startCollecting()
   }
-  if (settings.kafka.exists(_.sendToKafka))
-    system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
-  if (settings.postgres.exists(_.enableSave))
-    system.actorOf(Props(classOf[BlockListener], dbService, nodeViewHolder)
-      .withDispatcher("block-listener-dispatcher"), "blockListener")
+//  if (settings.kafka.exists(_.sendToKafka))
+//    system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
+//  if (settings.postgres.exists(_.enableSave))
+//    system.actorOf(Props(classOf[BlockListener], dbService, nodeViewHolder)
+//      .withDispatcher("block-listener-dispatcher"), "blockListener")
 
   if (settings.node.mining) miner ! StartMining
   if (settings.node.useCli) {

@@ -9,8 +9,8 @@ import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp
-import encry.EncryApp._
+//import encry.EncryApp
+//import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
 import encry.modifiers._
