@@ -216,6 +216,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         val elemFlag = elemInfo.head
         val elemMap = elemInfo.tail
         val elemVersions = splitValue2elems(settings.versionKeySize, elemMap).map(ByteArrayWrapper.apply)
+        logger.info(s"Version: ${Algos.encode(versionToResolve)}. ElemsVersions: ${elemVersions.map(elem => Algos.encode(elem.data)).mkString(",")}")
         elemVersions.dropWhile(_ != wrappedVer).tail.foreach {
           elemVerToDel => batch.delete(accessableElementKeyForVersion(LevelDBVersion @@ elemVerToDel.data, elemKey))
         }
