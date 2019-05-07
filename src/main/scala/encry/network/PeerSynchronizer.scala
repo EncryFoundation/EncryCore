@@ -2,18 +2,22 @@ package encry.network
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
+import encry.network.NetworkController.ReceivableMessages._
 import java.net.InetSocketAddress
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef, Props}
 import akka.pattern.ask
-//import encry.EncryApp._
+import encry.settings.EncryAppSettings
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import encry.cli.commands.AddPeer.PeerFromCli
 import PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
 import BasicMessagesRepo._
 
-class PeerSynchronizer extends Actor with StrictLogging {
+class PeerSynchronizer(networkController: ActorRef,
+                       settings: EncryAppSettings,
+                       peerManager: ActorRef) extends Actor with StrictLogging {
+
+  import context.dispatcher
 
   implicit val timeout: Timeout = Timeout(settings.network.syncTimeout.getOrElse(5 seconds))
   var knownPeersCollection: Set[InetSocketAddress] = settings.network.knownPeers.toSet
@@ -51,4 +55,10 @@ class PeerSynchronizer extends Actor with StrictLogging {
       knownPeersCollection = knownPeersCollection + address
     case nonsense: Any => logger.warn(s"PeerSynchronizer: got something strange $nonsense")
   }
+}
+
+object PeerSynchronizer {
+
+  def props(networkController: ActorRef, settings: EncryAppSettings, peerManager: ActorRef): Props =
+    Props(new PeerSynchronizer(networkController, settings, peerManager))
 }

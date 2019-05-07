@@ -1,9 +1,8 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
-//import encry.EncryApp._
 import encry.cli.commands.AddPeer.PeerFromCli
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{DisconnectedPeer, HandshakedPeer}
 import encry.network.NetworkController.ReceivableMessages.ConnectTo
@@ -11,11 +10,20 @@ import encry.network.PeerConnectionHandler.ReceivableMessages.{CloseConnection, 
 import encry.network.PeerConnectionHandler._
 import encry.network.PeerManager.ReceivableMessages._
 import encry.settings.EncryAppSettings
+import encry.utils.NetworkTimeProvider
 import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.util.Random
 
-class PeerManager extends Actor with StrictLogging {
+class PeerManager(settings: EncryAppSettings,
+                  nvsh: ActorRef,
+                  networkController: ActorRef,
+                  ntp: NetworkTimeProvider) extends Actor with StrictLogging {
+
+  val peerSynchronizer: ActorRef = context.system.actorOf(
+    PeerSynchronizer.props(networkController, settings, self).withDispatcher("network-dispatcher"))
+
+  import context.dispatcher
 
   var connectedPeers: Map[InetSocketAddress, ConnectedPeer] = Map.empty
   var connectingPeers: Set[InetSocketAddress] = Set.empty
@@ -27,13 +35,14 @@ class PeerManager extends Actor with StrictLogging {
   override def receive: Receive = {
     case PeerFromCli(address) =>
       knownPeersCollection = knownPeersCollection + address
+      peerSynchronizer ! PeerFromCli(address)
     case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
     case GetAllPeers => sender() ! knownPeers()
     case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
       if (!isSelf(address, None) &&
         CheckPeersObj.checkPossibilityToAddPeer(address, knownPeersCollection, settings) &&
-        checkDuplicateIP(address)) timeProvider
-        .time()
+        checkDuplicateIP(address))
+        ntp.time()
         .map(time => addOrUpdateKnownPeer(address, PeerInfo(time, peerNameOpt, connTypeOpt)))
     case RandomPeers(howMany: Int) => sender() ! Random.shuffle(knownPeers().keys.toSeq).take(howMany)
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
@@ -53,12 +62,12 @@ class PeerManager extends Actor with StrictLogging {
         && !connectedPeers.contains(peer.socketAddress)) {
         self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
         connectedPeers += (peer.socketAddress -> peer)
-        nodeViewSynchronizer ! HandshakedPeer(peer)
+        nvsh ! HandshakedPeer(peer)
       }
     case Disconnected(remote) =>
       connectedPeers -= remote
       connectingPeers -= remote
-      nodeViewSynchronizer ! DisconnectedPeer(remote)
+      nvsh ! DisconnectedPeer(remote)
     case CheckPeers =>
       def randomPeer: Option[InetSocketAddress] = {
         val peers: Seq[InetSocketAddress] = knownPeers().keys.toSeq
@@ -83,7 +92,7 @@ class PeerManager extends Actor with StrictLogging {
       (InetAddress.getLoopbackAddress.getAddress sameElements address.getAddress.getAddress)
 
   /// TODO: REMOVE THIS
-  def addKnownPeersToPeersDatabase(): Future[Unit] = if (nodes.isEmpty) timeProvider.time().map { time =>
+  def addKnownPeersToPeersDatabase(): Future[Unit] = if (nodes.isEmpty) ntp.time().map { time =>
     settings.network.knownPeers.filterNot(isSelf(_, None)).foreach(addOrUpdateKnownPeer(_, PeerInfo(time, None)))
     Unit
   } else Future.successful(Unit)
@@ -104,6 +113,9 @@ class PeerManager extends Actor with StrictLogging {
 }
 
 object PeerManager {
+
+  def props(settings: EncryAppSettings, nvsh: ActorRef, networkController: ActorRef, ntp: NetworkTimeProvider): Props =
+    Props(new PeerManager(settings: EncryAppSettings, nvsh: ActorRef, networkController: ActorRef, ntp))
 
   object ReceivableMessages {
 

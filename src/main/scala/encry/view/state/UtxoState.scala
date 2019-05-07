@@ -25,7 +25,7 @@ import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDB
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDB, VersionalLevelDBCompanion}
 import encry.validation.{MalformedModifierError, ValidationResult}
 import encry.validation.ValidationResult.{Invalid, Valid}
-import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
+import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.view.history.History.Height
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.Algos

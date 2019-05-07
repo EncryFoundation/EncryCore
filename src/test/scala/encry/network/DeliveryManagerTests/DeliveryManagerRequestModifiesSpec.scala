@@ -14,7 +14,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, Ot
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.ModifierId
-import encry.view.EncryNodeViewHolder.DownloadRequest
+import encry.view.NodeViewHolder.DownloadRequest
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import encry.network.DeliveryManagerTests.DMUtils._
 import encry.view.history.EncrySyncInfo

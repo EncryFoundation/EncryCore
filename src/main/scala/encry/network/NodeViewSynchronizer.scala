@@ -1,7 +1,7 @@
 package encry.network
 
 import java.net.InetSocketAddress
-import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill}
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.util.Timeout
 import com.typesafe.config.Config
@@ -21,8 +21,8 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
 import encry.utils.Utils._
-import encry.view.EncryNodeViewHolder.DownloadRequest
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
+import encry.view.NodeViewHolder.DownloadRequest
+import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
 import encry.view.mempool.Mempool._
 import encry.view.state.StateReader
@@ -32,7 +32,6 @@ import scala.concurrent.duration._
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
                            networkControllerRef: ActorRef,
-                           system: ActorSystem,
                            settings: EncryAppSettings,
                            memoryPoolRef: ActorRef) extends Actor with StrictLogging {
 
@@ -43,7 +42,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   var chainSynced: Boolean = false
   val deliveryManager: ActorRef = context.actorOf(
     DeliveryManager.props(influxRef, nodeViewHolderRef, networkControllerRef, settings, memoryPoolRef)
-      .withDispatcher("delivery-manager-dispatcher"), "deliveryManager")
+      .withDispatcher("delivery-manager-dispatcher"))
 
   override def preStart(): Unit = {
     val messageIds: Seq[(Byte, String)] = Seq(
@@ -210,6 +209,13 @@ object NodeViewSynchronizer {
     case class SemanticallySuccessfulModifier[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends ModificationOutcome
 
   }
+
+  def props(influxRef: Option[ActorRef],
+            nodeViewHolderRef: ActorRef,
+            networkControllerRef: ActorRef,
+            settings: EncryAppSettings,
+            memoryPoolRef: ActorRef): Props =
+    Props(new NodeViewSynchronizer(influxRef, nodeViewHolderRef, networkControllerRef, settings, memoryPoolRef))
 
   class NodeViewSynchronizerPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(

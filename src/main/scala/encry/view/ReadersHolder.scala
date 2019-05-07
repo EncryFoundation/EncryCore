@@ -1,9 +1,9 @@
 package encry.view
 
 import akka.actor.Actor
-import encry.EncryApp._
+//import encry.EncryApp._
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange}
-import encry.view.EncryNodeViewHolder.ReceivableMessages.GetNodeViewChanges
+import encry.view.NodeViewHolder.ReceivableMessages.GetNodeViewChanges
 import encry.view.ReadersHolder.{GetDataFromHistory, GetReaders, Readers}
 import encry.view.history.EncryHistoryReader
 import encry.view.state.UtxoStateReader
@@ -17,16 +17,13 @@ class ReadersHolder extends Actor {
 
   var historyReaderOpt: Option[EncryHistoryReader] = None
   var stateReaderOpt: Option[UtxoStateReader] = None
-  //var mempoolReaderOpt: Option[MempoolReader] = None
 
   override def receive: Receive = {
     case ChangedHistory(reader: EncryHistoryReader@unchecked) if reader.isInstanceOf[EncryHistoryReader] =>
       historyReaderOpt = Some(reader)
     case ChangedState(reader: UtxoStateReader@unchecked) if reader.isInstanceOf[UtxoStateReader] =>
       stateReaderOpt = Some(reader)
-//    case ChangedMempool(reader: MempoolReader@unchecked) if reader.isInstanceOf[MempoolReader] =>
-//      mempoolReaderOpt = Some(reader)
-    case GetReaders => sender ! Readers(historyReaderOpt, stateReaderOpt)//, mempoolReaderOpt)
+    case GetReaders => sender ! Readers(historyReaderOpt, stateReaderOpt)
     case GetDataFromHistory => historyReaderOpt.foreach(sender ! _)
     case _ =>
   }
@@ -38,6 +35,6 @@ object ReadersHolder {
 
   case object GetReaders
 
-  case class Readers(h: Option[EncryHistoryReader], s: Option[UtxoStateReader])//, m: Option[MempoolReader])
+  case class Readers(h: Option[EncryHistoryReader], s: Option[UtxoStateReader])
 
 }

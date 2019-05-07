@@ -6,14 +6,14 @@ import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
-import encry.EncryApp.settings
-//import encry.EncryApp._
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, _}
 import PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BasicMessagesRepo._
 import PeerConnectionHandler.ReceivableMessages._
+import encry.settings.EncryAppSettings
+import encry.utils.NetworkTimeProvider
 import scala.annotation.tailrec
 import scala.collection.immutable.HashMap
 import scala.concurrent.duration._
@@ -22,7 +22,12 @@ import scala.util.{Failure, Random, Success}
 class PeerConnectionHandler(connection: ActorRef,
                             direction: ConnectionType,
                             ownSocketAddress: Option[InetSocketAddress],
-                            remote: InetSocketAddress) extends Actor with StrictLogging {
+                            remote: InetSocketAddress,
+                            peerManager: ActorRef,
+                            settings: EncryAppSettings,
+                            ntp: NetworkTimeProvider) extends Actor with StrictLogging {
+
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   context watch connection
 
@@ -59,7 +64,7 @@ class PeerConnectionHandler(connection: ActorRef,
 
   def startInteraction: Receive = {
     case StartInteraction =>
-      timeProvider.time().map { time =>
+      ntp.time().map { time =>
         val handshake: Handshake = Handshake(protocolToBytes(settings.network.appVersion),
           settings.network.nodeName
             .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort),
@@ -209,7 +214,7 @@ class PeerConnectionHandler(connection: ActorRef,
       packet._1.find { packet =>
         GeneralizedNetworkMessage.fromProto(packet) match {
           case Success(message) =>
-            networkController ! MessageFromNetwork(message, selfPeer)
+            context.parent ! MessageFromNetwork(message, selfPeer)
             logger.debug("Received message " + message.messageName + " from " + remote)
             false
           case Failure(e) =>
@@ -279,7 +284,12 @@ object PeerConnectionHandler {
     final case class Ack(offset: Long) extends Tcp.Event
   }
 
-  def props(connection: ActorRef, direction: ConnectionType,
-            ownSocketAddress: Option[InetSocketAddress], remote: InetSocketAddress): Props =
-    Props(new PeerConnectionHandler(connection, direction, ownSocketAddress, remote))
+  def props(connection: ActorRef,
+            direction: ConnectionType,
+            ownSocketAddress: Option[InetSocketAddress],
+            remote: InetSocketAddress,
+            peerManager: ActorRef,
+            settings: EncryAppSettings,
+            ntp: NetworkTimeProvider): Props =
+    Props(new PeerConnectionHandler(connection, direction, ownSocketAddress, remote, peerManager, settings, ntp))
 }

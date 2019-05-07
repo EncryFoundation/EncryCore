@@ -2,7 +2,7 @@ package encry.network
 
 import java.io.File
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
@@ -20,8 +20,7 @@ import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
 import org.iq80.leveldb.Options
 
-case class AuxiliaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvider, syncronizer: ActorRef)
-  extends Actor with StrictLogging {
+case class AuxiliaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends Actor with StrictLogging {
 
   val history: EncryHistory = AuxiliaryHistoryHolder.readOrGenerate(settings, ntp)
 
@@ -109,4 +108,7 @@ object AuxiliaryHistoryHolder {
   case class ReportModifierInvalid(mod: EncryPersistentModifier, progressInfo: ProgressInfo[EncryPersistentModifier])
   case class Append(mod: EncryPersistentModifier)
   case class AuxHistoryChanged(history: EncryHistory)
+
+  def props(settings: EncryAppSettings, ntp: NetworkTimeProvider): Props =
+    Props(new AuxiliaryHistoryHolder(settings, ntp))
 }

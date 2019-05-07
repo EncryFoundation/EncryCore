@@ -18,8 +18,8 @@ import encry.settings.Constants
 import encry.stats.StatsSender.{CandidateProducingTime, MiningEnd, MiningTime, SleepTime}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.NetworkTime.Time
-import encry.view.EncryNodeViewHolder.CurrentView
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
+import encry.view.NodeViewHolder.CurrentView
+import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.EncryHistory
 import encry.view.history.History.Height
 import encry.view.mempool.Mempool._

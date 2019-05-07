@@ -7,13 +7,13 @@ import encry.consensus.History._
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.mempool.Transaction
 import encry.network.DeliveryManager._
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.view.EncryNodeViewHolder.DownloadRequest
-import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
+import encry.view.NodeViewHolder.DownloadRequest
+import encry.view.NodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.{EncryHistory, EncrySyncInfo}
 import org.encryfoundation.common.Algos
 import encry.settings.EncryAppSettings

@@ -7,7 +7,7 @@ import encry.cli.{Ast, Response}
 import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.AssetBox
 import encry.settings.EncryAppSettings
-import encry.view.EncryNodeViewHolder.ReceivableMessages._
+import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.history.EncryHistory
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet

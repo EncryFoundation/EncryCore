@@ -6,7 +6,7 @@ import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.settings.RESTApiSettings
-import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.EncryHistory
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet

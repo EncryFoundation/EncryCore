@@ -22,7 +22,7 @@ import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, StatsSender, Zombie}
 import encry.utils.NetworkTimeProvider
 import encry.view.mempool.Mempool
-import encry.view.{EncryNodeViewHolder, ReadersHolder}
+import encry.view.{NodeViewHolder, ReadersHolder}
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
@@ -43,29 +43,21 @@ object EncryApp extends App with StrictLogging {
   val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
   //lazy val dbService: DBService = DBService()
 
-  val initializerActor: ActorRef = system.actorOf(Initializer.props(settings, timeProvider))
+  val influxRef: Option[ActorRef] = if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender])) else None
+
+  val auxHistoryHolder: ActorRef =
+    system.actorOf(AuxiliaryHistoryHolder.props(settings, timeProvider).withDispatcher("aux-history-dispatcher"))
+
+  val nodeViewHolder: ActorRef =
+    system.actorOf(NodeViewHolder.props(auxHistoryHolder, settings, influxRef, timeProvider).withDispatcher("nvh-dispatcher"))
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
   val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName
     .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)).take(5)
-  val influxRef: Option[ActorRef] =
-    if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender], "statsSender"))
-    else None
-  lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
-  lazy val memoryPool: ActorRef = system.actorOf(Mempool.props(settings, timeProvider, miner).withDispatcher("mempool-dispatcher"))
-  lazy val auxHistoryHolder: ActorRef =
-    system.actorOf(Props(AuxiliaryHistoryHolder(settings, timeProvider, nodeViewSynchronizer))
-    .withDispatcher("aux-history-dispatcher"), "auxHistoryHolder")
-  lazy val nodeViewHolder: ActorRef =
-    system.actorOf(EncryNodeViewHolder.props(auxHistoryHolder, memoryPool).withDispatcher("nvh-dispatcher"),
-      "nodeViewHolder")
+
   val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
-  lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
-    .withDispatcher("network-dispatcher"), "networkController")
-  lazy val peerManager: ActorRef = system.actorOf(Props(classOf[PeerManager]), "peerManager")
-  lazy val nodeViewSynchronizer: ActorRef = system.actorOf(
-    Props(classOf[NodeViewSynchronizer], influxRef, nodeViewHolder, networkController, system, settings, memoryPool)
-      .withDispatcher("nvsh-dispatcher"), "nodeViewSynchronizer")
+
+
   if (settings.monitoringSettings.exists(_.kamonEnabled)) {
     Kamon.reconfigure(EncryAppSettings.allConfig)
     Kamon.addReporter(new InfluxDBReporter())
@@ -77,7 +69,6 @@ object EncryApp extends App with StrictLogging {
 //    system.actorOf(Props(classOf[BlockListener], dbService, nodeViewHolder)
 //      .withDispatcher("block-listener-dispatcher"), "blockListener")
 
-  if (settings.node.mining) miner ! StartMining
   if (settings.node.useCli) {
     system.actorOf(Props[ConsoleListener], "cliListener")
     system.actorSelection("/user/cliListener") ! StartListening
