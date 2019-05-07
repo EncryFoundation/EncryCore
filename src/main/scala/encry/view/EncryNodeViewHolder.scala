@@ -117,7 +117,15 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       logger.info(s"Start processing LocallyGeneratedModifier message on NVH.")
       val startTime = System.currentTimeMillis()
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
-      pmodModify(lm.pmod, isLocallyGenerated = true)
+      lm.pmod match {
+        case block: Block =>
+          if (nodeView.history.bestBlockHeight < block.header.height) {
+            pmodModify(block.header, isLocallyGenerated = true)
+            pmodModify(block.payload, isLocallyGenerated = true)
+          } else logger.info(s"Got LocallyGeneratedModifier with id: ${Algos.encode(block.header.id)}" +
+            s"on height: ${block.header.height}.")
+        case anotherMod => pmodModify(anotherMod, isLocallyGenerated = true)
+      }
       logger.info(s"Time processing of msg LocallyGeneratedModifier with mod of type ${lm.pmod.modifierTypeId}:" +
         s" with id: ${Algos.encode(lm.pmod.id)} -> ${System.currentTimeMillis() - startTime}")
     case GetDataFromCurrentView(f) =>
