@@ -1,8 +1,7 @@
 package encry.network
 
 import java.io.File
-
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
@@ -13,7 +12,6 @@ import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.NetworkTimeProvider
 import encry.view.history.EncryHistory
-import encry.view.history.EncryHistory.{getHistoryIndexDir, getHistoryObjectsDir, logger}
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
 import encry.view.history.storage.HistoryStorage
@@ -24,18 +22,18 @@ case class AuxiliaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimePr
 
   val history: EncryHistory = AuxiliaryHistoryHolder.readOrGenerate(settings, ntp)
 
-  override def preStart(): Unit = syncronizer ! AuxHistoryChanged(history)
+  override def preStart(): Unit = context.system.eventStream.publish(AuxHistoryChanged(history))
 
   override def receive: Receive = {
     case Append(mod) =>
       history.append(mod)
-      syncronizer ! AuxHistoryChanged(history)
+      context.system.eventStream.publish(AuxHistoryChanged(history))
     case ReportModifierValid(mod) =>
       history.reportModifierIsValid(mod)
-      syncronizer ! AuxHistoryChanged(history)
+      context.system.eventStream.publish(AuxHistoryChanged(history))
     case ReportModifierInvalid(mod, progressInfo) =>
       history.reportModifierIsInvalid(mod, progressInfo)
-      syncronizer ! AuxHistoryChanged(history)
+      context.system.eventStream.publish(AuxHistoryChanged(history))
   }
 
   override def postStop(): Unit = {

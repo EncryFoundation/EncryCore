@@ -1,19 +1,13 @@
 package encry.view.history.processors
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.system
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History.ProgressInfo
 import encry.consensus.ModifierSemanticValidity.Invalid
-import encry.local.explorer.BlockListener.NewBestBlock
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history.{Block, Header, HeaderChain}
 import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
-import io.iohk.iodb.ByteArrayWrapper
 import io.circe.syntax._
-import io.circe.{Decoder, Encoder, HCursor}
-import org.encryfoundation.common.Algos
-
 import scala.util.{Failure, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
@@ -81,9 +75,6 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
                 .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
                 .getOrElse(false))
         updateStorage(newModRow, newBestHeader.id, updateBestHeader)
-
-        if (settings.postgres.exists(_.enableSave) && !auxHistory)
-          system.actorSelection("/user/blockListener") ! NewBestBlock(fullBlock.header.height)
 
         if (blocksToKeep >= 0) {
           val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)

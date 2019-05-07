@@ -1,7 +1,6 @@
 package encry.api.http.routes
 
 import java.net.{InetAddress, InetSocketAddress}
-
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
@@ -17,7 +16,6 @@ import encry.view.mempool.Mempool.GetMempoolSize
 import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.Algos
-
 import scala.concurrent.Future
 
 case class InfoApiRoute(readersHolder: ActorRef,

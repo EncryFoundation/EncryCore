@@ -2,28 +2,24 @@ package encry.view.history.processors
 
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.{forceStopApplication, system}
+import encry.EncryApp.forceStopApplication
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.consensus.History.ProgressInfo
 import encry.consensus.{ConsensusTaggedTypes, ModifierSemanticValidity, _}
-import encry.local.explorer.BlockListener.NewOrphaned
 import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history._
 import encry.settings.Constants._
 import encry.settings.{Constants, EncryAppSettings}
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{VersionalLevelDbKey, VersionalLevelDbValue}
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbValue
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.utils.NetworkTimeProvider
 import encry.validation.{ModifierValidator, ValidationResult}
 import encry.view.history.History.Height
 import encry.view.history.storage.HistoryStorage
-import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import scorex.crypto.hash.Digest32
 import supertagged.@@
-
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.collection.immutable.HashSet
@@ -186,10 +182,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         val headerIdsRow: Seq[(StorageKey, StorageValue)] =
           if ((header.height > bestHeaderHeight) ||
             (header.height == bestHeaderHeight && score > bestHeadersChainScore)) bestBlockHeaderIdsRow(header, score)
-          else {
-            if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(header)
-            orphanedBlockHeaderIdsRow(header, score)
-          }
+          else orphanedBlockHeaderIdsRow(header, score)
         (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
       }
     }

@@ -14,7 +14,11 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.cli.commands.AddPeer.PeerFromCli
 import BasicMessagesRepo._
 import encry.EncryApp.commonSupervisorStrategy
+import encry.api.http.HttpApiStarter
+import encry.cli.ConsoleListener
+import encry.cli.ConsoleListener.StartListening
 import encry.utils.NetworkTimeProvider
+import encry.view.ReadersHolder
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
@@ -24,7 +28,8 @@ class NetworkController(settings: EncryAppSettings,
                         nvh: ActorRef,
                         mempoolRef: ActorRef,
                         influxRef: Option[ActorRef],
-                        ntp: NetworkTimeProvider) extends Actor with StrictLogging {
+                        ntp: NetworkTimeProvider,
+                        minerRef: ActorRef) extends Actor with StrictLogging {
 
   import context.dispatcher
   implicit val system: ActorSystem = context.system
@@ -34,7 +39,15 @@ class NetworkController(settings: EncryAppSettings,
 
   val peerManager: ActorRef = context.system.actorOf(PeerManager.props(settings, nodeViewSynchronizer, self, ntp))
 
+  val readersHolder: ActorRef = context.system.actorOf(ReadersHolder.props(nvh))
 
+  HttpApiStarter.startHttpServer(settings, peerManager, self, readersHolder, minerRef,mempoolRef, ntp, nvh)
+
+  if (settings.node.useCli) {
+    val consoleListener: ActorRef = context.system.actorOf(
+      ConsoleListener.props(settings, self, nvh, minerRef, nodeViewSynchronizer, mempoolRef))
+    consoleListener ! StartListening
+  }
 
   var messagesHandlers: Map[Seq[Byte], ActorRef] = Map.empty
   var outgoing: Set[InetSocketAddress] = Set.empty
@@ -152,7 +165,8 @@ object NetworkController {
             nvh: ActorRef,
             mempoolRef: ActorRef,
             influxRef: Option[ActorRef],
-            ntp: NetworkTimeProvider): Props =
-    Props(new NetworkController(settings, nvh, mempoolRef, influxRef, ntp))
+            ntp: NetworkTimeProvider,
+            minerRef: ActorRef): Props =
+    Props(new NetworkController(settings, nvh, mempoolRef, influxRef, ntp, minerRef))
 
 }

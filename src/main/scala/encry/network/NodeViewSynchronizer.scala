@@ -16,6 +16,7 @@ import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
 import encry.network.BasicMessagesRepo._
 import encry.network.DeliveryManager.{FullBlockChainIsSynced, ModifiersFromNVH}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
+import encry.network.NodeViewSynchronizer.InitializeNodeViewSynchronizerRefOnNVH
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
@@ -50,9 +51,11 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       RequestModifiersNetworkMessage.NetworkMessageTypeID -> "RequestModifiersNetworkMessage",
       SyncInfoNetworkMessage.NetworkMessageTypeID         -> "SyncInfoNetworkMessage"
     )
+    nodeViewHolderRef ! InitializeNodeViewSynchronizerRefOnNVH(self)
     networkControllerRef ! RegisterMessagesHandler(messageIds, self)
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
+    context.system.eventStream.subscribe(self, classOf[AuxHistoryChanged])
     nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false)
   }
 
@@ -160,6 +163,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 }
 
 object NodeViewSynchronizer {
+
+  case class InitializeNodeViewSynchronizerRefOnNVH(nvshRef: ActorRef)
 
   object ReceivableMessages {
 

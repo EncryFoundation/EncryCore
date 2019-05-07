@@ -1,16 +1,11 @@
 package encry.local.miner
 
 import java.util.Date
-
 import akka.actor.Actor
-import encry.EncryApp._
-
-import scala.concurrent.duration._
 import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
 import encry.local.miner.Miner.MinedBlock
 import encry.local.miner.Worker.{MineBlock, NextChallenge}
 import java.text.SimpleDateFormat
-
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.Constants
 
@@ -32,7 +27,7 @@ class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with StrictLogging 
         .fold(self ! MineBlock(candidate, nonce + 1)) { block =>
           logger.info(s"New block is found: $block on worker $self at " +
             s"${sdf.format(new Date(System.currentTimeMillis()))}. Iter qty: ${nonce - initialNonce + 1}")
-          miner ! MinedBlock(block, myIdx)
+          context.parent ! MinedBlock(block, myIdx)
         }
     case NextChallenge(candidate: CandidateBlock) =>
       challengeStartTime = new Date(System.currentTimeMillis())

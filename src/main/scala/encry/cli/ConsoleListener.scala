@@ -1,12 +1,17 @@
 package encry.cli
 
-import akka.actor.Actor
-import encry.EncryApp.settings
+import akka.actor.{Actor, ActorRef, Props}
 import encry.cli.commands._
+import encry.settings.EncryAppSettings
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class ConsoleListener extends Actor {
+class ConsoleListener(settings: EncryAppSettings,
+                      ncRef: ActorRef,
+                      nvhRef: ActorRef,
+                      minerRef: ActorRef,
+                      nvshRef: ActorRef,
+                      mempoolRef: ActorRef) extends Actor {
 
   import ConsoleListener._
 
@@ -17,11 +22,13 @@ class ConsoleListener extends Actor {
           case Success(command) =>
             getCommand(command.category.name, command.ident.name) match {
               case Some(cmd) =>
-                cmd.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings)
-                  .map {
-                    case Some(x) => print(x.msg + s"\n$prompt")
-                    case None =>
-                  }
+                cmd.execute(
+                  Command.Args(command.params.map(p => p.ident.name -> p.value).toMap),
+                  settings, ncRef, nvhRef, minerRef, nvshRef, mempoolRef
+                ).map {
+                  case Some(x) => print(x.msg + s"\n$prompt")
+                  case None =>
+                }
               case None => println("Unknown command. Type 'app help' to see command list.")
             }
           case Failure(_) =>
@@ -32,6 +39,14 @@ class ConsoleListener extends Actor {
 
 object ConsoleListener {
 
+  def props(settings: EncryAppSettings,
+            ncRef: ActorRef,
+            nvhRef: ActorRef,
+            minerRef: ActorRef,
+            nvshRef: ActorRef,
+            mempoolRef: ActorRef): Props =
+    Props(new ConsoleListener(settings, ncRef, nvhRef, minerRef, nvshRef, mempoolRef))
+
   case object StartListening
 
   val prompt = "$> "
@@ -39,8 +54,8 @@ object ConsoleListener {
   def getCommand(cat: String, cmd: String): Option[Command] = cmdDictionary.get(cat).flatMap(_.get(cmd))
 
   private val nodeCmds = Map("node" -> Map(
-    "shutdown"    -> NodeShutdown,
-    "stopMining"  -> StopMine,
+    "shutdown" -> NodeShutdown,
+    "stopMining" -> StopMine,
     "startMining" -> StartMine,
   ))
 
@@ -53,12 +68,12 @@ object ConsoleListener {
   ))
 
   private val walletCmds = Map("wallet" -> Map(
-    "addrs"     -> PrintAddresses,
+    "addrs" -> PrintAddresses,
     "createKey" -> CreateKey,
-    "pubKeys"   -> PrintPubKeys,
-    "balance"   -> GetBalance,
-    "transfer"  -> Transfer,
-    "privKeys"  -> PrintPrivKeys //Todo delete
+    "pubKeys" -> PrintPubKeys,
+    "balance" -> GetBalance,
+    "transfer" -> Transfer,
+    "privKeys" -> PrintPrivKeys //Todo delete
   ))
 
   val cmdDictionary: Map[String, Map[String, Command]] =

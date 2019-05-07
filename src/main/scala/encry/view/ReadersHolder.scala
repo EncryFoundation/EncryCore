@@ -1,18 +1,17 @@
 package encry.view
 
-import akka.actor.Actor
-//import encry.EncryApp._
+import akka.actor.{Actor, ActorRef, Props}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange}
 import encry.view.NodeViewHolder.ReceivableMessages.GetNodeViewChanges
 import encry.view.ReadersHolder.{GetDataFromHistory, GetReaders, Readers}
 import encry.view.history.EncryHistoryReader
 import encry.view.state.UtxoStateReader
 
-class ReadersHolder extends Actor {
+class ReadersHolder(nvhRef: ActorRef) extends Actor {
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
-    nodeViewHolder ! GetNodeViewChanges(history = true, state = true, vault = true)
+    nvhRef ! GetNodeViewChanges(history = true, state = true, vault = true)
   }
 
   var historyReaderOpt: Option[EncryHistoryReader] = None
@@ -30,6 +29,8 @@ class ReadersHolder extends Actor {
 }
 
 object ReadersHolder {
+
+  def props(nvhRef: ActorRef): Props = Props(new ReadersHolder(nvhRef))
 
   case object GetDataFromHistory
 

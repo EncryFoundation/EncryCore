@@ -15,7 +15,6 @@ import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.mempool.Mempool
 import encry.consensus.History.ProgressInfo
-import encry.local.explorer.BlockListener.ChainSwitching
 import encry.modifiers._
 import encry.modifiers.history._
 import encry.modifiers.mempool.Transaction
@@ -37,6 +36,7 @@ import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import encry.EncryApp.forceStopApplication
+import encry.network.NodeViewSynchronizer.InitializeNodeViewSynchronizerRefOnNVH
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -55,7 +55,9 @@ class NodeViewHolder[StateType <: EncryState[StateType]](auxHistoryRef: ActorRef
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
 
-  val minerRef: ActorRef = context.system.actorOf(Props[Miner], "miner")
+  var nvsyncRef: Option[ActorRef] = None
+
+  val minerRef: ActorRef = context.system.actorOf(Miner.props(settings, self, ntp))
   if (settings.node.mining) minerRef ! StartMining
 
   val memoryPoolRef: ActorRef =
@@ -63,7 +65,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](auxHistoryRef: ActorRef
   memoryPoolRef ! UpdatedState(nodeView.state)
 
   val networkController: ActorRef =
-    context.system.actorOf(NetworkController.props(settings, self, memoryPoolRef, influxRef, ntp)
+    context.system.actorOf(NetworkController.props(settings, self, memoryPoolRef, influxRef, ntp, minerRef)
       .withDispatcher("network-dispatcher"))
 
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
@@ -139,6 +141,9 @@ class NodeViewHolder[StateType <: EncryState[StateType]](auxHistoryRef: ActorRef
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
       if (ids.nonEmpty) sender() ! RequestFromLocal(peer, modifierTypeId, ids)
+    case InitializeNodeViewSynchronizerRefOnNVH(nvshRef) =>
+      logger.info(s"NodeViewHolder got NodeViewSyncronizer's ActorRef!")
+      nvsyncRef = Some(nvshRef)
     case a: Any => logger.error(s"Strange input: $a")
   }
 
@@ -166,7 +171,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](auxHistoryRef: ActorRef
   }
 
   def requestDownloads(pi: ProgressInfo[EncryPersistentModifier], previousModifier: Option[ModifierId] = None): Unit =
-    pi.toDownload.foreach { case (tid, id) => nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier) }
+    pi.toDownload.foreach { case (tid, id) => nvsyncRef.foreach(_ ! DownloadRequest(tid, id, previousModifier)) }
 
   def trimChainSuffix(suffix: IndexedSeq[EncryPersistentModifier], rollbackPoint: ModifierId):
   IndexedSeq[EncryPersistentModifier] = {
@@ -254,16 +259,14 @@ class NodeViewHolder[StateType <: EncryState[StateType]](auxHistoryRef: ActorRef
                 nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
               blocksApplied.foreach(nodeView.wallet.scanPersistent)
               logger.info(s"Persistent modifier ${pmod.encodedId} applied successfully")
-              if (progressInfo.chainSwitchingNeeded)
-                context.actorSelection("/user/blockListener") !
-                  ChainSwitching(progressInfo.toRemove.map(_.id))
               influxRef.foreach(ref =>
                 newHistory.bestHeaderOpt.foreach(header => ref ! BestHeaderInChain(header, System.currentTimeMillis()))
               )
               if (newHistory.isFullChainSynced) {
                 logger.info(s"blockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
                 ModifiersCache.setChainSynced()
-                Seq(nodeViewSynchronizer, minerRef).foreach(_ ! FullBlockChainIsSynced)
+                minerRef ! FullBlockChainIsSynced
+                nvsyncRef.foreach(_ ! FullBlockChainIsSynced)
               }
               updateNodeView(Some(newHistory), Some(newMinState), Some(nodeView.wallet))
             case Failure(e) =>

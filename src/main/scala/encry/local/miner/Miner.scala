@@ -2,10 +2,9 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
-//import encry.EncryApp._
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme}
 import encry.local.miner.Worker.NextChallenge
@@ -14,10 +13,11 @@ import encry.modifiers.mempool.{Transaction, TransactionFactory}
 import encry.modifiers.state.box.Box.Amount
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import encry.settings.Constants
+import encry.settings.{Constants, EncryAppSettings}
 import encry.stats.StatsSender.{CandidateProducingTime, MiningEnd, MiningTime, SleepTime}
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.NetworkTime.Time
+import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewHolder.CurrentView
 import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.EncryHistory
@@ -33,7 +33,9 @@ import scala.collection._
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-class Miner extends Actor with StrictLogging {
+class Miner(settings: EncryAppSettings,
+            nvh: ActorRef,
+            timeProvider: NetworkTimeProvider) extends Actor with StrictLogging {
 
   implicit val timeout: Timeout = Timeout(5.seconds)
 
@@ -90,14 +92,14 @@ class Miner extends Actor with StrictLogging {
         s" with nonce: ${block.header.nonce}")
       logger.debug(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
       killAllWorkers()
-      nodeViewHolder ! LocallyGeneratedModifier(block.header)
-      nodeViewHolder ! LocallyGeneratedModifier(block.payload)
+      nvh ! LocallyGeneratedModifier(block.header)
+      nvh ! LocallyGeneratedModifier(block.payload)
       if (settings.influxDB.isDefined) {
         context.actorSelection("/user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
         context.actorSelection("/user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
       }
       if (settings.node.stateMode == StateMode.Digest)
-        block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
+        block.adProofsOpt.foreach(adp => nvh ! LocallyGeneratedModifier(adp))
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
     case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
@@ -190,7 +192,7 @@ class Miner extends Actor with StrictLogging {
   }
 
   def produceCandidate(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, CandidateEnvelope] {
+    nvh ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, CandidateEnvelope] {
       nodeView =>
         val producingStartTime: Time = System.currentTimeMillis()
         startTime = producingStartTime
@@ -220,6 +222,9 @@ class Miner extends Actor with StrictLogging {
 }
 
 object Miner {
+
+  def props(settings: EncryAppSettings, nvh: ActorRef, timeProvider: NetworkTimeProvider): Props =
+    Props(new Miner(settings, nvh, timeProvider))
 
   case object GetMinerStatus
 
