@@ -48,13 +48,14 @@ class NodeViewHolder[StateType <: EncryState[StateType]](auxHistoryRef: ActorRef
                                                          influxRef: Option[ActorRef],
                                                          ntp: NetworkTimeProvider) extends Actor with StrictLogging {
 
-  import context.dispatcher
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet)
 
   var applicationsSuccessful: Boolean = true
-  var nodeView: NodeView = restoreState().getOrElse(genesisState)
 
+  logger.info(s"Starting state and history initialisation on NVH...")
+  var nodeView: NodeView = restoreState().getOrElse(genesisState)
   logger.info(s"History and State on NVH are ready! Starting full application!")
 
   var nvsyncRef: Option[ActorRef] = None

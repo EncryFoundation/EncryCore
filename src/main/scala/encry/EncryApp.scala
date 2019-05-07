@@ -34,7 +34,7 @@ object EncryApp extends App with StrictLogging {
 
   val nodeViewHolder: ActorRef =
     system.actorOf(NodeViewHolder.props(auxHistoryHolder, settings, influxRef, timeProvider)
-      .withDispatcher("nvh-dispatcher"))
+      .withMailbox("nvh-mailbox"))
 
   if (settings.monitoringSettings.exists(_.kamonEnabled)) {
     Kamon.reconfigure(EncryAppSettings.allConfig)
