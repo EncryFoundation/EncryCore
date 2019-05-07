@@ -110,7 +110,15 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     }
     case lm: LocallyGeneratedModifier[EncryPersistentModifier]@unchecked =>
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
-      pmodModify(lm.pmod, isLocallyGenerated = true)
+      lm.pmod match {
+        case block: Block =>
+          if (nodeView.history.bestBlockHeight < block.header.height) {
+            pmodModify(block.header, isLocallyGenerated = true)
+            pmodModify(block.payload, isLocallyGenerated = true)
+          } else logger.info(s"Got LocallyGeneratedModifier with id: ${Algos.encode(block.header.id)}" +
+            s"on height: ${block.header.height}.")
+        case anotherMod => pmodModify(anotherMod, isLocallyGenerated = true)
+      }
     case GetDataFromCurrentView(f) =>
       val result = f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet))
       result match {
