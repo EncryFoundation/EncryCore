@@ -23,7 +23,9 @@ object EncryApp extends App with StrictLogging {
   val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
   val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
-  val influxRef: Option[ActorRef] = if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender])) else None
+  val influxRef: Option[ActorRef] = if (settings.influxDB.isDefined)
+    Some(system.actorOf(StatsSender.props(settings, timeProvider)))
+  else None
 
   system.actorOf(Props[Zombie])
 
@@ -31,7 +33,8 @@ object EncryApp extends App with StrictLogging {
     system.actorOf(AuxiliaryHistoryHolder.props(settings, timeProvider).withDispatcher("aux-history-dispatcher"))
 
   val nodeViewHolder: ActorRef =
-    system.actorOf(NodeViewHolder.props(auxHistoryHolder, settings, influxRef, timeProvider).withDispatcher("nvh-dispatcher"))
+    system.actorOf(NodeViewHolder.props(auxHistoryHolder, settings, influxRef, timeProvider)
+      .withDispatcher("nvh-dispatcher"))
 
   if (settings.monitoringSettings.exists(_.kamonEnabled)) {
     Kamon.reconfigure(EncryAppSettings.allConfig)
@@ -45,7 +48,8 @@ object EncryApp extends App with StrictLogging {
     sys.exit(code)
   }
 
-  def commonSupervisorStrategy: OneForOneStrategy = OneForOneStrategy(maxNrOfRetries = 5, withinTimeRange = 60 seconds) {
-    case _ => Restart
-  }
+  def commonSupervisorStrategy: OneForOneStrategy =
+    OneForOneStrategy(maxNrOfRetries = 5, withinTimeRange = 60 seconds) {
+      case _ => Restart
+    }
 }

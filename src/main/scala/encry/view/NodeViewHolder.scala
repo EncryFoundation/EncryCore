@@ -55,13 +55,15 @@ class NodeViewHolder[StateType <: EncryState[StateType]](auxHistoryRef: ActorRef
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
 
+  logger.info(s"History and State on NVH are ready! Starting full application!")
+
   var nvsyncRef: Option[ActorRef] = None
 
-  val minerRef: ActorRef = context.system.actorOf(Miner.props(settings, self, ntp))
+  val minerRef: ActorRef = context.system.actorOf(Miner.props(settings, self, ntp, influxRef))
   if (settings.node.mining) minerRef ! StartMining
 
   val memoryPoolRef: ActorRef =
-    context.system.actorOf(Mempool.props(settings, ntp, minerRef).withDispatcher("mempool-dispatcher"))
+    context.system.actorOf(Mempool.props(settings, ntp, minerRef, influxRef).withDispatcher("mempool-dispatcher"))
   memoryPoolRef ! UpdatedState(nodeView.state)
 
   val networkController: ActorRef =

@@ -21,8 +21,8 @@ import org.iq80.leveldb.Options
 case class AuxiliaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends Actor with StrictLogging {
 
   val history: EncryHistory = AuxiliaryHistoryHolder.readOrGenerate(settings, ntp)
-
-  override def preStart(): Unit = context.system.eventStream.publish(AuxHistoryChanged(history))
+  logger.info(s"History on AuxHistory is ready!")
+  context.system.eventStream.publish(AuxHistoryChanged(history))
 
   override def receive: Receive = {
     case Append(mod) =>

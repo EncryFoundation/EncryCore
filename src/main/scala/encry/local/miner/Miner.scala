@@ -35,7 +35,8 @@ import scala.util.{Failure, Success}
 
 class Miner(settings: EncryAppSettings,
             nvh: ActorRef,
-            timeProvider: NetworkTimeProvider) extends Actor with StrictLogging {
+            timeProvider: NetworkTimeProvider,
+            influx: Option[ActorRef]) extends Actor with StrictLogging {
 
   implicit val timeout: Timeout = Timeout(5.seconds)
 
@@ -94,9 +95,9 @@ class Miner(settings: EncryAppSettings,
       killAllWorkers()
       nvh ! LocallyGeneratedModifier(block.header)
       nvh ! LocallyGeneratedModifier(block.payload)
-      if (settings.influxDB.isDefined) {
-        context.actorSelection("/user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
-        context.actorSelection("/user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
+      influx.foreach { ref =>
+        ref ! MiningEnd(block.header, workerIdx, context.children.size)
+        ref ! MiningTime(System.currentTimeMillis() - startTime)
       }
       if (settings.node.stateMode == StateMode.Digest)
         block.adProofsOpt.foreach(adp => nvh ! LocallyGeneratedModifier(adp))
@@ -206,15 +207,12 @@ class Miner(settings: EncryAppSettings,
             (syncingDone || nodeView.history.isFullChainSynced)) || settings.node.offlineGeneration) {
             logger.info(s"Starting candidate generation at " +
               s"${dateFormat.format(new Date(System.currentTimeMillis()))}")
-            if (settings.influxDB.isDefined)
-              context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
+            influx.foreach(_ ! SleepTime(System.currentTimeMillis() - sleepTime))
             logger.info("Going to calculate last block:")
             val envelope: CandidateEnvelope =
               CandidateEnvelope
                 .fromCandidate(createCandidate(nodeView, bestHeaderOpt))
-            if (settings.influxDB.isDefined)
-              context.actorSelection("user/statsSender") !
-                CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
+            influx.foreach(_ ! CandidateProducingTime(System.currentTimeMillis() - producingStartTime))
             envelope
           } else CandidateEnvelope.empty
         candidate
@@ -223,8 +221,11 @@ class Miner(settings: EncryAppSettings,
 
 object Miner {
 
-  def props(settings: EncryAppSettings, nvh: ActorRef, timeProvider: NetworkTimeProvider): Props =
-    Props(new Miner(settings, nvh, timeProvider))
+  def props(settings: EncryAppSettings,
+            nvh: ActorRef,
+            timeProvider: NetworkTimeProvider,
+            influx: Option[ActorRef]): Props =
+    Props(new Miner(settings, nvh, timeProvider, influx))
 
   case object GetMinerStatus
 

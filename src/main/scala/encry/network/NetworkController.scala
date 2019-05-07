@@ -141,8 +141,7 @@ class NetworkController(settings: EncryAppSettings,
       logger.info(s"Registering handlers for ${types.mkString(",")}.")
       val ids = types.map(_._1)
       messagesHandlers += (ids -> handler)
-    case CommandFailed(cmd: Tcp.Command) =>
-      context.actorSelection("/user/statsSender") ! "Failed to execute command : " + cmd
+    case CommandFailed(cmd: Tcp.Command) => influxRef.foreach(_ ! "Failed to execute command : " + cmd)
     case nonsense: Any => logger.warn(s"NetworkController: got something strange $nonsense")
   }
 }

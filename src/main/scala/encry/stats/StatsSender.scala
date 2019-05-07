@@ -4,23 +4,21 @@ import java.io.File
 import java.net.InetAddress
 import java.util
 import java.text.SimpleDateFormat
-import java.util.Date
-
-import akka.actor.Actor
+import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
 import encry.modifiers.history.Header
+import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
+import encry.utils.NetworkTimeProvider
 import encry.view.history.History.Height
 import org.encryfoundation.common.Algos
 import org.influxdb.{InfluxDB, InfluxDBFactory}
-
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class StatsSender extends Actor with StrictLogging {
+class StatsSender(settings: EncryAppSettings, timeProvider: NetworkTimeProvider) extends Actor with StrictLogging {
 
   var modifiersToDownload: Map[String, (ModifierTypeId, Long)] = Map()
 
@@ -143,6 +141,9 @@ class StatsSender extends Actor with StrictLogging {
 }
 
 object StatsSender {
+
+  def props(settings: EncryAppSettings, timeProvider: NetworkTimeProvider): Props =
+    Props(new StatsSender(settings, timeProvider))
 
   case class CandidateProducingTime(time: Long)
 
