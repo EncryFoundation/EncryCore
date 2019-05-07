@@ -67,7 +67,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](auxHistoryRef: ActorRef
   memoryPoolRef ! UpdatedState(nodeView.state)
 
   val networkController: ActorRef =
-    context.system.actorOf(NetworkController.props(settings, self, memoryPoolRef, influxRef, ntp, minerRef)
+    context.system.actorOf(NetworkController.props(settings, self, memoryPoolRef, influxRef, ntp, minerRef, auxHistoryRef)
       .withDispatcher("network-dispatcher"))
 
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
@@ -410,7 +410,7 @@ object NodeViewHolder {
 
   }
 
-  class EncryNodeViewHolderPriorityQueue(settings: ActorSystem.Settings, config: Config)
+  class NodeViewHolderPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
         case CompareViews(_, _, _) => 0

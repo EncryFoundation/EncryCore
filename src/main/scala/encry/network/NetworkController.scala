@@ -29,13 +29,14 @@ class NetworkController(settings: EncryAppSettings,
                         mempoolRef: ActorRef,
                         influxRef: Option[ActorRef],
                         ntp: NetworkTimeProvider,
-                        minerRef: ActorRef) extends Actor with StrictLogging {
+                        minerRef: ActorRef,
+                        auxRef: ActorRef) extends Actor with StrictLogging {
 
   import context.dispatcher
   implicit val system: ActorSystem = context.system
 
   val nodeViewSynchronizer: ActorRef = context.system.actorOf(
-    NodeViewSynchronizer.props(influxRef, nvh, self, settings, mempoolRef).withDispatcher("nvsh-dispatcher"))
+    NodeViewSynchronizer.props(influxRef, nvh, self, settings, mempoolRef, auxRef).withDispatcher("nvsh-dispatcher"))
 
   val peerManager: ActorRef = context.system.actorOf(PeerManager.props(settings, nodeViewSynchronizer, self, ntp))
 
@@ -165,7 +166,8 @@ object NetworkController {
             mempoolRef: ActorRef,
             influxRef: Option[ActorRef],
             ntp: NetworkTimeProvider,
-            minerRef: ActorRef): Props =
-    Props(new NetworkController(settings, nvh, mempoolRef, influxRef, ntp, minerRef))
+            minerRef: ActorRef,
+            auxRef: ActorRef): Props =
+    Props(new NetworkController(settings, nvh, mempoolRef, influxRef, ntp, minerRef, auxRef))
 
 }

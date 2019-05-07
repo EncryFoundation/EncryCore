@@ -16,7 +16,7 @@ import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
 import encry.network.BasicMessagesRepo._
 import encry.network.DeliveryManager.{FullBlockChainIsSynced, ModifiersFromNVH}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
-import encry.network.NodeViewSynchronizer.InitializeNodeViewSynchronizerRefOnNVH
+import encry.network.NodeViewSynchronizer.{GetAuxHistoryChanges, InitializeNodeViewSynchronizerRefOnNVH}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
@@ -34,7 +34,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
                            networkControllerRef: ActorRef,
                            settings: EncryAppSettings,
-                           memoryPoolRef: ActorRef) extends Actor with StrictLogging {
+                           memoryPoolRef: ActorRef,
+                           auxRef: ActorRef) extends Actor with StrictLogging {
 
   implicit val timeout: Timeout = Timeout(5.seconds)
 
@@ -52,6 +53,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       SyncInfoNetworkMessage.NetworkMessageTypeID         -> "SyncInfoNetworkMessage"
     )
     nodeViewHolderRef ! InitializeNodeViewSynchronizerRefOnNVH(self)
+    auxRef ! GetAuxHistoryChanges
     networkControllerRef ! RegisterMessagesHandler(messageIds, self)
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
@@ -166,6 +168,8 @@ object NodeViewSynchronizer {
 
   case class InitializeNodeViewSynchronizerRefOnNVH(nvshRef: ActorRef)
 
+  case object GetAuxHistoryChanges
+
   object ReceivableMessages {
 
     case object SendLocalSyncInfo
@@ -219,8 +223,9 @@ object NodeViewSynchronizer {
             nodeViewHolderRef: ActorRef,
             networkControllerRef: ActorRef,
             settings: EncryAppSettings,
-            memoryPoolRef: ActorRef): Props =
-    Props(new NodeViewSynchronizer(influxRef, nodeViewHolderRef, networkControllerRef, settings, memoryPoolRef))
+            memoryPoolRef: ActorRef,
+            auxRef: ActorRef): Props =
+    Props(new NodeViewSynchronizer(influxRef, nodeViewHolderRef, networkControllerRef, settings, memoryPoolRef, auxRef))
 
   class NodeViewSynchronizerPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(

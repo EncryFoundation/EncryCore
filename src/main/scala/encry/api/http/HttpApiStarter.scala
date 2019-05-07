@@ -51,6 +51,8 @@ object HttpApiStarter extends StrictLogging {
         StateInfoApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
         WalletInfoApiRoute(nodeViewHolder, settings.restApi)
       )
+      logger.info(s"Starting http server on ${settings.restApi.bindAddress.getAddress.getHostAddress}" +
+        s":${ settings.restApi.bindAddress.getPort}")
       Http().bindAndHandle(
         CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute,
         settings.restApi.bindAddress.getAddress.getHostAddress,

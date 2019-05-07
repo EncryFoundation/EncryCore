@@ -1,11 +1,13 @@
 package encry.network
 
 import java.io.File
+
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
 import encry.network.AuxiliaryHistoryHolder._
+import encry.network.NodeViewSynchronizer.GetAuxHistoryChanges
 import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.VersionalStorage
 import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
@@ -22,7 +24,6 @@ case class AuxiliaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimePr
 
   val history: EncryHistory = AuxiliaryHistoryHolder.readOrGenerate(settings, ntp)
   logger.info(s"History on AuxHistory is ready!")
-  context.system.eventStream.publish(AuxHistoryChanged(history))
 
   override def receive: Receive = {
     case Append(mod) =>
@@ -33,6 +34,9 @@ case class AuxiliaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimePr
       context.system.eventStream.publish(AuxHistoryChanged(history))
     case ReportModifierInvalid(mod, progressInfo) =>
       history.reportModifierIsInvalid(mod, progressInfo)
+      context.system.eventStream.publish(AuxHistoryChanged(history))
+    case GetAuxHistoryChanges =>
+      logger.info(s"AuxHistory got request from NVSH for initial history. Sending it back.")
       context.system.eventStream.publish(AuxHistoryChanged(history))
   }
 
