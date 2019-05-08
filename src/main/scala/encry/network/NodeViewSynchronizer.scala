@@ -91,7 +91,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           case Some(historyReader) =>
             val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, settings.network.networkChunkSize)
             val ext: ModifierIds = extensionOpt.getOrElse(Seq())
-            val comparison: HistoryComparisonResult = historyReader.compare(syncInfo, remote)
+            val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
             logger.info(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
               s"Comparison result is $comparison. Sending extension of length ${ext.length}.")
             if (!(extensionOpt.nonEmpty || comparison != Younger)) logger.warn("Extension is empty while comparison is younger")

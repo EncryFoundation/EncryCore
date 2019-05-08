@@ -55,39 +55,20 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     * @param si other's node sync info
     * @return Equal if nodes have the same history, Younger if another node is behind, Older if a new node is ahead
     */
-  def compare(si: EncrySyncInfo, peer: ConnectedPeer): HistoryComparisonResult = bestHeaderIdOpt match {
+  def compare(si: EncrySyncInfo): HistoryComparisonResult = bestHeaderIdOpt match {
 
     //Our best header is the same as other history best header
-    case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) =>
-      logger.info(s"Got syncInfo from: $peer. Their last header is: ${Algos.encode(si.lastHeaderIds.last)}." +
-        s"Our is: ${Algos.encode(id)}. Comparison result is: Equal.")
-      Equal
+    case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) => Equal
 
     //Our best header is in other history best chain, but not at the last position
-    case Some(id) if si.lastHeaderIds.exists(_ sameElements id) =>
-      logger.info(s"Got syncInfo from: $peer. Their last header is: ${Algos.encode(si.lastHeaderIds.last)}." +
-        s" Their all headers are: ${si.lastHeaderIds.map(Algos.encode).mkString(",")}." +
-        s" Last headers contains our best header, but not in last position. " +
-        s"Our is: ${Algos.encode(id)}. Comparison result is: Older.")
-      Older
+    case Some(id) if si.lastHeaderIds.exists(_ sameElements id) => Older
 
     /* Other history is empty, or our history contains last id from other history */
-    case Some(id) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.lastOption.exists(contains) =>
-      logger.info(s"Got syncInfo from: $peer. Their last header is: ${Try(Algos.encode(si.lastHeaderIds.last))}." +
-        s" Their all headers are: ${si.lastHeaderIds.map(Algos.encode).mkString(",")}." +
-        s" We contains their last header in our history. " +
-        s"Our is: ${Algos.encode(id)}. Comparison result is: Younger.")
-      Younger
+    case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.lastOption.exists(contains) => Younger
 
-    case Some(id) =>
+    case Some(_) =>
       //Our history contains some ids from other history
-      if (si.lastHeaderIds.exists(contains)) {
-        logger.info(s"Got syncInfo from: $peer. Their last header is: ${Try(Algos.encode(si.lastHeaderIds.last))}." +
-          s" Their all headers are: ${si.lastHeaderIds.map(Algos.encode).mkString(",")}." +
-          s" We contains some of their headers in our history. " +
-          s"Our is: ${Algos.encode(id)}. Comparison result is: Fork.")
-        Fork
-      }
+      if (si.lastHeaderIds.exists(contains)) Fork
       //Unknown comparison result
       else Unknown
 
