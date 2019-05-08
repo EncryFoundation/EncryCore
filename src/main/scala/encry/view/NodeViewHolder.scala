@@ -79,7 +79,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](auxHistoryRef: ActorRef
 
   influxRef.foreach(ref =>
     context.system.scheduler.schedule(
-      5.second, 5.second, ref, HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight))
+      5.second, 5.second) { ref ! HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight) }
   )
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -91,7 +91,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](auxHistoryRef: ActorRef
     .schedule(5.seconds, 10.seconds)(logger.debug(s"Modifiers cache from NVH: ${ModifiersCache.size}"))
 
   override def postStop(): Unit = {
-    logger.warn(s"Stopping EncryNodeViewHolder")
+    logger.warn(s"Stopping NodeViewHolder")
     nodeView.history.closeStorage()
     nodeView.state.closeStorage()
   }
