@@ -61,13 +61,15 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
   def update[K <: Array[Byte], V <: Array[Byte]](prover: BatchAVLProver[D, _],
                                                  additionalData: Seq[(K, V)]): Try[Unit] = Try {
     val digestWrapper: Store.K = ByteArrayWrapper(prover.digest)
+    val wrappedRootHash: (Store.K, Store.V) =
+      ByteArrayWrapper(Algos.hash(additionalData.headOption.map(_._1).getOrElse(Array.emptyByteArray))) -> digestWrapper
     val indexes: Seq[(Store.K, Store.K)] = Seq(TopNodeKey -> nodeKey(prover.topNode),
       TopNodeHeight -> ByteArrayWrapper(Ints.toByteArray(prover.rootNodeHeight)))
     val toRemove: List[Store.K] = prover.removedNodes().map(rn => ByteArrayWrapper(rn.label))
     val toUpdate: Seq[(Store.K, Store.K)] = indexes ++ serializedVisitedNodes(prover.topNode, isTop = true)
     val toUpdateWrapped: Seq[(Store.K, Store.K)] =
       additionalData.map { case (k, v) => ByteArrayWrapper(k) -> ByteArrayWrapper(v) }
-    val toUpdateWithWrapped: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = toUpdate ++ toUpdateWrapped
+    val toUpdateWithWrapped: Seq[(ByteArrayWrapper, ByteArrayWrapper)] = toUpdate ++ toUpdateWrapped :+ wrappedRootHash
     val toRemoveMerged: List[ByteArrayWrapper] = toRemove.filterNot(toUpdate.map(_._1).intersect(toRemove).contains)
     logger.info(s"Update storage to version ${Algos.encode(digestWrapper.data)}: ${toUpdateWithWrapped.size} elements to insert," +
       s" ${toRemove.size} elements to remove")
