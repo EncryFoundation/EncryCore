@@ -89,9 +89,9 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
   override def applyModifier(mod: EncryPersistentModifier): Try[UtxoState] = mod match {
 //here
     case block: Block =>
-      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)}!")
+      logger.debug(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)}!")
       val startTime = System.currentTimeMillis()
-      logger.info(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
+      logger.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height.")
       statsSenderRef.foreach(_ ! TxsInBlock(block.payload.transactions.size))
       applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
@@ -102,10 +102,10 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           block.header.timestamp
         )
         val proofBytes: SerializedAdProof = persistentProver.generateProofAndUpdateStorage(meta)
-        logger.info(s"starting generating proofHash!")
+        logger.debug(s"starting generating proofHash!")
         val timer1 = System.currentTimeMillis()
         val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
-        logger.info(s"Finifhsing generating proofHash! Process time is: ${System.currentTimeMillis() - timer1}")
+        logger.debug(s"Finifhsing generating proofHash! Process time is: ${System.currentTimeMillis() - timer1}")
 
         if (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest)
           onAdProofGenerated(ADProofs(block.header.id, proofBytes))
@@ -131,7 +131,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           settings,
           statsSenderRef
         )
-        logger.info(s"Finishing o applyModifier as a Block: ${Algos.encode(mod.id)}! Time is: ${System.currentTimeMillis() - startTime}")
+        logger.debug(s"Finishing o applyModifier as a Block: ${Algos.encode(mod.id)}! Time is: ${System.currentTimeMillis() - startTime}")
         a
       }.recoverWith[UtxoState] { case e =>
         logger.info(s"Failed to apply block with header ${block.header.encodedId} to UTXOState with root" +
@@ -140,7 +140,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
       }
 
     case header: Header =>
-      logger.info(s"\n\nStarting to applyModifier as a Header: ${Algos.encode(mod.id)}!")
+      logger.debug(s"\n\nStarting to applyModifier as a Header: ${Algos.encode(mod.id)}!")
       val startTime = System.currentTimeMillis()
 
       val a = Success(new UtxoState(
@@ -153,7 +153,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         settings,
         statsSenderRef
       ))
-      logger.info(s"Finishing o applyModifier as a Header: ${Algos.encode(mod.id)}! Time is: ${System.currentTimeMillis() - startTime}")
+      logger.debug(s"Finishing o applyModifier as a Header: ${Algos.encode(mod.id)}! Time is: ${System.currentTimeMillis() - startTime}")
 
       a
 

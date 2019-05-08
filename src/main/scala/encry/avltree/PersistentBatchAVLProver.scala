@@ -22,15 +22,15 @@ trait PersistentBatchAVLProver[D <: Digest, HF <: CryptographicHash[D]] extends 
   def performOneOperation(operation: Operation): Try[Option[ADValue]] = avlProver.performOneOperation(operation)
 
   def generateProofAndUpdateStorage[K <: Array[Byte], V <: Array[Byte]](additionalData: Seq[(K, V)]): SerializedAdProof = {
-    logger.info(s"\nStarting generateProofAndUpdateStorage!!!\n")
+    logger.debug(s"\nStarting generateProofAndUpdateStorage!!!\n")
     val startTime1 = System.currentTimeMillis()
-    logger.info(s"Starting storage.update!")
+    logger.debug(s"Starting storage.update!")
     storage.update(avlProver, additionalData).get
-    logger.info(s"Finished storage.update! Process time is: ${System.currentTimeMillis() - startTime1}")
-    logger.info(s"Starting generateProof!")
+    logger.debug(s"Finished storage.update! Process time is: ${System.currentTimeMillis() - startTime1}")
+    logger.debug(s"Starting generateProof!")
     val startTime2 = System.currentTimeMillis()
     val a = avlProver.generateProof()
-    logger.info(s"Finished generateProof! Process time is: ${System.currentTimeMillis() - startTime2}")
+    logger.debug(s"Finished generateProof! Process time is: ${System.currentTimeMillis() - startTime2}")
     a
   }
 
