@@ -87,7 +87,7 @@ class Miner extends Actor with StrictLogging {
       context.become(miningDisabled)
     case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
       logger.info(s"Going to propagate new block $block from worker $workerIdx" +
-        s" with nonce: ${block.header.nonce}")
+        s" with nonce: ${block.header.nonce}.")
       logger.debug(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
       killAllWorkers()
       nodeViewHolder ! LocallyGeneratedModifier(block.header)
