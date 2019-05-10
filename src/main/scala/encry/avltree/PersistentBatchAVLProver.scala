@@ -38,7 +38,9 @@ trait PersistentBatchAVLProver[D <: Digest, HF <: CryptographicHash[D]] extends 
 
   def rollback(version: ADDigest): Try[Unit] = Try {
     val recoveredTop: (EncryProverNodes[D], Int) = storage.rollback(version).get
+    val startTime = System.currentTimeMillis()
     avlProver = new BatchAVLProver(avlProver.keyLength, avlProver.valueLengthOpt, Some(recoveredTop))(avlProver.hf)
+    logger.info(s"Avl prover init: ${(System.currentTimeMillis() - startTime)/1000} s")
   }
 
   def checkTree(postProof: Boolean = false): Unit = avlProver.checkTree(postProof)
