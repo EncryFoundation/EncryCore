@@ -34,7 +34,7 @@ object ModifiersCache extends StrictLogging {
   def contains(key: Key): Boolean = cache.contains(key)
 
   def put(key: Key, value: EncryPersistentModifier, history: EncryHistory): Unit = if (!contains(key)) {
-    logger.info(s"put ${Algos.encode(key.toArray)} to cache")
+    logger.debug(s"put ${Algos.encode(key.toArray)} to cache")
     cache.put(key, value)
     value match {
       case header: Header =>
@@ -81,7 +81,7 @@ object ModifiersCache extends StrictLogging {
             case headerKey if isApplicable(headerKey) => headerKey
           }
         case None =>
-          logger.info(s"Can't find headers at height $height in cache")
+          logger.debug(s"Can't find headers at height $height in cache")
           List.empty[Key]
       }
     }
@@ -117,12 +117,12 @@ object ModifiersCache extends StrictLogging {
                     )
                 )
                 && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
-              logger.info(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
+              logger.debug(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
               new mutable.WrappedArray.ofByte(v.id)
           }
 
         case None =>
-          logger.info(s"No header in cache at height ${history.bestHeaderHeight + 1}. " +
+          logger.debug(s"No header in cache at height ${history.bestHeaderHeight + 1}. " +
             s"Trying to find in range [${history.bestHeaderHeight - Constants.Chain.MaxRollbackDepth}, ${history.bestHeaderHeight}]")
           (history.bestHeaderHeight - Constants.Chain.MaxRollbackDepth to history.bestHeaderHeight).flatMap(height =>
             getHeadersKeysAtHeight(height)
@@ -135,7 +135,7 @@ object ModifiersCache extends StrictLogging {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           List(new mutable.WrappedArray.ofByte(header.payloadId))
         case _ if !isChainSynced =>
-          logger.info(s"ModsCache no applicable payload at height: ${history.bestBlockHeight + 1}." +
+          logger.debug(s"ModsCache no applicable payload at height: ${history.bestBlockHeight + 1}." +
             s"Trying to find in range [${history.bestBlockHeight - Constants.Chain.MaxRollbackDepth}, ${history.bestBlockHeight}]")
           (history.bestBlockHeight - Constants.Chain.MaxRollbackDepth to history.bestBlockHeight).flatMap(height =>
             findApplicablePayloadAtHeight(height)

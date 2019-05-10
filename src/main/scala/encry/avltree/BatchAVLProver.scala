@@ -135,6 +135,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
   }
 
   def generateProof(): SerializedAdProof = {
+    //here
     changedNodesBuffer.clear()
     changedNodesBufferToCheck.clear()
     val packagedTree = new mutable.ArrayBuffer[Byte]
@@ -175,11 +176,23 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
       r.visited = false
     }
 
+    logger.debug(s"\n\nStarting to PACK TREE!!")
+    val startTime = System.currentTimeMillis()
     packTree(oldTopNode)
+    logger.debug(s"\n\nFinishing to PACK TREE. Process time is: ${System.currentTimeMillis() - startTime}")
+    logger.debug(s"\n\nStarting to EndOfTreeInPackagedProof!!")
+    val startTime1 = System.currentTimeMillis()
     packagedTree += EndOfTreeInPackagedProof
+    logger.debug(s"\n\nFinishing to EndOfTreeInPackagedProof. Process time is: ${System.currentTimeMillis() - startTime1}")
+    logger.debug(s"\n\nStarting to directions!!")
+    val startTime2 = System.currentTimeMillis()
     packagedTree ++= directions
+    logger.debug(s"\n\nFinishing to directions. Process time is: ${System.currentTimeMillis() - startTime2}")
 
+    logger.debug(s"\n\nStarting to resetNew!!")
+    val startTime3 = System.currentTimeMillis()
     resetNew(topNode)
+    logger.debug(s"\n\nFinishing to resetNew. Process time is: ${System.currentTimeMillis() - startTime3}")
     directions = new mutable.ArrayBuffer[Byte]
     directionsBitLength = 0
     oldTopNode = topNode

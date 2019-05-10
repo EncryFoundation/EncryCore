@@ -84,7 +84,7 @@ case class SyncTracker(deliveryManager: ActorRef,
 
   def getPeersForConnection: Vector[(InetAddress, (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer))] =
     statuses
-      .filter { case (_, (hcr, _, _)) => hcr != Younger }
+      .filter { case (_, (hcr, _, _)) => hcr != Fork }
       .toVector.sortBy { case (_, (_, pps, _)) => pps }
 
   def scheduleSendSyncInfo(): Unit = {

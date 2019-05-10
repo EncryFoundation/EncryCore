@@ -81,6 +81,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   override def receive: Receive = {
     case ModifiersFromRemote(modifierTypeId, modifiers) =>
       val startTime = System.currentTimeMillis()
+      logger.info(s"Start processing ModifiersFromRemote message on NVH.")
       modifierTypeId match {
         case Payload.modifierTypeId =>
           modifiers.foreach { bytes =>
@@ -111,37 +112,49 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
           computeApplications()
         case id => logger.info(s"NodeViewHolder got modifier of wrong type: $id!")
       }
-      logger.info(s"Time processing of msg ModifiersFromRemote with mod of type: $modifierTypeId: ${System.currentTimeMillis() - startTime}")
+      logger.debug(s"Time processing of msg ModifiersFromRemote with mod of type: $modifierTypeId: ${System.currentTimeMillis() - startTime}")
     case lm: LocallyGeneratedModifier[EncryPersistentModifier]@unchecked =>
+      logger.debug(s"Start processing LocallyGeneratedModifier message on NVH.")
       val startTime = System.currentTimeMillis()
-      logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
-      pmodModify(lm.pmod, isLocallyGenerated = true)
-      logger.info(s"Time processing of msg LocallyGeneratedModifier with mod of type ${lm.pmod.modifierTypeId}:" +
+      logger.debug(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
+      lm.pmod match {
+        case block: Block =>
+          if (nodeView.history.bestBlockHeight < block.header.height) {
+            pmodModify(block.header, isLocallyGenerated = true)
+            pmodModify(block.payload, isLocallyGenerated = true)
+          } else logger.info(s"Got LocallyGeneratedModifier with id: ${Algos.encode(block.header.id)}" +
+            s"on height: ${block.header.height}.")
+        case anotherMod => pmodModify(anotherMod, isLocallyGenerated = true)
+      }
+      logger.debug(s"Time processing of msg LocallyGeneratedModifier with mod of type ${lm.pmod.modifierTypeId}:" +
         s" with id: ${Algos.encode(lm.pmod.id)} -> ${System.currentTimeMillis() - startTime}")
     case GetDataFromCurrentView(f) =>
+      logger.debug(s"Start processing GetDataFromCurrentView message on NVH.")
       val startTime = System.currentTimeMillis()
       val result = f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet))
       result match {
         case resultFuture: Future[_] => resultFuture.pipeTo(sender())
         case _ => sender() ! result
       }
-      logger.info(s"Time processing of msg GetDataFromCurrentView from $sender(): ${System.currentTimeMillis() - startTime}")
+      logger.debug(s"Time processing of msg GetDataFromCurrentView from $sender(): ${System.currentTimeMillis() - startTime}")
     case GetNodeViewChanges(history, state, _) =>
+      logger.debug(s"Start processing GetNodeViewChanges message on NVH.")
       val startTime = System.currentTimeMillis()
       if (history) sender() ! ChangedHistory(nodeView.history)
       if (state) sender() ! ChangedState(nodeView.state)
-      logger.info(s"Time processing of msg GetNodeViewChanges from $sender(): ${System.currentTimeMillis() - startTime}")
+      logger.debug(s"Time processing of msg GetNodeViewChanges from $sender(): ${System.currentTimeMillis() - startTime}")
     case CompareViews(peer, modifierTypeId, modifierIds) =>
+      logger.debug(s"Start processing CompareViews message on NVH.")
       val startTime = System.currentTimeMillis()
       val ids: Seq[ModifierId] = modifierTypeId match {
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
-      if (modifierTypeId != Transaction.ModifierTypeId) logger.info(s"Got compare view message on NVH from ${peer.socketAddress}." +
+      if (modifierTypeId != Transaction.ModifierTypeId) logger.debug(s"Got compare view message on NVH from ${peer.socketAddress}." +
         s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
         s" Sending RequestFromLocal with ids to $sender." +
         s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
       if (ids.nonEmpty) sender() ! RequestFromLocal(peer, modifierTypeId, ids)
-      logger.info(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
+      logger.debug(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
     case a: Any => logger.error(s"Strange input: $a")
   }
 
@@ -170,7 +183,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
 
   def requestDownloads(pi: ProgressInfo[EncryPersistentModifier], previousModifier: Option[ModifierId] = None): Unit =
     pi.toDownload.foreach { case (tid, id) =>
-      if (tid != Transaction.ModifierTypeId) logger.info(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
+      if (tid != Transaction.ModifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
       nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
     }
@@ -192,7 +205,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
                                  failedMod: Option[EncryPersistentModifier],
                                  alternativeProgressInfo: Option[ProgressInfo[EncryPersistentModifier]],
                                  suffix: IndexedSeq[EncryPersistentModifier])
-
+    logger.debug(s"\nStarting updating state in updateState function!")
+    val startTime = System.currentTimeMillis()
     requestDownloads(progressInfo, None)
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
     val (stateToApplyTry: Try[StateType], suffixTrimmed: IndexedSeq[EncryPersistentModifier]@unchecked) =
@@ -203,12 +217,15 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
           else Success(state) -> IndexedSeq()
         }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty.")))
       } else Success(state) -> suffixApplied
-
     stateToApplyTry match {
       case Success(stateToApply) =>
+        logger.debug(s"\nApplied to state successfully! Time of it is: ${System.currentTimeMillis() - startTime}.")
+        logger.debug(s"\nStarting to update UpdateInformation!")
+        val startTime1 = System.currentTimeMillis()
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
+          //here
           if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
             case Success(stateAfterApply) =>
               modToApply match {
@@ -232,6 +249,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           } else u
         }
+        logger.debug(s"\n\nFinished UpdateInformation! Time is: ${System.currentTimeMillis() - startTime1}")
         uf.failedMod match {
           case Some(_) => updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
           case None => (uf.history, Success(uf.state), uf.suffix)
@@ -244,7 +262,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   }
 
   def pmodModify(pmod: EncryPersistentModifier, isLocallyGenerated: Boolean = false): Unit = if (!nodeView.history.contains(pmod.id)) {
-    logger.info(s"\nStarting to apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
+    logger.debug(s"\nStarting to apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
     val startAppHistory = System.currentTimeMillis()
     if (settings.influxDB.isDefined) context.system
       .actorSelection("user/statsSender") !
@@ -252,14 +270,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     auxHistoryHolder ! Append(pmod)
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
-        logger.info(s"\nSuccessfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
-        logger.info(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
+        logger.debug(s"\nSuccessfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
+        logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
         if (settings.influxDB.isDefined)
           context.system.actorSelection("user/statsSender") ! EndOfApplyingModif(pmod.id)
         logger.info(s"\nGoing to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
         val startAppState = System.currentTimeMillis()
         if (progressInfo.toApply.nonEmpty) {
-          logger.info(s"\n progress info non empty")
+          logger.debug(s"\n progress info non empty")
           val startPoint: Long = System.currentTimeMillis()
           val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
@@ -267,31 +285,31 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
             context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
           newStateTry match {
             case Success(newMinState) =>
-              logger.info(s"\nTime of applying to state SUCCESS is: ${System.currentTimeMillis() - startAppState}. modId is: ${pmod.encodedId}")
-              logger.info(s"\nStarting inner updating after succeeded state applying!")
+              logger.debug(s"\nTime of applying to state SUCCESS is: ${System.currentTimeMillis() - startAppState}. modId is: ${pmod.encodedId}")
+              logger.debug(s"\nStarting inner updating after succeeded state applying!")
               val startInnerStateApp = System.currentTimeMillis()
               sendUpdatedInfoToMemoryPool(newMinState, progressInfo.toRemove, blocksApplied)
               if (progressInfo.chainSwitchingNeeded)
                 nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
               blocksApplied.foreach(nodeView.wallet.scanPersistent)
-              logger.info(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
+              logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
               if (progressInfo.chainSwitchingNeeded)
                 context.actorSelection("/user/blockListener") !
                   ChainSwitching(progressInfo.toRemove.map(_.id))
               if (settings.influxDB.isDefined) newHistory.bestHeaderOpt.foreach(header =>
                 context.actorSelection("/user/statsSender") ! BestHeaderInChain(header, System.currentTimeMillis()))
               if (newHistory.isFullChainSynced) {
-                logger.info(s"\nblockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
+                logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
                 ModifiersCache.setChainSynced()
                 Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
               }
               updateNodeView(Some(newHistory), Some(newMinState), Some(nodeView.wallet))
-              logger.info(s"\nTime of applying in inner state is: ${System.currentTimeMillis() - startInnerStateApp}")
+              logger.debug(s"\nTime of applying in inner state is: ${System.currentTimeMillis() - startInnerStateApp}")
             case Failure(e) =>
-              logger.info(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
+              logger.debug(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
                 s"to minimal state because of: $e")
 
-              logger.info(s"\nTime of applying to state FAILURE is: ${System.currentTimeMillis() - startAppState}. modId is: ${pmod.encodedId}")
+              logger.debug(s"\nTime of applying to state FAILURE is: ${System.currentTimeMillis() - startAppState}. modId is: ${pmod.encodedId}")
               updateNodeView(updatedHistory = Some(newHistory))
               context.system.eventStream.publish(SemanticallyFailedModification(pmod, e))
           }
@@ -300,14 +318,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
             .actorSelection("user/statsSender") ! NewBlockAppended(true, true)
           if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
           context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
-          logger.info(s"\nProgres info is empty")
+          logger.debug(s"\nProgres info is empty")
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Failure(e) =>
-        logger.info(s"\nTime of applying to history FAILURE is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
+        logger.debug(s"\nTime of applying to history FAILURE is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
         if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.modifierTypeId) context.system
           .actorSelection("user/statsSender") ! NewBlockAppended(true, false)
-        logger.info(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
+        logger.debug(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
           s" to history caused $e")
         context.system.eventStream.publish(SyntacticallyFailedModification(pmod, e))
     }
