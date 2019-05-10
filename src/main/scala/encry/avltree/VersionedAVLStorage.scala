@@ -79,7 +79,7 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
       toRemoveMerged.map(key => StorageKey @@ key.data)
     )
   }.recoverWith { case e =>
-    logger.info(s"Failed to update tree: $e")
+    logger.info(s"Failed to update tree: $e.")
     Failure(e)
   }
 
