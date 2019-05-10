@@ -63,12 +63,25 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def processBetterChain: BlockProcessing = {
     case toProcess@ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
+      logger.debug(s"<<<---processBetterChain case isBetterChain--->>>")
       val prevBest: Block = bestBlockOpt.get
+      logger.debug(s"prevBestBlock: $prevBest")
       val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
+      logger.debug(s"PrevChain and NewChain:")
+      logger.debug(s"${prevChain.headers.mkString(",")}")
+      logger.debug(s"${newChain.headers.mkString(",")}")
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
+      logger.debug(s"toRemove ->>>>>  ${toRemove.mkString(",")}")
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
+      logger.debug(s"toApply ->>>>>  ${toApply.mkString(",")}")
+      if (toApply.lengthCompare(newChain.length - 1) != 0) {
+        logger.debug(s"!!!!!IF!!!!!!")
+        logger.debug(s"${toApply.size} ->>> ${newChain.length - 1} -->>> ${toApply.lengthCompare(newChain.length - 1) != 0}")
+        logger.debug(s"GO TO NON BEST BLOCK FUNCTION::::()()()()")
+        nonBestBlock(toProcess)
+      }
       else {
         //application of this block leads to full chain with higher score
         logger.info(s"Appending ${fullBlock.encodedId}|${fullBlock.header.height} as a better chain")
@@ -111,8 +124,13 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def nonBestBlock: BlockProcessing = {
     case params =>
       //Orphaned block or full chain is not initialized yet
-      logger.info(s"Appending ${params.fullBlock.encodedId}. Height: ${params.fullBlock.header.height} as a non best block.")
+      logger.debug(s"<<<<< -----  NON BEST BLOCK  ----->>>>>")
+      logger.debug(s"bestBlock isNonEmpty? -> ${bestBlockOpt.nonEmpty}")
+      logger.debug(s"isBetterChain? -> ${isBetterChain(params.newBestHeader.id)}")
+      logger.debug(s"Appending ${params.fullBlock.encodedId}. Height: ${params.fullBlock.header.height} as a non best block.")
       logStatus(Seq(), Seq(), params.fullBlock, None)
+      logger.debug(s"params full block: ${params.fullBlock}")
+      logStatus(Seq.empty, Seq.empty, params.fullBlock, None)
       historyStorage.bulkInsert(storageVersion(params.newModRow), Seq.empty, Seq(params.newModRow))
       ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
