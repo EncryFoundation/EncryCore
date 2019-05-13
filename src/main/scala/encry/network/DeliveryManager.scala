@@ -38,7 +38,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
   implicit val exCon: ExecutionContextExecutor = context.dispatcher
-
   /**
     * If block chain is synced, we will put all headers ids and peers who sent us this headers to this collection
     * in order to ask payload directly from peers who sent us appropriate header.
