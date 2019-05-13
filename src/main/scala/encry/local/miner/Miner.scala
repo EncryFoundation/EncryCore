@@ -15,7 +15,7 @@ import encry.modifiers.state.box.Box.Amount
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
-import encry.stats.StatsSender.{CandidateProducingTime, MiningEnd, MiningTime, SleepTime}
+import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.CurrentView
@@ -52,8 +52,12 @@ class Miner extends Actor with StrictLogging {
   val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
   var transactionsPool: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
 
-  override def preStart(): Unit =
+  override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
+    context.system.scheduler.schedule(5.seconds, 1.seconds)(
+      influxRef.foreach(_ ! InfoAboutTxsFromMiner(transactionsPool.size))
+    )
+  }
 
   override def postStop(): Unit = killAllWorkers()
 

@@ -51,6 +51,9 @@ class StatsSender extends Actor with StrictLogging {
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
   override def receive: Receive = {
+    case InfoAboutTxsFromMiner(qty) =>
+      influxDB.write(InfluxPort, s"infoAboutTxsFromMiner,nodeName=$nodeName value=$qty")
+
     case DiffBtwMempoolAndLastBlockTxs(num) =>
       influxDB.write(InfluxPort, s"txsDiff,nodeName=$nodeName value=$num")
 
@@ -171,6 +174,8 @@ object StatsSender {
   case class TransactionsStatMessage(transactionsNum: Int, blockHeight: Int)
 
   case class MempoolStat(size: Int)
+
+  case class InfoAboutTxsFromMiner(qty: Int)
 
   case class DiffBtwMempoolAndLastBlockTxs(diff: Int)
 
