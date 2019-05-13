@@ -187,7 +187,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
         logger.debug(s"This modifiers ${Algos.encode(modifierId)} is not contained in expectedModifiers collection from $peer.")
     }
   }
-
   /**
     * If node is not synced, send sync info to random peer, otherwise to all known peers.
     *
