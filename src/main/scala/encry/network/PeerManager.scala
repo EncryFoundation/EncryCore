@@ -36,7 +36,10 @@ class PeerManager extends Actor with StrictLogging {
         .time()
         .map(time => addOrUpdateKnownPeer(address, PeerInfo(time, peerNameOpt, connTypeOpt)))
     case RandomPeers(howMany: Int) => sender() ! Random.shuffle(knownPeers().keys.toSeq).take(howMany)
-    case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
+    case FilterPeers(sendingStrategy: SendingStrategy) =>
+      val peers = sendingStrategy.choose(connectedPeers.values.toSeq)
+      logger.info(s"After processing FilterPeers by strategy $sendingStrategy got next peers: ${peers}")
+      sender() ! peers
     case DoConnecting(remote, direction) =>
       if (connectingPeers.contains(remote) && direction != Incoming) {
         logger.info(s"Trying to connect twice to $remote, going to drop the duplicate connection")

@@ -68,8 +68,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case ChangedState(_) =>
     case SyntacticallyFailedModification(_, _) =>
     case SemanticallySuccessfulModifier(mod) =>
+      logger.info(s"Get SemanticallySuccessfulModifier on nvsh with id: ${Algos.encode(mod.id)}")
       mod match {
         case block: Block =>
+          logger.info(s"Broadcast header with id: ${Algos.encode(block.header.id)}")
           broadcastModifierInv(block.header)
           modifiersRequestCache = Map(
             Algos.encode(block.id) -> block.header,
@@ -181,7 +183,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     }
 
   def broadcastModifierInv[M <: NodeViewModifier](m: M): Unit =
-    if (chainSynced) networkControllerRef ! SendToNetwork(InvNetworkMessage(m.modifierTypeId -> Seq(m.id)), Broadcast)
+    if (chainSynced) {
+      logger.info(s"triggered broadcastModifierInv with id: ${Algos.encode(m.id)}")
+      networkControllerRef ! SendToNetwork(InvNetworkMessage(m.modifierTypeId -> Seq(m.id)), Broadcast)
+    }
 }
 
 object NodeViewSynchronizer {
