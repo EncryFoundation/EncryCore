@@ -57,10 +57,7 @@ class Miner extends Actor with StrictLogging {
 
   override def postStop(): Unit = killAllWorkers()
 
-  def killAllWorkers(): Unit = {
-    logger.info("Kill all workers!")
-    context.children.foreach(context.stop)
-  }
+  def killAllWorkers(): Unit = context.children.foreach(context.stop)
 
   def needNewCandidate(b: Block): Boolean =
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(id => Algos.encode(id) == Algos.encode(b.header.id))
@@ -70,7 +67,6 @@ class Miner extends Actor with StrictLogging {
   def mining: Receive = {
     case StartMining if context.children.nonEmpty & syncingDone =>
       killAllWorkers()
-      logger.info("Kill all workers! StartMining 1")
       self ! StartMining
     case StartMining if syncingDone =>
       for (i <- 0 until numberOfWorkers) yield context.actorOf(
@@ -86,8 +82,6 @@ class Miner extends Actor with StrictLogging {
     case TxsForMiner(txs) => transactionsPool = transactionsPool ++ txs
     case StartMining => logger.info("Can't start mining because of chain is not synced!")
     case DisableMining if context.children.nonEmpty =>
-      logger.info(s"Get disable mining from $sender")
-      logger.info("Kill all workers! DisableMining 1")
       killAllWorkers()
       candidateOpt = None
       context.become(miningDisabled)
@@ -95,7 +89,6 @@ class Miner extends Actor with StrictLogging {
       logger.info(s"Going to propagate new block $block from worker $workerIdx" +
         s" with nonce: ${block.header.nonce}.")
       logger.debug(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
-      logger.info("Kill all workers! MinedBlock 1")
       killAllWorkers()
       nodeViewHolder ! LocallyGeneratedModifier(block)
       if (settings.influxDB.isDefined) {
