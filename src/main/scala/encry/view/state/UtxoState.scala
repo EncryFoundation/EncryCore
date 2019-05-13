@@ -48,10 +48,13 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
 
   import UtxoState.metadata
 
-  override def rootHash: ADDigest = persistentProver.storage.store
-    .get(StorageKey !@@ Algos.hash(version))
-    .map(value => ADDigest !@@ value)
-    .getOrElse(persistentProver.digest)
+  override def rootHash: ADDigest = {
+    val rootInDb = persistentProver.storage.store
+      .get(StorageKey !@@ Algos.hash(version))
+    logger.info(s"Root in db: ${rootInDb.map(Algos.encode)}")
+    rootInDb.map(value => ADDigest !@@ value)
+      .getOrElse(persistentProver.digest)
+  }
 
   def maxRollbackDepth: Int = Constants.Chain.MaxRollbackDepth
 
