@@ -7,7 +7,7 @@ import encry.consensus.History._
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.mempool.Transaction
 import encry.network.DeliveryManager._
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
@@ -143,7 +143,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     }
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: ModifierId, previousModifier: Option[ModifierId]) =>
       if (modifierTypeId != Transaction.ModifierTypeId)
-        logger.debug(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: ${modifierTypeId} prev mod: " +
+        logger.debug(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: $modifierTypeId prev mod: " +
         s"${previousModifier.map(Algos.encode)}")
       if (previousModifier.isDefined && isBlockChainSynced) {
         logger.debug(s"Sending this donwload request! for modfiier: ${Algos.encode(modifiersId)}")
@@ -498,5 +498,4 @@ object DeliveryManager {
         case PoisonPill => 4
         case _ => 2
       })
-
 }
