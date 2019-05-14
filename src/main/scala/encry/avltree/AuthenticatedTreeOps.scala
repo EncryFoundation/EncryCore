@@ -41,7 +41,6 @@ trait AuthenticatedTreeOps[D <: Digest] extends StrictLogging {
 
   protected def digest(rootNode: EncryNode[D]): ADDigest = {
     assert(rootNodeHeight >= 0 && rootNodeHeight < 256)
-    logger.info(s"rootNode.labelOpt: ${rootNode.labelOpt.map(Algos.encode)}")
     ADDigest @@ (rootNode.label :+ rootNodeHeight.toByte)
   }
 

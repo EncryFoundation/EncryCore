@@ -38,7 +38,6 @@ trait PersistentBatchAVLProver[D <: Digest, HF <: CryptographicHash[D]] extends 
 
   def rollback(version: ADDigest): Try[Unit] = Try {
     val recoveredTop: (EncryProverNodes[D], Int) = storage.rollback(version).get
-    logger.info(s"After rollback top label: ${recoveredTop._1.labelOpt} by key: ${Algos.encode(nodeKey(recoveredTop._1).data)}")
     avlProver = new BatchAVLProver(avlProver.keyLength, avlProver.valueLengthOpt, Some(recoveredTop))(avlProver.hf)
   }
 
