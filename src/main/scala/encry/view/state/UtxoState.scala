@@ -48,13 +48,9 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
 
   import UtxoState.metadata
 
-  override def rootHash: ADDigest = {
-    val rootInDb = persistentProver.storage.store
-      .get(StorageKey !@@ Algos.hash(version))
-    logger.info(s"Root in db: ${rootInDb.map(Algos.encode)}")
-    rootInDb.map(value => ADDigest !@@ value)
-      .getOrElse(persistentProver.digest)
-  }
+  override val rootHash: ADDigest = persistentProver.storage.store
+    .get(StorageKey !@@ Algos.hash(version)).map(value => ADDigest !@@ value)
+    .getOrElse(persistentProver.digest)
 
   def maxRollbackDepth: Int = Constants.Chain.MaxRollbackDepth
 
@@ -180,9 +176,9 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
 
   override def rollbackTo(version: VersionTag): Try[UtxoState] = {
     logger.info(s"Rollback UtxoState to version ${Algos.encoder.encode(version)}")
-    stateStore.get(StorageKey @@ version.untag(VersionTag)) match {
+    stateStore.get(StorageKey !@@ version) match {
       case Some(v) =>
-        val rollbackResult: Try[UtxoState] = persistentProver.rollback(ADDigest @@ v.untag(VersionalLevelDbValue)).map { _ =>
+        val rollbackResult: Try[UtxoState] = persistentProver.rollback(ADDigest !@@ v).map { _ =>
           val stateHeight: Int = stateStore.get(StorageKey @@ UtxoState.bestHeightKey.untag(Digest32))
             .map(d => Ints.fromByteArray(d)).getOrElse(Constants.Chain.GenesisHeight)
           new UtxoState(

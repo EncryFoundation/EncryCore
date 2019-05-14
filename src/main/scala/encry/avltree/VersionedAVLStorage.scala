@@ -96,10 +96,18 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
 
   private def nodeKey(node: EncryProverNodes[D]): ByteArrayWrapper = ByteArrayWrapper(node.label)
 
-  private def toBytes(node: EncryProverNodes[D]): Array[Byte] = node match {
-    case n: InternalProverEncryNode[D] => InternalNodePrefix +: n.balance +: (n.key ++ n.left.label ++ n.right.label)
-    case n: ProverLeaf[D] if nodeParameters.valueSize.isDefined => LeafPrefix +: (n.key ++ n.value ++ n.nextLeafKey)
-    case n: ProverLeaf[D] => LeafPrefix +: (n.key ++ Ints.toByteArray(n.value.length) ++ n.value ++ n.nextLeafKey)
+  private def toBytes(node: EncryProverNodes[D]): Array[Byte] = {
+    val bytesWithoutLabel = node match {
+      case n: InternalProverEncryNode[D] if n.labelOpt.isDefined => InternalNodePrefix +: n.balance +: (n.key ++ n.left.label ++ n.right.label)
+      case n: InternalProverEncryNode[D] => InternalNodePrefix +: n.balance +: (n.key ++ n.left.label ++ n.right.label)
+      case n: ProverLeaf[D] if nodeParameters.valueSize.isDefined => LeafPrefix +: (n.key ++ n.value ++ n.nextLeafKey)
+      case n: ProverLeaf[D] => LeafPrefix +: (n.key ++ Ints.toByteArray(n.value.length) ++ n.value ++ n.nextLeafKey)
+    }
+    node match {
+      case withLabel: EncryNode[D] if withLabel.labelOpt.isDefined =>
+        bytesWithoutLabel ++ withLabel.labelOpt.get
+      case withOutLabel: EncryNode[D] => bytesWithoutLabel
+    }
   }
 }
 
@@ -121,22 +129,31 @@ object VersionedAVLStorage extends StrictLogging {
         val leftKey: ADKey = ADKey @@ bytes.slice(2 + keySize, 2 + keySize + labelSize)
         val rightKey: ADKey = ADKey @@ bytes.slice(2 + keySize + labelSize, 2 + keySize + (2 * labelSize))
         val n: ProxyInternalProverEncryNode[D] = new ProxyInternalProverEncryNode[D](key, leftKey, rightKey, balance)
+        val labelOpt: Option[D] = if (bytes.length > 2 + keySize + (2 * labelSize))
+          Some(bytes.slice(2 + keySize + (2 * labelSize), bytes.length).asInstanceOf[D])
+        else None
+        n.labelOpt = labelOpt
         n.isNew = false
         n
       case LeafPrefix =>
         val key: ADKey = ADKey @@ bytes.slice(1, 1 + keySize)
-        val (value: ADValue, nextLeafKey: ADKey) = if (nodeParameters.valueSize.isDefined) {
+        val (value: ADValue, nextLeafKey: ADKey, labelOpt: Option[D]) = if (nodeParameters.valueSize.isDefined) {
           val valueSize: Int = nodeParameters.valueSize.get
           val value: ADValue = ADValue @@ bytes.slice(1 + keySize, 1 + keySize + valueSize)
           val nextLeafKey: ADKey = ADKey @@ bytes.slice(1 + keySize + valueSize, 1 + (2 * keySize) + valueSize)
-          value -> nextLeafKey
+          if (bytes.length > 1 + (2 * keySize) + valueSize)
+            (value, nextLeafKey, Some(bytes.slice(1 + (2 * keySize) + valueSize, bytes.length)))
+          else (value, nextLeafKey, None)
         } else {
           val valueSize: Int = Ints.fromByteArray(bytes.slice(1 + keySize, 1 + keySize + 4))
           val value: ADValue = ADValue @@ bytes.slice(1 + keySize + 4, 1 + keySize + 4 + valueSize)
           val nextLeafKey: ADKey = ADKey @@ bytes.slice(1 + keySize + 4 + valueSize, 1 + (2 * keySize) + 4 + valueSize)
-          value -> nextLeafKey
+          if (bytes.length > 1 + (2 * keySize) + 4 + valueSize)
+            (value, nextLeafKey, Some(bytes.slice(1 + (2 * keySize) + 4 + valueSize, bytes.length)))
+          else (value, nextLeafKey, None)
         }
         val l: ProverLeaf[D] = new ProverLeaf[D](key, value, nextLeafKey)
+        l.labelOpt = labelOpt
         l.isNew = false
         l
     }

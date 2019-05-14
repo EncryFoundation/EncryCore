@@ -9,7 +9,7 @@ import scorex.crypto.hash._
 sealed trait EncryNode[D <: Digest] extends StrictLogging{
 
   var visited: Boolean = false
-  protected var labelOpt: Option[D] = None
+  var labelOpt: Option[D] = None
 
   protected def arrayToString(a: Array[Byte]): String = Base16.encode(a).take(8)
 
@@ -31,9 +31,13 @@ sealed trait EncryProverNodes[D <: Digest] extends EncryNode[D] with KeyInVar {
 sealed trait VerifierNodes[D <: Digest] extends EncryNode[D]
 
 class LabelOnlyEncryNode[D <: Digest](l: D) extends VerifierNodes[D] {
+
   labelOpt = Some(l)
 
-  protected def computeLabel: D = l
+  protected def computeLabel: D = {
+    logger.info("computeLabel in LabelOnlyEncryNode")
+    l
+  }
 }
 
 sealed trait InternalEncryNode[D <: Digest] extends EncryNode[D] {
@@ -41,7 +45,10 @@ sealed trait InternalEncryNode[D <: Digest] extends EncryNode[D] {
 
   protected val hf: CryptographicHash[D]
 
-  protected def computeLabel: D = hf.prefixedHash(1: Byte, Array(b), left.label, right.label)
+  protected def computeLabel: D = {
+    logger.info("computeLabel in InternalEncryNode")
+    hf.prefixedHash(1: Byte, Array(b), left.label, right.label)
+  }
 
   def balance: Balance = b
 
@@ -70,6 +77,7 @@ class InternalProverEncryNode[D <: Digest](protected var k: ADKey,
     this
   } else {
     val ret: InternalProverEncryNode[D] = new InternalProverEncryNode(newKey, left, right, b)
+    logger.info("getNewKey")
     ret.labelOpt = labelOpt // label doesn't change when key of an internal node changes
     ret
   }
@@ -79,6 +87,7 @@ class InternalProverEncryNode[D <: Digest](protected var k: ADKey,
     l = newLeft.asInstanceOf[EncryProverNodes[D]]
     r = newRight.asInstanceOf[EncryProverNodes[D]]
     b = newBalance
+    //logger.info("getNew1")
     labelOpt = None
     this
   } else new InternalProverEncryNode(k, newLeft.asInstanceOf[EncryProverNodes[D]],
@@ -104,6 +113,7 @@ class InternalVerifierEncryNode[D <: Digest](protected var l: EncryNode[D], prot
     l = newLeft
     r = newRight
     b = newBalance
+    //logger.info("getNew2")
     labelOpt = None
     this
   }
@@ -121,7 +131,10 @@ sealed trait EncryLeaf[D <: Digest] extends EncryNode[D] with KeyInVar {
 
   def value: ADValue = v
 
-  protected def computeLabel: D = hf.prefixedHash(0: Byte, k, v, nk)
+  protected def computeLabel: D = {
+    logger.info("compute label in EncryLeaf")
+    hf.prefixedHash(0: Byte, k, v, nk)
+  }
 
   def getNew(newKey: ADKey = k, newValue: ADValue = v, newNextLeafKey: ADKey = nk): EncryLeaf[D]
 
@@ -136,17 +149,21 @@ class VerifierLeaf[D <: Digest](protected var k: ADKey, protected var v: ADValue
     k = newKey
     v = newValue
     nk = newNextLeafKey
+    //logger.info("getnew3")
     labelOpt = None
     this
   }
 }
 
-class ProverLeaf[D <: Digest](protected var k: ADKey, protected var v: ADValue, protected var nk: ADKey)
+class ProverLeaf[D <: Digest](protected var k: ADKey,
+                              protected var v: ADValue,
+                              protected var nk: ADKey)
                              (implicit val hf: CryptographicHash[D]) extends EncryLeaf[D] with EncryProverNodes[D] {
   def getNew(newKey: ADKey = k, newValue: ADValue = v, newNextLeafKey: ADKey = nk): ProverLeaf[D] = if (isNew) {
     k = newKey
     v = newValue
     nk = newNextLeafKey
+    //logger.info("getnew4")
     labelOpt = None
     this
   } else new ProverLeaf(newKey, newValue, newNextLeafKey)
