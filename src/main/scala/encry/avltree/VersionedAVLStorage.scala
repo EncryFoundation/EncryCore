@@ -29,6 +29,7 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
 
   def rollback(version: ADDigest): Try[(EncryProverNodes[D], Int)] = Try {
     store.rollbackTo(StorageVersion @@ version.untag(ADDigest))
+    logger.info(s"After rollback data is: ${Algos.encode(store.get(StorageKey !@@ store.get(StorageKey @@ TopNodeKey.data).get).get)}.")
     val top: EncryProverNodes[D] =
       VersionedAVLStorage.fetch[D](ADKey @@ store.get(StorageKey @@ TopNodeKey.data).get.untag(StorageValue))(hf, store, nodeParameters)
     val topHeight: Int = Ints.fromByteArray(store.get(StorageKey @@ TopNodeHeight.data).get)
