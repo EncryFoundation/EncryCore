@@ -126,6 +126,43 @@ object Utils extends StrictLogging {
     Block(header, Payload(header.id, transactions), None)
   }
 
+  def generateNextBlockForStateWithSpendingAllPreviousBoxes(prevBlock: Block,
+                                                            state: UtxoState,
+                                                            box: Seq[AssetBox],
+                                                            splitCoef: Int = 2,
+                                                            addDiff: Difficulty = Difficulty @@ BigInt(0)): Block = {
+
+    val transactions: Seq[Transaction] = box.indices.foldLeft(box, Seq.empty[Transaction]) {
+      case ((boxes, transactionsL), _) =>
+        val tx: Transaction = defaultPaymentTransactionScratch(
+          privKey,
+          fee = 1,
+          timestamp = 11L,
+          useBoxes = IndexedSeq(boxes.head),
+          recipient = privKey.publicImage.address.address,
+          amount = boxes.head.amount - 1,
+          numOfOutputs = splitCoef
+        )
+        (boxes.tail, transactionsL :+ tx)
+    }._2.filter(tx => state.isValid(tx)) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
+    logger.info(s"Number of generated transactions: ${transactions.size}.")
+    val (adProofN: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(transactions).get
+    val adPN: Digest32 = ADProofs.proofDigest(adProofN)
+    val header = Header(
+      1.toByte,
+      prevBlock.id,
+      adPN,
+      adDigest,
+      Payload.rootHash(transactions.map(_.id)),
+      System.currentTimeMillis(),
+      prevBlock.header.height + 1,
+      R.nextLong(),
+      Difficulty @@ (BigInt(1) + addDiff),
+      EquihashSolution(Seq(1, 3))
+    )
+    Block(header, Payload(header.id, transactions), None)
+  }
+
   def generateNextBlockValidForHistory(history: EncryHistory,
                                        difficultyDiff: BigInt = 0,
                                        prevBlock: Option[Block],
@@ -215,8 +252,8 @@ object Utils extends StrictLogging {
   def coinbaseTransaction(height: Int): Transaction = TransactionFactory.coinbaseTransactionScratch(
     privKey.publicImage,
     System.currentTimeMillis(),
-    supply = 10L,
-    amount = 1,
+    supply = 10000000L,
+    amount = 1L,
     height = Height @@ height
   )
 
