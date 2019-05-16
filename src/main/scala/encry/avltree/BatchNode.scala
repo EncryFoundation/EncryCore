@@ -9,7 +9,7 @@ import scorex.crypto.hash._
 sealed trait EncryNode[D <: Digest] extends StrictLogging{
 
   var visited: Boolean = false
-  protected var labelOpt: Option[D] = None
+  var labelOpt: Option[D] = None
 
   protected def arrayToString(a: Array[Byte]): String = Base16.encode(a).take(8)
 
@@ -31,6 +31,7 @@ sealed trait EncryProverNodes[D <: Digest] extends EncryNode[D] with KeyInVar {
 sealed trait VerifierNodes[D <: Digest] extends EncryNode[D]
 
 class LabelOnlyEncryNode[D <: Digest](l: D) extends VerifierNodes[D] {
+
   labelOpt = Some(l)
 
   protected def computeLabel: D = l
@@ -141,7 +142,9 @@ class VerifierLeaf[D <: Digest](protected var k: ADKey, protected var v: ADValue
   }
 }
 
-class ProverLeaf[D <: Digest](protected var k: ADKey, protected var v: ADValue, protected var nk: ADKey)
+class ProverLeaf[D <: Digest](protected var k: ADKey,
+                              protected var v: ADValue,
+                              protected var nk: ADKey)
                              (implicit val hf: CryptographicHash[D]) extends EncryLeaf[D] with EncryProverNodes[D] {
   def getNew(newKey: ADKey = k, newValue: ADValue = v, newNextLeafKey: ADKey = nk): ProverLeaf[D] = if (isNew) {
     k = newKey

@@ -1,8 +1,6 @@
 package encry.avltree
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.LevelDBVersion
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, SerializedAdProof}
@@ -35,6 +33,8 @@ trait PersistentBatchAVLProver[D <: Digest, HF <: CryptographicHash[D]] extends 
   }
 
   def generateProofAndUpdateStorage(): SerializedAdProof = generateProofAndUpdateStorage(Seq())
+
+  def nodeKey(node: EncryProverNodes[D]): ByteArrayWrapper = ByteArrayWrapper(node.label)
 
   def rollback(version: ADDigest): Try[Unit] = Try {
     val recoveredTop: (EncryProverNodes[D], Int) = storage.rollback(version).get

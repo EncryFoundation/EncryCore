@@ -75,7 +75,7 @@ class NetworkController extends Actor with StrictLogging {
     case SendToNetwork(message, sendingStrategy) =>
       (peerManager ? FilterPeers(sendingStrategy)) (5 seconds)
         .map(_.asInstanceOf[Seq[ConnectedPeer]])
-        .foreach(_.foreach(_.handlerRef ! message))
+        .foreach(_.foreach(peer => peer.handlerRef ! message))
   }
 
   def peerLogic: Receive = {
