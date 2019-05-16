@@ -1,6 +1,6 @@
 package encry.view.history
 
-import encry.consensus.History.{Equal, Fork, Older, Younger}
+import encry.consensus.History._
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.Block
 import encry.network.DeliveryManagerTests.DMUtils.generateBlocks
