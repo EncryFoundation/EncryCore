@@ -228,6 +228,7 @@ object Miner {
 
   case object DisableMining
 
+
   case object EnableMining
 
   case object StartMining
