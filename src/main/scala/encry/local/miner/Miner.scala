@@ -245,13 +245,13 @@ object Miner {
 
   case class MinerStatus(isMining: Boolean, candidateBlock: Option[CandidateBlock]) {
     lazy val json: Json = Map(
-      "isMining" -> isMining.asJson,
+      "isMining"       -> isMining.asJson,
       "candidateBlock" -> candidateBlock.map(_.asJson).getOrElse("None".asJson)
     ).asJson
   }
 
   implicit val jsonEncoder: Encoder[MinerStatus] = (r: MinerStatus) => Map(
-    "isMining" -> r.isMining.asJson,
+    "isMining"       -> r.isMining.asJson,
     "candidateBlock" -> r.candidateBlock.map(_.asJson).getOrElse("None".asJson)
   ).asJson
 }
