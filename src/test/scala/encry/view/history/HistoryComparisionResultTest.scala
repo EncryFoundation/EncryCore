@@ -55,7 +55,7 @@ class HistoryComparisionResultTest extends WordSpecLike
       assert(comparisonResult == Younger)
     }
 
-    "mark history as Younger when our history contains all ids from other history, but they are out of range our last ids" in {
+    "mark history as Younger when our history contains all other history but other history doesn't contain our last 70 headers" in {
       val history: EncryHistory = generateDummyHistory(settings)
       val blocks: List[Block] = generateBlocks(100, generateDummyHistory(settings))._2
       val syncInfo: EncrySyncInfo = EncrySyncInfo(blocks.take(30).map(_.header.id))
