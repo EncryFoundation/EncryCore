@@ -3,7 +3,7 @@ package benches
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-import benches.StateRollbackBenche.StateRollbackState
+import benches.StateRollbackBench.StateRollbackState
 import benches.Utils._
 import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.modifiers.history.Block
@@ -39,7 +39,7 @@ class StateRollbackBench {
   }
 }
 
-object StateRollbackBenche {
+object StateRollbackBench {
 
   val benchSettings: Settings = Settings.read
 

@@ -29,7 +29,6 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
 
   def rollback(version: ADDigest): Try[(EncryProverNodes[D], Int)] = Try {
     store.rollbackTo(StorageVersion @@ version.untag(ADDigest))
-    logger.info(s"After rollback data is: ${Algos.encode(store.get(StorageKey !@@ store.get(StorageKey @@ TopNodeKey.data).get).get)}.")
     val top: EncryProverNodes[D] =
       VersionedAVLStorage.fetch[D](ADKey @@ store.get(StorageKey @@ TopNodeKey.data).get.untag(StorageValue))(hf, store, nodeParameters)
     val topHeight: Int = Ints.fromByteArray(store.get(StorageKey @@ TopNodeHeight.data).get)
@@ -67,9 +66,6 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
     val indexes: Seq[(Store.K, Store.K)] = Seq(TopNodeKey -> nodeKey(prover.topNode),
       TopNodeHeight -> ByteArrayWrapper(Ints.toByteArray(prover.rootNodeHeight)))
     val toRemove: List[Store.K] = prover.removedNodes().map(rn => ByteArrayWrapper(rn.label))
-    logger.info(s"To remove: ${prover.removedNodes().map(n => Algos.encode(nodeKey(n).data)).mkString(",")}")
-    logger.info(s"top node value should contains: ${Algos.encode(toBytes(prover.topNode))}")
-    logger.info(s"Putting top node(${Algos.encode(nodeKey(prover.topNode).data)}) with label: ${prover.topNode.labelOpt.map(Algos.encode)} when digest ${Algos.encode(prover.digest)}")
     val toUpdate: Seq[(Store.K, Store.K)] = indexes ++ serializedVisitedNodes(prover.topNode, isTop = true)
     val toUpdateWrapped: Seq[(Store.K, Store.K)] =
       additionalData.map { case (k, v) => ByteArrayWrapper(k) -> ByteArrayWrapper(v) }

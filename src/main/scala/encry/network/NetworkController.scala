@@ -72,16 +72,10 @@ class NetworkController extends Actor with StrictLogging {
       findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
     case MessageFromNetwork(message, Some(remote)) =>
       logger.info(s"Invalid message type: ${message.messageName} from remote $remote")
-    case SendToNetwork(message, sendingStrategy) => {
-      logger.info(s"SendToNetwork! ${message} by strategy ${sendingStrategy}")
+    case SendToNetwork(message, sendingStrategy) =>
       (peerManager ? FilterPeers(sendingStrategy)) (5 seconds)
         .map(_.asInstanceOf[Seq[ConnectedPeer]])
-        .foreach(_.foreach{peer =>
-          logger.info(s"Send to $peer msg $message")
-          peer.handlerRef ! message
-        }
-        )
-    }
+        .foreach(_.foreach(peer => peer.handlerRef ! message))
   }
 
   def peerLogic: Receive = {
