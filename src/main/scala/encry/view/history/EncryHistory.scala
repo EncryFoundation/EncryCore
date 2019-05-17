@@ -220,6 +220,7 @@ object EncryHistory extends StrictLogging {
           override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
+          override var bestBlockIdOptCache: Option[ModifierId] = Option.empty[ModifierId]
         }
       case (false, true) =>
         new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
@@ -227,6 +228,7 @@ object EncryHistory extends StrictLogging {
           override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
+          override var bestBlockIdOptCache: Option[ModifierId] = Option.empty[ModifierId]
         }
       case (true, false) =>
         new EncryHistory with ADStateProofProcessor with EmptyBlockPayloadProcessor {
@@ -234,6 +236,7 @@ object EncryHistory extends StrictLogging {
           override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
+          override var bestBlockIdOptCache: Option[ModifierId] = Option.empty[ModifierId]
         }
       case m => throw new Error(s"Unsupported settings ADState=:${m._1}, verifyTransactions=:${m._2}, ")
     }

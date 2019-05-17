@@ -42,6 +42,20 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node)
   private var isHeadersChainSyncedVar: Boolean = false
 
+  var bestHeaderOptCache: Option[Header] = None
+
+  /**
+    * Header of best Header chain. Empty if no genesis block is applied yet.
+    * Transactions and ADProofs for this Header may be missed, to get block from best full chain (in mode that support
+    * it) call bestFullBlockOpt.
+    */
+  def bestHeaderOpt: Option[Header] =
+    bestHeaderOptCache.orElse{
+      val bestHeaderInDB = bestHeaderIdOpt.flatMap(typedModifierById[Header])
+      bestHeaderOptCache = bestHeaderInDB
+      bestHeaderInDB
+    }
+
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
 
   def modifiersToDownload(howMany: Int, excluding: HashSet[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
@@ -123,7 +137,14 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   def realDifficulty(h: Header): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
 
-  protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
+  var bestHeaderIdOptCache: Option[ModifierId] = None
+
+  protected def bestHeaderIdOpt: Option[ModifierId] =
+    bestHeaderIdOptCache.orElse{
+      val bestHeaderIdInDB = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
+      bestHeaderIdOptCache = bestHeaderIdInDB
+      bestHeaderIdInDB
+    }
 
   def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity
 
@@ -140,7 +161,11 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   def contains(id: ModifierId): Boolean
 
+  var bestBlockOptCache: Option[Block]
+
   def bestBlockOpt: Option[Block]
+
+  var bestBlockIdOptCache: Option[ModifierId]
 
   def bestBlockIdOpt: Option[ModifierId]
 
@@ -166,6 +191,8 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   private def getHeaderInfoUpdate(header: Header): Option[(Seq[(StorageKey, StorageValue)], EncryPersistentModifier)] =
     if (header.isGenesis) {
       logger.info(s"Initialize header chain with genesis header ${header.encodedId}")
+      bestHeaderIdOptCache = Some(header.id)
+      bestHeaderOptCache = Some(header)
       Option(Seq(
         BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId),
         heightIdsKey(Constants.Chain.GenesisHeight) -> StorageValue @@ header.id.untag(ModifierId),
@@ -177,8 +204,11 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
           Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
         val bestRow: Seq[(StorageKey, StorageValue)] =
           if ((header.height > bestHeaderHeight) ||
-            (header.height == bestHeaderHeight && score > bestHeadersChainScore))
-            Seq(BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId)) else Seq.empty
+            (header.height == bestHeaderHeight && score > bestHeadersChainScore)) {
+            bestHeaderIdOptCache = Some(header.id)
+            bestHeaderOptCache = Some(header)
+              Seq(BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId))
+          } else Seq.empty
         val scoreRow: (StorageKey, StorageValue) =
           headerScoreKey(header.id) -> StorageValue @@ score.toByteArray
         val heightRow: (StorageKey, StorageValue) =

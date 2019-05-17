@@ -22,8 +22,15 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
 
   protected val auxHistory: Boolean = false
 
+  var bestBlockIdCache: Option[ModifierId] = None
+
   /** Id of header that contains transactions and proofs */
-  override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
+  override def bestBlockIdOpt: Option[ModifierId] =
+    bestBlockIdCache.orElse{
+      val bestBlockInDB = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
+      bestBlockIdCache = bestBlockInDB
+      bestBlockInDB
+    }
 
   protected def getBlock(h: Header): Option[Block]
 
@@ -55,6 +62,8 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     case ToProcess(fullBlock, newModRow, newBestHeader, newBestChain, _)
       if isValidFirstBlock(fullBlock.header) =>
       logger.info(s"Appending ${fullBlock.encodedId} as a valid first block")
+      bestBlockIdCache = Some(fullBlock.id)
+      bestBlockOptCache = Some(fullBlock)
       logStatus(Seq(), newBestChain, fullBlock, None)
       updateStorage(newModRow, newBestHeader.id)
       ProgressInfo(None, Seq.empty, newBestChain, Seq.empty)
@@ -94,7 +103,12 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
                 .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
                 .getOrElse(false))
         updateStorage(newModRow, newBestHeader.id, updateBestHeader)
-
+        if (updateBestHeader) {
+          bestHeaderOptCache = Some(fullBlock.header)
+          bestHeaderIdOptCache = Some(fullBlock.id)
+        }
+        bestBlockOptCache = Some(fullBlock)
+        bestBlockIdOptCache = Some(fullBlock.id)
         if (settings.postgres.exists(_.enableSave) && !auxHistory)
           system.actorSelection("/user/blockListener") ! NewBestBlock(fullBlock.header.height)
 

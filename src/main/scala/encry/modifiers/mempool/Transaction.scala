@@ -48,9 +48,9 @@ case class Transaction(fee: Amount,
 
   val id: ModifierId = ModifierId !@@ Algos.hash(messageToSign)
 
-  lazy val size: Int = this.bytes.length
+  val size: Int = this.bytes.length
 
-  lazy val newBoxes: Traversable[EncryBaseBox] =
+  val newBoxes: Traversable[EncryBaseBox] =
     directives.zipWithIndex.flatMap { case (d, idx) => d.boxes(Digest32 !@@ id, idx) }
 
   override def toString: String =
