@@ -7,8 +7,7 @@ import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbKey
-import encry.storage.levelDb.versionalLevelDB.{VersionalLevelDB, VersionalLevelDBCompanion}
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, Balance}
@@ -86,7 +85,7 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
   // Should always serialize top node. It may not be new if it is the creation of the tree
   private def serializedVisitedNodes(node: EncryProverNodes[D], isTop: Boolean): Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
     if (node.isNew || isTop) {
-      val pair: (ByteArrayWrapper, ByteArrayWrapper) = (nodeKey(node), ByteArrayWrapper(toBytes(node)))
+      val pair: (ByteArrayWrapper, ByteArrayWrapper) = (nodeKey(node), ByteArrayWrapper(toBytes(node, isTop)))
       node match {
         case n: InternalProverEncryNode[D] =>
           pair +: (serializedVisitedNodes(n.left, isTop = false) ++ serializedVisitedNodes(n.right, isTop = false))
@@ -96,15 +95,14 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
 
   private def nodeKey(node: EncryProverNodes[D]): ByteArrayWrapper = ByteArrayWrapper(node.label)
 
-  private def toBytes(node: EncryProverNodes[D]): Array[Byte] = {
+  private def toBytes(node: EncryProverNodes[D], isTop: Boolean): Array[Byte] = {
     val bytesWithoutLabel = node match {
-      case n: InternalProverEncryNode[D] if n.labelOpt.isDefined => InternalNodePrefix +: n.balance +: (n.key ++ n.left.label ++ n.right.label)
       case n: InternalProverEncryNode[D] => InternalNodePrefix +: n.balance +: (n.key ++ n.left.label ++ n.right.label)
       case n: ProverLeaf[D] if nodeParameters.valueSize.isDefined => LeafPrefix +: (n.key ++ n.value ++ n.nextLeafKey)
       case n: ProverLeaf[D] => LeafPrefix +: (n.key ++ Ints.toByteArray(n.value.length) ++ n.value ++ n.nextLeafKey)
     }
     node match {
-      case withLabel: EncryNode[D] if withLabel.labelOpt.isDefined =>
+      case withLabel: EncryNode[D] if withLabel.labelOpt.isDefined && isTop =>
         bytesWithoutLabel ++ withLabel.labelOpt.get
       case withOutLabel: EncryNode[D] => bytesWithoutLabel
     }
