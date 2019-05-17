@@ -105,7 +105,6 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
         updateStorage(newModRow, newBestHeader.id, updateBestHeader)
         if (updateBestHeader) {
           bestHeaderOptCache = Some(fullBlock.header)
-          bestHeaderIdOptCache = Some(fullBlock.id)
         }
         bestBlockOptCache = Some(fullBlock)
         bestBlockIdOptCache = Some(fullBlock.id)
@@ -170,8 +169,15 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
                             bestFullHeaderId: ModifierId,
                             updateHeaderInfo: Boolean = false): Unit = {
     val indicesToInsert: Seq[(Array[Byte], Array[Byte])] =
-      if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderId, BestHeaderKey -> bestFullHeaderId)
-      else Seq(BestBlockKey -> bestFullHeaderId)
+      if (updateHeaderInfo) {
+        bestBlockIdOptCache = Some(bestFullHeaderId)
+        bestHeaderIdOptCache = Some(bestFullHeaderId)
+        Seq(BestBlockKey -> bestFullHeaderId, BestHeaderKey -> bestFullHeaderId)
+      }
+      else {
+        bestBlockIdOptCache = Some(bestFullHeaderId)
+        Seq(BestBlockKey -> bestFullHeaderId)
+      }
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
   }
 

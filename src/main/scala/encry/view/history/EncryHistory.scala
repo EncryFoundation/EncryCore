@@ -103,6 +103,7 @@ trait EncryHistory extends EncryHistoryReader {
 
             if (!bestFullIsInvalidated) {
               // Only headers chain involved.
+              bestHeaderIdOptCache = Some(newBestHeader.id)
               historyStorage.insert(
                 StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
                 List(BestHeaderKey -> StorageValue @@ newBestHeader.id.untag(ModifierId))
@@ -123,6 +124,8 @@ trait EncryHistory extends EncryHistoryReader {
                   BestBlockKey -> StorageValue @@ validChain.last.id.untag(ModifierId),
                   BestHeaderKey -> StorageValue @@ newBestHeader.id.untag(ModifierId)
                 )
+              bestBlockIdOptCache = Some(validChain.last.id)
+              bestHeaderIdOptCache = Some(newBestHeader.id)
               val toInsert: List[(StorageKey, StorageValue)] = validityRow ++ changedLinks
               historyStorage.insert(StorageVersion @@ validityKey(modifier.id).untag(StorageKey), toInsert)
               ProgressInfo[EncryPersistentModifier](Some(branchPoint.id), invalidatedChain.tail, validChain.tail, Seq.empty)

@@ -191,7 +191,6 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   private def getHeaderInfoUpdate(header: Header): Option[(Seq[(StorageKey, StorageValue)], EncryPersistentModifier)] =
     if (header.isGenesis) {
       logger.info(s"Initialize header chain with genesis header ${header.encodedId}")
-      bestHeaderIdOptCache = Some(header.id)
       bestHeaderOptCache = Some(header)
       Option(Seq(
         BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId),
@@ -205,7 +204,6 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         val bestRow: Seq[(StorageKey, StorageValue)] =
           if ((header.height > bestHeaderHeight) ||
             (header.height == bestHeaderHeight && score > bestHeadersChainScore)) {
-            bestHeaderIdOptCache = Some(header.id)
             bestHeaderOptCache = Some(header)
               Seq(BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId))
           } else Seq.empty
@@ -215,7 +213,11 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
           headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(header.height)
         val headerIdsRow: Seq[(StorageKey, StorageValue)] =
           if ((header.height > bestHeaderHeight) ||
-            (header.height == bestHeaderHeight && score > bestHeadersChainScore)) bestBlockHeaderIdsRow(header, score)
+            (header.height == bestHeaderHeight && score > bestHeadersChainScore)) {
+            val row = bestBlockHeaderIdsRow(header, score)
+            bestHeaderIdOptCache = Some(header.id)
+            row
+          }
           else {
             if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(header)
             orphanedBlockHeaderIdsRow(header, score)
