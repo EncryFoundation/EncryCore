@@ -157,10 +157,6 @@ trait InstanceFactory extends Keys with EncryGenerator {
       transactionsRoot = Payload.rootHash(txs.map(_.id))
     )
 
-    val a = "123"
-
-    a.length
-
     Block(header, Payload(header.id, txs), None)
   }
 

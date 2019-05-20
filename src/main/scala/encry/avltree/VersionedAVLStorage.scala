@@ -65,7 +65,6 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
     val indexes: Seq[(Store.K, Store.K)] = Seq(TopNodeKey -> nodeKey(prover.topNode),
       TopNodeHeight -> ByteArrayWrapper(Ints.toByteArray(prover.rootNodeHeight)))
     val toRemove: List[Store.K] = prover.removedNodes().map(rn => ByteArrayWrapper(rn.label))
-    logger.info(s"prover.topNode: ${prover.topNode.labelOpt}")
     val toUpdate: Seq[(Store.K, Store.K)] = indexes ++ serializedVisitedNodes(prover.topNode, isTop = true)
     val toUpdateWrapped: Seq[(Store.K, Store.K)] =
       additionalData.map { case (k, v) => ByteArrayWrapper(k) -> ByteArrayWrapper(v) }

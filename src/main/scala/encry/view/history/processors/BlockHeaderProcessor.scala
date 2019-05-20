@@ -202,7 +202,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   private def addHeaderToCacheIfNecessary(h: Header): Unit =
     if (h.height >= bestHeaderHeight - Constants.Chain.MaxRollbackDepth) {
-      logger.info(s"Should add ${Algos.encode(h.id)} to header cache")
+      logger.debug(s"Should add ${Algos.encode(h.id)} to header cache")
       val newHeadersIdsAtHeaderHeight = headersCacheIndexes.getOrElse(h.height, Seq.empty[ModifierId]) :+ h.id
       headersCacheIndexes = headersCacheIndexes + (h.height -> newHeadersIdsAtHeaderHeight)
       headersCache = headersCache + h
@@ -210,13 +210,13 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       if (headersCacheIndexes.size > Constants.Chain.MaxRollbackDepth) {
         headersCacheIndexes.get(bestHeaderHeight - Constants.Chain.MaxRollbackDepth).foreach{ headersIds =>
           val wrappedIds = headersIds.map(ByteArrayWrapper.apply)
-          logger.info(s"Cleanup header cache from headers: ${headersIds.map(Algos.encode).mkString(",")}")
+          logger.debug(s"Cleanup header cache from headers: ${headersIds.map(Algos.encode).mkString(",")}")
           headersCache = headersCache.filterNot(header => wrappedIds.contains(ByteArrayWrapper(header.id)))
         }
         headersCacheIndexes = headersCacheIndexes - (bestHeaderHeight - Constants.Chain.MaxRollbackDepth)
       }
-      logger.info(s"headersCache size: ${headersCache.size}")
-      logger.info(s"headersCacheIndexes size: ${headersCacheIndexes.size}")
+      logger.debug(s"headersCache size: ${headersCache.size}")
+      logger.debug(s"headersCacheIndexes size: ${headersCacheIndexes.size}")
     }
 
   private def getHeaderInfoUpdate(header: Header): Option[(Seq[(StorageKey, StorageValue)], EncryPersistentModifier)] = {
