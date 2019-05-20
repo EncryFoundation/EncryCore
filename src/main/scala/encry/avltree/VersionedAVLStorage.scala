@@ -86,7 +86,6 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
   // Should always serialize top node. It may not be new if it is the creation of the tree
   private def serializedVisitedNodes(node: EncryProverNodes[D], isTop: Boolean): Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
     if (node.isNew || isTop) {
-      logger.info("serializedVisitedNodes")
       val pair: (ByteArrayWrapper, ByteArrayWrapper) = (nodeKey(node), ByteArrayWrapper(toBytes(node, isTop)))
       node match {
         case n: InternalProverEncryNode[D] =>
