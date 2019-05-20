@@ -135,11 +135,8 @@ object ModifiersCache extends StrictLogging {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           List(new mutable.WrappedArray.ofByte(header.payloadId))
         case _ if !isChainSynced =>
-          logger.debug(s"ModsCache no applicable payload at height: ${history.bestBlockHeight + 1}." +
-            s"Trying to find in range [${history.bestHeaderHeight - Constants.Chain.MaxRollbackDepth}, ${history.bestHeaderHeight}]")
-          (history.bestHeaderHeight - Constants.Chain.MaxRollbackDepth to history.bestHeaderHeight).flatMap(height =>
-            findApplicablePayloadAtHeight(height)
-          ).toList
+          logger.debug(s"ModsCache no applicable payload at height: ${history.bestBlockHeight + 1}.")
+          findApplicablePayloadAtHeight(history.bestBlockHeight + 1)
         case _ => exhaustiveSearch
       }
       case None if isChainSynced =>
