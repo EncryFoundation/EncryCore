@@ -29,7 +29,7 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
   def rollback(version: ADDigest): Try[(EncryProverNodes[D], Int)] = Try {
     store.rollbackTo(StorageVersion @@ version.untag(ADDigest))
     val top: EncryProverNodes[D] =
-      VersionedAVLStorage.fetch[D](ADKey @@ store.get(StorageKey @@ TopNodeKey.data).get.untag(StorageValue))(hf, store, nodeParameters, isTop = true)
+      VersionedAVLStorage.fetch[D](ADKey @@ store.get(StorageKey @@ TopNodeKey.data).get.untag(StorageValue), isTop = true)(hf, store, nodeParameters)
     val topHeight: Int = Ints.fromByteArray(store.get(StorageKey @@ TopNodeHeight.data).get)
     top -> topHeight
   }.recoverWith { case e =>
@@ -114,10 +114,12 @@ object VersionedAVLStorage extends StrictLogging {
   val InternalNodePrefix: Byte = 0.toByte
   val LeafPrefix: Byte = 1.toByte
 
-  def fetch[D <: hash.Digest](key: ADKey)(implicit hf: CryptographicHash[D],
-                                          store: VersionalStorage,
-                                          nodeParameters: NodeParameters,
-                                          isTop: Boolean = false): EncryProverNodes[D] = {
+  def fetch[D <: hash.Digest](key: ADKey,
+                              isTop: Boolean = false,
+                              isTopLeaf: Boolean = false)
+                             (implicit hf: CryptographicHash[D],
+                              store: VersionalStorage,
+                              nodeParameters: NodeParameters): EncryProverNodes[D] = {
     val bytes: Array[Byte] = store.get(StorageKey @@ key.untag(ADKey)).get
     val keySize: Int = nodeParameters.keySize
     val labelSize: Int = nodeParameters.labelSize
@@ -127,11 +129,12 @@ object VersionedAVLStorage extends StrictLogging {
         val key: ADKey = ADKey @@ bytes.slice(2, 2 + keySize)
         val leftKey: ADKey = ADKey @@ bytes.slice(2 + keySize, 2 + keySize + labelSize)
         val rightKey: ADKey = ADKey @@ bytes.slice(2 + keySize + labelSize, 2 + keySize + (2 * labelSize))
-        val n: ProxyInternalProverEncryNode[D] = new ProxyInternalProverEncryNode[D](key, leftKey, rightKey, balance)
+        val n: ProxyInternalProverEncryNode[D] =
+          new ProxyInternalProverEncryNode[D](key, leftKey, rightKey, balance, isTop)
         val labelOpt: Option[D] = if (bytes.length > 2 + keySize + (2 * labelSize))
           Some(bytes.slice(2 + keySize + (2 * labelSize), bytes.length).asInstanceOf[D])
         else None
-        if (isTop) n.labelOpt = labelOpt
+        if (isTop || isTopLeaf) n.labelOpt = labelOpt
         n.isNew = false
         n
       case LeafPrefix =>
@@ -152,7 +155,7 @@ object VersionedAVLStorage extends StrictLogging {
           else (value, nextLeafKey, None)
         }
         val l: ProverLeaf[D] = new ProverLeaf[D](key, value, nextLeafKey)
-        if (isTop) l.labelOpt = labelOpt
+        if (isTop || isTopLeaf) l.labelOpt = labelOpt
         l.isNew = false
         l
     }
@@ -161,7 +164,8 @@ object VersionedAVLStorage extends StrictLogging {
   class ProxyInternalProverEncryNode[D <: Digest](protected var pk: ADKey,
                                                   val lkey: ADKey,
                                                   val rkey: ADKey,
-                                                  protected var pb: Balance = Balance @@ 0.toByte)
+                                                  protected var pb: Balance = Balance @@ 0.toByte,
+                                                  isTopLeaf: Boolean = false)
                                                  (implicit val phf: CryptographicHash[D],
                                                   store: VersionalStorage,
                                                   nodeParameters: NodeParameters)
@@ -169,12 +173,12 @@ object VersionedAVLStorage extends StrictLogging {
     extends InternalProverEncryNode(k = pk, l = null, r = null, b = pb)(phf) {
 
     override def left: EncryProverNodes[D] = {
-      if (l == null) l = VersionedAVLStorage.fetch[D](lkey)
+      if (l == null) l = VersionedAVLStorage.fetch[D](lkey, isTopLeaf = isTopLeaf)
       l
     }
 
     override def right: EncryProverNodes[D] = {
-      if (r == null) r = VersionedAVLStorage.fetch[D](rkey)
+      if (r == null) r = VersionedAVLStorage.fetch[D](rkey, isTopLeaf = isTopLeaf)
       r
     }
   }
