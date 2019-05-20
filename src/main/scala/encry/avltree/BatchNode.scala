@@ -18,7 +18,7 @@ sealed trait EncryNode[D <: Digest] extends StrictLogging{
   def label: D = labelOpt match {
     case None =>
       val l: D = computeLabel
-      //labelOpt = Some(l)
+      labelOpt = Some(l)
       l
     case Some(l) => l
   }

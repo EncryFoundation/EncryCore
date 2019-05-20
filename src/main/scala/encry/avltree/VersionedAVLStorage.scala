@@ -101,11 +101,12 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
       case n: ProverLeaf[D] if nodeParameters.valueSize.isDefined => LeafPrefix +: (n.key ++ n.value ++ n.nextLeafKey)
       case n: ProverLeaf[D] => LeafPrefix +: (n.key ++ Ints.toByteArray(n.value.length) ++ n.value ++ n.nextLeafKey)
     }
-//    node match {
-//      case withLabel: EncryNode[D] if withLabel.labelOpt.isDefined =>
-//        bytesWithoutLabel ++ withLabel.labelOpt.get
-//      case _: EncryNode[D] => bytesWithoutLabel
-//    }
+    node match {
+      case withLabel: EncryNode[D] if withLabel.labelOpt.isDefined =>
+        logger.info(s"Label size: ${withLabel.labelOpt.get.length}")
+        bytesWithoutLabel ++ withLabel.labelOpt.get
+      case _: EncryNode[D] => bytesWithoutLabel
+    }
     bytesWithoutLabel
   }
 }
@@ -135,7 +136,7 @@ object VersionedAVLStorage extends StrictLogging {
         val labelOpt: Option[D] = if (bytes.length > 2 + keySize + (2 * labelSize))
           Some(bytes.slice(2 + keySize + (2 * labelSize), bytes.length).asInstanceOf[D])
         else None
-        //if (isTop || isTopLeaf) n.labelOpt = labelOpt
+        if (isTop || isTopLeaf) n.labelOpt = labelOpt
         n.isNew = false
         n
       case LeafPrefix =>
@@ -156,7 +157,7 @@ object VersionedAVLStorage extends StrictLogging {
           else (value, nextLeafKey, None)
         }
         val l: ProverLeaf[D] = new ProverLeaf[D](key, value, nextLeafKey)
-        //if (isTop || isTopLeaf) l.labelOpt = labelOpt
+        if (isTop || isTopLeaf) l.labelOpt = labelOpt
         l.isNew = false
         l
     }
