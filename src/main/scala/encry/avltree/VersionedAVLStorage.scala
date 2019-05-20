@@ -104,7 +104,7 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
     node match {
       case withLabel: EncryNode[D] if withLabel.labelOpt.isDefined && isTop =>
         bytesWithoutLabel ++ withLabel.labelOpt.get
-      case withOutLabel: EncryNode[D] => bytesWithoutLabel
+      case _: EncryNode[D] => bytesWithoutLabel
     }
   }
 }
