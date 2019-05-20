@@ -20,15 +20,13 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
 
   protected val labelLength: Int = hf.DigestSize
 
-  var topNode: EncryProverNodes[D] = {
-    logger.info(s"oldRootAndHeight: ${oldRootAndHeight}. ${oldRootAndHeight.map(_._1.labelOpt)}")
+  var topNode: EncryProverNodes[D] =
     oldRootAndHeight.map(_._1).getOrElse({
       val t: EncryProverNodes[D] = new ProverLeaf(NegativeInfinityKey,
         ADValue @@ Array.fill(valueLengthOpt.getOrElse(0))(0: Byte), PositiveInfinityKey)
       t.isNew = false
       t
     })
-  }
 
   var rootNodeHeight: Int = oldRootAndHeight.map(_._2).getOrElse(0)
 
