@@ -85,7 +85,7 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
   // Should always serialize top node. It may not be new if it is the creation of the tree
   private def serializedVisitedNodes(node: EncryProverNodes[D], isTop: Boolean): Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
     if (node.isNew || isTop) {
-      val pair: (ByteArrayWrapper, ByteArrayWrapper) = (nodeKey(node), ByteArrayWrapper(toBytes(node, isTop)))
+      val pair: (ByteArrayWrapper, ByteArrayWrapper) = (nodeKey(node), ByteArrayWrapper(toBytes(node)))
       node match {
         case n: InternalProverEncryNode[D] =>
           pair +: (serializedVisitedNodes(n.left, isTop = false) ++ serializedVisitedNodes(n.right, isTop = false))
@@ -95,7 +95,7 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
 
   private def nodeKey(node: EncryProverNodes[D]): ByteArrayWrapper = ByteArrayWrapper(node.label)
 
-  private def toBytes(node: EncryProverNodes[D], isTop: Boolean): Array[Byte] = {
+  private def toBytes(node: EncryProverNodes[D]): Array[Byte] = {
     val bytesWithoutLabel = node match {
       case n: InternalProverEncryNode[D] => InternalNodePrefix +: n.balance +: (n.key ++ n.left.label ++ n.right.label)
       case n: ProverLeaf[D] if nodeParameters.valueSize.isDefined => LeafPrefix +: (n.key ++ n.value ++ n.nextLeafKey)
@@ -135,7 +135,7 @@ object VersionedAVLStorage extends StrictLogging {
         val labelOpt: Option[D] = if (bytes.length > 2 + keySize + (2 * labelSize))
           Some(bytes.slice(2 + keySize + (2 * labelSize), bytes.length).asInstanceOf[D])
         else None
-        if (isTop || isTopLeaf) n.labelOpt = labelOpt
+        n.labelOpt = labelOpt
         n.isNew = false
         n
       case LeafPrefix =>
@@ -156,7 +156,7 @@ object VersionedAVLStorage extends StrictLogging {
           else (value, nextLeafKey, None)
         }
         val l: ProverLeaf[D] = new ProverLeaf[D](key, value, nextLeafKey)
-        if (isTop || isTopLeaf) l.labelOpt = labelOpt
+        l.labelOpt = labelOpt
         l.isNew = false
         l
     }
