@@ -181,9 +181,9 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   def bestBlockIdOpt: Option[ModifierId]
 
-  def bestHeaderHeight: Int = bestHeaderIdOpt.flatMap(id => heightOf(id)).getOrElse(Constants.Chain.PreGenesisHeight)
+  def bestHeaderHeight: Int = bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight)
 
-  def bestBlockHeight: Int = bestBlockIdOpt.flatMap(id => heightOf(id)).getOrElse(Constants.Chain.PreGenesisHeight)
+  def bestBlockHeight: Int = bestBlockOpt.map(_.header.height).getOrElse(Constants.Chain.PreGenesisHeight)
 
   protected def process(h: Header): ProgressInfo[EncryPersistentModifier] = getHeaderInfoUpdate(h) match {
     case Some(dataToUpdate) =>
