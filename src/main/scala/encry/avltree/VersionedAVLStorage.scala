@@ -102,7 +102,7 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
       case n: ProverLeaf[D] => LeafPrefix +: (n.key ++ Ints.toByteArray(n.value.length) ++ n.value ++ n.nextLeafKey)
     }
     node match {
-      case withLabel: EncryNode[D] if withLabel.labelOpt.isDefined && isTop =>
+      case withLabel: EncryNode[D] if withLabel.labelOpt.isDefined =>
         bytesWithoutLabel ++ withLabel.labelOpt.get
       case _: EncryNode[D] => bytesWithoutLabel
     }
