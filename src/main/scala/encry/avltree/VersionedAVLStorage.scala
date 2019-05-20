@@ -65,6 +65,7 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
     val indexes: Seq[(Store.K, Store.K)] = Seq(TopNodeKey -> nodeKey(prover.topNode),
       TopNodeHeight -> ByteArrayWrapper(Ints.toByteArray(prover.rootNodeHeight)))
     val toRemove: List[Store.K] = prover.removedNodes().map(rn => ByteArrayWrapper(rn.label))
+    logger.info(s"prover.topNode: ${prover.topNode.labelOpt}")
     val toUpdate: Seq[(Store.K, Store.K)] = indexes ++ serializedVisitedNodes(prover.topNode, isTop = true)
     val toUpdateWrapped: Seq[(Store.K, Store.K)] =
       additionalData.map { case (k, v) => ByteArrayWrapper(k) -> ByteArrayWrapper(v) }
@@ -85,6 +86,7 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
   // Should always serialize top node. It may not be new if it is the creation of the tree
   private def serializedVisitedNodes(node: EncryProverNodes[D], isTop: Boolean): Seq[(ByteArrayWrapper, ByteArrayWrapper)] =
     if (node.isNew || isTop) {
+      logger.info("serializedVisitedNodes")
       val pair: (ByteArrayWrapper, ByteArrayWrapper) = (nodeKey(node), ByteArrayWrapper(toBytes(node, isTop)))
       node match {
         case n: InternalProverEncryNode[D] =>
@@ -103,7 +105,6 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
     }
     node match {
       case withLabel: EncryNode[D] if withLabel.labelOpt.isDefined =>
-        logger.info(s"Label size: ${withLabel.labelOpt.get.length}")
         bytesWithoutLabel ++ withLabel.labelOpt.get
       case _: EncryNode[D] => bytesWithoutLabel
     }
