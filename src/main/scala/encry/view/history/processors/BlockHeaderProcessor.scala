@@ -50,7 +50,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     * headersCache contains all header with ids from headersCacheIndexes
     */
 
-  var headersCacheIndexes: Map[Int, HashSet[ModifierId]] = Map.empty
+  var headersCacheIndexes: Map[Int, Seq[ModifierId]] = Map.empty
 
   var headersCache: HashSet[Header] = HashSet.empty
 
@@ -203,7 +203,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   private def addHeaderToCacheIfNecessary(h: Header): Unit =
     if (h.height >= bestHeaderHeight - Constants.Chain.MaxRollbackDepth) {
       logger.info(s"Should add ${Algos.encode(h.id)} to header cache")
-      val newHeadersIdsAtHeaderHeight = headersCacheIndexes.getOrElse(h.height, HashSet.empty[ModifierId]) + h.id
+      val newHeadersIdsAtHeaderHeight = headersCacheIndexes.getOrElse(h.height, Seq.empty[ModifierId]) :+ h.id
       headersCacheIndexes = headersCacheIndexes + (h.height -> newHeadersIdsAtHeaderHeight)
       headersCache = headersCache + h
       // cleanup cache if necessary
@@ -311,10 +311,10 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     *         First id is always from the best headers chain.
     */
   def headerIdsAtHeight(height: Int): Seq[ModifierId] =
-    historyStorage.store
+    headersCacheIndexes.getOrElse(height, historyStorage.store
       .get(heightIdsKey(height))
       .map(elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq)
-      .getOrElse(Seq.empty[ModifierId])
+      .getOrElse(Seq.empty[ModifierId]))
 
   /**
     * @param limit       - maximum length of resulting HeaderChain

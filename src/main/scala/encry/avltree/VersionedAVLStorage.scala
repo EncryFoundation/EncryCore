@@ -29,7 +29,7 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
   def rollback(version: ADDigest): Try[(EncryProverNodes[D], Int)] = Try {
     store.rollbackTo(StorageVersion @@ version.untag(ADDigest))
     val top: EncryProverNodes[D] =
-      VersionedAVLStorage.fetch[D](ADKey @@ store.get(StorageKey @@ TopNodeKey.data).get.untag(StorageValue))(hf, store, nodeParameters)
+      VersionedAVLStorage.fetch[D](ADKey @@ store.get(StorageKey @@ TopNodeKey.data).get.untag(StorageValue))(hf, store, nodeParameters, isTop = true)
     val topHeight: Int = Ints.fromByteArray(store.get(StorageKey @@ TopNodeHeight.data).get)
     top -> topHeight
   }.recoverWith { case e =>
@@ -116,7 +116,8 @@ object VersionedAVLStorage extends StrictLogging {
 
   def fetch[D <: hash.Digest](key: ADKey)(implicit hf: CryptographicHash[D],
                                           store: VersionalStorage,
-                                          nodeParameters: NodeParameters): EncryProverNodes[D] = {
+                                          nodeParameters: NodeParameters,
+                                          isTop: Boolean = false): EncryProverNodes[D] = {
     val bytes: Array[Byte] = store.get(StorageKey @@ key.untag(ADKey)).get
     val keySize: Int = nodeParameters.keySize
     val labelSize: Int = nodeParameters.labelSize
@@ -130,7 +131,7 @@ object VersionedAVLStorage extends StrictLogging {
         val labelOpt: Option[D] = if (bytes.length > 2 + keySize + (2 * labelSize))
           Some(bytes.slice(2 + keySize + (2 * labelSize), bytes.length).asInstanceOf[D])
         else None
-        n.labelOpt = labelOpt
+        if (isTop) n.labelOpt = labelOpt
         n.isNew = false
         n
       case LeafPrefix =>
@@ -151,7 +152,7 @@ object VersionedAVLStorage extends StrictLogging {
           else (value, nextLeafKey, None)
         }
         val l: ProverLeaf[D] = new ProverLeaf[D](key, value, nextLeafKey)
-        l.labelOpt = labelOpt
+        if (isTop) l.labelOpt = labelOpt
         l.isNew = false
         l
     }

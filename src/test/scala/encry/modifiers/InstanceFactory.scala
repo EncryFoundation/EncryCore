@@ -156,6 +156,11 @@ trait InstanceFactory extends Keys with EncryGenerator {
       difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff),
       transactionsRoot = Payload.rootHash(txs.map(_.id))
     )
+
+    val a = "123"
+
+    a.length
+
     Block(header, Payload(header.id, txs), None)
   }
 
@@ -174,6 +179,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
       override protected val nodeSettings: NodeSettings = settings.node
       override protected val historyStorage: HistoryStorage = storage
       override protected val timeProvider: NetworkTimeProvider = ntp
+      override var bestBlockIdOptCache: Option[ModifierId] = Option.empty[ModifierId]
     }
   }
 }
