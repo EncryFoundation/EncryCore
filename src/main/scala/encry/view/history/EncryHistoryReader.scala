@@ -32,17 +32,20 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   def contains(id: ModifierId): Boolean = modifierById(id).isDefined
 
   /**
-    * Header of best Header chain. Empty if no genesis block is applied yet.
-    * Transactions and ADProofs for this Header may be missed, to get block from best full chain (in mode that support
-    * it) call bestFullBlockOpt.
+    * Contains best full block, if it is defined. None during node init
     */
-  def bestHeaderOpt: Option[Header] = bestHeaderIdOpt.flatMap(typedModifierById[Header])
+  var bestBlockOptCache: Option[Block] = None
 
   /**
     * Complete block of the best chain with transactions.
     * Always None for an SPV mode, Some(fullBLock) for fullnode regime after initial bootstrap.
     */
-  def bestBlockOpt: Option[Block] = bestBlockIdOpt.flatMap(id => typedModifierById[Header](id)).flatMap(getBlock)
+  def bestBlockOpt: Option[Block] =
+    bestBlockOptCache.orElse{
+      val bestBlockInDB = bestBlockIdOpt.flatMap(id => typedModifierById[Header](id)).flatMap(getBlock)
+      bestBlockOptCache = bestBlockInDB
+      bestBlockInDB
+    }
 
   /** @return ids of count headers starting from offset */
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))

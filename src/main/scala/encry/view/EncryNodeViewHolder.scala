@@ -81,7 +81,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   override def receive: Receive = {
     case ModifiersFromRemote(modifierTypeId, modifiers) =>
       val startTime = System.currentTimeMillis()
-      logger.info(s"Start processing ModifiersFromRemote message on NVH.")
+      //logger.info(s"Start processing ModifiersFromRemote message on NVH.")
       modifierTypeId match {
         case Payload.modifierTypeId =>
           modifiers.foreach { bytes =>
