@@ -441,6 +441,7 @@ object Utils extends StrictLogging {
       override protected val nodeSettings: NodeSettings = settings.node
       override protected val historyStorage: HistoryStorage = storage
       override protected val timeProvider: NetworkTimeProvider = ntp
+      override var bestBlockIdOptCache: Option[ModifierId] = Option.empty[ModifierId]
     }
   }
 
