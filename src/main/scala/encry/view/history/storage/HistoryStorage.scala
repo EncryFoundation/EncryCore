@@ -1,21 +1,21 @@
 package encry.view.history.storage
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.modifiers.EncryPersistentModifier
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.VLDBWrapper
 import encry.storage.VersionalStorage
-import encry.utils.CoreTaggedTypes.ModifierId
 import scorex.utils.{Random => ScorexRandom}
-import encry.modifiers.history.HistoryModifiersProtoSerializer
 import encry.storage.EncryStorage
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.HistoryModifiersProtoSerializer
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.util.{Failure, Random, Success}
 
 case class HistoryStorage(override val store: VersionalStorage) extends EncryStorage with StrictLogging {
 
-  def modifierById(id: ModifierId): Option[EncryPersistentModifier] = {
+  def modifierById(id: ModifierId): Option[PersistentModifier] = {
     val possibleMod = store match {
       case iodb: IODBHistoryWrapper =>
         iodb.objectStore.get(ByteArrayWrapper(id)).map(_.data)
@@ -32,7 +32,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
     }
   }
 
-  def insertObjects(objectsToInsert: Seq[EncryPersistentModifier]): Unit =
+  def insertObjects(objectsToInsert: Seq[PersistentModifier]): Unit =
     store match {
       case iodb: IODBHistoryWrapper =>
         iodb.objectStore.update(Random.nextLong(), Seq.empty,
@@ -49,7 +49,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
 
   def bulkInsert(version: Array[Byte],
                  indexesToInsert: Seq[(Array[Byte], Array[Byte])],
-                 objectsToInsert: Seq[EncryPersistentModifier]): Unit = {
+                 objectsToInsert: Seq[PersistentModifier]): Unit = {
     store match {
       case _: IODBHistoryWrapper =>
         insertObjects(objectsToInsert)

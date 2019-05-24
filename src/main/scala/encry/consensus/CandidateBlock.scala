@@ -1,20 +1,18 @@
 package encry.consensus
 
-import encry.consensus.ConsensusTaggedTypes.Difficulty
-import encry.modifiers.history.Block.{Timestamp, Version}
-import encry.modifiers.history.Header
-import encry.modifiers.mempool.Transaction
 import io.circe.Encoder
 import io.circe.syntax._
-import org.encryfoundation.common.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
+import org.encryfoundation.common.modifiers.history.Header
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Difficulty, SerializedAdProof}
 
 case class CandidateBlock(parentOpt: Option[Header],
                           adProofBytes: SerializedAdProof,
                           stateRoot: ADDigest,
-                          version: Version,
+                          version: Byte,
                           transactions: Seq[Transaction],
-                          timestamp: Timestamp,
+                          timestamp: Long,
                           difficulty: Difficulty) {
 
   override def toString: String = s"<CandidateBlock timestamp=$timestamp txQty=${transactions.size} " +

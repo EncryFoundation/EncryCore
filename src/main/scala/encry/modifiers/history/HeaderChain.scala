@@ -1,9 +1,10 @@
 package encry.modifiers.history
 
+import org.encryfoundation.common.modifiers.history.Header
+
 case class HeaderChain(headers: IndexedSeq[Header]) {
-  headers.indices.foreach { i =>
-    if (i > 0) require(headers(i).parentId sameElements headers(i - 1).id)
-  }
+
+  headers.indices.foreach(i => if (i > 0) require(headers(i).parentId.sameElements(headers(i - 1).id)))
 
   def exists(f: Header => Boolean): Boolean = headers.exists(f)
 
@@ -16,7 +17,7 @@ case class HeaderChain(headers: IndexedSeq[Header]) {
   def take(i: Int): HeaderChain = HeaderChain(headers.take(i))
 
   def takeAfter(h: Header): HeaderChain = {
-    val commonIndex = headers.indexWhere(_.id sameElements h.id)
+    val commonIndex = headers.indexWhere(_.id.sameElements(h.id))
     val commonBlockThenSuffixes = headers.takeRight(headers.length - commonIndex)
     HeaderChain(commonBlockThenSuffixes)
   }

@@ -1,9 +1,9 @@
 package encry.utils
 
-import encry.modifiers.state.box.TokenIssuingBox.TokenId
-import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox, TokenIssuingBox}
 import encry.settings.Constants
+import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, TokenIssuingBox}
 
 object BalanceCalculator {
 

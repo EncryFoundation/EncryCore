@@ -3,7 +3,7 @@ package encry.storage.iodb.versionalIODB
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import io.iohk.iodb.Store
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.Algos
 
 /**
   * Iodb db wrapper with object store, only for history

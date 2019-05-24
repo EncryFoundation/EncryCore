@@ -1,7 +1,7 @@
 package encry.view.history.processors
 
-import encry.modifiers.history.Header
 import encry.settings.{Constants, NodeSettings}
+import org.encryfoundation.common.modifiers.history.Header
 
 /** Class that keeps and calculates minimal height for full blocks starting from which we need to download these full
   * blocks from the network and keep them in our history. */
@@ -26,10 +26,12 @@ case class BlockDownloadProcessor(nodeSettings: NodeSettings) {
     if (!nodeSettings.verifyTransactions) Int.MaxValue // we do not verify transactions at any height
     else if (minimalBlockHeightVar == Int.MaxValue) {
       // just synced with the headers chain - determine first full block to apply
-      if (nodeSettings.blocksToKeep < 0) Constants.Chain.GenesisHeight // keep all blocks in history
-      else if (!nodeSettings.stateMode.isDigest) Constants.Chain.GenesisHeight // TODO: start with the height of UTXO snapshot applied. Start from genesis until this is implemented
-      else Math.max(Constants.Chain.GenesisHeight, header.height - nodeSettings.blocksToKeep + 1) // Start from config.blocksToKeep blocks back
+      if (nodeSettings.blocksToKeep < 0) org.encryfoundation.common.utils.Constants.Chain.GenesisHeight // keep all blocks in history
+      // TODO: start with the height of UTXO snapshot applied. Start from genesis until this is implemented
+      else if (!nodeSettings.stateMode.isDigest) org.encryfoundation.common.utils.Constants.Chain.GenesisHeight
+      // Start from config.blocksToKeep blocks back
+      else Math.max(org.encryfoundation.common.utils.Constants.Chain.GenesisHeight, header.height - nodeSettings.blocksToKeep + 1)
     } else if (nodeSettings.blocksToKeep >= 0) Math.max(header.height - nodeSettings.blocksToKeep + 1, minimalBlockHeightVar)
-    else Constants.Chain.GenesisHeight
+    else org.encryfoundation.common.utils.Constants.Chain.GenesisHeight
   }
 }

@@ -5,20 +5,21 @@ import java.io.File
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
-import encry.modifiers.state.box._
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
 import encry.storage.VersionalStorage
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDB
 import io.iohk.iodb.Store
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.modifiers.state.box._
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import scorex.crypto.encode.Base16
 
 import scala.util.Try
 
-trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
-  extends MinimalState[EncryPersistentModifier, IState] {
+trait EncryState[IState <: MinimalState[PersistentModifier, IState]]
+  extends MinimalState[PersistentModifier, IState] {
 
   self: IState =>
 
@@ -41,7 +42,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   /** ID of the last applied modifier. */
   override def version: VersionTag
 
-  override def applyModifier(mod: EncryPersistentModifier): Try[IState]
+  override def applyModifier(mod: PersistentModifier): Try[IState]
 
   override def rollbackTo(version: VersionTag): Try[IState]
 

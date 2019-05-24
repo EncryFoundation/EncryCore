@@ -3,15 +3,12 @@ package encry.api.http.routes
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import akka.pattern.ask
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.modifiers.mempool.Transaction
 import encry.view.state.StateMode
-import io.circe.Json
 import io.circe.syntax._
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
 import encry.settings.RESTApiSettings
-import scala.concurrent.Future
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 
 case class TransactionsApiRoute(readersHolder: ActorRef, memoryPoolRef: ActorRef,
                                 restApiSettings: RESTApiSettings, stateMode: StateMode)(implicit val context: ActorRefFactory)

@@ -1,12 +1,10 @@
 package encry.avltree
 
 import com.typesafe.scalalogging.StrictLogging
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, Balance}
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest
 import scorex.utils.ByteArray
-
 import scala.collection.mutable.ArrayBuffer
 import scala.util.{Failure, Success, Try}
 

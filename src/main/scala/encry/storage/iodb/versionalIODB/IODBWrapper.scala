@@ -4,7 +4,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import io.iohk.iodb.{ByteArrayWrapper, Store}
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.Algos
 
 /**
   * Wrapper, which extends VersionalStorage trait

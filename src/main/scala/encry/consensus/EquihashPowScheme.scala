@@ -1,18 +1,15 @@
 package encry.consensus
 
 import com.google.common.primitives.Chars
-import encry.consensus.ConsensusTaggedTypes.Difficulty
-import encry.utils.CoreTaggedTypes.ModifierId
-import encry.crypto.equihash.{Equihash, EquihashSolution}
-import encry.modifiers.history.{ADProofs, Block, Header, Payload}
-import encry.modifiers.history.Block.Version
-import encry.modifiers.mempool.Transaction
+import encry.crypto.equihash.Equihash
 import encry.settings.Constants
 import org.bouncycastle.crypto.digests.Blake2bDigest
-import org.encryfoundation.common.Algos
-import org.encryfoundation.common.utils.TaggedTypes.SerializedAdProof
+import org.encryfoundation.common.crypto.equihash.EquihashSolution
+import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId, SerializedAdProof}
 import scorex.crypto.hash.Digest32
-
 import scala.annotation.tailrec
 import scala.math.BigInt
 
@@ -86,7 +83,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
   override def getDerivedHeaderFields(parentOpt: Option[Header],
                                       adProofBytes: SerializedAdProof,
                                       transactions: Seq[Transaction]): (Byte, ModifierId, Digest32, Digest32, Int) = {
-    val version: Version = Constants.Chain.Version
+    val version: Byte = Constants.Chain.Version
     val parentId: ModifierId = parentOpt.map(_.id).getOrElse(Header.GenesisParentId)
     val adProofsRoot: Digest32 = ADProofs.proofDigest(adProofBytes)
     val txsRoot: Digest32 = Payload.rootHash(transactions.map(_.id))

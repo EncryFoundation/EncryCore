@@ -2,21 +2,18 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
+
 import akka.actor.{Actor, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
-import encry.consensus.ConsensusTaggedTypes.Difficulty
 import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme}
 import encry.local.miner.Worker.NextChallenge
-import encry.modifiers.history.{Block, Header}
-import encry.modifiers.mempool.{Transaction, TransactionFactory}
-import encry.modifiers.state.box.Box.Amount
+import encry.modifiers.mempool.TransactionFactory
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Constants
 import encry.stats.StatsSender._
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.CurrentView
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
@@ -27,8 +24,13 @@ import encry.view.state.{StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.PrivateKey25519
+import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
+
 import scala.collection._
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}

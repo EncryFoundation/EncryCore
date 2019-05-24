@@ -1,8 +1,8 @@
 package encry.consensus
 
-import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.modifiers.PersistentNodeViewModifier
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.modifiers.PersistentNodeViewModifier
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
 object History {
 

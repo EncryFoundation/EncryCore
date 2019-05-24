@@ -1,10 +1,8 @@
 package encry.consensus
 
-import encry.consensus.ConsensusTaggedTypes.Difficulty
-import encry.modifiers.history.{Block, Header}
-import encry.utils.CoreTaggedTypes.ModifierId
-import encry.modifiers.mempool.Transaction
-import org.encryfoundation.common.utils.TaggedTypes.SerializedAdProof
+import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId, SerializedAdProof}
 import scorex.crypto.hash.Digest32
 
 import scala.math.BigInt

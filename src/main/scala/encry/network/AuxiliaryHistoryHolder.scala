@@ -1,25 +1,22 @@
 package encry.network
 
 import java.io.File
-
 import akka.actor.{Actor, ActorRef}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.ProgressInfo
-import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.Header
 import encry.network.AuxiliaryHistoryHolder._
 import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.VersionalStorage
 import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.NetworkTimeProvider
 import encry.view.history.EncryHistory
-import encry.view.history.EncryHistory.{getHistoryIndexDir, getHistoryObjectsDir, logger}
 import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
 import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.Options
 
 case class AuxiliaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvider, syncronizer: ActorRef)
@@ -107,8 +104,8 @@ object AuxiliaryHistoryHolder {
     history
   }
 
-  case class ReportModifierValid(mod: EncryPersistentModifier)
-  case class ReportModifierInvalid(mod: EncryPersistentModifier, progressInfo: ProgressInfo[EncryPersistentModifier])
-  case class Append(mod: EncryPersistentModifier)
+  case class ReportModifierValid(mod: PersistentModifier)
+  case class ReportModifierInvalid(mod: PersistentModifier, progressInfo: ProgressInfo[PersistentModifier])
+  case class Append(mod: PersistentModifier)
   case class AuxHistoryChanged(history: EncryHistory)
 }

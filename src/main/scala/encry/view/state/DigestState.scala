@@ -3,10 +3,8 @@ package encry.view.state
 import java.io.File
 
 import com.typesafe.scalalogging.StrictLogging
+import encry.modifiers.history.ADProofsFunctions
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.{ADProofs, Block, Header}
-import encry.modifiers.mempool.Transaction
 import encry.settings.{Constants, EncryAppSettings, LevelDBSettings, NodeSettings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
@@ -15,7 +13,10 @@ import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDB
 import encry.storage.levelDb.versionalLevelDB._
 import encry.view.state.UtxoState.logger
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import org.iq80.leveldb.Options
 
@@ -25,26 +26,27 @@ class DigestState protected(override val version: VersionTag,
                             override val rootHash: ADDigest,
                             val stateStore: VersionalStorage,
                             settings: NodeSettings)
-  extends EncryState[DigestState] with ModifierValidation[EncryPersistentModifier] with StrictLogging {
+  extends EncryState[DigestState] with ModifierValidation[PersistentModifier] with StrictLogging {
 
   assert(version sameElements stateStore.currentVersion, "`version` should always be equal to store.lastVersionID")
 
   val maxRollbackDepth: Int = stateStore.versions.size
 
-  def validate(mod: EncryPersistentModifier): Try[Unit] = mod match {
+  def validate(mod: PersistentModifier): Try[Unit] = mod match {
     case block: Block =>
       Try {
         if (!ADProofs.proofDigest(block.adProofsOpt.get.proofBytes).sameElements(block.header.adProofsRoot))
           Failure(new Exception(s"Got invalid Proof for block: $block"))
 
-        val txs: Seq[Transaction] = block.payload.transactions
+        val txs: Seq[Transaction] = block.payload.txs
         val declaredHash: ADDigest = block.header.stateRoot
 
         //TODO: refactor
         txs.foldLeft(Success(): Try[Unit]) { case (status, tx) =>
           status.flatMap(_ => if (tx.semanticValidity.isSuccess) Success(tx)
                               else util.Failure(tx.semanticValidity.errors.head.toThrowable)
-          )}.flatMap(_ => block.adProofsOpt.map(_.verify(extractStateChanges(txs), rootHash, declaredHash))
+          )}.flatMap(_ => block.adProofsOpt.map(d =>
+          ADProofsFunctions.verify(d, extractStateChanges(txs), rootHash, declaredHash))
           .getOrElse(Failure(new Exception("Proofs are empty"))))
       }.flatten match {
         case s: Success[_] =>
@@ -67,7 +69,7 @@ class DigestState protected(override val version: VersionTag,
     new DigestState(newVersion, newRootHash, stateStore, settings)
   }
 
-  override def applyModifier(mod: EncryPersistentModifier): Try[DigestState] = mod match {
+  override def applyModifier(mod: PersistentModifier): Try[DigestState] = mod match {
     case block: Block if settings.verifyTransactions =>
       logger.info(s"Got new full block with id ${block.encodedId} " +
         s"with root ${Algos.encoder.encode(block.header.stateRoot)}")

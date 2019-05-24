@@ -1,7 +1,7 @@
 package encry.view.state
 
-import encry.modifiers.state.box.EncryBaseBox
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
 import scala.collection.immutable.SortedMap
 
 class BoxHolder(val boxes: SortedMap[ByteArrayWrapper, EncryBaseBox]) {

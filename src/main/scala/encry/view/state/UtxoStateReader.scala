@@ -1,12 +1,12 @@
 package encry.view.state
 
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedAVLStorage}
-import encry.modifiers.state.StateModifierSerializer
-import encry.modifiers.state.box._
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.view.history.History.Height
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.modifiers.state.StateModifierSerializer
+import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryBox}
+import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scorex.crypto.hash.Digest32
 

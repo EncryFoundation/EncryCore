@@ -2,7 +2,6 @@ package encry.avltree
 
 import com.typesafe.scalalogging.StrictLogging
 import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import scorex.crypto.hash._
 

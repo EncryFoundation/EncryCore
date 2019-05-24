@@ -1,20 +1,11 @@
 package encry.settings
 
-import encry.consensus.ConsensusTaggedTypes.Difficulty
-import encry.modifiers.history.Block.Version
 import encry.view.history.History.Height
-import org.encryfoundation.common.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ADKey
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Difficulty}
 import scala.concurrent.duration._
 
 object Constants {
-
-  val DigestLength: Int = 32
-
-  val ModifierIdSize: Int = DigestLength
-
-  // Maximum block payload size in bytes
-  val PayloadMaxSize: Int = 1000000
 
   // Maximum block header size in bytes
   val HeaderMaxSize: Int = 200
@@ -24,8 +15,6 @@ object Constants {
   val PersistentByteCost: Int = 16
 
   val StateByteCost: Int = 26
-
-  val MaxDataLength: Int = 1000
 
   val AfterGenesisStateDigestHex: String = "39bc0df81fec1ee7b3804eb42084883ce4925aec8393df39806f00e129ade9f101"
 
@@ -37,13 +26,11 @@ object Constants {
 
     val ConsensusScheme: String = "equihash"
 
-    val HashLength: Int = 32
-
-    val MaxTarget: BigInt = BigInt(1, Array.fill(HashLength)((-1).toByte))
+    val MaxTarget: BigInt = BigInt(1, Array.fill(org.encryfoundation.common.utils.Constants.Chain.HashLength)((-1).toByte))
 
     val InitialDifficulty: Difficulty = Difficulty @@ BigInt(1)
 
-    val Version: Version = 0: Byte
+    val Version: Byte = 0: Byte
 
     val InitialEmissionAmount: Int = 1000000000
 
@@ -61,9 +48,7 @@ object Constants {
 
     val EpochLength: Int = 100
 
-    val GenesisHeight: Height = Height @@ 0
-
-    val PreGenesisHeight: Height = Height @@ (GenesisHeight - 1)
+    val PreGenesisHeight: Height = Height @@ (org.encryfoundation.common.utils.Constants.Chain.GenesisHeight - 1)
 
     // Maximum number of epochs blockchain state can be rolled back
     val MaxRollbackDepth: Int = 100

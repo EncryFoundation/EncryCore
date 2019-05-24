@@ -2,18 +2,14 @@ package encry.view.history.processors
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.system
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History.ProgressInfo
-import encry.consensus.ModifierSemanticValidity.Invalid
-import encry.local.explorer.BlockListener.NewBestBlock
-import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.{Block, Header, HeaderChain}
-import encry.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
-import io.iohk.iodb.ByteArrayWrapper
+import encry.modifiers.history.HeaderChain
 import io.circe.syntax._
-import io.circe.{Decoder, Encoder, HCursor}
-import org.encryfoundation.common.Algos
-
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.encryfoundation.common.validation.ModifierSemanticValidity.Invalid
+import org.encryfoundation.common.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
 import scala.util.{Failure, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
@@ -38,8 +34,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     * @return ProgressInfo required for State to process to be consistent with History
     */
   protected def processBlock(fullBlock: Block,
-                             modToApply: EncryPersistentModifier): ProgressInfo[EncryPersistentModifier] = {
-    logger.debug(s"Process block: ${fullBlock.asJson}")
+                             modToApply: PersistentModifier): ProgressInfo[PersistentModifier] = {
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
     logger.debug(s"best full chain contains: ${bestFullChain.length}")
     val newBestAfterThis: Header = bestFullChain.last.header
@@ -94,9 +89,6 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
                 .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
                 .getOrElse(false))
         updateStorage(newModRow, newBestHeader.id, updateBestHeader)
-        if (settings.postgres.exists(_.enableSave) && !auxHistory)
-          system.actorSelection("/user/blockListener") ! NewBestBlock(fullBlock.header.height)
-
         if (blocksToKeep >= 0) {
           val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)
           val bestHeight: Int = toApply.last.header.height
@@ -151,7 +143,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     historyStorage.removeObjects(toRemove)
   }
 
-  private def updateStorage(newModRow: EncryPersistentModifier,
+  private def updateStorage(newModRow: PersistentModifier,
                             bestFullHeaderId: ModifierId,
                             updateHeaderInfo: Boolean = false): Unit = {
     val indicesToInsert: Seq[(Array[Byte], Array[Byte])] =
@@ -160,9 +152,9 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     historyStorage.bulkInsert(storageVersion(newModRow), indicesToInsert, Seq(newModRow))
   }
 
-  private def storageVersion(newModRow: EncryPersistentModifier) = newModRow.id
+  private def storageVersion(newModRow: PersistentModifier) = newModRow.id
 
-  protected def modifierValidation(m: EncryPersistentModifier, headerOpt: Option[Header]): Try[Unit] = {
+  protected def modifierValidation(m: PersistentModifier, headerOpt: Option[Header]): Try[Unit] = {
     val minimalHeight: Int = blockDownloadProcessor.minimalBlockHeight
     headerOpt.map(header => PayloadValidator.validate(m, header, minimalHeight).toTry)
       .getOrElse(Failure(RecoverableModifierError(s"Header for modifier $m is not defined")))
@@ -186,7 +178,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   /** Validator for `BlockPayload` and `AdProofs` */
   object PayloadValidator extends ModifierValidator {
 
-    def validate(m: EncryPersistentModifier, header: Header, minimalHeight: Int): ValidationResult = {
+    def validate(m: PersistentModifier, header: Header, minimalHeight: Int): ValidationResult = {
       failFast
         .validate(!historyStorage.containsObject(m.id)) {
           fatal(s"Modifier ${m.encodedId} is already in history")
@@ -208,10 +200,10 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
 
 object BlockProcessor {
 
-  type BlockProcessing = PartialFunction[ToProcess, ProgressInfo[EncryPersistentModifier]]
+  type BlockProcessing = PartialFunction[ToProcess, ProgressInfo[PersistentModifier]]
 
   case class ToProcess(fullBlock: Block,
-                       newModRow: EncryPersistentModifier,
+                       newModRow: PersistentModifier,
                        newBestHeader: Header,
                        newBestChain: Seq[Block],
                        blocksToKeep: Int)

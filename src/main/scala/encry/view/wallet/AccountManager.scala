@@ -6,11 +6,10 @@ import encry.crypto.encryption.AES
 import encry.settings.EncryAppSettings
 import encry.utils.Mnemonic
 import io.iohk.iodb.{ByteArrayWrapper, Store}
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
+import org.encryfoundation.common.utils.Algos
 import scorex.crypto.hash.Blake2b256
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
-
 import scala.util.Try
 
 case class AccountManager(store: Store) extends StrictLogging {

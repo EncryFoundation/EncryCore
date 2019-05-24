@@ -6,8 +6,6 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
-import encry.modifiers.history.Block
-import encry.modifiers.history.Header
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeerManager.ReceivableMessages.{GetConnectedPeers, GetRecoveryStatus}
 import encry.settings._
@@ -16,7 +14,8 @@ import encry.view.ReadersHolder.{GetReaders, Readers}
 import encry.view.mempool.Mempool.GetMempoolSize
 import io.circe.Json
 import io.circe.syntax._
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.utils.Algos
 
 import scala.concurrent.Future
 
