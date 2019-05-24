@@ -106,7 +106,6 @@ case class VersionedAVLStorage[D <: Digest](store: VersionalStorage,
         bytesWithoutLabel ++ withLabel.labelOpt.get
       case _: EncryNode[D] => bytesWithoutLabel
     }
-    bytesWithoutLabel
   }
 }
 
