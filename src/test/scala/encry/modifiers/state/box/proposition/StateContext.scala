@@ -1,6 +1,6 @@
 package encry.modifiers.state.box.proposition
 
-import org.encryfoundation.common.utils.TaggedTypes.Height .Height
+import org.encryfoundation.common.utils.TaggedTypes.Height
 import scorex.crypto.authds.ADDigest
 import scorex.utils.Random
 
