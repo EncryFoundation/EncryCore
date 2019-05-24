@@ -8,7 +8,6 @@ import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
 import encry.it.util.KeyHelper._
 import encry.settings.Constants.IntrinsicTokenId
-import encry.view.history.History.Height
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
@@ -16,10 +15,12 @@ import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedCon
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, TokenIssuingBox}
 import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.crypto.signatures.Curve25519
 import scorex.utils.Random
+
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 

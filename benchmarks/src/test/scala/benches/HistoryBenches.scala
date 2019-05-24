@@ -4,11 +4,11 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import benches.HistoryBenches.HistoryBenchState
 import benches.Utils.{generateHistory, generateNextBlockValidForHistory, getRandomTempDir}
-import encry.modifiers.history.Block
-import encry.modifiers.mempool.Transaction
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
 import encryBenchmark.Settings
+import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import org.openjdk.jmh.profile.GCProfiler

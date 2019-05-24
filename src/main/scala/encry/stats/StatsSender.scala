@@ -4,16 +4,17 @@ import java.io.File
 import java.net.InetAddress
 import java.util
 import java.text.SimpleDateFormat
+
 import akka.actor.Actor
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
 import encry.stats.StatsSender._
-import encry.view.history.History.Height
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId, ModifierTypeId}
 import org.influxdb.{InfluxDB, InfluxDBFactory}
+
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 

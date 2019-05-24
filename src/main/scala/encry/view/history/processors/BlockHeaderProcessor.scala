@@ -10,16 +10,16 @@ import encry.settings.{Constants, EncryAppSettings}
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbValue
 import encry.utils.NetworkTimeProvider
-import encry.view.history.History.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId, ModifierTypeId}
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
 import org.encryfoundation.common.validation.{ModifierSemanticValidity, ModifierValidator, ValidationResult}
 import scorex.crypto.hash.Digest32
 import supertagged.@@
+
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.collection.immutable.HashSet

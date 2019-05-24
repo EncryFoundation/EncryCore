@@ -1,14 +1,13 @@
 package encry.modifiers.mempool
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.view.history.History.Height
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import org.encryfoundation.common.modifiers.mempool.directive.{Directive, TransferDirective}
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.modifiers.mempool.transaction._
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.MonetaryBox
-import org.encryfoundation.common.utils.TaggedTypes.ADKey
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Height}
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 

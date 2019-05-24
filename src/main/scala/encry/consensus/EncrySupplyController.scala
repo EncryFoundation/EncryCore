@@ -1,8 +1,8 @@
 package encry.consensus
 
 import encry.settings.Constants
-import encry.view.history.History.Height
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.utils.TaggedTypes.Height
 
 object EncrySupplyController {
 

@@ -1,8 +1,8 @@
 package encry.settings
 
-import encry.view.history.History.Height
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Difficulty}
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Difficulty, Height}
+
 import scala.concurrent.duration._
 
 object Constants {

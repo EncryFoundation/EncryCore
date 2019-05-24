@@ -58,6 +58,4 @@ object VersionalLevelDBBanches {
     val elems10k = Utils.generateRandomLevelDbElemsWithoutDeletions(10000, 100)
     //val elems30k = Utils.generateRandomLevelDbElemsWithoutDeletions(30000, 100)
   }
-
 }
-

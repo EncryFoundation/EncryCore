@@ -1,6 +1,7 @@
 package encry.view.state
 
 import java.io.File
+
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
@@ -18,7 +19,6 @@ import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbValue
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
-import encry.view.history.History.Height
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header}
@@ -29,11 +29,12 @@ import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryBox}
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.Algos.HF
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, ModifierId, SerializedAdProof}
+import org.encryfoundation.common.utils.TaggedTypes._
 import org.encryfoundation.common.validation.ValidationResult.{Invalid, Valid}
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
+
 import scala.util.{Failure, Success, Try}
 
 class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF],

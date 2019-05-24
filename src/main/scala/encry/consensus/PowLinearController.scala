@@ -1,9 +1,8 @@
 package encry.consensus
 
 import encry.settings.Constants
-import encry.view.history.History.Height
 import org.encryfoundation.common.modifiers.history.Header
-import org.encryfoundation.common.utils.TaggedTypes.Difficulty
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height}
 import supertagged.@@
 
 object PowLinearController {

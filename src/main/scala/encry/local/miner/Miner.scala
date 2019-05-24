@@ -2,7 +2,6 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
-
 import akka.actor.{Actor, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
@@ -18,7 +17,6 @@ import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.CurrentView
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.EncryHistory
-import encry.view.history.History.Height
 import encry.view.mempool.Mempool._
 import encry.view.state.{StateMode, UtxoState}
 import encry.view.wallet.EncryWallet
@@ -29,11 +27,11 @@ import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
-
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
 import scala.collection._
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
+import Miner._
 
 class Miner extends Actor with StrictLogging {
 
@@ -42,8 +40,6 @@ class Miner extends Actor with StrictLogging {
   type TransactionIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
   def toKey(id: ModifierId): TransactionIdAsKey = new mutable.WrappedArray.ofByte(id)
-
-  import Miner._
 
   val dateFormat: SimpleDateFormat = new SimpleDateFormat("HH:mm:ss")
   var startTime: Long = System.currentTimeMillis()

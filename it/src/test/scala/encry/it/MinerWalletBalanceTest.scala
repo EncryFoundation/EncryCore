@@ -5,8 +5,8 @@ import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
 import encry.settings.Constants._
-import encry.view.history.History.Height
 import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.scalatest.{AsyncFunSuite, Matchers}
 
 import scala.concurrent.Await

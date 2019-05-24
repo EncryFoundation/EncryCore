@@ -11,12 +11,11 @@ import encry.EncryApp.settings
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.storage.VersionalStorage.StorageKey
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbKey
-import encry.view.history.History.Height
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import org.encryfoundation.common.validation.ModifierSemanticValidity
 
 import scala.annotation.tailrec
