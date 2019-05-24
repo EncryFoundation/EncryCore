@@ -9,7 +9,7 @@ import scorex.crypto.encode.Base16
 
 import scala.util.Try
 
-object BlockFunctions {
+object BlockUtils {
 
   def toSeq(block: Block): Seq[PersistentModifier] = Seq(block.header, block.payload) ++ block.adProofsOpt.toSeq
 

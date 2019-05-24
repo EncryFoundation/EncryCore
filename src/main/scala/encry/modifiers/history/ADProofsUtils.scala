@@ -9,7 +9,7 @@ import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue}
 import scorex.crypto.hash.Digest32
 import scala.util.{Failure, Success, Try}
 
-object ADProofsFunctions {
+object ADProofsUtils {
 
   val KeyLength: Int = 32
 

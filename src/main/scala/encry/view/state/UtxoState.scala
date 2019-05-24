@@ -7,7 +7,7 @@ import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
 import encry.avltree.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, VersionedAVLStorage}
 import encry.consensus.EncrySupplyController
-import encry.modifiers.history.ADProofsFunctions
+import encry.modifiers.history.ADProofsUtils
 import encry.modifiers.state.{Context, EncryPropositionFunctions}
 import encry.settings.{Constants, EncryAppSettings, LevelDBSettings}
 import encry.utils.CoreTaggedTypes.VersionTag
@@ -66,7 +66,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
       txs.foldLeft[Try[Option[ADValue]]](Success(None)) { case (t, tx) =>
         t.flatMap { _ =>
           if (validate(tx, allowedOutputDelta).isSuccess) {
-            extractStateChanges(tx).operations.map(ADProofsFunctions.toModification)
+            extractStateChanges(tx).operations.map(ADProofsUtils.toModification)
               .foldLeft[Try[Option[ADValue]]](Success(None)) { case (tIn, m) =>
               tIn.flatMap(_ => persistentProver.performOneOperation(m))
             }
@@ -169,7 +169,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     if (txs.isEmpty) throw new Exception("Got empty transaction sequence")
     else if (!storage.version.exists(_.sameElements(rootHash)))
       throw new Exception(s"Invalid storage version: ${storage.version.map(Algos.encode)} != ${Algos.encode(rootHash)}")
-    persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofsFunctions.toModification))
+    persistentProver.avlProver.generateProofForOperations(extractStateChanges(txs).operations.map(ADProofsUtils.toModification))
   }.flatten.recoverWith[(SerializedAdProof, ADDigest)] { case e =>
     logger.info(s"Failed to generate ADProof cause $e")
     Failure(e)

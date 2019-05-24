@@ -3,7 +3,7 @@ package encry.view.state
 import java.io.File
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.modifiers.history.ADProofsFunctions
+import encry.modifiers.history.ADProofsUtils
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.settings.{Constants, EncryAppSettings, LevelDBSettings, NodeSettings}
 import encry.storage.VersionalStorage
@@ -46,7 +46,7 @@ class DigestState protected(override val version: VersionTag,
           status.flatMap(_ => if (tx.semanticValidity.isSuccess) Success(tx)
                               else util.Failure(tx.semanticValidity.errors.head.toThrowable)
           )}.flatMap(_ => block.adProofsOpt.map(d =>
-          ADProofsFunctions.verify(d, extractStateChanges(txs), rootHash, declaredHash))
+          ADProofsUtils.verify(d, extractStateChanges(txs), rootHash, declaredHash))
           .getOrElse(Failure(new Exception("Proofs are empty"))))
       }.flatten match {
         case s: Success[_] =>
