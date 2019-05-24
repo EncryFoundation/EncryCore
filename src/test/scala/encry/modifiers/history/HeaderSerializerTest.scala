@@ -1,6 +1,7 @@
 package encry.modifiers.history
 
 import encry.utils.EncryGenerator
+import org.encryfoundation.common.modifiers.history.HeaderSerializer
 import org.scalatest.{Matchers, PropSpec}
 
 class HeaderSerializerTest extends PropSpec with Matchers with EncryGenerator{

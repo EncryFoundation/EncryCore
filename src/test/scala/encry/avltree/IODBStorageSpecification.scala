@@ -4,7 +4,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.avltree.helpers.TestHelper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbDiff, VersionalLevelDB}
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.Algos
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.hash.{Blake2b256, Digest32}

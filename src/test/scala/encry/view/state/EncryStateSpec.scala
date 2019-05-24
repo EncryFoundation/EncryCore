@@ -1,8 +1,7 @@
 package encry.view.state
 
-import encry.consensus.EncrySupplyController
-import encry.modifiers.state.box.AssetBox
 import encry.utils.EncryGenerator
+import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.scalatest.{Matchers, PropSpec}
 
 class EncryStateSpec extends PropSpec with Matchers with EncryGenerator {

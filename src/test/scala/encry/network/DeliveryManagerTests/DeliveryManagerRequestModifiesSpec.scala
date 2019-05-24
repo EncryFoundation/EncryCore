@@ -5,19 +5,19 @@ import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import encry.consensus.History.{Fork, Older, Younger}
 import encry.modifiers.InstanceFactory
-import encry.modifiers.history.{Block, Header, Payload}
-import encry.modifiers.mempool.Transaction
-import encry.network.BasicMessagesRepo._
 import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, OtherNodeSyncingStatus, RequestFromLocal}
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.EncryAppSettings
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import encry.network.DeliveryManagerTests.DMUtils._
-import encry.view.history.EncrySyncInfo
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
+import org.encryfoundation.common.network.SyncInfo
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.collection.mutable.WrappedArray
 
 class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfterAll
@@ -47,7 +47,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       val (deliveryManager, cp1, _, _, _, headersIds, headersAsKey) = initialiseState()
       deliveryManager ! HandshakedPeer(cp1)
       deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
-      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, headersIds)
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress.getAddress, Map.empty)
         .keys.size == headersIds.size)
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress.getAddress, Map.empty)
@@ -57,8 +57,8 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       val (deliveryManager, cp1, _, _, _, headersIds, headersAsKey) = initialiseState()
       deliveryManager ! HandshakedPeer(cp1)
       deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
-      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
-      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, headersIds)
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress.getAddress, Map.empty)
         .keys.size == headersIds.size)
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress.getAddress, Map.empty)
@@ -68,9 +68,9 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       val (deliveryManager, cp1, _, _, blocks, headersIds, headersAsKey) = initialiseState()
       deliveryManager ! HandshakedPeer(cp1)
       deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
-      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, headersIds)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.modifierTypeId -> blocks.map(k => k.header.id -> Array.emptyByteArray).toMap), cp1)
+        Header.HeaderTypeId -> blocks.map(k => k.header.id -> Array.emptyByteArray).toMap), cp1)
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress.getAddress, Map.empty)
         .keys.isEmpty)
       assert(deliveryManager.underlyingActor.receivedModifiers.size == blocks.size)
@@ -81,11 +81,11 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       val (deliveryManager, cp1, _, _, blocks, headersIds, headersAsKey) = initialiseState()
       deliveryManager ! HandshakedPeer(cp1)
       deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
-      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, headersIds)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.modifierTypeId -> blocks.map(k => k.header.id -> Array.emptyByteArray).toMap), cp1)
+        Header.HeaderTypeId -> blocks.map(k => k.header.id -> Array.emptyByteArray).toMap), cp1)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.modifierTypeId -> blocks.map(k => k.header.id -> Array.emptyByteArray).toMap), cp1)
+        Header.HeaderTypeId -> blocks.map(k => k.header.id -> Array.emptyByteArray).toMap), cp1)
       assert(deliveryManager.underlyingActor.receivedModifiers.size == headersIds.size)
       assert(deliveryManager.underlyingActor.receivedModifiers.forall(elem => headersAsKey.contains(elem)))
       assert(deliveryManager.underlyingActor.headersForPriorityRequest.forall(x => headersAsKey.contains(x._1)))
@@ -94,11 +94,11 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       val (deliveryManager, cp1, _, _, blocks, headersIds, _) = initialiseState()
       deliveryManager ! HandshakedPeer(cp1)
       deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
-      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, headersIds)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.modifierTypeId -> blocks.map(k => k.header.id -> Array.emptyByteArray).toMap), cp1)
+        Header.HeaderTypeId -> blocks.map(k => k.header.id -> Array.emptyByteArray).toMap), cp1)
       headersIds.foreach(id =>
-        deliveryManager ! DownloadRequest(Payload.modifierTypeId, blocks.find(block =>
+        deliveryManager ! DownloadRequest(Payload.PayloadTypeId, blocks.find(block =>
           block.id.sameElements(id)).get.payload.id, Some(id)))
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress.getAddress, Map.empty)
         .size == blocks.size)
@@ -134,24 +134,24 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
 
       val header: Header = blocks.head.header
 
-      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(header.id))
-      deliveryManager ! RequestFromLocal(cp2, Header.modifierTypeId, Seq(header.id))
-      deliveryManager ! RequestFromLocal(cp3, Header.modifierTypeId, Seq(header.id))
+      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, Seq(header.id))
+      deliveryManager ! RequestFromLocal(cp2, Header.HeaderTypeId, Seq(header.id))
+      deliveryManager ! RequestFromLocal(cp3, Header.HeaderTypeId, Seq(header.id))
 
-      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId, Map(header.id -> header.bytes)), cp1)
-      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId, Map(header.id -> header.bytes)), cp2)
-      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId, Map(header.id -> header.bytes)), cp3)
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.HeaderTypeId, Map(header.id -> header.bytes)), cp1)
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.HeaderTypeId, Map(header.id -> header.bytes)), cp2)
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.HeaderTypeId, Map(header.id -> header.bytes)), cp3)
 
-      deliveryManager ! DownloadRequest(Payload.modifierTypeId, header.payloadId, Some(header.id))
+      deliveryManager ! DownloadRequest(Payload.PayloadTypeId, header.payloadId, Some(header.id))
 
       handler1.expectMsgAnyOf(
-        RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)),
-        RequestModifiersNetworkMessage(Payload.modifierTypeId -> Seq(header.payloadId)),
-        SyncInfoNetworkMessage(EncrySyncInfo(List()))
+        RequestModifiersNetworkMessage(Header.HeaderTypeId -> Seq(header.id)),
+        RequestModifiersNetworkMessage(Payload.PayloadTypeId -> Seq(header.payloadId)),
+        SyncInfoNetworkMessage(SyncInfo(List()))
       )
 
-      handler2.expectMsgAllOf(RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)))
-      handler3.expectMsgAllOf(RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)))
+      handler2.expectMsgAllOf(RequestModifiersNetworkMessage(Header.HeaderTypeId -> Seq(header.id)))
+      handler3.expectMsgAllOf(RequestModifiersNetworkMessage(Header.HeaderTypeId -> Seq(header.id)))
     }
     "not ask modifiers while block chain is not synced from Younger nodes" in {
       val (deliveryManager, _, _, _, blocks, _, _) = initialiseState(isChainSynced = false)
@@ -175,11 +175,11 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
 
       val header: Header = blocks.head.header
 
-      deliveryManager ! RequestFromLocal(cp2, Header.modifierTypeId, Seq(header.id))
-      deliveryManager ! RequestFromLocal(cp3, Header.modifierTypeId, Seq(header.id))
+      deliveryManager ! RequestFromLocal(cp2, Header.HeaderTypeId, Seq(header.id))
+      deliveryManager ! RequestFromLocal(cp3, Header.HeaderTypeId, Seq(header.id))
 
       handler2.expectNoMsg()
-      handler3.expectMsgAllOf(RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)))
+      handler3.expectMsgAllOf(RequestModifiersNetworkMessage(Header.HeaderTypeId -> Seq(header.id)))
     }
     "not ask modifiers from peer which is not contained in status tracker" in {
       val (deliveryManager, _, _, _, blocks, _, _) = initialiseState()
@@ -201,11 +201,11 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
 
       val header: Header = blocks.head.header
 
-      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(header.id))
-      deliveryManager ! RequestFromLocal(cp2, Header.modifierTypeId, Seq(header.id))
+      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, Seq(header.id))
+      deliveryManager ! RequestFromLocal(cp2, Header.HeaderTypeId, Seq(header.id))
 
       handler1.expectNoMsg()
-      handler2.expectMsgAllOf(RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)))
+      handler2.expectMsgAllOf(RequestModifiersNetworkMessage(Header.HeaderTypeId -> Seq(header.id)))
     }
     "not ask transactions while block chain is not synced" in {
       val (deliveryManager, _, _, _, _, _, _) = initialiseState(isChainSynced = false)
@@ -220,7 +220,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       deliveryManager ! HandshakedPeer(cp1)
       deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
 
-      deliveryManager ! RequestFromLocal(cp1, Transaction.ModifierTypeId, txs.map(_.id))
+      deliveryManager ! RequestFromLocal(cp1, Transaction.TransactionTypeId, txs.map(_.id))
 
       handler1.expectNoMsg()
     }
@@ -237,7 +237,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       deliveryManager ! HandshakedPeer(cp1)
       deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
 
-      deliveryManager ! RequestFromLocal(cp1, Transaction.ModifierTypeId, txs.map(_.id))
+      deliveryManager ! RequestFromLocal(cp1, Transaction.TransactionTypeId, txs.map(_.id))
 
       handler1.expectNoMsg()
     }
@@ -255,16 +255,16 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
 
       val header: Header = blocks.head.header
 
-      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(header.id))
+      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, Seq(header.id))
 
-      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId, Map(header.id -> header.bytes)), cp1)
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.HeaderTypeId, Map(header.id -> header.bytes)), cp1)
 
       handler1.expectMsgAllOf(
-        RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)),
-        SyncInfoNetworkMessage(EncrySyncInfo(List.empty))
+        RequestModifiersNetworkMessage(Header.HeaderTypeId -> Seq(header.id)),
+        SyncInfoNetworkMessage(SyncInfo(List.empty))
       )
 
-      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(header.id))
+      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, Seq(header.id))
 
       handler1.expectNoMsg()
 

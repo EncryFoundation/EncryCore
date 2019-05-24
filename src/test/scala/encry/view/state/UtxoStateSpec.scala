@@ -5,18 +5,18 @@ import java.io.File
 import akka.actor.ActorRef
 import encry.avltree
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedAVLStorage}
-import encry.modifiers.mempool.{Transaction, TransactionFactory}
-import encry.modifiers.state.box.AssetBox
-import encry.modifiers.state.box.Box.Amount
+import encry.modifiers.mempool.TransactionFactory
 import encry.settings.{Constants, EncryAppSettings, LevelDBSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
-import encry.view.history.History.Height
 import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.Algos.HF
-import org.encryfoundation.common.{Algos, crypto}
-import org.encryfoundation.common.transaction.Pay2PubKeyAddress
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, SerializedAdProof}
+import org.encryfoundation.common.crypto
+import org.encryfoundation.common.modifiers.mempool.transaction.{Pay2PubKeyAddress, Transaction}
+import org.encryfoundation.common.modifiers.state.box.AssetBox
+import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.Algos.HF
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, Height, SerializedAdProof}
 import org.iq80.leveldb.Options
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.hash.Digest32
@@ -43,7 +43,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
     new UtxoState(
       persistentProver,
       EncryState.genesisStateVersion,
-      Constants.Chain.GenesisHeight,
+      org.encryfoundation.common.utils.Constants.Chain.GenesisHeight,
       vldb,
       0L,
       None,

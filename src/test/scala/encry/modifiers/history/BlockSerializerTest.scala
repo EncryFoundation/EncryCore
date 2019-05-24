@@ -1,12 +1,12 @@
 package encry.modifiers.history
 
-import encry.crypto.equihash.EquihashSolution
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.Constants
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.{EncryGenerator, TestHelper}
-import org.encryfoundation.common.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, SerializedAdProof}
+import org.encryfoundation.common.crypto.equihash.EquihashSolution
+import org.encryfoundation.common.modifiers.history._
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, SerializedAdProof}
 import org.scalatest.FunSuite
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random

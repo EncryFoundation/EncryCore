@@ -5,15 +5,15 @@ import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.InstanceFactory
-import encry.modifiers.history.Block
-import encry.network.BasicMessagesRepo.Handshake
 import encry.network.DeliveryManager
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.EncryAppSettings
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.view.history.EncryHistory
+import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.collection.mutable
 import scala.collection.mutable.WrappedArray
 

@@ -29,7 +29,7 @@ import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryBox}
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.Algos.HF
-import org.encryfoundation.common.utils.TaggedTypes._
+import org.encryfoundation.common.utils.TaggedTypes.{Height, _}
 import org.encryfoundation.common.validation.ValidationResult.{Invalid, Valid}
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options

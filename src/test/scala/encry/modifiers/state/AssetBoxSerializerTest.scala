@@ -1,7 +1,7 @@
 package encry.modifiers.state
 
 import encry.modifiers.InstanceFactory
-import encry.modifiers.state.box.AssetBoxSerializer
+import org.encryfoundation.common.modifiers.state.box.AssetBoxSerializer
 import org.scalatest.FunSuite
 
 class AssetBoxSerializerTest extends FunSuite with InstanceFactory {

@@ -7,7 +7,7 @@ import encry.utils.FileHelper
 import encry.utils.levelDBUtils.LevelDbUnitsGenerator
 import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.io.FileUtils
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.Algos
 import org.iq80.leveldb.{Options, ReadOptions}
 import org.scalatest.{Matchers, PropSpec}
 

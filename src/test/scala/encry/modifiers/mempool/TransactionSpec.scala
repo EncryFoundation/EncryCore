@@ -1,8 +1,9 @@
 package encry.modifiers.mempool
 
 import encry.modifiers.InstanceFactory
-import encry.modifiers.state.box.AssetBox
 import encry.utils.TestHelper
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.scalatest.{Matchers, PropSpec}
 
 class TransactionSpec extends PropSpec with Matchers with InstanceFactory {

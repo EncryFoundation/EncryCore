@@ -1,24 +1,21 @@
 package encry.modifiers
 
-import encry.consensus.ConsensusTaggedTypes.Difficulty
-import encry.modifiers.history.{Block, Header, Payload}
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
-import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.{AssetBox, EncryProposition}
 import encry.settings.{Constants, EncryAppSettings, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
 import encry.view.history.EncryHistory
-import encry.view.history.History.Height
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.processors.proofs.FullStateProofProcessor
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.Algos
-import org.encryfoundation.common.transaction.Input
-import org.encryfoundation.common.utils.TaggedTypes.{ADKey, LeafData}
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.mempool.transaction.{Input, Transaction}
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryProposition}
+import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{Height, _}
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.Ast.Expr
 import org.encryfoundation.prismlang.core.{Ast, Types}
@@ -50,7 +47,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
   def generateGenesisBlock: Block = {
 
-    val header = genHeader.copy(parentId = Header.GenesisParentId, height = Constants.Chain.GenesisHeight)
+    val header = genHeader.copy(parentId = Header.GenesisParentId, height = org.encryfoundation.common.utils.Constants.Chain.GenesisHeight)
 
     Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
   }
@@ -135,7 +132,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
           val payload = Payload(header.id, txs)
           Block(header, payload, None)
         }
-        val newUtxo = block.payload.transactions.flatMap(_.newBoxes)
+        val newUtxo = block.payload.txs.flatMap(_.newBoxes)
         (fakeBlockchain :+ block) -> newUtxo.collect{case ab: AssetBox => ab}
     }
   }._1

@@ -12,7 +12,7 @@ import encry.avltree.helpers.TestHelper
 import encry.settings.EncryAppSettings
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDB
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbKey
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.Algos
 import scorex.crypto.encode.{Base16, Base58}
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.utils.{Random => RandomBytes}
