@@ -6,8 +6,9 @@ import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
 import encry.settings.Constants._
 import encry.view.history.History.Height
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.Algos
 import org.scalatest.{AsyncFunSuite, Matchers}
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
