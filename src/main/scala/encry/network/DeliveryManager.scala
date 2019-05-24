@@ -436,6 +436,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         headersForPriorityRequest = headersForPriorityRequest
           .updated(toKey(mId), headersForPriorityRequest.getOrElse(toKey(mId), Seq.empty) :+ peer.socketAddress.getAddress)
       }
+      if (expectedModifiers.isEmpty) self ! SendLocalSyncInfo
     } else {
       receivedSpamModifiers = receivedSpamModifiers - toKey(mId) + (toKey(mId) -> peer)
       syncTracker.decrementRequest(peer)
