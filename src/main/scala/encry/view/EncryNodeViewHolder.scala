@@ -9,8 +9,13 @@ import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp
-import encry.EncryApp._
+import encry.EncryApp.system
+import encry.settings.EncryAppSettings
+import encry.utils.NetworkTimeProvider
+
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import encry.consensus.History.ProgressInfo
 import encry.local.explorer.BlockListener.ChainSwitching
 import encry.modifiers._
@@ -42,7 +47,12 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: ActorRef,
-                                                              memoryPoolRef: ActorRef) extends Actor with StrictLogging {
+                                                              memoryPoolRef: ActorRef,
+                                                              nodeViewSynchronizer: ActorRef,
+                                                              miner: ActorRef,
+                                                              influxRef: Option[ActorRef],
+                                                              timeProvider: NetworkTimeProvider,
+                                                              settings: EncryAppSettings) extends Actor with StrictLogging {
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet)
 
@@ -69,7 +79,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     System.exit(100)
   }
 
-  system.scheduler.schedule(5.seconds, 10.seconds)(logger.debug(s"Modifiers cache from NVH: ${ModifiersCache.size}. " +
+  context.system.scheduler.schedule(5.seconds, 10.seconds)(logger.debug(s"Modifiers cache from NVH: ${ModifiersCache.size}. " +
     s"Elems: ${ModifiersCache.cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")}"))
 
   override def postStop(): Unit = {
@@ -255,7 +265,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       case Failure(e) =>
         logger.error(s"Rollback failed: $e")
         context.system.eventStream.publish(RollbackFailed(branchingPointOpt))
-        EncryApp.forceStopApplication(500)
+        forceStopApplication(500)
     }
   }
 
@@ -421,6 +431,14 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         }
         toApply.foldLeft(startState) { (s, m) => s.applyModifier(m).get }
     }
+
+  def forceStopApplication(code: Int = 0): Nothing = {
+    system.registerOnTermination {
+      println("Actor system is terminated")
+    }
+    Await.ready(system.terminate(), 1 minute)
+    sys.exit(code)
+  }
 }
 
 object EncryNodeViewHolder {
@@ -460,8 +478,35 @@ object EncryNodeViewHolder {
         case otherwise => 1
       })
 
-  def props(auxHistoryHolder: ActorRef, memoryPoolRef: ActorRef): Props = settings.node.stateMode match {
-    case StateMode.Digest => Props(new EncryNodeViewHolder[DigestState](auxHistoryHolder, memoryPoolRef))
-    case StateMode.Utxo => Props(new EncryNodeViewHolder[UtxoState](auxHistoryHolder, memoryPoolRef))
-  }
+  def props(auxHistoryHolder: ActorRef,
+            memoryPoolRef: ActorRef,
+            nodeViewSynchronizer: ActorRef,
+            miner: ActorRef,
+            influxRef: Option[ActorRef] = None,
+            timeProvider: NetworkTimeProvider,
+            settings: EncryAppSettings): Props =
+    settings.node.stateMode match {
+      case StateMode.Digest => Props(
+          new EncryNodeViewHolder[DigestState](
+            auxHistoryHolder,
+            memoryPoolRef,
+            nodeViewSynchronizer,
+            miner,
+            influxRef,
+            timeProvider,
+            settings
+          )
+        )
+      case StateMode.Utxo => Props(
+        new EncryNodeViewHolder[UtxoState](
+          auxHistoryHolder,
+          memoryPoolRef,
+          nodeViewSynchronizer,
+          miner,
+          influxRef,
+          timeProvider,
+          settings
+        )
+      )
+    }
 }

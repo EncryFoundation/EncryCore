@@ -55,8 +55,12 @@ object EncryApp extends App with StrictLogging {
     system.actorOf(Props(AuxiliaryHistoryHolder(settings, timeProvider, nodeViewSynchronizer))
     .withDispatcher("aux-history-dispatcher"), "auxHistoryHolder")
   lazy val nodeViewHolder: ActorRef =
-    system.actorOf(EncryNodeViewHolder.props(auxHistoryHolder, memoryPool).withMailbox("nvh-mailbox"),
-      "nodeViewHolder")
+    system.actorOf(
+      EncryNodeViewHolder
+        .props(auxHistoryHolder, memoryPool, nodeViewSynchronizer, miner, influxRef, timeProvider, settings)
+        .withMailbox("nvh-mailbox"),
+      "nodeViewHolder"
+    )
   val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
     .withDispatcher("network-dispatcher"), "networkController")
