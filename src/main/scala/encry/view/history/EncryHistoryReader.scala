@@ -7,8 +7,6 @@ import encry.settings.{Constants, NodeSettings}
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
-import encry.EncryApp.settings
-import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.storage.VersionalStorage.StorageKey
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbKey
 import org.encryfoundation.common.modifiers.PersistentModifier
