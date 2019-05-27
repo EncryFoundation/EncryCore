@@ -162,10 +162,12 @@ trait EncryHistory extends EncryHistoryReader {
           ProgressInfo[EncryPersistentModifier](None, Seq.empty, Seq.empty, Seq.empty) // Applies best header to the history
         else {
           // Marks non-best full block as valid. Should have more blocks to apply to sync state and history.
+          logger.info(s"bestBlockOpt is: ${bestBlockOpt.map(block => Algos.encode(block.id))}")
           val bestFullHeader: Header = bestBlockOpt.get.header
           val limit: Int = bestFullHeader.height - block.header.height
           val chainBack: HeaderChain = headerChainBack(limit, bestFullHeader, h => h.parentId sameElements block.header.id)
             .ensuring(_.headOption.isDefined, s"Should have next block to apply, failed for ${block.header}")
+          logger.info(s"chainBack: ${chainBack.headers.map(header => Algos.encode(header.id)).mkString(",")}")
           // Block in the best chain that is linked to this header.
           val toApply: Option[Block] = chainBack.headOption.flatMap(opt => getBlock(opt))
             .ensuring(_.isDefined, s"Should be able to get full block for header ${chainBack.headOption}")

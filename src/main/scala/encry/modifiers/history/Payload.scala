@@ -10,10 +10,11 @@ import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, HCursor}
 import org.apache.commons.lang.ArrayUtils
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.serialization.Serializer
+import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.LeafData
 import scorex.crypto.hash.Digest32
+
 import scala.util.{Success, Try}
 
 case class Payload(override val headerId: ModifierId, txs: Seq[Transaction])

@@ -107,6 +107,8 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         logger.debug(s"starting generating proofHash!")
         val timer1 = System.currentTimeMillis()
         val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
+        logger.info(s"ProofHash: ${Algos.encode(proofHash)}")
+        logger.info(s"Digest: ${Algos.encode(persistentProver.digest)}")
         logger.debug(s"Finifhsing generating proofHash! Process time is: ${System.currentTimeMillis() - timer1}")
 
         if (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest)
