@@ -65,7 +65,7 @@ object ModifiersCache extends StrictLogging {
 
   def findCandidateKey(history: EncryHistory): List[Key] = {
 
-    def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier, true) match {
+    def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier) match {
       case Failure(_: RecoverableModifierError) => false
       case Failure(_: MalformedModifierError) =>
         remove(key)
