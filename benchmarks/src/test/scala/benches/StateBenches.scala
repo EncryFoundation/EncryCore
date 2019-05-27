@@ -70,7 +70,7 @@ object StateBenches {
     val tmpDir: File = getRandomTempDir
 
     val initialBoxes: IndexedSeq[AssetBox] = (0 until benchSettings.stateBenchSettings.totalBoxesNumber).map(nonce =>
-      genHardcodedBox(privKey.publicImage.address.address, nonce)
+      genAssetBox(privKey.publicImage.address.address, nonce)
     )
     val boxesHolder: BoxHolder = BoxHolder(initialBoxes)
     var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)

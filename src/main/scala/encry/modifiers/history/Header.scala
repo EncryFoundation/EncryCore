@@ -67,7 +67,7 @@ case class Header(version: Version,
   override def toString: String = s"Header(id=$encodedId, height=$height, parent=${Algos.encode(parentId)}, " +
     s"version = $version, adProofsRoot = ${Algos.encode(adProofsRoot)}, stateRoot = ${Algos.encode(stateRoot)}, " +
     s" transactionsRoot = ${Algos.encode(transactionsRoot)}, timestamp = $timestamp, nonce = $nonce, " +
-    s"difficulty = $difficulty)"
+    s"difficulty = $difficulty, payloadId: ${Algos.encode(payloadId)})"
 }
 
 case class HeaderDBVersion(id: String,

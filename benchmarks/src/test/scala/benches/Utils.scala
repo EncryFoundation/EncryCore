@@ -170,13 +170,14 @@ object Utils extends StrictLogging {
     val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
     val requiredDifficulty: Difficulty = prevBlock.map(b => history.requiredDifficultyAfter(b.header))
       .getOrElse(Constants.Chain.InitialDifficulty)
+    val transactions = txs :+ coinbaseTransaction
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.bestHeaderHeight + 1,
       difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff),
-      transactionsRoot = Payload.rootHash(txs.map(_.id))
+      transactionsRoot = Payload.rootHash(transactions.map(_.id))
     )
-    Block(header, Payload(header.id, txs), None)
+    Block(header, Payload(header.id, transactions), None)
   }
 
   def genValidPaymentTxs(qty: Int): Seq[Transaction] = {
@@ -244,7 +245,7 @@ object Utils extends StrictLogging {
     )
   }
 
-  def genHardcodedBox(address: Address, nonce: Long): AssetBox =
+  def genAssetBox(address: Address, nonce: Long): AssetBox =
     AssetBox(EncryProposition.addressLocked(address), nonce, 10000000L, None)
 
   def randomAddress: Address = Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address

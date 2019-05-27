@@ -48,7 +48,6 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
       EquihashSolution.empty
     )
 
-    @tailrec
     def generateHeader(nonce: Long): Option[Header] = {
       val currentDigest = new Blake2bDigest(digest)
       Equihash.hashNonce(currentDigest, nonce)
@@ -58,7 +57,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
         .find { newHeader => correctWorkDone(realDifficulty(newHeader), difficulty) }
       headerWithSuitableSolution match {
         case headerWithFoundSolution @ Some(_) => headerWithFoundSolution
-        case None if nonce + 1 < finishingNonce => generateHeader(nonce + 1)
+        //case None if nonce + 1 < finishingNonce => generateHeader(nonce + 1)
         case _ => None
       }
     }

@@ -95,6 +95,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
       val startTime = System.currentTimeMillis()
       logger.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height.")
+      //logger.info(s"Digest before applyMod: ${Algos.encode(persistentProver.digest)}")
       statsSenderRef.foreach(_ ! TxsInBlock(block.payload.transactions.size))
       applyBlockTransactions(block.payload.transactions, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] = metadata(
@@ -121,7 +122,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         else if (!stateStore.versions.exists(_ sameElements block.header.stateRoot))
           throw new Exception("Unable to apply modification properly.")
         else if (!(block.header.adProofsRoot sameElements proofHash))
-          throw new Exception("Calculated proofHash is not equal to the declared one.")
+          throw new Exception(s"Calculated proofHash(${Algos.encode(proofHash)}) is not equal to the declared one(${Algos.encode(block.header.adProofsRoot)}).")
         else if (!(block.header.stateRoot sameElements persistentProver.digest))
           throw new Exception("Calculated stateRoot is not equal to the declared one.")
 

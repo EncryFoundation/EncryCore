@@ -141,9 +141,12 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       Seq((Payload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId))
     else Seq((Payload.modifierTypeId, h.payloadId))
 
-  private def isNewHeader(header: Header): Boolean =
-    timeProvider.estimatedTime - header.timestamp <
+  private def isNewHeader(header: Header): Boolean = {
+    val res = timeProvider.estimatedTime - header.timestamp <
       Constants.Chain.DesiredBlockInterval.toMillis * Constants.Chain.NewHeaderTimeMultiplier
+    logger.info(s"Header is new: $res")
+    res
+  }
 
   def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
 
@@ -286,7 +289,12 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     Seq(heightIdsKey(h.height) -> StorageValue @@ (headerIdsAtHeight(h.height) :+ h.id).flatten.toArray)
   }
 
-  protected def validate(header: Header): Try[Unit] = HeaderValidator.validate(header).toTry
+  protected def validate(header: Header, testValidator: Boolean = false): Try[Unit] = {
+    logger.info(s"validate testValidator $testValidator")
+    val res = HeaderValidator.validate(header, testValidator)
+    logger.info(s"res: ${res}")
+    res.toTry
+  }
 
   def isInBestChain(id: ModifierId): Boolean = heightOf(id).flatMap(h => bestHeaderIdAtHeight(h))
     .exists(_ sameElements id)
@@ -370,11 +378,16 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   object HeaderValidator extends ModifierValidator {
 
-    def validate(header: Header): ValidationResult =
+    def validate(header: Header, testValidator: Boolean = false): ValidationResult = {
+      logger.info(s"testValidator: $testValidator")
       if (header.isGenesis) validateGenesisBlockHeader(header)
       else headersCache.find(_.id sameElements header.parentId).orElse(typedModifierById[Header](header.parentId)).map { parent =>
-        validateChildBlockHeader(header, parent)
+        logger.info("111validate")
+        val res = validateChildBlockHeader(header, parent, testValidator)
+        logger.info(s"res validateChildBlockHeader: $res")
+        res
       } getOrElse error(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
+    }
 
     private def validateGenesisBlockHeader(header: Header): ValidationResult =
       accumulateErrors
@@ -389,7 +402,8 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         }
         .result
 
-    private def validateChildBlockHeader(header: Header, parent: Header): ValidationResult = {
+    private def validateChildBlockHeader(header: Header, parent: Header, testValidator: Boolean = false): ValidationResult = {
+      logger.info(s"testValidator validateChildBlockHeader: $testValidator")
       failFast
         .validate(header.timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift) {
           error(s"Header timestamp ${header.timestamp} is too far in future from now " +
@@ -404,18 +418,18 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         .validateNot(historyStorage.containsObject(header.id)) {
           fatal("Header is already in history")
         }
-        .validate(realDifficulty(header) >= header.requiredDifficulty) {
+        .validate(realDifficulty(header) >= header.requiredDifficulty || testValidator) {
           fatal(s"Block difficulty ${realDifficulty(header)} is less than required " +
             s"${header.requiredDifficulty}")
         }
-        .validate(header.difficulty >= requiredDifficultyAfter(parent)) {
+        .validate(header.difficulty >= requiredDifficultyAfter(parent) || testValidator) {
           fatal(s"Incorrect required difficulty in header: " +
             s"${Algos.encode(header.id)} on height ${header.height}")
         }
         .validate(heightOf(header.parentId).exists(h => bestHeaderHeight - h < Constants.Chain.MaxRollbackDepth)) {
           fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
         }
-        .validate(powScheme.verify(header)) {
+        .validate( testValidator || powScheme.verify(header) ) {
           fatal(s"Wrong proof-of-work solution for $header")
         }
         .validateSemantics(isSemanticallyValid(header.parentId)) {

@@ -185,8 +185,10 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
 
   protected def modifierValidation(m: EncryPersistentModifier, headerOpt: Option[Header]): Try[Unit] = {
     val minimalHeight: Int = blockDownloadProcessor.minimalBlockHeight
-    headerOpt.map(header => PayloadValidator.validate(m, header, minimalHeight).toTry)
+    val res = headerOpt.map(header => PayloadValidator.validate(m, header, minimalHeight).toTry)
       .getOrElse(Failure(RecoverableModifierError(s"Header for modifier $m is not defined")))
+    logger.info(s"Res: $res")
+    res
   }
 
   private def logStatus(toRemove: Seq[Block],

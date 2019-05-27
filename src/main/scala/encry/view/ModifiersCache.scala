@@ -33,8 +33,8 @@ object ModifiersCache extends StrictLogging {
 
   def contains(key: Key): Boolean = cache.contains(key)
 
-  def put(key: Key, value: EncryPersistentModifier, history: EncryHistory): Unit = if (!contains(key)) {
-    logger.debug(s"put ${Algos.encode(key.toArray)} to cache")
+  def put(key: Key, value: EncryPersistentModifier, history: EncryHistory, testValidator: Boolean = false): Unit = if (!contains(key)) {
+    logger.info(s"put ${Algos.encode(key.toArray)} to cache")
     cache.put(key, value)
     value match {
       case header: Header =>
@@ -65,7 +65,7 @@ object ModifiersCache extends StrictLogging {
 
   def findCandidateKey(history: EncryHistory): List[Key] = {
 
-    def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier) match {
+    def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier, true) match {
       case Failure(_: RecoverableModifierError) => false
       case Failure(_: MalformedModifierError) =>
         remove(key)
@@ -102,6 +102,8 @@ object ModifiersCache extends StrictLogging {
           isApplicableMod
       }
     }).collect { case Some(v) => v._1 }
+
+    logger.info(headersCollection.keys.mkString(","))
 
     val bestHeadersIds: List[Key] = {
       headersCollection.get(history.bestHeaderHeight + 1) match {

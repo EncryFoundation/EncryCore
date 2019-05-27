@@ -2,11 +2,12 @@ package benches
 
 import java.io.File
 import java.util.concurrent.TimeUnit
+
 import benches.HistoryBenches.HistoryBenchState
 import benches.Utils.{generateHistory, generateNextBlockValidForHistory, getRandomTempDir}
 import encry.modifiers.history.Block
 import encry.modifiers.mempool.Transaction
-import encry.settings.EncryAppSettings
+import encry.settings.{Constants, EncryAppSettings}
 import encry.view.history.EncryHistory
 import encryBenchmark.Settings
 import org.openjdk.jmh.annotations._
@@ -23,18 +24,18 @@ class HistoryBenches {
       val history: EncryHistory = generateHistory(benchStateHistory.settings, getRandomTempDir)
       benchStateHistory.blocks.foldLeft(history) { case (historyL, block) =>
         historyL.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
-      }
+      }.append(benchStateHistory.forkBlocks.head.header).get._1.append(benchStateHistory.forkBlocks.head.payload).get._1.reportModifierIsValid(benchStateHistory.forkBlocks.head)
       history.closeStorage()
     }
   }
 
-  @Benchmark
-  def readHistoryFileBench(benchStateHistory: HistoryBenchState, bh: Blackhole): Unit = {
-    bh.consume {
-      val history: EncryHistory = generateHistory(benchStateHistory.settings, benchStateHistory.tmpDir)
-      history.closeStorage()
-    }
-  }
+//  @Benchmark
+//  def readHistoryFileBench(benchStateHistory: HistoryBenchState, bh: Blackhole): Unit = {
+//    bh.consume {
+//      val history: EncryHistory = generateHistory(benchStateHistory.settings, benchStateHistory.tmpDir)
+//      history.closeStorage()
+//    }
+//  }
 }
 
 object HistoryBenches {
@@ -66,19 +67,24 @@ object HistoryBenches {
     val tmpDir: File = getRandomTempDir
     val initialHistory: EncryHistory = generateHistory(settings, tmpDir)
 
-    val resultedHistory: (EncryHistory, Option[Block], Vector[Block]) =
-      (0 until benchSettings.historyBenchSettings.blocksNumber)
-        .foldLeft(initialHistory, Option.empty[Block], Vector.empty[Block]) {
+    val resultedHistory: (EncryHistory, Option[Block], Vector[(Block, Block)]) =
+      (0 until Constants.Chain.MaxRollbackDepth + 10)
+        .foldLeft(initialHistory, Option.empty[Block], Vector.empty[(Block, Block)]) {
           case ((prevHistory, prevBlock, vector), _) =>
-            val block: Block =
+            val block1: Block =
               generateNextBlockValidForHistory(
-                prevHistory, 0, prevBlock,  Seq.empty[Transaction]
+                prevHistory, 100, prevBlock,  Seq.empty[Transaction]
               )
-            (prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block),
-              Some(block), vector :+ block)
+            val block2: Block =
+              generateNextBlockValidForHistory(
+                prevHistory, 1, prevBlock,  Seq.empty[Transaction]
+              )
+            (prevHistory.append(block1.header).get._1.append(block1.payload).get._1.reportModifierIsValid(block1),
+              Some(block1), vector :+ (block1, block2))
         }
     resultedHistory._1.closeStorage()
 
-    val blocks: Vector[Block] = resultedHistory._3
+    val blocks: Vector[Block] = resultedHistory._3.map(_._1)
+    val forkBlocks: Vector[Block] = resultedHistory._3.map(_._2)
   }
 }

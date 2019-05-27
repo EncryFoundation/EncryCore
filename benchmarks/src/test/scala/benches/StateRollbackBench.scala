@@ -33,6 +33,7 @@ class StateRollbackBench {
         newState -> (rootHashes :+ newState.version)
       }
       val stateAfterRollback = newState._1.rollbackTo(newState._2.dropRight(1).last).get
+      println("Rollback!")
       val stateAfterForkBlockApplying = stateAfterRollback.applyModifier(stateBench.forkBlocks.last).get
       stateAfterForkBlockApplying.closeStorage()
     }
@@ -68,7 +69,7 @@ object StateRollbackBench {
     val tmpDir: File = getRandomTempDir
 
     val initialBoxes: IndexedSeq[AssetBox] = (0 until benchSettings.stateBenchSettings.totalBoxesNumber).map(nonce =>
-      genHardcodedBox(privKey.publicImage.address.address, nonce)
+      genAssetBox(privKey.publicImage.address.address, nonce)
     )
     val boxesHolder: BoxHolder = BoxHolder(initialBoxes)
     var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
