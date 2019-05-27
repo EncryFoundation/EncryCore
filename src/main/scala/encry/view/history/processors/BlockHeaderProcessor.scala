@@ -289,12 +289,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     Seq(heightIdsKey(h.height) -> StorageValue @@ (headerIdsAtHeight(h.height) :+ h.id).flatten.toArray)
   }
 
-  protected def validate(header: Header, testValidator: Boolean = false): Try[Unit] = {
-    logger.info(s"validate testValidator $testValidator")
-    val res = HeaderValidator.validate(header, testValidator)
-    logger.info(s"res: ${res}")
-    res.toTry
-  }
+  protected def validate(header: Header): Try[Unit] = HeaderValidator.validate(header).toTry
 
   def isInBestChain(id: ModifierId): Boolean = heightOf(id).flatMap(h => bestHeaderIdAtHeight(h))
     .exists(_ sameElements id)
@@ -378,16 +373,11 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   object HeaderValidator extends ModifierValidator {
 
-    def validate(header: Header, testValidator: Boolean = false): ValidationResult = {
-      logger.info(s"testValidator: $testValidator")
+    def validate(header: Header, testValidator: Boolean = false): ValidationResult =
       if (header.isGenesis) validateGenesisBlockHeader(header)
       else headersCache.find(_.id sameElements header.parentId).orElse(typedModifierById[Header](header.parentId)).map { parent =>
-        logger.info("111validate")
-        val res = validateChildBlockHeader(header, parent, testValidator)
-        logger.info(s"res validateChildBlockHeader: $res")
-        res
+        validateChildBlockHeader(header, parent, testValidator)
       } getOrElse error(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
-    }
 
     private def validateGenesisBlockHeader(header: Header): ValidationResult =
       accumulateErrors

@@ -105,11 +105,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
           }
           computeApplications()
         case Header.modifierTypeId =>
-          logger.info("get mods")
           modifiers.foreach { bytes =>
             logger.info(s"res: ${Try(HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)))}")
             Try(HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)).foreach { header =>
-              logger.info(s"Get header at height: ${header.height}")
               if (nodeView.history.contains(header.id) || ModifiersCache.contains(key(header.id)))
                 logger.info(s"Received modifier ${header.encodedId} that is already in history(" +
                   s"history: ${nodeView.history.contains(header.id)}. Cache: ${ModifiersCache.contains(key(header.id))})")

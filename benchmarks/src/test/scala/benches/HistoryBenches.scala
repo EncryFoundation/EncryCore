@@ -25,6 +25,7 @@ class HistoryBenches {
       benchStateHistory.blocks.foldLeft(history) { case (historyL, block) =>
         historyL.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
       }.append(benchStateHistory.forkBlocks.head.header).get._1.append(benchStateHistory.forkBlocks.head.payload).get._1.reportModifierIsValid(benchStateHistory.forkBlocks.head)
+          .append(benchStateHistory.blocks(100).header).get._1.append(benchStateHistory.blocks(100).payload).get._1.reportModifierIsValid(benchStateHistory.blocks(100))
       history.closeStorage()
     }
   }
