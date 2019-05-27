@@ -105,15 +105,17 @@ object NVHUtils extends SettingsReaders with NodeSettingsReader {
                                        difficultyDiff: BigInt = 0,
                                        prevBlock: Option[Block],
                                        txs: Seq[Transaction],
-                                       state: UtxoState): Block = {
+                                       state: UtxoState,
+                                       isLast: Boolean = false): Block = {
     val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
     val requiredDifficulty: Difficulty = prevBlock.map(b => history.requiredDifficultyAfter(b.header))
       .getOrElse(Constants.Chain.InitialDifficulty)
     val transactions = txs :+ coinbaseTransaction
+    val diff: Difficulty = if (isLast) Difficulty @@ (requiredDifficulty + difficultyDiff) else requiredDifficulty
     val header: Header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.bestHeaderHeight + 1,
-      difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff),
+      difficulty = diff,
       transactionsRoot = Payload.rootHash(transactions.map(_.id))
     )
 //    state.generateProofs(Seq(coinbaseTransaction)) match {

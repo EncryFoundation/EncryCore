@@ -35,16 +35,16 @@ class EncryNodeViewHolderTest extends WordSpecLike
       val initialHistory: EncryHistory = NVHUtils.generateHistory(settings, tmpDir)
       val initState = EncryState.generateGenesisUtxoState(NVHUtils.getRandomTempDir, None, settings, None)
       val resultedHistory: (EncryHistory, Option[Block], Vector[(Block, Block)], UtxoState) =
-        (0 until 10)
+        (0 to 10)
           .foldLeft(initialHistory, Option.empty[Block], Vector.empty[(Block, Block)], initState) {
-            case ((prevHistory, prevBlock, vector, state), _) =>
+            case ((prevHistory, prevBlock, vector, state), i) =>
               val block1: Block =
                 NVHUtils.generateNextBlockValidForHistory(
                   prevHistory, 0, prevBlock,  Seq.empty[Transaction], state
                 )
               val block2: Block =
                 NVHUtils.generateNextBlockValidForHistory(
-                  prevHistory, 1, prevBlock,  Seq.empty[Transaction], state
+                  prevHistory, 1, prevBlock,  Seq.empty[Transaction], state, i == 10
                 )
               (prevHistory.append(block1.header).get._1.append(block1.payload).get._1.reportModifierIsValid(block1),
                 Some(block1), vector :+ (block1, block2), state.applyModifier(block1).get)
@@ -54,24 +54,30 @@ class EncryNodeViewHolderTest extends WordSpecLike
       val headersFromMainChain: ModifiersFromRemote =
         ModifiersFromRemote(
           Header.modifierTypeId,
-          resultedHistory._3.map(blocks => HeaderProtoSerializer.toProto(blocks._1.header).toByteArray)
+          resultedHistory._3.init.map(blocks => HeaderProtoSerializer.toProto(blocks._1.header).toByteArray)
         )
       val payloadsFromMainChain: ModifiersFromRemote =
         ModifiersFromRemote(
           Payload.modifierTypeId,
-          resultedHistory._3.map(blocks => PayloadProtoSerializer.toProto(blocks._1.payload).toByteArray)
+          resultedHistory._3.init.map(blocks => PayloadProtoSerializer.toProto(blocks._1.payload).toByteArray)
         )
-      val firstHeaderFromFork: ModifiersFromRemote =
-        ModifiersFromRemote(Header.modifierTypeId, Seq(resultedHistory._3.head._2.header.bytes))
-      val firstPayloadFromFork: ModifiersFromRemote =
-        ModifiersFromRemote(Payload.modifierTypeId, Seq(resultedHistory._3.head._2.payload.bytes))
+      val headersFromFromFork: ModifiersFromRemote =
+        ModifiersFromRemote(
+          Header.modifierTypeId,
+          resultedHistory._3.takeRight(2).map(blocks => HeaderProtoSerializer.toProto(blocks._1.header).toByteArray)
+        )
+      val payloadsFromFromFork: ModifiersFromRemote =
+        ModifiersFromRemote(
+          Payload.modifierTypeId,
+          resultedHistory._3.takeRight(2).map(blocks => PayloadProtoSerializer.toProto(blocks._1.payload).toByteArray)
+        )
 
       println(Algos.encode(resultedHistory._3.head._2.header.parentId))
 
       nvhRef ! headersFromMainChain
       nvhRef ! payloadsFromMainChain
-      //nvhRef ! firstHeaderFromFork
-      //nvhRef ! firstPayloadFromFork
+      nvhRef ! headersFromFromFork
+      nvhRef ! payloadsFromFromFork
 
       nvhRef.stop()
     }
