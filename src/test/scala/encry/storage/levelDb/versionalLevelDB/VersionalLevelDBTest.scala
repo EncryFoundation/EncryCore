@@ -215,7 +215,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     levelDbElems.foreach(vldbInit.insert)
 
-    vldbInit.rollbackTo(levelDbElems(rollbackPointIdx).version)
+    vldbInit.rollbackTo(levelDbElems(rollbackPointIdx - 1).version)
 
     levelDbElems(rollbackPointIdx).elemsToInsert.forall{case (key, value) =>
       vldbInit.get(key).exists(dbValue => Algos.hash(dbValue) sameElements Algos.hash(value))
