@@ -127,7 +127,10 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   }
 
   def testApplicable(modifier: EncryPersistentModifier): Try[Unit] = modifier match {
-    case header: Header => validate(header)
+    case header: Header =>
+      val res = validate(header)
+      logger.info(s"result of validating $modifier is $res")
+      res
     case payload: Payload => validate(payload)
     case adProofs: ADProofs => validate(adProofs)
     case mod: Any => Failure(new Exception(s"Modifier $mod is of incorrect type."))
