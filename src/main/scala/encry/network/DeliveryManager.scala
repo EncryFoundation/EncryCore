@@ -82,7 +82,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
   def basicMessageHandler(history: EncryHistory, isBlockChainSynced: Boolean, isMining: Boolean): Receive = {
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
-      logger.info(s"Get status of $remote == $status with ext of type: ${extOpt.map(_.map(mod => Algos.encode(mod._2)).mkString(","))}")
       syncTracker.updateStatus(remote, status)
       status match {
         case Unknown => logger.info("Peer status is still unknown.")
