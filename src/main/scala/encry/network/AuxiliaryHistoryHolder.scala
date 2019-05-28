@@ -6,11 +6,13 @@ import akka.actor.{Actor, ActorRef}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.EncryPersistentModifier
+import encry.modifiers.history.Header
 import encry.network.AuxiliaryHistoryHolder._
 import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.VersionalStorage
 import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.NetworkTimeProvider
 import encry.view.history.EncryHistory
 import encry.view.history.EncryHistory.{getHistoryIndexDir, getHistoryObjectsDir, logger}
@@ -83,6 +85,7 @@ object AuxiliaryHistoryHolder {
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
           override protected val auxHistory: Boolean = true
+          override var bestBlockIdOptCache: Option[ModifierId] = Option.empty[ModifierId]
         }
       case (false, true) =>
         new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
@@ -91,6 +94,7 @@ object AuxiliaryHistoryHolder {
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
           override protected val auxHistory: Boolean = true
+          override var bestBlockIdOptCache: Option[ModifierId] = Option.empty[ModifierId]
         }
       case (true, false) =>
         new EncryHistory with ADStateProofProcessor with EmptyBlockPayloadProcessor {
@@ -99,6 +103,7 @@ object AuxiliaryHistoryHolder {
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
           override protected val auxHistory: Boolean = true
+          override var bestBlockIdOptCache: Option[ModifierId] = Option.empty[ModifierId]
         }
       case m => throw new Error(s"Unsupported settings ADState=:${m._1}, verifyTransactions=:${m._2}, ")
     }

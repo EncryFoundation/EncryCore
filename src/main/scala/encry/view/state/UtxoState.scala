@@ -269,7 +269,7 @@ object UtxoState extends StrictLogging {
              nodeViewHolderRef: Option[ActorRef],
              settings: EncryAppSettings,
              statsSenderRef: Option[ActorRef]): UtxoState = {
-    val vldbInit = settings.storage.state match {
+    val versionalStorage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
         IODBWrapper(new LSMStore(stateDir, keepVersions = Constants.DefaultKeepVersions))
@@ -278,24 +278,24 @@ object UtxoState extends StrictLogging {
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 33), keySize = 33))
     }
-    val stateVersion: Array[Byte] = vldbInit.get(StorageKey @@ bestVersionKey.untag(Digest32))
+    val stateVersion: Array[Byte] = versionalStorage.get(StorageKey @@ bestVersionKey.untag(Digest32))
       .map(_.untag(VersionalLevelDbValue)).getOrElse(EncryState.genesisStateVersion)
-    val stateHeight: Int = vldbInit.get(StorageKey @@ bestHeightKey.untag(Digest32))
+    val stateHeight: Int = versionalStorage.get(StorageKey @@ bestHeightKey.untag(Digest32))
       .map(d => Ints.fromByteArray(d)).getOrElse(Constants.Chain.PreGenesisHeight)
-    val lastBlockTimestamp: Amount = vldbInit.get(StorageKey @@ lastBlockTimeKey.untag(Digest32))
+    val lastBlockTimestamp: Amount = versionalStorage.get(StorageKey @@ lastBlockTimeKey.untag(Digest32))
       .map(d => Longs.fromByteArray(d)).getOrElse(0L)
     val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF] = {
       val bp: encry.avltree.BatchAVLProver[Digest32, HF] =
         new encry.avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
       val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
-      val storage: VersionedAVLStorage[Digest32] = new VersionedAVLStorage(vldbInit, np, settings)(Algos.hash)
+      val storage: VersionedAVLStorage[Digest32] = new VersionedAVLStorage(versionalStorage, np, settings)(Algos.hash)
       PersistentBatchAVLProver.create(bp, storage).getOrElse(throw new Error("Fatal: Failed to create persistent prover"))
     }
     new UtxoState(
       persistentProver,
       VersionTag @@ stateVersion,
       Height @@ stateHeight,
-      vldbInit,
+      versionalStorage,
       lastBlockTimestamp,
       nodeViewHolderRef,
       settings,
