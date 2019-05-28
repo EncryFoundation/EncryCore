@@ -103,7 +103,6 @@ trait EncryHistory extends EncryHistoryReader {
 
             if (!bestFullIsInvalidated) {
               // Only headers chain involved.
-              bestHeaderIdOptCache = Some(newBestHeader.id)
               historyStorage.insert(
                 StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
                 List(BestHeaderKey -> StorageValue @@ newBestHeader.id.untag(ModifierId))
@@ -124,8 +123,6 @@ trait EncryHistory extends EncryHistoryReader {
                   BestBlockKey -> StorageValue @@ validChain.last.id.untag(ModifierId),
                   BestHeaderKey -> StorageValue @@ newBestHeader.id.untag(ModifierId)
                 )
-              bestBlockIdOptCache = Some(validChain.last.id)
-              bestHeaderIdOptCache = Some(newBestHeader.id)
               val toInsert: List[(StorageKey, StorageValue)] = validityRow ++ changedLinks
               historyStorage.insert(StorageVersion @@ validityKey(modifier.id).untag(StorageKey), toInsert)
               ProgressInfo[EncryPersistentModifier](Some(branchPoint.id), invalidatedChain.tail, validChain.tail, Seq.empty)
@@ -223,7 +220,6 @@ object EncryHistory extends StrictLogging {
           override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
-          override var bestBlockIdOptCache: Option[ModifierId] = Option.empty[ModifierId]
         }
       case (false, true) =>
         new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
@@ -231,7 +227,6 @@ object EncryHistory extends StrictLogging {
           override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
-          override var bestBlockIdOptCache: Option[ModifierId] = Option.empty[ModifierId]
         }
       case (true, false) =>
         new EncryHistory with ADStateProofProcessor with EmptyBlockPayloadProcessor {
@@ -239,7 +234,6 @@ object EncryHistory extends StrictLogging {
           override protected val nodeSettings: NodeSettings = settings.node
           override protected val historyStorage: HistoryStorage = storage
           override protected val timeProvider: NetworkTimeProvider = ntp
-          override var bestBlockIdOptCache: Option[ModifierId] = Option.empty[ModifierId]
         }
       case m => throw new Error(s"Unsupported settings ADState=:${m._1}, verifyTransactions=:${m._2}, ")
     }
