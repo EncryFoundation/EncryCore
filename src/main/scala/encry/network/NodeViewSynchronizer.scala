@@ -95,6 +95,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             logger.info(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
               s"Comparison result is $comparison. Sending extension of length ${ext.length}.")
             if (!(extensionOpt.nonEmpty || comparison != Younger)) logger.warn("Extension is empty while comparison is younger")
+            logger.info(s"Send to dm OtherNodeSyncingStatus(${remote}, $comparison, ${extensionOpt.map(_.map(mod => Algos.encode(mod._2)).mkString(","))})")
             deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
           case _ =>
         }
