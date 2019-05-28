@@ -120,7 +120,6 @@ object ModifiersCache extends StrictLogging {
               logger.debug(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
               new mutable.WrappedArray.ofByte(v.id)
           }
-
         case None =>
           logger.debug(s"No header in cache at height ${history.bestHeaderHeight + 1}. " +
             s"Trying to find in range [${history.bestHeaderHeight - Constants.Chain.MaxRollbackDepth}, ${history.bestHeaderHeight}]")
