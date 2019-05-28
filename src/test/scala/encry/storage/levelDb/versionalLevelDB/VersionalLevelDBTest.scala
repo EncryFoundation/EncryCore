@@ -20,7 +20,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     * Check correctness of data stored in level db, after insert(no deletions), close and init.
     * Check correctness of version and elems, stored in level db
     */
-  property("LevelDB should recover to last version") {
+  property("LevelDB should recover to last version.") {
 
     val maxVersions = Random.nextInt(300) + 1
 
