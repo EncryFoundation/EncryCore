@@ -104,10 +104,10 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
                 .getOrElse(false))
         updateStorage(newModRow, newBestHeader.id, updateBestHeader)
         if (updateBestHeader) {
-          bestHeaderOptCache = Some(fullBlock.header)
+          bestHeaderOptCache = getBlock(newChain.headers.last).map(_.header)
         }
-        bestBlockOptCache = Some(fullBlock)
-        bestBlockIdOptCache = Some(fullBlock.id)
+        bestBlockOptCache = getBlock(newChain.headers.last)
+        bestBlockIdOptCache = getBlock(newChain.headers.last).map(_.id)
         if (settings.postgres.exists(_.enableSave) && !auxHistory)
           system.actorSelection("/user/blockListener") ! NewBestBlock(fullBlock.header.height)
 
