@@ -6,7 +6,7 @@ import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.modifiers.mempool._
-import encry.settings.{Constants, EncryAppSettings, NodeSettings}
+import encry.settings.{TestConstants, EncryAppSettings, NodeSettings}
 import encry.storage.VersionalStorage
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDB
 import io.iohk.iodb.Store
@@ -55,10 +55,10 @@ object EncryState extends StrictLogging {
 
   def initialStateBoxes: IndexedSeq[AssetBox] = IndexedSeq(AssetBox(EncryProposition.open, -9, 0))
 
-  val afterGenesisStateDigest: ADDigest = ADDigest @@ Base16.decode(Constants.AfterGenesisStateDigestHex)
+  val afterGenesisStateDigest: ADDigest = ADDigest @@ Base16.decode(TestConstants.AfterGenesisStateDigestHex)
     .getOrElse(throw new Error("Failed to decode genesis state digest"))
 
-  val genesisStateVersion: VersionTag = VersionTag @@ Base16.decode(Constants.GenesisStateVersion)
+  val genesisStateVersion: VersionTag = VersionTag @@ Base16.decode(TestConstants.GenesisStateVersion)
     .getOrElse(throw new Error("Failed to decode genesis state digest"))
 
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
@@ -69,7 +69,7 @@ object EncryState extends StrictLogging {
                                statsSenderRef: Option[ActorRef]): UtxoState = {
     val supplyBoxes: List[EncryBaseBox] = EncryState.initialStateBoxes.toList
     UtxoState.genesis(supplyBoxes, stateDir, nodeViewHolderRef, settings, statsSenderRef).ensuring(us => {
-      logger.info(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
+      logger.info(s"Expected afterGenesisDigest: ${TestConstants.AfterGenesisStateDigestHex}")
       logger.info(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
       logger.info(s"Generated UTXO state with ${supplyBoxes.size} boxes inside.")
       us.rootHash.sameElements(afterGenesisStateDigest) && us.version.sameElements(genesisStateVersion)

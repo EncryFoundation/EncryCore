@@ -2,7 +2,7 @@ package encry.view.wallet
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.InstanceFactory
-import encry.settings.{Constants, EncryAppSettings, LevelDBSettings}
+import encry.settings.{TestConstants, EncryAppSettings, LevelDBSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDBCompanion}
 import encry.utils.TestHelper.Props
 import encry.utils.{EncryGenerator, FileHelper}
@@ -63,11 +63,11 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     wallet.scanPersistent(firstBlock)
 
-    wallet.walletStorage.getTokenBalanceById(Constants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance
+    wallet.walletStorage.getTokenBalanceById(TestConstants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance
 
     wallet.scanPersistent(secondBlock)
 
-    wallet.walletStorage.getTokenBalanceById(Constants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance - useBox.amount
+    wallet.walletStorage.getTokenBalanceById(TestConstants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance - useBox.amount
 
     logger.info(s"tmp dir size: ${dir.length()}")
   }

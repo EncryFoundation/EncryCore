@@ -94,7 +94,7 @@ object InfoApiRoute {
       "bestFullHeaderId" -> bestFullBlock.map(_.header.encodedId).asJson,
       "previousFullHeaderId" -> bestFullBlock.map(_.header.parentId).map(Algos.encode).asJson,
       "difficulty" -> bestFullBlock.map(block => block.header.difficulty.toString)
-        .getOrElse(Constants.Chain.InitialDifficulty.toString).asJson,
+        .getOrElse(TestConstants.InitialDifficulty.toString).asJson,
       "unconfirmedCount" -> mempoolSize.asJson,
       "stateType" -> stateType.asJson,
       "stateVersion" -> stateVersion.asJson,

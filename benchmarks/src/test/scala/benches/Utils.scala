@@ -6,7 +6,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.avltree
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedAVLStorage}
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{Constants, EncryAppSettings, LevelDBSettings, NodeSettings}
+import encry.settings.{TestConstants, EncryAppSettings, LevelDBSettings, NodeSettings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.StorageType
 import encry.storage.iodb.versionalIODB.IODBWrapper
@@ -73,13 +73,13 @@ object Utils extends StrictLogging {
       parentId = Header.GenesisParentId,
       adProofsRoot = adPN,
       stateRoot = adDigest,
-      height = org.encryfoundation.common.utils.Constants.Chain.GenesisHeight
+      height = TestConstants.GenesisHeight
     )
     Block(header, Payload(header.id, txs), None)
   }
 
   def generateGenesisBlockValidForHistory: Block = {
-    val header = genHeader.copy(parentId = Header.GenesisParentId, height = org.encryfoundation.common.utils.Constants.Chain.GenesisHeight)
+    val header = genHeader.copy(parentId = Header.GenesisParentId, height = TestConstants.GenesisHeight)
     Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
   }
 
@@ -164,7 +164,7 @@ object Utils extends StrictLogging {
                                        txs: Seq[Transaction]): Block = {
     val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
     val requiredDifficulty: Difficulty = prevBlock.map(b => history.requiredDifficultyAfter(b.header))
-      .getOrElse(Constants.Chain.InitialDifficulty)
+      .getOrElse(TestConstants.InitialDifficulty)
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.bestHeaderHeight + 1,
@@ -208,7 +208,7 @@ object Utils extends StrictLogging {
     new UtxoState(
       persistentProver,
       EncryState.genesisStateVersion,
-      org.encryfoundation.common.utils.Constants.Chain.GenesisHeight,
+      TestConstants.GenesisHeight,
       versionalStorage,
       0L,
       None,
@@ -234,7 +234,7 @@ object Utils extends StrictLogging {
       Math.abs(random.nextLong()),
       Math.abs(random.nextInt(10000)),
       random.nextLong(),
-      Constants.Chain.InitialDifficulty,
+      TestConstants.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
   }

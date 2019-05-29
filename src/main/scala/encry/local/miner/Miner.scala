@@ -2,6 +2,7 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
+
 import akka.actor.{Actor, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
@@ -11,7 +12,6 @@ import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.mempool.TransactionFactory
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import encry.settings.Constants
 import encry.stats.StatsSender._
 import encry.utils.NetworkTime.Time
 import encry.view.EncryNodeViewHolder.CurrentView
@@ -28,10 +28,12 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
+
 import scala.collection._
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 import Miner._
+import encry.settings.TestConstants
 
 class Miner extends Actor with StrictLogging {
 
@@ -47,7 +49,7 @@ class Miner extends Actor with StrictLogging {
   var candidateOpt: Option[CandidateBlock] = None
   var syncingDone: Boolean = settings.node.offlineGeneration
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
-  val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
+  val powScheme: EquihashPowScheme = EquihashPowScheme(TestConstants.n, TestConstants.k)
   var transactionsPool: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
 
   override def preStart(): Unit = {
@@ -162,7 +164,7 @@ class Miner extends Actor with StrictLogging {
         } else usedInputsIds -> acc
     }._2
     val timestamp: Time = timeProvider.estimatedTime
-    val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1)
+    val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(TestConstants.PreGenesisHeight) + 1)
     val feesTotal: Amount = filteredTxsWithoutDuplicateInputs.map(_.fee).sum
     val supplyTotal: Amount = EncrySupplyController.supplyAt(view.state.height)
     val minerSecret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
@@ -174,10 +176,10 @@ class Miner extends Actor with StrictLogging {
     view.state.generateProofs(txs) match {
       case Success((adProof, adDigest)) =>
         val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
-          .getOrElse(Constants.Chain.InitialDifficulty)
+          .getOrElse(TestConstants.InitialDifficulty)
 
         val candidate: CandidateBlock =
-          CandidateBlock(bestHeaderOpt, adProof, adDigest, Constants.Chain.Version, txs, timestamp, difficulty)
+          CandidateBlock(bestHeaderOpt, adProof, adDigest, TestConstants.Version, txs, timestamp, difficulty)
 
         logger.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
           s"and 1 coinbase for height $height.")

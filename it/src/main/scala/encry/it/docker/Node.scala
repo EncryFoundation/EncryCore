@@ -6,7 +6,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.settings
 import encry.it.api.HttpApi
 import encry.it.util.KeyHelper.createPrivKey
-import encry.settings.{Constants, EncryAppSettings}
+import encry.settings.{TestConstants, EncryAppSettings}
 import org.asynchttpclient._
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import scala.concurrent.duration.FiniteDuration
@@ -44,6 +44,6 @@ object Node {
 
     def publicKeyStr: String = n.publicKey.toString
 
-    def blockDelay: FiniteDuration = Constants.Chain.DesiredBlockInterval
+    def blockDelay: FiniteDuration = TestConstants.DesiredBlockInterval
   }
 }

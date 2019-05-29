@@ -7,7 +7,7 @@ import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
 import encry.it.util.KeyHelper._
-import encry.settings.Constants.IntrinsicTokenId
+import encry.settings.TestConstants.IntrinsicTokenId
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address

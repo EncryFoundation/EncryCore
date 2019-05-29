@@ -1,6 +1,6 @@
 package encry.consensus
 
-import encry.settings.Constants
+import encry.settings.TestConstants
 import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.scalatest.{Matchers, PropSpec}
 
@@ -12,8 +12,8 @@ class PowLinearControllerSpec extends PropSpec with Matchers {
 
     val retargetingAtHeight: Int = 1001
 
-    val expected: immutable.Seq[Int] = (0 to Constants.Chain.RetargetingEpochsQty).reverse
-      .map(i => (retargetingAtHeight - 1) - i * Constants.Chain.EpochLength).filter(_ >= org.encryfoundation.common.utils.Constants.Chain.GenesisHeight)
+    val expected: immutable.Seq[Int] = (0 to TestConstants.RetargetingEpochsQty).reverse
+      .map(i => (retargetingAtHeight - 1) - i * TestConstants.EpochLength).filter(_ >= TestConstants.GenesisHeight)
 
     val heights: Seq[Height] = PowLinearController.getHeightsForRetargetingAt(Height @@ retargetingAtHeight)
 

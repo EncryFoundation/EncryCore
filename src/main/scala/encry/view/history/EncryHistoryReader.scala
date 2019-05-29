@@ -3,7 +3,7 @@ package encry.view.history
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
 import encry.modifiers.history._
-import encry.settings.{Constants, NodeSettings}
+import encry.settings.{TestConstants, NodeSettings}
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
@@ -15,7 +15,6 @@ import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import org.encryfoundation.common.validation.ModifierSemanticValidity
-
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
@@ -78,9 +77,9 @@ trait EncryHistoryReader extends BlockHeaderProcessor
       val startId: ModifierId = headerIdsAtHeight(heightFrom).head
       val startHeader: Header = typedModifierById[Header](startId).get
       val headers: HeaderChain = headerChainBack(size, startHeader, _ => false)
-        .ensuring(_.headers.exists(_.height == org.encryfoundation.common.utils.Constants.Chain.GenesisHeight),
+        .ensuring(_.headers.exists(_.height == TestConstants.GenesisHeight),
           "Should always contain genesis header.")
-      headers.headers.flatMap(h => Seq((Header.HeaderTypeId, h.id)))
+      headers.headers.flatMap(h => Seq((Header.modifierTypeId, h.id)))
     } else {
       val ids: Seq[ModifierId] = info.lastHeaderIds
       val lastHeaderInOurBestChain: ModifierId = ids.view.reverse.find(m => isInBestChain(m)).get
@@ -89,7 +88,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
       val startId: ModifierId = headerIdsAtHeight(heightFrom).head
       val startHeader: Header = typedModifierById[Header](startId).get
       headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
-        .headers.map(h => Header.HeaderTypeId -> h.id)
+        .headers.map(h => Header.modifierTypeId -> h.id)
     }
   }.toOption
 

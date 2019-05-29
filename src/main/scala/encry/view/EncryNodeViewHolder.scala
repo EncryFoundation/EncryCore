@@ -47,9 +47,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   memoryPoolRef ! UpdatedState(nodeView.state)
 
   val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
-    Header.HeaderTypeId -> HeaderSerializer,
-    Payload.PayloadTypeId -> PayloadSerializer,
-    ADProofs.ADProofsTypeId -> ADProofSerializer
+    Header.modifierTypeId -> HeaderSerializer,
+    Payload.modifierTypeId -> PayloadSerializer,
+    ADProofs.modifierTypeId -> ADProofSerializer
   )
 
   if (settings.influxDB.isDefined) {
@@ -78,7 +78,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       val startTime = System.currentTimeMillis()
       //logger.info(s"Start processing ModifiersFromRemote message on NVH.")
       modifierTypeId match {
-        case Payload.PayloadTypeId =>
+        case Payload.modifierTypeId =>
           modifiers.foreach { bytes =>
             Try(PayloadProtoSerializer.fromProto(PayloadProtoMessage.parseFrom(bytes)).foreach { payload =>
               logger.info(s"after ser: ${Algos.encode(payload.id)}")
@@ -89,7 +89,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
             })
           }
           computeApplications()
-        case Header.HeaderTypeId =>
+        case Header.modifierTypeId =>
           modifiers.foreach { bytes =>
             Try(HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)).foreach { header =>
               if (nodeView.history.contains(header.id) || ModifiersCache.contains(key(header.id)))
@@ -142,7 +142,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       val ids: Seq[ModifierId] = modifierTypeId match {
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
-      if (modifierTypeId != Transaction.TransactionTypeId) logger.debug(s"Got compare view message on NVH from ${peer.socketAddress}." +
+      if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got compare view message on NVH from ${peer.socketAddress}." +
         s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
         s" Sending RequestFromLocal with ids to $sender." +
         s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
@@ -176,7 +176,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
 
   def requestDownloads(pi: ProgressInfo[PersistentModifier], previousModifier: Option[ModifierId] = None): Unit =
     pi.toDownload.foreach { case (tid, id) =>
-      if (tid != Transaction.TransactionTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
+      if (tid != Transaction.modifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
       nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
     }
@@ -304,7 +304,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
               context.system.eventStream.publish(SemanticallyFailedModification(pmod, e))
           }
         } else {
-          if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.HeaderTypeId) context.system
+          if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.modifierTypeId) context.system
             .actorSelection("user/statsSender") ! NewBlockAppended(true, true)
           if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
           context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
@@ -313,7 +313,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         }
       case Failure(e) =>
         logger.debug(s"\nTime of applying to history FAILURE is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
-        if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.HeaderTypeId) context.system
+        if (settings.influxDB.isDefined && pmod.modifierTypeId == Header.modifierTypeId) context.system
           .actorSelection("user/statsSender") ! NewBlockAppended(true, false)
         logger.debug(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
           s" to history caused $e")

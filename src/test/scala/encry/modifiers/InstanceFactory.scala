@@ -2,7 +2,7 @@ package encry.modifiers
 
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
-import encry.settings.{Constants, EncryAppSettings, NodeSettings}
+import encry.settings.{TestConstants, EncryAppSettings, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
 import encry.view.history.EncryHistory
@@ -47,7 +47,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
   def generateGenesisBlock: Block = {
 
-    val header = genHeader.copy(parentId = Header.GenesisParentId, height = org.encryfoundation.common.utils.Constants.Chain.GenesisHeight)
+    val header = genHeader.copy(parentId = Header.GenesisParentId, height = TestConstants.GenesisHeight)
 
     Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
   }
@@ -145,7 +145,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
     val previousHeaderId: ModifierId =
       prevId.getOrElse(history.bestHeaderOpt.map(_.id).getOrElse(Header.GenesisParentId))
     val requiredDifficulty: Difficulty = history.bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
-      .getOrElse(Constants.Chain.InitialDifficulty)
+      .getOrElse(TestConstants.InitialDifficulty)
     val txs = (if (txsQty != 0) genValidPaymentTxs(Scarand.nextInt(txsQty)) else Seq.empty) ++
       Seq(coinbaseTransaction)
     val header = genHeader.copy(

@@ -31,13 +31,13 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
   val thirdAddress = new InetSocketAddress("172.16.11.12", 9002)
   val peers: Seq[InetSocketAddress] = Seq(firstAddress, secondAddress, thirdAddress)
 
-  val invDataHeaders: (ModifierTypeId, Vector[ModifierId]) = Header.HeaderTypeId -> testedBlocks.map(_.header.id)
-  val invDataPayloads: (ModifierTypeId, Vector[ModifierId]) = Payload.PayloadTypeId -> testedBlocks.map(_.payload.id)
-  val invDataTransactions: (ModifierTypeId, Seq[ModifierId]) = Transaction.TransactionTypeId -> testedTransaction.map(_.id)
+  val invDataHeaders: (ModifierTypeId, Vector[ModifierId]) = Header.modifierTypeId -> testedBlocks.map(_.header.id)
+  val invDataPayloads: (ModifierTypeId, Vector[ModifierId]) = Payload.modifierTypeId -> testedBlocks.map(_.payload.id)
+  val invDataTransactions: (ModifierTypeId, Seq[ModifierId]) = Transaction.modifierTypeId -> testedTransaction.map(_.id)
 
-  val invDataHeadersDummy: (ModifierTypeId, Vector[ModifierId]) = Header.HeaderTypeId -> Vector.empty[ModifierId]
-  val invDataPayloadsDummy: (ModifierTypeId, Vector[ModifierId]) = Payload.PayloadTypeId -> Vector.empty[ModifierId]
-  val invDataTransactionsDummy: (ModifierTypeId, Seq[ModifierId]) = Transaction.TransactionTypeId -> Vector.empty[ModifierId]
+  val invDataHeadersDummy: (ModifierTypeId, Vector[ModifierId]) = Header.modifierTypeId -> Vector.empty[ModifierId]
+  val invDataPayloadsDummy: (ModifierTypeId, Vector[ModifierId]) = Payload.modifierTypeId -> Vector.empty[ModifierId]
+  val invDataTransactionsDummy: (ModifierTypeId, Seq[ModifierId]) = Transaction.modifierTypeId -> Vector.empty[ModifierId]
 
   property("SyncInfoMessage should be serialized correctly") {
     val syncInfo: SyncInfo = SyncInfo(testedBlocks.map(_.header.id))
@@ -256,11 +256,11 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
 
   property("ModifiersNetworkMessage should be serialized correctly") {
     val modifiersDataAsHeader: (ModifierTypeId, Map[ModifierId, Array[Byte]]) =
-      Header.HeaderTypeId -> testedBlocks.map(block => block.header.id -> block.header.toHeaderProto.toByteArray).toMap
+      Header.modifierTypeId -> testedBlocks.map(block => block.header.id -> block.header.toHeaderProto.toByteArray).toMap
     val modifiersDataAsPayloads: (ModifierTypeId, Map[ModifierId, Array[Byte]]) =
-      Payload.PayloadTypeId -> testedBlocks.map(block => block.payload.id -> block.payload.toProtoPayload.toByteArray).toMap
+      Payload.modifierTypeId -> testedBlocks.map(block => block.payload.id -> block.payload.toProtoPayload.toByteArray).toMap
     val modifiersDataAsTransactions: (ModifierTypeId, Map[ModifierId, Array[Byte]]) =
-      Transaction.TransactionTypeId -> testedTransaction.map(tx => tx.id -> tx.toTransactionProto.toByteArray).toMap
+      Transaction.modifierTypeId -> testedTransaction.map(tx => tx.id -> tx.toTransactionProto.toByteArray).toMap
 
     val modifiersNetworkMessageHeaders: ModifiersNetworkMessage = ModifiersNetworkMessage(modifiersDataAsHeader)
     val modifiersNetworkMessagePayloads: ModifiersNetworkMessage = ModifiersNetworkMessage(modifiersDataAsPayloads)

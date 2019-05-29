@@ -5,7 +5,7 @@ import java.io.File
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.history.ADProofsUtils
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.settings.{Constants, EncryAppSettings, LevelDBSettings, NodeSettings}
+import encry.settings.{TestConstants, EncryAppSettings, LevelDBSettings, NodeSettings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
@@ -107,7 +107,7 @@ object DigestState extends StrictLogging {
     val vldbInit = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(dir, keepVersions = Constants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(dir, keepVersions = TestConstants.DefaultKeepVersions))
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(dir, new Options)

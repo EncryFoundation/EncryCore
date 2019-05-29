@@ -61,12 +61,12 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
 
       val header: ModifierId = headersIds.head
 
-      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, Seq(header))
+      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(header))
       handler1.expectMsgAllOf(
         settings.network.deliveryTimeout * (settings.network.maxDeliveryChecks + 2),
-        RequestModifiersNetworkMessage(Header.HeaderTypeId -> Seq(header)),
-        RequestModifiersNetworkMessage(Header.HeaderTypeId -> Seq(header)),
-        RequestModifiersNetworkMessage(Header.HeaderTypeId -> Seq(header))
+        RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header)),
+        RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header)),
+        RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header))
       )
       //this thread sleep is using for expecting modifier removal
       Thread.sleep(6000)
@@ -87,16 +87,16 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
 
       val header: ModifierId = headersIds.head
 
-      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, Seq(header))
+      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(header))
 
       //await one re-ask
       handler1.expectMsgAllOf(
         settings.network.deliveryTimeout * (settings.network.maxDeliveryChecks + 2),
-        RequestModifiersNetworkMessage(Header.HeaderTypeId -> Seq(header)),
-        RequestModifiersNetworkMessage(Header.HeaderTypeId -> Seq(header))
+        RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header)),
+        RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header))
       )
 
-      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.HeaderTypeId,
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId,
         Map(header -> Array.emptyByteArray)), cp1)
 
       handler1.expectMsg(SyncInfoNetworkMessage(SyncInfo(List())))
@@ -113,11 +113,11 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       deliveryManager ! HandshakedPeer(cp1)
       deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
 
-      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, Seq(headerIds.head))
+      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(headerIds.head))
 
-      handler1.expectMsg(RequestModifiersNetworkMessage(Header.HeaderTypeId -> Seq(headerIds.head)))
+      handler1.expectMsg(RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(headerIds.head)))
 
-      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.HeaderTypeId,
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId,
         Map(headerIds.head -> Array.emptyByteArray)), cp1)
 
       val uHistory: EncryHistory = history.append(blocks.head.header).get._1.reportModifierIsValid(blocks.head.header)
@@ -126,7 +126,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
 
       deliveryManager ! SemanticallySuccessfulModifier(blocks.head.header)
 
-      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, Seq(headerIds.head))
+      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(headerIds.head))
 
       handler1.expectMsg(SyncInfoNetworkMessage(SyncInfo(List())))
 
@@ -136,7 +136,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
     "remove peer from expectedModifiers if expected modifiers collection from this peer is empty" in {
       val (deliveryManager, cp1, _, _, _, headerIds, _, _) = initialiseState()
 
-      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, Seq(headerIds.head))
+      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(headerIds.head))
       //this thread sleep is using for expecting modifier removal
       Thread.sleep((settings.network.maxDeliveryChecks * settings.network.deliveryTimeout._1) * 1000)
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress.getAddress, Map.empty).isEmpty)
@@ -157,10 +157,10 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
 
       val transactions: Seq[ModifierId] = genValidPaymentTxs(1).map(_.id)
 
-      deliveryManager ! RequestFromLocal(cp1, Transaction.TransactionTypeId, transactions)
+      deliveryManager ! RequestFromLocal(cp1, Transaction.modifierTypeId, transactions)
 
       handler1.expectMsgAllOf(
-        RequestModifiersNetworkMessage(Transaction.TransactionTypeId -> transactions)
+        RequestModifiersNetworkMessage(Transaction.modifierTypeId -> transactions)
       )
       handler1.expectNoMsg(10.seconds)
       assert(deliveryManager.underlyingActor.expectedModifiers

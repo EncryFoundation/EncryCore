@@ -64,7 +64,7 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       val (deliveryManager, cp1, _, _, _, _, _, _, _, _, _, headersIds) = initialiseState
       deliveryManager ! HandshakedPeer(cp1)
       deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
-      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
       deliveryManager.underlyingActor.syncTracker.updatePeersPriorityStatus()
       val priorityResult: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
         deliveryManager.underlyingActor.syncTracker.statuses(cp1.socketAddress.getAddress)
@@ -88,9 +88,9 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       val (deliveryManager, cp1, _, _, _, _, _, _, _, _, blocks, headersIds) = initialiseState
       deliveryManager ! HandshakedPeer(cp1)
       deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
-      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.HeaderTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp1)
+        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp1)
       deliveryManager.underlyingActor.syncTracker.updatePeersPriorityStatus()
       val priorityResult: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
         deliveryManager.underlyingActor.syncTracker.statuses(cp1.socketAddress.getAddress)
@@ -114,9 +114,9 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       val (deliveryManager, cp1, _, _, _, _, _, _, _, _, blocks, headersIds) = initialiseState
       deliveryManager ! HandshakedPeer(cp1)
       deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
-      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.HeaderTypeId, blocks.take(6).map(block => block.header.id -> block.header.bytes).toMap), cp1)
+        Header.modifierTypeId, blocks.take(6).map(block => block.header.id -> block.header.bytes).toMap), cp1)
       deliveryManager.underlyingActor.syncTracker.updatePeersPriorityStatus()
       val priorityResult: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
         deliveryManager.underlyingActor.syncTracker.statuses(cp1.socketAddress.getAddress)
@@ -160,37 +160,37 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       deliveryManager ! OtherNodeSyncingStatus(cp8, Younger, None)
       deliveryManager ! HandshakedPeer(cp9)
       deliveryManager ! OtherNodeSyncingStatus(cp9, Equal, None)
-      deliveryManager ! RequestFromLocal(cp1, Header.HeaderTypeId, headersIds)
-      deliveryManager ! RequestFromLocal(cp2, Header.HeaderTypeId, headersIds)
-      deliveryManager ! RequestFromLocal(cp3, Header.HeaderTypeId, headersIds)
-      deliveryManager ! RequestFromLocal(cp4, Header.HeaderTypeId, headersIds)
-      deliveryManager ! RequestFromLocal(cp5, Header.HeaderTypeId, headersIds)
-      deliveryManager ! RequestFromLocal(cp6, Header.HeaderTypeId, headersIds)
-      deliveryManager ! RequestFromLocal(cp7, Header.HeaderTypeId, headersIds)
-      deliveryManager ! RequestFromLocal(cp8, Header.HeaderTypeId, headersIds)
-      deliveryManager ! RequestFromLocal(cp9, Header.HeaderTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp2, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp3, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp4, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp5, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp6, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp7, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp8, Header.modifierTypeId, headersIds)
+      deliveryManager ! RequestFromLocal(cp9, Header.modifierTypeId, headersIds)
 
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.HeaderTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp1)
+        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp1)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.HeaderTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp2)
+        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp2)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.HeaderTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp3)
+        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp3)
 
 
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.HeaderTypeId, blocks.take(5).map(block => block.header.id -> block.header.bytes).toMap), cp4)
+        Header.modifierTypeId, blocks.take(5).map(block => block.header.id -> block.header.bytes).toMap), cp4)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.HeaderTypeId, blocks.take(5).map(block => block.header.id -> block.header.bytes).toMap), cp5)
+        Header.modifierTypeId, blocks.take(5).map(block => block.header.id -> block.header.bytes).toMap), cp5)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.HeaderTypeId, blocks.take(5).map(block => block.header.id -> block.header.bytes).toMap), cp6)
+        Header.modifierTypeId, blocks.take(5).map(block => block.header.id -> block.header.bytes).toMap), cp6)
 
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.HeaderTypeId, blocks.take(2).map(block => block.header.id -> block.header.bytes).toMap), cp7)
+        Header.modifierTypeId, blocks.take(2).map(block => block.header.id -> block.header.bytes).toMap), cp7)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.HeaderTypeId, blocks.take(2).map(block => block.header.id -> block.header.bytes).toMap), cp8)
+        Header.modifierTypeId, blocks.take(2).map(block => block.header.id -> block.header.bytes).toMap), cp8)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.HeaderTypeId, blocks.take(2).map(block => block.header.id -> block.header.bytes).toMap), cp9)
+        Header.modifierTypeId, blocks.take(2).map(block => block.header.id -> block.header.bytes).toMap), cp9)
 
       deliveryManager.underlyingActor.syncTracker.updatePeersPriorityStatus()
       val priorityResult1: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
@@ -258,7 +258,7 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       deliveryManager ! HandshakedPeer(cp1)
       deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.HeaderTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp1)
+        Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp1)
       deliveryManager.underlyingActor.syncTracker.updatePeersPriorityStatus()
       val priorityResultByPeer: (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer) =
         deliveryManager.underlyingActor.syncTracker.statuses(cp1.socketAddress.getAddress)

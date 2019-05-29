@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
-import encry.settings.Constants._
+import encry.settings.TestConstants._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.scalatest.{AsyncFunSuite, Matchers}
