@@ -7,7 +7,7 @@ import encry.consensus.History._
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.mempool.Transaction
 import encry.network.DeliveryManager._
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
@@ -38,7 +38,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
   implicit val exCon: ExecutionContextExecutor = context.dispatcher
-
   /**
     * If block chain is synced, we will put all headers ids and peers who sent us this headers to this collection
     * in order to ask payload directly from peers who sent us appropriate header.
@@ -86,7 +85,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       syncTracker.updateStatus(remote, status)
       status match {
         case Unknown => logger.info("Peer status is still unknown.")
-        case Younger if isBlockChainSynced => sendInvData(remote, status, extOpt)
+        case Younger | Fork if isBlockChainSynced => sendInvData(remote, status, extOpt)
         case _ =>
       }
     case HandshakedPeer(remote) => syncTracker.updateStatus(remote, Unknown)
@@ -143,7 +142,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     }
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifiersId: ModifierId, previousModifier: Option[ModifierId]) =>
       if (modifierTypeId != Transaction.ModifierTypeId)
-        logger.debug(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: ${modifierTypeId} prev mod: " +
+        logger.debug(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: $modifierTypeId prev mod: " +
         s"${previousModifier.map(Algos.encode)}")
       if (previousModifier.isDefined && isBlockChainSynced) {
         logger.debug(s"Sending this donwload request! for modfiier: ${Algos.encode(modifiersId)}")
@@ -158,7 +157,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case StartMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = true))
     case DisableMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = false))
     case UpdatedHistory(historyReader) => context.become(basicMessageHandler(historyReader, isBlockChainSynced, isMining))
-    case message => logger.info(s"Got strange message $message(${message.getClass}) on DeliveryManager from $sender")
+    case message => logger.debug(s"Got strange message $message(${message.getClass}) on DeliveryManager from $sender")
   }
 
   /**
@@ -188,7 +187,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
         logger.debug(s"This modifiers ${Algos.encode(modifierId)} is not contained in expectedModifiers collection from $peer.")
     }
   }
-
   /**
     * If node is not synced, send sync info to random peer, otherwise to all known peers.
     *
@@ -223,7 +221,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     val secondCondition: Boolean = mTypeId != Transaction.ModifierTypeId
     val thirdCondition: Boolean =
       if (!isBlockChainSynced) syncTracker.statuses.get(peer.socketAddress.getAddress)
-        .exists { case (comrResult, _, _) => comrResult != Fork }
+        .exists { case (comrResult, _, _) => comrResult != Younger }
       else syncTracker.statuses.contains(peer.socketAddress.getAddress)
     if (mTypeId != Transaction.ModifierTypeId)
       logger.debug(s"Got requestModifier for modifiers of type: $mTypeId to $peer with modifiers ${modifierIds.size}." +
@@ -273,25 +271,24 @@ class DeliveryManager(influxRef: Option[ActorRef],
                         modId: ModifierId,
                         peerRequests: Map[ModifierIdAsKey, (Cancellable, Int)]): Unit =
     peerRequests.get(toKey(modId)) match {
-      case Some((_, attempts)) =>
-        syncTracker.statuses.find { case (innerPeerAddr, (cResult, _, _)) =>
-          innerPeerAddr == peer.socketAddress.getAddress && cResult != Fork
-        } match {
-          case Some((_, (_, _, cP))) =>
-            cP.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
-            logger.debug(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
-              s"$mTypeId with id: ${Algos.encode(modId)}. Attempts: $attempts")
-            syncTracker.incrementRequest(peer)
-            expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, peerRequests.updated(
-              toKey(modId),
-              context.system.scheduler
-                .scheduleOnce(settings.network.deliveryTimeout)(schedulerChecker(peer, mTypeId, modId)) -> (attempts + 1)
-            ))
-          case None =>
-            expectedModifiers = clearExpectedModifiersCollection(peerRequests, toKey(modId), peer.socketAddress.getAddress)
-            logger.debug(s"Tried to re-ask modifier ${Algos.encode(modId)}, but this id not needed from $peer")
-        }
-      case _ => logger.debug(s"There is no such modifier ${Algos.encode(modId)} in expected collection from $peer.")
+      case Some((_, attempts)) => syncTracker.statuses.find { case (innerPeerAddr, (cResult, _, _)) =>
+        innerPeerAddr == peer.socketAddress.getAddress && cResult != Younger
+      } match {
+        case Some((_, (_, _, cP))) =>
+          cP.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
+          logger.debug(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
+            s"$mTypeId with id: ${Algos.encode(modId)}. Attempts: $attempts")
+          syncTracker.incrementRequest(peer)
+          expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, peerRequests.updated(
+            toKey(modId),
+            context.system.scheduler
+              .scheduleOnce(settings.network.deliveryTimeout)(schedulerChecker(peer, mTypeId, modId)) -> (attempts + 1)
+          ))
+        case None =>
+          expectedModifiers = clearExpectedModifiersCollection(peerRequests, toKey(modId), peer.socketAddress.getAddress)
+          logger.debug(s"Tried to re-ask modifier ${Algos.encode(modId)}, but this id not needed from this peer")
+      }
+      case _ => logger.debug(s"There is no such modifier ${Algos.encode(modId)} in expected collection.")
     }
   /**
     * Check 'expectedModifiers' for awaiting modifier with id 'mId' from 'peer'
@@ -328,8 +325,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case Some(data) =>
       data.groupBy(_._1).mapValues(_.map(_._2)).foreach {
         case (mTid, mods) if mods.size <= settings.network.maxInvObjects =>
+          logger.info(s"Send to peer ${peer} inv msg with mods: ${mods.map(Algos.encode).mkString(",")}")
           peer.handlerRef ! InvNetworkMessage(mTid -> mods)
-        case (_, mods) => logger.debug(s"Tried to send inv message with size ${mods.size}. Current size is redundant.")
+        case (_, mods) => logger.info(s"Tried to send inv message with size ${mods.size}. Current size is redundant.")
       }
     case None => logger.info(s"dataForInvMessage is empty for: $peer. Peer's status is: $status.")
   }

@@ -137,19 +137,23 @@ case class SyncTracker(deliveryManager: ActorRef,
     */
   def peersToSyncWith: Seq[ConnectedPeer] = {
     val outdated: Seq[ConnectedPeer] = outdatedPeers
-    lazy val unknowns: IndexedSeq[ConnectedPeer] = statuses.collect{
+    val unknowns: IndexedSeq[ConnectedPeer] = statuses.collect {
       case (_, (historyComparisonResult, _, cP)) if historyComparisonResult == Unknown => cP
     }.toIndexedSeq
-    lazy val olderNodes: IndexedSeq[ConnectedPeer] = statuses.collect{
+    val olderNodes: IndexedSeq[ConnectedPeer] = statuses.collect {
       case (_, (historyComparisonResult, _, cP)) if historyComparisonResult == Older => cP
     }.toIndexedSeq
-    lazy val nonOutdated: IndexedSeq[ConnectedPeer] =
+    val nonOutdated: IndexedSeq[ConnectedPeer] =
       if (olderNodes.nonEmpty) olderNodes(scala.util.Random.nextInt(olderNodes.size)) +: unknowns else unknowns
-    val peers: Seq[ConnectedPeer] = if (outdated.nonEmpty) outdated
-    else nonOutdated.filter(p => (System.currentTimeMillis() - lastSyncSentTime.getOrElse(p, 0L))
-      .millis >= networkSettings.syncInterval)
-    peers.foreach(updateLastSyncSentTime)
-    peers
+    val peers: Seq[ConnectedPeer] =
+      if (outdated.nonEmpty) outdated
+      else nonOutdated.filter(p => (System.currentTimeMillis() - lastSyncSentTime.getOrElse(p, 0L))
+        .millis >= networkSettings.syncInterval)
+    val resultedPeers: Seq[ConnectedPeer] =
+      if (peers.nonEmpty) peers
+      else statuses.map(_._2._3).toSeq
+    resultedPeers.foreach(updateLastSyncSentTime)
+    resultedPeers
   }
 }
 

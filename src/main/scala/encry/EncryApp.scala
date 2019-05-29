@@ -1,7 +1,6 @@
 package encry
 
 import java.net.InetAddress
-
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
@@ -27,7 +26,6 @@ import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
 import org.encryfoundation.common.Algos
-
 import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
 import scala.io.Source
@@ -61,9 +59,9 @@ object EncryApp extends App with StrictLogging {
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
     .withDispatcher("network-dispatcher"), "networkController")
   lazy val peerManager: ActorRef = system.actorOf(Props(classOf[PeerManager]), "peerManager")
-  lazy val nodeViewSynchronizer: ActorRef = system.actorOf(
-    Props(classOf[NodeViewSynchronizer], influxRef, nodeViewHolder, networkController, system, settings, memoryPool)
-      .withDispatcher("nvsh-dispatcher"), "nodeViewSynchronizer")
+  lazy val nodeViewSynchronizer: ActorRef = system.actorOf(NodeViewSynchronizer
+    .props(influxRef, nodeViewHolder, networkController, settings, memoryPool)
+    .withDispatcher("nvsh-dispatcher"), "nodeViewSynchronizer")
   if (settings.monitoringSettings.exists(_.kamonEnabled)) {
     Kamon.reconfigure(EncryAppSettings.allConfig)
     Kamon.addReporter(new InfluxDBReporter())

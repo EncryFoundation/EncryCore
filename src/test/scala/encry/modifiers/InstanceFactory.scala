@@ -141,9 +141,10 @@ trait InstanceFactory extends Keys with EncryGenerator {
   }._1
 
   def generateNextBlock(history: EncryHistory,
-                        difficultyDiff: BigInt = 0,
+                        difficultyDiff: BigInt = 1,
                         prevId: Option[ModifierId] = None,
-                        txsQty: Int = 100): Block = {
+                        txsQty: Int = 100,
+                        additionalDifficulty: BigInt = 0): Block = {
     val previousHeaderId: ModifierId =
       prevId.getOrElse(history.bestHeaderOpt.map(_.id).getOrElse(Header.GenesisParentId))
     val requiredDifficulty: Difficulty = history.bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
@@ -153,11 +154,59 @@ trait InstanceFactory extends Keys with EncryGenerator {
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.bestHeaderHeight + 1,
-      difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff),
+      difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff + additionalDifficulty),
       transactionsRoot = Payload.rootHash(txs.map(_.id))
     )
 
     Block(header, Payload(header.id, txs), None)
+  }
+
+  def genForkOn(qty: Int,
+                addDifficulty: BigInt = 0,
+                from: Int,
+                to: Int,
+                settings: EncryAppSettings): (List[Block], List[Block]) = {
+    val history: EncryHistory = generateDummyHistory(settings)
+    val forkInterval = (from until to).toList
+    (0 until qty).foldLeft((List(history), List.empty[Block] -> List.empty[Block])) {
+      case ((histories, blocks), blockHeight) =>
+        if (forkInterval.contains(blockHeight)) {
+          if (histories.length == 1) {
+            val secondHistory = generateDummyHistory(settings)
+            blocks._1.foldLeft(secondHistory) {
+              case (prevHistory, blockToApply) =>
+                prevHistory.append(blockToApply.header).get._1.append(blockToApply.payload).get._1.reportModifierIsValid(blockToApply)
+            }
+            val nextBlockInFirstChain = generateNextBlock(histories.head)
+            val nextBlockInSecondChain = generateNextBlock(secondHistory, additionalDifficulty = addDifficulty)
+            (
+              List(
+                histories.head.append(nextBlockInFirstChain.header).get._1.append(nextBlockInFirstChain.payload).get._1.reportModifierIsValid(nextBlockInFirstChain),
+                secondHistory.append(nextBlockInSecondChain.header).get._1.append(nextBlockInSecondChain.payload).get._1.reportModifierIsValid(nextBlockInSecondChain)
+              ),
+              (blocks._1 :+ nextBlockInFirstChain) -> List(nextBlockInSecondChain)
+            )
+          } else {
+            val nextBlockInFirstChain = generateNextBlock(histories.head)
+            val nextBlockInSecondChain = generateNextBlock(histories.last, additionalDifficulty = addDifficulty)
+            (
+              List(
+                histories.head.append(nextBlockInFirstChain.header).get._1.append(nextBlockInFirstChain.payload).get._1.reportModifierIsValid(nextBlockInFirstChain),
+                histories.last.append(nextBlockInSecondChain.header).get._1.append(nextBlockInSecondChain.payload).get._1.reportModifierIsValid(nextBlockInSecondChain)
+              ),
+              (blocks._1 :+ nextBlockInFirstChain) -> (blocks._2 :+ nextBlockInSecondChain)
+            )
+          }
+        } else {
+          val block: Block = generateNextBlock(histories.head)
+          (
+            List(
+              histories.head.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
+            ),
+            (blocks._1 :+ block) -> blocks._2
+          )
+        }
+    }._2
   }
 
   def generateDummyHistory(settingsEncry: EncryAppSettings): EncryHistory = {
@@ -175,7 +224,6 @@ trait InstanceFactory extends Keys with EncryGenerator {
       override protected val nodeSettings: NodeSettings = settings.node
       override protected val historyStorage: HistoryStorage = storage
       override protected val timeProvider: NetworkTimeProvider = ntp
-      override var bestBlockIdOptCache: Option[ModifierId] = Option.empty[ModifierId]
     }
   }
 }

@@ -11,6 +11,7 @@ import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
 import encry.EncryApp.settings
+import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.storage.VersionalStorage.StorageKey
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbKey
 import encry.view.history.History.Height
@@ -32,20 +33,10 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   def contains(id: ModifierId): Boolean = modifierById(id).isDefined
 
   /**
-    * Contains best full block, if it is defined. None during node init
-    */
-  var bestBlockOptCache: Option[Block] = None
-
-  /**
     * Complete block of the best chain with transactions.
     * Always None for an SPV mode, Some(fullBLock) for fullnode regime after initial bootstrap.
     */
-  def bestBlockOpt: Option[Block] =
-    bestBlockOptCache.orElse{
-      val bestBlockInDB = bestBlockIdOpt.flatMap(id => typedModifierById[Header](id)).flatMap(getBlock)
-      bestBlockOptCache = bestBlockInDB
-      bestBlockInDB
-    }
+  def bestBlockOpt: Option[Block] = bestBlockIdOpt.flatMap(id => typedModifierById[Header](id)).flatMap(getBlock)
 
   /** @return ids of count headers starting from offset */
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
@@ -57,23 +48,28 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     * @param si other's node sync info
     * @return Equal if nodes have the same history, Younger if another node is behind, Older if a new node is ahead
     */
-  def compare(si: EncrySyncInfo): HistoryComparisonResult = {
-    bestHeaderIdOpt match {
-      case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) =>
-        Equal //Our best header is the same as other node best header
-      case Some(id) if si.lastHeaderIds.exists(_ sameElements id) =>
-        Older //Our best header is in other node best chain, but not at the last position
-      case Some(_) if si.lastHeaderIds.isEmpty =>
-        Younger //Other history is empty, our contain some headers
-      case Some(_) =>
-        //We are on different forks now.
-        //Return Younger, because we can send blocks from our fork that other node can download.
-        if (si.lastHeaderIds.view.exists(contains)) Younger
-        else Unknown //We don't have any of id's from other's node sync info in history.
-      //We don't know whether we can sync with it and what blocks to send in Inv message.
-      case None if si.lastHeaderIds.isEmpty => Equal //Both nodes do not keep any blocks
-      case None => Older //Our history is empty, other contain some headers
-    }
+  def compare(si: EncrySyncInfo): HistoryComparisonResult = bestHeaderIdOpt match {
+
+    //Our best header is the same as other history best header
+    case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) => Equal
+
+    //Our best header is in other history best chain, but not at the last position
+    case Some(id) if si.lastHeaderIds.exists(_ sameElements id) => Older
+
+    /* Other history is empty, or our history contains last id from other history */
+    case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.lastOption.exists(contains) => Younger
+
+    case Some(_) =>
+      //Our history contains some ids from other history
+      if (si.lastHeaderIds.exists(contains)) Fork
+      //Unknown comparison result
+      else Unknown
+
+    //Both nodes do not keep any blocks
+    case None if si.lastHeaderIds.isEmpty => Equal
+
+    //Our history is empty, other contain some headers
+    case None => Older
   }
 
   def continuationIds(info: EncrySyncInfo, size: Int): Option[ModifierIds] = Try {
@@ -116,11 +112,15 @@ trait EncryHistoryReader extends BlockHeaderProcessor
         loop(currentHeight + 1, updatedChains ++ nonUpdatedChains)
       }
     }
+
     loop(header.height, Seq(Seq(header)))
   }
 
   def testApplicable(modifier: EncryPersistentModifier): Try[Unit] = modifier match {
-    case header: Header => validate(header)
+    case header: Header =>
+      val res = validate(header)
+      logger.info(s"result of validating $modifier is $res")
+      res
     case payload: Payload => validate(payload)
     case adProofs: ADProofs => validate(adProofs)
     case mod: Any => Failure(new Exception(s"Modifier $mod is of incorrect type."))
@@ -173,6 +173,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
         else throw new Exception(s"Common point not found for headers $header1 and $header2")
       }
     }
+
     loop(2, HeaderChain(Seq(header2)))
   }
 
