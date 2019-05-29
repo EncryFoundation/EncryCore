@@ -11,7 +11,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
-import encry.network.AuxiliaryHistoryHolder.{Append, ReportModifierInvalid, ReportModifierValid}
+import encry.network.AuxiliaryHistoryHolder
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -36,13 +36,16 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: ActorRef,
-                                                              memoryPoolRef: ActorRef) extends Actor with StrictLogging {
+class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef) extends Actor with StrictLogging {
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet)
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
+
+  val auxHistoryHolder: ActorRef =
+    system.actorOf(Props(AuxiliaryHistoryHolder(nodeView.history, nodeViewSynchronizer))
+      .withDispatcher("aux-history-dispatcher"), "auxHistoryHolder")
 
   memoryPoolRef ! UpdatedState(nodeView.state)
 
@@ -227,7 +230,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
                 case _ =>
               }
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
-              auxHistoryHolder ! ReportModifierValid(modToApply)
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               if (settings.influxDB.isDefined) context.system
                 .actorSelection("user/statsSender") ! NewBlockAppended(false, true)
@@ -235,7 +237,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
             case Failure(e) =>
               val (newHis: EncryHistory, newProgressInfo: ProgressInfo[PersistentModifier]) =
                 history.reportModifierIsInvalid(modToApply, progressInfo)
-              auxHistoryHolder ! ReportModifierInvalid(modToApply, progressInfo)
+              auxHistoryHolder ! NewHistory(newHis)
               if (settings.influxDB.isDefined) context.system
                 .actorSelection("user/statsSender") ! NewBlockAppended(false, false)
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
@@ -260,7 +262,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     if (settings.influxDB.isDefined) context.system
       .actorSelection("user/statsSender") !
       StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
-    auxHistoryHolder ! Append(pmod)
     nodeView.history.append(pmod) match {
       case Success((historyBeforeStUpdate, progressInfo)) =>
         logger.debug(s"\nSuccessfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
@@ -452,8 +453,8 @@ object EncryNodeViewHolder {
         case otherwise => 1
       })
 
-  def props(auxHistoryHolder: ActorRef, memoryPoolRef: ActorRef): Props = settings.node.stateMode match {
-    case StateMode.Digest => Props(new EncryNodeViewHolder[DigestState](auxHistoryHolder, memoryPoolRef))
-    case StateMode.Utxo => Props(new EncryNodeViewHolder[UtxoState](auxHistoryHolder, memoryPoolRef))
+  def props(memoryPoolRef: ActorRef): Props = settings.node.stateMode match {
+    case StateMode.Digest => Props(new EncryNodeViewHolder[DigestState](memoryPoolRef))
+    case StateMode.Utxo => Props(new EncryNodeViewHolder[UtxoState](memoryPoolRef))
   }
 }

@@ -19,33 +19,25 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.Options
 
-case class AuxiliaryHistoryHolder(settings: EncryAppSettings, ntp: NetworkTimeProvider, syncronizer: ActorRef)
+case class AuxiliaryHistoryHolder(var history: EncryHistory, syncronizer: ActorRef)
   extends Actor with StrictLogging {
-
-  val history: EncryHistory = AuxiliaryHistoryHolder.readOrGenerate(settings, ntp)
 
   override def preStart(): Unit = syncronizer ! AuxHistoryChanged(history)
 
   override def receive: Receive = {
-    case Append(mod) =>
-      history.append(mod)
-      syncronizer ! AuxHistoryChanged(history)
-    case ReportModifierValid(mod) =>
-      history.reportModifierIsValid(mod)
-      syncronizer ! AuxHistoryChanged(history)
-    case ReportModifierInvalid(mod, progressInfo) =>
-      history.reportModifierIsInvalid(mod, progressInfo)
+    case NewHistory(historyFromNvh) =>
+      history = historyFromNvh
       syncronizer ! AuxHistoryChanged(history)
   }
 
   override def postStop(): Unit = {
     logger.warn(s"Stopping AuxiliaryHistoryHolder.")
-    history.closeStorage()
   }
-
 }
 
 object AuxiliaryHistoryHolder {
+
+  case class NewHistory(history: EncryHistory)
 
   private def getHistoryIndexDir(settings: EncryAppSettings): File = {
     val dir: File = new File(s"${settings.directory}/auxHistory/index")
