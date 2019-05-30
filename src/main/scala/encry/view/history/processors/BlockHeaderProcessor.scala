@@ -2,25 +2,22 @@ package encry.view.history.processors
 
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.{forceStopApplication, system}
-import encry.consensus.ConsensusTaggedTypes.Difficulty
+import encry.EncryApp.forceStopApplication
 import encry.consensus.History.ProgressInfo
-import encry.consensus.{ConsensusTaggedTypes, ModifierSemanticValidity, _}
-import encry.local.explorer.BlockListener.NewOrphaned
-import encry.modifiers.EncryPersistentModifier
+import encry.consensus._
 import encry.modifiers.history._
-import encry.settings.Constants._
-import encry.settings.{Constants, EncryAppSettings}
+import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{VersionalLevelDbKey, VersionalLevelDbValue}
-import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbValue
 import encry.utils.NetworkTimeProvider
-import encry.validation.{ModifierValidator, ValidationResult}
-import encry.view.history.History.Height
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
+import org.encryfoundation.common.utils.constants.TestNetConstants
+import org.encryfoundation.common.validation.{ModifierSemanticValidity, ModifierValidator, ValidationResult}
 import scorex.crypto.hash.Digest32
 import supertagged.@@
 
@@ -34,10 +31,10 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   protected val settings: EncryAppSettings
   protected val timeProvider: NetworkTimeProvider
   private val difficultyController: PowLinearController.type = PowLinearController
-  val powScheme: EquihashPowScheme = EquihashPowScheme(Constants.Equihash.n, Constants.Equihash.k)
+  val powScheme: EquihashPowScheme = EquihashPowScheme(TestNetConstants.n, TestNetConstants.k)
   protected val BestHeaderKey: StorageKey =
-    StorageKey @@ Array.fill(DigestLength)(Header.modifierTypeId.untag(ModifierTypeId))
-  protected val BestBlockKey: StorageKey = StorageKey @@ Array.fill(DigestLength)(-1: Byte)
+    StorageKey @@ Array.fill(TestNetConstants.DigestLength)(Header.modifierTypeId.untag(ModifierTypeId))
+  protected val BestBlockKey: StorageKey = StorageKey @@ Array.fill(TestNetConstants.DigestLength)(-1: Byte)
   protected val historyStorage: HistoryStorage
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node)
   private var isHeadersChainSyncedVar: Boolean = false
@@ -68,17 +65,17 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       else {
         headerIdsAtHeight(height).headOption
           .flatMap(id => headersCache.find(_.id sameElements id).orElse(typedModifierById[Header](id))) match {
-            case Some(bestHeaderAtThisHeight) =>
-              logger.debug(s"requiredModifiersForHeader($bestHeaderAtThisHeight) ->" +
-                s"${requiredModifiersForHeader(bestHeaderAtThisHeight).map(x => Algos.encode(x._2))}")
-              val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
+          case Some(bestHeaderAtThisHeight) =>
+            logger.debug(s"requiredModifiersForHeader($bestHeaderAtThisHeight) ->" +
+              s"${requiredModifiersForHeader(bestHeaderAtThisHeight).map(x => Algos.encode(x._2))}")
+            val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
 
-              val b = toDownload.filter(m => !excluding.exists(_ sameElements m._2))
+            val b = toDownload.filter(m => !excluding.exists(_ sameElements m._2))
 
-              val c = b.filter(m => !contains(m._2)) //todo can we combine this 2 filter?
+            val c = b.filter(m => !contains(m._2)) //todo can we combine this 2 filter?
 
-              continuation(Height @@ (height + 1), acc ++ c)
-            case None => acc
+            continuation(Height @@ (height + 1), acc ++ c)
+          case None => acc
         }
       }
 
@@ -100,11 +97,11 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       else {
         headerIdsAtHeight(height).headOption.flatMap(id =>
           headersCache.find(_.id sameElements id).orElse(typedModifierById[Header](id))) match {
-            case Some(bestHeaderAtThisHeight) =>
-              val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
-                .filter(m => !contains(m._2))
-              continuation(Height @@ (height + 1), acc ++ toDownload)
-            case None => acc
+          case Some(bestHeaderAtThisHeight) =>
+            val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
+              .filter(m => !contains(m._2))
+            continuation(Height @@ (height + 1), acc ++ toDownload)
+          case None => acc
         }
       }
 
@@ -136,9 +133,9 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   private def isNewHeader(header: Header): Boolean =
     timeProvider.estimatedTime - header.timestamp <
-      Constants.Chain.DesiredBlockInterval.toMillis * Constants.Chain.NewHeaderTimeMultiplier
+      TestNetConstants.DesiredBlockInterval.toMillis * TestNetConstants.NewHeaderTimeMultiplier
 
-  def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T]
+  def typedModifierById[T <: PersistentModifier](id: ModifierId): Option[T]
 
   def realDifficulty(h: Header): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
 
@@ -163,11 +160,11 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   def bestBlockIdOpt: Option[ModifierId]
 
-  def bestHeaderHeight: Int = bestHeaderOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight)
+  def bestHeaderHeight: Int = bestHeaderOpt.map(_.height).getOrElse(TestNetConstants.PreGenesisHeight)
 
-  def bestBlockHeight: Int = bestBlockOpt.map(_.header.height).getOrElse(Constants.Chain.PreGenesisHeight)
+  def bestBlockHeight: Int = bestBlockOpt.map(_.header.height).getOrElse(TestNetConstants.PreGenesisHeight)
 
-  protected def process(h: Header): ProgressInfo[EncryPersistentModifier] = getHeaderInfoUpdate(h) match {
+  protected def process(h: Header): ProgressInfo[PersistentModifier] = getHeaderInfoUpdate(h) match {
     case Some(dataToUpdate) =>
       historyStorage.bulkInsert(h.id, dataToUpdate._1, Seq(dataToUpdate._2))
       bestHeaderIdOpt match {
@@ -183,36 +180,36 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   }
 
   private def addHeaderToCacheIfNecessary(h: Header): Unit =
-    if (h.height >= bestHeaderHeight - Constants.Chain.MaxRollbackDepth) {
+    if (h.height >= bestHeaderHeight - TestNetConstants.MaxRollbackDepth) {
       logger.debug(s"Should add ${Algos.encode(h.id)} to header cache")
       val newHeadersIdsAtHeaderHeight = headersCacheIndexes.getOrElse(h.height, Seq.empty[ModifierId]) :+ h.id
       headersCacheIndexes = headersCacheIndexes + (h.height -> newHeadersIdsAtHeaderHeight)
       headersCache = headersCache + h
       // cleanup cache if necessary
-      if (headersCacheIndexes.size > Constants.Chain.MaxRollbackDepth) {
-        headersCacheIndexes.get(bestHeaderHeight - Constants.Chain.MaxRollbackDepth).foreach{ headersIds =>
+      if (headersCacheIndexes.size > TestNetConstants.MaxRollbackDepth) {
+        headersCacheIndexes.get(bestHeaderHeight - TestNetConstants.MaxRollbackDepth).foreach { headersIds =>
           val wrappedIds = headersIds.map(ByteArrayWrapper.apply)
           logger.debug(s"Cleanup header cache from headers: ${headersIds.map(Algos.encode).mkString(",")}")
           headersCache = headersCache.filterNot(header => wrappedIds.contains(ByteArrayWrapper(header.id)))
         }
-        headersCacheIndexes = headersCacheIndexes - (bestHeaderHeight - Constants.Chain.MaxRollbackDepth)
+        headersCacheIndexes = headersCacheIndexes - (bestHeaderHeight - TestNetConstants.MaxRollbackDepth)
       }
       logger.debug(s"headersCache size: ${headersCache.size}")
       logger.debug(s"headersCacheIndexes size: ${headersCacheIndexes.size}")
     }
 
-  private def getHeaderInfoUpdate(header: Header): Option[(Seq[(StorageKey, StorageValue)], EncryPersistentModifier)] = {
+  private def getHeaderInfoUpdate(header: Header): Option[(Seq[(StorageKey, StorageValue)], PersistentModifier)] = {
     addHeaderToCacheIfNecessary(header)
     if (header.isGenesis) {
       logger.info(s"Initialize header chain with genesis header ${header.encodedId}")
       Option(Seq(
         BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId),
-        heightIdsKey(Constants.Chain.GenesisHeight) -> StorageValue @@ header.id.untag(ModifierId),
-        headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(Constants.Chain.GenesisHeight),
+        heightIdsKey(TestNetConstants.GenesisHeight) -> StorageValue @@ header.id.untag(ModifierId),
+        headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(TestNetConstants.GenesisHeight),
         headerScoreKey(header.id) -> StorageValue @@ header.difficulty.toByteArray) -> header)
     } else {
       scoreOf(header.parentId).map { parentScore =>
-        val score: BigInt @@ ConsensusTaggedTypes.Difficulty.Tag =
+        val score: BigInt @@ Difficulty.Tag =
           Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
         val bestRow: Seq[(StorageKey, StorageValue)] =
           if ((header.height > bestHeaderHeight) ||
@@ -229,10 +226,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
             val row = bestBlockHeaderIdsRow(header, score)
             row
           }
-          else {
-            if (settings.postgres.exists(_.enableSave)) system.actorSelection("/user/blockListener") ! NewOrphaned(header)
-            orphanedBlockHeaderIdsRow(header, score)
-          }
+          else orphanedBlockHeaderIdsRow(header, score)
         (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
       }
     }
@@ -328,14 +322,14 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   protected final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = {
     headerIdsAtHeight(height).find(id => p(id))
       .flatMap(id => headersCache.find(_.id sameElements id).orElse(typedModifierById[Header](id))) match {
-        case Some(header) => Some(header)
-        case None if height > Constants.Chain.GenesisHeight => loopHeightDown(height - 1, p)
-        case None => None
-      }
+      case Some(header) => Some(header)
+      case None if height > TestNetConstants.GenesisHeight => loopHeightDown(height - 1, p)
+      case None => None
+    }
   }
 
   def requiredDifficultyAfter(parent: Header): Difficulty = {
-    val parentHeight: Block.Height = parent.height
+    val parentHeight: Int = parent.height
     val requiredHeights: Seq[Height] =
       difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
         .ensuring(_.last == parentHeight, "Incorrect heights sequence!")
@@ -363,14 +357,14 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         .validate(bestHeaderIdOpt.isEmpty) {
           fatal("Trying to append genesis block to non-empty history")
         }
-        .validate(header.height == Constants.Chain.GenesisHeight) {
+        .validate(header.height == TestNetConstants.GenesisHeight) {
           fatal(s"Height of genesis block $header is incorrect")
         }
         .result
 
     private def validateChildBlockHeader(header: Header, parent: Header): ValidationResult = {
       failFast
-        .validate(header.timestamp - timeProvider.estimatedTime <= Constants.Chain.MaxTimeDrift) {
+        .validate(header.timestamp - timeProvider.estimatedTime <= TestNetConstants.MaxTimeDrift) {
           error(s"Header timestamp ${header.timestamp} is too far in future from now " +
             s"${timeProvider.estimatedTime}")
         }
@@ -391,7 +385,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
           fatal(s"Incorrect required difficulty in header: " +
             s"${Algos.encode(header.id)} on height ${header.height}")
         }
-        .validate(heightOf(header.parentId).exists(h => bestHeaderHeight - h < Constants.Chain.MaxRollbackDepth)) {
+        .validate(heightOf(header.parentId).exists(h => bestHeaderHeight - h < TestNetConstants.MaxRollbackDepth)) {
           fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
         }
         .validate(powScheme.verify(header)) {
@@ -402,5 +396,4 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         }.result
     }
   }
-
 }

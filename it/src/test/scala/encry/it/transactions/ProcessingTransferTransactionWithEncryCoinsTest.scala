@@ -7,18 +7,19 @@ import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
 import encry.it.util.KeyHelper._
-import encry.modifiers.history.Block
-import encry.modifiers.mempool.Transaction
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
-import encry.settings.Constants.IntrinsicTokenId
-import encry.view.history.History.Height
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
-import org.encryfoundation.common.transaction.EncryAddress.Address
+import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox}
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.Height
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.crypto.signatures.Curve25519
 import scorex.utils.Random
+
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
@@ -64,7 +65,7 @@ class ProcessingTransferTransactionWithEncryCoinsTest extends AsyncFunSuite
     Await.result(dockerNodes().head.waitForHeadersHeight(secondHeightToWait), waitTime)
 
     val checkBalance: Boolean = Await.result(dockerNodes().head.balances, waitTime)
-      .find(_._1 == Algos.encode(IntrinsicTokenId))
+      .find(_._1 == Algos.encode(TestNetConstants.IntrinsicTokenId))
       .map(_._2 == supplyAtHeight - amount)
       .get
 
@@ -80,9 +81,9 @@ class ProcessingTransferTransactionWithEncryCoinsTest extends AsyncFunSuite
     val lastBlocks: Future[Seq[Block]] = Future.sequence(headersAtHeight.map { h => dockerNodes().head.getBlock(h) })
 
     lastBlocks.map { blocks =>
-      val txsNum: Int = blocks.map(_.payload.transactions.size).sum
+      val txsNum: Int = blocks.map(_.payload.txs.size).sum
       docker.close()
-      val transactionFromChain: Transaction = blocks.flatMap(_.payload.transactions.init).head
+      val transactionFromChain: Transaction = blocks.flatMap(_.payload.txs.init).head
       transactionFromChain.id shouldEqual transaction.id
       true shouldEqual (txsNum > secondHeightToWait - firstHeightToWait)
       txsNum shouldEqual (secondHeightToWait - firstHeightToWait + 1)

@@ -1,4 +1,5 @@
 package encry.cli.commands
+
 import akka.pattern._
 import akka.util.Timeout
 import encry.cli.Response
@@ -9,7 +10,6 @@ import encry.view.wallet.EncryWallet
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import scala.concurrent.Future
 import encry.EncryApp._
-import org.encryfoundation.common.Algos
 
 object GetBalance extends Command {
 

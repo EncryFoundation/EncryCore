@@ -1,9 +1,9 @@
 package encry.utils
 
 import com.google.common.primitives.Longs
-import CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.network.BasicMessagesRepo.BasicMsgDataTypes.InvData
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.network.BasicMessagesRepo.BasicMsgDataTypes.InvData
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
 object Utils {
 

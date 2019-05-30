@@ -7,18 +7,18 @@ import com.google.common.base.Charsets
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SuccessfulTransaction
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.MempoolStat
-import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
 import encry.utils.NetworkTimeProvider
 import encry.view.EncryNodeViewHolder.ReceivableMessages.{LocallyGeneratedTransaction, ModifiersFromRemote}
 import encry.view.mempool.Mempool._
 import encry.view.state.{DigestState, EncryState, UtxoState}
-import org.encryfoundation.common.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ADKey
+import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId, ModifierTypeId}
+
 import scala.collection.immutable.HashMap
 import scala.collection.mutable
 import scala.concurrent.ExecutionContextExecutor
@@ -66,7 +66,7 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
   def messagesHandler(state: UtxoState): Receive = mainLogic(state).orElse(handleStates)
 
   def mainLogic(state: UtxoState): Receive = {
-    case ModifiersFromRemote(modTypeId, filteredModifiers) if modTypeId == Transaction.ModifierTypeId =>
+    case ModifiersFromRemote(modTypeId, filteredModifiers) if modTypeId == Transaction.modifierTypeId =>
       val parsedModifiers: IndexedSeq[Transaction] = filteredModifiers.foldLeft(IndexedSeq.empty[Transaction]) {
         case (transactions, bytes) =>
           TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes)) match {
@@ -82,7 +82,7 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
       bloomFilterForBoxesIds = initBloomFilter
     case CompareTransactionsWithUnconfirmed(peer, transactions) =>
       val unrequestedModifiers: IndexedSeq[ModifierId] = notRequested(transactions)
-      if (unrequestedModifiers.nonEmpty) sender ! RequestForTransactions(peer, Transaction.ModifierTypeId, unrequestedModifiers)
+      if (unrequestedModifiers.nonEmpty) sender ! RequestForTransactions(peer, Transaction.modifierTypeId, unrequestedModifiers)
     case RolledBackTransactions(txs) => memoryPool = validateAndPutTransactions(txs, memoryPool, state, fromNetwork = false)
     case TransactionsForRemove(txs) =>
       memoryPool = removeOldTransactions(txs, memoryPool)

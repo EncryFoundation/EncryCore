@@ -1,16 +1,16 @@
 package encry.modifiers.mempool
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.modifiers.mempool.directive.{Directive, TransferDirective}
-import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.MonetaryBox
-import encry.view.history.History.Height
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
-import org.encryfoundation.common.transaction.EncryAddress.Address
-import org.encryfoundation.common.transaction.{Input, Proof, PubKeyLockedContract}
-import org.encryfoundation.common.utils.TaggedTypes.ADKey
+import org.encryfoundation.common.modifiers.mempool.directive.{Directive, TransferDirective}
+import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
+import org.encryfoundation.common.modifiers.mempool.transaction._
+import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.modifiers.state.box.MonetaryBox
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Height}
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
+
 import scala.util.Random
 
 object TransactionFactory extends StrictLogging {
@@ -23,8 +23,9 @@ object TransactionFactory extends StrictLogging {
                                        amount: Amount,
                                        tokenIdOpt: Option[ADKey] = None): Transaction = {
     val pubKey: PublicKey25519 = privKey.publicImage
-    val uInputs: IndexedSeq[Input] = useBoxes
-      .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes)))).toIndexedSeq
+    val uInputs: IndexedSeq[Input] = useBoxes.map(bx =>
+      Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes)))
+    ).toIndexedSeq
     val change: Amount = useBoxes.map(_.amount).sum - (amount + fee)
     val directives: IndexedSeq[TransferDirective] =
       if (change > 0) IndexedSeq(

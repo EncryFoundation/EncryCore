@@ -1,18 +1,15 @@
 package encry.consensus
 
 import com.google.common.primitives.Chars
-import encry.consensus.ConsensusTaggedTypes.Difficulty
-import encry.utils.CoreTaggedTypes.ModifierId
-import encry.crypto.equihash.{Equihash, EquihashSolution}
-import encry.modifiers.history.{ADProofs, Block, Header, Payload}
-import encry.modifiers.history.Block.Version
-import encry.modifiers.mempool.Transaction
-import encry.settings.Constants
+import encry.crypto.equihash.Equihash
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.bouncycastle.crypto.digests.Blake2bDigest
-import org.encryfoundation.common.Algos
-import org.encryfoundation.common.utils.TaggedTypes.SerializedAdProof
+import org.encryfoundation.common.crypto.equihash.EquihashSolution
+import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId, SerializedAdProof}
 import scorex.crypto.hash.Digest32
-
 import scala.annotation.tailrec
 import scala.math.BigInt
 
@@ -86,17 +83,17 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
   override def getDerivedHeaderFields(parentOpt: Option[Header],
                                       adProofBytes: SerializedAdProof,
                                       transactions: Seq[Transaction]): (Byte, ModifierId, Digest32, Digest32, Int) = {
-    val version: Version = Constants.Chain.Version
+    val version: Byte = TestNetConstants.Version
     val parentId: ModifierId = parentOpt.map(_.id).getOrElse(Header.GenesisParentId)
     val adProofsRoot: Digest32 = ADProofs.proofDigest(adProofBytes)
     val txsRoot: Digest32 = Payload.rootHash(transactions.map(_.id))
-    val height: Int = parentOpt.map(_.height).getOrElse(Constants.Chain.PreGenesisHeight) + 1
+    val height: Int = parentOpt.map(_.height).getOrElse(TestNetConstants.PreGenesisHeight) + 1
 
     (version, parentId, adProofsRoot, txsRoot, height)
   }
 
   override def realDifficulty(header: Header): Difficulty = {
-    Difficulty @@ (Constants.Chain.MaxTarget / BigInt(1, header.powHash))
+    Difficulty @@ (TestNetConstants.MaxTarget / BigInt(1, header.powHash))
   }
 
   override def toString: String = s"EquihashPowScheme(n = ${n.toInt}, k = ${k.toInt})"

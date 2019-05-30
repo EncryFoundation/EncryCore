@@ -1,22 +1,19 @@
 package encry.utils
 
-import encry.crypto.equihash.EquihashSolution
-import encry.modifiers.history.Header
+import encry.modifiers.mempool.TransactionFactory
 import encry.modifiers.mempool.directive._
-import encry.modifiers.mempool.{Transaction, TransactionFactory, UnsignedTransaction}
-import encry.modifiers.InstanceFactory
-import encry.modifiers.history.{Block, Header}
-import encry.modifiers.mempool.{Transaction, TransactionFactory}
-import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.modifiers.state.box._
-import encry.settings.Constants
-import encry.utils.CoreTaggedTypes.ModifierId
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import encry.utils.TestHelper.Props
+import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
-import org.encryfoundation.common.transaction.EncryAddress.Address
-import org.encryfoundation.common.transaction.{Input, Pay2PubKeyAddress, Proof, PubKeyLockedContract}
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey}
+import org.encryfoundation.common.modifiers.history.Header
+import org.encryfoundation.common.modifiers.mempool.directive._
+import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
+import org.encryfoundation.common.modifiers.mempool.transaction._
+import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.modifiers.state.box._
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ModifierId}
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
@@ -145,7 +142,7 @@ trait EncryGenerator {
       Math.abs(random.nextLong()),
       Math.abs(random.nextInt(10000)),
       random.nextLong(),
-      Constants.Chain.InitialDifficulty,
+      TestNetConstants.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
   }
@@ -161,7 +158,7 @@ trait EncryGenerator {
       Math.abs(random.nextLong()),
       height,
       random.nextLong(),
-      Constants.Chain.InitialDifficulty,
+      TestNetConstants.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
   }

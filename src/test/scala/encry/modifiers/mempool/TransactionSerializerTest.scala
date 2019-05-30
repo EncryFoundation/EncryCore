@@ -1,6 +1,7 @@
 package encry.modifiers.mempool
 
 import encry.modifiers.InstanceFactory
+import org.encryfoundation.common.modifiers.mempool.transaction.TransactionSerializer
 import org.scalatest.FunSuite
 
 class TransactionSerializerTest extends FunSuite with InstanceFactory {

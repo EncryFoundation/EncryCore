@@ -7,13 +7,16 @@ import PayloadProto.PayloadProtoMessage
 import TransactionProto.TransactionProtoMessage
 import encry.modifiers.InstanceFactory
 import encry.modifiers.mempool.directive._
-import encry.modifiers.mempool.{Transaction, TransactionProtoSerializer}
 import encry.modifiers.state.box._
-import org.encryfoundation.common.transaction.{Pay2PubKeyAddress, PubKeyLockedContract}
+import org.encryfoundation.common.modifiers.history._
+import org.encryfoundation.common.modifiers.mempool.directive._
+import org.encryfoundation.common.modifiers.mempool.transaction.{Pay2PubKeyAddress, PubKeyLockedContract, Transaction, TransactionProtoSerializer}
+import org.encryfoundation.common.modifiers.state.box._
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.signatures.PublicKey
 import scorex.utils.Random
+
 import scala.util.Try
 
 class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {

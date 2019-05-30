@@ -5,17 +5,18 @@ import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.consensus.History.Older
 import encry.modifiers.InstanceFactory
-import encry.modifiers.history.{Block, Header}
-import encry.modifiers.mempool.Transaction
-import encry.network.BasicMessagesRepo._
 import encry.network.DeliveryManager
 import encry.network.DeliveryManagerTests.DMUtils._
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.EncryAppSettings
-import encry.utils.CoreTaggedTypes.ModifierId
-import encry.view.history.{EncryHistory, EncrySyncInfo}
+import encry.view.history.{EncryHistory}
+import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
+import org.encryfoundation.common.network.SyncInfo
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import scala.concurrent.duration._
 import scala.collection.mutable.WrappedArray
@@ -98,7 +99,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId,
         Map(header -> Array.emptyByteArray)), cp1)
 
-      handler1.expectMsg(SyncInfoNetworkMessage(EncrySyncInfo(List())))
+      handler1.expectMsg(SyncInfoNetworkMessage(SyncInfo(List())))
     }
     "not re-ask modifiers which were applied to the history" in {
       val (deliveryManager, _, _, _, blocks, headerIds, _, history) = initialiseState()
@@ -127,7 +128,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
 
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(headerIds.head))
 
-      handler1.expectMsg(SyncInfoNetworkMessage(EncrySyncInfo(List())))
+      handler1.expectMsg(SyncInfoNetworkMessage(SyncInfo(List())))
 
       assert(deliveryManager.underlyingActor.expectedModifiers
         .getOrElse(cp1.socketAddress.getAddress, Map.empty).isEmpty)
@@ -156,10 +157,10 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
 
       val transactions: Seq[ModifierId] = genValidPaymentTxs(1).map(_.id)
 
-      deliveryManager ! RequestFromLocal(cp1, Transaction.ModifierTypeId, transactions)
+      deliveryManager ! RequestFromLocal(cp1, Transaction.modifierTypeId, transactions)
 
       handler1.expectMsgAllOf(
-        RequestModifiersNetworkMessage(Transaction.ModifierTypeId -> transactions)
+        RequestModifiersNetworkMessage(Transaction.modifierTypeId -> transactions)
       )
       handler1.expectNoMsg(10.seconds)
       assert(deliveryManager.underlyingActor.expectedModifiers

@@ -1,11 +1,12 @@
 package benches
 
 import java.util.concurrent.TimeUnit
+
 import benches.SerializedMonetaryTxBenchmark.SerializedMonetaryBenchState
 import benches.Utils._
-import encry.modifiers.mempool.{Transaction, TransactionSerializer}
-import encry.modifiers.state.box.AssetBox
 import encryBenchmark.Settings
+import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionSerializer}
+import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import org.openjdk.jmh.profile.GCProfiler

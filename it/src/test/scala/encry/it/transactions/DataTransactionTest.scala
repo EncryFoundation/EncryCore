@@ -6,11 +6,10 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
 import encry.it.util.KeyHelper._
-import encry.modifiers.history.Block
-import encry.modifiers.mempool.Transaction
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox}
 import org.encryfoundation.common.crypto.PrivateKey25519
-import org.encryfoundation.common.transaction.PubKeyLockedContract
+import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedContract, Transaction}
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.utils.Random
@@ -64,9 +63,9 @@ class DataTransactionTest extends AsyncFunSuite
     val lastBlocks: Future[Seq[Block]] = Future.sequence(headersAtHeight.map { h => dockerNodes().head.getBlock(h) })
 
     lastBlocks.map { blocks =>
-      val txsNum: Int = blocks.map(_.payload.transactions.size).sum
+      val txsNum: Int = blocks.map(_.payload.txs.size).sum
       docker.close()
-      val transactionFromChain: Transaction = blocks.flatMap(_.payload.transactions.init).head
+      val transactionFromChain: Transaction = blocks.flatMap(_.payload.txs.init).head
       transactionFromChain.id shouldEqual transaction.id
       true shouldEqual (txsNum > secondHeightToWait - firstHeightToWait)
       txsNum shouldEqual (secondHeightToWait - firstHeightToWait + 1)

@@ -6,34 +6,32 @@ import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.avltree
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedAVLStorage}
-import encry.consensus.ConsensusTaggedTypes.Difficulty
-import encry.crypto.equihash.EquihashSolution
-import encry.modifiers.history.{ADProofs, Block, Header, Payload}
-import encry.modifiers.mempool.directive.{AssetIssuingDirective, DataDirective, Directive, TransferDirective}
-import encry.modifiers.mempool.{Transaction, TransactionFactory, UnsignedTransaction}
-import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
-import encry.settings.{Constants, EncryAppSettings, LevelDBSettings, NodeSettings}
+import encry.modifiers.mempool.TransactionFactory
+import encry.settings.{EncryAppSettings, LevelDBSettings, NodeSettings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.StorageType
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB._
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
 import encry.view.history.EncryHistory
-import encry.view.history.History.Height
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.processors.proofs.FullStateProofProcessor
 import encry.view.history.storage.HistoryStorage
 import encry.view.state.{BoxHolder, EncryState, UtxoState}
 import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.Algos
-import org.encryfoundation.common.Algos.HF
+import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
-import org.encryfoundation.common.transaction.EncryAddress.Address
-import org.encryfoundation.common.transaction.{Input, Pay2PubKeyAddress, Proof, PubKeyLockedContract}
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, SerializedAdProof}
+import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
+import org.encryfoundation.common.modifiers.mempool.directive.{AssetIssuingDirective, DataDirective, Directive, TransferDirective}
+import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
+import org.encryfoundation.common.modifiers.mempool.transaction._
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
+import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.Algos.HF
+import org.encryfoundation.common.utils.TaggedTypes._
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.{Blake2b256, Digest32}
@@ -78,13 +76,13 @@ object Utils extends StrictLogging {
       parentId = Header.GenesisParentId,
       adProofsRoot = adPN,
       stateRoot = adDigest,
-      height = Constants.Chain.GenesisHeight
+      height = TestNetConstants.GenesisHeight
     )
     Block(header, Payload(header.id, txs), None)
   }
 
   def generateGenesisBlockValidForHistory: Block = {
-    val header = genHeader.copy(parentId = Header.GenesisParentId, height = Constants.Chain.GenesisHeight)
+    val header = genHeader.copy(parentId = Header.GenesisParentId, height = TestNetConstants.GenesisHeight)
     Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
   }
 
@@ -169,7 +167,7 @@ object Utils extends StrictLogging {
                                        txs: Seq[Transaction]): Block = {
     val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
     val requiredDifficulty: Difficulty = prevBlock.map(b => history.requiredDifficultyAfter(b.header))
-      .getOrElse(Constants.Chain.InitialDifficulty)
+      .getOrElse(TestNetConstants.InitialDifficulty)
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.bestHeaderHeight + 1,
@@ -213,7 +211,7 @@ object Utils extends StrictLogging {
     new UtxoState(
       persistentProver,
       EncryState.genesisStateVersion,
-      Constants.Chain.GenesisHeight,
+      TestNetConstants.GenesisHeight,
       versionalStorage,
       0L,
       None,
@@ -239,7 +237,7 @@ object Utils extends StrictLogging {
       Math.abs(random.nextLong()),
       Math.abs(random.nextInt(10000)),
       random.nextLong(),
-      Constants.Chain.InitialDifficulty,
+      TestNetConstants.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
   }

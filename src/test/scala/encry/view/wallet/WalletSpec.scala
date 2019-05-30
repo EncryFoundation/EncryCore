@@ -1,17 +1,17 @@
 package encry.view.wallet
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.modifiers.InstanceFactory
-import encry.modifiers.history.{Block, Header, Payload}
-import encry.modifiers.mempool.Transaction
-import encry.modifiers.state.box.{AssetBox, MonetaryBox}
-import encry.settings.{Constants, EncryAppSettings, LevelDBSettings}
+import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDBCompanion}
 import encry.utils.TestHelper.Props
 import encry.utils.{EncryGenerator, FileHelper}
 import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, MonetaryBox}
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.iq80.leveldb.{DB, Options}
 import org.scalatest.{Matchers, PropSpec}
 
@@ -64,11 +64,11 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     wallet.scanPersistent(firstBlock)
 
-    wallet.walletStorage.getTokenBalanceById(Constants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance
+    wallet.walletStorage.getTokenBalanceById(TestNetConstants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance
 
     wallet.scanPersistent(secondBlock)
 
-    wallet.walletStorage.getTokenBalanceById(Constants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance - useBox.amount
+    wallet.walletStorage.getTokenBalanceById(TestNetConstants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance - useBox.amount
 
     logger.info(s"tmp dir size: ${dir.length()}")
   }

@@ -1,9 +1,8 @@
 package encry.view.history.processors.proofs
 
-import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.ADProofs
 import encry.consensus.History.ProgressInfo
-
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.ADProofs
 import scala.util.Try
 
 trait BaseADProofProcessor {
@@ -17,7 +16,7 @@ trait BaseADProofProcessor {
     * @param m - modifier to process
     * @return ProgressInfo - info required for State to be consistent with History
     */
-  protected def process(m: ADProofs): ProgressInfo[EncryPersistentModifier]
+  protected def process(m: ADProofs): ProgressInfo[PersistentModifier]
 
   /**
     * @param m - ADProof to validate

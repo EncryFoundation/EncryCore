@@ -1,5 +1,6 @@
 package encry.modifiers.mempool.directive
 
+import org.encryfoundation.common.modifiers.mempool.directive.{ScriptedAssetDirective, ScriptedAssetDirectiveSerializer}
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.Ast.Expr
 import org.encryfoundation.prismlang.core.{Ast, Types}

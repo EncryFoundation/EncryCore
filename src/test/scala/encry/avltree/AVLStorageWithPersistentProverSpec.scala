@@ -1,13 +1,13 @@
 package encry.avltree
 
 import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, SerializedAdProof}
 import org.scalatest.{Matchers, PropSpec}
 import encry.avltree.benchmark.IODBBenchmark.getRandomTempDir
 import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.FileHelper
+import org.encryfoundation.common.utils.Algos
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.utils.Random

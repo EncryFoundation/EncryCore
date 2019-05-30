@@ -12,12 +12,12 @@ import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationStat
 import PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.BasicMessagesRepo._
 import PeerConnectionHandler.ReceivableMessages._
 import scala.annotation.tailrec
 import scala.collection.immutable.HashMap
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
+import org.encryfoundation.common.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, NetworkMessage}
 
 class PeerConnectionHandler(connection: ActorRef,
                             direction: ConnectionType,
@@ -73,7 +73,7 @@ class PeerConnectionHandler(connection: ActorRef,
   }
 
   def receivedData: Receive = {
-    case Received(data) => GeneralizedNetworkMessage.fromProto(data) match {
+    case Received(data) => GeneralizedNetworkMessage.fromProto(data.toArray) match {
       case Success(value) => value match {
         case handshake: Handshake =>
           logger.info(s"Got a Handshake from $remote.")
@@ -207,7 +207,7 @@ class PeerConnectionHandler(connection: ActorRef,
       val packet: (List[ByteString], ByteString) = getPacket(chunksBuffer ++ data)
       chunksBuffer = packet._2
       packet._1.find { packet =>
-        GeneralizedNetworkMessage.fromProto(packet) match {
+        GeneralizedNetworkMessage.fromProto(packet.toArray) match {
           case Success(message) =>
             networkController ! MessageFromNetwork(message, selfPeer)
             logger.debug("Received message " + message.messageName + " from " + remote)

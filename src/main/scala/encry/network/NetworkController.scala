@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
+
 import akka.actor._
 import akka.io.Tcp.SO.KeepAlive
 import akka.io.Tcp._
@@ -12,8 +13,9 @@ import encry.network.PeerConnectionHandler._
 import PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import com.typesafe.scalalogging.StrictLogging
 import encry.cli.commands.AddPeer.PeerFromCli
-import BasicMessagesRepo._
 import encry.settings.NetworkSettings
+import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
+
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
@@ -67,7 +69,7 @@ class NetworkController extends Actor with StrictLogging {
     }
 
   def businessLogic: Receive = {
-    case MessageFromNetwork(message, Some(remote)) if message.isValid(settings) =>
+    case MessageFromNetwork(message, Some(remote)) if message.isValid(settings.network.syncPacketLength) =>
       logger.debug(s"Got ${message.messageName} on the NetworkController.")
       findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
     case MessageFromNetwork(message, Some(remote)) =>

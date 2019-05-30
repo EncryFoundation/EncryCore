@@ -4,7 +4,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.utils.CoreTaggedTypes.VersionTag
 import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.Algos
 import scorex.crypto.hash.Digest32
 
 import scala.util.Try

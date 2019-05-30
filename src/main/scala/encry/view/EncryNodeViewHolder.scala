@@ -1,7 +1,6 @@
 package encry.view
 
 import java.io.File
-
 import HeaderProto.HeaderProtoMessage
 import PayloadProto.PayloadProtoMessage
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
@@ -12,17 +11,12 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
-import encry.local.explorer.BlockListener.ChainSwitching
-import encry.modifiers._
-import encry.modifiers.history._
-import encry.modifiers.mempool.Transaction
-import encry.modifiers.state.box.EncryProposition
 import encry.network.AuxiliaryHistoryHolder.{Append, ReportModifierInvalid, ReportModifierValid}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
-import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId, VersionTag}
+import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.EncryNodeViewHolder.ReceivableMessages._
 import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
@@ -30,11 +24,12 @@ import encry.view.mempool.Mempool._
 import encry.view.state._
 import encry.view.wallet.EncryWallet
 import org.apache.commons.io.FileUtils
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentModifier}
+import org.encryfoundation.common.modifiers.history._
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.serialization.Serializer
-import org.encryfoundation.common.transaction.Proposition
-import org.encryfoundation.common.utils.TaggedTypes.ADDigest
-
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -113,7 +108,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         case id => logger.info(s"NodeViewHolder got modifier of wrong type: $id!")
       }
       logger.debug(s"Time processing of msg ModifiersFromRemote with mod of type: $modifierTypeId: ${System.currentTimeMillis() - startTime}")
-    case lm: LocallyGeneratedModifier[EncryPersistentModifier]@unchecked =>
+    case lm: LocallyGeneratedModifier[PersistentModifier]@unchecked =>
       logger.debug(s"Start processing LocallyGeneratedModifier message on NVH.")
       val startTime = System.currentTimeMillis()
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
@@ -147,7 +142,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       val ids: Seq[ModifierId] = modifierTypeId match {
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
-      if (modifierTypeId != Transaction.ModifierTypeId) logger.debug(s"Got compare view message on NVH from ${peer.socketAddress}." +
+      if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got compare view message on NVH from ${peer.socketAddress}." +
         s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
         s" Sending RequestFromLocal with ids to $sender." +
         s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
@@ -179,15 +174,15 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     nodeView = newNodeView
   }
 
-  def requestDownloads(pi: ProgressInfo[EncryPersistentModifier], previousModifier: Option[ModifierId] = None): Unit =
+  def requestDownloads(pi: ProgressInfo[PersistentModifier], previousModifier: Option[ModifierId] = None): Unit =
     pi.toDownload.foreach { case (tid, id) =>
-      if (tid != Transaction.ModifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
+      if (tid != Transaction.modifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
       nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
     }
 
-  def trimChainSuffix(suffix: IndexedSeq[EncryPersistentModifier], rollbackPoint: ModifierId):
-  IndexedSeq[EncryPersistentModifier] = {
+  def trimChainSuffix(suffix: IndexedSeq[PersistentModifier], rollbackPoint: ModifierId):
+  IndexedSeq[PersistentModifier] = {
     val idx: Int = suffix.indexWhere(_.id.sameElements(rollbackPoint))
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
@@ -195,19 +190,19 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   @tailrec
   private def updateState(history: EncryHistory,
                           state: StateType,
-                          progressInfo: ProgressInfo[EncryPersistentModifier],
-                          suffixApplied: IndexedSeq[EncryPersistentModifier]):
-  (EncryHistory, Try[StateType], Seq[EncryPersistentModifier]) = {
+                          progressInfo: ProgressInfo[PersistentModifier],
+                          suffixApplied: IndexedSeq[PersistentModifier]):
+  (EncryHistory, Try[StateType], Seq[PersistentModifier]) = {
     case class UpdateInformation(history: EncryHistory,
                                  state: StateType,
-                                 failedMod: Option[EncryPersistentModifier],
-                                 alternativeProgressInfo: Option[ProgressInfo[EncryPersistentModifier]],
-                                 suffix: IndexedSeq[EncryPersistentModifier])
+                                 failedMod: Option[PersistentModifier],
+                                 alternativeProgressInfo: Option[ProgressInfo[PersistentModifier]],
+                                 suffix: IndexedSeq[PersistentModifier])
     logger.debug(s"\nStarting updating state in updateState function!")
     val startTime = System.currentTimeMillis()
     requestDownloads(progressInfo, None)
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
-    val (stateToApplyTry: Try[StateType], suffixTrimmed: IndexedSeq[EncryPersistentModifier]@unchecked) =
+    val (stateToApplyTry: Try[StateType], suffixTrimmed: IndexedSeq[PersistentModifier]@unchecked) =
       if (progressInfo.chainSwitchingNeeded) {
         branchingPointOpt.map { branchPoint =>
           if (!state.version.sameElements(branchPoint))
@@ -228,7 +223,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
             case Success(stateAfterApply) =>
               modToApply match {
                 case block: Block if settings.influxDB.isDefined =>
-                  context.system.actorSelection("user/statsSender") ! TxsInBlock(block.transactions.size)
+                  context.system.actorSelection("user/statsSender") ! TxsInBlock(block.payload.txs.size)
                 case _ =>
               }
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
@@ -238,7 +233,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
                 .actorSelection("user/statsSender") ! NewBlockAppended(false, true)
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Failure(e) =>
-              val (newHis: EncryHistory, newProgressInfo: ProgressInfo[EncryPersistentModifier]) =
+              val (newHis: EncryHistory, newProgressInfo: ProgressInfo[PersistentModifier]) =
                 history.reportModifierIsInvalid(modToApply, progressInfo)
               auxHistoryHolder ! ReportModifierInvalid(modToApply, progressInfo)
               if (settings.influxDB.isDefined) context.system
@@ -259,7 +254,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
     }
   }
 
-  def pmodModify(pmod: EncryPersistentModifier, isLocallyGenerated: Boolean = false): Unit = if (!nodeView.history.contains(pmod.id)) {
+  def pmodModify(pmod: PersistentModifier, isLocallyGenerated: Boolean = false): Unit = if (!nodeView.history.contains(pmod.id)) {
     logger.debug(s"\nStarting to apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
     val startAppHistory = System.currentTimeMillis()
     if (settings.influxDB.isDefined) context.system
@@ -277,7 +272,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
         if (progressInfo.toApply.nonEmpty) {
           logger.debug(s"\n progress info non empty")
           val startPoint: Long = System.currentTimeMillis()
-          val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[EncryPersistentModifier]) =
+          val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[PersistentModifier]) =
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
           if (settings.influxDB.isDefined)
             context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
@@ -291,9 +286,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
                 nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
               blocksApplied.foreach(nodeView.wallet.scanPersistent)
               logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
-              if (progressInfo.chainSwitchingNeeded)
-                context.actorSelection("/user/blockListener") !
-                  ChainSwitching(progressInfo.toRemove.map(_.id))
               if (settings.influxDB.isDefined) newHistory.bestHeaderOpt.foreach(header =>
                 context.actorSelection("/user/statsSender") ! BestHeaderInChain(header, System.currentTimeMillis()))
               if (newHistory.isFullChainSynced) {
@@ -330,8 +322,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
   } else logger.info(s"\nTrying to apply modifier ${pmod.encodedId} that's already in history.")
 
   def sendUpdatedInfoToMemoryPool(state: StateType,
-                                  toRemove: Seq[EncryPersistentModifier],
-                                  blocksApplied: Seq[EncryPersistentModifier]): Unit = {
+                                  toRemove: Seq[PersistentModifier],
+                                  blocksApplied: Seq[PersistentModifier]): Unit = {
     memoryPoolRef ! UpdatedState(state)
     val rolledBackTxs: IndexedSeq[Transaction] =
       toRemove.flatMap(extractTransactions).toIndexedSeq
@@ -342,8 +334,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](auxHistoryHolder: 
       memoryPoolRef ! TransactionsForRemove(appliedTransactions)
   }
 
-  def extractTransactions(mod: EncryPersistentModifier): Seq[Transaction] = mod match {
-    case tcm: TransactionsCarryingPersistentNodeViewModifier[EncryProposition, Transaction]@unchecked => tcm.transactions
+  def extractTransactions(mod: PersistentModifier): Seq[Transaction] = mod match {
+    case b: Block => b.payload.txs
+    case p: Payload => p.txs
     case _ => Seq.empty[Transaction]
   }
 
@@ -445,8 +438,7 @@ object EncryNodeViewHolder {
 
     case class LocallyGeneratedTransaction(tx: Transaction)
 
-    case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentNodeViewModifier]
-    (pmod: EncryPersistentModifier)
+    case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentModifier](pmod: EncryPersistentModifier)
 
   }
 

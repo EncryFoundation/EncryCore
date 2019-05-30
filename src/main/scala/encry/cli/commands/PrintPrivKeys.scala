@@ -9,7 +9,8 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import encry.EncryApp._
 import encry.view.EncryNodeViewHolder.ReceivableMessages.GetDataFromCurrentView
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.Algos
+
 import scala.concurrent.Future
 
 //TODO This cmd is unsafe.

@@ -11,7 +11,7 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import encry.cli.commands.AddPeer.PeerFromCli
 import PeerManager.ReceivableMessages.{AddOrUpdatePeer, RandomPeers}
-import BasicMessagesRepo._
+import org.encryfoundation.common.network.BasicMessagesRepo.{GetPeersNetworkMessage, PeersNetworkMessage}
 
 class PeerSynchronizer extends Actor with StrictLogging {
 

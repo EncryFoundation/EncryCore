@@ -5,6 +5,7 @@ import java.nio.{ByteBuffer, ByteOrder}
 import org.apache.commons.lang.ArrayUtils
 import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests.Blake2bDigest
+import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import scala.collection.mutable.ArrayBuffer
 
 object Equihash {

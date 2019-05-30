@@ -12,7 +12,7 @@ import encry.local.miner.Worker.{MineBlock, NextChallenge}
 import java.text.SimpleDateFormat
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.Constants
+import org.encryfoundation.common.utils.constants.TestNetConstants
 
 class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with StrictLogging {
 
@@ -37,7 +37,7 @@ class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with StrictLogging 
     case NextChallenge(candidate: CandidateBlock) =>
       challengeStartTime = new Date(System.currentTimeMillis())
       logger.info(s"Start next challenge on worker: $myIdx at height " +
-        s"${candidate.parentOpt.map(_.height + 1).getOrElse(Constants.Chain.PreGenesisHeight.toString)} at ${sdf.format(challengeStartTime)}")
+        s"${candidate.parentOpt.map(_.height + 1).getOrElse(TestNetConstants.PreGenesisHeight.toString)} at ${sdf.format(challengeStartTime)}")
         self ! MineBlock(candidate, Long.MaxValue / numberOfWorkers * myIdx)
   }
 

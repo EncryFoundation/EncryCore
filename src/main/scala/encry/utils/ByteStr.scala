@@ -1,6 +1,6 @@
 package encry.utils
 
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.Algos
 import scorex.crypto.encode.Base58
 import scala.util.Try
 

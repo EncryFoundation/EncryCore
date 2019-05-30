@@ -1,21 +1,21 @@
 package encry.view.history
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.consensus.History._
-import encry.consensus.ModifierSemanticValidity
-import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.history._
-import encry.settings.{Constants, NodeSettings}
+import encry.settings.NodeSettings
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
-import encry.EncryApp.settings
-import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.storage.VersionalStorage.StorageKey
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbKey
-import encry.view.history.History.Height
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
+import org.encryfoundation.common.network.SyncInfo
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
+import org.encryfoundation.common.utils.constants.TestNetConstants
+import org.encryfoundation.common.validation.ModifierSemanticValidity
 
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
@@ -48,7 +48,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     * @param si other's node sync info
     * @return Equal if nodes have the same history, Younger if another node is behind, Older if a new node is ahead
     */
-  def compare(si: EncrySyncInfo): HistoryComparisonResult = bestHeaderIdOpt match {
+  def compare(si: SyncInfo): HistoryComparisonResult = bestHeaderIdOpt match {
 
     //Our best header is the same as other history best header
     case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) => Equal
@@ -72,14 +72,15 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     case None => Older
   }
 
-  def continuationIds(info: EncrySyncInfo, size: Int): Option[ModifierIds] = Try {
+  def continuationIds(info: SyncInfo, size: Int): Option[ModifierIds] = Try {
     if (isEmpty) info.startingPoints
     else if (info.lastHeaderIds.isEmpty) {
       val heightFrom: Int = Math.min(bestHeaderHeight, size - 1)
       val startId: ModifierId = headerIdsAtHeight(heightFrom).head
       val startHeader: Header = typedModifierById[Header](startId).get
       val headers: HeaderChain = headerChainBack(size, startHeader, _ => false)
-        .ensuring(_.headers.exists(_.height == Constants.Chain.GenesisHeight), "Should always contain genesis header.")
+        .ensuring(_.headers.exists(_.height == TestNetConstants.GenesisHeight),
+          "Should always contain genesis header.")
       headers.headers.flatMap(h => Seq((Header.modifierTypeId, h.id)))
     } else {
       val ids: Seq[ModifierId] = info.lastHeaderIds
@@ -116,11 +117,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     loop(header.height, Seq(Seq(header)))
   }
 
-  def testApplicable(modifier: EncryPersistentModifier): Try[Unit] = modifier match {
-    case header: Header =>
-      val res = validate(header)
-      logger.info(s"result of validating $modifier is $res")
-      res
+  def testApplicable(modifier: PersistentModifier): Try[Unit] = modifier match {
+    case header: Header => validate(header)
     case payload: Payload => validate(payload)
     case adProofs: ADProofs => validate(adProofs)
     case mod: Any => Failure(new Exception(s"Modifier $mod is of incorrect type."))
@@ -129,10 +127,10 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   def lastHeaders(count: Int): HeaderChain = bestHeaderOpt
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(HeaderChain.empty)
 
-  def modifierById(id: ModifierId): Option[EncryPersistentModifier] = historyStorage.modifierById(id)
+  def modifierById(id: ModifierId): Option[PersistentModifier] = historyStorage.modifierById(id)
     .ensuring(_.forall(_.id sameElements id), s"Modifier ${Algos.encode(id)} id mismatch")
 
-  def typedModifierById[T <: EncryPersistentModifier](id: ModifierId): Option[T] = modifierById(id) match {
+  def typedModifierById[T <: PersistentModifier](id: ModifierId): Option[T] = modifierById(id) match {
     case Some(m: T@unchecked) if m.isInstanceOf[T] => Some(m)
     case _ => None
   }
@@ -187,8 +185,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     (currentChain, otherChain.takeAfter(currentChain.head))
   }
 
-  def syncInfo: EncrySyncInfo = if (isEmpty) EncrySyncInfo(Seq.empty)
-  else EncrySyncInfo(lastHeaders(settings.network.syncPacketLength).headers.map(_.id))
+  def syncInfo: SyncInfo = if (isEmpty) SyncInfo(Seq.empty)
+  else SyncInfo(lastHeaders(settings.network.syncPacketLength).headers.map(_.id))
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
     historyStorage.store.get(validityKey(modifierId)) match {

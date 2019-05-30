@@ -5,20 +5,22 @@ import java.io.File
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.modifiers.EncryPersistentModifier
 import encry.modifiers.mempool._
-import encry.modifiers.state.box._
-import encry.settings.{Constants, EncryAppSettings, NodeSettings}
+import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.VersionalStorage
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDB
 import io.iohk.iodb.Store
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.modifiers.state.box._
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import scorex.crypto.encode.Base16
 
 import scala.util.Try
 
-trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
-  extends MinimalState[EncryPersistentModifier, IState] {
+trait EncryState[IState <: MinimalState[PersistentModifier, IState]]
+  extends MinimalState[PersistentModifier, IState] {
 
   self: IState =>
 
@@ -41,7 +43,7 @@ trait EncryState[IState <: MinimalState[EncryPersistentModifier, IState]]
   /** ID of the last applied modifier. */
   override def version: VersionTag
 
-  override def applyModifier(mod: EncryPersistentModifier): Try[IState]
+  override def applyModifier(mod: PersistentModifier): Try[IState]
 
   override def rollbackTo(version: VersionTag): Try[IState]
 
@@ -54,10 +56,10 @@ object EncryState extends StrictLogging {
 
   def initialStateBoxes: IndexedSeq[AssetBox] = IndexedSeq(AssetBox(EncryProposition.open, -9, 0))
 
-  val afterGenesisStateDigest: ADDigest = ADDigest @@ Base16.decode(Constants.AfterGenesisStateDigestHex)
+  val afterGenesisStateDigest: ADDigest = ADDigest @@ Base16.decode(TestNetConstants.AfterGenesisStateDigestHex)
     .getOrElse(throw new Error("Failed to decode genesis state digest"))
 
-  val genesisStateVersion: VersionTag = VersionTag @@ Base16.decode(Constants.GenesisStateVersion)
+  val genesisStateVersion: VersionTag = VersionTag @@ Base16.decode(TestNetConstants.GenesisStateVersion)
     .getOrElse(throw new Error("Failed to decode genesis state digest"))
 
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
@@ -68,7 +70,7 @@ object EncryState extends StrictLogging {
                                statsSenderRef: Option[ActorRef]): UtxoState = {
     val supplyBoxes: List[EncryBaseBox] = EncryState.initialStateBoxes.toList
     UtxoState.genesis(supplyBoxes, stateDir, nodeViewHolderRef, settings, statsSenderRef).ensuring(us => {
-      logger.info(s"Expected afterGenesisDigest: ${Constants.AfterGenesisStateDigestHex}")
+      logger.info(s"Expected afterGenesisDigest: ${TestNetConstants.AfterGenesisStateDigestHex}")
       logger.info(s"Actual afterGenesisDigest:   ${Base16.encode(us.rootHash)}")
       logger.info(s"Generated UTXO state with ${supplyBoxes.size} boxes inside.")
       us.rootHash.sameElements(afterGenesisStateDigest) && us.version.sameElements(genesisStateVersion)

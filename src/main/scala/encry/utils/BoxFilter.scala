@@ -1,6 +1,6 @@
 package encry.utils
 
-import encry.modifiers.state.box.{MonetaryBox, EncryBaseBox}
+import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, MonetaryBox}
 
 object BoxFilter {
 

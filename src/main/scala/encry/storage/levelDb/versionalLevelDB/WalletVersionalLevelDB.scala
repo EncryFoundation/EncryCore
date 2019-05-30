@@ -4,16 +4,15 @@ import cats.instances.all._
 import cats.syntax.semigroup._
 import com.google.common.primitives.Longs
 import com.typesafe.scalalogging.StrictLogging
-import encry.modifiers.state.StateModifierSerializer
-import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.EncryBaseBox
-import encry.modifiers.state.box.TokenIssuingBox.TokenId
 import encry.settings.LevelDBSettings
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion._
 import encry.utils.{BalanceCalculator, ByteStr}
-import encry.utils.CoreTaggedTypes.ModifierId
-import org.encryfoundation.common.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ADKey
+import org.encryfoundation.common.modifiers.state.StateModifierSerializer
+import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
+import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
 import org.iq80.leveldb.DB
 import scorex.crypto.hash.Digest32
 import scala.util.Success

@@ -9,10 +9,11 @@ import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion
 import io.iohk.iodb.{ByteArrayWrapper, Store}
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ADValue, Balance}
 import scorex.crypto.hash
 import scorex.crypto.hash.{CryptographicHash, Digest}
+
 import scala.util.{Failure, Try}
 
 case class NodeParameters(keySize: Int, valueSize: Option[Int], labelSize: Int)

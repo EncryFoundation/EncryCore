@@ -1,9 +1,9 @@
 package encry.api.http.routes
 
 import encry.modifiers.InstanceFactory
-import encry.modifiers.mempool.Transaction
 import io.circe.Decoder.Result
 import io.circe.Json
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.scalatest.{Matchers, PropSpec}
 
 class TransactionsApiRouteSpec extends PropSpec with Matchers with InstanceFactory {

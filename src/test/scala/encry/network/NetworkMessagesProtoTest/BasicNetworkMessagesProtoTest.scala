@@ -1,18 +1,18 @@
 package encry.network.NetworkMessagesProtoTest
 
 import java.net.InetSocketAddress
+
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage.InnerMessage
-import akka.util.ByteString
 import encry.modifiers.InstanceFactory
-import encry.modifiers.history.{Block, Header, Payload}
-import encry.modifiers.mempool.Transaction
-import encry.network.BasicMessagesRepo
-import encry.network.BasicMessagesRepo._
 import encry.settings.EncryAppSettings
-import encry.utils.CoreTaggedTypes.{ModifierId, ModifierTypeId}
-import encry.view.history.EncrySyncInfo
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.network.BasicMessagesRepo._
+import org.encryfoundation.common.network.{BasicMessagesRepo, SyncInfo}
+import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import org.scalatest.{Matchers, PropSpec}
+
 import scala.util.Try
 
 class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with InstanceFactory {
@@ -33,14 +33,14 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
 
   val invDataHeaders: (ModifierTypeId, Vector[ModifierId]) = Header.modifierTypeId -> testedBlocks.map(_.header.id)
   val invDataPayloads: (ModifierTypeId, Vector[ModifierId]) = Payload.modifierTypeId -> testedBlocks.map(_.payload.id)
-  val invDataTransactions: (ModifierTypeId, Seq[ModifierId]) = Transaction.ModifierTypeId -> testedTransaction.map(_.id)
+  val invDataTransactions: (ModifierTypeId, Seq[ModifierId]) = Transaction.modifierTypeId -> testedTransaction.map(_.id)
 
   val invDataHeadersDummy: (ModifierTypeId, Vector[ModifierId]) = Header.modifierTypeId -> Vector.empty[ModifierId]
   val invDataPayloadsDummy: (ModifierTypeId, Vector[ModifierId]) = Payload.modifierTypeId -> Vector.empty[ModifierId]
-  val invDataTransactionsDummy: (ModifierTypeId, Seq[ModifierId]) = Transaction.ModifierTypeId -> Vector.empty[ModifierId]
+  val invDataTransactionsDummy: (ModifierTypeId, Seq[ModifierId]) = Transaction.modifierTypeId -> Vector.empty[ModifierId]
 
   property("SyncInfoMessage should be serialized correctly") {
-    val syncInfo: EncrySyncInfo = EncrySyncInfo(testedBlocks.map(_.header.id))
+    val syncInfo: SyncInfo = SyncInfo(testedBlocks.map(_.header.id))
     val syncInfoBeforeProto: SyncInfoNetworkMessage = SyncInfoNetworkMessage(syncInfo)
     val syncInfoToProto: GeneralizedNetworkProtoMessage.InnerMessage = syncInfoBeforeProto.toInnerMessage
     val syncInfoFromProto: Option[SyncInfoNetworkMessage] = SyncInfoNetworkMessageSerializer.fromProto(syncInfoToProto)
@@ -52,7 +52,7 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
 
     val generalizedNetworkMessageToProto: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(syncInfoBeforeProto)
     val generalizedNetworkMessageFromProto: Try[NetworkMessage] =
-      GeneralizedNetworkMessage.fromProto(ByteString(generalizedNetworkMessageToProto.toByteArray))
+      GeneralizedNetworkMessage.fromProto(generalizedNetworkMessageToProto.toByteArray)
 
     generalizedNetworkMessageFromProto.isSuccess shouldBe true
 
@@ -64,7 +64,7 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
       syncInfoBeforeProto.esi.lastHeaderIds.exists(element => id.sameElements(element)))
     comparisonReceivedMessage shouldEqual true
 
-    val syncInfoWithoutModifiers: EncrySyncInfo = EncrySyncInfo(Seq.empty[ModifierId])
+    val syncInfoWithoutModifiers: SyncInfo = SyncInfo(Seq.empty[ModifierId])
     val syncInfoBeforeProtoWithoutModifiers: SyncInfoNetworkMessage = SyncInfoNetworkMessage(syncInfoWithoutModifiers)
     val syncInfoToProtoWithoutModifiers: GeneralizedNetworkProtoMessage.InnerMessage = syncInfoBeforeProtoWithoutModifiers.toInnerMessage
     val syncInfoFromProtoWithoutModifiers: Option[SyncInfoNetworkMessage] = SyncInfoNetworkMessageSerializer.fromProto(syncInfoToProtoWithoutModifiers)
@@ -74,7 +74,7 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
     val generalizedNetworkMessageToProtoSIWithoutModifiers: GeneralizedNetworkProtoMessage =
       GeneralizedNetworkMessage.toProto(syncInfoBeforeProtoWithoutModifiers)
     val generalizedNetworkMessageFromProtoSIWithoutModifiers: Try[NetworkMessage] =
-      GeneralizedNetworkMessage.fromProto(ByteString(generalizedNetworkMessageToProtoSIWithoutModifiers.toByteArray))
+      GeneralizedNetworkMessage.fromProto(generalizedNetworkMessageToProtoSIWithoutModifiers.toByteArray)
 
     generalizedNetworkMessageFromProtoSIWithoutModifiers.isSuccess shouldBe true
 
@@ -98,7 +98,7 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
 
     val generalizedNetworkMessageToProtoHeaders: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(invNetworkMessageWithHeadersBeforeProto)
     val generalizedNetworkMessageFromProtoHeaders: Try[NetworkMessage] =
-      GeneralizedNetworkMessage.fromProto(ByteString(generalizedNetworkMessageToProtoHeaders.toByteArray))
+      GeneralizedNetworkMessage.fromProto(generalizedNetworkMessageToProtoHeaders.toByteArray)
 
     generalizedNetworkMessageFromProtoHeaders.isSuccess shouldBe true
 
@@ -122,7 +122,7 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
 
     val generalizedNetworkMessageToProtoPayloads: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(invNetworkMessageWithPayloadsBeforeProto)
     val generalizedNetworkMessageFromProtoPayloads: Try[NetworkMessage] =
-      GeneralizedNetworkMessage.fromProto(ByteString(generalizedNetworkMessageToProtoPayloads.toByteArray))
+      GeneralizedNetworkMessage.fromProto(generalizedNetworkMessageToProtoPayloads.toByteArray)
 
     generalizedNetworkMessageFromProtoPayloads.isSuccess shouldBe true
 
@@ -146,7 +146,7 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
 
     val generalizedNetworkMessageToProtoTx: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(invNetworkMessageWithTransactionsBeforeProto)
     val generalizedNetworkMessageFromProtoTx: Try[NetworkMessage] =
-      GeneralizedNetworkMessage.fromProto(ByteString(generalizedNetworkMessageToProtoTx.toByteArray))
+      GeneralizedNetworkMessage.fromProto(generalizedNetworkMessageToProtoTx.toByteArray)
 
     generalizedNetworkMessageFromProtoTx.isSuccess shouldBe true
 
@@ -193,7 +193,7 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
 
     val generalizedNetworkMessageToProtoHeaders: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(requestModifiersWithHeadersBeforeProto)
     val generalizedNetworkMessageFromProtoHeaders: Try[NetworkMessage] =
-      GeneralizedNetworkMessage.fromProto(ByteString(generalizedNetworkMessageToProtoHeaders.toByteArray))
+      GeneralizedNetworkMessage.fromProto((generalizedNetworkMessageToProtoHeaders.toByteArray))
 
     generalizedNetworkMessageFromProtoHeaders.isSuccess shouldBe true
 
@@ -235,7 +235,7 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
     val generalizedNetworkMessageToProtoHeadersDummy: GeneralizedNetworkProtoMessage =
       GeneralizedNetworkMessage.toProto(requestModifiersWithHeadersBeforeProtoDummy)
     val generalizedNetworkMessageFromProtoHeadersDummy: Try[NetworkMessage] =
-      GeneralizedNetworkMessage.fromProto(ByteString(generalizedNetworkMessageToProtoHeadersDummy.toByteArray))
+      GeneralizedNetworkMessage.fromProto((generalizedNetworkMessageToProtoHeadersDummy.toByteArray))
 
     generalizedNetworkMessageFromProtoHeadersDummy.isFailure shouldBe true
 
@@ -260,7 +260,7 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
     val modifiersDataAsPayloads: (ModifierTypeId, Map[ModifierId, Array[Byte]]) =
       Payload.modifierTypeId -> testedBlocks.map(block => block.payload.id -> block.payload.toProtoPayload.toByteArray).toMap
     val modifiersDataAsTransactions: (ModifierTypeId, Map[ModifierId, Array[Byte]]) =
-      Transaction.ModifierTypeId -> testedTransaction.map(tx => tx.id -> tx.toTransactionProto.toByteArray).toMap
+      Transaction.modifierTypeId -> testedTransaction.map(tx => tx.id -> tx.toTransactionProto.toByteArray).toMap
 
     val modifiersNetworkMessageHeaders: ModifiersNetworkMessage = ModifiersNetworkMessage(modifiersDataAsHeader)
     val modifiersNetworkMessagePayloads: ModifiersNetworkMessage = ModifiersNetworkMessage(modifiersDataAsPayloads)
@@ -305,7 +305,7 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
 
     val generalizedNetworkMessageToProto: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(getPeersBeforeProto)
     val generalizedNetworkMessageFromProto: Try[NetworkMessage] =
-      GeneralizedNetworkMessage.fromProto(ByteString(generalizedNetworkMessageToProto.toByteArray))
+      GeneralizedNetworkMessage.fromProto((generalizedNetworkMessageToProto.toByteArray))
 
     generalizedNetworkMessageFromProto.isSuccess shouldBe true
 
@@ -327,7 +327,7 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
 
     val generalizedNetworkMessageToProto: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(peersMessageBeforeProto)
     val generalizedNetworkMessageFromProto: Try[NetworkMessage] =
-      GeneralizedNetworkMessage.fromProto(ByteString(generalizedNetworkMessageToProto.toByteArray))
+      GeneralizedNetworkMessage.fromProto((generalizedNetworkMessageToProto.toByteArray))
 
     generalizedNetworkMessageFromProto.isSuccess shouldBe true
 
@@ -347,7 +347,7 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
 
     val generalizedNetworkMessageToProtoDummy: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(peersMessageBeforeProtoWithoutPeers)
     val generalizedNetworkMessageFromProtoDummy: Try[NetworkMessage] =
-      GeneralizedNetworkMessage.fromProto(ByteString(generalizedNetworkMessageToProtoDummy.toByteArray))
+      GeneralizedNetworkMessage.fromProto((generalizedNetworkMessageToProtoDummy.toByteArray))
 
     generalizedNetworkMessageFromProtoDummy.isFailure shouldBe true
   }
@@ -385,7 +385,7 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
 
     val generalizedNetworkMessageToProto: GeneralizedNetworkProtoMessage = GeneralizedNetworkMessage.toProto(handshakeBeforeProtoWithAddress)
     val generalizedNetworkMessageFromProto: Try[NetworkMessage] =
-      GeneralizedNetworkMessage.fromProto(ByteString(generalizedNetworkMessageToProto.toByteArray))
+      GeneralizedNetworkMessage.fromProto((generalizedNetworkMessageToProto.toByteArray))
 
     generalizedNetworkMessageFromProto.isSuccess shouldBe true
 

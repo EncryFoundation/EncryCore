@@ -1,9 +1,10 @@
 package encry.modifiers.history
 
-import encry.modifiers.mempool.{Transaction, TransactionFactory}
-import encry.utils.CoreTaggedTypes.ModifierId
+import encry.modifiers.mempool.{TransactionFactory}
 import encry.utils.TestHelper
-import encry.view.history.History.Height
+import org.encryfoundation.common.modifiers.history.{Payload, PayloadSerializer}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import org.scalatest.FunSuite
 
 class PayloadSerializerTest extends FunSuite {
@@ -29,6 +30,6 @@ class PayloadSerializerTest extends FunSuite {
 
     assert(blockPayload.id sameElements blockPayloadDeserialized.get.id, "Payload id mismatch.")
 
-    assert(txs.size == blockPayloadDeserialized.get.transactions.size, "Transactions quantity mismatch.")
+    assert(txs.size == blockPayloadDeserialized.get.txs.size, "Transactions quantity mismatch.")
   }
 }

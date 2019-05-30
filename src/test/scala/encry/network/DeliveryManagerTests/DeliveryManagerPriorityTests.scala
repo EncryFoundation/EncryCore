@@ -1,13 +1,12 @@
 package encry.network.DeliveryManagerTests
 
 import java.net.InetSocketAddress
+
 import encry.network.DeliveryManagerTests.DMUtils.{createPeer, generateBlocks, initialiseDeliveryManager}
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestKit}
 import encry.consensus.History.{Equal, HistoryComparisonResult, Older, Younger}
 import encry.modifiers.InstanceFactory
-import encry.modifiers.history.{Block, Header}
-import encry.network.BasicMessagesRepo.ModifiersNetworkMessage
 import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, OtherNodeSyncingStatus, RequestFromLocal}
@@ -15,7 +14,9 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.SyncTracker.PeerPriorityStatus
 import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
 import encry.settings.EncryAppSettings
-import encry.utils.CoreTaggedTypes.ModifierId
+import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.network.BasicMessagesRepo.ModifiersNetworkMessage
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 
 class DeliveryManagerPriorityTests extends WordSpecLike

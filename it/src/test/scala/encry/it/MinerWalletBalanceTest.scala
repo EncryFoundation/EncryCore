@@ -4,10 +4,11 @@ import com.typesafe.config.Config
 import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
-import encry.settings.Constants._
-import encry.view.history.History.Height
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.Height
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.scalatest.{AsyncFunSuite, Matchers}
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
@@ -28,7 +29,7 @@ class MinerWalletBalanceTest extends AsyncFunSuite with Matchers with NodesFromD
     Await.result(height, 30.minutes)
     height map { _ =>
       val res = Await.result(dockerNodes().head.balances, 30.minutes)
-        .find(_._1 == Algos.encode(IntrinsicTokenId))
+        .find(_._1 == Algos.encode(TestNetConstants.IntrinsicTokenId))
         .map(_._2 == supplyAtHeight)
         .get
       docker.close()

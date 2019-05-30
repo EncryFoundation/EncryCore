@@ -1,20 +1,10 @@
 package encry.utils
 
-import java.io.File
-
-import encry.modifiers.state.box.Box.Amount
-import encry.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
-import encry.settings.{EncryAppSettings, NodeSettings}
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import encry.view.history.EncryHistory
-import encry.view.history.processors.payload.BlockPayloadProcessor
-import encry.view.history.processors.proofs.FullStateProofProcessor
-import encry.view.history.storage.HistoryStorage
-import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.crypto.PrivateKey25519
-import org.encryfoundation.common.transaction.EncryAddress
+import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
+import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
-import org.iq80.leveldb.Options
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
 import scala.util.Random

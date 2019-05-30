@@ -5,19 +5,19 @@ import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import encry.consensus.History.{Fork, Older, Younger}
 import encry.modifiers.InstanceFactory
-import encry.modifiers.history.{Block, Header, Payload}
-import encry.modifiers.mempool.Transaction
-import encry.network.BasicMessagesRepo._
 import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, OtherNodeSyncingStatus, RequestFromLocal}
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.EncryAppSettings
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.view.EncryNodeViewHolder.DownloadRequest
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import encry.network.DeliveryManagerTests.DMUtils._
-import encry.view.history.EncrySyncInfo
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
+import org.encryfoundation.common.network.SyncInfo
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.collection.mutable.WrappedArray
 
 class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfterAll
@@ -147,7 +147,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       handler1.expectMsgAnyOf(
         RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)),
         RequestModifiersNetworkMessage(Payload.modifierTypeId -> Seq(header.payloadId)),
-        SyncInfoNetworkMessage(EncrySyncInfo(List()))
+        SyncInfoNetworkMessage(SyncInfo(List()))
       )
 
       handler2.expectMsgAllOf(RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)))
@@ -220,7 +220,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       deliveryManager ! HandshakedPeer(cp1)
       deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
 
-      deliveryManager ! RequestFromLocal(cp1, Transaction.ModifierTypeId, txs.map(_.id))
+      deliveryManager ! RequestFromLocal(cp1, Transaction.modifierTypeId, txs.map(_.id))
 
       handler1.expectNoMsg()
     }
@@ -237,7 +237,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       deliveryManager ! HandshakedPeer(cp1)
       deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
 
-      deliveryManager ! RequestFromLocal(cp1, Transaction.ModifierTypeId, txs.map(_.id))
+      deliveryManager ! RequestFromLocal(cp1, Transaction.modifierTypeId, txs.map(_.id))
 
       handler1.expectNoMsg()
     }
@@ -261,7 +261,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
 
       handler1.expectMsgAllOf(
         RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)),
-        SyncInfoNetworkMessage(EncrySyncInfo(List.empty))
+        SyncInfoNetworkMessage(SyncInfo(List.empty))
       )
 
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(header.id))

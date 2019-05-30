@@ -4,10 +4,6 @@ import supertagged.TaggedType
 
 object ConsensusTaggedTypes {
 
-  object Difficulty extends TaggedType[BigInt]
-
-  type Difficulty = Difficulty.Type
-
   object NBits extends TaggedType[Long]
 
   type NBits = NBits.Type

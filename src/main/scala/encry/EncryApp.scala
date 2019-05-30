@@ -12,8 +12,6 @@ import encry.api.http.routes._
 import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
 import encry.cli.ConsoleListener
 import encry.cli.ConsoleListener.StartListening
-import encry.local.explorer.BlockListener
-import encry.local.explorer.database.DBService
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network.{PeerManager, _}
@@ -25,7 +23,7 @@ import encry.view.{EncryNodeViewHolder, ReadersHolder}
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.Algos
 import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
 import scala.io.Source
@@ -37,9 +35,9 @@ object EncryApp extends App with StrictLogging {
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
 
+
   lazy val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
-  lazy val dbService: DBService = DBService()
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
   val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName
@@ -69,10 +67,6 @@ object EncryApp extends App with StrictLogging {
   }
   if (settings.kafka.exists(_.sendToKafka))
     system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
-  if (settings.postgres.exists(_.enableSave))
-    system.actorOf(Props(classOf[BlockListener], dbService, nodeViewHolder)
-      .withDispatcher("block-listener-dispatcher"), "blockListener")
-
   if (settings.node.mining) miner ! StartMining
   if (settings.node.useCli) {
     system.actorOf(Props[ConsoleListener], "cliListener")

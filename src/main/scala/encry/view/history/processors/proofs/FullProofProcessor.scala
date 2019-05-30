@@ -1,17 +1,16 @@
 package encry.view.history.processors.proofs
 
-import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.{ADProofs, Block, Header, Payload}
 import encry.view.history.processors.BlockProcessor
 import encry.consensus.History.ProgressInfo
-
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
 import scala.util.Try
 
 trait FullProofProcessor extends BaseADProofProcessor with BlockProcessor {
 
   protected val adState: Boolean
 
-  override protected def process(m: ADProofs): ProgressInfo[EncryPersistentModifier] =
+  override protected def process(m: ADProofs): ProgressInfo[PersistentModifier] =
     getBlockByProofs(m).map(block => processBlock(block, m)).getOrElse {
       historyStorage.insertObjects(Seq(m))
       ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)

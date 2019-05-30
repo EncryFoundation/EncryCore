@@ -7,20 +7,20 @@ import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
 import encry.it.util.KeyHelper._
-import encry.modifiers.history.Block
-import encry.modifiers.mempool.Transaction
-import encry.modifiers.state.box.TokenIssuingBox.TokenId
-import encry.modifiers.state.box._
-import encry.settings.Constants.IntrinsicTokenId
-import encry.view.history.History.Height
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
-import org.encryfoundation.common.transaction.EncryAddress.Address
-import org.encryfoundation.common.transaction.PubKeyLockedContract
+import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
+import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedContract, Transaction}
+import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, TokenIssuingBox}
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.Height
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.crypto.signatures.Curve25519
 import scorex.utils.Random
+
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
@@ -75,8 +75,8 @@ class AssetTokenTransactionTest extends AsyncFunSuite
     Future.sequence(headersAtHeight.map { h => dockerNodes().head.getBlock(h) }).flatMap { blockByHeaders =>
 
       val tokenId: TokenId = blockByHeaders.collect {
-        case block: Block if block.transactions.size > 1 =>
-          block.transactions.collect {
+        case block: Block if block.payload.txs.size > 1 =>
+          block.payload.txs.collect {
             case transaction: Transaction if transaction.fee > 0 =>
               transaction.newBoxes.toList.collect { case box: TokenIssuingBox => box.tokenId }
           }.flatten
@@ -87,8 +87,8 @@ class AssetTokenTransactionTest extends AsyncFunSuite
         .map(_._2 == createdTokensAmount)
         .get
 
-      val txsNum: Int = blockByHeaders.map(_.payload.transactions.size).sum
-      val transactionFromChain: Transaction = blockByHeaders.flatMap(_.payload.transactions.init).head
+      val txsNum: Int = blockByHeaders.map(_.payload.txs.size).sum
+      val transactionFromChain: Transaction = blockByHeaders.flatMap(_.payload.txs.init).head
 
       transactionFromChain.id shouldEqual transaction.id
       checkBalance shouldEqual true
@@ -135,14 +135,14 @@ class AssetTokenTransactionTest extends AsyncFunSuite
         }
 
         val ckeckEncryBalanceNew: Boolean = Await.result(dockerNodes().head.balances, waitTime)
-          .find(_._1 == Algos.encode(IntrinsicTokenId))
+          .find(_._1 == Algos.encode(TestNetConstants.IntrinsicTokenId))
           .map(_._2 == supplyAtHeight - amount)
           .get
 
-        val txsNumNew: Int = blockByHeadersNew.map(_.payload.transactions.size).sum
+        val txsNumNew: Int = blockByHeadersNew.map(_.payload.txs.size).sum
 
         docker.close()
-        val transactionFromChainNew: Transaction = blockByHeadersNew.flatMap(_.payload.transactions.init).head
+        val transactionFromChainNew: Transaction = blockByHeadersNew.flatMap(_.payload.txs.init).head
 
         transactionFromChainNew.id shouldEqual transactionWithAssetToken.id
         ckeckEncryBalanceNew shouldEqual true

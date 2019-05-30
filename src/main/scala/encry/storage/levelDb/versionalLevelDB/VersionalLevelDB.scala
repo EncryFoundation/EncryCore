@@ -5,7 +5,7 @@ import encry.settings.LevelDBSettings
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, _}
 import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.lang.ArrayUtils
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.utils.Algos
 import org.iq80.leveldb.{DB, ReadOptions}
 import supertagged.TaggedType
 

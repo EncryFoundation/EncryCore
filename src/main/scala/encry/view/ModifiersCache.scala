@@ -1,16 +1,14 @@
 package encry.view
 
-import java.util.concurrent.ConcurrentHashMap
-
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.settings
-import encry.modifiers.EncryPersistentModifier
-import encry.utils.CoreTaggedTypes.ModifierId
-import encry.modifiers.history.Header
-import encry.settings.Constants
-import encry.validation.{MalformedModifierError, RecoverableModifierError}
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import encry.view.history.EncryHistory
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.Header
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.encryfoundation.common.validation.{MalformedModifierError, RecoverableModifierError}
 import scala.collection.immutable.SortedMap
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
@@ -20,9 +18,9 @@ object ModifiersCache extends StrictLogging {
 
   private type Key = mutable.WrappedArray[Byte]
 
-  //  private val cache1 =
-  val cache: TrieMap[Key, EncryPersistentModifier] = TrieMap[Key, EncryPersistentModifier]()
+  val cache: TrieMap[Key, PersistentModifier] = TrieMap[Key, PersistentModifier]()
   private var headersCollection: SortedMap[Int, List[ModifierId]] = SortedMap[Int, List[ModifierId]]()
+
   private var isChainSynced = false
 
   def setChainSynced(): Unit = isChainSynced = true
@@ -33,7 +31,7 @@ object ModifiersCache extends StrictLogging {
 
   def contains(key: Key): Boolean = cache.contains(key)
 
-  def put(key: Key, value: EncryPersistentModifier, history: EncryHistory): Unit = if (!contains(key)) {
+  def put(key: Key, value: PersistentModifier, history: EncryHistory): Unit = if (!contains(key)) {
     logger.debug(s"put ${Algos.encode(key.toArray)} to cache")
     cache.put(key, value)
     value match {
@@ -52,12 +50,12 @@ object ModifiersCache extends StrictLogging {
     }.map(mod => remove(mod._1))
   }
 
-  def remove(key: Key): Option[EncryPersistentModifier] = {
+  def remove(key: Key): Option[PersistentModifier] = {
     logger.info(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains: ${cache.get(key).isDefined}.")
     cache.remove(key)
   }
 
-  def popCandidate(history: EncryHistory): List[EncryPersistentModifier] = synchronized {
+  def popCandidate(history: EncryHistory): List[PersistentModifier] = synchronized {
     findCandidateKey(history).flatMap(k => remove(k))
   }
 
@@ -112,7 +110,7 @@ object ModifiersCache extends StrictLogging {
             case Some(v: Header)
               if (
                 (v.parentId sameElements history.bestHeaderOpt.map(_.id).getOrElse(Array.emptyByteArray)) ||
-                  (history.bestHeaderHeight == Constants.Chain.PreGenesisHeight &&
+                  (history.bestHeaderHeight == TestNetConstants.PreGenesisHeight &&
                     (v.parentId sameElements Header.GenesisParentId)
                     )
                 )
@@ -122,8 +120,8 @@ object ModifiersCache extends StrictLogging {
           }
         case None =>
           logger.debug(s"No header in cache at height ${history.bestHeaderHeight + 1}. " +
-            s"Trying to find in range [${history.bestHeaderHeight - Constants.Chain.MaxRollbackDepth}, ${history.bestHeaderHeight}]")
-          (history.bestHeaderHeight - Constants.Chain.MaxRollbackDepth to history.bestHeaderHeight).flatMap(height =>
+            s"Trying to find in range [${history.bestHeaderHeight - TestNetConstants.MaxRollbackDepth}, ${history.bestHeaderHeight}]")
+          (history.bestHeaderHeight - TestNetConstants.MaxRollbackDepth to history.bestHeaderHeight).flatMap(height =>
             getHeadersKeysAtHeight(height)
           ).toList
       }

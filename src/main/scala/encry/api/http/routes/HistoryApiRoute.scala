@@ -3,16 +3,16 @@ package encry.api.http.routes
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
-import encry.modifiers.history.{Block, Header}
 import encry.settings.{EncryAppSettings, RESTApiSettings}
 import encry.view.ReadersHolder.GetDataFromHistory
 import encry.view.history.EncryHistoryReader
 import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
-import org.encryfoundation.common.Algos
+import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 import scala.concurrent.Future
 
@@ -62,7 +62,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
   }
 
   def getBlockTransactionsByHeaderIdR: Route = (modifierId & pathPrefix("transactions") & get) { id =>
-    getFullBlockByHeaderId(id).map(_.map(_.transactions.asJson)).okJson()
+    getFullBlockByHeaderId(id).map(_.map(_.payload.txs.asJson)).okJson()
   }
 
   def candidateBlockR: Route = (path("candidateBlock") & pathEndOrSingleSlash & get) {

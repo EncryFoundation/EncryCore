@@ -1,19 +1,18 @@
 package encry.view.wallet
 
 import java.io.File
-
 import com.typesafe.scalalogging.StrictLogging
-import encry.modifiers.EncryPersistentModifier
-import encry.modifiers.history.Block
-import encry.modifiers.mempool.Transaction
-import encry.modifiers.state.box.{EncryBaseBox, EncryProposition}
-import encry.settings.{Constants, EncryAppSettings}
+import encry.settings.EncryAppSettings
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB, WalletVersionalLevelDBCompanion}
-import encry.utils.CoreTaggedTypes.{ModifierId, VersionTag}
+import encry.utils.CoreTaggedTypes.VersionTag
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.crypto.PublicKey25519
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition}
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.{DB, Options}
-
 import scala.util.Try
 
 case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: AccountManager) extends StrictLogging {
@@ -22,11 +21,11 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: Ac
 
   def propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes))
 
-  def scanPersistent(modifier: EncryPersistentModifier): EncryWallet = modifier match {
+  def scanPersistent(modifier: PersistentModifier): EncryWallet = modifier match {
     case block: Block =>
-      logger.info(s"Keys during sync: ${publicKeys}")
+      logger.info(s"Keys during sync: $publicKeys")
       val (newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]) =
-        block.transactions.foldLeft(Seq[EncryBaseBox](), Seq[EncryBaseBox]()) {
+        block.payload.txs.foldLeft(Seq[EncryBaseBox](), Seq[EncryBaseBox]()) {
           case ((nBxs, sBxs), tx: Transaction) =>
             val newBxsL: Seq[EncryBaseBox] = tx.newBoxes
               .foldLeft(Seq[EncryBaseBox]()) { case (nBxs2, bx) =>

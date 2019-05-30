@@ -3,19 +3,14 @@ package encry.it.docker
 import java.net.{InetAddress, InetSocketAddress, URL}
 
 import com.typesafe.config.Config
-import com.typesafe.scalalogging.{Logger, StrictLogging}
+import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.settings
 import encry.it.api.HttpApi
-import encry.it.util.GlobalTimer
 import encry.it.util.KeyHelper.createPrivKey
-import encry.settings.{Constants, EncryAppSettings}
-import org.asynchttpclient.Dsl.{config => clientConfig, _}
+import encry.settings.EncryAppSettings
 import org.asynchttpclient._
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
-import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import org.encryfoundation.common.utils.constants.TestNetConstants
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -52,6 +47,6 @@ object Node {
 
     def publicKeyStr: String = n.publicKey.toString
 
-    def blockDelay: FiniteDuration = Constants.Chain.DesiredBlockInterval
+    def blockDelay: FiniteDuration = TestNetConstants.DesiredBlockInterval
   }
 }

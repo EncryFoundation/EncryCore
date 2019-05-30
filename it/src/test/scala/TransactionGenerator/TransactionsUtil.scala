@@ -2,12 +2,11 @@ package TransactionGenerator
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.typesafe.scalalogging.StrictLogging
-import encry.modifiers.mempool.Transaction
-import encry.modifiers.mempool.directive._
-import encry.modifiers.state.box.TokenIssuingBox.TokenId
-import encry.modifiers.state.box.{AssetBox, MonetaryBox, TokenIssuingBox}
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
-import org.encryfoundation.common.transaction.{Input, Proof, PubKeyLockedContract}
+import org.encryfoundation.common.modifiers.mempool.directive._
+import org.encryfoundation.common.modifiers.mempool.transaction.{Input, Proof, PubKeyLockedContract, Transaction}
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, MonetaryBox, TokenIssuingBox}
+import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue

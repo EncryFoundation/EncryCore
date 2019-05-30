@@ -2,13 +2,13 @@ package encry.api.http.routes
 
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.{Directive, Directive1, Route}
-import encry.utils.CoreTaggedTypes.ModifierId
 import encry.api.http.ApiRoute
 import io.circe.Json
-import org.encryfoundation.common.Algos
 import org.encryfoundation.common.crypto.encoding.Base58Check
-import org.encryfoundation.common.transaction.EncryAddress.Address
-import org.encryfoundation.common.utils.TaggedTypes.ADKey
+import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
+
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.Success
 
