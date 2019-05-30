@@ -217,7 +217,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
       } else Success(state) -> suffixApplied
     stateToApplyTry match {
       case Success(stateToApply) =>
-        logger.debug(s"\nApplied to state successfully! Time of it is: ${System.currentTimeMillis() - startTime}.")
+        logger.debug(s"\nApplied to state successfully! Time of it is: ${System.currentTimeMillis() - startTime}")
         logger.debug(s"\nStarting to update UpdateInformation !")
         val startTime1 = System.currentTimeMillis()
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
