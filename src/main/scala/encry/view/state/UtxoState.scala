@@ -30,6 +30,7 @@ import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.Algos.HF
 import org.encryfoundation.common.utils.TaggedTypes.{Height, _}
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.ValidationResult.{Invalid, Valid}
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
@@ -53,7 +54,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     .get(StorageKey !@@ Algos.hash(version)).map(value => ADDigest !@@ value)
     .getOrElse(persistentProver.digest)
 
-  def maxRollbackDepth: Int = TestConstants.MaxRollbackDepth
+  def maxRollbackDepth: Int = TestNetConstants.MaxRollbackDepth
 
   private def onAdProofGenerated(proof: ADProofs): Unit = {
     if (nodeViewHolderRef.isEmpty) logger.warn(s"Got proof while nodeViewHolderRef is empty")
@@ -181,7 +182,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
       case Some(v) =>
         val rollbackResult: Try[UtxoState] = persistentProver.rollback(ADDigest !@@ v).map { _ =>
           val stateHeight: Int = stateStore.get(StorageKey @@ UtxoState.bestHeightKey.untag(Digest32))
-            .map(d => Ints.fromByteArray(d)).getOrElse(TestConstants.GenesisHeight)
+            .map(d => Ints.fromByteArray(d)).getOrElse(TestNetConstants.GenesisHeight)
           new UtxoState(
             persistentProver,
             version,
@@ -232,11 +233,11 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
         val creditB: Map[String, Amount] = {
           val balanceSheet: Map[TokenId, Amount] =
             BalanceCalculator.balanceSheet(tx.newBoxes, excludeTokenIssuance = true)
-          val intrinsicBalance: Amount = balanceSheet.getOrElse(TestConstants.IntrinsicTokenId, 0L)
-          balanceSheet.updated(TestConstants.IntrinsicTokenId, intrinsicBalance + tx.fee)
+          val intrinsicBalance: Amount = balanceSheet.getOrElse(TestNetConstants.IntrinsicTokenId, 0L)
+          balanceSheet.updated(TestNetConstants.IntrinsicTokenId, intrinsicBalance + tx.fee)
         }.map { case (tokenId, amount) => Algos.encode(tokenId) -> amount }
         creditB.forall { case (tokenId, amount) =>
-          if (tokenId == Algos.encode(TestConstants.IntrinsicTokenId))
+          if (tokenId == Algos.encode(TestNetConstants.IntrinsicTokenId))
             debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
           else debitB.getOrElse(tokenId, 0L) >= amount
         }
@@ -273,7 +274,7 @@ object UtxoState extends StrictLogging {
     val versionalStorage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(stateDir, keepVersions = TestConstants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(stateDir, keepVersions = TestNetConstants.DefaultKeepVersions))
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
@@ -282,7 +283,7 @@ object UtxoState extends StrictLogging {
     val stateVersion: Array[Byte] = versionalStorage.get(StorageKey @@ bestVersionKey.untag(Digest32))
       .map(_.untag(VersionalLevelDbValue)).getOrElse(EncryState.genesisStateVersion)
     val stateHeight: Int = versionalStorage.get(StorageKey @@ bestHeightKey.untag(Digest32))
-      .map(d => Ints.fromByteArray(d)).getOrElse(TestConstants.PreGenesisHeight)
+      .map(d => Ints.fromByteArray(d)).getOrElse(TestNetConstants.PreGenesisHeight)
     val lastBlockTimestamp: Amount = versionalStorage.get(StorageKey @@ lastBlockTimeKey.untag(Digest32))
       .map(d => Longs.fromByteArray(d)).getOrElse(0L)
     val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF] = {
@@ -329,7 +330,7 @@ object UtxoState extends StrictLogging {
     val vldbInit = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(stateDir, keepVersions = TestConstants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(stateDir, keepVersions = TestNetConstants.DefaultKeepVersions))
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
@@ -342,14 +343,14 @@ object UtxoState extends StrictLogging {
     val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF] = PersistentBatchAVLProver.create(
       p,
       storage,
-      metadata(EncryState.genesisStateVersion, p.digest, TestConstants.PreGenesisHeight, 0L),
+      metadata(EncryState.genesisStateVersion, p.digest, TestNetConstants.PreGenesisHeight, 0L),
       paranoidChecks = true
     ).getOrElse(throw new Error("Fatal: Failed to create persistent prover"))
 
     new UtxoState(
       persistentProver,
       EncryState.genesisStateVersion,
-      TestConstants.PreGenesisHeight,
+      TestNetConstants.PreGenesisHeight,
       vldbInit,
       0L,
       nodeViewHolderRef,

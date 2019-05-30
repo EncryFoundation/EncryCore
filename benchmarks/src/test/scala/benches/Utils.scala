@@ -1,12 +1,13 @@
 package benches
 
 import java.io.File
+
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.avltree
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedAVLStorage}
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{TestConstants, EncryAppSettings, LevelDBSettings, NodeSettings}
+import encry.settings.{EncryAppSettings, LevelDBSettings, NodeSettings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.StorageType
 import encry.storage.iodb.versionalIODB.IODBWrapper
@@ -30,11 +31,13 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.Algos.HF
 import org.encryfoundation.common.utils.TaggedTypes._
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
+
 import scala.collection.immutable
 import scala.util.{Random => R}
 
@@ -73,13 +76,13 @@ object Utils extends StrictLogging {
       parentId = Header.GenesisParentId,
       adProofsRoot = adPN,
       stateRoot = adDigest,
-      height = TestConstants.GenesisHeight
+      height = TestNetConstants.GenesisHeight
     )
     Block(header, Payload(header.id, txs), None)
   }
 
   def generateGenesisBlockValidForHistory: Block = {
-    val header = genHeader.copy(parentId = Header.GenesisParentId, height = TestConstants.GenesisHeight)
+    val header = genHeader.copy(parentId = Header.GenesisParentId, height = TestNetConstants.GenesisHeight)
     Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
   }
 
@@ -164,7 +167,7 @@ object Utils extends StrictLogging {
                                        txs: Seq[Transaction]): Block = {
     val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
     val requiredDifficulty: Difficulty = prevBlock.map(b => history.requiredDifficultyAfter(b.header))
-      .getOrElse(TestConstants.InitialDifficulty)
+      .getOrElse(TestNetConstants.InitialDifficulty)
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.bestHeaderHeight + 1,
@@ -208,7 +211,7 @@ object Utils extends StrictLogging {
     new UtxoState(
       persistentProver,
       EncryState.genesisStateVersion,
-      TestConstants.GenesisHeight,
+      TestNetConstants.GenesisHeight,
       versionalStorage,
       0L,
       None,
@@ -234,7 +237,7 @@ object Utils extends StrictLogging {
       Math.abs(random.nextLong()),
       Math.abs(random.nextInt(10000)),
       random.nextLong(),
-      TestConstants.InitialDifficulty,
+      TestNetConstants.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
   }

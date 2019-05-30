@@ -5,7 +5,7 @@ import java.io.File
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.history.ADProofsUtils
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.settings.{TestConstants, EncryAppSettings, LevelDBSettings, NodeSettings}
+import encry.settings.{EncryAppSettings, LevelDBSettings, NodeSettings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
@@ -18,6 +18,7 @@ import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.iq80.leveldb.Options
 
 import scala.util.{Failure, Success, Try}
@@ -107,7 +108,7 @@ object DigestState extends StrictLogging {
     val vldbInit = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(dir, keepVersions = TestConstants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(dir, keepVersions = TestNetConstants.DefaultKeepVersions))
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(dir, new Options)

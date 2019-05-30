@@ -2,7 +2,7 @@ package encry.view
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.settings
-import encry.settings.TestConstants
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import encry.view.history.EncryHistory
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Header
@@ -109,7 +109,7 @@ object ModifiersCache extends StrictLogging {
             case Some(v: Header)
               if (
                 (v.parentId sameElements history.bestHeaderOpt.map(_.id).getOrElse(Array.emptyByteArray)) ||
-                  (history.bestHeaderHeight == TestConstants.PreGenesisHeight &&
+                  (history.bestHeaderHeight == TestNetConstants.PreGenesisHeight &&
                     (v.parentId sameElements Header.GenesisParentId)
                     )
                 )
@@ -119,8 +119,8 @@ object ModifiersCache extends StrictLogging {
           }
         case None =>
           logger.debug(s"No header in cache at height ${history.bestHeaderHeight + 1}. " +
-            s"Trying to find in range [${history.bestHeaderHeight - TestConstants.MaxRollbackDepth}, ${history.bestHeaderHeight}]")
-          (history.bestHeaderHeight - TestConstants.MaxRollbackDepth to history.bestHeaderHeight).flatMap(height =>
+            s"Trying to find in range [${history.bestHeaderHeight - TestNetConstants.MaxRollbackDepth}, ${history.bestHeaderHeight}]")
+          (history.bestHeaderHeight - TestNetConstants.MaxRollbackDepth to history.bestHeaderHeight).flatMap(height =>
             getHeadersKeysAtHeight(height)
           ).toList
       }

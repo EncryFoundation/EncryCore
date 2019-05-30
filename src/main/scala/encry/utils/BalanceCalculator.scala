@@ -1,6 +1,6 @@
 package encry.utils
 
-import encry.settings.TestConstants
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, TokenIssuingBox}
@@ -11,7 +11,7 @@ object BalanceCalculator {
                    excludeTokenIssuance: Boolean = false): Map[TokenId, Amount] =
     bxs.foldLeft(Map.empty[ByteStr, Amount]) {
       case (cache, bx: AssetBox) =>
-        val tokenId: ByteStr = ByteStr(bx.tokenIdOpt.getOrElse(TestConstants.IntrinsicTokenId))
+        val tokenId: ByteStr = ByteStr(bx.tokenIdOpt.getOrElse(TestNetConstants.IntrinsicTokenId))
         cache.get(tokenId).map { amount =>
           cache.updated(tokenId, amount + bx.amount)
         }.getOrElse(cache.updated(tokenId, bx.amount))

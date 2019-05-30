@@ -6,7 +6,7 @@ import akka.actor.ActorRef
 import encry.avltree
 import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedAVLStorage}
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{TestConstants, EncryAppSettings, LevelDBSettings}
+import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
 import io.iohk.iodb.LSMStore
@@ -17,6 +17,7 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.Algos.HF
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, Height, SerializedAdProof}
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.iq80.leveldb.Options
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.hash.Digest32
@@ -43,7 +44,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
     new UtxoState(
       persistentProver,
       EncryState.genesisStateVersion,
-      TestConstants.GenesisHeight,
+      TestNetConstants.GenesisHeight,
       vldb,
       0L,
       None,

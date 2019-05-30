@@ -2,7 +2,7 @@ package encry.consensus
 
 import com.google.common.primitives.Chars
 import encry.crypto.equihash.Equihash
-import encry.settings.TestConstants
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
@@ -83,17 +83,17 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
   override def getDerivedHeaderFields(parentOpt: Option[Header],
                                       adProofBytes: SerializedAdProof,
                                       transactions: Seq[Transaction]): (Byte, ModifierId, Digest32, Digest32, Int) = {
-    val version: Byte = TestConstants.Version
+    val version: Byte = TestNetConstants.Version
     val parentId: ModifierId = parentOpt.map(_.id).getOrElse(Header.GenesisParentId)
     val adProofsRoot: Digest32 = ADProofs.proofDigest(adProofBytes)
     val txsRoot: Digest32 = Payload.rootHash(transactions.map(_.id))
-    val height: Int = parentOpt.map(_.height).getOrElse(TestConstants.PreGenesisHeight) + 1
+    val height: Int = parentOpt.map(_.height).getOrElse(TestNetConstants.PreGenesisHeight) + 1
 
     (version, parentId, adProofsRoot, txsRoot, height)
   }
 
   override def realDifficulty(header: Header): Difficulty = {
-    Difficulty @@ (TestConstants.MaxTarget / BigInt(1, header.powHash))
+    Difficulty @@ (TestNetConstants.MaxTarget / BigInt(1, header.powHash))
   }
 
   override def toString: String = s"EquihashPowScheme(n = ${n.toInt}, k = ${k.toInt})"

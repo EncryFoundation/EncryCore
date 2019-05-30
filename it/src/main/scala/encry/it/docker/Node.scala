@@ -1,14 +1,17 @@
 package encry.it.docker
 
 import java.net.{InetAddress, InetSocketAddress, URL}
+
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.settings
 import encry.it.api.HttpApi
 import encry.it.util.KeyHelper.createPrivKey
-import encry.settings.{TestConstants, EncryAppSettings}
+import encry.settings.EncryAppSettings
 import org.asynchttpclient._
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
+import org.encryfoundation.common.utils.constants.TestNetConstants
+
 import scala.concurrent.duration.FiniteDuration
 
 case class Node(config: Config,
@@ -44,6 +47,6 @@ object Node {
 
     def publicKeyStr: String = n.publicKey.toString
 
-    def blockDelay: FiniteDuration = TestConstants.DesiredBlockInterval
+    def blockDelay: FiniteDuration = TestNetConstants.DesiredBlockInterval
   }
 }

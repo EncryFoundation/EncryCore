@@ -3,7 +3,7 @@ package encry.view.history
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
 import encry.modifiers.history._
-import encry.settings.{TestConstants, NodeSettings}
+import encry.settings.NodeSettings
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
@@ -14,7 +14,9 @@ import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Pa
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.ModifierSemanticValidity
+
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
@@ -77,7 +79,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
       val startId: ModifierId = headerIdsAtHeight(heightFrom).head
       val startHeader: Header = typedModifierById[Header](startId).get
       val headers: HeaderChain = headerChainBack(size, startHeader, _ => false)
-        .ensuring(_.headers.exists(_.height == TestConstants.GenesisHeight),
+        .ensuring(_.headers.exists(_.height == TestNetConstants.GenesisHeight),
           "Should always contain genesis header.")
       headers.headers.flatMap(h => Seq((Header.modifierTypeId, h.id)))
     } else {

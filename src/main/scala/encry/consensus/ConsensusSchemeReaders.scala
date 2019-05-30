@@ -1,11 +1,11 @@
 package encry.consensus
 
-import encry.settings.TestConstants
+import org.encryfoundation.common.utils.constants.TestNetConstants
 
 object ConsensusSchemeReaders {
 
   val consensusScheme: ConsensusScheme = {
-    val schemeName = TestConstants.ConsensusScheme
+    val schemeName = TestNetConstants.ConsensusScheme
     Seq(EquihashPowSchemeReader).find(_.schemeName == schemeName)
       .getOrElse(EquihashPowSchemeReader)
       .read
@@ -22,8 +22,8 @@ object EquihashPowSchemeReader extends ConsensusSchemeReader[EquihashPowScheme] 
   val schemeName = "equihash"
 
   def read: EquihashPowScheme = {
-    val n = TestConstants.n
-    val k = TestConstants.k
+    val n = TestNetConstants.n
+    val k = TestNetConstants.k
     EquihashPowScheme(n, k)
   }
 }

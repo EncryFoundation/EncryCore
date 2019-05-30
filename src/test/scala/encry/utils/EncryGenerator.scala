@@ -3,7 +3,7 @@ package encry.utils
 import encry.modifiers.mempool.TransactionFactory
 import encry.modifiers.mempool.directive._
 import encry.modifiers.state.box._
-import encry.settings.TestConstants
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import encry.utils.TestHelper.Props
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
@@ -142,7 +142,7 @@ trait EncryGenerator {
       Math.abs(random.nextLong()),
       Math.abs(random.nextInt(10000)),
       random.nextLong(),
-      TestConstants.InitialDifficulty,
+      TestNetConstants.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
   }
@@ -158,7 +158,7 @@ trait EncryGenerator {
       Math.abs(random.nextLong()),
       height,
       random.nextLong(),
-      TestConstants.InitialDifficulty,
+      TestNetConstants.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
   }
