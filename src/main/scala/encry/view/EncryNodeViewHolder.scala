@@ -232,6 +232,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
                 case _ =>
               }
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
+              auxHistoryHolder ! NewHistory(newHis)
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               if (settings.influxDB.isDefined) context.system
                 .actorSelection("user/statsSender") ! NewBlockAppended(false, true)
