@@ -25,53 +25,62 @@ class PeerManager extends Actor with StrictLogging {
   addKnownPeersToPeersDatabase()
 
   override def receive: Receive = {
-    case PeerFromCli(address) =>
-      knownPeersCollection = knownPeersCollection + address
+    case PeerFromCli(address) => knownPeersCollection = knownPeersCollection + address
+
     case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
+
     case GetAllPeers => sender() ! knownPeers()
-    case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) =>
-      if (!isSelf(address, None) &&
-        CheckPeersObj.checkPossibilityToAddPeer(address, knownPeersCollection, settings) &&
-        checkDuplicateIP(address)) timeProvider
-        .time()
-        .map(time => addOrUpdateKnownPeer(address, PeerInfo(time, peerNameOpt, connTypeOpt)))
+
+    case AddOrUpdatePeer(address, peerNameOpt, connTypeOpt) if !isSelf(address, None) && CheckPeersObj
+        .checkPossibilityToAddPeer(address, knownPeersCollection, settings) && checkDuplicateIP(address) =>
+      timeProvider.time().map(time => addOrUpdateKnownPeer(address, PeerInfo(time, peerNameOpt, connTypeOpt)))
+
     case RandomPeers(howMany: Int) => sender() ! Random.shuffle(knownPeers().keys.toSeq).take(howMany)
+
     case FilterPeers(sendingStrategy: SendingStrategy) => sender() ! sendingStrategy.choose(connectedPeers.values.toSeq)
-    case DoConnecting(remote, direction) =>
-      if (connectingPeers.contains(remote) && direction != Incoming) {
-        logger.info(s"Trying to connect twice to $remote, going to drop the duplicate connection")
-        sender() ! CloseConnection
-      } else if (direction != Incoming) {
-        logger.info(s"Connecting to $remote")
-        connectingPeers += remote
-      }
+
+    case DoConnecting(remote, direction) if connectingPeers.contains(remote) && direction != Incoming =>
+      logger.info(s"Trying to connect twice to $remote, going to drop the duplicate connection")
+      sender() ! CloseConnection
+    //TODO !?
+    case DoConnecting(remote, direction) if direction != Incoming =>
+      logger.info(s"Connecting to $remote")
+      connectingPeers += remote
       sender() ! StartInteraction
-    case Handshaked(peer) =>
-      if (peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress))
-        peer.handlerRef ! CloseConnection
-      else if (CheckPeersObj.checkPossibilityToAddPeer(peer.socketAddress, knownPeersCollection, settings)
-        && !connectedPeers.contains(peer.socketAddress)) {
-        self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
-        connectedPeers += (peer.socketAddress -> peer)
-        nodeViewSynchronizer ! HandshakedPeer(peer)
-      }
+    //TODO !?
+    case DoConnecting(_, _) => sender() ! StartInteraction
+
+    case Handshaked(peer) if peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress) =>
+      peer.handlerRef ! CloseConnection
+
+    case Handshaked(peer) if CheckPeersObj.checkPossibilityToAddPeer(
+      peer.socketAddress,
+      knownPeersCollection,
+      settings
+    ) && !connectedPeers.contains(peer.socketAddress) =>
+      self ! AddOrUpdatePeer(peer.socketAddress, Some(peer.handshake.nodeName), Some(peer.direction))
+      connectedPeers += (peer.socketAddress -> peer)
+      nodeViewSynchronizer ! HandshakedPeer(peer)
+
     case Disconnected(remote) =>
       connectedPeers -= remote
       connectingPeers -= remote
       nodeViewSynchronizer ! DisconnectedPeer(remote)
-    case CheckPeers =>
-      def randomPeer: Option[InetSocketAddress] = {
-        val peers: Seq[InetSocketAddress] = knownPeers().keys.toSeq
-        if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
-        else None
-      }
 
-      if (connectedPeers.size + connectingPeers.size <= settings.network.maxConnections)
-        randomPeer.filter(address => !connectedPeers.exists(_._1 == address) &&
-          !connectingPeers.exists(_.getHostName == address.getHostName) &&
-          CheckPeersObj.checkPossibilityToAddPeer(address, knownPeersCollection, settings) &&
-          checkDuplicateIP(address)
-        ).foreach { address => sender() ! ConnectTo(address) }
+    case CheckPeers if connectedPeers.size + connectingPeers.size <= settings.network.maxConnections =>
+      randomPeer.filter(address =>
+        !connectedPeers.exists(_._1 == address) && !connectingPeers.exists(_.getHostName == address.getHostName) &&
+          CheckPeersObj.checkPossibilityToAddPeer(address, knownPeersCollection, settings) && checkDuplicateIP(address)
+      ).foreach(address => sender() ! ConnectTo(address))
+
+    case CheckPeers =>
+    case Handshaked(_) =>
+  }
+
+  def randomPeer: Option[InetSocketAddress] = {
+    val peers: Seq[InetSocketAddress] = knownPeers().keys.toSeq
+    if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
+    else None
   }
 
   def isSelf(address: InetSocketAddress, declaredAddress: Option[InetSocketAddress]): Boolean =
@@ -108,17 +117,29 @@ object PeerManager {
   object ReceivableMessages {
 
     case object CheckPeers
+
     case object GetConnectedPeers
+
     case object GetAllPeers
+
     case object GetRecoveryStatus
-    case class  AddOrUpdatePeer(address: InetSocketAddress, peerName: Option[String], direction: Option[ConnectionType])
-    case class  RandomPeers(howMany: Int)
-    case class  FilterPeers(sendingStrategy: SendingStrategy)
-    case class  DoConnecting(remote: InetSocketAddress, direction: ConnectionType)
-    case class  Handshaked(peer: ConnectedPeer)
-    case class  Disconnected(remote: InetSocketAddress)
-    case class  AskCheckPossibilityToAddPeer(address: InetSocketAddress)
+
+    case class AddOrUpdatePeer(address: InetSocketAddress, peerName: Option[String], direction: Option[ConnectionType])
+
+    case class RandomPeers(howMany: Int)
+
+    case class FilterPeers(sendingStrategy: SendingStrategy)
+
+    case class DoConnecting(remote: InetSocketAddress, direction: ConnectionType)
+
+    case class Handshaked(peer: ConnectedPeer)
+
+    case class Disconnected(remote: InetSocketAddress)
+
+    case class AskCheckPossibilityToAddPeer(address: InetSocketAddress)
+
   }
+
 }
 
 // TODO: REMOVE THIS

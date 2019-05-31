@@ -15,8 +15,8 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Utils._
-import encry.view.EncryNodeViewHolder.DownloadRequest
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
+import encry.view.NodeViewHolder.DownloadRequest
+import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
 import encry.view.mempool.Mempool._
 import encry.view.state.StateReader

@@ -7,13 +7,19 @@ import scala.concurrent.duration._
 
 case object TestConstants extends Constants {
 
+  val StateRootSize: Int = 33
+
+  val AdProofsRootSize: Int = 32
+
+  val TransactionsRootSize: Int = 32
+
   val DigestLength: Int = 32
 
   val ModifierIdSize: Int = DigestLength
 
   val PayloadMaxSize: Int = 1000000
 
-  val HeaderMaxSize: Int = 200
+  val HeaderMaxSize: Int = 322
 
   val DefaultKeepVersions: Int = 200
 

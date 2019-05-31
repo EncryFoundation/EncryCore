@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
-
 import akka.actor._
 import akka.io.Tcp.SO.KeepAlive
 import akka.io.Tcp._
@@ -13,47 +12,42 @@ import encry.network.PeerConnectionHandler._
 import PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
 import com.typesafe.scalalogging.StrictLogging
 import encry.cli.commands.AddPeer.PeerFromCli
-import encry.settings.NetworkSettings
+import encry.settings.EncryAppSettings
 import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
-
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
 import scala.util.Try
 
-class NetworkController extends Actor with StrictLogging {
+class NetworkController(settings: EncryAppSettings) extends Actor with StrictLogging {
 
-  val networkSettings: NetworkSettings = settings.network
-  val peerSynchronizer: ActorRef =
-    context.actorOf(Props[PeerSynchronizer].withDispatcher("network-dispatcher"), "peerSynchronizer")
+  val peerSynchronizer: ActorRef = context.actorOf(Props[PeerSynchronizer].withDispatcher("network-dispatcher"))
   var messagesHandlers: Map[Seq[Byte], ActorRef] = Map.empty
   var outgoing: Set[InetSocketAddress] = Set.empty
-  lazy val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress orElse None
+  lazy val externalSocketAddress: Option[InetSocketAddress] = settings.network.declaredAddress orElse None
   var knownPeersCollection: Set[InetSocketAddress] = settings.network.knownPeers.toSet
 
-  if (!networkSettings.localOnly.getOrElse(false)) {
-    networkSettings.declaredAddress.foreach { myAddress =>
-      Try {
-        val myAddrs: Array[InetAddress] = InetAddress.getAllByName(new URI("http://" + myAddress).getHost)
-        NetworkInterface.getNetworkInterfaces.asScala.exists { intf =>
-          intf.getInterfaceAddresses.asScala.exists { intfAddr => myAddrs.contains(intfAddr.getAddress) }
-        }
-      } recover { case t: Throwable => logger.error(s"Declared address validation failed: $t") }
-    }
-  }
+  var blackList: Map[InetAddress, Long] = Map.empty
+
+  if (!settings.network.localOnly.getOrElse(false)) settings.network.declaredAddress.foreach(myAddress =>
+    Try(NetworkInterface.getNetworkInterfaces.asScala.exists(interface =>
+      interface.getInterfaceAddresses.asScala.exists(interfaceAddress =>
+        InetAddress.getAllByName(new URI("http://" + myAddress).getHost).contains(interfaceAddress.getAddress)
+      ))).recover { case t: Throwable => logger.error(s"Declared address validation failed: $t") }
+  )
 
   logger.info(s"Declared address: $externalSocketAddress")
 
-  IO(Tcp) ! Bind(self, networkSettings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
+  IO(Tcp) ! Bind(self, settings.network.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
 
   override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
 
   def bindingLogic: Receive = {
     case Bound(_) =>
-      logger.info("Successfully bound to the port " + networkSettings.bindAddress.getPort)
+      logger.info("Successfully bound to the port " + settings.network.bindAddress.getPort)
       context.system.scheduler.schedule(600.millis, 5.seconds)(peerManager ! CheckPeers)
     case CommandFailed(_: Bind) =>
-      logger.info("Network port " + networkSettings.bindAddress.getPort + " already in use!")
+      logger.info("Network port " + settings.network.bindAddress.getPort + " already in use!")
       context stop self
   }
 
@@ -87,7 +81,7 @@ class NetworkController extends Actor with StrictLogging {
       IO(Tcp) ! Connect(remote,
         localAddress = externalSocketAddress,
         options = KeepAlive(true) :: Nil,
-        timeout = Some(networkSettings.connectionTimeout),
+        timeout = Some(settings.network.connectionTimeout),
         pullMode = true)
     case PeerFromCli(address) =>
       knownPeersCollection = knownPeersCollection + address
@@ -125,6 +119,8 @@ class NetworkController extends Actor with StrictLogging {
 }
 
 object NetworkController {
+
+  def props(settings: EncryAppSettings): Props = Props(new NetworkController(settings))
 
   object ReceivableMessages {
 

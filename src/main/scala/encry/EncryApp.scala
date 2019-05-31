@@ -19,7 +19,7 @@ import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, StatsSender, Zombie}
 import encry.utils.NetworkTimeProvider
 import encry.view.mempool.Mempool
-import encry.view.{EncryNodeViewHolder, ReadersHolder}
+import encry.view.{NodeViewHolder, ReadersHolder}
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
@@ -47,11 +47,12 @@ object EncryApp extends App with StrictLogging {
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
   lazy val memoryPool: ActorRef = system.actorOf(Mempool.props(settings, timeProvider, miner).withDispatcher("mempool-dispatcher"))
   lazy val nodeViewHolder: ActorRef =
-    system.actorOf(EncryNodeViewHolder.props(memoryPool, influxRef).withMailbox("nvh-mailbox"),
+    system.actorOf(NodeViewHolder.props(memoryPool, influxRef).withMailbox("nvh-mailbox"),
       "nodeViewHolder")
   val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
-  lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
-    .withDispatcher("network-dispatcher"), "networkController")
+  lazy val networkController: ActorRef = system.actorOf(
+    NetworkController.props(settings).withDispatcher("network-dispatcher")
+  )
   lazy val peerManager: ActorRef = system.actorOf(Props(classOf[PeerManager]), "peerManager")
   lazy val nodeViewSynchronizer: ActorRef = system.actorOf(NodeViewSynchronizer
     .props(influxRef, nodeViewHolder, networkController, settings, memoryPool)

@@ -14,8 +14,8 @@ import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.stats.StatsSender._
 import encry.utils.NetworkTime.Time
-import encry.view.EncryNodeViewHolder.CurrentView
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
+import encry.view.NodeViewHolder.CurrentView
+import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.EncryHistory
 import encry.view.mempool.Mempool._
 import encry.view.state.{StateMode, UtxoState}

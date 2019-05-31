@@ -10,7 +10,7 @@ import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, OtherNodeSyncingStatus, RequestFromLocal}
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.EncryAppSettings
-import encry.view.EncryNodeViewHolder.DownloadRequest
+import encry.view.NodeViewHolder.DownloadRequest
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import encry.network.DeliveryManagerTests.DMUtils._
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}

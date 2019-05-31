@@ -18,7 +18,7 @@ import encry.storage.VersionalStorage.StorageKey
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbValue
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import encry.view.EncryNodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
+import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header}

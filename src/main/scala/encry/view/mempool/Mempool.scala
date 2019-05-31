@@ -12,7 +12,7 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.MempoolStat
 import encry.utils.NetworkTimeProvider
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{LocallyGeneratedTransaction, ModifiersFromRemote}
+import encry.view.NodeViewHolder.ReceivableMessages.{LocallyGeneratedTransaction, ModifiersFromRemote}
 import encry.view.mempool.Mempool._
 import encry.view.state.{DigestState, EncryState, UtxoState}
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
