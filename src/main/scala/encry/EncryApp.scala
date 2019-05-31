@@ -35,7 +35,6 @@ object EncryApp extends App with StrictLogging {
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
 
-
   lazy val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
@@ -48,7 +47,7 @@ object EncryApp extends App with StrictLogging {
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
   lazy val memoryPool: ActorRef = system.actorOf(Mempool.props(settings, timeProvider, miner).withDispatcher("mempool-dispatcher"))
   lazy val nodeViewHolder: ActorRef =
-    system.actorOf(EncryNodeViewHolder.props(memoryPool).withMailbox("nvh-mailbox"),
+    system.actorOf(EncryNodeViewHolder.props(memoryPool, influxRef).withMailbox("nvh-mailbox"),
       "nodeViewHolder")
   val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
   lazy val networkController: ActorRef = system.actorOf(Props[NetworkController]
