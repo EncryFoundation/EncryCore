@@ -11,8 +11,6 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
-import encry.network.AuxiliaryHistoryHolder
-import encry.network.AuxiliaryHistoryHolder.NewHistory
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -31,7 +29,6 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
-
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -45,9 +42,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
 
-  val auxHistoryHolder: ActorRef =
-    system.actorOf(Props(AuxiliaryHistoryHolder(nodeView.history, nodeViewSynchronizer))
-      .withDispatcher("aux-history-dispatcher"), "auxHistoryHolder")
+//  val auxHistoryHolder: ActorRef =
+//    system.actorOf(Props(AuxiliaryHistoryHolder(nodeView.history, nodeViewSynchronizer))
+//      .withDispatcher("aux-history-dispatcher"), "auxHistoryHolder")
 
   memoryPoolRef ! UpdatedState(nodeView.state)
 
@@ -232,7 +229,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
                 case _ =>
               }
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
-              auxHistoryHolder ! NewHistory(newHis)
+              //auxHistoryHolder ! NewHistory(newHis)
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               if (settings.influxDB.isDefined) context.system
                 .actorSelection("user/statsSender") ! NewBlockAppended(false, true)
@@ -240,7 +237,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
             case Failure(e) =>
               val (newHis: EncryHistory, newProgressInfo: ProgressInfo[PersistentModifier]) =
                 history.reportModifierIsInvalid(modToApply, progressInfo)
-              auxHistoryHolder ! NewHistory(newHis)
+              //auxHistoryHolder ! NewHistory(newHis)
               if (settings.influxDB.isDefined) context.system
                 .actorSelection("user/statsSender") ! NewBlockAppended(false, false)
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))

@@ -8,7 +8,6 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
 import encry.local.miner.Miner.{DisableMining, StartMining}
-import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -77,7 +76,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         case tx: Transaction => broadcastModifierInv(tx)
         case _ => //Do nothing
       }
-    case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
+    //case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       deliveryManager ! UpdatedHistory(reader)
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
@@ -86,7 +85,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       case SyncInfoNetworkMessage(syncInfo) =>
         logger.info(s"Got sync message from ${remote.socketAddress} with " +
           s"${syncInfo.lastHeaderIds.size} headers. Head's headerId is: " +
-          s"${Algos.encode(syncInfo.lastHeaderIds.headOption.getOrElse(Array.emptyByteArray))}.")
+          s"${Algos.encode(syncInfo.lastHeaderIds.headOption.getOrElse(Array.emptyByteArray))}. History: ${historyReaderOpt}")
         historyReaderOpt match {
           case Some(historyReader) =>
             val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, settings.network.networkChunkSize)

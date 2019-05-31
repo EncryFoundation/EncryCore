@@ -1,7 +1,7 @@
 package encry.utils
 
-import encry.modifiers.state.box.Context
-import org.encryfoundation.common.transaction._
+import encry.modifiers.state.Context
+import org.encryfoundation.common.modifiers.mempool.transaction._
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue.Signature25519Value
 import scorex.crypto.signatures.{Curve25519, Signature}
 
