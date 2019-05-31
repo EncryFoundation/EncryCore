@@ -9,6 +9,8 @@ import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.encryfoundation.common.validation.{MalformedModifierError, RecoverableModifierError}
+
+import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
@@ -101,6 +103,13 @@ object ModifiersCache extends StrictLogging {
       }
     }).collect { case Some(v) => v._1 }
 
+    @tailrec
+    def applicableBestPayloadChain(atHeight: Int = history.bestBlockHeight + 1, prevKeys: List[Key] = List.empty[Key]): List[Key] = {
+      val payloads = findApplicablePayloadAtHeight(atHeight)
+      if (payloads.nonEmpty) applicableBestPayloadChain(atHeight + 1, prevKeys ++ payloads)
+      else prevKeys
+    }
+
     val bestHeadersIds: List[Key] = {
       headersCollection.get(history.bestHeaderHeight + 1) match {
         case Some(value) =>
@@ -132,8 +141,8 @@ object ModifiersCache extends StrictLogging {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           List(new mutable.WrappedArray.ofByte(header.payloadId))
         case _ if !isChainSynced =>
-          logger.debug(s"ModsCache no applicable payload at height: ${history.bestBlockHeight + 1}.")
-          findApplicablePayloadAtHeight(history.bestBlockHeight + 1)
+          logger.info(s"ModsCache no applicable payload at height: ${history.bestBlockHeight + 1}.")
+          applicableBestPayloadChain()
         case _ => exhaustiveSearch
       }
       case None if isChainSynced =>

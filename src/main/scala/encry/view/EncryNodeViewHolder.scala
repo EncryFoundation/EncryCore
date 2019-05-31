@@ -66,7 +66,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
     System.exit(100)
   }
 
-  system.scheduler.schedule(5.seconds, 10.seconds)(logger.debug(s"Modifiers cache from NVH: ${ModifiersCache.size}. " +
+  system.scheduler.schedule(5.seconds, 10.seconds)(logger.info(s"Modifiers cache from NVH: ${ModifiersCache.size}. " +
     s"Elems: ${ModifiersCache.cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")}"))
 
   override def postStop(): Unit = {
@@ -171,7 +171,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
     val newNodeView: NodeView = NodeView(updatedHistory.getOrElse(nodeView.history),
       updatedState.getOrElse(nodeView.state),
       updatedVault.getOrElse(nodeView.wallet))
-    if (updatedHistory.nonEmpty) context.system.eventStream.publish(ChangedHistory(newNodeView.history))
+    if (updatedHistory.nonEmpty) {
+      nodeViewSynchronizer ! ChangedHistory(newNodeView.history)
+      context.system.eventStream.publish(ChangedHistory(newNodeView.history))
+    }
     if (updatedState.nonEmpty) context.system.eventStream.publish(ChangedState(newNodeView.state))
     nodeView = newNodeView
   }

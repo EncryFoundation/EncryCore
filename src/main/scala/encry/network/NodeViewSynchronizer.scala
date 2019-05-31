@@ -50,12 +50,20 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       SyncInfoNetworkMessage.NetworkMessageTypeID         -> "SyncInfoNetworkMessage"
     )
     networkControllerRef ! RegisterMessagesHandler(messageIds, self)
-    context.system.eventStream.subscribe(self, classOf[NodeViewChange])
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
     nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false)
   }
 
-  override def receive: Receive = {
+  override def receive: Receive = awaitingHistoryCycle
+
+  def awaitingHistoryCycle: Receive = {
+    case ChangedHistory(reader: EncryHistory) =>
+      logger.info(s"get history: $reader from $sender")
+      deliveryManager ! UpdatedHistory(reader)
+      context.become(workingCycle(reader))
+  }
+
+  def workingCycle(encryHistory: EncryHistory): Receive = {
     case DownloadRequest(modifierTypeId: ModifierTypeId, modifierId: ModifierId, previousModifier: Option[ModifierId]) =>
       if(modifierTypeId != Transaction.modifierTypeId) logger.debug(s"NVSH got download request from $sender for modfiier of type:" +
         s" $modifierTypeId with id: ${Algos.encode(modifierId)}. PrevMod is: ${previousModifier.map(Algos.encode)}." +
@@ -63,7 +71,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       deliveryManager ! DownloadRequest(modifierTypeId, modifierId, previousModifier)
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
     case SemanticallyFailedModification(_, _) =>
-    case ChangedState(_) =>
     case SyntacticallyFailedModification(_, _) =>
     case SemanticallySuccessfulModifier(mod) =>
       mod match {
@@ -77,7 +84,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         case _ => //Do nothing
       }
     //case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
-    case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
+    case ChangedHistory(reader: EncryHistory) =>
+      logger.info(s"get history: $reader from $sender")
+      context.become(workingCycle(reader))
       deliveryManager ! UpdatedHistory(reader)
     case HandshakedPeer(remote) => deliveryManager ! HandshakedPeer(remote)
     case DisconnectedPeer(remote) => deliveryManager ! DisconnectedPeer(remote)
@@ -85,8 +94,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       case SyncInfoNetworkMessage(syncInfo) =>
         logger.info(s"Got sync message from ${remote.socketAddress} with " +
           s"${syncInfo.lastHeaderIds.size} headers. Head's headerId is: " +
-          s"${Algos.encode(syncInfo.lastHeaderIds.headOption.getOrElse(Array.emptyByteArray))}. History: ${historyReaderOpt}")
-        historyReaderOpt match {
+          s"${Algos.encode(syncInfo.lastHeaderIds.headOption.getOrElse(Array.emptyByteArray))}. History: ${encryHistory}")
+        val testHistory = Option(encryHistory)
+        testHistory match {
           case Some(historyReader) =>
             val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, settings.network.networkChunkSize)
             val ext: ModifierIds = extensionOpt.getOrElse(Seq())
@@ -110,7 +120,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           val nonInRequestCache: Seq[ModifierId] = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
           if (nonInRequestCache.nonEmpty) {
             if (invData._1 == Transaction.modifierTypeId) memoryPoolRef ! AskTransactionsFromNVS(remote, nonInRequestCache)
-            else historyReaderOpt.foreach { reader =>
+            else Option(encryHistory).foreach { reader =>
               invData._1 match {
                 case typeId: ModifierTypeId => nonInRequestCache.foreach(id =>
                   reader.modifierById(id).foreach { mod =>
