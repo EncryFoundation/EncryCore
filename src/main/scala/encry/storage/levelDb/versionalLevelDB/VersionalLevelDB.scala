@@ -139,9 +139,9 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
             writeBatch.delete(userKey(VersionalLevelDbKey @@ elemKey))
           else {
             val versions =
-              splitValue2elems(settings.versionKeySize, accessMap.tail).map(ver => new ByteArrayWrapper(ver))
+              splitValue2elems(settings.versionKeySize, accessMap.drop(1)).map(ver => new ByteArrayWrapper(ver))
                 .dropWhile(_ != new ByteArrayWrapper(versionToResolve))
-            val vertoput = versions.tail
+            val vertoput = versions.drop(1)
               .foldLeft(Array.emptyByteArray) {
                 case (acc, elem) => acc ++ elem.data
               }
@@ -150,10 +150,10 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         }
         deletions.foreach { elemKey =>
           val accessMap = db.get(userKey(VersionalLevelDbKey @@ elemKey), readOptions)
-          writeBatch.put(userKey(VersionalLevelDbKey @@ elemKey), ACCESSIBLE_KEY_PREFIX +: accessMap.tail)
+          writeBatch.put(userKey(VersionalLevelDbKey @@ elemKey), ACCESSIBLE_KEY_PREFIX +: accessMap.drop(1))
         }
         db.write(writeBatch)
-        if (versionsToResolve.nonEmpty) rollbackResolver(versionsToResolve.tail)
+        if (versionsToResolve.nonEmpty) rollbackResolver(versionsToResolve.drop(1))
       } finally {
         writeBatch.close()
         readOptions.snapshot().close()
@@ -179,7 +179,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         getInaccessiableKeysInVersion(versionToResolve, readOptions)
       deletionsByThisVersion.foreach { key =>
         val elemMap = db.get(userKey(key), readOptions)
-        val wrappedVersions = splitValue2elems(settings.versionKeySize, elemMap.tail)
+        val wrappedVersions = splitValue2elems(settings.versionKeySize, elemMap.drop(1))
           .map(ver => new ByteArrayWrapper(ver))
         val elemVersions = wrappedVersions.filter(currentVersions.contains)
         val toDeleteElemsVersions = wrappedVersions.filterNot(currentVersions.contains)
@@ -194,9 +194,9 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       insertionsByThisVersion.foreach { elemKey =>
         val elemInfo = db.get(userKey(elemKey))
         val elemFlag = elemInfo.head
-        val elemMap = elemInfo.tail
+        val elemMap = elemInfo.drop(1)
         val elemVersions = splitValue2elems(settings.versionKeySize, elemMap).map(ByteArrayWrapper.apply)
-        elemVersions.dropWhile(_ != wrappedVer).tail.foreach {
+        elemVersions.dropWhile(_ != wrappedVer).drop(1).foreach {
           elemVerToDel => batch.delete(accessableElementKeyForVersion(LevelDBVersion @@ elemVerToDel.data, elemKey))
         }
         val newElemMap = elemVersions.takeWhile(_ != wrappedVer) :+ wrappedVer
@@ -222,9 +222,9 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       val versions = versionsList.map(ver => new ByteArrayWrapper(ver))
       if (versions.length > settings.maxVersions) {
         val versionToDelete = versions.last
-        batch.put(VERSIONS_LIST, versions.init
+        batch.put(VERSIONS_LIST, versions.dropRight(1)
           .foldLeft(Array.emptyByteArray) { case (acc, key) => acc ++ key.data })
-        versionsList = versionsList.init
+        versionsList = versionsList.dropRight(1)
         db.write(batch)
         deleteResolver(LevelDBVersion @@ versionToDelete.data)
       }
@@ -249,7 +249,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       while (iter.hasNext && (maxQty == -1 || buffer.length < maxQty)) {
         val nextKey = iter.next().getKey
         if (nextKey.head == USER_KEY_PREFIX && db.get(nextKey).headOption.contains(ACCESSIBLE_KEY_PREFIX)) {
-          buffer ::= VersionalLevelDbKey @@ nextKey.tail
+          buffer ::= VersionalLevelDbKey @@ nextKey.drop(1)
         }
       }
       buffer
