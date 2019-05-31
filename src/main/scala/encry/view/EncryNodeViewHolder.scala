@@ -287,11 +287,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
               logger.debug(s"\nTime of applying to state SUCCESS is: ${System.currentTimeMillis() - startAppState}. modId is: ${pmod.encodedId}")
               logger.debug(s"\nStarting inner updating after succeeded state applying!")
               influxRef.foreach { ref =>
-                val isHeader: Boolean = pmod match {
-                  case _: Header => true
-                  case _: Payload => false
+                val isBlock: Boolean = pmod match {
+                  case _: Payload => true
+                  case _ => false
                 }
-                ref ! ModifierAppendedToState(isHeader, success = true)
+                if (isBlock) ref ! ModifierAppendedToState(success = true)
               }
               val startInnerStateApp = System.currentTimeMillis()
               sendUpdatedInfoToMemoryPool(newMinState, progressInfo.toRemove, blocksApplied)
@@ -312,11 +312,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
               logger.debug(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod) " +
                 s"to minimal state because of: $e")
               influxRef.foreach { ref =>
-                val isHeader: Boolean = pmod match {
-                  case _: Header => true
-                  case _: Payload => false
+                val isBlock: Boolean = pmod match {
+                  case _: Payload => true
+                  case _ => false
                 }
-                ref ! ModifierAppendedToState(isHeader, success = false)
+                if (isBlock) ref ! ModifierAppendedToState(success = true)
               }
               logger.debug(s"\nTime of applying to state FAILURE is: ${System.currentTimeMillis() - startAppState}. modId is: ${pmod.encodedId}")
               updateNodeView(updatedHistory = Some(newHistory))

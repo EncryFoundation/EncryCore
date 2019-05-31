@@ -141,11 +141,11 @@ class StatsSender extends Actor with StrictLogging {
         InfluxPort,
         s"""modifierAppendedToHistory,success=$success,isHeader=$isHeader,nodeName=$nodeName value=$nodeNumber"""
       )
-    case ModifierAppendedToState(isHeader, success) if nodeName.exists(_.isDigit) =>
+    case ModifierAppendedToState(success) if nodeName.exists(_.isDigit) =>
       val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
       influxDB.write(
         InfluxPort,
-        s"""modifierAppendedToState,success=$success,isHeader=$isHeader,nodeName=$nodeName value=$nodeNumber"""
+        s"""modifierAppendedToState,success=$success,nodeName=$nodeName value=$nodeNumber"""
       )
     case TimestampDifference(diff) => influxDB.write(InfluxPort,s"""tsDiff,nodeName=$nodeName value=$diff""")
   }
@@ -191,7 +191,7 @@ object StatsSender {
 
   case class ModifierAppendedToHistory(isHeader: Boolean, success: Boolean)
 
-  case class ModifierAppendedToState(isHeader: Boolean, success: Boolean)
+  case class ModifierAppendedToState(success: Boolean)
 
   case class CurrentUtxosQtyInIOdb(utxosQty: Int)
 
