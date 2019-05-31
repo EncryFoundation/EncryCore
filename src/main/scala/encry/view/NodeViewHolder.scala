@@ -20,6 +20,8 @@ import encry.network.PeersKeeper.BanPeer
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
+import encry.view.NodeViewHolder.ReceivableMessages._
+import encry.view.NodeViewHolder.{DownloadRequest, _}
 import encry.view.NodeViewHolder._
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.history.EncryHistory
