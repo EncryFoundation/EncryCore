@@ -39,9 +39,9 @@ object ModifiersCache extends StrictLogging {
     value match {
       case header: Header =>
         val possibleHeadersAtCurrentHeight: List[ModifierId] = headersCollection.getOrElse(header.height, List())
-        logger.info(s"possibleHeadersAtCurrentHeight: ${possibleHeadersAtCurrentHeight.map(Algos.encode).mkString(",")}")
+        logger.info(s"possibleHeadersAtCurrentHeight(${header.height}): ${possibleHeadersAtCurrentHeight.map(Algos.encode).mkString(",")}")
         val updatedHeadersAtCurrentHeight: List[ModifierId] = header.id :: possibleHeadersAtCurrentHeight
-        logger.info(s"updatedHeadersAtCurrentHeight: ${updatedHeadersAtCurrentHeight.map(Algos.encode).mkString(",")}")
+        logger.info(s"updatedHeadersAtCurrentHeight(${header.height}): ${updatedHeadersAtCurrentHeight.map(Algos.encode).mkString(",")}")
         headersCollection = headersCollection.updated(header.height, updatedHeadersAtCurrentHeight)
       case _ =>
     }
