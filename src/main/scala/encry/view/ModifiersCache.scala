@@ -34,7 +34,7 @@ object ModifiersCache extends StrictLogging {
   def contains(key: Key): Boolean = cache.contains(key)
 
   def put(key: Key, value: PersistentModifier, history: EncryHistory): Unit = if (!contains(key)) {
-    logger.debug(s"put ${Algos.encode(key.toArray)} to cache")
+    logger.info(s"put ${Algos.encode(key.toArray)} to cache")
     cache.put(key, value)
     value match {
       case header: Header =>
@@ -124,17 +124,19 @@ object ModifiersCache extends StrictLogging {
                     )
                 )
                 && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
-              logger.debug(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
+              logger.info(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
               new mutable.WrappedArray.ofByte(v.id)
           }
         case None =>
-          logger.debug(s"No header in cache at height ${history.bestHeaderHeight + 1}. " +
+          logger.info(s"No header in cache at height ${history.bestHeaderHeight + 1}. " +
             s"Trying to find in range [${history.bestHeaderHeight - TestNetConstants.MaxRollbackDepth}, ${history.bestHeaderHeight}]")
           (history.bestHeaderHeight - TestNetConstants.MaxRollbackDepth to history.bestHeaderHeight).flatMap(height =>
             getHeadersKeysAtHeight(height)
           ).toList
       }
     }
+    logger.info(s"history.bestHeaderHeight: ${history.bestHeaderHeight}")
+    logger.info(s"history.bestBlockHeight: ${history.bestBlockHeight}")
     if (bestHeadersIds.nonEmpty) bestHeadersIds
     else history.headerIdsAtHeight(history.bestBlockHeight + 1).headOption match {
       case Some(id) => history.modifierById(id) match {
