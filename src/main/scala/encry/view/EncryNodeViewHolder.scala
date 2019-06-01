@@ -357,19 +357,23 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
     NodeView(history, state, wallet)
   }
 
-  def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryObjectsDir(settings).listFiles.isEmpty)
-    try {
-      val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
-      val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
-      val state: StateType =
-        restoreConsistentState(EncryState.readOrGenerate(settings, Some(self), influxRef).asInstanceOf[StateType], history)
-      Some(NodeView(history, state, wallet))
-    } catch {
-      case ex: Throwable =>
-        logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
-        new File(settings.directory).listFiles.foreach(dir => FileUtils.cleanDirectory(dir))
-        Some(genesisState)
-    } else None
+  def restoreState(): Option[NodeView] =
+    if (EncryHistory.getHistoryIndexDir(settings).listFiles.nonEmpty)
+      try {
+        val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
+        val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
+        val state: StateType =
+          restoreConsistentState(EncryState.readOrGenerate(settings, Some(self), influxRef).asInstanceOf[StateType], history)
+        Some(NodeView(history, state, wallet))
+      } catch {
+        case ex: Throwable =>
+          logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
+          new File(settings.directory).listFiles.foreach(dir => FileUtils.cleanDirectory(dir))
+          Some(genesisState)
+      } else {
+      logger.info("none")
+      None
+    }
 
   def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): StateType = {
     val dir: File = EncryState.getStateDir(settings)
