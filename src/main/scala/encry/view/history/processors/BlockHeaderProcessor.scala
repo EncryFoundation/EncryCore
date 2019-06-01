@@ -240,7 +240,9 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     logger.info(s"New best header ${h.encodedId} with score: $score." +
       s" New height: ${h.height}, old height: $prevHeight")
     val self: (StorageKey, StorageValue) =
-      heightIdsKey(h.height) -> StorageValue @@ (Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray
+      heightIdsKey(h.height) -> StorageValue @@ (Seq(h.id) ++
+        headerIdsAtHeight(h.height).filterNot(_ sameElements h.id)
+        ).flatten.toArray
     val parentHeaderOpt: Option[Header] =
       headersCache.find(_.id sameElements h.parentId).orElse(typedModifierById[Header](h.parentId))
     val forkHeaders: Seq[Header] = parentHeaderOpt.toSeq
