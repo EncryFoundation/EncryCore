@@ -2,22 +2,23 @@ package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.ByteOrder
+
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
-import encry.EncryApp.settings
-import encry.EncryApp._
-import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, _}
-import PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import PeerConnectionHandler.ReceivableMessages._
+import encry.EncryApp.{settings, _}
+import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, _}
+import encry.network.PeerConnectionHandler.ReceivableMessages._
+import encry.network.PeersKeeper.{ConnectionStopped, StableConnectionSetup}
+import org.encryfoundation.common.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, NetworkMessage}
+
 import scala.annotation.tailrec
 import scala.collection.immutable.HashMap
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
-import org.encryfoundation.common.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, NetworkMessage}
 
 class PeerConnectionHandler(connection: ActorRef,
                             direction: ConnectionType,
@@ -35,7 +36,6 @@ class PeerConnectionHandler(connection: ActorRef,
   var outMessagesCounter: Long = 0
 
   override def preStart: Unit = {
-    peerManager ! DoConnecting(remote, direction)
     handshakeTimeoutCancellableOpt = Some(context.system.scheduler.scheduleOnce(settings.network.handshakeTimeout)
     (self ! HandshakeTimeout))
     connection ! Register(self, keepOpenOnPeerClosed = false, useResumeWriting = true)
@@ -99,24 +99,27 @@ class PeerConnectionHandler(connection: ActorRef,
       require(receivedHandshake.isDefined)
       val peer: ConnectedPeer = ConnectedPeer(remote, self, direction, receivedHandshake.get)
       selfPeer = Some(peer)
-      peerManager ! Handshaked(peer)
+      context.parent ! StableConnectionSetup(peer)
       handshakeTimeoutCancellableOpt.map(_.cancel())
       connection ! ResumeReading
       logger.debug(s"Starting workingCycleWriting on peerHandler for $remote.")
-      context become workingCycleWriting
+      context.become(workingCycleWriting)
   }
 
   def processErrors(stateName: CommunicationState): Receive = {
     case cc: ConnectionClosed =>
       logger.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
-      peerManager ! Disconnected(remote)
-      context stop self
+      context.parent ! ConnectionStopped(remote)
+      context.stop(self)
+
     case CloseConnection =>
       logger.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")
       connection ! Close
+
     case fail@CommandFailed(cmd: Tcp.Command) =>
       logger.debug("Failed to execute command : " + cmd + s" in state $stateName cause ${fail.cause}")
       connection ! ResumeReading
+
     case message => logger.debug(s"Peer connection handler for $remote Got something strange: $message")
   }
 

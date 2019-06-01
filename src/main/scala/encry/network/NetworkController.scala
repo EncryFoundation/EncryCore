@@ -2,16 +2,16 @@ package encry.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
 import akka.actor._
-import akka.io.Tcp.SO.KeepAlive
-import akka.io.Tcp._
+import akka.actor.SupervisorStrategy.Restart
 import akka.io.{IO, Tcp}
-import akka.pattern.ask
-import encry.EncryApp._
-import encry.network.NetworkController.ReceivableMessages._
-import encry.network.PeerConnectionHandler._
-import PeerManager.ReceivableMessages.{CheckPeers, Disconnected, FilterPeers}
+import akka.io.Tcp._
+import akka.io.Tcp.SO.KeepAlive
 import com.typesafe.scalalogging.StrictLogging
 import encry.cli.commands.AddPeer.PeerFromCli
+import encry.network.NetworkController.ReceivableMessages._
+import encry.network.PeerConnectionHandler._
+import encry.network.PeerConnectionHandler.ReceivableMessages.StartInteraction
+import encry.network.PeersKeeper._
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
 import scala.collection.JavaConverters._
@@ -19,15 +19,17 @@ import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
 import scala.util.Try
 
-class NetworkController(settings: EncryAppSettings) extends Actor with StrictLogging {
+class NetworkController(settings: EncryAppSettings, peersKeeper: ActorRef) extends Actor with StrictLogging {
 
-  val peerSynchronizer: ActorRef = context.actorOf(Props[PeerSynchronizer].withDispatcher("network-dispatcher"))
+  import context.dispatcher
+  import context.system
+
   var messagesHandlers: Map[Seq[Byte], ActorRef] = Map.empty
-  var outgoing: Set[InetSocketAddress] = Set.empty
-  lazy val externalSocketAddress: Option[InetSocketAddress] = settings.network.declaredAddress orElse None
+  val externalSocketAddress: Option[InetSocketAddress] = settings.network.declaredAddress.orElse(None)
   var knownPeersCollection: Set[InetSocketAddress] = settings.network.knownPeers.toSet
 
-  var blackList: Map[InetAddress, Long] = Map.empty
+  logger.info(s"Declared address is: $externalSocketAddress.")
+
 
   if (!settings.network.localOnly.getOrElse(false)) settings.network.declaredAddress.foreach(myAddress =>
     Try(NetworkInterface.getNetworkInterfaces.asScala.exists(interface =>
@@ -36,19 +38,86 @@ class NetworkController(settings: EncryAppSettings) extends Actor with StrictLog
       ))).recover { case t: Throwable => logger.error(s"Declared address validation failed: $t") }
   )
 
-  logger.info(s"Declared address: $externalSocketAddress")
-
   IO(Tcp) ! Bind(self, settings.network.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
 
-  override def supervisorStrategy: SupervisorStrategy = commonSupervisorStrategy
+  override def supervisorStrategy: SupervisorStrategy = OneForOneStrategy(
+    maxNrOfRetries = 5,
+    withinTimeRange = 60 seconds) {
+    case _ => Restart
+  }
+
+  override def receive: Receive = bindingLogic
+    .orElse(businessLogic)
+    .orElse(peersLogic)
+    .orElse {
+      case RegisterMessagesHandler(types, handler) =>
+        logger.info(s"Registering handlers for ${types.mkString(",")}.")
+        val ids = types.map(_._1)
+        messagesHandlers += (ids -> handler)
+      case CommandFailed(cmd: Tcp.Command) => logger.info(s"Failed to execute: $cmd.")
+      case msg => logger.warn(s"NetworkController: got something strange $msg.")
+    }
 
   def bindingLogic: Receive = {
-    case Bound(_) =>
-      logger.info("Successfully bound to the port " + settings.network.bindAddress.getPort)
-      context.system.scheduler.schedule(600.millis, 5.seconds)(peerManager ! CheckPeers)
-    case CommandFailed(_: Bind) =>
-      logger.info("Network port " + settings.network.bindAddress.getPort + " already in use!")
-      context stop self
+    case Bound(address) =>
+      logger.info(s"Successfully bound to the port ${address.getPort}.")
+      context.system.scheduler.schedule(600.millis, 5.second)(peersKeeper ! RequestPeerForConnection)
+    case CommandFailed(add: Bind) =>
+      logger.info(s"Node can't be bind to the address: ${add.localAddress}.")
+      context.stop(self)
+  }
+
+  def businessLogic: Receive = {
+    case MessageFromNetwork(message, Some(remote)) if message.isValid(settings.network.syncPacketLength) =>
+      logger.debug(s"Got ${message.messageName} on the NetworkController.")
+      findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
+    case MessageFromNetwork(message, Some(remote)) =>
+      logger.info(s"Invalid message type: ${message.messageName} from remote $remote")
+  }
+
+  def peersLogic: Receive = {
+    case PeerForConnection(peer) =>
+      logger.info(s"Network controller got new peer for connection: $peer. Trying to set connection with remote...")
+      IO(Tcp) ! Connect(
+        peer,
+        externalSocketAddress,
+        KeepAlive(true) :: Nil,
+        Some(settings.network.connectionTimeout),
+        pullMode = true
+      )
+
+    case Connected(remote, _) =>
+      logger.info(s"Network controller got 'Connected' message from: $remote. Trying to set stable connection with remote...")
+      peersKeeper ! RequestForStableConnection(remote, sender())
+
+    case CreateStableConnection(remote, remoteConnection, connectionType) =>
+      logger.info(s"Network controller got approvement for stable connection with: $remote. Starting interaction process...")
+      val peerConnectionHandler: ActorRef = context.actorOf(
+        PeerConnectionHandler.props(remoteConnection, connectionType, externalSocketAddress, remote)
+          .withDispatcher("network-dispatcher")
+      )
+      peerConnectionHandler ! StartInteraction
+
+    case StableConnectionSetup(remote) =>
+      logger.info(s"Network controller got approvement from peer handler about successful handshake. " +
+        s"Sending to peerKeeper connected peer.")
+      peersKeeper ! StableConnectionSetup(remote)
+
+    case ConnectionStopped(peer) =>
+      logger.info(s"Network controller got signal about breaking connection with: $peer. " +
+        s"Sending to peerKeeper actual information.")
+      peersKeeper ! ConnectionStopped(peer)
+
+    case CommandFailed(connect: Connect) =>
+      logger.info(s"Failed to connect to: ${connect.remoteAddress}.")
+      peersKeeper ! OutgoingConnectionFailed(connect.remoteAddress)
+
+    case PeerFromCli(address) =>
+      knownPeersCollection = knownPeersCollection + address
+      peerManager ! PeerFromCli(address)
+      peerSynchronizer ! PeerFromCli(address)
+      self ! ConnectTo(address)
+
   }
 
   private def findHandler(message: NetworkMessage,
@@ -61,77 +130,16 @@ class NetworkController(settings: EncryAppSettings) extends Actor with StrictLog
         logger.debug(s"Send message DataFromPeer with ${message.messageName} to $handler.")
       case None => logger.error("No handlers found for message: " + message.messageName)
     }
-
-  def businessLogic: Receive = {
-    case MessageFromNetwork(message, Some(remote)) if message.isValid(settings.network.syncPacketLength) =>
-      logger.debug(s"Got ${message.messageName} on the NetworkController.")
-      findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
-    case MessageFromNetwork(message, Some(remote)) =>
-      logger.info(s"Invalid message type: ${message.messageName} from remote $remote")
-    case SendToNetwork(message, sendingStrategy) =>
-      (peerManager ? FilterPeers(sendingStrategy)) (5 seconds)
-        .map(_.asInstanceOf[Seq[ConnectedPeer]])
-        .foreach(_.foreach(peer => peer.handlerRef ! message))
-  }
-
-  def peerLogic: Receive = {
-    ///TODO: Duplicate `checkPossibilityToAddPeer` logic
-    case ConnectTo(remote) if CheckPeersObj.checkPossibilityToAddPeer(remote, knownPeersCollection, settings) =>
-      outgoing += remote
-      IO(Tcp) ! Connect(remote,
-        localAddress = externalSocketAddress,
-        options = KeepAlive(true) :: Nil,
-        timeout = Some(settings.network.connectionTimeout),
-        pullMode = true)
-    case PeerFromCli(address) =>
-      knownPeersCollection = knownPeersCollection + address
-      peerManager ! PeerFromCli(address)
-      peerSynchronizer ! PeerFromCli(address)
-      self ! ConnectTo(address)
-    case Connected(remote, local) if CheckPeersObj.checkPossibilityToAddPeer(remote, knownPeersCollection, settings) =>
-      val direction: ConnectionType = if (outgoing.contains(remote)) Outgoing else Incoming
-      val logMsg: String = direction match {
-        case Incoming => s"New incoming connection from $remote established (bound to local $local)"
-        case Outgoing => s"New outgoing connection to $remote established (bound to local $local)"
-      }
-      logger.info(logMsg)
-      context.actorOf(PeerConnectionHandler.props(sender(), direction, externalSocketAddress, remote)
-        .withDispatcher("network-dispatcher"))
-      outgoing -= remote
-    case Connected(remote, _) =>
-      logger.info(s"Peer $remote trying to connect, but checkPossibilityToAddPeer(remote):" +
-        s" ${CheckPeersObj.checkPossibilityToAddPeer(remote, knownPeersCollection, settings)}.")
-    case CommandFailed(c: Connect) =>
-      outgoing -= c.remoteAddress
-      logger.info("Failed to connect to : " + c.remoteAddress)
-      peerManager ! Disconnected(c.remoteAddress)
-  }
-
-  override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse {
-    case RegisterMessagesHandler(types, handler) =>
-      logger.info(s"Registering handlers for ${types.mkString(",")}.")
-      val ids = types.map(_._1)
-      messagesHandlers += (ids -> handler)
-    case CommandFailed(cmd: Tcp.Command) =>
-      context.actorSelection("/user/statsSender") ! "Failed to execute command : " + cmd
-    case nonsense: Any => logger.warn(s"NetworkController: got something strange $nonsense")
-  }
 }
 
 object NetworkController {
 
-  def props(settings: EncryAppSettings): Props = Props(new NetworkController(settings))
+  def props(settings: EncryAppSettings, peersKeeper: ActorRef): Props = Props(new NetworkController(settings, peersKeeper))
 
   object ReceivableMessages {
 
     case class DataFromPeer(message: NetworkMessage, source: ConnectedPeer)
 
     case class RegisterMessagesHandler(types: Seq[(Byte, String)], handler: ActorRef)
-
-    case class SendToNetwork(message: NetworkMessage, sendingStrategy: SendingStrategy)
-
-    case class ConnectTo(address: InetSocketAddress)
-
   }
-
 }

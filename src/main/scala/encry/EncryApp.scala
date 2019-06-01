@@ -46,12 +46,18 @@ object EncryApp extends App with StrictLogging {
     else None
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
   lazy val memoryPool: ActorRef = system.actorOf(Mempool.props(settings, timeProvider, miner).withDispatcher("mempool-dispatcher"))
+
+  val peersKeeper: ActorRef = system.actorOf(PeersKeeper.props(settings))
+
   lazy val nodeViewHolder: ActorRef =
-    system.actorOf(NodeViewHolder.props(memoryPool, influxRef).withMailbox("nvh-mailbox"),
+    system.actorOf(NodeViewHolder.props(memoryPool, peersKeeper, influxRef).withMailbox("nvh-mailbox"),
       "nodeViewHolder")
+
   val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
+
+
   lazy val networkController: ActorRef = system.actorOf(
-    NetworkController.props(settings).withDispatcher("network-dispatcher")
+    NetworkController.props(settings, peersKeeper).withDispatcher("network-dispatcher")
   )
   lazy val peerManager: ActorRef = system.actorOf(Props(classOf[PeerManager]), "peerManager")
   lazy val nodeViewSynchronizer: ActorRef = system.actorOf(NodeViewSynchronizer

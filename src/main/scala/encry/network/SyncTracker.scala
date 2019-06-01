@@ -37,55 +37,55 @@ case class SyncTracker(deliveryManager: ActorRef,
   private type Received  = Int
   private var peersNetworkCommunication: Map[InetAddress, (Requested, Received)] = Map.empty
 
-  def updatePeersPriorityStatus(): Unit = {
-    peersNetworkCommunication.foreach { case (peer, (requested, received)) =>
-      statuses.get(peer) match {
-        case Some((hcr, _, cp)) =>
-          val priority: PeerPriorityStatus = PeerPriorityStatus.definePriorityStatus(requested, received)
-          logger.info(s"Peer $peer has new priority: ${PeerPriorityStatus.toString(priority)}.")
-          statuses = statuses.updated(peer, (hcr, priority, cp))
-        case None => logger.info(s"Can't update peer $peer priority. No such peer in status tracker")
-      }
-    }
-    peersNetworkCommunication = Map.empty[InetAddress, (Requested, Received)]
-  }
+//  def updatePeersPriorityStatus(): Unit = {
+//    peersNetworkCommunication.foreach { case (peer, (requested, received)) =>
+//      statuses.get(peer) match {
+//        case Some((hcr, _, cp)) =>
+//          val priority: PeerPriorityStatus = PeerPriorityStatus.definePriorityStatus(requested, received)
+//          logger.info(s"Peer $peer has new priority: ${PeerPriorityStatus.toString(priority)}.")
+//          statuses = statuses.updated(peer, (hcr, priority, cp))
+//        case None => logger.info(s"Can't update peer $peer priority. No such peer in status tracker")
+//      }
+//    }
+//    peersNetworkCommunication = Map.empty[InetAddress, (Requested, Received)]
+//  }
 
-  def incrementRequest(peer: ConnectedPeer): Unit = {
-    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
-    logger.debug(s"Updating request parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
-      s" New one is: (${requestReceiveStat._1 + 1}, ${requestReceiveStat._2})")
-    peersNetworkCommunication =
-      peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1 + 1, requestReceiveStat._2))
-  }
+//  def incrementRequest(peer: ConnectedPeer): Unit = {
+//    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
+//    logger.debug(s"Updating request parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
+//      s" New one is: (${requestReceiveStat._1 + 1}, ${requestReceiveStat._2})")
+//    peersNetworkCommunication =
+//      peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1 + 1, requestReceiveStat._2))
+//  }
+//
+//  def incrementRequestForNModifiers(peer: ConnectedPeer, modifiersQty: Int): Unit = {
+//    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
+//    logger.debug(s"Updating request parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
+//      s" New one is: (${requestReceiveStat._1 + modifiersQty}, ${requestReceiveStat._2})")
+//    peersNetworkCommunication =
+//      peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1 + modifiersQty, requestReceiveStat._2))
+//  }
+//
+//  def incrementReceive(peer: ConnectedPeer): Unit = {
+//    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
+//    logger.debug(s"Updating received parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
+//      s" New one is: (${requestReceiveStat._1}, ${requestReceiveStat._2 + 1})")
+//    peersNetworkCommunication =
+//      peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1, requestReceiveStat._2 + 1))
+//  }
+//
+//  def decrementRequest(peer: ConnectedPeer): Unit = {
+//    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
+//    logger.debug(s"Decrement request parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
+//      s" New one is: (${requestReceiveStat._1}, ${requestReceiveStat._2 - 1})")
+//    peersNetworkCommunication =
+//      peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1, requestReceiveStat._2 - 1))
+//  }
 
-  def incrementRequestForNModifiers(peer: ConnectedPeer, modifiersQty: Int): Unit = {
-    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
-    logger.debug(s"Updating request parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
-      s" New one is: (${requestReceiveStat._1 + modifiersQty}, ${requestReceiveStat._2})")
-    peersNetworkCommunication =
-      peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1 + modifiersQty, requestReceiveStat._2))
-  }
-
-  def incrementReceive(peer: ConnectedPeer): Unit = {
-    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
-    logger.debug(s"Updating received parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
-      s" New one is: (${requestReceiveStat._1}, ${requestReceiveStat._2 + 1})")
-    peersNetworkCommunication =
-      peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1, requestReceiveStat._2 + 1))
-  }
-
-  def decrementRequest(peer: ConnectedPeer): Unit = {
-    val requestReceiveStat: (Requested, Received) = peersNetworkCommunication.getOrElse(peer.socketAddress.getAddress, (0, 0))
-    logger.debug(s"Decrement request parameter from ${peer.socketAddress}. Old is $requestReceiveStat." +
-      s" New one is: (${requestReceiveStat._1}, ${requestReceiveStat._2 - 1})")
-    peersNetworkCommunication =
-      peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1, requestReceiveStat._2 - 1))
-  }
-
-  def peersForDownloadRequest: Vector[(InetAddress, (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer))] =
-    statuses
-      .filter { case (_, (hcr, _, _)) => hcr != Younger }
-      .toVector.sortBy { case (_, (_, pps, _)) => pps }
+//  def getPeersForConnection: Vector[(InetAddress, (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer))] =
+//    statuses
+//      .filter { case (_, (hcr, _, _)) => hcr != Fork }
+//      .toVector.sortBy { case (_, (_, pps, _)) => pps }
 
   def scheduleSendSyncInfo(): Unit = {
     schedule.foreach(_.cancel())
@@ -159,31 +159,31 @@ case class SyncTracker(deliveryManager: ActorRef,
 
 object SyncTracker {
 
-  object PeerPriorityStatus {
-
-    type PeerPriorityStatus = Int
-
-    val HighPriority: PeerPriorityStatus    = 4
-    val LowPriority: PeerPriorityStatus     = 3
-    val InitialPriority: PeerPriorityStatus = 2
-    val BadNode: PeerPriorityStatus         = 1
-
-    private val criterionForHighP: Double = 0.75
-    private val criterionForLowP: Double  = 0.50
-
-    def definePriorityStatus(requested: Int, received: Int): PeerPriorityStatus =
-      received.toDouble / requested match {
-        case t if t >= criterionForHighP => HighPriority
-        case t if t >= criterionForLowP  => LowPriority
-        case _                           => BadNode
-      }
-
-    def toString(priority: PeerPriorityStatus): String = priority match {
-      case 1 => "BadNode"
-      case 2 => "InitialPriorityNode"
-      case 3 => "LowPriorityNode"
-      case 4 => "HighPriorityNode"
-    }
-  }
+//  object PeerPriorityStatus {
+//
+//    type PeerPriorityStatus = Int
+//
+////    val HighPriority: PeerPriorityStatus    = 4
+////    val LowPriority: PeerPriorityStatus     = 3
+////    val InitialPriority: PeerPriorityStatus = 2
+////    val BadNode: PeerPriorityStatus         = 1
+//
+//    private val criterionForHighP: Double = 0.75
+//    private val criterionForLowP: Double  = 0.50
+//
+//    def definePriorityStatus(requested: Int, received: Int): PeerPriorityStatus =
+//      received.toDouble / requested match {
+//        case t if t >= criterionForHighP => HighPriority
+//        case t if t >= criterionForLowP  => LowPriority
+//        case _                           => BadNode
+//      }
+//
+//    def toString(priority: PeerPriorityStatus): String = priority match {
+//      case 1 => "BadNode"
+//      case 2 => "InitialPriorityNode"
+//      case 3 => "LowPriorityNode"
+//      case 4 => "HighPriorityNode"
+//    }
+//  }
 
 }

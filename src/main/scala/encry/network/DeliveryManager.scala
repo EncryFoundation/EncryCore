@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.InetAddress
+
 import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, PoisonPill, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
@@ -14,12 +15,14 @@ import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.EncryHistory
 import encry.settings.EncryAppSettings
+
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.mutable
 import scala.util.Random
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
+import encry.network.PeersKeeper.PeersForSyncInfo
 import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
 import encry.view.mempool.Mempool.RequestForTransactions
 import org.encryfoundation.common.modifiers.history.Header
@@ -28,6 +31,7 @@ import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, 
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.concurrent.ExecutionContextExecutor
 
 class DeliveryManager(influxRef: Option[ActorRef],
@@ -59,7 +63,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * Modifier considered expected if we sent request for it.
     */
   var expectedModifiers: Map[InetAddress, Map[ModifierIdAsKey, (Cancellable, Int)]] = Map.empty
-  val syncTracker: SyncTracker = SyncTracker(self, context, settings.network)
+  //val syncTracker: SyncTracker = SyncTracker(self, context, settings.network)
 
   override def preStart(): Unit = {
     networkControllerRef ! RegisterMessagesHandler(
@@ -152,6 +156,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
         priorityRequest(modifierTypeId, modifiersId, previousModifier.get, history, isBlockChainSynced, isMining)
       }
       else requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
+    case PeersForSyncInfo(peers) =>
+
     case SendLocalSyncInfo =>
       if (syncTracker.elapsedTimeSinceLastSync < settings.network.syncInterval.toMillis / 2)
         logger.debug("Trying to send sync info too often")
@@ -196,9 +202,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * @param syncInfo           - sync info
     * @param isBlockChainSynced - current block chain status
     */
-  def sendSync(syncInfo: SyncInfo, isBlockChainSynced: Boolean): Unit =
-    if (isBlockChainSynced) syncTracker.peersToSyncWith.foreach(peer => peer.handlerRef ! SyncInfoNetworkMessage(syncInfo))
-    else Random.shuffle(syncTracker.peersToSyncWith).headOption.foreach(peer => peer.handlerRef ! SyncInfoNetworkMessage(syncInfo))
+  def sendSync(syncInfo: SyncInfo, isBlockChainSynced: Boolean, peers: Seq[ConnectedPeer]): Unit =
+    if (isBlockChainSynced) peers.foreach(peer => peer.handlerRef ! SyncInfoNetworkMessage(syncInfo))
+    else Random.shuffle(peers).headOption.foreach(peer => peer.handlerRef ! SyncInfoNetworkMessage(syncInfo))
 
   /**
     * Send request to 'peer' with modifiers ids of type 'modifierTypeId'.

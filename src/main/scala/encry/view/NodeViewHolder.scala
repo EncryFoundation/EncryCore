@@ -11,9 +11,12 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
+import encry.network.BlackList.SyntacticallyInvalidModifier
+import encry.modifiers.history.{PayloadUtils => PU, HeaderUtils => HU}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.network.PeersKeeper.BanPeer
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewHolder.ReceivableMessages._
@@ -30,14 +33,13 @@ import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
 import scala.annotation.tailrec
-import scala.collection.{IndexedSeq, Seq, mutable}
+import scala.collection.{mutable, IndexedSeq, Seq}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef,
                                                          influxRef: Option[ActorRef]) extends Actor with StrictLogging {
-
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet)
 
   var applicationsSuccessful: Boolean = true
@@ -85,9 +87,9 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
               logger.info(s"Received payload ${Algos.encode(payload.id)} can't be placed into cache cause of: " +
                 s"inHistory: $isInHistory, inCache: $isInCache.")
             else ModifiersCache.put(key(payload.id), payload, nodeView.history)
-          case Success(_) => //TODO send info about potentially bad node
+          case Success(_) => peersKeeper ! BanPeer(peer, SyntacticallyInvalidModifier)
           case Failure(ex) =>
-            //TODO send info about potentially bad node
+            peersKeeper ! BanPeer(peer, SyntacticallyInvalidModifier)
             logger.debug(s"Received modifier from $peer can't be parsed cause of: ${ex.getMessage}.")
         })
         computeApplications()
@@ -101,9 +103,9 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
               logger.info(s"Received header ${Algos.encode(header.id)} can't be placed into cache cause of: " +
                 s"inHistory: $isInHistory, inCache: $isInCache.")
             else ModifiersCache.put(key(header.id), header, nodeView.history)
-          case Success(_) => //TODO send info about potentially bad node
+          case Success(_) => peersKeeper ! BanPeer(peer, SyntacticallyInvalidModifier)
           case Failure(ex) =>
-            //TODO send info about potentially bad node
+            peersKeeper ! BanPeer(peer, SyntacticallyInvalidModifier)
             logger.debug(s"Received modifier from $peer can't be parsed cause of: ${ex.getMessage}.")
         })
         computeApplications()
@@ -477,8 +479,9 @@ object NodeViewHolder {
         case otherwise => 1
       })
 
-  def props(memoryPoolRef: ActorRef, influxRef: Option[ActorRef]): Props = settings.node.stateMode match {
-    case StateMode.Digest => Props(new NodeViewHolder[DigestState](memoryPoolRef, influxRef))
-    case StateMode.Utxo => Props(new NodeViewHolder[UtxoState](memoryPoolRef, influxRef))
-  }
+  def props(memoryPoolRef: ActorRef, peersKeeper: ActorRef, influxRef: Option[ActorRef]): Props =
+    settings.node.stateMode match {
+      case StateMode.Digest => Props(new NodeViewHolder[DigestState](memoryPoolRef, peersKeeper, influxRef))
+      case StateMode.Utxo => Props(new NodeViewHolder[UtxoState](memoryPoolRef, peersKeeper, influxRef))
+    }
 }
