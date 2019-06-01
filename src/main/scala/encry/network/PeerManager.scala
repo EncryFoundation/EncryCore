@@ -53,6 +53,7 @@ class PeerManager extends Actor with StrictLogging {
     case Handshaked(peer) if peer.direction == Outgoing && isSelf(peer.socketAddress, peer.handshake.declaredAddress) =>
       peer.handlerRef ! CloseConnection
 
+
     case Handshaked(peer) if CheckPeersObj.checkPossibilityToAddPeer(
       peer.socketAddress,
       knownPeersCollection,
@@ -143,7 +144,7 @@ object PeerManager {
 }
 
 // TODO: REMOVE THIS
-case class PeerInfo(lastSeen: Long, nodeName: Option[String] = None, connectionType: Option[ConnectionType] = None)
+//case class PeerInfo(lastSeen: Long, nodeName: Option[String] = None, connectionType: Option[ConnectionType] = None)
 
 object CheckPeersObj {
   def checkPossibilityToAddPeer(address: InetSocketAddress,

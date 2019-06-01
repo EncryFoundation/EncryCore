@@ -13,11 +13,16 @@ import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
 import encry.network.BlackList.SyntacticallyInvalidModifier
 import encry.modifiers.history.{PayloadUtils => PU, HeaderUtils => HU}
+import encry.modifiers.history.{HeaderUtils => HU, PayloadUtils => PU}
+import encry.network.AuxiliaryHistoryHolder
+import encry.network.AuxiliaryHistoryHolder.NewHistory
+import encry.network.BlackList.SyntacticallyInvalidModifier
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
+import encry.network.PeersKeeper.BanPeer
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewHolder.ReceivableMessages._
