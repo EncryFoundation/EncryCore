@@ -177,6 +177,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         } //todo: Ban node that send payload id?
       case _ => logger.debug(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
     }
+    case TxsForNVSH(remote, txs) => sendResponse(remote, Transaction.modifierTypeId, txs)
+    case msg@RequestFromLocal(peer, modifierTypeId, modifierIds, peers) =>
     case TxsForNVSH(remote, txs) => sendResponse(
       remote, Transaction.modifierTypeId, txs.map(tx => tx.id -> TransactionProtoSerializer.toProto(tx).toByteArray)
     )

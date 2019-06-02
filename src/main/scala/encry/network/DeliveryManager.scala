@@ -250,7 +250,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequested)
         priorityCalculator.incrementRequestForNModifiers(peer.socketAddress.getAddress, notYetRequested.size)
         //syncTracker.incrementRequestForNModifiers(peer, notYetRequested.size)
-        val requestedModIds: Map[ModifierIdAsKey, (Cancellable, PeerPriorityStatus)] =
+        val requestedModIds: Map[ModifierIdAsKey, (Cancellable, Int)] =
           notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
             rYet.updated(toKey(id),
               context.system

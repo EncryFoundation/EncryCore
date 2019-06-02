@@ -51,6 +51,8 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
     .orElse(networkMessagesProcessingLogic)
     .orElse(banPeersLogic)
     .orElse {
+      case GetPeersForRequestFromLocal(f1, f2, f3) =>
+        nodeViewSynchronizer !
       case CheckModifiersToDownloadSuccess =>
         context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(
           nodeViewSynchronizer ! CheckModifiersToDownload(connectedPeers.getPeersForDeliveryManager)

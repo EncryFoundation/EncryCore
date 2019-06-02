@@ -58,7 +58,8 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
       info.connectedPeer -> info.peerPriorityStatus
     }.toIndexedSeq
 
-
+  def getPeersWithoutYounger: Map[ConnectedPeer, HistoryComparisonResult] =
+    peers.map(x => x._2.connectedPeer -> x._2.historyComparisonResult)
 }
 
 object ConnectedPeersList {
