@@ -1,18 +1,17 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.History.{HistoryComparisonResult, Unknown}
-import encry.network.ConnectedPeersList.{LastUptime, PeerInfo, PeersPriorityStatus}
-import encry.network.ConnectedPeersList.PeersPriorityStatus.{InitialPriority, PeersPriorityStatus, Received, Requested}
+import encry.consensus.History.{Fork, HistoryComparisonResult, Unknown}
+import encry.network.ConnectedPeersList.{LastUptime, PeerInfo}
 import encry.network.PeerConnectionHandler.{ConnectedPeer, ConnectionType, Outgoing}
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.{InitialPriority, PeersPriorityStatus}
 import encry.settings.EncryAppSettings
 
 final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging {
 
   private var peers: Map[InetAddress, PeerInfo] = Map.empty
-
-  private var peersNetworkStatistic: Map[InetAddress, (Requested, Received)] = Map.empty
 
   def contains(peer: InetAddress): Boolean = peers.contains(peer)
 
@@ -37,50 +36,28 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
 
   def getAllConnectedPeers: Seq[ConnectedPeer] = peers.values.map(_.connectedPeer).toSeq
 
-  def updatePeersPriorityStatus(): Unit = {
-    peersNetworkStatistic.foreach { case (peer, (requested, received)) =>
-      peers.get(peer) match {
-        case Some(peerInfo) =>
-          val priority: PeersPriorityStatus = PeersPriorityStatus.calculateStatuses(received, requested)
-          logger.info(s"Updating priority status for peer $peer... $priority.")
-          peers = peers.updated(peer, peerInfo.copy(peerPriorityStatus = priority))
-        case None => logger.info(s"Can't update peer's $peer priority. No such peer in connected peers list.")
-      }
+  def updatePeersPriorityStatus(statistic: Map[InetAddress, PeersPriorityStatus]): Unit = statistic.foreach {
+    case (peer, status) => peers.get(peer) match {
+      case Some(peerInfo) =>
+        logger.info(s"Updating priority status for peer $peer... $status.")
+        peers = peers.updated(peer, peerInfo.copy(peerPriorityStatus = status))
+      case None => logger.info(s"Can't update peer's $peer priority. No such peer in connected peers list.")
     }
-    peersNetworkStatistic = Map.empty[InetAddress, (Requested, Received)]
   }
 
-  def incrementRequest(peer: InetAddress): Unit = {
-    val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
-    val newRequested: Requested = Requested(requested.increment)
-    logger.info(s"Updating request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
-    peersNetworkStatistic = peersNetworkStatistic.updated(peer, (newRequested, received))
-  }
+  def updatePeerComparisonStatus(peer: ConnectedPeer, status: HistoryComparisonResult): Unit =
+    peers.get(peer.socketAddress.getAddress) match {
+      case Some(value) =>
+        val newPeerInfo: PeerInfo = value.copy(historyComparisonResult = status)
+        peers = peers.updated(peer.socketAddress.getAddress, newPeerInfo)
+      case None => //todo can we have such behaviour??
+    }
 
-  def incrementReceive(peer: InetAddress): Unit = {
-    val (requested, received): (Requested, Received) = peers.getOrElse(peer, (Requested(), Received()))
-    val newReceived: Received = Received(received.increment)
-    logger.info(s"Updating received parameter from $peer. Old is ($requested, $received). New one is: ($requested, $newReceived)")
-    peersNetworkStatistic = peersNetworkStatistic.updated(peer, (requested, newReceived))
-  }
+  def getPeersForDeliveryManager: IndexedSeq[(ConnectedPeer, PeersPriorityStatus)] =
+    peers.collect { case (_, info) if info.historyComparisonResult != Fork =>
+      info.connectedPeer -> info.peerPriorityStatus
+    }.toIndexedSeq
 
-  def decrementRequest(peer: InetAddress): Unit = {
-    val (requested, received): (Requested, Received) = peers.getOrElse(peer, (Requested(), Received()))
-    val newRequested: Requested = Requested(requested.decrement)
-    logger.info(s"Decrement request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
-    peersNetworkStatistic = peersNetworkStatistic.updated(peer, (newRequested, received))
-  }
-
-  def incrementRequestForNModifiers(peer: InetAddress, modifiersQty: Int): Unit = {
-    val (requested, received): (Requested, Received) = peers.getOrElse(peer, (Requested(), Received()))
-    val newRequested: Requested = Requested(requested.increment(modifiersQty))
-    logger.info(s"Updating request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
-    peersNetworkStatistic = peersNetworkStatistic.updated(peer, (newRequested, received))
-  }
-
-//  def getPeersForConnection: IndexedSeq[(InetAddress, PeerInfo)] = peers
-//    .filter { case (_, peerInfo) => peerInfo.historyComparisonResult != Fork }
-//    .toIndexedSeq.sortBy { case (_, peerInfo) => peerInfo.peerPriorityStatus }
 
 }
 
@@ -94,51 +71,5 @@ object ConnectedPeersList {
                             connectionType: ConnectionType,
                             lastUptime: LastUptime)
 
-  object PeersPriorityStatus {
-
-    sealed trait PeersPriorityStatus extends Any
-
-    final case class HighPriority(priority: Int = 4) extends AnyVal with PeersPriorityStatus {
-      override def toString: String = "Priority status is: HighPriority"
-    }
-
-    final case class LowPriority(priority: Int = 3) extends AnyVal with PeersPriorityStatus {
-      override def toString: String = "Priority status is: LowPriority"
-    }
-
-    final case class InitialPriority(priority: Int = 2) extends AnyVal with PeersPriorityStatus {
-      override def toString: String = "Priority status is: InitialPriority"
-    }
-
-    final case class BadNode(priority: Int = 1) extends AnyVal with PeersPriorityStatus {
-      override def toString: String = "Priority status is: BadNodePriority"
-    }
-
-    final case class Received(received: Int = 0) extends AnyVal {
-      def increment: Int = received + 1
-
-      override def toString: String = s"Received: $received"
-    }
-
-    final case class Requested(requested: Int = 0) extends AnyVal {
-      def increment: Int = requested + 1
-
-      def decrement: Int = requested - 1
-
-      def increment(qty: Int): Int = requested + qty
-
-      override def toString: String = s"Requested: $requested"
-    }
-
-    private val criterionForHighP: Double = 0.75
-    private val criterionForLowP: Double = 0.50
-
-    def calculateStatuses(res: Received, req: Requested): PeersPriorityStatus =
-      res.received.toDouble / req.requested match {
-        case t if t >= criterionForHighP => HighPriority()
-        case t if t >= criterionForLowP => LowPriority()
-        case _ => BadNode()
-      }
-  }
 
 }

@@ -61,7 +61,7 @@ object EncryApp extends App with StrictLogging {
   )
   lazy val peerManager: ActorRef = system.actorOf(Props(classOf[PeerManager]), "peerManager")
   lazy val nodeViewSynchronizer: ActorRef = system.actorOf(NodeViewSynchronizer
-    .props(influxRef, nodeViewHolder, networkController, settings, memoryPool)
+    .props(influxRef, nodeViewHolder, networkController, settings, memoryPool, peersKeeper)
     .withDispatcher("nvsh-dispatcher"), "nodeViewSynchronizer")
   if (settings.monitoringSettings.exists(_.kamonEnabled)) {
     Kamon.reconfigure(EncryAppSettings.allConfig)

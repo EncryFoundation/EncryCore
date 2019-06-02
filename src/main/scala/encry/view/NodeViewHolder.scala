@@ -17,10 +17,11 @@ import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
+import encry.view.NodeViewHolder._
 import encry.view.NodeViewHolder.ReceivableMessages._
-import encry.view.NodeViewHolder.{DownloadRequest, _}
 import encry.view.history.EncryHistory
 import encry.view.mempool.Mempool._
 import encry.view.state._
@@ -182,7 +183,8 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
     pi.toDownload.foreach { case (tid, id) =>
       if (tid != Transaction.modifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
-      nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
+
+      peersKeeper ! PrepareForDownloadRequest(tid, id, previousModifier)
     }
 
   def trimChainSuffix(suffix: IndexedSeq[PersistentModifier], rollbackPoint: ModifierId):
@@ -445,7 +447,12 @@ object NodeViewHolder {
 
   case class DownloadRequest(modifierTypeId: ModifierTypeId,
                              modifierId: ModifierId,
-                             previousModifier: Option[ModifierId] = None) extends NodeViewHolderEvent
+                             previousModifier: Option[ModifierId] = None,
+                             peers: IndexedSeq[(ConnectedPeer, PeersPriorityStatus)]) extends NodeViewHolderEvent
+
+  final case class PrepareForDownloadRequest(modifierTypeId: ModifierTypeId,
+                                             modifierId: ModifierId,
+                                             previousModifier: Option[ModifierId] = None)
 
   case class CurrentView[HIS, MS, VL](history: HIS, state: MS, vault: VL)
 

@@ -10,7 +10,9 @@ import encry.network.PeerConnectionHandler._
 import encry.network.PeersKeeper._
 import encry.settings.EncryAppSettings
 import encry.EncryApp.{networkController, nodeViewSynchronizer}
-import encry.network.NodeViewSynchronizer.ReceivableMessages.SendLocalSyncInfo
+import encry.network.NodeViewSynchronizer.ReceivableMessages._
+import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
+import encry.view.NodeViewHolder.{DownloadRequest, PrepareForDownloadRequest}
 import org.encryfoundation.common.network.BasicMessagesRepo._
 
 import scala.concurrent.duration._
@@ -30,7 +32,7 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
 
   override def preStart(): Unit = {
     networkController ! RegisterMessagesHandler(Seq(
-      PeersNetworkMessage.NetworkMessageTypeID    -> "PeersNetworkMessage",
+      PeersNetworkMessage.NetworkMessageTypeID -> "PeersNetworkMessage",
       GetPeersNetworkMessage.NetworkMessageTypeID -> "GetPeersNetworkMessage"
     ), self)
     context.system.scheduler.schedule(2.seconds, settings.network.syncInterval)(
@@ -40,12 +42,23 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
     context.system.scheduler.schedule(settings.network.syncInterval, settings.network.syncInterval)(
       self ! SendLocalSyncInfo
     )
+    context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(
+      nodeViewSynchronizer ! CheckModifiersToDownload(connectedPeers.getPeersForDeliveryManager)
+    )
   }
 
   override def receive: Receive = settingConnectionsLogic
     .orElse(networkMessagesProcessingLogic)
     .orElse(banPeersLogic)
     .orElse {
+      case CheckModifiersToDownloadSuccess =>
+        context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(
+          nodeViewSynchronizer ! CheckModifiersToDownload(connectedPeers.getPeersForDeliveryManager)
+        )
+      case PrepareForDownloadRequest(f1, f2, f3) =>
+        nodeViewSynchronizer ! DownloadRequest(f1, f2, f3, connectedPeers.getPeersForDeliveryManager)
+      case OtherNodeSyncingStatus(remote, comparison, _) => connectedPeers.updatePeerComparisonStatus(remote, comparison)
+      case AccumulatedPeersStatistic(statistic) => connectedPeers.updatePeersPriorityStatus(statistic)
       case SendToNetwork(message, strategy) =>
         strategy.choose(connectedPeers.getAllConnectedPeers).foreach { peer =>
           logger.info(s"Sending message: ${message.messageName} to: ${peer.socketAddress}.")
@@ -120,7 +133,6 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
         logger.info(s"Got request for local known peers. Sending to: $remote peers: ${correctPeers.mkString(",")}.")
         remote.handlerRef ! PeersNetworkMessage(correctPeers)
 
-      case msg => logger.info(s"PeerKeeper got unhandled network message: ${msg.messageName}.")
     }
   }
 
@@ -135,13 +147,18 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
 object PeersKeeper {
 
   final case class RequestForStableConnection(peer: InetSocketAddress, remoteConnection: ActorRef)
+
   final case class CreateStableConnection(peer: InetSocketAddress, remoteConnection: ActorRef, ct: ConnectionType)
+
   final case class OutgoingConnectionFailed(peer: InetSocketAddress) extends AnyVal
+
   final case class StableConnectionSetup(peer: ConnectedPeer) extends AnyVal
+
   final case class ConnectionStopped(peer: InetSocketAddress) extends AnyVal
 
 
   final case object RequestPeerForConnection
+
   final case class PeerForConnection(peer: InetSocketAddress) extends AnyVal
 
 
@@ -152,7 +169,6 @@ object PeersKeeper {
   final case class BanPeer(peer: ConnectedPeer, reason: BanReason)
 
 
-
   final case object RequestAllAvailablePeers
 
   final case class AllAvailablePeers(peers: Seq[InetSocketAddress]) extends AnyVal
@@ -160,16 +176,6 @@ object PeersKeeper {
   final case class RequestRandomAvailablePeers(qty: Int) extends AnyVal
 
   final case class RandomAvailablePeers(peers: Seq[InetSocketAddress]) extends AnyVal
-
-
-
-
-
-
-
-
-
-
 
 
   def props(settings: EncryAppSettings): Props = Props(new PeersKeeper(settings))
