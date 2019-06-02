@@ -24,8 +24,6 @@ import encry.network.ConnectedPeersList.PeerInfo
 import encry.network.PeersKeeper.PeersForSyncInfo
 import encry.network.PrioritiesCalculator.{AccumulatedPeersStatistic, PeersPriorityStatus}
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
-import encry.network.PeersKeeper.PeersForSyncInfo
-import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
 import encry.view.mempool.Mempool.RequestForTransactions
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -67,7 +65,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
   //val syncTracker: SyncTracker = SyncTracker(self, context, settings.network)
 
   val priorityCalculator: PrioritiesCalculator = new PrioritiesCalculator(settings)
-  //val syncTracker: SyncTracker = SyncTracker(self, context, settings.network)
 
   override def preStart(): Unit = {
     networkControllerRef ! RegisterMessagesHandler(
@@ -100,11 +97,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
     //case HandshakedPeer(remote) => syncTracker.updateStatus(remote, Unknown)
     //case DisconnectedPeer(remote) => syncTracker.clearStatus(remote)
     case CheckModifiersToDownload(peers) =>
-    case CheckDelivery(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
-      checkDelivery(peer, modifierTypeId, modifierId)
-    case HandshakedPeer(remote) => syncTracker.updateStatus(remote, Unknown)
-    case DisconnectedPeer(remote) => syncTracker.clearStatus(remote)
-    case CheckModifiersToDownload =>
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
       logger.debug(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
@@ -229,8 +221,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * @param isBlockChainSynced - current block chain status
     * @param isMining           - current mining status
     */
-
-  //todo rework in future
   def requestModifies(history: EncryHistory,
                       peer: ConnectedPeer,
                       mTypeId: ModifierTypeId,
@@ -260,7 +250,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequested)
         priorityCalculator.incrementRequestForNModifiers(peer.socketAddress.getAddress, notYetRequested.size)
         //syncTracker.incrementRequestForNModifiers(peer, notYetRequested.size)
-        val requestedModIds: Map[ModifierIdAsKey, (Cancellable, Int)] =
+        val requestedModIds: Map[ModifierIdAsKey, (Cancellable, PeerPriorityStatus)] =
           notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
             rYet.updated(toKey(id),
               context.system
@@ -288,7 +278,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * @param mTypeId - modifier type id
     * @param modId   - re-asked modifier id
     */
-  //todo do we really need to check peer in current peers collection while re-asking
   def reRequestModifier(peer: ConnectedPeer,
                         mTypeId: ModifierTypeId,
                         modId: ModifierId,
@@ -355,6 +344,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       }
     case None => logger.info(s"dataForInvMessage is empty for: $peer. Peer's status is: $status.")
   }
+
   /**
     * This function provides request with priority status. This means, that in priority we will ask peer who sent us
     * a header to send us payload. If we can't connect to this peer we will call 'requestDownload' function
@@ -438,6 +428,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         }
       case _ => logger.debug(s"BlockChain is synced. There is no nodes, which we can connect with.")
     }
+
   /**
     * Handle received modifier. We will process received modifier only if we are expecting this on.
     *
@@ -471,6 +462,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       priorityCalculator.decrementRequest(peer.socketAddress.getAddress)
       //syncTracker.decrementRequest(peer)
     }
+
   /**
     * Transform modifier id to WrappedArray.ofBytes
     *
@@ -478,6 +470,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * @return transformed modifier id
     */
   def toKey(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
+
   /**
     * This function gets collection of current expected modifiers from 'peer' and modifier, which
     * will be removed from received collection as a parameters.
@@ -504,6 +497,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
 object DeliveryManager {
 
   case object FullBlockChainIsSynced
+
+  case class CheckModifiersWithQueueSize(size: Int)
   case class  CheckModifiersWithQueueSize(size: Int)
   final case class CheckDelivery(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId)
 

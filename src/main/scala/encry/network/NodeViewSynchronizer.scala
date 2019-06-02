@@ -16,6 +16,9 @@ import encry.network.PeersKeeper.{PeersForSyncInfo, SendToNetwork}
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PeersKeeper.PeersForSyncInfo
+import encry.network.PeersKeeper.{PeersForSyncInfo, SendToNetwork}
+import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Utils._
@@ -60,6 +63,15 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false)
   }
 
+  override def receive: Receive = {
+    case msg@CheckModifiersToDownload(_) => deliveryManager ! msg
+    case msg@CheckModifiersToDownloadSuccess => peersKeeperRef ! msg
+    case msg@AccumulatedPeersStatistic(_) => peersKeeperRef ! msg
+    case msg@PeersForSyncInfo(_) => deliveryManager ! msg
+    case msg@DownloadRequest(_, _, _, _) => deliveryManager ! msg
+//      if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"NVSH got download request from $sender for modfiier of type:" +
+//        s" $modifierTypeId with id: ${Algos.encode(modifierId)}. PrevMod is: ${previousModifier.map(Algos.encode)}." +
+//        s"Sending this message to DM.")
   override def receive: Receive = awaitingHistoryCycle
 
   def awaitingHistoryCycle: Receive = {
@@ -132,11 +144,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
           if (invData._1 != Transaction.modifierTypeId)
             logger.debug(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
-          sendResponse(remote, invData._1, inRequestCache.values.collect {
-            case header: Header => header.id -> HeaderProtoSerializer.toProto(header).toByteArray
-            case payload: Payload => payload.id -> PayloadProtoSerializer.toProto(payload).toByteArray
-            case adProof: ADProofs => adProof.id -> ADProofsProtoSerializer.toProto(adProof).toByteArray
-          }.toSeq)
+          sendResponse(remote, invData._1, inRequestCache.values.toSeq)
           val nonInRequestCache: Seq[ModifierId] = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
           if (nonInRequestCache.nonEmpty) {
             if (invData._1 == Transaction.modifierTypeId) memoryPoolRef ! AskTransactionsFromNVS(remote, nonInRequestCache)
