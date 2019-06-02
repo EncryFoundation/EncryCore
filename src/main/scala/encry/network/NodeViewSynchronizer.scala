@@ -172,11 +172,11 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case TxsForNVSH(remote, txs) => sendResponse(
       remote, Transaction.modifierTypeId, txs.map(tx => tx.id -> TransactionProtoSerializer.toProto(tx).toByteArray)
     )
-    case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
+    case msg@RequestFromLocal(peer, modifierTypeId, modifierIds, peers) =>
       if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got RequestFromLocal on NVSH from $sender with " +
         s"ids of type: $modifierTypeId. Number of ids is: ${modifierIds.size}. Sending request from local to DeliveryManager." +
         s" \nIds are: ${modifierIds.map(Algos.encode).mkString(",")}")
-      deliveryManager ! RequestFromLocal(peer, modifierTypeId, modifierIds)
+      deliveryManager ! msg
     case StartMining => deliveryManager ! StartMining
     case DisableMining => deliveryManager ! DisableMining
     case FullBlockChainIsSynced =>
@@ -224,7 +224,13 @@ object NodeViewSynchronizer {
     case class ResponseFromLocal[M <: NodeViewModifier]
     (source: ConnectedPeer, modifierTypeId: ModifierTypeId, localObjects: Seq[M])
 
-    case class RequestFromLocal(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
+    final case class GetPeersForRequestFromLocal(source: ConnectedPeer,
+                                                 modifierTypeId: ModifierTypeId,
+                                                 modifierIds: Seq[ModifierId])
+    case class RequestFromLocal(source: ConnectedPeer,
+                                modifierTypeId: ModifierTypeId,
+                                modifierIds: Seq[ModifierId],
+                                peers: Map[ConnectedPeer, HistoryComparisonResult])
 
     trait PeerManagerEvent
 
@@ -271,7 +277,7 @@ object NodeViewSynchronizer {
   class NodeViewSynchronizerPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
-        case RequestFromLocal(_, _, _) => 0
+        case RequestFromLocal(_, _, _, _) => 0
 
         case DataFromPeer(msg, _) => msg match {
           case SyncInfoNetworkMessage(_) => 1

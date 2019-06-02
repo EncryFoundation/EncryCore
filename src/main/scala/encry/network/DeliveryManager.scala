@@ -124,10 +124,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case SemanticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
     case SyntacticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
     case SuccessfulTransaction(_) => //do nothing
-    case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
+    case RequestFromLocal(peer, modifierTypeId, modifierIds, peers) =>
       if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got RequestFromLocal on NVSH from $sender with " +
         s"ids of type: $modifierTypeId. Number of ids is: ${modifierIds.size}. Sending request from local to DeliveryManager.")
-      if (modifierIds.nonEmpty) requestModifies(history, peer, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
+      if (modifierIds.nonEmpty) requestModifies(history, peer, modifierTypeId, modifierIds, isBlockChainSynced, isMining, peers)
     case RequestForTransactions(peer, modifierTypeId, modifierIds) =>
       if (modifierIds.nonEmpty) requestModifies(history, peer, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
     case DataFromPeer(message, remote) => message match {
@@ -236,13 +236,14 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       mTypeId: ModifierTypeId,
                       modifierIds: Seq[ModifierId],
                       isBlockChainSynced: Boolean,
-                      isMining: Boolean): Unit = {
+                      isMining: Boolean,
+                      peers:Map[ConnectedPeer, HistoryComparisonResult]): Unit = {
     val firstCondition: Boolean = mTypeId == Transaction.modifierTypeId && isBlockChainSynced && isMining
     val secondCondition: Boolean = mTypeId != Transaction.modifierTypeId
     val thirdCondition: Boolean =
-      if (!isBlockChainSynced) syncTracker.statuses.get(peer.socketAddress.getAddress)
-        .exists { case (comrResult, _, _) => comrResult != Younger }
-      else syncTracker.statuses.contains(peer.socketAddress.getAddress)
+      if (!isBlockChainSynced) peers.get(peer)
+        .exists(comrResult => comrResult != Younger)
+      else peers.contains(peer)
     if (mTypeId != Transaction.modifierTypeId)
       logger.debug(s"Got requestModifier for modifiers of type: $mTypeId to $peer with modifiers ${modifierIds.size}." +
         s" Try to check conditions: $firstCondition -> $secondCondition -> $thirdCondition.")
@@ -259,7 +260,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequested)
         priorityCalculator.incrementRequestForNModifiers(peer.socketAddress.getAddress, notYetRequested.size)
         //syncTracker.incrementRequestForNModifiers(peer, notYetRequested.size)
-        val requestedModIds: Map[ModifierIdAsKey, (Cancellable, PeerPriorityStatus)] =
+        val requestedModIds: Map[ModifierIdAsKey, (Cancellable, Int)] =
           notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
             rYet.updated(toKey(id),
               context.system
