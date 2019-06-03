@@ -18,7 +18,7 @@ object HeaderUtils {
     .result
 
   def semanticValidity(header: Header): ValidationResult = ModifierValidator.accumulateErrors
-    .demand(header.height > TestNetConstants.GenesisHeight, "Header's height should be more than 0")
+    .demand(header.height >= TestNetConstants.GenesisHeight, "Header's height should be more than 0")
     .demand(header.difficulty >= TestNetConstants.InitialDifficulty, "Difficulty should be more than 0")
     .demand(header.equihashSolution.ints.nonEmpty, "Equihash solution shouldn't be empty")
     .result

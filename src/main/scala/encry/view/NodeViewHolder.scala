@@ -77,7 +77,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
     System.exit(100)
   }
 
-  context.system.scheduler.schedule(5.seconds, 10.seconds)(logger.debug(s"Modifiers cache from NVH: " +
+  context.system.scheduler.schedule(5.seconds, 10.seconds)(logger.info(s"Modifiers cache from NVH: " +
     s"${ModifiersCache.size}. Elems: ${ModifiersCache.cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")}"))
 
   override def postStop(): Unit = {
@@ -98,10 +98,12 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
               logger.info(s"Received payload ${Algos.encode(payload.id)} can't be placed into cache cause of: " +
                 s"inHistory: $isInHistory, inCache: $isInCache.")
             else ModifiersCache.put(key(payload.id), payload, nodeView.history)
-          case Success(_) => peersKeeper ! BanPeer(peer, SyntacticallyInvalidModifier)
+          case Success(m) =>
+            logger.info(s"Modifier with id: ${m.encodedId} invalid caze of: ${PU.semanticValidity(m)} && ${PU.syntacticallyValidity(m)}")
+            peersKeeper ! BanPeer(peer, SyntacticallyInvalidModifier)
           case Failure(ex) =>
             peersKeeper ! BanPeer(peer, SyntacticallyInvalidModifier)
-            logger.debug(s"Received modifier from $peer can't be parsed cause of: ${ex.getMessage}.")
+            logger.info(s"Received modifier from $peer can't be parsed cause of: ${ex.getMessage}.")
         })
         computeApplications()
       case Header.modifierTypeId => modifiers.foreach(serializedModifier =>
@@ -114,10 +116,12 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
               logger.info(s"Received header ${Algos.encode(header.id)} can't be placed into cache cause of: " +
                 s"inHistory: $isInHistory, inCache: $isInCache.")
             else ModifiersCache.put(key(header.id), header, nodeView.history)
-          case Success(_) => peersKeeper ! BanPeer(peer, SyntacticallyInvalidModifier)
+          case Success(m) =>
+            logger.info(s"Modifier with id: ${m.encodedId} invalid caze of: ${HU.semanticValidity(m)} && ${HU.syntacticallyValidity(m)}")
+            peersKeeper ! BanPeer(peer, SyntacticallyInvalidModifier)
           case Failure(ex) =>
             peersKeeper ! BanPeer(peer, SyntacticallyInvalidModifier)
-            logger.debug(s"Received modifier from $peer can't be parsed cause of: ${ex.getMessage}.")
+            logger.info(s"Received modifier from $peer can't be parsed cause of: ${ex.getMessage}.")
         })
         computeApplications()
       case modType => logger.info(s"NodeViewHolder got modifier of wrong type: $modType!")
@@ -157,7 +161,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
         s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
         s" Sending RequestFromLocal with ids to $sender." +
         s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
-      if (ids.nonEmpty) nodeViewSynchronizer ! RequestFromLocal(peer, modifierTypeId, ids)
+      if (ids.nonEmpty) sender() ! RequestFromLocal(peer, modifierTypeId, ids)
       logger.debug(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
 
     case msg => logger.error(s"Got strange message on nvh: $msg")
