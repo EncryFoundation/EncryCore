@@ -37,7 +37,7 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
 
   override def preStart(): Unit = {
     networkController ! RegisterMessagesHandler(Seq(
-      PeersNetworkMessage.NetworkMessageTypeID    -> "PeersNetworkMessage",
+      PeersNetworkMessage.NetworkMessageTypeID -> "PeersNetworkMessage",
       GetPeersNetworkMessage.NetworkMessageTypeID -> "GetPeersNetworkMessage"
     ), self)
     if (!connectWithOnlyKnownPeers) context.system.scheduler.schedule(2.seconds, settings.network.syncInterval)(
@@ -137,9 +137,9 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
 
   def networkMessagesProcessingLogic: Receive = {
     case DataFromPeer(message, remote) => message match {
-      case PeersNetworkMessage(peers) if !connectWithOnlyKnownPeers =>
-        peers.filterNot(p =>
-          blackList.contains(p.getAddress) || connectedPeers.contains(p.getAddress) || !isLocal(p)).foreach { p =>
+      case PeersNetworkMessage(peers) if !connectWithOnlyKnownPeers => peers
+        .filterNot(p => blackList.contains(p.getAddress) || connectedPeers.contains(p.getAddress) || isLocal(p))
+        .foreach { p =>
           logger.info(s"Found new peer: $p. Adding it to the available peers collection.")
           availablePeers = availablePeers.updated(p.getAddress, p)
         }
@@ -176,26 +176,39 @@ object PeersKeeper {
 
   final case class RequestForStableConnection(peer: InetSocketAddress,
                                               remoteConnection: ActorRef)
+
   final case class CreateStableConnection(peer: InetSocketAddress,
                                           remoteConnection: ActorRef,
                                           ct: ConnectionType)
+
   final case class OutgoingConnectionFailed(peer: InetSocketAddress) extends AnyVal
+
   final case class StableConnectionSetup(peer: ConnectedPeer) extends AnyVal
+
   final case class ConnectionStopped(peer: InetSocketAddress) extends AnyVal
+
   final case object RequestPeerForConnection
+
   final case class PeerForConnection(peer: InetSocketAddress) extends AnyVal
 
   final case class SendToNetwork(message: NetworkMessage,
                                  sendingStrategy: SendingStrategy)
+
   final case class PeersForSyncInfo(peers: Seq[ConnectedPeer]) extends AnyVal
+
   final case class UpdatedPeersCollection(peers: Map[InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)]
                                          ) extends AnyVal
+
   final case object AwaitingOlderPeer
+
   final case class BanPeer(peer: ConnectedPeer, reason: BanReason)
 
   sealed trait ApiResponse
+
   final case object GetConnectedPeers extends ApiResponse
+
   final case object GetKnownPeers extends ApiResponse
+
   final case object GetInfoAboutConnectedPeers extends ApiResponse
 
   def props(settings: EncryAppSettings): Props = Props(new PeersKeeper(settings))
