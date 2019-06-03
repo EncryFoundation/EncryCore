@@ -4,7 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.BlackList.BanReason
+import encry.network.BlackList.{BanReason, SentPeersMessageWithoutRequest}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.PeerConnectionHandler._
 import encry.network.PeersKeeper._
@@ -126,7 +126,7 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
           logger.info(s"Found new peer: $p. Adding it to the available peers collection.")
           availablePeers = availablePeers.updated(p.getAddress, p)
         }
-      case PeersNetworkMessage(_) => //todo do ban
+      case PeersNetworkMessage(_) => self ! BanPeer(remote, SentPeersMessageWithoutRequest)
       case GetPeersNetworkMessage =>
         val correctPeers: Seq[InetSocketAddress] = connectedPeers.getAll.filter(address =>
           if (remote.socketAddress.getAddress.isSiteLocalAddress) true

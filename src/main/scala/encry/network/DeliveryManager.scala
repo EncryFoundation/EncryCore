@@ -193,7 +193,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     else expectedModifiersByPeer.find { case (id, (_, _)) => id == toKey(modifierId) } match {
       case Some((_, (_, attempts))) if attempts <= settings.network.maxDeliveryChecks =>
         logger.debug(s"Modifier ${Algos.encode(modifierId)} needed to be requested from $peer!")
-        //reRequestModifier(peer, modifierTypeId, modifierId, expectedModifiersByPeer)
+        reRequestModifier(peer, modifierTypeId, modifierId, expectedModifiersByPeer)
       case Some((modId, (_, _))) =>
         logger.debug(s"Maximum number of attempts has expired. Remove modifier ${Algos.encode(modifierId)} from $peer.")
         expectedModifiers = clearExpectedModifiersCollection(expectedModifiersByPeer, modId, peer.socketAddress.getAddress)
