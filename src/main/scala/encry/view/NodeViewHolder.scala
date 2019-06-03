@@ -10,6 +10,7 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp._
+import encry.consensus.History.{HistoryComparisonResult, ProgressInfo}
 import encry.consensus.History.ProgressInfo
 import encry.network.BlackList.SyntacticallyInvalidModifier
 import encry.modifiers.history.{PayloadUtils => PU, HeaderUtils => HU}
@@ -43,7 +44,7 @@ import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
 import scala.annotation.tailrec
-import scala.collection.{mutable, IndexedSeq, Seq}
+import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
@@ -156,7 +157,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
         s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
         s" Sending RequestFromLocal with ids to $sender." +
         s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
-      if (ids.nonEmpty) peersKeeper ! GetPeersForRequestFromLocal(peer, modifierTypeId, ids)
+      if (ids.nonEmpty) nodeViewSynchronizer ! RequestFromLocal(peer, modifierTypeId, ids)
       logger.debug(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
 
     case msg => logger.error(s"Got strange message on nvh: $msg")
@@ -193,7 +194,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
       if (tid != Transaction.modifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
 
-      peersKeeper ! PrepareForDownloadRequest(tid, id, previousModifier)
+      nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
     }
 
   def trimChainSuffix(suffix: IndexedSeq[PersistentModifier], rollbackPoint: ModifierId):
@@ -454,14 +455,9 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
 
 object NodeViewHolder {
 
-  case class DownloadRequest(modifierTypeId: ModifierTypeId,
-                             modifierId: ModifierId,
-                             previousModifier: Option[ModifierId] = None,
-                             peers: IndexedSeq[(ConnectedPeer, PeersPriorityStatus)]) extends NodeViewHolderEvent
-
-  final case class PrepareForDownloadRequest(modifierTypeId: ModifierTypeId,
-                                             modifierId: ModifierId,
-                                             previousModifier: Option[ModifierId] = None)
+  final case class DownloadRequest(modifierTypeId: ModifierTypeId,
+                                   modifierId: ModifierId,
+                                   previousModifier: Option[ModifierId] = None) extends NodeViewHolderEvent
 
   case class CurrentView[HIS, MS, VL](history: HIS, state: MS, vault: VL)
 

@@ -27,9 +27,7 @@ class NetworkController(settings: EncryAppSettings, peersKeeper: ActorRef) exten
   var messagesHandlers: Map[Seq[Byte], ActorRef] = Map.empty
   val externalSocketAddress: Option[InetSocketAddress] = settings.network.declaredAddress.orElse(None)
   var knownPeersCollection: Set[InetSocketAddress] = settings.network.knownPeers.toSet
-
   logger.info(s"Declared address is: $externalSocketAddress.")
-
 
   if (!settings.network.localOnly.getOrElse(false)) settings.network.declaredAddress.foreach(myAddress =>
     Try(NetworkInterface.getNetworkInterfaces.asScala.exists(interface =>

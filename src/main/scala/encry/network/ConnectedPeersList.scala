@@ -53,10 +53,8 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
       case None => //todo can we have such behaviour??
     }
 
-  def getPeersForDeliveryManager: IndexedSeq[(ConnectedPeer, PeersPriorityStatus)] =
-    peers.collect { case (_, info) if info.historyComparisonResult != Fork =>
-      info.connectedPeer -> info.peerPriorityStatus
-    }.toIndexedSeq
+  def getPeersForDeliveryManager: Map[InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] =
+    peers.map(x => x._1 -> (x._2.connectedPeer, x._2.historyComparisonResult, x._2.peerPriorityStatus))
 
   def getPeersWithoutYounger: Map[ConnectedPeer, HistoryComparisonResult] =
     peers.map(x => x._2.connectedPeer -> x._2.historyComparisonResult)

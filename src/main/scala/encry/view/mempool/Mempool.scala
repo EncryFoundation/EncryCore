@@ -7,8 +7,10 @@ import com.google.common.base.Charsets
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
+import encry.consensus.History.HistoryComparisonResult
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SuccessfulTransaction
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.MempoolStat
 import encry.utils.NetworkTimeProvider
@@ -20,7 +22,7 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId, ModifierTypeId}
 
 import scala.collection.immutable.HashMap
-import scala.collection.mutable
+import scala.collection.{IndexedSeq, mutable}
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.util.Success
@@ -66,7 +68,7 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
   def messagesHandler(state: UtxoState): Receive = mainLogic(state).orElse(handleStates)
 
   def mainLogic(state: UtxoState): Receive = {
-    case ModifiersFromRemote(modTypeId, filteredModifiers) if modTypeId == Transaction.modifierTypeId =>
+    case ModifiersFromRemote(modTypeId, filteredModifiers, _) if modTypeId == Transaction.modifierTypeId =>
       val parsedModifiers: IndexedSeq[Transaction] = filteredModifiers.foldLeft(IndexedSeq.empty[Transaction]) {
         case (transactions, bytes) =>
           TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes)) match {
@@ -82,7 +84,7 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
       bloomFilterForBoxesIds = initBloomFilter
     case CompareTransactionsWithUnconfirmed(peer, transactions) =>
       val unrequestedModifiers: IndexedSeq[ModifierId] = notRequested(transactions)
-      if (unrequestedModifiers.nonEmpty) sender ! RequestForTransactions(peer, Transaction.modifierTypeId, unrequestedModifiers)
+      if (unrequestedModifiers.nonEmpty) sender ! RequestPeersForTransactions(peer, Transaction.modifierTypeId, unrequestedModifiers)
     case RolledBackTransactions(txs) => memoryPool = validateAndPutTransactions(txs, memoryPool, state, fromNetwork = false)
     case TransactionsForRemove(txs) =>
       memoryPool = removeOldTransactions(txs, memoryPool)
@@ -126,7 +128,7 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
                                  fromNetwork: Boolean): HashMap[WrappedIdAsKey, Transaction] = {
     val validatedTransactions: IndexedSeq[Transaction] = inputTransactions.filter(tx =>
       tx.semanticValidity.isSuccess && !currentMemoryPool.contains(toKey(tx.id))
-        //&& currentState.validate(tx).isSuccess
+      //&& currentState.validate(tx).isSuccess
     )
     if (memoryPool.size + validatedTransactions.size <= settings.node.mempoolMaxCapacity)
       validatedTransactions.foldLeft(memoryPool) { case (pool, tx) =>
@@ -195,7 +197,9 @@ object Mempool {
 
   case class TxsForNVSH(peer: ConnectedPeer, txs: Seq[Transaction])
 
-  case class RequestForTransactions(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
+  final case class RequestForTransactions(source: ConnectedPeer,
+                                          modifierTypeId: ModifierTypeId,
+                                          modifierIds: Seq[ModifierId])
 
   def props(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: ActorRef): Props =
     Props(new Mempool(settings, ntp, minerRef))
@@ -211,4 +215,5 @@ object Mempool {
         // We default to 1, which is in between high and low
         case otherwise => 2
       })
+
 }

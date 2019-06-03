@@ -34,6 +34,7 @@ import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, 
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
+import scala.collection.IndexedSeq
 import scala.concurrent.duration._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
@@ -64,11 +65,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   }
 
   override def receive: Receive = {
-    case msg@CheckModifiersToDownload(_) => deliveryManager ! msg
-    case msg@CheckModifiersToDownloadSuccess => peersKeeperRef ! msg
     case msg@AccumulatedPeersStatistic(_) => peersKeeperRef ! msg
     case msg@PeersForSyncInfo(_) => deliveryManager ! msg
-    case msg@DownloadRequest(_, _, _, _) => deliveryManager ! msg
+    case msg@DownloadRequest(_, _, _) => deliveryManager ! msg
+    case msg@UpdatedPeersCollection(_) => deliveryManager ! msg
 //      if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"NVSH got download request from $sender for modfiier of type:" +
 //        s" $modifierTypeId with id: ${Algos.encode(modifierId)}. PrevMod is: ${previousModifier.map(Algos.encode)}." +
 //        s"Sending this message to DM.")
@@ -183,6 +183,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       remote, Transaction.modifierTypeId, txs.map(tx => tx.id -> TransactionProtoSerializer.toProto(tx).toByteArray)
     )
     case msg@RequestFromLocal(peer, modifierTypeId, modifierIds, peers) =>
+    case msg@RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got RequestFromLocal on NVSH from $sender with " +
         s"ids of type: $modifierTypeId. Number of ids is: ${modifierIds.size}. Sending request from local to DeliveryManager." +
         s" \nIds are: ${modifierIds.map(Algos.encode).mkString(",")}")
@@ -192,7 +193,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case FullBlockChainIsSynced =>
       chainSynced = true
       deliveryManager ! FullBlockChainIsSynced
-    case r@RequestForTransactions(_, _, _) => deliveryManager ! r
+    case msg@RequestForTransactions(_, _, _) => deliveryManager ! msg
     case a: Any => logger.error(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
   }
 
@@ -224,23 +225,16 @@ object NodeViewSynchronizer {
 
     final case object SendLocalSyncInfo
 
-    final case class CheckModifiersToDownload(peers: IndexedSeq[(ConnectedPeer, PeersPriorityStatus)]) extends AnyVal
-    final case object CheckModifiersToDownloadSuccess
-
-    case class OtherNodeSyncingStatus(remote: ConnectedPeer,
-                                      status: encry.consensus.History.HistoryComparisonResult,
-                                      extension: Option[Seq[(ModifierTypeId, ModifierId)]])
+    final case class OtherNodeSyncingStatus(remote: ConnectedPeer,
+                                            status: encry.consensus.History.HistoryComparisonResult,
+                                            extension: Option[Seq[(ModifierTypeId, ModifierId)]])
 
     case class ResponseFromLocal[M <: NodeViewModifier]
     (source: ConnectedPeer, modifierTypeId: ModifierTypeId, localObjects: Seq[M])
 
-    final case class GetPeersForRequestFromLocal(source: ConnectedPeer,
-                                                 modifierTypeId: ModifierTypeId,
-                                                 modifierIds: Seq[ModifierId])
-    case class RequestFromLocal(source: ConnectedPeer,
-                                modifierTypeId: ModifierTypeId,
-                                modifierIds: Seq[ModifierId],
-                                peers: Map[ConnectedPeer, HistoryComparisonResult])
+    final case class RequestFromLocal(source: ConnectedPeer,
+                                      modifierTypeId: ModifierTypeId,
+                                      modifierIds: Seq[ModifierId])
 
     trait PeerManagerEvent
 
@@ -287,7 +281,7 @@ object NodeViewSynchronizer {
   class NodeViewSynchronizerPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
-        case RequestFromLocal(_, _, _, _) => 0
+        case RequestFromLocal(_, _, _) => 0
 
         case DataFromPeer(msg, _) => msg match {
           case SyncInfoNetworkMessage(_) => 1
