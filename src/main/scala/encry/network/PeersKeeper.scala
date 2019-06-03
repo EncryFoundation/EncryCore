@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
-
 import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList.{BanReason, SentPeersMessageWithoutRequest}
@@ -12,10 +11,10 @@ import encry.settings.EncryAppSettings
 import encry.EncryApp.{networkController, nodeViewSynchronizer}
 import encry.consensus.History.HistoryComparisonResult
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
+import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import org.encryfoundation.common.network.BasicMessagesRepo._
-
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -35,17 +34,14 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
 
   override def preStart(): Unit = {
     networkController ! RegisterMessagesHandler(Seq(
-      PeersNetworkMessage.NetworkMessageTypeID -> "PeersNetworkMessage",
+      PeersNetworkMessage.NetworkMessageTypeID    -> "PeersNetworkMessage",
       GetPeersNetworkMessage.NetworkMessageTypeID -> "GetPeersNetworkMessage"
     ), self)
-    if (!connectWithOnlyKnownPeers)
-      context.system.scheduler.schedule(2.seconds, settings.network.syncInterval)(
-        self ! SendToNetwork(GetPeersNetworkMessage, SendToRandom)
-      )
-    context.system.scheduler.schedule(10.seconds, 10.seconds)(blackList.cleanupBlackList())
-    context.system.scheduler.schedule(settings.network.syncInterval, settings.network.syncInterval)(
-      self ! SendLocalSyncInfo
+    if (!connectWithOnlyKnownPeers) context.system.scheduler.schedule(2.seconds, settings.network.syncInterval)(
+      self ! SendToNetwork(GetPeersNetworkMessage, SendToRandom)
     )
+    context.system.scheduler.schedule(10.seconds, 10.seconds)(blackList.cleanupBlackList())
+    context.system.scheduler.scheduleOnce(5.seconds)(self ! AwaitingOlderPeer)
     context.system.scheduler.schedule(10.seconds, 5.seconds)(
       nodeViewSynchronizer ! UpdatedPeersCollection(connectedPeers.getPeersForDeliveryManager)
     )
@@ -64,7 +60,12 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
         }
       case SendLocalSyncInfo =>
         logger.info(s"Time to send sync info!")
-        nodeViewSynchronizer ! PeersForSyncInfo(connectedPeers.getAllConnectedPeers)
+        nodeViewSynchronizer ! PeersForSyncInfo(connectedPeers.getPeersForSyncInfo)
+      case AwaitingOlderPeer if connectedPeers.containsOlderPeer =>
+        context.system.scheduler.schedule(settings.network.syncInterval, settings.network.syncInterval)(
+          self ! SendLocalSyncInfo
+        )
+      case AwaitingOlderPeer => context.system.scheduler.scheduleOnce(5.seconds)(self ! AwaitingOlderPeer)
       case msg => logger.info(s"Peers keeper got unhandled message: $msg.")
     }
 
@@ -72,13 +73,13 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
     case RequestPeerForConnection if connectedPeers.size < settings.network.maxConnections =>
       logger.info(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
         s"so peer keeper allows to add one more connect.")
-      Random.shuffle(availablePeers).headOption.foreach { peer =>
-        logger.info(s"Selected peer: ${peer._1}. Sending 'PeerForConnection' message to network controller. " +
+      Random.shuffle(availablePeers).headOption.foreach { case (address, peer) =>
+        logger.info(s"Selected peer: $peer. Sending 'PeerForConnection' message to network controller. " +
           s"Adding new outgoing connection to outgoingConnections collection. Current collection is: " +
           s"${outgoingConnections.mkString(",")}.")
-        sender() ! PeerForConnection(peer._2)
-        outgoingConnections += peer._1
-        availablePeers -= peer._1
+        sender() ! PeerForConnection(peer)
+        outgoingConnections += address
+        availablePeers -= address
       }
 
     case RequestPeerForConnection =>
@@ -89,14 +90,17 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
       val notConnectedYet: Boolean = !connectedPeers.contains(remote.getAddress)
       val notBannedPeer: Boolean = !blackList.contains(remote.getAddress)
       if (notConnectedYet && notBannedPeer) {
-        //todo check for duplicates
         logger.info(s"Peer: $remote is available to setup stable connect with it. Sending approvement for connection.")
-        val connectionType: ConnectionType = if (outgoingConnections.contains(remote.getAddress)) Outgoing else Incoming
-        if (connectionType == Incoming && connectWithOnlyKnownPeers)
-          logger.info(s"Got incomming connection but we can connect only with known peers.")
-        else {
-          outgoingConnections -= remote.getAddress
-          sender() ! CreateStableConnection(remote, remoteConnection, connectionType)
+        (if (outgoingConnections.contains(remote.getAddress)) Outgoing else Incoming) match {
+          case _@Incoming if connectWithOnlyKnownPeers =>
+            logger.info(s"Got incoming connection but we can connect only with known peers.")
+          case in@Incoming =>
+            logger.info(s"Got new incoming connection. Sending to network controller approvement for connect.")
+            sender() ! CreateStableConnection(remote, remoteConnection, in)
+          case out@Outgoing =>
+            logger.info(s"Got outgoing connection.")
+            outgoingConnections -= remote.getAddress
+            sender() ! CreateStableConnection(remote, remoteConnection, out)
         }
       } else logger.info(s"Connection for requested peer: $remote is unavailable cause of:" +
         s" Is banned: $notBannedPeer, Is connected: $notConnectedYet.")
@@ -126,7 +130,12 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
           logger.info(s"Found new peer: $p. Adding it to the available peers collection.")
           availablePeers = availablePeers.updated(p.getAddress, p)
         }
-      case PeersNetworkMessage(_) => self ! BanPeer(remote, SentPeersMessageWithoutRequest)
+
+      case PeersNetworkMessage(_) =>
+        logger.info(s"Got PeersNetworkMessage from $remote, but connectWithOnlyKnownPeers: $connectWithOnlyKnownPeers, " +
+          s"so ignore this message and ban this peer.")
+        self ! BanPeer(remote, SentPeersMessageWithoutRequest)
+
       case GetPeersNetworkMessage =>
         val correctPeers: Seq[InetSocketAddress] = connectedPeers.getAll.filter(address =>
           if (remote.socketAddress.getAddress.isSiteLocalAddress) true
@@ -141,45 +150,33 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
     case BanPeer(peer, reason) =>
       logger.info(s"Banning peer: ${peer.socketAddress} for $reason.")
       blackList.banPeer(reason, peer.socketAddress.getAddress)
+      peer.handlerRef ! CloseConnection
   }
 
 }
 
 object PeersKeeper {
 
-  final case class RequestForStableConnection(peer: InetSocketAddress, remoteConnection: ActorRef)
+  sealed trait ConnectionsMessages
+  final case class RequestForStableConnection(peer: InetSocketAddress,
+                                              remoteConnection: ActorRef) extends ConnectionsMessages
+  final case class CreateStableConnection(peer: InetSocketAddress,
+                                          remoteConnection: ActorRef,
+                                          ct: ConnectionType) extends ConnectionsMessages
+  final case class OutgoingConnectionFailed(peer: InetSocketAddress) extends AnyVal with ConnectionsMessages
+  final case class StableConnectionSetup(peer: ConnectedPeer) extends AnyVal with ConnectionsMessages
+  final case class ConnectionStopped(peer: InetSocketAddress) extends AnyVal with ConnectionsMessages
+  final case object RequestPeerForConnection extends ConnectionsMessages
+  final case class PeerForConnection(peer: InetSocketAddress) extends AnyVal with ConnectionsMessages
 
-  final case class CreateStableConnection(peer: InetSocketAddress, remoteConnection: ActorRef, ct: ConnectionType)
-
-  final case class OutgoingConnectionFailed(peer: InetSocketAddress) extends AnyVal
-
-  final case class StableConnectionSetup(peer: ConnectedPeer) extends AnyVal
-
-  final case class ConnectionStopped(peer: InetSocketAddress) extends AnyVal
-
-
-  final case object RequestPeerForConnection
-
-  final case class PeerForConnection(peer: InetSocketAddress) extends AnyVal
-
-
-  final case class SendToNetwork(message: NetworkMessage, sendingStrategy: SendingStrategy)
-
-  final case class PeersForSyncInfo(peers: Seq[ConnectedPeer]) extends AnyVal
-
-  final case class UpdatedPeersCollection(peers: Map[InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)]) extends AnyVal
-
-  final case class BanPeer(peer: ConnectedPeer, reason: BanReason)
-
-
-  final case object RequestAllAvailablePeers
-
-  final case class AllAvailablePeers(peers: Seq[InetSocketAddress]) extends AnyVal
-
-  final case class RequestRandomAvailablePeers(qty: Int) extends AnyVal
-
-  final case class RandomAvailablePeers(peers: Seq[InetSocketAddress]) extends AnyVal
-
+  sealed trait PeersKeeperActorMessages
+  final case class SendToNetwork(message: NetworkMessage,
+                                 sendingStrategy: SendingStrategy) extends PeersKeeperActorMessages
+  final case class PeersForSyncInfo(peers: Seq[ConnectedPeer]) extends AnyVal with PeersKeeperActorMessages
+  final case class UpdatedPeersCollection(peers: Map[InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)]
+                                         ) extends AnyVal with PeersKeeperActorMessages
+  final case object AwaitingOlderPeer extends PeersKeeperActorMessages
+  final case class BanPeer(peer: ConnectedPeer, reason: BanReason) extends PeersKeeperActorMessages
 
   def props(settings: EncryAppSettings): Props = Props(new PeersKeeper(settings))
 }

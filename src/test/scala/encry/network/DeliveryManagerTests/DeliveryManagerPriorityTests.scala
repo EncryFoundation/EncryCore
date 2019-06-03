@@ -11,8 +11,8 @@ import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, OtherNodeSyncingStatus, RequestFromLocal}
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.network.SyncTracker.PeerPriorityStatus
-import encry.network.SyncTracker.PeerPriorityStatus.PeerPriorityStatus
+import .PeerPriorityStatus
+import .PeerPriorityStatus.PeerPriorityStatus
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.network.BasicMessagesRepo.ModifiersNetworkMessage

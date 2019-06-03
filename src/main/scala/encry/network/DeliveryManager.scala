@@ -61,7 +61,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * Modifier considered expected if we sent request for it.
     */
   var expectedModifiers: Map[InetAddress, Map[ModifierIdAsKey, (Cancellable, Int)]] = Map.empty
-  //val syncTracker: SyncTracker = SyncTracker(self, context, settings.network)
 
   var peersCollection: Map[InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] = Map.empty
 
@@ -76,31 +75,24 @@ class DeliveryManager(influxRef: Option[ActorRef],
   override def receive: Receive = {
     case UpdatedHistory(historyReader) =>
       logger.debug(s"Got message with history. Starting normal actor's work.")
-      //context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
       context.system.scheduler.schedule(0.second, priorityCalculator.updatingStatisticTime)(
         context.parent ! AccumulatedPeersStatistic(priorityCalculator.accumulatePeersStatistic)
       )
       context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(
         self ! CheckModifiersToDownload
       )
-      //syncTracker.scheduleSendSyncInfo()
       context.become(basicMessageHandler(historyReader, isBlockChainSynced = false, isMining = settings.node.mining))
-    //case HandshakedPeer(remote) => //syncTracker.updateStatus(remote, Unknown)
-    //case DisconnectedPeer(remote) => //syncTracker.clearStatus(remote)
     case message => logger.debug(s"Got new message $message while awaiting history.")
   }
 
   def basicMessageHandler(history: EncryHistory, isBlockChainSynced: Boolean, isMining: Boolean): Receive = {
     case UpdatedPeersCollection(coll) => peersCollection = coll
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
-      //syncTracker.updateStatus(remote, status)
       status match {
         case Unknown => logger.info("Peer status is still unknown.")
         case Younger | Fork if isBlockChainSynced => sendInvData(remote, status, extOpt)
         case _ =>
       }
-    //case HandshakedPeer(remote) => syncTracker.updateStatus(remote, Unknown)
-    //case DisconnectedPeer(remote) => syncTracker.clearStatus(remote)
     case CheckModifiersToDownload =>
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
@@ -163,10 +155,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
       else requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
 
     case PeersForSyncInfo(peers) => sendSync(history.syncInfo, isBlockChainSynced, peers)
-    //    case SendLocalSyncInfo =>
-    //      if (syncTracker.elapsedTimeSinceLastSync < settings.network.syncInterval.toMillis / 2)
-    //        logger.debug("Trying to send sync info too often")
-    //      else sendSync(history.syncInfo, isBlockChainSynced)
     case FullBlockChainIsSynced => context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining))
     case StartMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = true))
     case DisableMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = false))
@@ -252,7 +240,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
           logger.debug(s"Send request to ${peer.socketAddress.getAddress} for ${notYetRequested.size} modifiers of type $mTypeId ")
         peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequested)
         priorityCalculator.incrementRequestForNModifiers(peer.socketAddress.getAddress, notYetRequested.size)
-        //syncTracker.incrementRequestForNModifiers(peer, notYetRequested.size)
         val requestedModIds: Map[ModifierIdAsKey, (Cancellable, Int)] =
           notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
             rYet.updated(toKey(id),
@@ -294,7 +281,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
           logger.debug(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
             s"$mTypeId with id: ${Algos.encode(modId)}. Attempts: $attempts")
           priorityCalculator.incrementRequest(peer.socketAddress.getAddress)
-          //syncTracker.incrementRequest(peer)
           expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, peerRequests.updated(
             toKey(modId),
             context.system.scheduler
@@ -343,7 +329,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
         case (mTid, mods) if mods.size <= settings.network.maxInvObjects =>
           logger.info(s"Send to peer $peer inv msg with mods: ${mods.map(Algos.encode).mkString(",")}")
           peer.handlerRef ! InvNetworkMessage(mTid -> mods)
-        case (_, mods) => logger.info(s"Tried to send inv message with size ${mods.size}. Current size is redundant.")
+        case (_, mods) =>
+          //todo ban node for invalid size of modifiers
+          logger.info(s"Tried to send inv message with size ${mods.size}. Current size is redundant.")
       }
     case None => logger.info(s"dataForInvMessage is empty for: $peer. Peer's status is: $status.")
   }
@@ -399,9 +387,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       isBlockChainSynced: Boolean,
                       isMining: Boolean): Unit =
     if (!isBlockChainSynced) {
-      //logger.debug(s"Function - request modifiers. syncTracker's peerCollection is: ${syncTracker.statuses}")
-      //logger.debug(s"Function - request modifiers. syncTracker's getPeersForConnection is: ${syncTracker.getPeersForConnection}")
-
       val (withBadNodesMap, withoutBadNodesMap) = peersCollection.partition {
         case (_, (_, _, priority)) => priority == PeersPriorityStatus.BadNode()
       }
@@ -450,7 +435,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
       if (mTid != Transaction.modifierTypeId)
         logger.debug(s"Got new modifier with type $mTid from: ${peer.socketAddress}. with id ${Algos.encode(mId)}")
       priorityCalculator.incrementReceive(peer.socketAddress.getAddress)
-      //syncTracker.incrementReceive(peer)
       val peerExpectedModifiers: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress.getAddress, Map.empty)
       peerExpectedModifiers.get(toKey(mId)).foreach(_._1.cancel())
@@ -465,7 +449,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
     } else {
       receivedSpamModifiers = receivedSpamModifiers - toKey(mId) + (toKey(mId) -> peer)
       priorityCalculator.decrementRequest(peer.socketAddress.getAddress)
-      //syncTracker.decrementRequest(peer)
     }
 
   /**
@@ -532,5 +515,4 @@ object DeliveryManager {
         case PoisonPill => 4
         case _ => 2
       })
-
 }
