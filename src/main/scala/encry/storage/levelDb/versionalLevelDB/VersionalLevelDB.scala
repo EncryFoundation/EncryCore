@@ -194,7 +194,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       insertionsByThisVersion.foreach { elemKey =>
         val elemInfo = db.get(userKey(elemKey))
         if (elemInfo == null) {
-          logger.info(s"NULL at key: ${Algos.encode(elemKey)}")
+          logger.info(s"NULL at key: ${Algos.encode(elemKey)}. Deletion by ver: ${deletionsByThisVersion.map(Algos.encode).mkString(",")}")
         }
         val elemFlag = elemInfo.head
         val elemMap = elemInfo.drop(1)
