@@ -249,8 +249,12 @@ class PeerConnectionHandler(connection: ActorRef,
 object PeerConnectionHandler {
 
   sealed trait ConnectionType
-  case object Incoming extends ConnectionType
-  case object Outgoing extends ConnectionType
+  case object Incoming extends ConnectionType {
+    override def toString: String = "Incomming"
+  }
+  case object Outgoing extends ConnectionType {
+    override def toString: String = "Outgoing"
+  }
 
   case class ConnectedPeer(socketAddress: InetSocketAddress,
                            handlerRef: ActorRef,

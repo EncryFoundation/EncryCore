@@ -61,19 +61,19 @@ object PrioritiesCalculator {
 
     sealed trait PeersPriorityStatus
 
-    final case class HighPriority(priority: Int = 4) extends AnyVal with PeersPriorityStatus {
+    final case class HighPriority(priority: Int = 4) extends PeersPriorityStatus {
       override def toString: String = "Priority status is: HighPriority"
     }
 
-    final case class LowPriority(priority: Int = 3) extends AnyVal with PeersPriorityStatus {
+    final case class LowPriority(priority: Int = 3) extends PeersPriorityStatus {
       override def toString: String = "Priority status is: LowPriority"
     }
 
-    final case class InitialPriority(priority: Int = 2) extends AnyVal with PeersPriorityStatus {
+    final case class InitialPriority(priority: Int = 2) extends PeersPriorityStatus {
       override def toString: String = "Priority status is: InitialPriority"
     }
 
-    final case class BadNode(priority: Int = 1) extends AnyVal with PeersPriorityStatus {
+    final case class BadNode(priority: Int = 1) extends PeersPriorityStatus {
       override def toString: String = "Priority status is: BadNodePriority"
     }
 

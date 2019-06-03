@@ -14,7 +14,7 @@ import encry.cli.ConsoleListener
 import encry.cli.ConsoleListener.StartListening
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
-import encry.network.{PeerManager, _}
+import encry.network.{_}
 import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, StatsSender, Zombie}
 import encry.utils.NetworkTimeProvider
@@ -47,7 +47,7 @@ object EncryApp extends App with StrictLogging {
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
   lazy val memoryPool: ActorRef = system.actorOf(Mempool.props(settings, timeProvider, miner).withDispatcher("mempool-dispatcher"))
 
-  val peersKeeper: ActorRef = system.actorOf(PeersKeeper.props(settings))
+  val peersKeeper: ActorRef = system.actorOf(PeersKeeper.props(settings).withDispatcher("peers-keeper-dispatcher"))
 
   lazy val nodeViewHolder: ActorRef =
     system.actorOf(NodeViewHolder.props(memoryPool, peersKeeper, influxRef).withMailbox("nvh-mailbox"),
@@ -59,7 +59,6 @@ object EncryApp extends App with StrictLogging {
   lazy val networkController: ActorRef = system.actorOf(
     NetworkController.props(settings, peersKeeper).withDispatcher("network-dispatcher")
   )
-  lazy val peerManager: ActorRef = system.actorOf(Props(classOf[PeerManager]), "peerManager")
   lazy val nodeViewSynchronizer: ActorRef = system.actorOf(NodeViewSynchronizer
     .props(influxRef, nodeViewHolder, networkController, settings, memoryPool, peersKeeper)
     .withDispatcher("nvsh-dispatcher"), "nodeViewSynchronizer")
@@ -92,8 +91,8 @@ object EncryApp extends App with StrictLogging {
 
     val apiRoutes: Seq[ApiRoute] = Seq(
       UtilsApiRoute(settings.restApi),
-      PeersApiRoute(peerManager, networkController, settings.restApi),
-      InfoApiRoute(readersHolder, miner, peerManager, settings, nodeId, memoryPool, timeProvider),
+      PeersApiRoute(networkController, settings.restApi),
+      InfoApiRoute(readersHolder, miner, settings, nodeId, memoryPool, timeProvider),
       HistoryApiRoute(readersHolder, miner, settings, nodeId, settings.node.stateMode),
       TransactionsApiRoute(readersHolder, memoryPool, settings.restApi, settings.node.stateMode),
       StateInfoApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),

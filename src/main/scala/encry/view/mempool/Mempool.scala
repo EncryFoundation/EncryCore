@@ -84,7 +84,7 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
       bloomFilterForBoxesIds = initBloomFilter
     case CompareTransactionsWithUnconfirmed(peer, transactions) =>
       val unrequestedModifiers: IndexedSeq[ModifierId] = notRequested(transactions)
-      if (unrequestedModifiers.nonEmpty) sender ! RequestPeersForTransactions(peer, Transaction.modifierTypeId, unrequestedModifiers)
+      if (unrequestedModifiers.nonEmpty) sender ! RequestForTransactions(peer, Transaction.modifierTypeId, unrequestedModifiers)
     case RolledBackTransactions(txs) => memoryPool = validateAndPutTransactions(txs, memoryPool, state, fromNetwork = false)
     case TransactionsForRemove(txs) =>
       memoryPool = removeOldTransactions(txs, memoryPool)

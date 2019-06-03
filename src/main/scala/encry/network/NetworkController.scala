@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
+
 import akka.actor._
 import akka.actor.SupervisorStrategy.Restart
 import akka.io.{IO, Tcp}
@@ -8,12 +9,14 @@ import akka.io.Tcp._
 import akka.io.Tcp.SO.KeepAlive
 import com.typesafe.scalalogging.StrictLogging
 import encry.cli.commands.AddPeer.PeerFromCli
+import encry.network.BlackList.InvalidNetworkMessage
 import encry.network.NetworkController.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
 import encry.network.PeerConnectionHandler.ReceivableMessages.StartInteraction
 import encry.network.PeersKeeper._
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
+
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
@@ -69,6 +72,7 @@ class NetworkController(settings: EncryAppSettings, peersKeeper: ActorRef) exten
       logger.debug(s"Got ${message.messageName} on the NetworkController.")
       findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
     case MessageFromNetwork(message, Some(remote)) =>
+      peersKeeper ! BanPeer(remote, InvalidNetworkMessage)
       logger.info(s"Invalid message type: ${message.messageName} from remote $remote")
   }
 
@@ -108,13 +112,6 @@ class NetworkController(settings: EncryAppSettings, peersKeeper: ActorRef) exten
     case CommandFailed(connect: Connect) =>
       logger.info(s"Failed to connect to: ${connect.remoteAddress}.")
       peersKeeper ! OutgoingConnectionFailed(connect.remoteAddress)
-
-    case PeerFromCli(address) =>
-      knownPeersCollection = knownPeersCollection + address
-      peerManager ! PeerFromCli(address)
-      peerSynchronizer ! PeerFromCli(address)
-      self ! ConnectTo(address)
-
   }
 
   private def findHandler(message: NetworkMessage,

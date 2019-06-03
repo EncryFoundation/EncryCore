@@ -7,8 +7,9 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.network.PeerManager.ReceivableMessages.{GetConnectedPeers, GetRecoveryStatus}
+import encry.network.PeersKeeper.GetConnectedPeers
 import encry.settings._
+import encry.EncryApp._
 import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.ReadersHolder.{GetReaders, Readers}
 import encry.view.mempool.Mempool.GetMempoolSize
@@ -22,7 +23,6 @@ import scala.concurrent.Future
 
 case class InfoApiRoute(readersHolder: ActorRef,
                         miner: ActorRef,
-                        peerManager: ActorRef,
                         appSettings: EncryAppSettings,
                         nodeId: Array[Byte],
                         mempool: ActorRef,
@@ -52,7 +52,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
       ).okJson()
   }
 
-  private def getConnectedPeers: Future[Int] = (peerManager ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map(_.size)
+  private def getConnectedPeers: Future[Int] = (peersKeeper ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map(_.size)
 
   private def getStateType: String = appSettings.node.stateMode.verboseName
 
@@ -61,7 +61,7 @@ case class InfoApiRoute(readersHolder: ActorRef,
 
   private def storageInfo: String = if (appSettings.postgres.exists(_.enableSave)) "Postgres(write)" else ""
 
-  private def restoreInfo: Future[Boolean] = (peerManager ? GetRecoveryStatus).mapTo[Boolean]
+  //private def restoreInfo: Future[Boolean] = (peersKeeper ? GetRecoveryStatus).mapTo[Boolean]
 
   private def getAddress: Seq[InetSocketAddress] = appSettings.network.knownPeers
 

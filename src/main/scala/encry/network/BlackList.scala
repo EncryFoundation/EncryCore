@@ -15,7 +15,8 @@ final class BlackList(settings: EncryAppSettings) {
     blackList = blackList.updated(peer, (reason, BanTime(System.currentTimeMillis()), TemporaryBan))
 
   def banPeer(reason: BanReason, peer: InetAddress): Unit = reason match {
-    case SpamSender || SentPeersMessageWithoutRequest => temporaryBan(reason, peer)
+    case SpamSender => temporaryBan(reason, peer)
+    case SentPeersMessageWithoutRequest => temporaryBan(reason, peer)
     case _ => permanentBan(reason, peer)
   }
 
@@ -36,6 +37,9 @@ object BlackList {
   final case object SyntacticallyInvalidModifier extends BanReason
   final case object SpamSender extends BanReason
   final case object SentPeersMessageWithoutRequest extends BanReason
+  final case object SentInvForPayload extends BanReason
+  final case object SentNetworkMessageWithTooManyModifiers extends BanReason
+  final case object InvalidNetworkMessage extends BanReason
 
   final case class BanTime(time: Long) extends AnyVal
 

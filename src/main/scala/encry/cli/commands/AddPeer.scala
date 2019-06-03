@@ -15,7 +15,7 @@ object AddPeer extends Command {
     val host: String = args.requireArg[Ast.Str]("host").s
     val port: Long = args.requireArg[Ast.Num]("port").i
     val peer: InetSocketAddress = new InetSocketAddress(host, port.toInt)
-    networkController ! PeerFromCli(peer)
+    peersKeeper ! PeerFromCli(peer)
     Future(Some(Response("Peer added!")))
   }
 

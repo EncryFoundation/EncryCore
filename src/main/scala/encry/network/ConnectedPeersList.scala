@@ -76,6 +76,8 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
     case None => //todo do we have such case?
   }
 
+  def getPeers: Map[InetAddress, PeerInfo] = peers
+
 }
 
 object ConnectedPeersList {

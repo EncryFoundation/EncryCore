@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.util.Timeout
@@ -9,11 +10,12 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
+import encry.network.BlackList.SentInvForPayload
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.network.PeersKeeper.{PeersForSyncInfo, SendToNetwork, UpdatedPeersCollection}
+import encry.network.PeersKeeper.{BanPeer, PeersForSyncInfo, SendToNetwork, UpdatedPeersCollection}
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
@@ -29,6 +31,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, Tr
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.concurrent.duration._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
@@ -118,7 +121,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             s" ${invData._1}. Size of inv is: ${invData._2.size}. Sending CompareViews to NVH. " +
             s"\nModifiers in inv message are: ${invData._2.map(Algos.encode).mkString(",")}")
           nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
-        } //todo: Ban node that send payload id?
+        } else peersKeeperRef ! BanPeer(remote, SentInvForPayload)
       case _ => logger.debug(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
     }
     case msg@RequestFromLocal(_, _, _) => deliveryManager ! msg
@@ -129,7 +132,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@RequestForTransactions(_, _, _) => deliveryManager ! msg
     case msg@StartMining => deliveryManager ! msg
     case msg@DisableMining => deliveryManager ! msg
+    case msg@BanPeer(_, _) => peersKeeperRef ! msg
     case msg@AccumulatedPeersStatistic(_) => peersKeeperRef ! msg
+    case msg@SendLocalSyncInfo => peersKeeperRef ! msg
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       deliveryManager ! UpdatedHistory(reader)
