@@ -9,8 +9,8 @@ object PayloadUtils {
   def syntacticallyValidity(payload: Payload): ValidationResult = ModifierValidator.accumulateErrors
     .demand(payload.modifierTypeId == Payload.modifierTypeId, "Modifier's type id should be 102")
     .demand(payload.headerId.size == TestNetConstants.ModifierIdSize, "Modifier's id should be 32 bytes")
-    .demand(payload.serializer.toBytes(payload).length < TestNetConstants.PayloadMaxSize,
-      "Payload's max size should be less than boundary value")
+    //.demand(payload.serializer.toBytes(payload).length < TestNetConstants.PayloadMaxSize,
+      //"Payload's max size should be less than boundary value")
     .result
 
   def semanticValidity(payload: Payload): ValidationResult = ModifierValidator.accumulateErrors
