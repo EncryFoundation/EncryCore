@@ -44,7 +44,9 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
       self ! SendToNetwork(GetPeersNetworkMessage, SendToRandom)
     )
     context.system.scheduler.schedule(10.seconds, 10.seconds)(blackList.cleanupBlackList())
-    context.system.scheduler.scheduleOnce(5.seconds)(self ! AwaitingOlderPeer)
+    context.system.scheduler.schedule(settings.network.syncInterval, settings.network.syncInterval)(
+      self ! SendLocalSyncInfo
+    )
     context.system.scheduler.schedule(10.seconds, 5.seconds)(
       nodeViewSynchronizer ! UpdatedPeersCollection(connectedPeers.getPeersForDeliveryManager)
     )
@@ -64,11 +66,6 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
       case SendLocalSyncInfo =>
         logger.info(s"Time to send sync info!")
         nodeViewSynchronizer ! PeersForSyncInfo(connectedPeers.getPeersForSyncInfo)
-      case AwaitingOlderPeer if connectedPeers.containsOlderPeer =>
-        context.system.scheduler.schedule(settings.network.syncInterval, settings.network.syncInterval)(
-          self ! SendLocalSyncInfo
-        )
-      case AwaitingOlderPeer => context.system.scheduler.scheduleOnce(5.seconds)(self ! AwaitingOlderPeer)
       case GetConnectedPeers => sender() ! connectedPeers.getAllConnectedPeers
       case GetInfoAboutConnectedPeers => sender() ! connectedPeers.getPeers
       case PeerFromCli(peer) =>

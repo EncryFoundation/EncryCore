@@ -49,7 +49,7 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
       case Some(value) =>
         val newPeerInfo: PeerInfo = value.copy(historyComparisonResult = status)
         peers = peers.updated(peer.socketAddress.getAddress, newPeerInfo)
-      case None => //todo can we have such behaviour??
+      case None => //todo can we have such case??
     }
 
   def getPeersForDeliveryManager: Map[InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] =
