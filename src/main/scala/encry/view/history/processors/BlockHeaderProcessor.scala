@@ -240,7 +240,9 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     logger.info(s"New best header ${h.encodedId} with score: $score." +
       s" New height: ${h.height}, old height: $prevHeight")
     val self: (StorageKey, StorageValue) =
-      heightIdsKey(h.height) -> StorageValue @@ (Seq(h.id) ++ headerIdsAtHeight(h.height)).flatten.toArray
+      heightIdsKey(h.height) -> StorageValue @@ (Seq(h.id) ++
+        headerIdsAtHeight(h.height).filterNot(_ sameElements h.id)
+        ).flatten.toArray
     val parentHeaderOpt: Option[Header] =
       headersCache.find(_.id sameElements h.parentId).orElse(typedModifierById[Header](h.parentId))
     val forkHeaders: Seq[Header] = parentHeaderOpt.toSeq
@@ -283,11 +285,12 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     *         multiple ids if there are forks at chosen height.
     *         First id is always from the best headers chain.
     */
-  def headerIdsAtHeight(height: Int): Seq[ModifierId] =
+  def headerIdsAtHeight(height: Int): Seq[ModifierId] = {
     headersCacheIndexes.getOrElse(height, historyStorage.store
       .get(heightIdsKey(height))
-      .map(elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq)
+      .map{elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq}
       .getOrElse(Seq.empty[ModifierId]))
+  }
 
   /**
     * @param limit       - maximum length of resulting HeaderChain
