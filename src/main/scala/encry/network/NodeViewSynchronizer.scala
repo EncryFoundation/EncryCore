@@ -126,10 +126,11 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       case _ => logger.debug(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
     }
     case msg@RequestFromLocal(_, _, _) => deliveryManager ! msg
-    case msg@PeersForSyncInfo(_) => deliveryManager ! msg
     case msg@DownloadRequest(_, _, _) => deliveryManager ! msg
     case msg@UpdatedPeersCollection(_) => deliveryManager ! msg
-    case msg@PeersForSyncInfo(_) => deliveryManager ! msg
+    case msg@PeersForSyncInfo(_) =>
+      logger.info(s"NodeViewSync got peers for sync info. Sending them to DM.")
+      deliveryManager ! msg
     case msg@RequestForTransactions(_, _, _) => deliveryManager ! msg
     case msg@StartMining => deliveryManager ! msg
     case msg@DisableMining => deliveryManager ! msg

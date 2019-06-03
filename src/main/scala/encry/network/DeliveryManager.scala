@@ -159,7 +159,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
       }
       else requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
 
-    case PeersForSyncInfo(peers) => sendSync(history.syncInfo, isBlockChainSynced, peers)
+    case PeersForSyncInfo(peers) =>
+      logger.info(s"DM gor peers for sync info. Sending sync message!")
+      sendSync(history.syncInfo, isBlockChainSynced, peers)
     case FullBlockChainIsSynced => context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining))
     case StartMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = true))
     case DisableMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = false))

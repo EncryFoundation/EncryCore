@@ -139,6 +139,7 @@ class PeerConnectionHandler(connection: ActorRef,
         outMessagesCounter += 1
         val messageToNetwork: Array[Byte] = GeneralizedNetworkMessage.toProto(message).toByteArray
         val bytes: ByteString = ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork)
+        logger.info(s"Sending network message: ${message.messageName} from PCH to remote")
         connection ! Write(bytes, Ack(outMessagesCounter))
       }
       settings.network.addedMaxDelay match {
