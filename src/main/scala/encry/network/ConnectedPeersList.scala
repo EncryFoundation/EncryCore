@@ -22,7 +22,7 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
       InitialPriority(),
       peer,
       Outgoing,
-      LastUptime()
+      LastUptime(0)
     )
     peers = peers.updated(peer.socketAddress.getAddress, peerInfo)
   }
@@ -61,9 +61,10 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
   def containsOlderPeer: Boolean = peers.exists(p => p._2.historyComparisonResult == Older)
 
   def getPeersForSyncInfo: Seq[ConnectedPeer] = peers
-    .filter(p =>
-      p._2.lastUptime.time + settings.network.syncInterval._1 > System.currentTimeMillis() &&
-        (p._2.historyComparisonResult == Older || p._2.historyComparisonResult == Unknown))
+    .filter { p =>
+      logger.info(s"GetPeersForSyncInfo: ${p._2.lastUptime.time + settings.network.syncInterval._1} > ${System.currentTimeMillis()}")
+      (System.currentTimeMillis() - p._2.lastUptime.time) > settings.network.syncInterval._1
+    }
     .map { p =>
       updateUptime(p._1)
       p._2.connectedPeer
@@ -71,7 +72,7 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
 
   def updateUptime(peer: InetAddress): Unit = peers.get(peer) match {
     case Some(info) =>
-      val newInfo: PeerInfo = info.copy(lastUptime = LastUptime())
+      val newInfo: PeerInfo = info.copy(lastUptime = LastUptime(System.currentTimeMillis()))
       peers = peers.updated(peer, newInfo)
     case None => //todo do we have such case?
   }
@@ -82,7 +83,7 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
 
 object ConnectedPeersList {
 
-  final case class LastUptime(time: Long = System.currentTimeMillis()) extends AnyVal
+  final case class LastUptime(time: Long) extends AnyVal
 
   final case class PeerInfo(historyComparisonResult: HistoryComparisonResult,
                             peerPriorityStatus: PeersPriorityStatus,

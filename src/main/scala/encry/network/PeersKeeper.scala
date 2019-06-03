@@ -64,8 +64,9 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
           peer.handlerRef ! message
         }
       case SendLocalSyncInfo =>
-        logger.info(s"Time to send sync info from PK!")
-        nodeViewSynchronizer ! PeersForSyncInfo(connectedPeers.getPeersForSyncInfo)
+        val peersForConnect: Seq[ConnectedPeer] = connectedPeers.getPeersForSyncInfo
+        logger.info(s"Time to send sync info from PK! Current peers are: ${peersForConnect.mkString(",")}")
+        if (peersForConnect.nonEmpty) nodeViewSynchronizer ! PeersForSyncInfo(peersForConnect)
       case GetConnectedPeers => sender() ! connectedPeers.getAllConnectedPeers
       case GetInfoAboutConnectedPeers => sender() ! connectedPeers.getPeers
       case PeerFromCli(peer) =>

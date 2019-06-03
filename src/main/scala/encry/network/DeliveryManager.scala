@@ -205,7 +205,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
     */
   def sendSync(syncInfo: SyncInfo, isBlockChainSynced: Boolean, peers: Seq[ConnectedPeer]): Unit =
     if (isBlockChainSynced) peers.foreach(peer => peer.handlerRef ! SyncInfoNetworkMessage(syncInfo))
-    else Random.shuffle(peers).headOption.foreach(peer => peer.handlerRef ! SyncInfoNetworkMessage(syncInfo))
+    else Random.shuffle(peers).headOption.foreach { peer =>
+      logger.info(s"Sending syncInfo message from DM to $peer.")
+      peer.handlerRef ! SyncInfoNetworkMessage(syncInfo)
+    }
 
   /**
     * Send request to 'peer' with modifiers ids of type 'modifierTypeId'.
