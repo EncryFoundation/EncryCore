@@ -56,7 +56,7 @@ final class PrioritiesCalculator(settings: EncryAppSettings) extends StrictLoggi
 
 object PrioritiesCalculator {
 
-  final case class AccumulatedPeersStatistic(statistic: Map[InetAddress, PeersPriorityStatus]) extends AnyVal
+  final case class AccumulatedPeersStatistic(statistic: Map[InetAddress, PeersPriorityStatus])
 
   object PeersPriorityStatus {
 

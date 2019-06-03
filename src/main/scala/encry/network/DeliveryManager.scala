@@ -500,7 +500,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
 object DeliveryManager {
 
-  final case object CheckModifiersToDownload
+  case object CheckModifiersToDownload
 
   case object FullBlockChainIsSynced
 

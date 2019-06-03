@@ -186,7 +186,7 @@ object NodeViewSynchronizer {
 
   object ReceivableMessages {
 
-    final case object SendLocalSyncInfo
+    case object SendLocalSyncInfo
 
     final case class OtherNodeSyncingStatus(remote: ConnectedPeer,
                                             status: encry.consensus.History.HistoryComparisonResult,

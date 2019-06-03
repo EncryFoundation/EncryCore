@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
-
 import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList.{BanReason, SentPeersMessageWithoutRequest}
@@ -17,7 +16,6 @@ import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import org.encryfoundation.common.network.BasicMessagesRepo._
-
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -182,35 +180,34 @@ object PeersKeeper {
                                           remoteConnection: ActorRef,
                                           ct: ConnectionType)
 
-  final case class OutgoingConnectionFailed(peer: InetSocketAddress) extends AnyVal
+  final case class OutgoingConnectionFailed(peer: InetSocketAddress)
 
-  final case class StableConnectionSetup(peer: ConnectedPeer) extends AnyVal
+  final case class StableConnectionSetup(peer: ConnectedPeer)
 
-  final case class ConnectionStopped(peer: InetSocketAddress) extends AnyVal
+  final case class ConnectionStopped(peer: InetSocketAddress)
 
-  final case object RequestPeerForConnection
+  case object RequestPeerForConnection
 
-  final case class PeerForConnection(peer: InetSocketAddress) extends AnyVal
+  final case class PeerForConnection(peer: InetSocketAddress)
 
   final case class SendToNetwork(message: NetworkMessage,
                                  sendingStrategy: SendingStrategy)
 
-  final case class PeersForSyncInfo(peers: Seq[ConnectedPeer]) extends AnyVal
+  final case class PeersForSyncInfo(peers: Seq[ConnectedPeer])
 
-  final case class UpdatedPeersCollection(peers: Map[InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)]
-                                         ) extends AnyVal
+  final case class UpdatedPeersCollection(peers: Map[InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)])
 
-  final case object AwaitingOlderPeer
+  case object AwaitingOlderPeer
 
   final case class BanPeer(peer: ConnectedPeer, reason: BanReason)
 
-  sealed trait ApiResponse
 
-  final case object GetConnectedPeers extends ApiResponse
 
-  final case object GetKnownPeers extends ApiResponse
+  case object GetConnectedPeers
 
-  final case object GetInfoAboutConnectedPeers extends ApiResponse
+  case object GetKnownPeers
+
+  case object GetInfoAboutConnectedPeers
 
   def props(settings: EncryAppSettings): Props = Props(new PeersKeeper(settings))
 }
