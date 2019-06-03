@@ -17,28 +17,28 @@ final class PrioritiesCalculator(settings: EncryAppSettings) extends StrictLoggi
   def incrementRequest(peer: InetAddress): Unit = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newRequested: Requested = Requested(requested.increment)
-    logger.info(s"Updating request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
+    logger.debug(s"Updating request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
     peersNetworkStatistic = peersNetworkStatistic.updated(peer, (newRequested, received))
   }
 
   def incrementReceive(peer: InetAddress): Unit = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newReceived: Received = Received(received.increment)
-    logger.info(s"Updating received parameter from $peer. Old is ($requested, $received). New one is: ($requested, $newReceived)")
+    logger.debug(s"Updating received parameter from $peer. Old is ($requested, $received). New one is: ($requested, $newReceived)")
     peersNetworkStatistic = peersNetworkStatistic.updated(peer, (requested, newReceived))
   }
 
   def decrementRequest(peer: InetAddress): Unit = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newRequested: Requested = Requested(requested.decrement)
-    logger.info(s"Decrement request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
+    logger.debug(s"Decrement request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
     peersNetworkStatistic = peersNetworkStatistic.updated(peer, (newRequested, received))
   }
 
   def incrementRequestForNModifiers(peer: InetAddress, modifiersQty: Int): Unit = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newRequested: Requested = Requested(requested.increment(modifiersQty))
-    logger.info(s"Updating request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
+    logger.debug(s"Updating request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
     peersNetworkStatistic = peersNetworkStatistic.updated(peer, (newRequested, received))
   }
 
@@ -49,6 +49,7 @@ final class PrioritiesCalculator(settings: EncryAppSettings) extends StrictLoggi
         peer -> priority
     }
     peersNetworkStatistic = Map.empty[InetAddress, (Requested, Received)]
+    logger.info(s"Accumulated peers statistic. Current stats are: ${updatedStatistic.mkString(",")}")
     updatedStatistic
   }
 }
