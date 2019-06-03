@@ -93,7 +93,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
   override def applyModifier(mod: PersistentModifier): Try[UtxoState] = mod match {
     //here
     case block: Block =>
-      logger.debug(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)}!")
+      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)}!")
       val startTime = System.currentTimeMillis()
       logger.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height.")

@@ -7,8 +7,7 @@ import encry.settings.NodeSettings
 import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
-import encry.storage.VersionalStorage.StorageKey
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbKey
+import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
 import org.encryfoundation.common.network.SyncInfo
@@ -36,7 +35,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     * Complete block of the best chain with transactions.
     * Always None for an SPV mode, Some(fullBLock) for fullnode regime after initial bootstrap.
     */
-  def bestBlockOpt: Option[Block] = bestBlockIdOpt.flatMap(id => typedModifierById[Header](id)).flatMap(getBlock)
+  def bestBlockOpt: Option[Block] =
+    bestBlockIdOpt.flatMap(id => blocksCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id).flatMap(getBlock)))
 
   /** @return ids of count headers starting from offset */
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
@@ -76,8 +76,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     if (isEmpty) info.startingPoints
     else if (info.lastHeaderIds.isEmpty) {
       val heightFrom: Int = Math.min(bestHeaderHeight, size - 1)
-      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
-      val startHeader: Header = typedModifierById[Header](startId).get
+      val startId: ModifierId = headersCacheIndexes.getOrElse(heightFrom, headerIdsAtHeight(heightFrom)).head
+      val startHeader: Header = headersCache.get(ByteArrayWrapper(startId)).orElse(typedModifierById[Header](startId)).get
       val headers: HeaderChain = headerChainBack(size, startHeader, _ => false)
         .ensuring(_.headers.exists(_.height == TestNetConstants.GenesisHeight),
           "Should always contain genesis header.")
@@ -87,8 +87,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
       val lastHeaderInOurBestChain: ModifierId = ids.view.reverse.find(m => isInBestChain(m)).get
       val theirHeight: Height = heightOf(lastHeaderInOurBestChain).get
       val heightFrom: Int = Math.min(bestHeaderHeight, theirHeight + size)
-      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
-      val startHeader: Header = typedModifierById[Header](startId).get
+      val startId: ModifierId = headersCacheIndexes.getOrElse(heightFrom, headerIdsAtHeight(heightFrom)).head
+      val startHeader: Header = headersCache.get(ByteArrayWrapper(startId)).orElse(typedModifierById[Header](startId)).get
       headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
         .headers.map(h => Header.modifierTypeId -> h.id)
     }
@@ -100,8 +100,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     @tailrec
     def loop(currentHeight: Int, acc: Seq[Seq[Header]]): Seq[Seq[Header]] = {
       val nextLevelHeaders: Seq[Header] = Seq(currentHeight)
-        .flatMap { h => headerIdsAtHeight(h + 1) }
-        .flatMap { id => typedModifierById[Header](id) }
+        .flatMap { h => headersCacheIndexes.getOrElse(h + 1, headerIdsAtHeight(h + 1))}
+        .flatMap { id => headersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)) }
         .filter(filterCond)
       if (nextLevelHeaders.isEmpty) acc.map(_.reverse)
       else {
@@ -136,11 +136,12 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   }
 
   def getBlock(header: Header): Option[Block] =
+    blocksCache.get(ByteArrayWrapper(header.id)).orElse(
     (typedModifierById[Payload](header.payloadId), typedModifierById[ADProofs](header.adProofsId)) match {
       case (Some(txs), Some(proofs)) => Some(Block(header, txs, Some(proofs)))
       case (Some(txs), None) if !nodeSettings.stateMode.isDigest => Some(Block(header, txs, None))
       case _ => None
-    }
+    })
 
   /**
     * Return headers, required to apply to reach header2 if you are at header1 position.

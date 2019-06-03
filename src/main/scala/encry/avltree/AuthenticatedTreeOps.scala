@@ -126,8 +126,11 @@ trait AuthenticatedTreeOps[D <: Digest] extends StrictLogging {
               (r, false, false, false, None)
           }
         case r: InternalEncryNode[D] =>
+          //logger.info("Root node is internal")
           if (nextDirectionIsLeft(key, r)) {
+            //logger.info(s"Previous left was: ${r.left.labelOpt} and it was visited: ${r.left.visited}")
             val (newLeftM, changeHappened, childHeightIncreased, toDelete, oldValue) = modifyHelper(r.left, key, operation)
+            //logger.info(s"New left was: ${newLeftM.labelOpt} and it was visited: ${newLeftM.visited}")
             onNodeVisit(r, operation)
             if (changeHappened) {
               if (childHeightIncreased && r.balance < 0) {
@@ -143,7 +146,9 @@ trait AuthenticatedTreeOps[D <: Digest] extends StrictLogging {
               }
             } else (r, false, false, toDelete, oldValue)
           } else {
+            //logger.info(s"Previous right was: ${r.right.labelOpt} and it was visited: ${r.right.visited}")
             val (newRightM, changeHappened, childHeightIncreased, toDelete, oldValue) = modifyHelper(r.right, key, operation)
+            //logger.info(s"New right was: ${newRightM.labelOpt} and it was visited: ${newRightM.visited}")
             onNodeVisit(r, operation)
             if (changeHappened) {
               if (childHeightIncreased && r.balance > 0) {

@@ -280,10 +280,10 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
     def stringTreeHelper(rNode: EncryProverNodes[D], depth: Int): String = {
       Seq.fill(depth + 2)(" ").mkString + (rNode match {
         case leaf: ProverLeaf[D] =>
-          "At leaf label = " + arrayToString(leaf.label) + " key = " + arrayToString(leaf.key) +
+          "At leaf label = " + leaf.labelOpt.map(arrayToString) + " key = " + arrayToString(leaf.key) +
             " nextLeafKey = " + arrayToString(leaf.nextLeafKey) + "\n"
         case r: InternalProverEncryNode[D] =>
-          "Internal node label = " + arrayToString(r.label) + " key = " + arrayToString(r.key) + " balance = " +
+          "Internal node label = " + r.labelOpt.map(arrayToString) + " key = " + arrayToString(r.key) + " balance = " +
             r.balance + "\n" + stringTreeHelper(r.left, depth + 1) +
             stringTreeHelper(r.right, depth + 1)
       })

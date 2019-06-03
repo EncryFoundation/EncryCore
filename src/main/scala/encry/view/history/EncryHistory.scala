@@ -69,8 +69,10 @@ trait EncryHistory extends EncryHistoryReader {
   protected def correspondingHeader(modifier: PersistentModifier): Option[Header] = modifier match {
     case header: Header => Some(header)
     case block: Block => Some(block.header)
-    case proof: ADProofs => typedModifierById[Header](proof.headerId)
-    case payload: Payload => typedModifierById[Header](payload.headerId)
+    case proof: ADProofs =>
+      headersCache.get(ByteArrayWrapper(proof.headerId)).orElse(typedModifierById[Header](proof.headerId))
+    case payload: Payload =>
+      headersCache.get(ByteArrayWrapper(payload.headerId)).orElse(typedModifierById[Header](payload.headerId))
     case _ => None
   }
 

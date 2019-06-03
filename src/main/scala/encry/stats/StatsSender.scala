@@ -135,10 +135,18 @@ class StatsSender extends Actor with StrictLogging {
           modifiersToDownload = modifiersToDownload - Algos.encode(downloadedModifierId)
         }
       )
-    case NewBlockAppended(isHeader, success) if nodeName.exists(_.isDigit) =>
+    case ModifierAppendedToHistory(isHeader, success) if nodeName.exists(_.isDigit) =>
       val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
-      influxDB.write(InfluxPort,s"""newBlockAppended,success=$success,isHeader=$isHeader,nodeName=$nodeName value=$nodeNumber""")
-    case NewBlockAppended(_, _) =>
+      influxDB.write(
+        InfluxPort,
+        s"""modifierAppendedToHistory,success=$success,isHeader=$isHeader,nodeName=$nodeName value=$nodeNumber"""
+      )
+    case ModifierAppendedToState(success) if nodeName.exists(_.isDigit) =>
+      val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
+      influxDB.write(
+        InfluxPort,
+        s"""modifierAppendedToState,success=$success,nodeName=$nodeName value=$nodeNumber"""
+      )
     case TimestampDifference(diff) => influxDB.write(InfluxPort,s"""tsDiff,nodeName=$nodeName value=$diff""")
   }
 }
@@ -181,7 +189,9 @@ object StatsSender {
 
   case class WorkedTime(time: Long, size: Int)
 
-  case class NewBlockAppended(isHeader: Boolean, success: Boolean)
+  case class ModifierAppendedToHistory(isHeader: Boolean, success: Boolean)
+
+  case class ModifierAppendedToState(success: Boolean)
 
   case class CurrentUtxosQtyInIOdb(utxosQty: Int)
 
