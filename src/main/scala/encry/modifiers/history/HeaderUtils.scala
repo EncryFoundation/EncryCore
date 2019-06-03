@@ -15,8 +15,6 @@ object HeaderUtils {
     .demand(header.stateRoot.size == TestConstants.StateRootSize, "StateRoot's size should be 33 bytes")
     .demand(header.adProofsRoot.size == TestConstants.AdProofsRootSize, "AdProofsRoot's size should be 32 bytes")
     .demand(header.transactionsRoot.size == TestConstants.TransactionsRootSize, "TransactionsRoot's size should be 32 bytes")
-    .demand(header.timestamp < System.currentTimeMillis(), "Header shouldn't be from the future")
-    .demand(headerBytesSize(header) <= TestConstants.HeaderMaxSize, "Header's byte size should be less than 322 bytes")
     .result
 
   def semanticValidity(header: Header): ValidationResult = ModifierValidator.accumulateErrors
