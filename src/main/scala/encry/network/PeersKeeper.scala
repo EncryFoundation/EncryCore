@@ -23,8 +23,6 @@ import scala.util.Random
 
 class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
 
-  //todo add check for self peer
-
   import context.dispatcher
 
   var availablePeers: Map[InetAddress, InetSocketAddress] = settings.network.knownPeers.map(p => p.getAddress -> p).toMap
@@ -141,7 +139,7 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
     case DataFromPeer(message, remote) => message match {
       case PeersNetworkMessage(peers) if !connectWithOnlyKnownPeers =>
         peers.filterNot(p =>
-          blackList.contains(p.getAddress) && connectedPeers.contains(p.getAddress) && !isLocal(p)).foreach { p =>
+          blackList.contains(p.getAddress) || connectedPeers.contains(p.getAddress) || !isLocal(p)).foreach { p =>
           logger.info(s"Found new peer: $p. Adding it to the available peers collection.")
           availablePeers = availablePeers.updated(p.getAddress, p)
         }
