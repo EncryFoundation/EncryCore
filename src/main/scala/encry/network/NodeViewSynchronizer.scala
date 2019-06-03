@@ -57,6 +57,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       SyncInfoNetworkMessage.NetworkMessageTypeID -> "SyncInfoNetworkMessage"
     )
     networkControllerRef ! RegisterMessagesHandler(messageIds, self)
+    logger.info(s"NVSH sent register messages")
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
     nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false)

@@ -481,7 +481,7 @@ object NodeViewHolder {
 
   }
 
-  class EncryNodeViewHolderPriorityQueue(settings: ActorSystem.Settings, config: Config)
+  class NodeViewHolderPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
         case CompareViews(_, _, _) => 0

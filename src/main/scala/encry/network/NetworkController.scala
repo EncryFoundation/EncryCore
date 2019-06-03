@@ -1,14 +1,12 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
-
 import akka.actor._
 import akka.actor.SupervisorStrategy.Restart
 import akka.io.{IO, Tcp}
 import akka.io.Tcp._
 import akka.io.Tcp.SO.KeepAlive
 import com.typesafe.scalalogging.StrictLogging
-import encry.cli.commands.AddPeer.PeerFromCli
 import encry.network.BlackList.InvalidNetworkMessage
 import encry.network.NetworkController.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
@@ -16,7 +14,6 @@ import encry.network.PeerConnectionHandler.ReceivableMessages.StartInteraction
 import encry.network.PeersKeeper._
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
-
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
@@ -61,7 +58,7 @@ class NetworkController(settings: EncryAppSettings, peersKeeper: ActorRef) exten
   def bindingLogic: Receive = {
     case Bound(address) =>
       logger.info(s"Successfully bound to the port ${address.getPort}.")
-      context.system.scheduler.schedule(600.millis, 5.second)(peersKeeper ! RequestPeerForConnection)
+      context.system.scheduler.schedule(2.seconds, 5.second)(peersKeeper ! RequestPeerForConnection)
     case CommandFailed(add: Bind) =>
       logger.info(s"Node can't be bind to the address: ${add.localAddress}.")
       context.stop(self)
