@@ -193,6 +193,9 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         splitValue2elems(DEFAULT_USER_KEY_SIZE, db.get(versionKey(versionToResolve))).map(VersionalLevelDbKey @@ _)
       insertionsByThisVersion.foreach { elemKey =>
         val elemInfo = db.get(userKey(elemKey))
+        if (elemInfo == null) {
+          logger.info(s"NULL at key: ${Algos.encode(elemKey)}")
+        }
         val elemFlag = elemInfo.head
         val elemMap = elemInfo.drop(1)
         val elemVersions = splitValue2elems(settings.versionKeySize, elemMap).map(ByteArrayWrapper.apply)
