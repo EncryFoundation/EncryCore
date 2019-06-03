@@ -106,7 +106,7 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
       if (notConnectedYet && notBannedPeer) {
         logger.info(s"Peer: $remote is available to setup stable connect with it. Sending approvement for connection.")
         (if (outgoingConnections.contains(remote.getAddress)) Outgoing else Incoming) match {
-          case _@Incoming if connectWithOnlyKnownPeers =>
+          case _@Incoming if connectWithOnlyKnownPeers || isLocal(remote) =>
             logger.info(s"Got incoming connection but we can connect only with known peers.")
           case in@Incoming =>
             logger.info(s"Got new incoming connection. Sending to network controller approvement for connect.")
@@ -140,7 +140,8 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
   def networkMessagesProcessingLogic: Receive = {
     case DataFromPeer(message, remote) => message match {
       case PeersNetworkMessage(peers) if !connectWithOnlyKnownPeers =>
-        peers.filterNot(p => blackList.contains(p.getAddress) && connectedPeers.contains(p.getAddress)).foreach { p =>
+        peers.filterNot(p =>
+          blackList.contains(p.getAddress) && connectedPeers.contains(p.getAddress) && !isLocal(p)).foreach { p =>
           logger.info(s"Found new peer: $p. Adding it to the available peers collection.")
           availablePeers = availablePeers.updated(p.getAddress, p)
         }
@@ -166,6 +167,10 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
       blackList.banPeer(reason, peer.socketAddress.getAddress)
       peer.handlerRef ! CloseConnection
   }
+
+  def isLocal(address: InetSocketAddress): Boolean = address == settings.network.bindAddress ||
+    InetAddress.getLocalHost.getAddress.sameElements(address.getAddress.getAddress) ||
+    InetAddress.getLoopbackAddress.getAddress.sameElements(address.getAddress.getAddress)
 
 }
 
