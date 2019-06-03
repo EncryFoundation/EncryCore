@@ -82,7 +82,7 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
   def setupConnectionsLogic: Receive = {
     case RequestPeerForConnection if connectedPeers.size < settings.network.maxConnections =>
       logger.info(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
-        s"so peer keeper allows to add one more connect.")
+        s"so peer keeper allows to add one more connect. Current avalible is: ${availablePeers.mkString(",")}.")
       Random.shuffle(availablePeers).headOption.foreach { case (address, peer) =>
         logger.info(s"Selected peer: $peer. Sending 'PeerForConnection' message to network controller. " +
           s"Adding new outgoing connection to outgoingConnections collection. Current collection is: " +
@@ -125,7 +125,10 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
     case ConnectionStopped(peer) =>
       logger.info(s"Connection stopped for: $peer.")
       connectedPeers.removePeer(peer.getAddress)
-      if (!blackList.contains(peer.getAddress)) availablePeers += peer.getAddress -> peer
+      if (!blackList.contains(peer.getAddress)) {
+        availablePeers += peer.getAddress -> peer
+        logger.info(s"New available peer added to availablePeers. Current is: ${availablePeers.mkString(",")}.")
+      }
 
     case OutgoingConnectionFailed(peer) =>
       logger.info(s"Connection failed for: $peer.")
