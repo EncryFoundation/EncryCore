@@ -90,6 +90,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         //if not, we should find last full block from best chain, and start processing all blocks after that
         else {
           val lastFullBlock = lastBestBlockRelevantToBestChain(fb.header.height)
+          logger.info(s"Last full block in best chain is block: ${lastFullBlock.map(block => Algos.encode(block.id))}")
           lastFullBlock.map(block => continuation(Height @@ (block.header.height + 1), Seq.empty))
             .getOrElse(continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty))
         }
