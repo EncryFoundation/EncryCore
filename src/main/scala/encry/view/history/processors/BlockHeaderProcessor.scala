@@ -79,7 +79,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         }
       }
 
-    logger.debug(s"BEST BLOCK OPT ${bestBlockOpt.map(x => Algos.encode(x.id))}")
+    logger.info(s"BEST BLOCK OPT ${bestBlockOpt.map(x => Algos.encode(x.id))}")
     bestBlockOpt match {
       case _ if !isHeadersChainSynced =>
         Seq.empty
