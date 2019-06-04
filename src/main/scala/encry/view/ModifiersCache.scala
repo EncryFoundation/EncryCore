@@ -119,6 +119,7 @@ object ModifiersCache extends StrictLogging {
         case Some(value) =>
           headersCollection = headersCollection - (history.bestHeaderHeight + 1)
           logger.info(s"HeadersCollection size is: ${headersCollection.size}")
+          logger.info(s"Drop height ${history.bestHeaderHeight + 1} in HeadersCollection")
           value.map(cache.get(_)).collect {
             case Some(v: Header)
               if (
