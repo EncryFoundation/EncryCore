@@ -106,7 +106,7 @@ object ModifiersCache extends StrictLogging {
     }).collect { case Some(v) => v._1 }
 
     @tailrec
-    def applicableBestPayloadChain(atHeight: Int = history.bestBlockHeight + 1, prevKeys: List[Key] = List.empty[Key]): List[Key] = {
+    def applicableBestPayloadChain(atHeight: Int = history.bestBlockHeight, prevKeys: List[Key] = List.empty[Key]): List[Key] = {
       val payloads = findApplicablePayloadAtHeight(atHeight)
       if (payloads.nonEmpty) applicableBestPayloadChain(atHeight + 1, prevKeys ++ payloads)
       else prevKeys
