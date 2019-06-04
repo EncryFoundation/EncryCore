@@ -38,6 +38,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   protected val historyStorage: HistoryStorage
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node)
   private var isHeadersChainSyncedVar: Boolean = false
+  protected def getBlock(h: Header): Option[Block]
 
   /**
     * headersCacheIndexes & headersCache contains headers from (currentBestHeaderHeight - maxRollBackDepth) to
@@ -66,7 +67,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         headerIdsAtHeight(height).headOption
           .flatMap(id => headersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id))) match {
           case Some(bestHeaderAtThisHeight) =>
-            logger.debug(s"requiredModifiersForHeader($bestHeaderAtThisHeight) ->" +
+            logger.info(s"requiredModifiersForHeader($bestHeaderAtThisHeight) ->" +
               s"${requiredModifiersForHeader(bestHeaderAtThisHeight).map(x => Algos.encode(x._2))}")
             val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
 
@@ -84,11 +85,28 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       case _ if !isHeadersChainSynced =>
         Seq.empty
       case Some(fb) =>
-        continuation(Height @@ (fb.header.height + 1), Seq.empty)
+        //if best block in best chain, just process all blocks after that
+        if (isInBestChain(fb.header)) continuation(Height @@ (fb.header.height + 1), Seq.empty)
+        //if not, we should find last full block from best chain, and start processing all blocks after that
+        else {
+          val lastFullBlock = lastBestBlockRelevantToBestChain(fb.header.height)
+          lastFullBlock.map(block => continuation(Height @@ (block.header.height + 1), Seq.empty))
+            .getOrElse(continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty))
+        }
       case None =>
         continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
+
+  def lastBestBlockRelevantToBestChain(atHeight: Int): Option[Block] = {
+    val blocksAtHeight: Option[Block] = for {
+      headerId <- bestHeaderIdAtHeight(atHeight)
+      header <- typedModifierById[Header](headerId)
+      block <- getBlock(header)
+    } yield block
+    blocksAtHeight.orElse(lastBestBlockRelevantToBestChain(atHeight - 1))
+  }
+
 
   def modifiersToDownloadForNVH(howMany: Int): Seq[(ModifierTypeId, ModifierId)] = {
     @tailrec
