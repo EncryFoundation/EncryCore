@@ -120,18 +120,17 @@ object ModifiersCache extends StrictLogging {
           headersCollection = headersCollection - (history.bestHeaderHeight + 1)
           logger.info(s"HeadersCollection size is: ${headersCollection.size}")
           logger.info(s"Drop height ${history.bestHeaderHeight + 1} in HeadersCollection")
-          value.map(cache.get(_)).collect {
+          val res = value.map(cache.get(_)).collect {
             case Some(v: Header)
-              if (
-                (v.parentId sameElements history.bestHeaderOpt.map(_.id).getOrElse(Array.emptyByteArray)) ||
+              if ((v.parentId sameElements history.bestHeaderOpt.map(_.id).getOrElse(Array.emptyByteArray)) ||
                   (history.bestHeaderHeight == TestNetConstants.PreGenesisHeight &&
                     (v.parentId sameElements Header.GenesisParentId)
-                    ) || history.modifierById(v.parentId).nonEmpty
-                )
-                && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
+                    ) || history.modifierById(v.parentId).nonEmpty) && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
               logger.info(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
               new mutable.WrappedArray.ofByte(v.id)
           }
+          value.map(id => new mutable.WrappedArray.ofByte(id)).filter(res.contains).foreach(cache.remove)
+          res
         case None =>
           logger.info(s"No header in cache at height ${history.bestHeaderHeight + 1}. " +
             s"Trying to find in range [${history.bestHeaderHeight - TestNetConstants.MaxRollbackDepth}, ${history.bestHeaderHeight}]")
