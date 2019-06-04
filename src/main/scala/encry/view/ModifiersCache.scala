@@ -129,7 +129,7 @@ object ModifiersCache extends StrictLogging {
               logger.info(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
               new mutable.WrappedArray.ofByte(v.id)
           }
-          value.map(id => new mutable.WrappedArray.ofByte(id)).filter(res.contains).foreach(cache.remove)
+          value.map(id => new mutable.WrappedArray.ofByte(id)).filterNot(res.contains).foreach(cache.remove)
           res
         case None =>
           logger.info(s"No header in cache at height ${history.bestHeaderHeight + 1}. " +
