@@ -288,13 +288,14 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       try {
         batch.put(CURRENT_VERSION_KEY, rollbackPoint)
         val allVerWrapped = versionsList.map(ver => new ByteArrayWrapper(ver))
-        val versionsBeforeRollback = allVerWrapped
+        val versionUnwrapped = allVerWrapped
           .dropWhile(_ != new ByteArrayWrapper(rollbackPoint))
-          .foldLeft(Array.emptyByteArray) {
+        val versionsBeforeRollback = versionUnwrapped.foldLeft(Array.emptyByteArray) {
             case (acc, ver) => acc ++ ver.data
           }
         val verToDelete = allVerWrapped.takeWhile(_ != new ByteArrayWrapper(rollbackPoint))
         //Insert new version to versions list
+        versionsList = versionUnwrapped.map(el => LevelDBVersion @@ el.data)
         batch.put(VERSIONS_LIST, versionsBeforeRollback)
         db.write(batch)
         rollbackResolver(verToDelete.map(LevelDBVersion @@ _.data))
