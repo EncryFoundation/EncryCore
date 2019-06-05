@@ -40,9 +40,14 @@ trait TestHelper extends FileHelper {
     VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(keepVersions, keySize), keySize = keySize)
   }
 
-  def createQuickStore(keepVersions: Int = 0): VersionalLevelDB = {
-    val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
-    VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(keepVersions))
+  def createLSMStore(keepVersions: Int = 0): Store = {
+    val dir = getRandomTempDir
+    new LSMStore(dir, keepVersions = keepVersions)
+  }
+
+  def createQuickStore(keepVersions: Int = 0): Store = {
+    val dir = getRandomTempDir
+    new QuickStore(dir, keepVersions = keepVersions)
   }
 
   def createVersionedStorage(store: VersionalLevelDB, settings: EncryAppSettings): STORAGE =
