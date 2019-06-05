@@ -82,9 +82,9 @@ case class SyncTracker(deliveryManager: ActorRef,
       peersNetworkCommunication.updated(peer.socketAddress.getAddress, (requestReceiveStat._1, requestReceiveStat._2 - 1))
   }
 
-  def getPeersForConnection: Vector[(InetAddress, (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer))] =
+  def peersForDownloadRequest: Vector[(InetAddress, (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer))] =
     statuses
-      .filter { case (_, (hcr, _, _)) => hcr != Fork }
+      .filter { case (_, (hcr, _, _)) => hcr != Younger }
       .toVector.sortBy { case (_, (_, pps, _)) => pps }
 
   def scheduleSendSyncInfo(): Unit = {

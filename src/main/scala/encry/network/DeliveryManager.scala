@@ -385,8 +385,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       isMining: Boolean): Unit =
     if (!isBlockChainSynced) {
       logger.info(s"Function - request modifiers. syncTracker's peerCollection is: ${syncTracker.statuses}")
-      logger.info(s"Function - request modifiers. syncTracker's getPeersForConnection is: ${syncTracker.getPeersForConnection}")
-      val (withBadNodes, withoutBadNodes) = syncTracker.getPeersForConnection.partition {
+      logger.info(s"Function - request modifiers. syncTracker's getPeersForConnection is: ${syncTracker.peersForDownloadRequest}")
+      val (withBadNodes, withoutBadNodes) = syncTracker.peersForDownloadRequest.partition {
         case (_, (_, priority, _)) => priority == SyncTracker.PeerPriorityStatus.BadNode
       }
       val resultedPeerCollection: Vector[(InetAddress, (HistoryComparisonResult, PeerPriorityStatus, ConnectedPeer))] =
@@ -402,7 +402,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         requestModifies(history, cP, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
       } else logger.info(s"BlockChain is not synced. There is no nodes, which we can connect with.")
     }
-    else syncTracker.getPeersForConnection match {
+    else syncTracker.peersForDownloadRequest match {
       case coll: Vector[_] if coll.nonEmpty =>
         influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
         coll.foreach { case (_, (_, _, cP)) =>
